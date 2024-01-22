@@ -79,6 +79,43 @@ const deleteUserById = async (userId) => {
   return user;
 };
 
+/**
+ * Assign a caregiver to a user
+ * @param {ObjectId} userId
+ * @param {ObjectId} caregiverId
+ * @returns {Promise<User>}
+ */
+const assignCaregiver = async (userId, caregiverId) => {
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  const caregiver = await getUserById(caregiverId);
+  if (!caregiver || caregiver.role !== 'caregiver') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
+  }
+
+  user.caregiver = caregiverId;
+  await user.save();
+  return user;
+};
+
+/**
+ * Get clients for a caregiver
+ * @param {ObjectId} caregiverId
+ * @returns {Promise<Array<User>>}
+ */
+const getClientsForCaregiver = async (caregiverId) => {
+  const caregiver = await getUserById(caregiverId);
+  if (!caregiver || caregiver.role !== 'caregiver') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
+  }
+
+  const clients = await User.find({ caregiver: caregiverId });
+  return clients;
+};
+
 module.exports = {
   createUser,
   queryUsers,
@@ -86,4 +123,6 @@ module.exports = {
   getUserByEmail,
   updateUserById,
   deleteUserById,
+  assignCaregiver,
+  getClientsForCaregiver,
 };

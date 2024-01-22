@@ -1,5 +1,9 @@
 const express = require('express');
 const authRoute = require('./auth.route');
+const callRoute = require('./call.route');
+const conversationRoute = require('./conversation.route');
+const reportRoute = require('./report.route');
+const scheduleRoute = require('./schedule.route');
 const userRoute = require('./user.route');
 const docsRoute = require('./docs.route');
 const config = require('../../config/config');
@@ -10,6 +14,22 @@ const defaultRoutes = [
   {
     path: '/auth',
     route: authRoute,
+  },
+  {
+    path: '/calls',
+    route: callRoute,
+  },
+  {
+    path: '/conversations',
+    route: conversationRoute,
+  },
+  {
+    path: '/reports',
+    route: reportRoute,
+  },
+  {
+    path: '/schedules',
+    route: scheduleRoute,
   },
   {
     path: '/users',
