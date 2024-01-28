@@ -22,6 +22,10 @@ describe('User routes', () => {
       };
     });
 
+    afterEach(async () => {
+      await User.deleteMany();
+    });
+
     test('should return 201 and successfully create new user if data is ok', async () => {
       await insertUsers([admin]);
 
@@ -141,6 +145,10 @@ describe('User routes', () => {
   });
 
   describe('GET /v1/users', () => {
+    afterEach(async () => {
+      await User.deleteMany();
+    });
+
     test('should return 200 and apply the default query options', async () => {
       await insertUsers([userOne, userTwo, admin]);
 
@@ -351,6 +359,10 @@ describe('User routes', () => {
   });
 
   describe('GET /v1/users/:userId', () => {
+    afterEach(async () => {
+      await User.deleteMany();
+    });
+    
     test('should return 200 and the user object if data is ok', async () => {
       await insertUsers([userOne]);
 

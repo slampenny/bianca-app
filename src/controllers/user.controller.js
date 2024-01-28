@@ -34,10 +34,41 @@ const deleteUser = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+const assignCaregiver = catchAsync(async (req, res) => {
+  const { userId, caregiverId } = req.params;
+
+  const user = await userService.getUserById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  const caregiver = await userService.getUserById(caregiverId);
+  if (!caregiver || caregiver.role !== 'caregiver') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
+  }
+
+  const updatedUser = await userService.assignCaregiver(userId, caregiverId);
+  res.status(httpStatus.OK).send(updatedUser);
+});
+
+const getClientsForCaregiver = catchAsync(async (req, res) => {
+  const { caregiverId } = req.params;
+
+  const caregiver = await userService.getUserById(caregiverId);
+  if (!caregiver || caregiver.role !== 'caregiver') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
+  }
+
+  const clients = await userService.getClientsForCaregiver(caregiverId);
+  res.status(httpStatus.OK).send(clients);
+});
+
 module.exports = {
   createUser,
   getUsers,
   getUser,
   updateUser,
   deleteUser,
+  assignCaregiver,
+  getClientsForCaregiver,
 };

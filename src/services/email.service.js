@@ -3,6 +3,13 @@ const config = require('../config/config');
 const logger = require('../config/logger');
 
 const transport = nodemailer.createTransport(config.email.smtp);
+
+process.on('exit', () => {
+  if (transport) {
+    transport.close();
+  }
+});
+
 /* istanbul ignore next */
 if (config.env !== 'test') {
   transport

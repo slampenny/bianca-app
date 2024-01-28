@@ -23,6 +23,11 @@ const envVarsSchema = Joi.object()
     SMTP_USERNAME: Joi.string().description('username for email server'),
     SMTP_PASSWORD: Joi.string().description('password for email server'),
     EMAIL_FROM: Joi.string().description('the from field in the emails sent by the app'),
+    TWILIO_PHONENUMBER: Joi.string().description('twilio phone number'),
+    TWILIO_ACCOUNTSID: Joi.string().description('twilio account sid'),
+    TWILIO_AUTHTOKEN: Joi.string().description('twilio auth token'),
+    TWILIO_VOICEURL:  Joi.string().description('twilio voice url'),
+    OPEN_AI_KEY: Joi.string().description('open ai key'),
   })
   .unknown();
 
@@ -54,11 +59,22 @@ module.exports = {
     smtp: {
       host: envVars.SMTP_HOST,
       port: envVars.SMTP_PORT,
+      secure: false,
+      requireTLS: true,
       auth: {
         user: envVars.SMTP_USERNAME,
         pass: envVars.SMTP_PASSWORD,
       },
     },
     from: envVars.EMAIL_FROM,
+  },
+  twilio: {
+    phoneNumber: envVars.TWILIO_PHONENUMBER,
+    voiceUrl: 'https://bianca-app-backend.herokuapp.com/api/calls/webhook',
+    accountSid: envVars.TWILIO_ACCOUNTSID,
+    authToken: envVars.TWILIO_AUTHTOKEN,
+  },
+  openai: {
+    apiKey: envVars.OPEN_AI_KEY,
   },
 };

@@ -17,6 +17,71 @@ router
   .patch(auth('manageUsers'), validate(userValidation.updateUser), userController.updateUser)
   .delete(auth('manageUsers'), validate(userValidation.deleteUser), userController.deleteUser);
 
+// New route for assigning caregiver to a user
+/**
+ * @swagger
+ * /users/{userId}/caregiver/{caregiverId}:
+ *   post:
+ *     summary: Assign a caregiver to a user
+ *     description: Only admins can assign caregivers.
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *       - in: path
+ *         name: caregiverId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Caregiver ID
+ *     responses:
+ *       "200":
+ *         description: Caregiver assigned
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+  .route('/:userId/caregiver/:caregiverId')
+  .post(auth('manageUsers'), userController.assignCaregiver);
+
+// New route for getting clients of a caregiver
+/**
+ * @swagger
+ * /users/caregiver/{caregiverId}/clients:
+ *   get:
+ *     summary: Get clients for a caregiver
+ *     description: Only admins can retrieve clients for a caregiver.
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: caregiverId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Caregiver ID
+ *     responses:
+ *       "200":
+ *         description: List of clients retrieved
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+  .route('/caregiver/:caregiverId/clients')
+  .get(auth('manageUsers'), userController.getClientsForCaregiver);
+
+
 module.exports = router;
 
 /**

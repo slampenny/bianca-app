@@ -4,12 +4,6 @@ const reportController = require('../../controllers/report.controller');
 
 const router = express.Router();
 
-router
-  .route('/:userId')
-  .get(auth('getReports'), reportController.getReportForUser);
-
-module.exports = router;
-
 /**
  * @swagger
  * tags:
@@ -19,37 +13,32 @@ module.exports = router;
 
 /**
  * @swagger
- * /reports/{userId}:
- *   get:
- *     summary: Get reports for a user
- *     description: Authorized users can retrieve reports for a specific user.
+ * /reports:
+ *   post:
+ *     summary: Generate a report
+ *     description: Only authorized users can generate reports.
  *     tags: [Reports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: Unique user identifier
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - conversationId
+ *             properties:
+ *               conversationId:
+ *                 type: string
  *     responses:
- *       "200":
- *         description: Report data
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 report:
- *                   type: object
- *                   description: Detailed report data
+ *       "201":
+ *         description: Report generated
  *       "400":
  *         $ref: '#/components/responses/BadRequest'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
- *       "404":
- *         $ref: '#/components/responses/NotFound'
  */
+router
+  .route('/')
+  .post(auth('manageReports'), reportController.generateReport);
+
+module.exports = router;

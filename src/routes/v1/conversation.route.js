@@ -1,33 +1,23 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
-const validate = require('../../middlewares/validate');
-const conversationValidation = require('../../validations/conversation.validation');
 const conversationController = require('../../controllers/conversation.controller');
 
 const router = express.Router();
-
-router
-  .route('/analyze')
-  .post(auth('analyzeConversations'), validate(conversationValidation.analyzeConversation), conversationController.analyzeConversation);
-
-module.exports = router;
 
 /**
  * @swagger
  * tags:
  *   name: Conversations
- *   description: Conversation handling and analysis
+ *   description: Conversation handling and storage
  */
 
 /**
  * @swagger
- * /conversations/analyze:
+ * /conversations:
  *   post:
- *     summary: Analyze a conversation
- *     description: Authorized users can analyze conversation data.
+ *     summary: Store a conversation
+ *     description: Only authorized users can store conversations.
  *     tags: [Conversations]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -40,20 +30,18 @@ module.exports = router;
  *             properties:
  *               userId:
  *                 type: string
- *                 description: Unique user identifier
  *               text:
  *                 type: string
- *                 description: Text content of the conversation
- *             example:
- *               userId: "12345"
- *               text: "Conversation content goes here..."
  *     responses:
- *       "200":
- *         description: Analysis complete
+ *       "201":
+ *         description: Conversation stored
  *       "400":
  *         $ref: '#/components/responses/BadRequest'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
  */
+router
+  .route('/')
+  .post(auth('manageConversations'), conversationController.storeConversation);
+
+module.exports = router;

@@ -1,33 +1,23 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
-const validate = require('../../middlewares/validate');
-const callValidation = require('../../validations/call.validation');
-const callController = require('../../controllers/call.controller');
+const conversationController = require('../../controllers/conversation.controller');
 
 const router = express.Router();
-
-router
-  .route('/schedule')
-  .post(auth('manageCalls'), validate(callValidation.scheduleCall), callController.scheduleCall);
-
-module.exports = router;
 
 /**
  * @swagger
  * tags:
- *   name: Calls
- *   description: Call scheduling and management
+ *   name: Conversations
+ *   description: Conversation handling and storage
  */
 
 /**
  * @swagger
- * /calls/schedule:
+ * /conversations:
  *   post:
- *     summary: Schedule a new call
- *     description: Authorized users can schedule calls.
- *     tags: [Calls]
- *     security:
- *       - bearerAuth: []
+ *     summary: Store a conversation
+ *     description: Only authorized users can store conversations.
+ *     tags: [Conversations]
  *     requestBody:
  *       required: true
  *       content:
@@ -36,25 +26,22 @@ module.exports = router;
  *             type: object
  *             required:
  *               - userId
- *               - dateTime
+ *               - text
  *             properties:
  *               userId:
  *                 type: string
- *                 description: Unique user identifier
- *               dateTime:
+ *               text:
  *                 type: string
- *                 format: date-time
- *                 description: Scheduled time for the call
- *             example:
- *               userId: "12345"
- *               dateTime: "2024-01-01T10:00:00Z"
  *     responses:
  *       "201":
- *         description: Call scheduled
+ *         description: Conversation stored
  *       "400":
  *         $ref: '#/components/responses/BadRequest'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
  */
+router
+  .route('/')
+  .post(auth('manageConversations'), conversationController.storeConversation);
+
+module.exports = router;
