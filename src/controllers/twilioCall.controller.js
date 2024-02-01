@@ -14,19 +14,19 @@ const handleIncomingCall = catchAsync(async (req, res) => {
     res.type('text/xml').send(responseTwiML);
 });
 
-const handleRealTimeInteraction = catchAsync(async (req, res) => {
-    const responseTwiML = await twilioCallService.handleRealTimeInteraction(req.body);
+const prepareCallForTranscription = catchAsync(async (req, res) => {
+    const responseTwiML = await twilioCallService.prepareCallForTranscription(req.body);
     res.type('text/xml').send(responseTwiML);
 });
 
-const processCallRecording = catchAsync(async (req, res) => {
-    await twilioCallService.processCallRecording(req.body);
-    res.status(httpStatus.OK).send({ message: 'Call recording processed successfully.' });
+const handleRealTimeInteraction = catchAsync(async (req, res) => {
+    const responseTwiML = await twilioCallService.handleRealTimeInteraction(req.body);
+    res.type('text/xml').send(responseTwiML);
 });
 
 module.exports = {
     initiateCall,
     handleIncomingCall,
     handleRealTimeInteraction,
-    processCallRecording
+    prepareCallForTranscription
 };

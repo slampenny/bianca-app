@@ -70,7 +70,7 @@ module.exports = {
   },
   twilio: {
     phoneNumber: envVars.TWILIO_PHONENUMBER,
-    voiceUrl: 'https://bianca-app-backend.herokuapp.com/api/calls/webhook',
+    voiceUrl: 'http://127.0.0.1:3000/v1/voice-url',
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
   },

@@ -1,5 +1,5 @@
 const express = require('express');
-const validateTwilioRequest = require('../middlewares/validateTwilioRequest');
+const validateTwilioRequest = require('../../middlewares/validateTwilioRequest');
 const twilioCallController = require('../../controllers/twilioCall.controller');
 
 const router = express.Router();
@@ -32,7 +32,7 @@ router.post('/call-handler',
 
 /**
  * @swagger
- * /twilio/process-recording:
+ * /twilio/prepare-call-for-transcription:
  *   post:
  *     summary: Endpoint for Twilio to invoke for call recording processing
  *     description: Receives call recording data from Twilio
@@ -41,9 +41,9 @@ router.post('/call-handler',
  *       "200":
  *         description: Call recording processed successfully
  */
-router.post('/process-recording', 
+router.post('/prepare-call-for-transcription', 
     validateTwilioRequest,
-    twilioCallController.processCallRecording);
+    twilioCallController.prepareCallForTranscription);
 
 // Endpoint for handling real-time interactions during a call
 /**
@@ -63,11 +63,11 @@ twilioCallController.handleRealTimeInteraction);
 
 /**
  * @swagger
- * /calls/initiate:
+ * /twilio/initiate:
  *   post:
  *     summary: Initiate a call to a user
  *     description: Starts a phone call to the specified user using Twilio
- *     tags: [Call]
+ *     tags: [TwilioCalls]
  *     requestBody:
  *       required: true
  *       content:
@@ -97,7 +97,7 @@ twilioCallController.handleRealTimeInteraction);
  *         description: User not found
  */
 router.post('/initiate', validateTwilioRequest,
-twilioCallController.processCallRecording);
+twilioCallController.initiateCall);
 
 
 module.exports = router;

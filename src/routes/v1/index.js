@@ -5,6 +5,7 @@ const conversationRoute = require('./conversation.route');
 const reportRoute = require('./report.route');
 const scheduleRoute = require('./schedule.route');
 const userRoute = require('./user.route');
+const twilioRoute = require('./twilioCall.route');
 const docsRoute = require('./docs.route');
 const config = require('../../config/config');
 
@@ -30,6 +31,10 @@ const defaultRoutes = [
   {
     path: '/schedules',
     route: scheduleRoute,
+  },
+  {
+    path: '/twilio',
+    route: twilioRoute,
   },
   {
     path: '/users',

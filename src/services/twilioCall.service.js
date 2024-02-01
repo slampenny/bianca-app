@@ -1,8 +1,9 @@
 const httpStatus = require('http-status');
 const { VoiceResponse } = require('twilio').twiml;
 const ApiError = require('../utils/ApiError');
-const openAiService = require('./openAi.service');
+const chatService = require('./chat.service');
 const twilio = require('twilio'); // Service for interacting with ChatGPT
+const config = require('../config/config');
 const { Call, User } = require('../models');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
@@ -42,29 +43,42 @@ const initiateCall = async (userId) => {
  * @returns {Promise<String>} - TwiML instructions
  */
 const handleIncomingCall = async (callData) => {
-    const twiml = new VoiceResponse();
+    const twiml = new VoiceResponse({transcribe: true});
 
     // Example: Get a response from ChatGPT based on user's input
-    const response = await openAiService.chatWithGpt(callData.input);
+    const response = await chatService.chatWithGpt(callData.input);
     twiml.say(response);
 
     return twiml.toString();
 };
+
+const prepareCallForTranscription = async (callData) => {
+    const twiml = new VoiceResponse({transcribe: true});
+
+    const gather = twiml.gather({
+        input: 'speech',
+        action: 'http://127.0.0.1:3000/v1/real-time-interaction', // Endpoint to process speech response
+        method: 'POST',
+        speechTimeout: 'auto'
+    });
+    // If the user doesn't speak, continue the call with more instructions
+    twiml.say('No speech detected. Please try again.');
+
+    twiml.toString();
+}
 
 /**
  * Handles real-time conversation during the call
  * @param {String} callSid - The SID of the Twilio call
  * @param {String} userInput - The user's spoken input
  */
-const handleRealTimeInteraction = async (callSid, userInput) => {
-    // Transcribe the user's speech (if not already transcribed)
-    const transcribedText = await openAiService.transcribeSpeech(userInput);
-
+const handleRealTimeInteraction = async (callSid, transcribedText) => {
+    const speechText = req.body.SpeechResult;
     // Get ChatGPT's response
-    const chatGptResponse = await openAiService.chatWithGpt(transcribedText);
+    const chatGptResponse = await chatService.chatWith(transcribedText);
 
     // Convert the text response to speech using a TTS service
-    const speechUrl = await openAiService.textToSpeech(chatGptResponse);
+    const speechUrl = await chatService.textToSpeech(chatGptResponse);
 
     // Use Twilio to play the speech URL in the call
     await twilioClient.calls(callSid)
@@ -74,5 +88,6 @@ const handleRealTimeInteraction = async (callSid, userInput) => {
 module.exports = {
     initiateCall,
     handleIncomingCall,
-    handleRealTimeInteraction
+    handleRealTimeInteraction,
+    prepareCallForTranscription
 };
