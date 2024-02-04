@@ -40,6 +40,8 @@ if (error) {
 module.exports = {
   env: envVars.NODE_ENV,
   port: envVars.PORT,
+  authEnabled: false,
+  apiUrl: (envVars.NODE_ENV === 'development') ? 'http://localhost:3000/v1' : envVars.API_URL,
   mongoose: {
     url: envVars.MONGODB_URL + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {
@@ -70,11 +72,11 @@ module.exports = {
   },
   twilio: {
     phoneNumber: envVars.TWILIO_PHONENUMBER,
-    voiceUrl: 'http://127.0.0.1:3000/v1/voice-url',
+    voiceUrl: 'http://localhost:3000/v1/prepare-call-for-transcription',
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
   },
   openai: {
-    apiKey: envVars.OPEN_AI_KEY,
+    apiKey: envVars.OPENAI_API_KEY,
   },
 };

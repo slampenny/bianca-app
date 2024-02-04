@@ -3,6 +3,8 @@ version: '3'
 services:
   node-app:
     container_name: node-app-dev
-    command: yarn dev -L
+    command: yarn dev --inspect=0.0.0.0:9229
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "9229:9229"

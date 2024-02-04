@@ -18,7 +18,7 @@ async function seedDatabase() {
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
         role: 'user',
-        phone: faker.phone.phoneNumberFormat(1)
+        phone: '+16045624263'//faker.phone.phoneNumberFormat(1)
     });
 
     const user2 = await User.create({
@@ -26,7 +26,7 @@ async function seedDatabase() {
         email: faker.internet.email().toLowerCase(),
         password: 'password2',
         role: 'user',
-        phone: faker.phone.phoneNumberFormat(1)
+        phone: '+16045624263'//faker.phone.phoneNumberFormat(1)
     });
 
     const user3 = await User.create({
@@ -34,7 +34,7 @@ async function seedDatabase() {
         email: 'fake@example.com',
         password: 'password1',
         role: 'admin',
-        phone: faker.phone.phoneNumberFormat(1)
+        phone: '+16045624263'//faker.phone.phoneNumberFormat(1)
     });
 
     console.log('Database seeded!');

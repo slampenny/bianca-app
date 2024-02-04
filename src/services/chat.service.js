@@ -17,38 +17,17 @@ class ChatService {
  * @param {String} role - The role of the sender (default is 'user')
  * @returns {Promise<String>} - The response from ChatGPT
  */
-    async chatWith(userName, userDomain, message, role = 'user') {
+    async chatWith(conversation) {
         console.log(`Backend - Preparing to Send Message: \n${message}`);
         try {
-            let messages = [],
-                openaiResponse,
-                newConversation,
-                userConversationHistory = "";
-
-            // Add the user message to the messages array.
-            messages.push({
-                role: role,
-                content: message,
-            });
+            let messages = conversation.messages,
+                openaiResponse
 
             // Generate a response from OpenAI
             openaiResponse = await openaiAPI.generateResponseFromOpenAI(
                 messages,
-                userName
+                conversation.userId.name
             );
-
-            // Save the conversation to MongoDB
-            const id = uuidv4();
-            newConversation = new Conversation({
-                id: id,
-                username: userName,
-                userdomain: userDomain,
-                message: `${userName} prompt: ${message}`,
-                response: `AI response: ${openaiResponse}`,
-                date: `Date: ${new Date()}`,
-            });
-            await newConversation.save();
-            console.log("Backend - Saved conversation to MongoDB");
 
             return openaiResponse;
         } catch (err) {
@@ -73,8 +52,6 @@ class ChatService {
      * @returns {Promise<String>} - URL to the speech audio
      */
     async textToSpeech(text) {
-        const fileName = 'response.wav';
-        const filePath = `./${fileName}`;
         const client = new TextToSpeechClient();
         const request = {
             input: { text: text },
@@ -88,9 +65,8 @@ class ChatService {
 
         try {
             const [response] = await client.synthesizeSpeech(request);
-            await util.promisify(fs.writeFile)(filePath, response.audioContent, 'binary');
-            console.log(`Audio content written to file: ${filePath}`);
-            return filePath;
+            const audioContentBase64 = response.audioContent.toString('base64');
+            return audioContentBase64;
         } catch (err) {
             console.error(`Error generating audio file: ${err}`);
             throw err;

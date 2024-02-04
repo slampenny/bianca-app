@@ -10,7 +10,7 @@ const llm = new OpenAI({
 });
 
 const langChainAPI = {
-  async summarizeConversation(message, conversationHistory, userDomain) {
+  async summarizeConversation(message, conversationHistory, userDomain = 'casual conversation') {
     console.log(
       `LangChain - Summarizing Conversation, using Template: ${conversationHistory}`
     );

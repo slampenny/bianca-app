@@ -9,24 +9,24 @@ const initiateCall = catchAsync(async (req, res) => {
     res.status(httpStatus.OK).json({ message: 'Call initiated successfully' });
 });
 
-const handleIncomingCall = catchAsync(async (req, res) => {
-    const responseTwiML = await twilioCallService.handleIncomingCall(req.body);
-    res.type('text/xml').send(responseTwiML);
-});
+// const handleIncomingCall = catchAsync(async (req, res) => {
+//     const responseTwiML = await twilioCallService.handleIncomingCall(req.body);
+//     res.type('text/xml').send(responseTwiML);
+// });
 
-const prepareCallForTranscription = catchAsync(async (req, res) => {
-    const responseTwiML = await twilioCallService.prepareCallForTranscription(req.body);
+const prepareCall = catchAsync(async () => {
+    const responseTwiML = await twilioCallService.prepareCall();
     res.type('text/xml').send(responseTwiML);
 });
 
 const handleRealTimeInteraction = catchAsync(async (req, res) => {
-    const responseTwiML = await twilioCallService.handleRealTimeInteraction(req.body);
+    const { CallSid, SpeechResult } = req.body;
+    const responseTwiML = await twilioCallService.handleRealTimeInteraction(CallSid, SpeechResult);
     res.type('text/xml').send(responseTwiML);
 });
 
 module.exports = {
     initiateCall,
-    handleIncomingCall,
     handleRealTimeInteraction,
-    prepareCallForTranscription
+    prepareCall
 };

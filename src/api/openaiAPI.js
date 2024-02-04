@@ -6,7 +6,7 @@ const openaiAPI = {
   async generateResponseFromOpenAI(messages, userName) {
     console.log(`OpenAI - Sending messages: \n${JSON.stringify(messages)}`);
     try {
-      let response = await openai.createChatCompletion({
+      let response = await openai.ChatCompletion.create({
         messages,
         model: process.env.OPENAI_API_MODEL,
         user: userName,
