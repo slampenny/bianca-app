@@ -71,8 +71,8 @@ module.exports = {
     from: envVars.EMAIL_FROM,
   },
   twilio: {
-    phoneNumber: envVars.TWILIO_PHONENUMBER,
-    voiceUrl: 'http://localhost:3000/v1/prepare-call-for-transcription',
+    phone: envVars.TWILIO_PHONENUMBER,
+    voiceUrl: `https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/prepare-call`,
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
   },

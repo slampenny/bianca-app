@@ -2,6 +2,9 @@ const express = require('express');
 const validateTwilioRequest = require('../../middlewares/validateTwilioRequest');
 const twilioCallController = require('../../controllers/twilioCall.controller');
 
+const validate = require('../../middlewares/validate');
+const twilioCallValidation = require('../../validations/twilioCall.validation');
+
 const router = express.Router();
 
 /**
@@ -39,7 +42,7 @@ const router = express.Router();
  *       "404":
  *         description: User not found
  */
-router.post('/initiate', validateTwilioRequest,
+router.post('/initiate', validate(twilioCallValidation.initiate),
 twilioCallController.initiateCall);
 
 /**

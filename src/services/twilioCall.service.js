@@ -2,20 +2,24 @@ const twilio = require('twilio');
 const config = require('../config/config');
 const chatService = require('./chat.service');
 const { Conversation, User } = require('../models');
+const logger = require('../config/logger');
+const ApiError = require('../utils/ApiError');
+const httpStatus = require('http-status');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const initiateCall = async (userId) => {
+  
   const user = await User.findById(userId);
-  if (!user || !user.phoneNumber) {
+  if (!user || !user.phone) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User or phone number not found');
   }
-
+  logger.info(JSON.stringify(config.twilio, null, 2));
   const call = await twilioClient.calls.create({
-    url: `/v1/twilio/prepare-call`, // Endpoint to prepare call
-    to: user.phoneNumber,
-    from: config.twilio.phoneNumber,
+    url: `https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/prepare-call`, // Endpoint to prepare call
+    to: user.phone,
+    from: '+13155099565'//config.twilio.phone,
   });
 
   // Create a new conversation for this call
@@ -32,7 +36,7 @@ const prepareCall = () => {
     input: 'speech',
     speechTimeout: 'auto',
     speechModel: 'experimental_conversations',
-    action: `/v1/twilio/real-time-interaction`, // Endpoint to process speech response
+    action: `https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/real-time-interaction`, // Endpoint to process speech response
   });
 
   twiml.toString();
@@ -61,7 +65,7 @@ const handleRealTimeInteraction = async (callSid, speechResult) => {
     // Prepare the call for the next user speech
     const twiml = new VoiceResponse();
     twiml.say(chatGptResponse);
-    twiml.redirect('/v1/twilio/prepare-call');
+    twiml.redirect('https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/prepare-call');
   
     return twiml.toString();
   };

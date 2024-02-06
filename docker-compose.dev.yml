@@ -3,8 +3,17 @@ version: '3'
 services:
   node-app:
     container_name: node-app-dev
-    command: yarn dev --inspect=0.0.0.0:9229
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    command: yarn dev
     ports:
       - "9229:9229"
+  ngrok:
+    container_name: ngrok
+    image: ngrok/ngrok
+    restart: unless-stopped
+    command: 'http node-app:3000'        
+    ports:
+        - '4040:4040'
+    expose:
+        - '4040'
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}

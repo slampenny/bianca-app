@@ -1,7 +1,7 @@
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { twilioCallService } = require('../services/twilioCall.service');
+const { twilioCallService } = require('../services');
 
 const initiateCall = catchAsync(async (req, res) => {
     const { userId } = req.body;
