@@ -1,6 +1,8 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
+const validate = require('../../middlewares/validate');
 const conversationController = require('../../controllers/conversation.controller');
+const { conversationValidation } = require('../../validations');
 
 const router = express.Router();
 
@@ -43,5 +45,39 @@ const router = express.Router();
 router
   .route('/')
   .post(auth('manageConversations'), conversationController.storeConversation);
+
+  /**
+ * @swagger
+ * /conversations/{id}:
+ *   get:
+ *     summary: Get a conversation
+ *     description: Logged in users can fetch only their own conversation information. Only admins can fetch other conversation.
+ *     tags: [Conversations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Conversation id
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *                $ref: '#/components/schemas/Conversation'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+.route('/')
+.get(auth('getConversation'), validate(conversationValidation.getConversation), conversationController.getConversation);
 
 module.exports = router;

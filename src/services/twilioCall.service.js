@@ -1,7 +1,7 @@
 const twilio = require('twilio');
 const config = require('../config/config');
 const chatService = require('./chat.service');
-const { Conversation, User } = require('../models');
+const { Conversation, Message, User } = require('../models');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const httpStatus = require('http-status');
@@ -17,11 +17,12 @@ const initiateCall = async (userId) => {
   }
   logger.info(JSON.stringify(config.twilio, null, 2));
   const call = await twilioClient.calls.create({
-    url: `https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/prepare-call`, // Endpoint to prepare call
+    url: `${config.twilio.apiUrl}/v1/twilio/prepare-call`, // Endpoint to prepare call
     to: user.phone,
     from: '+13155099565'//config.twilio.phone,
   });
 
+  logger.info(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
   // Create a new conversation for this call
   const conversation = new Conversation({ callSid: call.sid, userId: user._id });
   await conversation.save();
@@ -30,42 +31,53 @@ const initiateCall = async (userId) => {
 };
 
 const prepareCall = () => {
+  logger.info(`In Prepare Call function`);
   const twiml = new VoiceResponse();
 
   twiml.gather({
     input: 'speech',
     speechTimeout: 'auto',
     speechModel: 'experimental_conversations',
-    action: `https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/real-time-interaction`, // Endpoint to process speech response
+    action: `${config.twilio.apiUrl}/v1/twilio/real-time-interaction`, // Endpoint to process speech response
   });
 
-  twiml.toString();
+  return twiml.toString();
 };
 
 const handleRealTimeInteraction = async (callSid, speechResult) => {
-    // Save the user's speech to the conversation
+    logger.info(`Save the user's speech to the conversation`);
     const conversation = await Conversation.findOne({ callSid }).populate('userId');
-    conversation.messages.push({ role: 'user', content: speechResult });
+    if (!conversation) {
+      logger.error(`No conversation found with callSid: ${callSid}`);
+      throw new Error(`No conversation found with callSid: ${callSid}`);
+    }
+
+    const userMessage = new Message({ role: 'user', content: speechResult });
+    await userMessage.save();
+    conversation.messages.push(userMessage._id);
   
-    // Send the user's speech to ChatGPT and get a response
+    logger.info(`Send the user's speech to ChatGPT and get a response`);
     const chatGptResponse = await chatService.chatWith(
         conversation
     );
 
-    // Save ChatGPT's response to the conversation
-    conversation.messages.push({ role: 'assistant', content: chatGptResponse });
+    logger.info(`Save ChatGPT's response to the conversation`);
+    const assistantMessage = new Message({ role: 'assistant', content: chatGptResponse });
+    await assistantMessage.save();
+
+    conversation.messages.push(assistantMessage._id);
     await conversation.save();
   
-    // Convert the ChatGPT response to speech and get a URL for the speech file
+    logger.info(`Convert the ChatGPT response to speech and get a URL for the speech file`);
     const speechUrl = await chatService.textToSpeech(chatGptResponse);
   
     // Update the call to play the speech file
     //await twilioClient.calls(callSid).update({ twiml: `<Play>${speechUrl}</Play>` });
   
-    // Prepare the call for the next user speech
+    logger.info(`Prepare the call for the next user speech`);
     const twiml = new VoiceResponse();
     twiml.say(chatGptResponse);
-    twiml.redirect('https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/prepare-call');
+    twiml.redirect(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
   
     return twiml.toString();
   };

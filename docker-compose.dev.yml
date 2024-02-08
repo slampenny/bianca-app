@@ -2,7 +2,7 @@ version: '3'
 
 services:
   node-app:
-    container_name: node-app-dev
+    container_name: node-app
     command: yarn dev
     ports:
       - "9229:9229"
@@ -10,10 +10,12 @@ services:
     container_name: ngrok
     image: ngrok/ngrok
     restart: unless-stopped
-    command: 'http node-app:3000'        
+    command: 'http node-app:3000'
+    depends_on:
+      - node-app        
     ports:
         - '4040:4040'
-    expose:
-        - '4040'
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    networks:
+      - node-network

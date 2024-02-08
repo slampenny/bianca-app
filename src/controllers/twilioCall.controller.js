@@ -2,6 +2,7 @@ const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { twilioCallService } = require('../services');
+const logger = require('../config/logger');
 
 const initiateCall = catchAsync(async (req, res) => {
     const { userId } = req.body;
@@ -14,7 +15,7 @@ const initiateCall = catchAsync(async (req, res) => {
 //     res.type('text/xml').send(responseTwiML);
 // });
 
-const prepareCall = catchAsync(async () => {
+const prepareCall = catchAsync(async (req, res) => {
     const responseTwiML = await twilioCallService.prepareCall();
     res.type('text/xml').send(responseTwiML);
 });

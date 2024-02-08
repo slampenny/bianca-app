@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
 
+const messageSchema = new mongoose.Schema({
+  role: String,
+  content: String,
+});
+
 // Conversation Schema
 const conversationSchema = mongoose.Schema(
   {
@@ -9,11 +14,10 @@ const conversationSchema = mongoose.Schema(
       required: true,
       ref: 'User'
     },
-    text: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    messages: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+    }],
     analyzedData: {
       type: mongoose.Schema.Types.Mixed,
       default: {}
@@ -38,4 +42,9 @@ conversationSchema.plugin(paginate);
  */
 const Conversation = mongoose.model('Conversation', conversationSchema);
 
-module.exports = Conversation;
+/**
+ * @typedef Message
+ */
+const Message = mongoose.model('Message', messageSchema);
+
+module.exports = { Message, Conversation };

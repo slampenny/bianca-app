@@ -72,7 +72,7 @@ module.exports = {
   },
   twilio: {
     phone: envVars.TWILIO_PHONENUMBER,
-    voiceUrl: `https://ae54-189-16-81-54.ngrok-free.app/v1/twilio/prepare-call`,
+    apiUrl: `https://3f06-179-184-19-126.ngrok-free.app`,
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
   },
