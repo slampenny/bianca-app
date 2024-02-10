@@ -3,6 +3,7 @@ const pick = require('../utils/pick');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { userService } = require('../services');
+const { conversationService } = require('../services');
 
 const createUser = catchAsync(async (req, res) => {
   const user = await userService.createUser(req.body);
@@ -63,10 +64,23 @@ const getClientsForCaregiver = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(clients);
 });
 
+const getConversationsByUser = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await userService.getUserById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid user ID');
+  }
+
+  const conversations = await conversationService.getConversationsByUser(userId);
+  res.status(httpStatus.OK).send(conversations);
+});
+
 module.exports = {
   createUser,
   getUsers,
   getUser,
+  getConversationsByUser,
   updateUser,
   deleteUser,
   assignCaregiver,

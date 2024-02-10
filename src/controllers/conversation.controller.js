@@ -3,9 +3,17 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { conversationService } = require('../services');
 
-const storeConversation = catchAsync(async (req, res) => {
-  const conversation = await conversationService.storeConversation(req.body);
+const createConversationForUser = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+  const conversation = await conversationService.createConversationForUser(userId);
   res.status(httpStatus.CREATED).send(conversation);
+});
+
+const addMessageToConversation = catchAsync(async (req, res) => {
+  const { conversationId } = req.params;
+  const { role, message } = req.body;
+  const conversation = await conversationService.addMessageToConversation(conversationId, role, message);
+  res.status(httpStatus.OK).send(conversation);
 });
 
 const getConversation = catchAsync(async (req, res) => {
@@ -17,6 +25,7 @@ const getConversation = catchAsync(async (req, res) => {
 });
 
 module.exports = {
-  storeConversation,
+  createConversationForUser,
+  addMessageToConversation,
   getConversation,
 };

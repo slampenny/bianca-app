@@ -22,6 +22,7 @@ const prepareCall = catchAsync(async (req, res) => {
 
 const handleRealTimeInteraction = catchAsync(async (req, res) => {
     const { CallSid, SpeechResult } = req.body;
+    logger.info(`CallSid: ${CallSid}, SpeechResult: ${SpeechResult}`);
     const responseTwiML = await twilioCallService.handleRealTimeInteraction(CallSid, SpeechResult);
     res.type('text/xml').send(responseTwiML);
 });

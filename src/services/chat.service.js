@@ -1,12 +1,13 @@
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
-const openaiAPI = require("../api/openaiAPI.js");
+const { openaiAPI } = require("../api/openaiAPI.js");
 const Conversation = require("../models/conversation.model");
 const langChainAPI = require("../api/langChainAPI.js");
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
 const fs = require('fs');
 const util = require('util');
+const logger = require('../config/logger.js');
 
 class ChatService {
     /**
@@ -18,7 +19,7 @@ class ChatService {
  * @returns {Promise<String>} - The response from ChatGPT
  */
     async chatWith(conversation) {
-        console.log(`Backend - Preparing to Send Message: \n${message}`);
+        console.log(`Backend - Preparing to Send Message`);
         try {
             let messages = conversation.messages,
                 openaiResponse
@@ -31,7 +32,7 @@ class ChatService {
 
             return openaiResponse;
         } catch (err) {
-            console.log(`Backend - Error with Request: ${err}`);
+            throw err;
         }
     }
 

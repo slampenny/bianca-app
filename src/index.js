@@ -2,10 +2,12 @@ const mongoose = require('mongoose');
 const app = require('./app');
 const config = require('./config/config');
 const logger = require('./config/logger');
+const { Conversation } = require('./models');
 
 let server;
 mongoose.connect(config.mongoose.url, config.mongoose.options).then(() => {
   logger.info('Connected to MongoDB');
+  Conversation.ensureIndexes(); //TODO: Fix: Move ensureIndexes() to the build process in production
   server = app.listen(config.port, () => {
     logger.info(`Listening to port ${config.port}`);
   });

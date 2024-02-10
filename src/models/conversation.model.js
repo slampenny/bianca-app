@@ -9,6 +9,10 @@ const messageSchema = new mongoose.Schema({
 // Conversation Schema
 const conversationSchema = mongoose.Schema(
   {
+    callSid: {
+      type: String,
+      index: true
+    },
     userId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,

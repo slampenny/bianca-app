@@ -15,7 +15,7 @@ const initiateCall = async (userId) => {
   if (!user || !user.phone) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User or phone number not found');
   }
-  logger.info(JSON.stringify(config.twilio, null, 2));
+  
   const call = await twilioClient.calls.create({
     url: `${config.twilio.apiUrl}/v1/twilio/prepare-call`, // Endpoint to prepare call
     to: user.phone,
@@ -24,6 +24,7 @@ const initiateCall = async (userId) => {
 
   logger.info(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
   // Create a new conversation for this call
+  logger.info(`{ callSid: ${call.sid}, userId: ${user._id} }`);
   const conversation = new Conversation({ callSid: call.sid, userId: user._id });
   await conversation.save();
 
@@ -45,7 +46,7 @@ const prepareCall = () => {
 };
 
 const handleRealTimeInteraction = async (callSid, speechResult) => {
-    logger.info(`Save the user's speech to the conversation`);
+    logger.info(`Save the user's speech to the conversation with these params: ${callSid} and ${speechResult}`);
     const conversation = await Conversation.findOne({ callSid }).populate('userId');
     if (!conversation) {
       logger.error(`No conversation found with callSid: ${callSid}`);
@@ -56,29 +57,40 @@ const handleRealTimeInteraction = async (callSid, speechResult) => {
     await userMessage.save();
     conversation.messages.push(userMessage._id);
   
+    // Populate the messages array
+    await conversation.populate('messages').execPopulate();
+
     logger.info(`Send the user's speech to ChatGPT and get a response`);
-    const chatGptResponse = await chatService.chatWith(
-        conversation
-    );
+    try {
+      const chatGptResponse = await chatService.chatWith(
+          conversation
+      );
 
-    logger.info(`Save ChatGPT's response to the conversation`);
-    const assistantMessage = new Message({ role: 'assistant', content: chatGptResponse });
-    await assistantMessage.save();
+      logger.info(`Save ChatGPT's response to the conversation`);
+      const assistantMessage = new Message({ role: 'assistant', content: chatGptResponse });
+      await assistantMessage.save();
 
-    conversation.messages.push(assistantMessage._id);
-    await conversation.save();
-  
-    logger.info(`Convert the ChatGPT response to speech and get a URL for the speech file`);
-    const speechUrl = await chatService.textToSpeech(chatGptResponse);
-  
-    // Update the call to play the speech file
-    //await twilioClient.calls(callSid).update({ twiml: `<Play>${speechUrl}</Play>` });
-  
-    logger.info(`Prepare the call for the next user speech`);
+      conversation.messages.push(assistantMessage._id);
+      await conversation.save();
+    
+      logger.info(`Convert the ChatGPT response to speech and get a URL for the speech file`);
+      const speechUrl = await chatService.textToSpeech(chatGptResponse);
+    
+      // Update the call to play the speech file
+      //await twilioClient.calls(callSid).update({ twiml: `<Play>${speechUrl}</Play>` });
+    
+      logger.info(`Prepare the call for the next user speech`);
+      const twiml = new VoiceResponse();
+      twiml.say(chatGptResponse);
+      twiml.redirect(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
+      
+      return twiml.toString();
+    } catch (err) { 
+      logger.error(`Error with ChatGPT: ${err}, so we hang up the call`);
+    }
+
     const twiml = new VoiceResponse();
-    twiml.say(chatGptResponse);
-    twiml.redirect(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
-  
+    twiml.hangup();
     return twiml.toString();
   };
 

@@ -78,5 +78,6 @@ module.exports = {
   },
   openai: {
     apiKey: envVars.OPENAI_API_KEY,
+    model: envVars.OPENAI_API_MODEL
   },
 };

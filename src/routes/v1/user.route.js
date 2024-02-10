@@ -93,6 +93,14 @@ module.exports = router;
 
 /**
  * @swagger
+ * tags:
+ *   name: Conversations
+ *   description: Conversation management and retrieval
+ */
+
+
+/**
+ * @swagger
  * /users:
  *   post:
  *     summary: Create a user
@@ -379,3 +387,39 @@ router
 router
   .route('/caregiver/:caregiverId/clients')
   .get(auth('manageUsers'), userController.getClientsForCaregiver);
+
+  /**
+ * @swagger
+ * /users/{userId}/conversations:
+ *   get:
+ *     summary: Get conversations by user
+ *     description: Logged in users can fetch only their own conversation information. Only admins can fetch other users' conversations.
+ *     tags: [Conversations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User id
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Conversation'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+.route('/:userId/conversations')
+.get(auth('getConversationsByUser'), validate(userValidation.getConversationsByUser), userController.getConversationsByUser);

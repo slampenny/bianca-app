@@ -1,24 +1,23 @@
 const OpenAI = require("openai");
 const config = require("../config/config");
-const openai = new OpenAI(config.openai.apiKey);
+const logger = require("../config/logger");
+const openai = new OpenAI({apiKey: config.openai.apiKey});
 
 const openaiAPI = {
   async generateResponseFromOpenAI(messages, userName) {
-    console.log(`OpenAI - Sending messages: \n${JSON.stringify(messages)}`);
+    logger.info(`OpenAI - Sending messages: \n${JSON.stringify(messages)}`);
     try {
-      let response = await openai.ChatCompletion.create({
+      let response = await openai.chat.completions.create({
         messages,
-        model: process.env.OPENAI_API_MODEL,
-        user: userName,
+        model: config.openai.model,
       });
+
+      logger.info(`OpenAI - response generated: \n${JSON.stringify(response)}`);
       response = response.data.choices[0].message.content;
-      console.log(`OpenAI - response generated: \n${response}`);
       return response;
     } catch (err) {
-      console.error(
-        `OpenAI - Error Generating Response. Status: ${err.response.status}. Error: ${err.response.statusText}`
-      );
-      return `OpenAI - Error Generating Response. Status: ${err.response.status}. Error: ${err.response.statusText}`;
+      logger.error(`OpenAI - Error Generating Response: ${err}`);
+      throw err;
     }
   },
 };
