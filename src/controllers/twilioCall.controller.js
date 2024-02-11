@@ -10,11 +10,6 @@ const initiateCall = catchAsync(async (req, res) => {
     res.status(httpStatus.OK).json({ message: 'Call initiated successfully' });
 });
 
-// const handleIncomingCall = catchAsync(async (req, res) => {
-//     const responseTwiML = await twilioCallService.handleIncomingCall(req.body);
-//     res.type('text/xml').send(responseTwiML);
-// });
-
 const prepareCall = catchAsync(async (req, res) => {
     const responseTwiML = await twilioCallService.prepareCall();
     res.type('text/xml').send(responseTwiML);
@@ -27,7 +22,15 @@ const handleRealTimeInteraction = catchAsync(async (req, res) => {
     res.type('text/xml').send(responseTwiML);
 });
 
+const endCall = catchAsync(async (req, res) => {
+    const { CallSid } = req.body;
+    logger.info(`CallSid: ${CallSid}`);
+    const responseTwiML = await twilioCallService.endCall(CallSid);
+    res.type('text/xml').send(responseTwiML);
+});
+
 module.exports = {
+    endCall,
     initiateCall,
     handleRealTimeInteraction,
     prepareCall

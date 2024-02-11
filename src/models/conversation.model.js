@@ -22,6 +22,9 @@ const conversationSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
     }],
+    history: {
+      type: String,
+    },
     analyzedData: {
       type: mongoose.Schema.Types.Mixed,
       default: {}

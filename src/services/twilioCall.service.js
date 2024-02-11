@@ -5,6 +5,7 @@ const { Conversation, Message, User } = require('../models');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const httpStatus = require('http-status');
+const e = require('express');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -19,13 +20,16 @@ const initiateCall = async (userId) => {
   const call = await twilioClient.calls.create({
     url: `${config.twilio.apiUrl}/v1/twilio/prepare-call`, // Endpoint to prepare call
     to: user.phone,
-    from: '+13155099565'//config.twilio.phone,
+    from: config.twilio.phone,
   });
 
-  logger.info(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
-  // Create a new conversation for this call
-  logger.info(`{ callSid: ${call.sid}, userId: ${user._id} }`);
-  const conversation = new Conversation({ callSid: call.sid, userId: user._id });
+  const previousConversation = await Conversation.find({ userId: userId }).sort({ createdAt: -1 }).limit(1);
+
+  const conversation = new Conversation({ 
+    callSid: call.sid, 
+    userId: user._id,
+    history: previousConversation.length > 0 ? previousConversation[0].history : null 
+  });
   await conversation.save();
 
   return call.sid;
@@ -41,7 +45,8 @@ const prepareCall = () => {
     speechModel: 'experimental_conversations',
     action: `${config.twilio.apiUrl}/v1/twilio/real-time-interaction`, // Endpoint to process speech response
   });
-
+  
+  twiml.say('Hello, I am Bianca. How can I help you today?');
   return twiml.toString();
 };
 
@@ -94,7 +99,17 @@ const handleRealTimeInteraction = async (callSid, speechResult) => {
     return twiml.toString();
   };
 
+  const endCall = async (callSid) => {
+    const conversation = await Conversation.findOne({ callSid }).populate('messages');
+    if (!conversation) {
+      logger.error(`No conversation found with callSid: ${callSid}`);
+    } else {
+      chatService.summarize(conversation);
+    }
+  };
+
 module.exports = {
+  endCall,
   initiateCall,
   prepareCall,
   handleRealTimeInteraction,

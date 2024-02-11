@@ -2,8 +2,8 @@ const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const { openaiAPI } = require("../api/openaiAPI.js");
-const Conversation = require("../models/conversation.model");
-const langChainAPI = require("../api/langChainAPI.js");
+const { Conversation } = require("../models/conversation.model");
+const {langChainAPI} = require("../api/langChainAPI.js");
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
 const fs = require('fs');
 const util = require('util');
@@ -11,13 +11,13 @@ const logger = require('../config/logger.js');
 
 class ChatService {
     /**
- * Sends text to ChatGPT and gets a response
- * @param {String} userName - The name of the user
- * @param {String} userDomain - The domain of the user
- * @param {String} message - The message to send to ChatGPT
- * @param {String} role - The role of the sender (default is 'user')
- * @returns {Promise<String>} - The response from ChatGPT
- */
+     * Sends text to ChatGPT and gets a response
+     * @param {String} userName - The name of the user
+     * @param {String} userDomain - The domain of the user
+     * @param {String} message - The message to send to ChatGPT
+     * @param {String} role - The role of the sender (default is 'user')
+     * @returns {Promise<String>} - The response from ChatGPT
+     */
     async chatWith(conversation) {
         console.log(`Backend - Preparing to Send Message`);
         try {
@@ -41,10 +41,22 @@ class ChatService {
      * @param {String} audioUrl - The URL of the audio to transcribe
      * @returns {Promise<String>} - The transcribed text
      */
-    async transcribeSpeech(audioUrl) {
-        // Implement transcription using Whisper here
-        // As of my last update, OpenAI had not released Whisper API for public use,
-        // so this method would depend on the specifics of their API once available.
+    async summarize(conversation) {
+        try {
+            // Summarize the conversation using LangChain
+            const summarizedConversation = await langChainAPI.summarizeConversation(
+                conversation.messages,
+                conversation.history
+            );
+
+            // Update the conversation with the summarized conversation
+            conversation.history = summarizedConversation;
+            await conversation.save();
+
+            return summarizedConversation;
+        } catch (err) {
+            throw err;
+        }
     }
 
     /**

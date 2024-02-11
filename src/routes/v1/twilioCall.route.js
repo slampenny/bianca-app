@@ -88,4 +88,28 @@ router.post('/real-time-interaction',
 validateTwilioRequest,
 twilioCallController.handleRealTimeInteraction);
 
+/**
+ * @swagger
+ * /twilio/call-end:
+ *   post:
+ *     summary: Endpoint for handling the end of a call
+ *     description: Receives a notification from Twilio when a call ends and processes any necessary cleanup or finalization tasks
+ *     tags: [TwilioCalls]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               CallSid:
+ *                 type: string
+ *                 description: The unique identifier for the call
+ *     responses:
+ *       "200":
+ *         description: Call end handled successfully
+ */
+router.post('/call-end', 
+validateTwilioRequest,
+twilioCallController.endCall);
+
 module.exports = router;
