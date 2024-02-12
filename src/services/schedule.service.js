@@ -1,7 +1,6 @@
 const httpStatus = require('http-status');
 const { Schedule } = require('../models');
 const ApiError = require('../utils/ApiError');
-const agenda = require('../config/agenda'); // Import your Agenda instance
 
 const createSchedule = async (userId, frequency, intervals) => {
   // Create the schedule

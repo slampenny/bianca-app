@@ -5,7 +5,6 @@ const { Conversation, Message, User } = require('../models');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const httpStatus = require('http-status');
-const e = require('express');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 const VoiceResponse = twilio.twiml.VoiceResponse;

@@ -29,14 +29,17 @@ agenda.define('runSchedules', async (job, done) => {
     // This could be a function call, a request to another service, etc.
     logger.info(`Running schedule ${schedule.id}`);
 
-    // Update the nextCallDate based on the frequency and interval
-    schedule.calculateNextCallDate();
+    try {
+        twilioCallService.initiateCall(schedule.userId);
+        
+        // Update the nextCallDate based on the frequency and interval
+        schedule.calculateNextCallDate();
 
-    //TODO: initiate a call here
-    twilioCallService.initiateCall(schedule.userId);
-
-    // Save the updated schedule
-    await schedule.save();
+        // Save the updated schedule
+        await schedule.save();
+    } catch (error) {
+      logger.error(`Error running schedule ${schedule.id}: ${error}`);
+    }
   }
 
   done();
