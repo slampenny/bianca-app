@@ -50,6 +50,7 @@
     "prettier"
   ],
   "dependencies": {
+    "@google-cloud/storage": "^7.7.0",
     "@google-cloud/text-to-speech": "^5.0.2",
     "@langchain/openai": "^0.0.13",
     "axios": "^0.21.1",

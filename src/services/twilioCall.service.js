@@ -79,17 +79,20 @@ const handleRealTimeInteraction = async (callSid, speechResult) => {
       await conversation.save();
     
       logger.info(`Convert the ChatGPT response to speech and get a URL for the speech file`);
-      const speechUrl = await chatService.textToSpeech(chatGptResponse);
-    
-      // Update the call to play the speech file
-      //await twilioClient.calls(callSid).update({ twiml: `<Play>${speechUrl}</Play>` });
+      const speechUrl = await chatService.textToSpeech(callSid, chatGptResponse);
     
       logger.info(`Prepare the call for the next user speech`);
       const twiml = new VoiceResponse();
-      twiml.say(chatGptResponse);
+      twiml.play(speechUrl); // Use the <Play> verb with the URL of the audio file
       twiml.redirect(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
-      
+        
       return twiml.toString();
+      // logger.info(`Prepare the call for the next user speech`);
+      // const twiml = new VoiceResponse();
+      // twiml.say(chatGptResponse);
+      // twiml.redirect(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
+      
+      // return twiml.toString();
     } catch (err) { 
       logger.error(`Error with ChatGPT: ${err}, so we hang up the call`);
     }
@@ -100,11 +103,17 @@ const handleRealTimeInteraction = async (callSid, speechResult) => {
   };
 
   const endCall = async (callSid) => {
+    logger.info(`In End Call function with callSid: ${callSid}`);
     const conversation = await Conversation.findOne({ callSid }).populate('messages');
     if (!conversation) {
       logger.error(`No conversation found with callSid: ${callSid}`);
     } else {
       chatService.summarize(conversation);
+    }
+    try {
+      chatService.cleanup(callSid);
+    } catch (err) {
+      logger.error(`Error with cleanup: ${err}`);
     }
   };
 

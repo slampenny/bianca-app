@@ -5,8 +5,9 @@ const { openaiAPI } = require("../api/openaiAPI.js");
 const { Conversation } = require("../models/conversation.model");
 const {langChainAPI} = require("../api/langChainAPI.js");
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
-const fs = require('fs');
-const util = require('util');
+const {Storage} = require('@google-cloud/storage');
+const storage = new Storage();
+const bucket = storage.bucket('bianca-app-audio-files');
 const logger = require('../config/logger.js');
 
 class ChatService {
@@ -64,7 +65,7 @@ class ChatService {
      * @param {String} text - The text to convert
      * @returns {Promise<String>} - URL to the speech audio
      */
-    async textToSpeech(text) {
+    async textToSpeech(callSid, text) {
         const client = new TextToSpeechClient();
         const request = {
             input: { text: text },
@@ -78,12 +79,47 @@ class ChatService {
 
         try {
             const [response] = await client.synthesizeSpeech(request);
-            const audioContentBase64 = response.audioContent.toString('base64');
-            return audioContentBase64;
+            logger.info('Synthesized speech successfully');
+            // Create a new blob in the bucket and upload the file data
+            const timestamp = Date.now();
+            const blob = bucket.file(`${callSid}/audio-${timestamp}.mp3`);
+            logger.info('Created blob successfully');
+
+            const blobStream = blob.createWriteStream();
+
+            return new Promise((resolve, reject) => {
+                blobStream.on('error', (err) => {
+                    logger.error(`Error uploading audio file: ${err}`);
+                    reject(err);
+                });
+
+                blobStream.on('finish', async () => {
+                    // The audio file is now uploaded and can be accessed at the following URL:
+                    const [url] = await blob.getSignedUrl({
+                        action: 'read',
+                        expires: Date.now() + 1000 * 60 * 60, // 1 hour
+                    });
+
+                    console.log('Generated signed URL successfully');
+
+                    resolve(url);
+                });
+
+                blobStream.end(response.audioContent);
+            });
+            // const [response] = await client.synthesizeSpeech(request);
+            // const audioContentBase64 = response.audioContent.toString('base64');
+            // return audioContentBase64;
         } catch (err) {
-            console.error(`Error generating audio file: ${err}`);
+            logger.error(`Error generating audio file: ${err}`);
             throw err;
         }
+    }
+
+    async cleanup(callSid) {
+        const [files] = await bucket.getFiles({prefix: callSid});
+        await Promise.all(files.map(file => file.delete()));
+        logger.info(`All audio files for call ${callSid} deleted.`);
     }
 }
 
