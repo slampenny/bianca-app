@@ -8,7 +8,7 @@ const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
 const {Storage} = require('@google-cloud/storage');
 const storage = new Storage();
 const bucket = storage.bucket('bianca-app-audio-files');
-const logger = require('../config/logger.js');
+const logger = require('../config/logger');
 
 class ChatService {
     /**
