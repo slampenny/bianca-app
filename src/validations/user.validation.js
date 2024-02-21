@@ -4,9 +4,24 @@ const { password, objectId } = require('./custom.validation');
 const createUser = {
   body: Joi.object().keys({
     email: Joi.string().required().email(),
-    password: Joi.string().required().custom(password),
+    password: Joi.when('role', {
+      is: 'caregiver',
+      then: Joi.string().required().custom(password),
+      otherwise: Joi.string().optional().allow('').custom(password),
+    }),
     name: Joi.string().required(),
-    role: Joi.string().required().valid('user', 'admin'),
+    role: Joi.string().required().valid('user', 'admin', 'caregiver'),
+    phone: Joi.when('role', {
+      is: 'user',
+      then: Joi.string().required().custom((value, helpers) => {
+        if (!validator.isMobilePhone(value)) {
+          return helpers.message('Invalid phone number');
+        }
+        return value;
+      }),
+      otherwise: Joi.string().optional().allow(''),
+    }),
+    caregiver: Joi.string().optional(),
   }),
 };
 

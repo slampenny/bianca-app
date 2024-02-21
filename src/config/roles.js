@@ -1,5 +1,6 @@
 const allRoles = {
   user: [],
+  caregiver: [],
   admin: ['getUsers', 'manageUsers'],
 };
 

@@ -37,7 +37,7 @@ const userSchema = mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: function() { return this.role === 'caregiver'; },
       trim: true,
       minlength: 8,
       validate(value) {
