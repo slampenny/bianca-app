@@ -55,18 +55,17 @@ const userSchema = mongoose.Schema(
     isEmailVerified: {
       type: Boolean,
       default: false,
-    },
-    // Additional fields for user profile
-    medicalHistory: {
-      type: String,
-      default: '',
-      trim: true
+      private: true,
     },
     caregiver: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'User',
       default: null
-    }
+    },
+    schedules: [{
+      type: mongoose.SchemaTypes.ObjectId,
+      ref: 'Schedule',
+    }],
   },
   {
     timestamps: true,

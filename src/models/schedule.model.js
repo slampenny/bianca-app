@@ -29,6 +29,10 @@ const scheduleSchema = mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    time: {
+      type: Date,
+      required: true
+    },
     nextCallDate: {
       type: Date,
       required: true
@@ -39,30 +43,35 @@ const scheduleSchema = mongoose.Schema(
   }
 );
 
-scheduleSchema.methods.calculateNextCallDate = async function() {
-  // Get the current date
+scheduleSchema.methods.calculateNextCallDate = function() {
   const now = new Date();
 
-  // Check if the schedule should run based on the intervals field
-  const interval = this.intervals.find(i => i.day === (this.frequency === 'weekly' ? now.getDay() : now.getDate()));
-  if (!interval) {
-    return;
-  }
+  // Reset nextCallDate to the start of the next day
+  this.nextCallDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
-  // Run the schedule
-  // This could be a function call, a request to another service, etc.
-  console.log(`Running schedule ${this.id}`);
+  // Set the time for nextCallDate
+  this.nextCallDate.setHours(this.time.getHours(), this.time.getMinutes(), this.time.getSeconds());
 
-  // Update the nextCallDate based on the frequency and interval
   switch (this.frequency) {
     case 'daily':
-      this.nextCallDate.setDate(this.nextCallDate.getDate() + 1);
+      // No changes needed for daily, as we've already set nextCallDate to the start of the next day
       break;
     case 'weekly':
-      this.nextCallDate.setDate(this.nextCallDate.getDate() + 7 * interval.weeks);
+      const weeklyInterval = this.intervals.find(i => i.day === now.getDay());
+      if (weeklyInterval) {
+        // Add the number of days until the next scheduled day of the week
+        const daysUntilNext = (weeklyInterval.day - now.getDay() + 7) % 7 || 7;
+        this.nextCallDate.setDate(this.nextCallDate.getDate() + daysUntilNext);
+      }
       break;
     case 'monthly':
-      this.nextCallDate.setMonth(this.nextCallDate.getMonth() + 1);
+      const monthlyInterval = this.intervals.find(i => i.day === now.getDate());
+      if (monthlyInterval) {
+        // Add the number of days until the next scheduled day of the month
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const daysUntilNext = (monthlyInterval.day - now.getDate() + daysInMonth) % daysInMonth || daysInMonth;
+        this.nextCallDate.setDate(this.nextCallDate.getDate() + daysUntilNext);
+      }
       break;
   }
 };

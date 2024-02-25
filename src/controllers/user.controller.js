@@ -4,9 +4,18 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { userService } = require('../services');
 const { conversationService } = require('../services');
+const { scheduleService } = require('../services');
 
 const createUser = catchAsync(async (req, res) => {
-  const user = await userService.createUser(req.body);
+  const { schedules, ...userData } = req.body;
+  const user = await userService.createUser(userData);
+  
+  if (schedules) {
+    for (const schedule of schedules) {
+      await scheduleService.createSchedule({userId: user.id, ...schedule});
+    }
+  }
+
   res.status(httpStatus.CREATED).send(user);
 });
 
@@ -54,12 +63,6 @@ const assignCaregiver = catchAsync(async (req, res) => {
 
 const getClientsForCaregiver = catchAsync(async (req, res) => {
   const { caregiverId } = req.params;
-
-  const caregiver = await userService.getUserById(caregiverId);
-  if (!caregiver || caregiver.role !== 'caregiver') {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
-  }
-
   const clients = await userService.getClientsForCaregiver(caregiverId);
   res.status(httpStatus.OK).send(clients);
 });

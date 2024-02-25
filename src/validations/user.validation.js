@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const validator = require('validator');
 const { password, objectId } = require('./custom.validation');
 
 const createUser = {
@@ -22,6 +23,19 @@ const createUser = {
       otherwise: Joi.string().optional().allow(''),
     }),
     caregiver: Joi.string().optional(),
+    schedules: Joi.array().items(
+      Joi.object().keys({
+        userId: Joi.string().custom(objectId).optional(),
+        frequency: Joi.string().valid('daily', 'weekly', 'monthly'),
+        intervals: Joi.array().items(
+          Joi.object().keys({
+            day: Joi.number().integer().min(0).max(6), // 0-6 for days of the week
+          })
+        ),
+        time: Joi.date(),
+        isActive: Joi.boolean(),
+      })
+    ).optional(),
   }),
 };
 

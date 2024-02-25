@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const { User } = require('../models');
 const ApiError = require('../utils/ApiError');
+const logger = require('../config/logger');
 
 /**
  * Create a user
@@ -12,6 +13,8 @@ const createUser = async (userBody) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
   userBody.role = userBody.role || 'user'; // set the role to 'user' if it's not provided
+
+  logger.info(`Creating user: ${JSON.stringify(userBody)}`);
   return await User.create(userBody);
 };
 
@@ -35,7 +38,7 @@ const queryUsers = async (filter, options) => {
  * @returns {Promise<User>}
  */
 const getUserById = async (id) => {
-  return User.findById(id);
+  return User.findById(id).populate('schedules');
 };
 
 /**
@@ -44,7 +47,7 @@ const getUserById = async (id) => {
  * @returns {Promise<User>}
  */
 const getUserByEmail = async (email) => {
-  return User.findOne({ email });
+  return User.findOne({ email }).populate('schedules');
 };
 
 /**
@@ -109,11 +112,15 @@ const assignCaregiver = async (userId, caregiverId) => {
  */
 const getClientsForCaregiver = async (caregiverId) => {
   const caregiver = await getUserById(caregiverId);
-  if (!caregiver || caregiver.role !== 'caregiver') {
+  if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
 
-  const clients = await User.find({ caregiver: caregiverId });
+  if (caregiver.role !== 'caregiver') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User is not a caregiver');
+  }
+
+  const clients = await User.find({ caregiver: caregiverId }).populate('schedules');
   return clients;
 };
 
