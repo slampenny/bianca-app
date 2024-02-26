@@ -29,9 +29,11 @@ const scheduleSchema = mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Modify the schema
     time: {
-      type: Date,
-      required: true
+      type: String,
+      required: true,
+      match: /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/ // Validates time in HH:mm format
     },
     nextCallDate: {
       type: Date,
@@ -48,9 +50,9 @@ scheduleSchema.methods.calculateNextCallDate = function() {
 
   // Reset nextCallDate to the start of the next day
   this.nextCallDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-
   // Set the time for nextCallDate
-  this.nextCallDate.setHours(this.time.getHours(), this.time.getMinutes(), this.time.getSeconds());
+  const [hours, minutes] = this.time.split(':');
+  this.nextCallDate.setHours(Number(hours), Number(minutes), 0);
 
   switch (this.frequency) {
     case 'daily':

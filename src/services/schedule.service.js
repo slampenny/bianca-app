@@ -27,21 +27,9 @@ const updateSchedule = async (scheduleId, updateBody) => {
     throw new Error('Schedule not found');
   }
 
-  if (updateBody.userId) {
-    schedule.userId = updateBody.userId;
-  }
-
-  if (updateBody.frequency) {
-    schedule.frequency = updateBody.frequency;
-  }
-
-  if (updateBody.intervals) {
-    schedule.intervals = updateBody.intervals;
-  }
-
-  if (updateBody.isActive !== undefined) {
-    schedule.isActive = updateBody.isActive;
-  }
+  Object.keys(updateBody).forEach((key) => {
+    schedule[key] = updateBody[key];
+  });
 
   // If the frequency or intervals are updated, recalculate the nextCallDate
   if (updateBody.frequency || updateBody.intervals) {
@@ -50,14 +38,12 @@ const updateSchedule = async (scheduleId, updateBody) => {
 
   if (updateBody.userId && updateBody.userId !== schedule.userId.toString()) {
     const oldUser = await User.findById(schedule.userId);
-    oldUser.schedules.pull(schedule._id);
+    oldUser.schedules.pull(schedule.id);
     await oldUser.save();
 
     const newUser = await User.findById(updateBody.userId);
-    newUser.schedules.push(schedule._id);
+    newUser.schedules.push(schedule.id);
     await newUser.save();
-
-    schedule.userId = updateBody.userId;
   }
 
   await schedule.save();

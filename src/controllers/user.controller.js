@@ -35,7 +35,14 @@ const getUser = catchAsync(async (req, res) => {
 });
 
 const updateUser = catchAsync(async (req, res) => {
-  const user = await userService.updateUserById(req.params.userId, req.body);
+  const { schedules, ...userData } = req.body;
+  
+  const user = await userService.updateUserById(req.params.userId, userData);
+  if (schedules) {
+    for (const schedule of schedules) {
+      await scheduleService.updateSchedule(schedule.id, {...schedule});
+    }
+  }
   res.send(user);
 });
 

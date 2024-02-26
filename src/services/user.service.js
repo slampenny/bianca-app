@@ -13,8 +13,6 @@ const createUser = async (userBody) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
   userBody.role = userBody.role || 'user'; // set the role to 'user' if it's not provided
-
-  logger.info(`Creating user: ${JSON.stringify(userBody)}`);
   return await User.create(userBody);
 };
 
