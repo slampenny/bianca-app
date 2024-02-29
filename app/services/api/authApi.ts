@@ -1,0 +1,85 @@
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { DEFAULT_API_CONFIG } from './api';
+import { User } from './api.types';
+import type { AuthTokens } from '../../store/authSlice'
+
+export const authApi = createApi({
+  reducerPath: 'authApi',
+  baseQuery: fetchBaseQuery({ baseUrl: DEFAULT_API_CONFIG.url }),
+  endpoints: (builder) => ({
+    register: builder.mutation<User, { name: string, email: string, password: string }>({
+      query: (data) => ({
+        url: '/auth/register',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    login: builder.mutation<{user: User, tokens: any}, { email: string, password: string }>({
+      query: (data) => ({
+        url: '/auth/login',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    logout: builder.mutation({
+      query: (authTokens: AuthTokens | null) => {
+        if (authTokens === null) {
+          throw new Error("No auth tokens provided");
+        }
+        return {
+          url: '/auth/logout',
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${authTokens.access.token}`, // Include the authToken in the request headers
+          },
+          body: { refreshToken: authTokens.refresh.token },
+        }
+      }
+    }),
+    refreshTokens: builder.mutation<{ tokens: any }, void>({
+      query: () => ({
+        url: '/auth/refresh-tokens',
+        method: 'POST',
+      }),
+    }),
+    forgotPassword: builder.mutation<void, { email: string }>({
+      query: (data) => ({
+        url: '/auth/forgot-password',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    resetPassword: builder.mutation<void, { password: string }>({
+      query: (data) => ({
+        url: '/auth/reset-password',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    sendVerificationEmail: builder.mutation<void, User>({
+      query: (data) => ({
+        url: '/auth/send-verification-email',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    verifyEmail: builder.mutation<void, { token: string }>({
+      query: (data) => ({
+        url: '/auth/verify-email',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+  }),
+});
+
+export const {
+  useRegisterMutation,
+  useLoginMutation,
+  useLogoutMutation,
+  useRefreshTokensMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useSendVerificationEmailMutation,
+  useVerifyEmailMutation,
+} = authApi;
