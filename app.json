@@ -1,10 +1,10 @@
 {
-  "name": "PizzaApp",
-  "displayName": "PizzaApp",
+  "name": "bianca=app-frontend",
+  "displayName": "bianca=app-frontend",
   "expo": {
-    "name": "PizzaApp",
-    "slug": "PizzaApp",
-    "scheme": "pizzaapp",
+    "name": "bianca=app-frontend",
+    "slug": "bianca=app-frontend",
+    "scheme": "bianca=app-frontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-all.png",
@@ -22,7 +22,7 @@
     ],
     "android": {
       "icon": "./assets/images/app-icon-android-legacy.png",
-      "package": "com.pizzaapp",
+      "package": "com.bianca=app-frontend",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
         "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
@@ -36,7 +36,7 @@
     "ios": {
       "icon": "./assets/images/app-icon-ios.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.pizzaapp",
+      "bundleIdentifier": "com.bianca=app-frontend",
       "splash": {
         "image": "./assets/images/splash-logo-ios-mobile.png",
         "tabletImage": "./assets/images/splash-logo-ios-tablet.png",

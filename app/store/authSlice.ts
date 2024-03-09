@@ -40,6 +40,7 @@ export const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.register.matchFulfilled, (state, { payload }) => {
+      console.log("logging in");
       state.currentUser = payload;
     });
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {

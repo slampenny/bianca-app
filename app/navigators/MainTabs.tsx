@@ -1,10 +1,11 @@
 import React from 'react';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { HomeScreen } from 'app/screens/HomeScreen';
 import { UserScreen } from 'app/screens/UserScreen';
 import { CaregiverScreen, LogoutScreen, PaymentInfoScreen } from 'app/screens';
+import { useSelector } from 'react-redux';
+import { isAuthenticated } from 'app/store/authSlice';
 
 // Define a type for your MainTabs navigator
 export type MainTabsParamList = {
@@ -19,26 +20,26 @@ const Drawer = createDrawerNavigator();
 
 export function MainTabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
+    <Tab.Navigator initialRouteName="HomeScreen" screenOptions={{ headerShown: false }}>
       <Tab.Screen name="HomeScreen" component={HomeScreen} />
       <Tab.Screen name="CaregiverScreen" component={CaregiverScreen} />
-      <Tab.Screen name="UserScreen" component={UserScreen}/>
     </Tab.Navigator>
   );
 }
 
 export default function MainTabsWithDrawer() {
+  const loggedIn = useSelector(isAuthenticated);
+
+  if (!loggedIn) {
+    // User is not authenticated, do not render the actual content
+    return null; // or return some placeholder component
+  }
+
   return (
-    <Drawer.Navigator initialRouteName="MainTabs">
-      <Drawer.Screen name="MainTabs" 
-        component={MainTabs} 
-        options={({ route }) => {
-          const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeScreen';
-          return { headerTitle: routeName };
-        }} 
-      />
-      <Drawer.Screen name="CaregiverInfo" component={CaregiverScreen} />
-      <Drawer.Screen name="PaymentInfo" component={PaymentInfoScreen} />
+    <Drawer.Navigator initialRouteName="Home">
+      <Drawer.Screen name="Home" component={MainTabs} />
+      <Drawer.Screen name="Caregiver" component={CaregiverScreen} />
+      <Drawer.Screen name="Payment" component={PaymentInfoScreen} />
       <Drawer.Screen name="Logout" component={LogoutScreen} />
     </Drawer.Navigator>
   );

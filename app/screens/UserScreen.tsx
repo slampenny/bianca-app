@@ -5,7 +5,7 @@ import { ScrollView } from 'react-native-gesture-handler';
 import { useSelector, useDispatch } from 'react-redux';
 import { useCreateUserMutation, useUpdateUserMutation, useDeleteUserMutation } from '../services/api/userApi';
 import { getCurrentUser } from '../store/authSlice';
-import { removeSelectedUser } from '../store/caregiverSlice';
+import { useRemoveCaregiverMutation } from 'app/services/api/caregiverApi'; 
 import { getSelectedUser } from '../store/userSlice';
 import Schedule from '../components/Schedule';
 
@@ -21,7 +21,7 @@ export function UserScreen() {
 
   const [addUser] = useCreateUserMutation();
   const [updateUser] = useUpdateUserMutation();
-  const [deleteUser] = useDeleteUserMutation();
+  const [deleteUser] = useRemoveCaregiverMutation();
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -57,9 +57,10 @@ export function UserScreen() {
 
   const handleDeleteUser = async () => {
     if (displayedUser && displayedUser.id) {
-      await deleteUser({ id: displayedUser.id});
-      dispatch(removeSelectedUser(displayedUser.id));
-      navigation.goBack();
+      if (currentUser && currentUser.id) {
+        await deleteUser({ userId: displayedUser.id, caregiverId: currentUser.id});
+        navigation.goBack();
+      }
     }
   };
 

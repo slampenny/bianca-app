@@ -23,6 +23,12 @@ export const caregiverApi = createApi({
         method: 'POST',
       }),
     }),
+    removeCaregiver: builder.mutation<void, { userId: string, caregiverId: string }>({
+      query: ({ userId, caregiverId }) => ({
+        url: `/users/${userId}/caregiver/${caregiverId}`,
+        method: 'DELETE',
+      }),
+    }),
     getClientsForCaregiver: builder.query<void, User | null >({
       query: (caregiver) => {
         if (caregiver === null) {
@@ -35,19 +41,12 @@ export const caregiverApi = createApi({
 
       }
     }),
-    deleteUser: builder.mutation<void, { userId: string }>({
-      query: ({ userId }) => ({
-        url: `/users/${userId}`,
-        method: 'DELETE',
-      }),
-    }),
-    // ...other endpoints...
   }),
 });
 
 export const {
   useAssignCaregiverMutation,
+  useRemoveCaregiverMutation,
   useGetClientsForCaregiverQuery,
-  useDeleteUserMutation,
   // ...other hooks...
 } = caregiverApi;

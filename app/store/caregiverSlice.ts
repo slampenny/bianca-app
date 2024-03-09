@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
 import { User } from '../services/api/api.types';
+import { caregiverApi } from 'app/services/api/caregiverApi';
 
 interface CaregiverState {
   caregiver: User | null;
@@ -32,6 +33,11 @@ export const caregiverSlice = createSlice({
       state.selectedUsers = state.selectedUsers.filter(user => user.id !== action.payload);
     },
   },
+  extraReducers: (builder) => {
+    builder.addMatcher(caregiverApi.endpoints.removeCaregiver.matchFulfilled, (state, { payload }) => {
+      state.selectedUsers = state.selectedUsers.filter(user => user.id !== payload);
+    });
+  }
 });
 
 export const { setCaregiver, setSelectedUsers, clearCaregiver, clearSelectedUsers, removeSelectedUser } = caregiverSlice.actions;

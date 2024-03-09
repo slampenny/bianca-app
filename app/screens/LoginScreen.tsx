@@ -9,7 +9,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack"
 // Define the type for the navigation stack parameters
 type LoginStackParamList = {
   Login: undefined; // No parameters expected for the Login route
-  Welcome: undefined; // No parameters expected for the Welcome route
+  MainTabsWithDrawer: undefined; // No parameters expected for the Welcome route
   // ... other routes in the stack
 };
 
@@ -46,7 +46,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     try {
       const result = await loginAPI({ email: authEmail, password: authPassword }).unwrap();
       dispatch(setAuthTokens(result.tokens));
-      navigation.navigate('Welcome');
+      navigation.navigate('MainTabsWithDrawer');
     } catch (error) {
       console.error(error);
     }

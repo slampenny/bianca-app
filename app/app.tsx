@@ -42,7 +42,7 @@ const config = {
     Login: {
       path: "",
     },
-    Welcome: "welcome",
+    MainTabsWithDrawer: "MainTabsWithDrawer",
   },
 }
 
