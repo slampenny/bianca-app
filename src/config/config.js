@@ -28,6 +28,7 @@ const envVarsSchema = Joi.object()
     TWILIO_AUTHTOKEN: Joi.string().description('twilio auth token'),
     TWILIO_VOICEURL:  Joi.string().description('twilio voice url'),
     OPEN_AI_KEY: Joi.string().description('open ai key'),
+    STRIPE_SECRET_KEY: Joi.string().description('stripe secret key'),
   })
   .unknown();
 
@@ -72,7 +73,7 @@ module.exports = {
   },
   twilio: {
     phone: envVars.TWILIO_PHONENUMBER,
-    apiUrl: `https://3f06-179-184-19-126.ngrok-free.app`,
+    apiUrl: `https://be0e-70-68-70-88.ngrok-free.app`,
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
   },
@@ -80,4 +81,7 @@ module.exports = {
     apiKey: envVars.OPENAI_API_KEY,
     model: envVars.OPENAI_API_MODEL
   },
+  stripe: {
+    secretKey: envVars.STRIPE_SECRET_KEY,
+  }
 };

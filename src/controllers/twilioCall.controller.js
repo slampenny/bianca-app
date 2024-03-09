@@ -11,14 +11,14 @@ const initiateCall = catchAsync(async (req, res) => {
 });
 
 const prepareCall = catchAsync(async (req, res) => {
-    const responseTwiML = await twilioCallService.prepareCall();
+    const responseTwiML = await twilioCallService.prepareCall(req);
     res.type('text/xml').send(responseTwiML);
 });
 
 const handleRealTimeInteraction = catchAsync(async (req, res) => {
-    const { CallSid, SpeechResult } = req.body;
-    logger.info(`CallSid: ${CallSid}, SpeechResult: ${SpeechResult}`);
-    const responseTwiML = await twilioCallService.handleRealTimeInteraction(CallSid, SpeechResult);
+    const { CallSid, SpeechResult, CallStatus } = req.body;
+    logger.info(`CallSid: ${CallSid}, SpeechResult: ${SpeechResult}, CallStatus: ${CallStatus}`);
+    const responseTwiML = await twilioCallService.handleRealTimeInteraction(CallSid, SpeechResult, CallStatus);
     res.type('text/xml').send(responseTwiML);
 });
 

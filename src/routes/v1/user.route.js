@@ -52,6 +52,41 @@ router
   .route('/:userId/caregiver/:caregiverId')
   .post(auth('manageUsers'), userController.assignCaregiver);
 
+// New route for removing a user from caregiver
+/**
+ * @swagger
+ * /users/{userId}/caregiver/{caregiverId}:
+ *   delete:
+ *     summary: Remove a user from a caregiver
+ *     description: Only admins can assign caregivers.
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *       - in: path
+ *         name: caregiverId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Caregiver ID
+ *     responses:
+ *       "200":
+ *         description: Caregiver removed
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+  .route('/:userId/caregiver/:caregiverId')
+  .delete(auth('manageUsers'), userController.removeCaregiver);
+
 // New route for getting clients of a caregiver
 /**
  * @swagger

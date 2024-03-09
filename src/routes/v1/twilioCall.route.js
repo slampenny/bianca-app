@@ -90,7 +90,7 @@ twilioCallController.handleRealTimeInteraction);
 
 /**
  * @swagger
- * /twilio/call-end:
+ * /twilio/end-call:
  *   post:
  *     summary: Endpoint for handling the end of a call
  *     description: Receives a notification from Twilio when a call ends and processes any necessary cleanup or finalization tasks
@@ -108,7 +108,7 @@ twilioCallController.handleRealTimeInteraction);
  *       "200":
  *         description: Call end handled successfully
  */
-router.post('/call-end', 
+router.post('/end-call', 
 validateTwilioRequest,
 twilioCallController.endCall);
 

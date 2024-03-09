@@ -17,9 +17,12 @@ const initiateCall = async (userId) => {
   }
   
   const call = await twilioClient.calls.create({
-    url: `${config.twilio.apiUrl}/v1/twilio/prepare-call`, // Endpoint to prepare call
+    url: `${config.twilio.apiUrl}/v1/twilio/prepare-call?initial=true`, // Endpoint to prepare call
     to: user.phone,
     from: config.twilio.phone,
+    statusCallback: `${config.twilio.apiUrl}/v1/twilio/end-call`, // Endpoint to handle call status updates
+    statusCallbackEvent: ['completed'], // List of call status events to trigger the webhook
+    statusCallbackMethod: 'POST', // HTTP method to use for the webhook request
   });
 
   const previousConversation = await Conversation.find({ userId: userId }).sort({ createdAt: -1 }).limit(1);
@@ -34,22 +37,34 @@ const initiateCall = async (userId) => {
   return call.sid;
 };
 
-const prepareCall = () => {
+const prepareCall = (req) => {
   logger.info(`In Prepare Call function`);
   const twiml = new VoiceResponse();
-
+  if (req.query.initial === 'true') {
+    twiml.say('Hello, I am Bianca. How can I help you today?');
+  }
+  
   twiml.gather({
     input: 'speech',
     speechTimeout: 'auto',
     speechModel: 'experimental_conversations',
     action: `${config.twilio.apiUrl}/v1/twilio/real-time-interaction`, // Endpoint to process speech response
+    actionOnEmptyResult: true,
   });
-  
-  twiml.say('Hello, I am Bianca. How can I help you today?');
+
   return twiml.toString();
 };
 
-const handleRealTimeInteraction = async (callSid, speechResult) => {
+const handleRealTimeInteraction = async (callSid, speechResult, callStatus) => {
+    logger.info(`In Handle Real Time Interaction function with callSid: ${callSid}, speechResult: ${speechResult}, and callStatus: ${callStatus}`);
+    if (!speechResult) {
+      // A timeout occurred
+      logger.info('A timeout occurred');
+      const twiml = new VoiceResponse();
+      twiml.say(`I didn't hear anything. I'll phone back later`);
+      return twiml.toString();
+    }
+
     logger.info(`Save the user's speech to the conversation with these params: ${callSid} and ${speechResult}`);
     const conversation = await Conversation.findOne({ callSid }).populate('userId');
     if (!conversation) {
@@ -107,7 +122,10 @@ const handleRealTimeInteraction = async (callSid, speechResult) => {
     if (!conversation) {
       logger.error(`No conversation found with callSid: ${callSid}`);
     } else {
-      chatService.summarize(conversation);
+      conversation.history = await chatService.summarize(conversation);
+      // Set the end time of the conversation to the current time
+      conversation.endTime = new Date();
+      await conversation.save();
     }
     try {
       chatService.cleanup(callSid);

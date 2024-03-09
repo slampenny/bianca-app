@@ -45,16 +45,10 @@ class ChatService {
     async summarize(conversation) {
         try {
             // Summarize the conversation using LangChain
-            const summarizedConversation = await langChainAPI.summarizeConversation(
+            return await langChainAPI.summarizeConversation(
                 conversation.messages,
                 conversation.history
             );
-
-            // Update the conversation with the summarized conversation
-            conversation.history = summarizedConversation;
-            await conversation.save();
-
-            return summarizedConversation;
         } catch (err) {
             throw err;
         }

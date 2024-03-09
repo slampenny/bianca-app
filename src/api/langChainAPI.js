@@ -15,10 +15,6 @@ const llm = new OpenAI({
 const langChainAPI = {
   // Define the summarizeConversation method
   async summarizeConversation(message, conversationHistory, userDomain = 'casual conversation') {
-    // Log the start of the conversation summarization
-    console.log(
-      `LangChain - Summarizing Conversation, using Template: ${conversationHistory}`
-    );
     try {
       // Get the generic summarization template
       const template = templates.generic.summarization;

@@ -104,6 +104,26 @@ const assignCaregiver = async (userId, caregiverId) => {
 };
 
 /**
+ * Delete user by id
+ * @param {ObjectId} userId
+ * @returns {Promise<User>}
+ */
+const removeCaregiverUserById = async (caregiverId, userId) => {
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+  if (caregiverId == userId) {
+    user.caregiverId = null;
+    await user.save();
+    return user;
+  } else { 
+    await user.remove();
+    return user;
+  }
+};
+
+/**
  * Get clients for a caregiver
  * @param {ObjectId} caregiverId
  * @returns {Promise<Array<User>>}
