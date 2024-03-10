@@ -3,13 +3,11 @@ version: 0.2
 env:
   variables:
     AWS_DEFAULT_REGION: "us-east-2" # Example, adjust as needed
+    AWS_ACCOUNT_ID: "730335291008" # Replace with your actual AWS Account ID
 
 phases:
   pre_build:
     commands:
-      - echo Retrieving AWS Account ID..
-      - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-      - echo $AWS_ACCOUNT_ID
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/node-app
@@ -26,6 +24,7 @@ phases:
   post_build:
     commands:
       - echo Build completed on `date`
+      # If you want to push to ECR, uncomment the following lines
       # - echo Pushing the Docker image...
       # - docker push $REPOSITORY_URI:$IMAGE_TAG
       # - docker push $REPOSITORY_URI:latest
