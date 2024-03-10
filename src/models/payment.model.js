@@ -60,5 +60,7 @@ invoiceSchema.plugin(toJSON);
 invoiceSchema.plugin(paginate);
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
+const LineItem = mongoose.model('LineItem', lineItemSchema);
 
 module.exports = Invoice;
+module.exports = LineItem;

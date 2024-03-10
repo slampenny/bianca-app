@@ -2,6 +2,10 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const httpStatus = require('http-status');
 const { User } = require('../models');
 const ApiError = require('../utils/ApiError');
+const mongoose = require('mongoose');
+const { Conversation } = require('./path-to-your-models');
+const Invoice = require('app/sec/models'); // Assuming you have this model
+const LineItem = require('./path-to-your-lineItem-model'); // Assuming you have this model
 
 const createPaymentMethod = async (userId, paymentMethodId) => {
   const user = await User.findById(userId);
@@ -46,11 +50,6 @@ const deletePaymentMethod = async (userId, paymentMethodId) => {
   return paymentMethodId;
 };
 
-const mongoose = require('mongoose');
-const { Conversation } = require('./path-to-your-models');
-const Invoice = require('./path-to-your-invoice-model'); // Assuming you have this model
-const LineItem = require('./path-to-your-lineItem-model'); // Assuming you have this model
-
 const createLineItemsAndLinkConversations = async (caregiverId, invoiceId) => {
   const unchargedConversations = await aggregateUnchargedConversations(caregiverId);
 
@@ -82,7 +81,9 @@ const linkConversationsToLineItem = async (conversationIds, lineItemId) => {
 };
 
 const calculateAmount = (totalDuration) => {
-  // Define how you calculate billing amount based on the conversation duration
+  const ratePerMinute = config.billing.ratePerMinute; // Change this to your actual rate
+  const totalMinutes = totalDuration / 60;
+  return totalMinutes * ratePerMinute;
 };
 
 module.exports = {
