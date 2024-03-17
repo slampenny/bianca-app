@@ -2,34 +2,34 @@ version: 0.2
 
 env:
   variables:
-    AWS_DEFAULT_REGION: "us-east-2" # Example, adjust as needed
-    AWS_ACCOUNT_ID: "730335291008" # Replace with your actual AWS Account ID
+    AWS_DEFAULT_REGION: "us-east-2"
+    AWS_ACCOUNT_ID: "730335291008"
+    REPOSITORY_NAME: "bianca-app-backend"  # Ensure this matches your actual ECR repository name
 
 phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/node-app
+      - $(aws ecr get-login-password --region $AWS_DEFAULT_REGION) | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       
   build:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
-      - docker build -t node-app .
-      - docker tag node-app:latest $REPOSITORY_URI:$IMAGE_TAG
-      - docker tag node-app:latest $REPOSITORY_URI:latest
+      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
 
   post_build:
     commands:
       - echo Build completed on `date`
-      # If you want to push to ECR, uncomment the following lines
-      # - echo Pushing the Docker image...
-      # - docker push $REPOSITORY_URI:$IMAGE_TAG
-      # - docker push $REPOSITORY_URI:latest
+      - echo Pushing the Docker image...
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_URI:latest
       - echo Writing image definitions file...
-      - printf '[{"name":"node-app","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - printf '[{"name":"bianca-app-backend","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
 
 artifacts:
-  files: imagedefinitions.json
+  files:
+    - imagedefinitions.json
