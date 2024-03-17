@@ -6,7 +6,7 @@ env:
     AWS_ACCOUNT_ID: "730335291008"
     REPOSITORY_NAME: "bianca-app-backend"  # Ensure this matches your actual ECR repository name
 
-phases:
+phases: 
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...

@@ -105,8 +105,7 @@ Resources:
             - sg-0e3774173bebafaab
     DependsOn: Listener
 
-
-  MyPipeline:
+  BiancaPipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
       RoleArn: arn:aws:iam::730335291008:role/service-role/codebuild-bianca-service-role
@@ -126,7 +125,7 @@ Resources:
                 - Name: SourceOutput
               Configuration:
                 Owner: slampenny
-                Repo: slampenny/bianca-app-backend
+                Repo: bianca-app-backend
                 Branch: main
                 OAuthToken: !Sub '{{resolve:secretsmanager:MySecretsManagerSecret:SecretString:GitHubToken}}'
               RunOrder: 1
