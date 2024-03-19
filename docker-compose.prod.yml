@@ -1,6 +1,6 @@
 version: '3'
 
 services:
-  node-app:
-    container_name: node-app-prod
+  bianca-app:
+    container_name: bianca-app-prod
     command: yarn start

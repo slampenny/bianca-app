@@ -31,23 +31,36 @@ Resources:
       Path: "/"
       Policies: [] # Optionally define task-specific policies
 
+   # Update ECSTaskDefinition to include both your application and MongoDB
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: bianca-webapp
-      Cpu: "256"
-      Memory: "512"
+      Cpu: "512" # Adjust based on needs
+      Memory: "1024" # Adjust based on needs
       NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
+      RequiresCompatibilities: [ "FARGATE" ]
       ExecutionRoleArn: !GetAtt ECSExecutionRole.Arn
       TaskRoleArn: !GetAtt ECSTaskRole.Arn
       ContainerDefinitions:
-        - Name: bianca-app-backend
-          Image: nginx # Update with your actual image URI from ECR
-          Essential: true
+        - Name: bianca-app
+          # Use image URI from CodeBuild output. Assuming ECR is used and the URI is updated dynamically via a placeholder or build process.
+          Image: !Ref 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend # Placeholder, replace with dynamic reference or actual image URI
+          Environment:
+            - Name: MONGODB_URL
+              Value: mongodb://mongodb:27017/bianca-app
           PortMappings:
-            - ContainerPort: 80
+            - ContainerPort: 3000
+          DependsOn:
+            - Condition: START
+              ContainerName: mongodb
+          Volumes:
+            - .:/usr/src/bianca-app # Adjust for ECS compatibility, likely through EFS if persistent storage is needed
+        - Name: mongodb
+          Image: mongo:4.2.1-bionic
+          PortMappings:
+            - ContainerPort: 27017
+          # Define volumes for MongoDB if persistent storage is required, possibly using EFS
 
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -142,7 +155,7 @@ Resources:
               OutputArtifacts:
                 - Name: BuildOutput
               Configuration:
-                ProjectName: bianca-build-project  # Ensure this matches your actual CodeBuild project name
+                ProjectName: bianca  # Ensure this matches your actual CodeBuild project name
               RunOrder: 1
         - Name: Deploy
           Actions:

@@ -76,7 +76,7 @@ module.exports = {
   },
   twilio: {
     phone: envVars.TWILIO_PHONENUMBER,
-    apiUrl: `https://be0e-70-68-70-88.ngrok-free.app`,
+    apiUrl: (envVars.NODE_ENV === 'development') ? 'https://be0e-70-68-70-88.ngrok-free.app' : envVars.API_URL,
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
   },
