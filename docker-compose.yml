@@ -6,7 +6,6 @@ services:
     image: bianca-app
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/bianca-app
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     ports:
       - '3000:3000'
     depends_on:

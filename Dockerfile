@@ -15,8 +15,11 @@ COPY --chown=node:node . .
 # Copy .env file
 COPY --chown=node:node .env ./
 
+# Copy .env file
+COPY --chown=node:node credentials ./
+
 # Expose the port the app runs on
 EXPOSE 3000
 
 # Command to run your application
-CMD ["node", "app.js"]
+CMD ["yarn", "start"]
