@@ -1,5 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
+  ECSCluster:
+    Type: String
+    Description: "The name of the ECS cluster"
+  ECSService:
+    Type: String
+    Description: "The name of the ECS service"
   AppImageUri:
     Type: String
     Description: "The URI of the Docker image in ECR"
