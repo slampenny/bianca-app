@@ -64,11 +64,11 @@ class ChatService {
         const request = {
             input: { text: text },
             voice: {
-                languageCode: process.env.GOOGLE_CLOUD_TTS_LANGUAGE,
-                name: process.env.GOOGLE_CLOUD_TTS_NAME,
-                ssmlGender: process.env.GOOGLE_CLOUD_TTS_GENDER,
+                languageCode:  config.google.language,
+                name: config.google.name,
+                ssmlGender: config.google.gender,
             },
-            audioConfig: { audioEncoding: process.env.GOOGLE_CLOUD_TTS_ENCODING },
+            audioConfig: { audioEncoding: config.google.encoding },
         };
 
         try {

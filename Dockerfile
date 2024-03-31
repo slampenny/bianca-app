@@ -1,6 +1,6 @@
 FROM node:alpine
 
-# Create app directory
+# Create app directoryaaaas
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
 WORKDIR /usr/src/bianca-app
 
@@ -11,12 +11,6 @@ RUN yarn install --pure-lockfile
 
 # Bundle app source
 COPY --chown=node:node . .
-
-# Copy .env file
-COPY --chown=node:node .env ./
-
-# Copy .env file
-COPY --chown=node:node credentials ./
 
 # Expose the port the app runs on
 EXPOSE 3000
