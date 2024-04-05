@@ -1,5 +1,8 @@
-const { version } = require('../../package.json');
+const m2s = require('mongoose-to-swagger');
 const config = require('../config/config');
+const { version } = require('../../package.json');
+const { User, Conversation, Call, Token, Schedule, Report, Message } = require('../models');
+const AccessControl = require('../models/accessControl.model');
 
 const swaggerDef = {
   openapi: '3.0.0',
@@ -9,6 +12,63 @@ const swaggerDef = {
     license: {
       name: 'MIT',
       url: 'https://github.com/hagopj13/node-express-boilerplate/blob/master/LICENSE',
+    },
+  },
+  components: {
+    schemas: {
+      User: m2s(User, { omitFields: ['password', 'isEmailVerified'] }),
+      Conversation: m2s(Conversation),
+      Call: m2s(Call),
+      AccessControl: m2s(AccessControl),
+      Token: m2s(Token),
+      AuthToken: {
+        title: 'AuthToken',
+        required: ['value', 'expiry'],
+        properties: {
+          value: {
+            type: 'string',
+          },
+          expiry: {
+            type: 'string',
+            format: 'date-time',
+          },
+        },
+      },
+      AuthTokens: {
+        title: 'AuthTokens',
+        required: ['accessToken', 'refreshToken'],
+        properties: {
+          accessToken: {
+            $ref: '#/components/schemas/AuthToken',
+          },
+          refreshToken: {
+            $ref: '#/components/schemas/AuthToken',
+          },
+        },
+      },
+      Schedule: m2s(Schedule),
+      Message: m2s(Message),
+      Report: m2s(Report),
+      Error: {
+        description: 'Server Error Occurred',
+      },
+    },
+    responses: {
+      NotFound: {
+        description: 'Not Found',
+      },
+      Unauthorized: {
+        description: 'Unauthorized',
+      },
+      Forbidden: {
+        description: 'Forbidden',
+      },
+      DuplicateEmail: {
+        description: 'Email already exists',
+      },
+      BadRequest: {
+        description: 'Bad Request',
+      },
     },
   },
   servers: [

@@ -8,6 +8,11 @@ const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
 
 /**
+ * @typedef {{ value: string; expires: string; }} AuthToken
+ * @typedef {{ accessToken: AuthToken, refreshToken: AuthToken }} AuthTokens
+ */
+
+/**
  * Generate token
  * @param {ObjectId} userId
  * @param {Moment} expires
@@ -63,7 +68,7 @@ const verifyToken = async (token, type) => {
 /**
  * Generate auth tokens
  * @param {User} user
- * @returns {Promise<Object>}
+ * @returns {Promise<AuthTokens>}
  */
 const generateAuthTokens = async (user) => {
   const accessTokenExpires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
@@ -75,12 +80,12 @@ const generateAuthTokens = async (user) => {
 
   return {
     access: {
-      token: accessToken,
-      expires: accessTokenExpires.toDate(),
+      value: accessToken,
+      expires: accessTokenExpires.unix(),
     },
     refresh: {
-      token: refreshToken,
-      expires: refreshTokenExpires.toDate(),
+      value: refreshToken,
+      expires: refreshTokenExpires.unix(),
     },
   };
 };
