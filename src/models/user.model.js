@@ -37,7 +37,9 @@ const userSchema = mongoose.Schema(
     },
     password: {
       type: String,
-      required: function() { return this.role === 'caregiver'; },
+      required: function required() {
+        return this.role === 'caregiver';
+      },
       trim: true,
       minlength: 8,
       validate(value) {
@@ -60,12 +62,14 @@ const userSchema = mongoose.Schema(
     caregiver: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'User',
-      default: null
+      default: null,
     },
-    schedules: [{
-      type: mongoose.SchemaTypes.ObjectId,
-      ref: 'Schedule',
-    }],
+    schedules: [
+      {
+        type: mongoose.SchemaTypes.ObjectId,
+        ref: 'Schedule',
+      },
+    ],
   },
   {
     timestamps: true,

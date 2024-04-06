@@ -117,10 +117,9 @@ const removeCaregiverUserById = async (caregiverId, userId) => {
     user.caregiverId = null;
     await user.save();
     return user;
-  } else { 
-    await user.remove();
-    return user;
   }
+  await user.remove();
+  return user;
 };
 
 /**
@@ -142,6 +141,17 @@ const getClientsForCaregiver = async (caregiverId) => {
   return clients;
 };
 
+const getCaregiverById = async (caregiverId) => {
+  const caregiver = await getUserById(caregiverId);
+  if (!caregiver) {
+    return null;
+  }
+  if (caregiver.role !== 'caregiver') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User is not a caregiver');
+  }
+  return caregiver;
+};
+
 module.exports = {
   createUser,
   queryUsers,
@@ -150,5 +160,6 @@ module.exports = {
   updateUserById,
   deleteUserById,
   assignCaregiver,
+  getCaregiverById,
   getClientsForCaregiver,
 };
