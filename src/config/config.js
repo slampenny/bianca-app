@@ -28,7 +28,7 @@ const envVarsSchema = Joi.object()
     TWILIO_ACCOUNTSID: Joi.string().description('twilio account sid'),
     TWILIO_AUTHTOKEN: Joi.string().description('twilio auth token'),
     TWILIO_VOICEURL:  Joi.string().description('twilio voice url'),
-    OPEN_AI_KEY: Joi.string().description('open ai key'),
+    OPENAI_API_KEY: Joi.string().description('open ai key'),
     STRIPE_SECRET_KEY: Joi.string().description('stripe secret key'),
   })
   .unknown();
@@ -59,13 +59,17 @@ async function getSecretValue(secretName) {
   }
 }
 
-if (process.env.NODE_ENV === 'production') {
-  // Replace 'MySecret' with the name of your secret in AWS Secrets Manager
-  const secrets = JSON.parse(await getSecretValue('MySecretsManagerSecret'));
+(async () => {
+  if (process.env.NODE_ENV === 'production') {
+    // Replace 'MySecret' with the name of your secret in AWS Secrets Manager
+    const secrets = JSON.parse(await getSecretValue('MySecretsManagerSecret'));
 
-  // Overwrite the environment variables with the secrets
-  process.env = { ...process.env, ...secrets };
-}
+    console.log(secrets);
+
+    // Overwrite the environment variables with the secrets
+    process.env = { ...process.env, ...secrets };
+  }
+})();
 
 const configVars = {
   env: envVars.NODE_ENV,
@@ -92,7 +96,7 @@ const configVars = {
   },
   email: {
     smtp: {
-      host: smtp.ethereal.email,
+      host: 'smtp.ethereal.email',
       port: 587,
       secure: false,
       requireTLS: true,
@@ -126,7 +130,7 @@ const configVars = {
 
 if (envVars.NODE_ENV === 'production') {
   configVars.authEnabled = true;
-  configVars.API_URL = 'http://app.myphonefriend.com/v1';
+  configVars.apiUrl = 'http://app.myphonefriend.com/v1';
   configVars.mongoose.url = 'mongodb://mongo:27017/bianca-app';
   configVars.email.smtp.secure = true;
   configVars.twilio.apiUrl = 'https://app.myphonefriend.com';
