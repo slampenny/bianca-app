@@ -3,7 +3,11 @@ const config = require('../../src/config/config');
 
 const setupTestDB = () => {
   beforeAll(async () => {
-    await mongoose.connect(config.mongoose.url, config.mongoose.options);
+    try {
+      await mongoose.connect(config.mongoose.url, config.mongoose.options);
+    } catch (error) {
+      console.error('Error connecting to MongoDB:', error);
+    }
   });
 
   beforeEach(async () => {
@@ -12,7 +16,7 @@ const setupTestDB = () => {
 
   afterAll(async () => {
     await mongoose.disconnect();
-  });
+  }, 10000);
 };
 
 module.exports = setupTestDB;

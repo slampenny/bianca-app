@@ -21,6 +21,7 @@ const envVarsSchema = Joi.object()
     //   .description('minutes after which verify email token expires'),
     // SMTP_HOST: Joi.string().description('server that will send the emails'),
     // SMTP_PORT: Joi.number().description('port to connect to the email server'),
+    MONGODB_URL: Joi.string().description('path to connect with mongo server'),
     SMTP_USERNAME: Joi.string().description('username for email server'),
     SMTP_PASSWORD: Joi.string().description('password for email server'),
     //EMAIL_FROM: Joi.string().description('the from field in the emails sent by the app'),
@@ -77,7 +78,7 @@ const configVars = {
   authEnabled: false,
   apiUrl: 'http://localhost:3000/v1',
   mongoose: {
-    url: 'mongodb://mongo:27017/bianca-app' + (envVars.NODE_ENV === 'test' ? '-test' : ''),
+    url: envVars.MONGODB_URL + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {
       useCreateIndex: true,
       useNewUrlParser: true,
