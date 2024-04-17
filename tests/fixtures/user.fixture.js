@@ -12,10 +12,12 @@ const userOne = {
   caregiver: null,
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
+  phone: '+16045624263',
   password,
   role: 'user',
   medicalHistory: "",
   isEmailVerified: false,
+  schedules: []
 };
 
 const userTwo = {
@@ -23,10 +25,12 @@ const userTwo = {
   caregiver: null,
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
+  phone: '+16045624263',
   password,
   role: 'user',
   medicalHistory: "",
   isEmailVerified: false,
+  schedules: []
 };
 
 const admin = {
@@ -34,10 +38,12 @@ const admin = {
   caregiver: null,
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
+  phone: '+16045624263',
   password,
   role: 'admin',
   medicalHistory: "",
   isEmailVerified: false,
+  schedules: []
 };
 
 const insertUsers = async (users) => {

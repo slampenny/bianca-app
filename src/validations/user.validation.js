@@ -61,18 +61,17 @@ const updateUser = {
   }),
   body: Joi.object()
     .keys({
-      id: Joi.required().custom(objectId),
-      email: Joi.string().required().email(),
+      email: Joi.string().email().optional(),
       password: Joi.when('role', {
         is: 'caregiver',
         then: Joi.string().required().custom(password),
         otherwise: Joi.string().optional().allow('').custom(password),
-      }),
-      name: Joi.string().required(),
-      role: Joi.string().required().valid('user', 'admin', 'caregiver'),
+      }).optional(),
+      name: Joi.string().optional(),
+      role: Joi.string().optional().valid('user', 'admin', 'caregiver'),
       phone: Joi.when('role', {
         is: 'user',
-        then: Joi.string().required().custom((value, helpers) => {
+        then: Joi.string().optional().custom((value, helpers) => {
           if (!validator.isMobilePhone(value)) {
             return helpers.message('Invalid phone number');
           }

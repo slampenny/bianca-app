@@ -80,11 +80,11 @@ const generateAuthTokens = async (user) => {
 
   return {
     access: {
-      value: accessToken,
+      token: accessToken,
       expires: accessTokenExpires.unix(),
     },
     refresh: {
-      value: refreshToken,
+      token: refreshToken,
       expires: refreshTokenExpires.unix(),
     },
   };

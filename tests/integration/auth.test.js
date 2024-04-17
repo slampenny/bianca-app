@@ -26,6 +26,7 @@ describe('Auth routes', () => {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
+        phone: '+16045624263'
       };
     });
 
@@ -37,7 +38,10 @@ describe('Auth routes', () => {
         id: expect.anything(),
         name: newUser.name,
         email: newUser.email,
+        phone: newUser.phone,
         role: 'user',
+        caregiver: null,
+        schedules: [],
         isEmailVerified: false,
       });
 
@@ -96,8 +100,11 @@ describe('Auth routes', () => {
         id: expect.anything(),
         name: userOne.name,
         email: userOne.email,
+        phone: userOne.phone,
         role: userOne.role,
-        isEmailVerified: userOne.isEmailVerified,
+        caregiver: null,
+        schedules: [],
+        isEmailVerified: false,
       });
 
       expect(res.body.tokens).toEqual({
