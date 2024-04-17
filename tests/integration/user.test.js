@@ -6,6 +6,7 @@ const setupTestDB = require('../utils/setupTestDB');
 const { User } = require('../../src/models');
 const { userOne, userTwo, admin, insertUsers } = require('../fixtures/user.fixture');
 const { userOneAccessToken, adminAccessToken } = require('../fixtures/token.fixture');
+const { schedule } = require('agenda/dist/agenda/schedule');
 
 setupTestDB();
 
@@ -17,6 +18,7 @@ describe('User routes', () => {
       newUser = {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
+        phone: '+16045624263',
         password: 'password1',
         role: 'user',
       };
@@ -40,7 +42,10 @@ describe('User routes', () => {
         id: expect.anything(),
         name: newUser.name,
         email: newUser.email,
+        phone: newUser.phone,
         role: newUser.role,
+        caregiver: null,
+        schedules: [],
         isEmailVerified: false,
       });
 
@@ -170,8 +175,11 @@ describe('User routes', () => {
         id: userOne._id.toHexString(),
         name: userOne.name,
         email: userOne.email,
+        phone: userOne.phone,
         role: userOne.role,
-        isEmailVerified: userOne.isEmailVerified,
+        caregiver: userOne.caregiver,
+        schedules: userOne.schedules,
+        isEmailVerified: false,
       });
     });
 
@@ -377,8 +385,11 @@ describe('User routes', () => {
         id: userOne._id.toHexString(),
         email: userOne.email,
         name: userOne.name,
+        phone: userOne.phone,
         role: userOne.role,
-        isEmailVerified: userOne.isEmailVerified,
+        caregiver: userOne.caregiver,
+        schedules: userOne.schedules,
+        isEmailVerified: false,
       });
     });
 
@@ -510,7 +521,10 @@ describe('User routes', () => {
         id: userOne._id.toHexString(),
         name: updateBody.name,
         email: updateBody.email,
+        phone: userOne.phone,
         role: 'user',
+        caregiver: userOne.caregiver,
+        schedules: userOne.schedules,
         isEmailVerified: false,
       });
 

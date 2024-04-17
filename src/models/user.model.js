@@ -57,7 +57,6 @@ const userSchema = mongoose.Schema(
     isEmailVerified: {
       type: Boolean,
       default: false,
-      private: true,
     },
     caregiver: {
       type: mongoose.SchemaTypes.ObjectId,

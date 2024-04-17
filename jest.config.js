@@ -4,7 +4,7 @@ module.exports = {
     NODE_ENV: 'test',
   },
   restoreMocks: true,
-  coveragePathIgnorePatterns: ['node_modules', 'src/config', 'src/app.js', 'tests'],
+  coveragePathIgnorePatterns: ['node_modules', 'src/config', 'src/app.js'],
   coverageReporters: ['text', 'lcov', 'clover', 'html'],
-  testMatch: ['**/unit/**/*.*.test.js'],
+  testMatch: ['**/*.test.js'], // Simplified to catch all .test.js files
 };

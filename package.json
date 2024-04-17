@@ -13,7 +13,8 @@
   "scripts": {
     "start": "pm2 start ecosystem.config.json --no-daemon",
     "dev": "cross-env NODE_ENV=development nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
-    "test": "jest -i --colors --verbose --detectOpenHandles",
+    "test": "jest -i --colors --verbose --detectOpenHandles --config jest.config.js",
+    "test:auth": "jest -i --colors --verbose --detectOpenHandles --debug tests/integration/auth.test.js",
     "test:watch": "jest -i --watchAll",
     "coverage": "jest -i --coverage",
     "coverage:coveralls": "jest -i --coverage --coverageReporters=text-lcov | coveralls",
@@ -57,6 +58,7 @@
     "@pothos/plugin-scope-auth": "^3.21.1",
     "@pothos/plugin-validation": "^3.10.1",
     "agenda": "^5.0.0",
+    "aws-sdk": "^2.1599.0",
     "axios": "^0.21.1",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",

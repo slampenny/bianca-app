@@ -38,4 +38,5 @@ const router = express.Router();
  *       "201":
  *         description: Permissions set
  *       "400":
- *         $ref: '#
+ *         $ref: '#/components/responses/DuplicateEmail'
+ */
