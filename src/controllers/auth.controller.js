@@ -1,18 +1,27 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { authService, userService, tokenService, emailService } = require('../services');
+const { authService, caregiverService, inviteService, tokenService, emailService } = require('../services');
 
 const register = catchAsync(async (req, res) => {
-  const user = await userService.createUser(req.body);
-  const tokens = await tokenService.generateAuthTokens(user);
-  res.status(httpStatus.CREATED).send({ user, tokens });
+  const caregiver = await caregiverService.createCaregiver(req.body);
+  const org = await orgService.createOrg({ caregiver }); // create an organization for the caregiver
+  const tokens = await tokenService.generateAuthTokens(caregiver);
+  res.status(httpStatus.CREATED).send({ caregiver, tokens });
+});
+
+const registerWithInvite = catchAsync(async (req, res) => {
+  const { token, ...caregiverInfo } = req.body;
+  const invite = await inviteService.verifyInviteToken(token);
+  const caregiver = await caregiverService.createCaregiver({ ...caregiverInfo, org: invite.org });
+  const tokens = await tokenService.generateAuthTokens(caregiver);
+  res.status(httpStatus.CREATED).send({ caregiver, tokens });
 });
 
 const login = catchAsync(async (req, res) => {
   const { email, password } = req.body;
-  const user = await authService.loginUserWithEmailAndPassword(email, password);
-  const tokens = await tokenService.generateAuthTokens(user);
-  res.send({ user, tokens });
+  const caregiver = await authService.loginCaregiverWithEmailAndPassword(email, password);
+  const tokens = await tokenService.generateAuthTokens(caregiver);
+  res.send({ caregiver, tokens });
 });
 
 const logout = catchAsync(async (req, res) => {
@@ -37,8 +46,8 @@ const resetPassword = catchAsync(async (req, res) => {
 });
 
 const sendVerificationEmail = catchAsync(async (req, res) => {
-  const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.user);
-  await emailService.sendVerificationEmail(req.user.email, verifyEmailToken);
+  const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.caregiver);
+  await emailService.sendVerificationEmail(req.caregiver.email, verifyEmailToken);
   res.status(httpStatus.NO_CONTENT).send();
 });
 

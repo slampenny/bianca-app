@@ -8,9 +8,9 @@ const accessControlSchema = mongoose.Schema(
       required: true,
       ref: 'Report'
     },
-    allowedUsers: [{
+    allowedCaregivers: [{
       type: mongoose.SchemaTypes.ObjectId,
-      ref: 'User'
+      ref: 'Caregiver'
     }]
   },
   {

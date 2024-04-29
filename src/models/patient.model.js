@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
+const mongooseDelete = require('mongoose-delete');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
 const { toJSON, paginate } = require('./plugins');
 const { roles } = require('../config/roles');
 
-// User Schema
-const userSchema = mongoose.Schema(
+// Patient Schema
+const patientSchema = mongoose.Schema(
   {
     name: {
       type: String,
@@ -49,20 +50,21 @@ const userSchema = mongoose.Schema(
       },
       private: true, // used by the toJSON plugin
     },
-    role: {
-      type: String,
-      enum: roles,
-      default: 'user',
-    },
     isEmailVerified: {
       type: Boolean,
       default: false,
     },
-    caregiver: {
+    org: {
       type: mongoose.SchemaTypes.ObjectId,
-      ref: 'User',
+      ref: 'Org',
       default: null,
     },
+    caregivers: [
+      {
+        type: mongoose.SchemaTypes.ObjectId,
+        ref: 'Caregiver',
+      },
+    ],
     schedules: [
       {
         type: mongoose.SchemaTypes.ObjectId,
@@ -76,33 +78,34 @@ const userSchema = mongoose.Schema(
 );
 
 // Plugin to convert mongoose to JSON, and paginate results
-userSchema.plugin(toJSON);
-userSchema.plugin(paginate);
+patientSchema.plugin(toJSON);
+patientSchema.plugin(paginate);
+patientSchema.plugin(mongooseDelete, { deletedAt : true });
 
 // Static method to check if email is taken
-userSchema.statics.isEmailTaken = async function (email, excludeUserId) {
-  const user = await this.findOne({ email, _id: { $ne: excludeUserId } });
-  return !!user;
+patientSchema.statics.isEmailTaken = async function (email, excludePatientId) {
+  const patient = await this.findOne({ email, _id: { $ne: excludePatientId } });
+  return !!patient;
 };
 
 // Method to check password match
-userSchema.methods.isPasswordMatch = async function (password) {
-  const user = this;
-  return bcrypt.compare(password, user.password);
+patientSchema.methods.isPasswordMatch = async function (password) {
+  const patient = this;
+  return bcrypt.compare(password, patient.password);
 };
 
 // Pre-save middleware to hash password
-userSchema.pre('save', async function (next) {
-  const user = this;
-  if (user.isModified('password')) {
-    user.password = await bcrypt.hash(user.password, 8);
+patientSchema.pre('save', async function (next) {
+  const patient = this;
+  if (patient.isModified('password')) {
+    patient.password = await bcrypt.hash(patient.password, 8);
   }
   next();
 });
 
 /**
- * @typedef User
+ * @typedef Patient
  */
-const User = mongoose.model('User', userSchema);
+const Patient = mongoose.model('Patient', patientSchema);
 
-module.exports = User;
+module.exports = Patient;

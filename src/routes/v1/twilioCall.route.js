@@ -11,8 +11,8 @@ const router = express.Router();
  * @swagger
  * /twilio/initiate:
  *   post:
- *     summary: Initiate a call to a user
- *     description: Starts a phone call to the specified user using Twilio
+ *     summary: Initiate a call to a patient
+ *     description: Starts a phone call to the specified patient using Twilio
  *     tags: [TwilioCalls]
  *     requestBody:
  *       required: true
@@ -21,11 +21,11 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - userId
+ *               - patientId
  *             properties:
- *               userId:
+ *               patientId:
  *                 type: string
- *                 description: The ID of the user to call
+ *                 description: The ID of the patient to call
  *     responses:
  *       "200":
  *         description: Call initiated successfully
@@ -40,7 +40,7 @@ const router = express.Router();
  *       "400":
  *         description: Bad request
  *       "404":
- *         description: User not found
+ *         description: Patient not found
  */
 router.post('/initiate', validate(twilioCallValidation.initiate),
 twilioCallController.initiateCall);
@@ -66,7 +66,7 @@ router.post('/prepare-call',
  * /twilio/real-time-interaction:
  *   post:
  *     summary: Endpoint for handling real-time interactions during a call
- *     description: Receives and processes user's real-time input (CallSid and SpeechResult) during a Twilio call
+ *     description: Receives and processes patient's real-time input (CallSid and SpeechResult) during a Twilio call
  *     tags: [TwilioCalls]
  *     requestBody:
  *       content:

@@ -1,22 +1,22 @@
 const httpStatus = require('http-status');
 const tokenService = require('./token.service');
-const userService = require('./user.service');
+const caregiverService = require('./patient.service');
 const Token = require('../models/token.model');
 const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
 const logger = require('../config/logger');
 /**
- * Login with username and password
+ * Login with caregivername and password
  * @param {string} email
  * @param {string} password
- * @returns {Promise<User>}
+ * @returns {Promise<Caregiver>}
  */
-const loginUserWithEmailAndPassword = async (email, password) => {
-  const user = await userService.getUserByEmail(email);
-  if (!user || !(await user.isPasswordMatch(password))) {
+const loginCaregiverWithEmailAndPassword = async (email, password) => {
+  const caregiver = await caregiverService.getCaregiverByEmail(email);
+  if (!caregiver || !(await caregiver.isPasswordMatch(password))) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
   }
-  return user;
+  return caregiver;
 };
 
 /**
@@ -40,12 +40,12 @@ const logout = async (refreshToken) => {
 const refreshAuth = async (refreshToken) => {
   try {
     const refreshTokenDoc = await tokenService.verifyToken(refreshToken, tokenTypes.REFRESH);
-    const user = await userService.getUserById(refreshTokenDoc.user);
-    if (!user) {
+    const caregiver = await caregiverService.getCaregiverById(refreshTokenDoc.caregiver);
+    if (!caregiver) {
       throw new Error();
     }
     await refreshTokenDoc.remove();
-    return tokenService.generateAuthTokens(user);
+    return tokenService.generateAuthTokens(caregiver);
   } catch (error) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate');
   }
@@ -60,12 +60,12 @@ const refreshAuth = async (refreshToken) => {
 const resetPassword = async (resetPasswordToken, newPassword) => {
   try {
     const resetPasswordTokenDoc = await tokenService.verifyToken(resetPasswordToken, tokenTypes.RESET_PASSWORD);
-    const user = await userService.getUserById(resetPasswordTokenDoc.user);
-    if (!user) {
+    const caregiver = await caregiverService.getCaregiverById(resetPasswordTokenDoc.caregiver);
+    if (!caregiver) {
       throw new Error();
     }
-    await userService.updateUserById(user.id, { password: newPassword });
-    await Token.deleteMany({ user: user.id, type: tokenTypes.RESET_PASSWORD });
+    await caregiverService.updateCaregiverById(caregiver.id, { password: newPassword });
+    await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.RESET_PASSWORD });
   } catch (error) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Password reset failed');
   }
@@ -79,19 +79,19 @@ const resetPassword = async (resetPasswordToken, newPassword) => {
 const verifyEmail = async (verifyEmailToken) => {
   try {
     const verifyEmailTokenDoc = await tokenService.verifyToken(verifyEmailToken, tokenTypes.VERIFY_EMAIL);
-    const user = await userService.getUserById(verifyEmailTokenDoc.user);
-    if (!user) {
+    const caregiver = await caregiverService.getCaregiverById(verifyEmailTokenDoc.caregiver);
+    if (!caregiver) {
       throw new Error();
     }
-    await Token.deleteMany({ user: user.id, type: tokenTypes.VERIFY_EMAIL });
-    await userService.updateUserById(user.id, { isEmailVerified: true });
+    await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.VERIFY_EMAIL });
+    await caregiverService.updateCaregiverById(caregiver.id, { isEmailVerified: true });
   } catch (error) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Email verification failed');
   }
 };
 
 module.exports = {
-  loginUserWithEmailAndPassword,
+  loginCaregiverWithEmailAndPassword,
   logout,
   refreshAuth,
   resetPassword,

@@ -1,8 +1,11 @@
 module.exports.authService = require('./auth.service');
 module.exports.chatService = require('./chat.service');
+module.exports.caregiverService = require('./caregiver.service');
 module.exports.conversationService = require('./conversation.service');
 module.exports.emailService = require('./email.service');
+module.exports.inviteService = require('./invite.service');
+module.exports.orgService = require('./org.service');
 module.exports.scheduleService = require('./schedule.service');
 module.exports.tokenService = require('./token.service');
 module.exports.twilioCallService = require('./twilioCall.service');
-module.exports.userService = require('./user.service');
+module.exports.patientService = require('./patient.service');

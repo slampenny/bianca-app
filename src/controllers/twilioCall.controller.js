@@ -5,8 +5,8 @@ const { twilioCallService } = require('../services');
 const logger = require('../config/logger');
 
 const initiateCall = catchAsync(async (req, res) => {
-    const { userId } = req.body;
-    await twilioCallService.initiateCall(userId);
+    const { patientId } = req.body;
+    await twilioCallService.initiateCall(patientId);
     res.status(httpStatus.OK).json({ message: 'Call initiated successfully' });
 });
 

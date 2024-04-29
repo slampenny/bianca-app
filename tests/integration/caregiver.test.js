@@ -3,162 +3,147 @@ const faker = require('faker');
 const httpStatus = require('http-status');
 const app = require('../../src/app');
 const setupTestDB = require('../utils/setupTestDB');
-const { User } = require('../../src/models');
-const { userOne, userTwo, admin, insertUsers } = require('../fixtures/user.fixture');
-const { userOneAccessToken, adminAccessToken } = require('../fixtures/token.fixture');
-const { schedule } = require('agenda/dist/agenda/schedule');
+const { Caregiver } = require('../../src/models');
+const { caregiverOne, caregiverTwo, admin, insertCaregivers } = require('../fixtures/caregiver.fixture');
+const { caregiverOneAccessToken, adminAccessToken } = require('../fixtures/token.fixture');
 
 setupTestDB();
 
-describe('User routes', () => {
-  describe('POST /v1/users', () => {
-    let newUser;
-
-    beforeEach(() => {
-      newUser = {
-        name: faker.name.findName(),
-        email: faker.internet.email().toLowerCase(),
-        phone: '+16045624263',
-        password: 'password1',
-        role: 'user',
-      };
+describe('Caregiver routes', () => {
+  describe('POST /v1/caregivers', () => {
+    beforeEach(async () => {
     });
 
     afterEach(async () => {
-      await User.deleteMany();
+      await Caregiver.deleteMany();
     });
 
-    test('should return 201 and successfully create new user if data is ok', async () => {
-      await insertUsers([admin]);
-
+    test('should return 201 and successfully create new caregiver if data is ok', async () => {
+      await insertCaregivers([admin]);
       const res = await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(caregiverTwo)
         .expect(httpStatus.CREATED);
 
       expect(res.body).not.toHaveProperty('password');
       expect(res.body).toEqual({
         id: expect.anything(),
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: newUser.role,
-        caregiver: null,
-        schedules: [],
+        name: caregiverTwo.name,
+        email: caregiverTwo.email,
+        phone: caregiverTwo.phone,
+        role: caregiverTwo.role,
+        patients: null,
         isEmailVerified: false,
       });
 
-      const dbUser = await User.findById(res.body.id);
-      expect(dbUser).toBeDefined();
-      expect(dbUser.password).not.toBe(newUser.password);
-      expect(dbUser).toMatchObject({ name: newUser.name, email: newUser.email, role: newUser.role, isEmailVerified: false });
+      const dbCaregiver = await Caregiver.findById(res.body.id);
+      expect(dbCaregiver).toBeDefined();
+      expect(dbCaregiver.password).not.toBe(caregiverTwo.password);
+      expect(dbCaregiver).toMatchObject({ name: caregiverTwo.name, email: caregiverTwo.email, role: caregiverTwo.role, isEmailVerified: false });
     });
 
     test('should be able to create an admin as well', async () => {
-      await insertUsers([admin]);
-      newUser.role = 'admin';
-
+      await insertCaregivers([admin]);
       const res = await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(admin)
         .expect(httpStatus.CREATED);
 
       expect(res.body.role).toBe('admin');
 
-      const dbUser = await User.findById(res.body.id);
-      expect(dbUser.role).toBe('admin');
+      const dbCaregiver = await Caregiver.findById(res.body.id);
+      expect(dbCaregiver.role).toBe('admin');
     });
 
     test('should return 401 error if access token is missing', async () => {
-      await request(app).post('/v1/users').send(newUser).expect(httpStatus.UNAUTHORIZED);
+      await request(app).post('/v1/caregivers').send(caregiverTwo).expect(httpStatus.UNAUTHORIZED);
     });
 
-    test('should return 403 error if logged in user is not admin', async () => {
-      await insertUsers([userOne]);
-
+    test('should return 403 error if logged in caregiver is not admin', async () => {
+      await insertCaregivers([caregiverOne]);
       await request(app)
-        .post('/v1/users')
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
-        .send(newUser)
+        .post('/v1/caregivers')
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
+        .send(caregiverTwo)
         .expect(httpStatus.FORBIDDEN);
     });
 
     test('should return 400 error if email is invalid', async () => {
-      await insertUsers([admin]);
-      newUser.email = 'invalidEmail';
+      await insertCaregivers([admin]);
+      caregiverOne.email = 'invalidEmail';
 
       await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(caregiverOne)
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 error if email is already used', async () => {
-      await insertUsers([admin, userOne]);
-      newUser.email = userOne.email;
+      await insertCaregivers([admin, caregiverOne]);
+      caregiverTwo.email = caregiverOne.email;
 
       await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(caregiverTwo)
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 error if password length is less than 8 characters', async () => {
-      await insertUsers([admin]);
-      newUser.password = 'passwo1';
+      await insertCaregivers([admin]);
+      caregiverTwo.password = 'passwo1';
 
       await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(caregiverTwo)
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 error if password does not contain both letters and numbers', async () => {
-      await insertUsers([admin]);
-      newUser.password = 'password';
+      await insertCaregivers([admin]);
+      caregiverTwo.password = 'password';
 
       await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(caregiverTwo)
         .expect(httpStatus.BAD_REQUEST);
 
-      newUser.password = '1111111';
+        caregiverTwo.password = '1111111';
 
       await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(caregiverTwo)
         .expect(httpStatus.BAD_REQUEST);
     });
 
-    test('should return 400 error if role is neither user nor admin', async () => {
-      await insertUsers([admin]);
-      newUser.role = 'invalid';
+    test('should return 400 error if role is neither caregiver nor admin', async () => {
+      await insertCaregivers([admin]);
+      caregiverTwo.role = 'invalid';
 
       await request(app)
-        .post('/v1/users')
+        .post('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .send(newUser)
+        .send(caregiverTwo)
         .expect(httpStatus.BAD_REQUEST);
     });
   });
 
-  describe('GET /v1/users', () => {
+  describe('GET /v1/caregivers', () => {
     afterEach(async () => {
-      await User.deleteMany();
+      await Caregiver.deleteMany();
     });
 
     test('should return 200 and apply the default query options', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send()
         .expect(httpStatus.OK);
@@ -172,40 +157,40 @@ describe('User routes', () => {
       });
       expect(res.body.results).toHaveLength(3);
       expect(res.body.results[0]).toEqual({
-        id: userOne._id.toHexString(),
-        name: userOne.name,
-        email: userOne.email,
-        phone: userOne.phone,
-        role: userOne.role,
-        caregiver: userOne.caregiver,
-        schedules: userOne.schedules,
+        id: caregiverOne._id.toHexString(),
+        name: caregiverOne.name,
+        email: caregiverOne.email,
+        phone: caregiverOne.phone,
+        role: caregiverOne.role,
+        patients: caregiverOne.patients,
+        schedules: caregiverOne.schedules,
         isEmailVerified: false,
       });
     });
 
     test('should return 401 if access token is missing', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
-      await request(app).get('/v1/users').send().expect(httpStatus.UNAUTHORIZED);
+      await request(app).get('/v1/caregivers').send().expect(httpStatus.UNAUTHORIZED);
     });
 
-    test('should return 403 if a non-admin is trying to access all users', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+    test('should return 403 if a non-admin is trying to access all caregivers', async () => {
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       await request(app)
-        .get('/v1/users')
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .get('/v1/caregivers')
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send()
         .expect(httpStatus.FORBIDDEN);
     });
 
     test('should correctly apply filter on name field', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .query({ name: userOne.name })
+        .query({ name: caregiverOne.name })
         .send()
         .expect(httpStatus.OK);
 
@@ -217,16 +202,16 @@ describe('User routes', () => {
         totalResults: 1,
       });
       expect(res.body.results).toHaveLength(1);
-      expect(res.body.results[0].id).toBe(userOne._id.toHexString());
+      expect(res.body.results[0].id).toBe(caregiverOne._id.toHexString());
     });
 
     test('should correctly apply filter on role field', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
-        .query({ role: 'user' })
+        .query({ role: 'caregiver' })
         .send()
         .expect(httpStatus.OK);
 
@@ -238,15 +223,15 @@ describe('User routes', () => {
         totalResults: 2,
       });
       expect(res.body.results).toHaveLength(2);
-      expect(res.body.results[0].id).toBe(userOne._id.toHexString());
-      expect(res.body.results[1].id).toBe(userTwo._id.toHexString());
+      expect(res.body.results[0].id).toBe(caregiverOne._id.toHexString());
+      expect(res.body.results[1].id).toBe(caregiverTwo._id.toHexString());
     });
 
     test('should correctly sort the returned array if descending sort param is specified', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .query({ sortBy: 'role:desc' })
         .send()
@@ -260,16 +245,16 @@ describe('User routes', () => {
         totalResults: 3,
       });
       expect(res.body.results).toHaveLength(3);
-      expect(res.body.results[0].id).toBe(userOne._id.toHexString());
-      expect(res.body.results[1].id).toBe(userTwo._id.toHexString());
+      expect(res.body.results[0].id).toBe(caregiverOne._id.toHexString());
+      expect(res.body.results[1].id).toBe(caregiverTwo._id.toHexString());
       expect(res.body.results[2].id).toBe(admin._id.toHexString());
     });
 
     test('should correctly sort the returned array if ascending sort param is specified', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .query({ sortBy: 'role:asc' })
         .send()
@@ -284,15 +269,15 @@ describe('User routes', () => {
       });
       expect(res.body.results).toHaveLength(3);
       expect(res.body.results[0].id).toBe(admin._id.toHexString());
-      expect(res.body.results[1].id).toBe(userOne._id.toHexString());
-      expect(res.body.results[2].id).toBe(userTwo._id.toHexString());
+      expect(res.body.results[1].id).toBe(caregiverOne._id.toHexString());
+      expect(res.body.results[2].id).toBe(caregiverTwo._id.toHexString());
     });
 
     test('should correctly sort the returned array if multiple sorting criteria are specified', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .query({ sortBy: 'role:desc,name:asc' })
         .send()
@@ -307,7 +292,7 @@ describe('User routes', () => {
       });
       expect(res.body.results).toHaveLength(3);
 
-      const expectedOrder = [userOne, userTwo, admin].sort((a, b) => {
+      const expectedOrder = [caregiverOne, caregiverTwo, admin].sort((a, b) => {
         if (a.role < b.role) {
           return 1;
         }
@@ -317,16 +302,16 @@ describe('User routes', () => {
         return a.name < b.name ? -1 : 1;
       });
 
-      expectedOrder.forEach((user, index) => {
-        expect(res.body.results[index].id).toBe(user._id.toHexString());
+      expectedOrder.forEach((caregiver, index) => {
+        expect(res.body.results[index].id).toBe(caregiver._id.toHexString());
       });
     });
 
     test('should limit returned array if limit param is specified', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .query({ limit: 2 })
         .send()
@@ -340,15 +325,15 @@ describe('User routes', () => {
         totalResults: 3,
       });
       expect(res.body.results).toHaveLength(2);
-      expect(res.body.results[0].id).toBe(userOne._id.toHexString());
-      expect(res.body.results[1].id).toBe(userTwo._id.toHexString());
+      expect(res.body.results[0].id).toBe(caregiverOne._id.toHexString());
+      expect(res.body.results[1].id).toBe(caregiverTwo._id.toHexString());
     });
 
     test('should return the correct page if page and limit params are specified', async () => {
-      await insertUsers([userOne, userTwo, admin]);
+      await insertCaregivers([caregiverOne, caregiverTwo, admin]);
 
       const res = await request(app)
-        .get('/v1/users')
+        .get('/v1/caregivers')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .query({ page: 2, limit: 2 })
         .send()
@@ -366,144 +351,144 @@ describe('User routes', () => {
     });
   });
 
-  describe('GET /v1/users/:userId', () => {
+  describe('GET /v1/caregivers/:caregiverId', () => {
     afterEach(async () => {
-      await User.deleteMany();
+      await Caregiver.deleteMany();
     });
     
-    test('should return 200 and the user object if data is ok', async () => {
-      await insertUsers([userOne]);
+    test('should return 200 and the caregiver object if data is ok', async () => {
+      await insertCaregivers([caregiverOne]);
 
       const res = await request(app)
-        .get(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .get(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send()
         .expect(httpStatus.OK);
 
       expect(res.body).not.toHaveProperty('password');
       expect(res.body).toEqual({
-        id: userOne._id.toHexString(),
-        email: userOne.email,
-        name: userOne.name,
-        phone: userOne.phone,
-        role: userOne.role,
-        caregiver: userOne.caregiver,
-        schedules: userOne.schedules,
+        id: caregiverOne._id.toHexString(),
+        email: caregiverOne.email,
+        name: caregiverOne.name,
+        phone: caregiverOne.phone,
+        role: caregiverOne.role,
+        caregiver: caregiverOne.caregiver,
+        schedules: caregiverOne.schedules,
         isEmailVerified: false,
       });
     });
 
     test('should return 401 error if access token is missing', async () => {
-      await insertUsers([userOne]);
+      await insertCaregivers([caregiverOne]);
 
-      await request(app).get(`/v1/users/${userOne._id}`).send().expect(httpStatus.UNAUTHORIZED);
+      await request(app).get(`/v1/caregivers/${caregiverOne._id}`).send().expect(httpStatus.UNAUTHORIZED);
     });
 
-    test('should return 403 error if user is trying to get another user', async () => {
-      await insertUsers([userOne, userTwo]);
+    test('should return 403 error if caregiver is trying to get another caregiver', async () => {
+      await insertCaregivers([caregiverOne, caregiverTwo]);
 
       await request(app)
-        .get(`/v1/users/${userTwo._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .get(`/v1/caregivers/${caregiverTwo._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send()
         .expect(httpStatus.FORBIDDEN);
     });
 
-    test('should return 200 and the user object if admin is trying to get another user', async () => {
-      await insertUsers([userOne, admin]);
+    test('should return 200 and the caregiver object if admin is trying to get another caregiver', async () => {
+      await insertCaregivers([caregiverOne, admin]);
 
       await request(app)
-        .get(`/v1/users/${userOne._id}`)
+        .get(`/v1/caregivers/${caregiverOne._id}`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send()
         .expect(httpStatus.OK);
     });
 
-    test('should return 400 error if userId is not a valid mongo id', async () => {
-      await insertUsers([admin]);
+    test('should return 400 error if caregiverId is not a valid mongo id', async () => {
+      await insertCaregivers([admin]);
 
       await request(app)
-        .get('/v1/users/invalidId')
+        .get('/v1/caregivers/invalidId')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send()
         .expect(httpStatus.BAD_REQUEST);
     });
 
-    test('should return 404 error if user is not found', async () => {
-      await insertUsers([admin]);
+    test('should return 404 error if caregiver is not found', async () => {
+      await insertCaregivers([admin]);
 
       await request(app)
-        .get(`/v1/users/${userOne._id}`)
+        .get(`/v1/caregivers/${caregiverOne._id}`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send()
         .expect(httpStatus.NOT_FOUND);
     });
   });
 
-  describe('DELETE /v1/users/:userId', () => {
+  describe('DELETE /v1/caregivers/:caregiverId', () => {
     test('should return 204 if data is ok', async () => {
-      await insertUsers([userOne]);
+      await insertCaregivers([caregiverOne]);
 
       await request(app)
-        .delete(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .delete(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send()
         .expect(httpStatus.NO_CONTENT);
 
-      const dbUser = await User.findById(userOne._id);
-      expect(dbUser).toBeNull();
+      const dbCaregiver = await Caregiver.findById(caregiverOne._id);
+      expect(dbCaregiver).toBeNull();
     });
 
     test('should return 401 error if access token is missing', async () => {
-      await insertUsers([userOne]);
+      await insertCaregivers([caregiverOne]);
 
-      await request(app).delete(`/v1/users/${userOne._id}`).send().expect(httpStatus.UNAUTHORIZED);
+      await request(app).delete(`/v1/caregivers/${caregiverOne._id}`).send().expect(httpStatus.UNAUTHORIZED);
     });
 
-    test('should return 403 error if user is trying to delete another user', async () => {
-      await insertUsers([userOne, userTwo]);
+    test('should return 403 error if caregiver is trying to delete another caregiver', async () => {
+      await insertCaregivers([caregiverOne, caregiverTwo]);
 
       await request(app)
-        .delete(`/v1/users/${userTwo._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .delete(`/v1/caregivers/${caregiverTwo._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send()
         .expect(httpStatus.FORBIDDEN);
     });
 
-    test('should return 204 if admin is trying to delete another user', async () => {
-      await insertUsers([userOne, admin]);
+    test('should return 204 if admin is trying to delete another caregiver', async () => {
+      await insertCaregivers([caregiverOne, admin]);
 
       await request(app)
-        .delete(`/v1/users/${userOne._id}`)
+        .delete(`/v1/caregivers/${caregiverOne._id}`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send()
         .expect(httpStatus.NO_CONTENT);
     });
 
-    test('should return 400 error if userId is not a valid mongo id', async () => {
-      await insertUsers([admin]);
+    test('should return 400 error if caregiverId is not a valid mongo id', async () => {
+      await insertCaregivers([admin]);
 
       await request(app)
-        .delete('/v1/users/invalidId')
+        .delete('/v1/caregivers/invalidId')
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send()
         .expect(httpStatus.BAD_REQUEST);
     });
 
-    test('should return 404 error if user already is not found', async () => {
-      await insertUsers([admin]);
+    test('should return 404 error if caregiver already is not found', async () => {
+      await insertCaregivers([admin]);
 
       await request(app)
-        .delete(`/v1/users/${userOne._id}`)
+        .delete(`/v1/caregivers/${caregiverOne._id}`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send()
         .expect(httpStatus.NOT_FOUND);
     });
   });
 
-  describe('PATCH /v1/users/:userId', () => {
-    test('should return 200 and successfully update user if data is ok', async () => {
-      await insertUsers([userOne]);
+  describe('PATCH /v1/caregivers/:caregiverId', () => {
+    test('should return 200 and successfully update caregiver if data is ok', async () => {
+      await insertCaregivers([caregiverOne]);
       const updateBody = {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
@@ -511,139 +496,139 @@ describe('User routes', () => {
       };
 
       const res = await request(app)
-        .patch(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.OK);
 
       expect(res.body).not.toHaveProperty('password');
       expect(res.body).toEqual({
-        id: userOne._id.toHexString(),
+        id: caregiverOne._id.toHexString(),
         name: updateBody.name,
         email: updateBody.email,
-        phone: userOne.phone,
-        role: 'user',
-        caregiver: userOne.caregiver,
-        schedules: userOne.schedules,
+        phone: caregiverOne.phone,
+        role: 'staff',
+        patients: caregiverOne.patients,
+        schedules: caregiverOne.schedules,
         isEmailVerified: false,
       });
 
-      const dbUser = await User.findById(userOne._id);
-      expect(dbUser).toBeDefined();
-      expect(dbUser.password).not.toBe(updateBody.password);
-      expect(dbUser).toMatchObject({ name: updateBody.name, email: updateBody.email, role: 'user' });
+      const dbCaregiver = await Caregiver.findById(caregiverOne._id);
+      expect(dbCaregiver).toBeDefined();
+      expect(dbCaregiver.password).not.toBe(updateBody.password);
+      expect(dbCaregiver).toMatchObject({ name: updateBody.name, email: updateBody.email, role: 'staff' });
     });
 
     test('should return 401 error if access token is missing', async () => {
-      await insertUsers([userOne]);
+      await insertCaregivers([caregiverOne]);
       const updateBody = { name: faker.name.findName() };
 
-      await request(app).patch(`/v1/users/${userOne._id}`).send(updateBody).expect(httpStatus.UNAUTHORIZED);
+      await request(app).patch(`/v1/caregivers/${caregiverOne._id}`).send(updateBody).expect(httpStatus.UNAUTHORIZED);
     });
 
-    test('should return 403 if user is updating another user', async () => {
-      await insertUsers([userOne, userTwo]);
+    test('should return 403 if caregiver is updating another caregiver', async () => {
+      await insertCaregivers([caregiverOne, caregiverTwo]);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
-        .patch(`/v1/users/${userTwo._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverTwo._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.FORBIDDEN);
     });
 
-    test('should return 200 and successfully update user if admin is updating another user', async () => {
-      await insertUsers([userOne, admin]);
+    test('should return 200 and successfully update caregiver if admin is updating another caregiver', async () => {
+      await insertCaregivers([caregiverOne, admin]);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.OK);
     });
 
-    test('should return 404 if admin is updating another user that is not found', async () => {
-      await insertUsers([admin]);
+    test('should return 404 if admin is updating another caregiver that is not found', async () => {
+      await insertCaregivers([admin]);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.NOT_FOUND);
     });
 
-    test('should return 400 error if userId is not a valid mongo id', async () => {
-      await insertUsers([admin]);
+    test('should return 400 error if caregiverId is not a valid mongo id', async () => {
+      await insertCaregivers([admin]);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
-        .patch(`/v1/users/invalidId`)
+        .patch(`/v1/caregivers/invalidId`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 if email is invalid', async () => {
-      await insertUsers([userOne]);
+      await insertCaregivers([caregiverOne]);
       const updateBody = { email: 'invalidEmail' };
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 if email is already taken', async () => {
-      await insertUsers([userOne, userTwo]);
-      const updateBody = { email: userTwo.email };
+      await insertCaregivers([caregiverOne, caregiverTwo]);
+      const updateBody = { email: caregiverTwo.email };
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should not return 400 if email is my email', async () => {
-      await insertUsers([userOne]);
-      const updateBody = { email: userOne.email };
+      await insertCaregivers([caregiverOne]);
+      const updateBody = { email: caregiverOne.email };
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.OK);
     });
 
     test('should return 400 if password length is less than 8 characters', async () => {
-      await insertUsers([userOne]);
+      await insertCaregivers([caregiverOne]);
       const updateBody = { password: 'passwo1' };
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 if password does not contain both letters and numbers', async () => {
-      await insertUsers([userOne]);
+      await insertCaregivers([caregiverOne]);
       const updateBody = { password: 'password' };
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.BAD_REQUEST);
 
       updateBody.password = '11111111';
 
       await request(app)
-        .patch(`/v1/users/${userOne._id}`)
-        .set('Authorization', `Bearer ${userOneAccessToken}`)
+        .patch(`/v1/caregivers/${caregiverOne._id}`)
+        .set('Authorization', `Bearer ${caregiverOneAccessToken}`)
         .send(updateBody)
         .expect(httpStatus.BAD_REQUEST);
     });

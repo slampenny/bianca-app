@@ -2,8 +2,8 @@ const httpStatus = require('http-status');
 const { Conversation, Message } = require('../models');
 const ApiError = require('../utils/ApiError');
 
-const createConversationForUser = async (userId) => {
-  const conversation = new Conversation({ userId });
+const createConversationForPatient = async (patientId) => {
+  const conversation = new Conversation({ patientId });
   await conversation.save();
   return conversation;
 };
@@ -29,17 +29,17 @@ const getConversationById = async (id) => {
   return conversation;
 };
 
-const getConversationsByUser = async (userId) => {
-  const conversations = await Conversation.find({ userId });
+const getConversationsByPatient = async (patientId) => {
+  const conversations = await Conversation.find({ patientId });
   if (!conversations) {
-    throw new ApiError(httpStatus.NOT_FOUND, `No conversation found for user <${userId}>`);
+    throw new ApiError(httpStatus.NOT_FOUND, `No conversation found for patient <${patientId}>`);
   }
   return conversations;
 };
 
 module.exports = {
-  createConversationForUser,
+  createConversationForPatient,
   addMessageToConversation,
   getConversationById,
-  getConversationsByUser,
+  getConversationsByPatient,
 };

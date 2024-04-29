@@ -9,14 +9,14 @@ const tokenSchema = mongoose.Schema(
       required: true,
       index: true,
     },
-    user: {
+    caregiver: {
       type: mongoose.SchemaTypes.ObjectId,
-      ref: 'User',
+      ref: 'Caregiver',
       required: true,
     },
     type: {
       type: String,
-      enum: [tokenTypes.REFRESH, tokenTypes.RESET_PASSWORD, tokenTypes.VERIFY_EMAIL],
+      enum: [tokenTypes.REFRESH, tokenTypes.RESET_PASSWORD, tokenTypes.VERIFY_EMAIL, tokenTypes.INVITE],
       required: true,
     },
     expires: {

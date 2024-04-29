@@ -15,13 +15,20 @@ const router = express.Router();
 
 /**
  * @swagger
- * /schedules:
+ * /patients/{patientId}/schedules:
  *   post:
- *     summary: Create a schedule
- *     description: Only authorized users can create schedules.
+ *     summary: Create a schedule for a patient
+ *     description: Only authorized patients can create schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
  *     requestBody:
  *       required: true
  *       content:
@@ -29,13 +36,9 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - userId
  *               - frequency
  *               - intervals
  *             properties:
- *               userId:
- *                 type: string
- *                 description: User ID
  *               frequency:
  *                 type: string
  *                 description: Frequency of the schedule, can be 'daily', 'weekly', or 'monthly'
@@ -54,19 +57,25 @@ const router = express.Router();
  *         $ref: '#/components/responses/Unauthorized'
  */
 router
-  .route('/')
+  .route('/:patientId')
   .post(auth('manageSchedules'), validate(scheduleValidation.createSchedule), scheduleController.createSchedule);
 
 /**
  * @swagger
- * /schedules/{scheduleId}:
+ * /patients/{patientId}/schedules/{scheduleId}:
  *   get:
- *     summary: Get a schedule by ID
- *     description: Only authorized users can get a schedule.
+ *     summary: Get a schedule by ID for a patient
+ *     description: Only authorized patients can get a schedule.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
  *       - in: path
  *         name: scheduleId
  *         required: true
@@ -81,11 +90,18 @@ router
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  *   put:
- *     summary: Update a schedule
- *     description: Only authorized users can update schedules.
+ *     summary: Update a schedule for a patient
+ *     description: Only authorized patients can update schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
  *     requestBody:
  *       required: true
  *       content:
@@ -93,13 +109,9 @@ router
  *           schema:
  *             type: object
  *             required:
- *               - userId
  *               - frequency
  *               - intervals
  *             properties:
- *               userId:
- *                 type: string
- *                 description: User ID
  *               frequency:
  *                 type: string
  *                 description: Frequency of the schedule, can be 'daily', 'weekly', or 'monthly'
@@ -119,11 +131,18 @@ router
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  *   patch:
- *     summary: Patch a schedule
- *     description: Only authorized users can patch schedules.
+ *     summary: Patch a schedule for a patient
+ *     description: Only authorized patients can patch schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
  *     requestBody:
  *       required: true
  *       content:
@@ -131,9 +150,6 @@ router
  *           schema:
  *             type: object
  *             properties:
- *               userId:
- *                 type: string
- *                 description: User ID
  *               frequency:
  *                 type: string
  *                 description: Frequency of the schedule, can be 'daily', 'weekly', or 'monthly'
@@ -153,11 +169,18 @@ router
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  *   delete:
- *     summary: Delete a schedule
- *     description: Only authorized users can delete schedules.
+ *     summary: Delete a schedule for a patient
+ *     description: Only authorized patients can delete schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
  *     responses:
  *       "204":
  *         description: Schedule deleted
@@ -167,7 +190,7 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/:scheduleId')
+  .route('/:patientId/:scheduleId')
   .get(auth('getSchedules'), validate(scheduleValidation.getSchedule), scheduleController.getSchedule)
   .put(auth('manageSchedules'), validate(scheduleValidation.updateSchedule), scheduleController.updateSchedule)
   .patch(auth('manageSchedules'), validate(scheduleValidation.patchSchedule), scheduleController.patchSchedule)

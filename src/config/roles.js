@@ -1,7 +1,12 @@
 const allRoles = {
-  user: [],
-  caregiver: [],
-  admin: ['getUsers', 'manageUsers'],
+  staff: [],
+  orgAdmin: [
+    'manageOwnOrg',
+    'getPatients', 
+    'managePatients', 
+    'changeRole'
+  ],
+  superAdmin: ['getOrgs', 'manageOwnOrg', 'manageOrgs'],
 };
 
 const roles = Object.keys(allRoles);

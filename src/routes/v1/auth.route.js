@@ -28,7 +28,7 @@ module.exports = router;
  * @swagger
  * /auth/register:
  *   post:
- *     summary: Register as user
+ *     summary: Register as caregiver
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -64,8 +64,8 @@ module.exports = router;
  *             schema:
  *               type: object
  *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
+ *                 caregiver:
+ *                   $ref: '#/components/schemas/Caregiver'
  *                 tokens:
  *                   $ref: '#/components/schemas/AuthTokens'
  *       "400":
@@ -105,8 +105,8 @@ module.exports = router;
  *             schema:
  *               type: object
  *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
+ *                 caregiver:
+ *                   $ref: '#/components/schemas/Caregiver'
  *                 tokens:
  *                   $ref: '#/components/schemas/AuthTokens'
  *       "401":

@@ -1,5 +1,5 @@
 const httpStatus = require('http-status');
-const { Schedule, User } = require('../models');
+const { Schedule, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
 
 const createSchedule = async (scheduleData) => {
@@ -12,10 +12,10 @@ const createSchedule = async (scheduleData) => {
   // Save the schedule
   const savedSchedule = await schedule.save();
 
-  // Add the new schedule's ID to the user's schedules field
-  const user = await User.findById(schedule.userId);
-  user.schedules.push(savedSchedule._id);
-  await user.save();
+  // Add the new schedule's ID to the patient's schedules field
+  const patient = await Patient.findById(schedule.patientId);
+  patient.schedules.push(savedSchedule._id);
+  await patient.save();
 
 
   return savedSchedule;
@@ -36,14 +36,14 @@ const updateSchedule = async (scheduleId, updateBody) => {
     schedule.calculateNextCallDate();
   }
 
-  if (updateBody.userId && updateBody.userId !== schedule.userId.toString()) {
-    const oldUser = await User.findById(schedule.userId);
-    oldUser.schedules.pull(schedule.id);
-    await oldUser.save();
+  if (updateBody.patientId && updateBody.patientId !== schedule.patientId.toString()) {
+    const oldPatient = await Patient.findById(schedule.patientId);
+    oldPatient.schedules.pull(schedule.id);
+    await oldPatient.save();
 
-    const newUser = await User.findById(updateBody.userId);
-    newUser.schedules.push(schedule.id);
-    await newUser.save();
+    const newPatient = await Patient.findById(updateBody.patientId);
+    newPatient.schedules.push(schedule.id);
+    await newPatient.save();
   }
 
   await schedule.save();
@@ -61,16 +61,16 @@ const patchSchedule = async (id, updateBody) => {
     schedule.calculateNextCallDate();
   }
 
-  // If the userId is updated, remove the schedule's ID from the old user's schedules field
-  // and add it to the new user's schedules field
-  if (updateBody.userId && updateBody.userId !== schedule.userId.toString()) {
-    const oldUser = await User.findById(schedule.userId);
-    oldUser.schedules.pull(schedule._id);
-    await oldUser.save();
+  // If the patientId is updated, remove the schedule's ID from the old patient's schedules field
+  // and add it to the new patient's schedules field
+  if (updateBody.patientId && updateBody.patientId !== schedule.patientId.toString()) {
+    const oldPatient = await Patient.findById(schedule.patientId);
+    oldPatient.schedules.pull(schedule._id);
+    await oldPatient.save();
 
-    const newUser = await User.findById(updateBody.userId);
-    newUser.schedules.push(schedule._id);
-    await newUser.save();
+    const newPatient = await Patient.findById(updateBody.patientId);
+    newPatient.schedules.push(schedule._id);
+    await newPatient.save();
   }
 
   await schedule.save();
@@ -80,10 +80,10 @@ const patchSchedule = async (id, updateBody) => {
 const deleteSchedule = async (id) => {
   const schedule = await getScheduleById(id);
 
-  // Remove the schedule's ID from the user's schedules field
-  const user = await User.findById(schedule.userId);
-  user.schedules.pull(schedule._id);
-  await user.save();
+  // Remove the schedule's ID from the patient's schedules field
+  const patient = await Patient.findById(schedule.patientId);
+  patient.schedules.pull(schedule._id);
+  await patient.save();
 
   await schedule.remove();
   return schedule;

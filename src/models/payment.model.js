@@ -3,10 +3,10 @@ const { toJSON, paginate } = require('./plugins');
 
 const lineItemSchema = mongoose.Schema(
   {
-    userId: {
+    patientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'User'
+      ref: 'Patient'
     },
     amount: {
       type: Number,
@@ -27,7 +27,7 @@ const invoiceSchema = mongoose.Schema(
     caregiverId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'User'
+      ref: 'Patient'
     },
     date: {
       type: Date,

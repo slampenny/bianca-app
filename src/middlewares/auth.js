@@ -4,16 +4,16 @@ const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const { roleRights } = require('../config/roles');
 
-const verifyCallback = (req, resolve, reject, requiredRights) => async (err, user, info) => {
-  if (err || info || !user) {
+const verifyCallback = (req, resolve, reject, requiredRights) => async (err, caregiver, info) => {
+  if (err || info || !caregiver) {
     return reject(new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate'));
   }
-  req.user = user;
+  req.caregiver = caregiver;
 
   if (requiredRights.length) {
-    const userRights = roleRights.get(user.role);
-    const hasRequiredRights = requiredRights.every((requiredRight) => userRights.includes(requiredRight));
-    if (!hasRequiredRights && req.params.userId !== user.id) {
+    const caregiverRights = roleRights.get(caregiver.role);
+    const hasRequiredRights = requiredRights.every((requiredRight) => caregiverRights.includes(requiredRight));
+    if (!hasRequiredRights && req.params.caregiverId !== caregiver.id) {
       return reject(new ApiError(httpStatus.FORBIDDEN, 'Forbidden'));
     }
   }

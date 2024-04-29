@@ -3,13 +3,13 @@ const { objectId } = require('./custom.validation');
 
 const getConversation = {
   params: Joi.object().keys({
-    userId: Joi.string().custom(objectId),
+    patientId: Joi.string().custom(objectId),
   }),
 };
 
-const createConversationForUser = {
+const createConversationForPatient = {
   params: Joi.object().keys({
-    userId: Joi.string().custom(objectId),
+    patientId: Joi.string().custom(objectId),
   }),
 };
 
@@ -26,5 +26,5 @@ const addMessageToConversation = {
 module.exports = {
   getConversation,
   addMessageToConversation,
-  createConversationForUser
+  createConversationForPatient
 };

@@ -1,0 +1,14 @@
+{
+    "inviteEmail": {
+      "subject": "Invitation to Join Bianca",
+      "text": "Dear caregiver,\nYou have been invited to join Bianca. To accept the invitation, click on this link: %s\nIf you did not expect this invitation, then ignore this email."
+    },
+    "sendResetPasswordEmail": {
+      "subject": "Reset password",
+      "text": "Dear caregiver,\nTo reset your password, click on this link: %s\nIf you did not request any password resets, then ignore this email."
+    },
+    "sendVerificationEmail": {
+      "subject": "Email Verification",
+      "text": "Dear caregiver,\nTo verify your email, click on this link: %s\nIf you did not create an account, then ignore this email."
+    }
+  }

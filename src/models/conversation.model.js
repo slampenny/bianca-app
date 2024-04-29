@@ -13,10 +13,10 @@ const conversationSchema = mongoose.Schema(
       type: String,
       index: true
     },
-    userId: {
+    patientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'User'
+      ref: 'Patient'
     },
     lineItemId: {
       type: mongoose.SchemaTypes.ObjectId,

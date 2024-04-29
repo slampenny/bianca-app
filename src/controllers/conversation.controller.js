@@ -3,9 +3,9 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { conversationService } = require('../services');
 
-const createConversationForUser = catchAsync(async (req, res) => {
-  const { userId } = req.params;
-  const conversation = await conversationService.createConversationForUser(userId);
+const createConversationForPatient = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+  const conversation = await conversationService.createConversationForPatient(patientId);
   res.status(httpStatus.CREATED).send(conversation);
 });
 
@@ -25,7 +25,7 @@ const getConversation = catchAsync(async (req, res) => {
 });
 
 module.exports = {
-  createConversationForUser,
+  createConversationForPatient,
   addMessageToConversation,
   getConversation,
 };

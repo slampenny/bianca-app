@@ -3,7 +3,7 @@ const { objectId } = require('./custom.validation');
 
 const createSchedule = {
   body: Joi.object().keys({
-    userId: Joi.string().custom(objectId),
+    patientId: Joi.string().custom(objectId),
     frequency: Joi.string().required(),
     intervals: Joi.array().items(Joi.string()).required(),
   }),
