@@ -5,7 +5,6 @@ const app = require('../../src/app');
 const setupTestDB = require('../utils/setupTestDB');
 const { Caregiver } = require('../../src/models');
 const { caregiverOne, caregiverTwo, admin, insertCaregivers } = require('../fixtures/caregiver.fixture');
-const { caregiverOneAccessToken, adminAccessToken } = require('../fixtures/token.fixture');
 
 setupTestDB();
 

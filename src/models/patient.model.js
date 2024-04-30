@@ -36,20 +36,6 @@ const patientSchema = mongoose.Schema(
         }
       },
     },
-    password: {
-      type: String,
-      required: function required() {
-        return this.role === 'caregiver';
-      },
-      trim: true,
-      minlength: 8,
-      validate(value) {
-        if (!value.match(/\d/) || !value.match(/[a-zA-Z]/)) {
-          throw new Error('Password must contain at least one letter and one number');
-        }
-      },
-      private: true, // used by the toJSON plugin
-    },
     isEmailVerified: {
       type: Boolean,
       default: false,
@@ -87,21 +73,6 @@ patientSchema.statics.isEmailTaken = async function (email, excludePatientId) {
   const patient = await this.findOne({ email, _id: { $ne: excludePatientId } });
   return !!patient;
 };
-
-// Method to check password match
-patientSchema.methods.isPasswordMatch = async function (password) {
-  const patient = this;
-  return bcrypt.compare(password, patient.password);
-};
-
-// Pre-save middleware to hash password
-patientSchema.pre('save', async function (next) {
-  const patient = this;
-  if (patient.isModified('password')) {
-    patient.password = await bcrypt.hash(patient.password, 8);
-  }
-  next();
-});
 
 /**
  * @typedef Patient

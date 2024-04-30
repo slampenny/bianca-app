@@ -7,12 +7,19 @@ const password = 'password1';
 const salt = bcrypt.genSaltSync(8);
 const hashedPassword = bcrypt.hashSync(password, salt);
 
+const fakeId = new mongoose.Types.ObjectId();
+
 const caregiverOne = {
   name: faker.name.findName(),
   email: "fake@example.org",
   phone: '+16045624263',
   role: 'staff',
   patients: []
+};
+
+const caregiverOneWithPassword = {
+  ...caregiverOne,
+  password: hashedPassword,
 };
 
 const caregiverTwo = {
@@ -45,7 +52,11 @@ const insertCaregivers = async (caregivers) => {
 
 module.exports = {
   caregiverOne,
+  caregiverOneWithPassword,
   caregiverTwo,
+  password,
+  hashedPassword,
+  fakeId,
   admin,
   superAdmin,
   insertCaregivers,

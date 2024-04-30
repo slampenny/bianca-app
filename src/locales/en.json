@@ -1,1 +1,10 @@
-{}
+{
+	"sendResetPasswordEmail": {
+		"subject": "sendResetPasswordEmail.subject",
+		"text": "sendResetPasswordEmail.text"
+	},
+	"sendVerificationEmail": {
+		"subject": "sendVerificationEmail.subject",
+		"text": "sendVerificationEmail.text"
+	}
+}

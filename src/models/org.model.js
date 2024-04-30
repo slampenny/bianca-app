@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const mongooseDelete = require('mongoose-delete');
 const validator = require('validator');
+const httpStatus = require('http-status');
+const ApiError = require('../utils/ApiError');
 const { toJSON, paginate } = require('./plugins');
 
 // Org Schema
@@ -63,8 +65,11 @@ orgSchema.statics.createOrgAndCaregiver = async function (orgBody, caregiverBody
   }
 
   const Caregiver = this.model('Caregiver');
+  if (await Caregiver.isEmailTaken(caregiverBody.email)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+  }
   const caregiver = await Caregiver.create({ ...caregiverBody, role: 'orgAdmin' });
-  const org = await this.create({ ...orgBody, caregivers: [caregiver._id] });
+  const org = await this.create({ ...orgBody, caregivers: [caregiver] });
 
   return org;
 };

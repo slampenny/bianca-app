@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 const config = require('../config/config');
 const logger = require('../config/logger');
-
+const i18n = require('i18n');
 const transport = nodemailer.createTransport(config.email.smtp);
 
 process.on('exit', () => {

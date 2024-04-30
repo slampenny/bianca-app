@@ -9,7 +9,6 @@ const { roles } = require('../config/roles');
 const caregiverSchema = mongoose.Schema(
   {
     org: { type: mongoose.Schema.Types.ObjectId, ref: 'Org' },
-    patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
     name: {
       type: String,
       required: true,
@@ -31,11 +30,25 @@ const caregiverSchema = mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      // validate(value) {
-      //   if (!validator.isMobilePhone (value)) {
-      //     throw new Error('Invalid phone number');
-      //   }
-      // },
+      validate(value) {
+        if (!validator.isMobilePhone (value)) {
+          throw new Error('Invalid phone number');
+        }
+      },
+    },
+    password: {
+      type: String,
+      required: function required() {
+        return this.role === 'caregiver';
+      },
+      trim: true,
+      minlength: 8,
+      validate(value) {
+        if (!value.match(/\d/) || !value.match(/[a-zA-Z]/)) {
+          throw new Error('Password must contain at least one letter and one number');
+        }
+      },
+      private: true, // used by the toJSON plugin
     },
     role: {
       type: String,
@@ -46,15 +59,17 @@ const caregiverSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    patients: [
-      {
-        type: mongoose.SchemaTypes.ObjectId,
-        ref: 'Patient',
-      },
-    ],
+    patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        delete ret.deleted;
+        return ret;
+      },
+    },
   }
 );
 
