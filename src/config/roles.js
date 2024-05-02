@@ -1,12 +1,22 @@
 const allRoles = {
-  staff: [],
+  staff: [
+    'getPatients',
+    'getOwnPatientConversations',
+  ],
   orgAdmin: [
     'manageOwnOrg',
+    'getCaregivers',
+    'manageCaregivers',
     'getPatients', 
     'managePatients', 
-    'changeRole'
+    'changeRole',
+    'getOwnPatientConversations',
   ],
-  superAdmin: ['getOrgs', 'manageOwnOrg', 'manageOrgs'],
+  superAdmin: [
+    'getOrgs', 
+    'manageOwnOrg', 
+    'manageOrgs'
+  ],
 };
 
 const roles = Object.keys(allRoles);

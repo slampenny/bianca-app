@@ -170,17 +170,34 @@ const removePatient = async (caregiverId, patientId) => {
  * @param {ObjectId} caregiverId
  * @returns {Promise<Array<Patient>>}
  */
-const getPatientsByCaregiver = async (caregiverId) => {
+const getPatients = async (caregiverId) => {
   const caregiver = await Caregiver.findById(caregiverId).populate('patients');
   if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
 
-  if (caregiver.role !== 'orgAdmin') {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Caregiver is not a caregiver');
+  return caregiver.patients;
+};
+
+const checkCaregiverOwnsPatient = async (caregiverId, patientId) => {
+  const caregiver = await Caregiver.findById(caregiverId);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
 
-  return caregiver.patients;
+  if (caregiver.role === 'staff' && !caregiver.patients.includes(patientId)) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient');
+  }
+
+  if (caregiver.role === 'orgAdmin') {
+    caregiver = await caregiver.populate('org').execPopulate();
+    if (!caregiver.org.patients.includes(patientId)) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient');
+    }
+  }
+
+  // If the caregiver is a superAdmin or has passed the previous checks, return true
+  return true;
 };
 
 module.exports = {
@@ -192,5 +209,6 @@ module.exports = {
   deleteCaregiverById,
   addPatient,
   removePatient,
-  getPatientsByCaregiver
+  getPatients,
+  checkCaregiverOwnsPatient
 };

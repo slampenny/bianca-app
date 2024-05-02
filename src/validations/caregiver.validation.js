@@ -16,6 +16,7 @@ const createCaregiver = {
 const getCaregivers = {
   query: Joi.object().keys({
     name: Joi.string(),
+    role: Joi.string(),
     sortBy: Joi.string(),
     limit: Joi.number().integer(),
     page: Joi.number().integer(),
@@ -66,6 +67,13 @@ const removePatient = {
 const getPatientsByCaregiver = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
+  }),
+};
+
+const getConversationsByPatient = {
+  params: Joi.object().keys({
+    caregiverId: Joi.required().custom(objectId),
+    patientId: Joi.required().custom(objectId),
   }),
 };
 

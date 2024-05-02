@@ -1,7 +1,11 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const faker = require('faker');
+const config = require('../../src/config/config');
+const moment = require('moment');
 const { Caregiver } = require('../../src/models');
+const tokenService = require('../../src/services/token.service');
+const { tokenTypes } = require('../../src/config/tokens');
 
 const password = 'password1';
 const salt = bcrypt.genSaltSync(8);
@@ -50,6 +54,32 @@ const insertCaregivers = async (caregivers) => {
   return await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, password: hashedPassword })));
 };
 
+const insertCaregiverAndReturnToken = async (caregiverChoice) => {
+  const [caregiver] = await Caregiver.insertMany([caregiverChoice]);
+  const expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
+  const accessToken = await tokenService.generateToken(caregiver.id, expires, tokenTypes.ACCESS);
+
+  return { caregiver, accessToken };
+};
+
+const insertCaregiverAndReturnTokenByRole = async (role = "staff") => {
+  let caregiverChoice;
+
+  switch (role) {
+    case "staff":
+      caregiverChoice = caregiverOneWithPassword;
+      break;
+    case "orgAdmin":
+      caregiverChoice = admin;
+      break;
+    case "superAdmin":
+      caregiverChoice = superAdmin;
+      break;
+  }
+
+  return  await insertCaregiverAndReturnToken(caregiverChoice);
+};
+
 module.exports = {
   caregiverOne,
   caregiverOneWithPassword,
@@ -60,4 +90,6 @@ module.exports = {
   admin,
   superAdmin,
   insertCaregivers,
+  insertCaregiverAndReturnToken,
+  insertCaregiverAndReturnTokenByRole
 };

@@ -3,49 +3,37 @@ const catchAsync = require('../utils/catchAsync');
 const { authService, caregiverService, inviteService, orgService, tokenService, emailService } = require('../services');
 
 const register = catchAsync(async (req, res, next) => {
-  try {
-    const org = await orgService.createOrg(
-      {
-        email: req.body.email,
-        name: req.body.name,
-        phone: req.body.phone,
-      },
-      {
-        email: req.body.email,
-        name: req.body.name,
-        phone: req.body.phone,
-        password: req.body.password,
-      }
-    );
+  const org = await orgService.createOrg(
+    {
+      email: req.body.email,
+      name: req.body.name,
+      phone: req.body.phone,
+    },
+    {
+      email: req.body.email,
+      name: req.body.name,
+      phone: req.body.phone,
+      password: req.body.password,
+    }
+  );
 
-    const tokens = await tokenService.generateAuthTokens(org.caregivers[0]);
-    res.status(httpStatus.CREATED).send({ org, tokens });
-  } catch (error) {
-    next(error);
-  }
+  const tokens = await tokenService.generateAuthTokens(org.caregivers[0]);
+  res.status(httpStatus.CREATED).send({ org, tokens });
 });
 
 const registerWithInvite = catchAsync(async (req, res) => {
-  try {
-    const { token, ...caregiverInfo } = req.body;
-    const invite = await inviteService.verifyInviteToken(token);
-    const caregiver = await caregiverService.createCaregiver({ ...caregiverInfo, org: invite.org });
-    const tokens = await tokenService.generateAuthTokens(caregiver);
-    res.status(httpStatus.CREATED).send({ caregiver, tokens });
-  } catch (error) {
-    next(error);
-  }
+  const { token, ...caregiverInfo } = req.body;
+  const invite = await inviteService.verifyInviteToken(token);
+  const caregiver = await caregiverService.createCaregiver({ ...caregiverInfo, org: invite.org });
+  const tokens = await tokenService.generateAuthTokens(caregiver);
+  res.status(httpStatus.CREATED).send({ caregiver, tokens });
 });
 
 const login = catchAsync(async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-    const caregiver = await authService.loginCaregiverWithEmailAndPassword(email, password);
-    const tokens = await tokenService.generateAuthTokens(caregiver);
-    res.send({ caregiver, tokens });
-  } catch (error) {
-    next(error);
-  }
+  const { email, password } = req.body;
+  const caregiver = await authService.loginCaregiverWithEmailAndPassword(email, password);
+  const tokens = await tokenService.generateAuthTokens(caregiver);
+  res.send({ caregiver, tokens });
 });
 
 const logout = catchAsync(async (req, res) => {

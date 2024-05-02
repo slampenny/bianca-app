@@ -4,13 +4,6 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { caregiverService } = require('../services');
 
-const createCaregiver = catchAsync(async (req, res) => {
-  const { schedules, ...caregiverData } = req.body;
-  const caregiver = await caregiverService.createCaregiver(caregiverData);
-
-  res.status(httpStatus.CREATED).send(caregiver);
-});
-
 const getCaregivers = catchAsync(async (req, res) => {
   const filter = pick(req.query, ['name', 'role']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
@@ -50,19 +43,40 @@ const removePatient = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
-const getPatientsByCaregiver = catchAsync(async (req, res) => {
+const updatePatient = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+  const updatedCaregiver = await caregiverService.removePatient(req.caregiver, patientId);
+  res.status(httpStatus.OK).send(updatedCaregiver);
+});
+
+
+const deletePatient = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+  const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, patientId);
+  res.status(httpStatus.OK).send(updatedCaregiver);
+});
+
+const getPatient = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+  const patients = await caregiverService.getPatient(req.caregiver, patientId);
+  res.status(httpStatus.OK).send(patients);
+});
+
+const getPatients = catchAsync(async (req, res) => {
   const { caregiverId } = req.params;
-  const patients = await caregiverService.getPatientsByCaregiver(caregiverId);
+  const patients = await caregiverService.getPatients(caregiverId);
   res.status(httpStatus.OK).send(patients);
 });
 
 module.exports = {
-  createCaregiver,
   getCaregivers,
   getCaregiver,
   updateCaregiver,
   deleteCaregiver,
   addPatient,
   removePatient,
-  getPatientsByCaregiver,
+  updatePatient,
+  deletePatient,
+  getPatient,
+  getPatients
 };
