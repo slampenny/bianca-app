@@ -36,10 +36,7 @@ const queryOrgs = async (filter, options) => {
  * @returns {Promise<Org>}
  */
 const getOrgById = async (id) => {
-  return Org.findOne({ 
-    _id: id, 
-    $or: [{ deleted: { $exists: false } }, { deleted: false }] 
-  });
+  return Org.findById(id);
 };
 
 /**

@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { objectId } = require('./custom.validation');
+const { password, objectId } = require('./custom.validation');
 
 const createCaregiver = {
   body: Joi.object().keys({
@@ -38,6 +38,7 @@ const updateCaregiver = {
       email: Joi.string().email(),
       name: Joi.string(),
       phone: Joi.string(),
+      password: Joi.string().required().custom(password).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)),
     })
     .min(1)

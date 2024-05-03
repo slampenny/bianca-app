@@ -53,6 +53,14 @@ orgSchema.plugin(toJSON);
 orgSchema.plugin(paginate);
 orgSchema.plugin(mongooseDelete, { deletedAt : true });
 
+orgSchema.pre('find', function() {
+  this.where({ deleted: { $ne: true } });
+});
+
+orgSchema.pre('findOne', function() {
+  this.where({ deleted: { $ne: true } });
+});
+
 // Static method to check if email is taken
 orgSchema.statics.isEmailTaken = async function (email, excludeOrgId) {
   const org = await this.findOne({ email, _id: { $ne: excludeOrgId } });

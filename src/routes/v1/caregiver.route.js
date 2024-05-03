@@ -245,13 +245,13 @@ const router = express.Router();
  */
 router
   .route('/')
-  .get(auth('getCaregivers'), validate(caregiverValidation.getCaregivers), caregiverController.getCaregivers);
+  .get(auth('readAny:caregiver'), validate(caregiverValidation.getCaregivers), caregiverController.getCaregivers);
 
 router
   .route('/:caregiverId')
-  .get(auth('getCaregiver'), validate(caregiverValidation.getCaregiver), caregiverController.getCaregiver)
-  .patch(auth('manageCargiver'), validate(caregiverValidation.updateCaregiver), caregiverController.updateCaregiver)
-  .delete(auth('manageCaregiver'), validate(caregiverValidation.deleteCaregiver), caregiverController.deleteCaregiver);
+  .get(auth('readOwn:caregiver', 'readAny:caregiver'), validate(caregiverValidation.getCaregiver), caregiverController.getCaregiver)
+  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.updateCaregiver), caregiverController.updateCaregiver)
+  .delete(auth('deleteOwn:caregiver', 'deleteAny:caregiver'), validate(caregiverValidation.deleteCaregiver), caregiverController.deleteCaregiver);
 
 /**
  * @swagger
@@ -285,7 +285,7 @@ router
  */
 router
   .route(':caregiverId/patients/patientId')
-  .post(auth('managePatients'), caregiverController.addPatient);
+  .post(auth('createAny:patients'), caregiverController.addPatient);
 
 /**
  * @swagger
@@ -319,7 +319,7 @@ router
  */
 router
   .route(':caregiverId/patients/:patientId')
-  .delete(auth('managePatients'), caregiverController.removePatient);
+  .delete(auth('deleteAny:patients'), caregiverController.removePatient);
 
 /**
  * @swagger
@@ -347,7 +347,7 @@ router
  */
 router
   .route(':caregiverId/patients/:patientId')
-  .get(auth('getPatient'), caregiverController.getPatient);
+  .get(auth('readOwn:patients', 'readAny:patients'), caregiverController.getPatient);
 
 /**
  * @swagger
@@ -375,7 +375,7 @@ router
  */
 router
   .route(':caregiverId/patients')
-  .get(auth('getPatients'), caregiverController.getPatients);
+  .get(auth('readOwn:patients', 'readAny:patients'), caregiverController.getPatients);
 
 module.exports = router;
 

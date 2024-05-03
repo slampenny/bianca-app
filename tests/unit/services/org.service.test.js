@@ -77,15 +77,27 @@ describe('orgService', () => {
   it('should remove a caregiver from an org', async () => {
     const [org] = await insertOrgs([orgOne]);
     const [cg] = await insertCaregivers([{
-      orgId: org.id,
+      org: org.id,
       ...caregiverTwo
     }]);
   
     // Add the caregiver to the organization
     org.caregivers.push(cg.id);
-    await org.save();
+
+    // Fetch the organization document from the database before saving it
+  const orgFromDb = await Org.findById(org.id);
+  if (!orgFromDb) {
+    throw new Error(`No matching document found for id "${org.id}"`);
+  }
+
+    try {
+      await org.save();
+    } catch (err) {
+      console.error(err);
+      throw err; // re-throw the error so the test fails
+    }
   
-    const updatedOrg = await orgService.removeCaregiver(cg.id, org.id);
+    const updatedOrg = await orgService.removeCaregiver(org.id, cg.id);
     expect(updatedOrg.caregivers).not.toContainEqual(cg.id);
   });
 

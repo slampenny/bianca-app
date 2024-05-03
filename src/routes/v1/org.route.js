@@ -9,13 +9,13 @@ const router = express.Router();
 router
   .route('/')
   .post(validate(orgValidation.createOrg), orgController.createOrg)
-  .get(auth('getOrgs'), validate(orgValidation.getOrgs), orgController.getOrgs);
+  .get(auth('readAny:org'), validate(orgValidation.getOrgs), orgController.getOrgs);
 
 router
   .route('/:orgId')
-  .get(auth('manageOwnOrg'), validate(orgValidation.getOrg), orgController.getOrg)
-  .patch(auth('manageOwnOrg'), validate(orgValidation.updateOrg), orgController.updateOrg)
-  .delete(auth('manageOwnOrg'), validate(orgValidation.deleteOrg), orgController.deleteOrg);
+  .get(auth('readOwn:org'), validate(orgValidation.getOrg), orgController.getOrg)
+  .patch(auth('updateOwn:org'), validate(orgValidation.updateOrg), orgController.updateOrg)
+  .delete(auth('deleteOwn:org'), validate(orgValidation.deleteOrg), orgController.deleteOrg);
 
 // New route for assigning caregiver to a org
 /**
@@ -50,7 +50,7 @@ router
  */
 router
   .route('/:orgId/caregiver/:caregiverId')
-  .post(auth('manageOwnOrg'), orgController.addCaregiver);
+  .post(auth('updateAny:caregiver'), orgController.addCaregiver);
 
 // New route for removing a org from caregiver
 /**
@@ -85,7 +85,7 @@ router
  */
 router
   .route('/:orgId/caregiver/:caregiverId')
-  .delete(auth('manageOwnOrg'), orgController.removeCaregiver);
+  .delete(auth('updateAny:caregiver'), orgController.removeCaregiver);
 
   /**
  * @swagger
@@ -132,7 +132,7 @@ router
  */
 router
 .route('/:orgId/caregiver/:caregiverId/role')
-.patch(auth('manageOwnOrg'), orgController.setRole);
+.patch(auth('updateAny:caregiver'), orgController.setRole);
 
 
 module.exports = router;

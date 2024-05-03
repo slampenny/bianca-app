@@ -57,6 +57,7 @@
     "@pothos/core": "^3.41.0",
     "@pothos/plugin-scope-auth": "^3.21.1",
     "@pothos/plugin-validation": "^3.10.1",
+    "accesscontrol": "^2.2.1",
     "agenda": "^5.0.0",
     "aws-sdk": "^2.1599.0",
     "axios": "^0.21.1",

@@ -1,7 +1,8 @@
 const httpStatus = require('http-status');
-const { Org, Caregiver } = require('../models');
+const { Org, Caregiver, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const mongoose = require('mongoose');
 
 /**
  * Create a caregiver
@@ -49,7 +50,7 @@ const queryCaregivers = async (filter, options) => {
  * @returns {Promise<Caregiver>}
  */
 const getCaregiverById = async (id) => {
-  return Caregiver.findById(id);
+  return Caregiver.findById(id).populate('org');
 };
 
 /**
@@ -91,20 +92,28 @@ const deleteCaregiverById = async (caregiverId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
-  // Remove caregiver from org's caregivers array
-  const org = await Org.findById(caregiver.org);
-  org.caregivers = org.caregivers.filter(id => !id.equals(caregiverId));
-  await org.save();
-
-  // Remove caregiver from all patients' caregivers array
-  const patients = await Patient.find({ caregivers: caregiverId });
-  for (let patient of patients) {
-    patient.caregivers = patient.caregivers.filter(id => !id.equals(caregiverId));
-    await patient.save();
+  try {
+    // Remove caregiver from org's caregivers array
+    const org = await Org.findById(caregiver.org);
+    org.caregivers = org.caregivers.filter(id => !id.equals(caregiverId));
+    await org.save();
+    console.log(`Caregiver removed from org ${org._id}`);
+  
+    // Remove caregiver from all patients' caregivers array
+    const patients = await Patient.find({ caregivers: { $in: [mongoose.Types.ObjectId(caregiverId)] } });
+    console.log(`Found ${patients.length} patients for caregiver ${caregiverId}`);
+    for (let patient of patients) {
+      patient.caregivers = patient.caregivers.filter(id => !id.equals(caregiverId));
+      await patient.save();
+      console.log(`Caregiver ${caregiverId} removed from patient ${patient._id}`);
+    }
+  
+    // Remove caregiver
+    await caregiver.delete();
+    console.log(`Caregiver ${caregiverId} deleted`);
+  } catch (error) {
+    console.error(`Error while removing caregiver ${caregiverId}:`, error);
   }
-
-  // Remove caregiver
-  await caregiver.remove();
 
   return caregiver;
 };

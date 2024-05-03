@@ -13,7 +13,7 @@ const ApiError = require('../../src/utils/ApiError');
 const { Org, Caregiver, Token } = require('../../src/models');
 const { roleRights } = require('../../src/config/roles');
 const { tokenTypes } = require('../../src/config/tokens');
-const { caregiverOne, caregiverOneWithPassword, password, fakeId, admin, insertCaregivers, caregiverTwo } = require('../fixtures/caregiver.fixture');
+const { caregiverOne, caregiverOneWithPassword, password, fakeId, admin, insertCaregivers, caregiverTwo, insertCaregiverAndReturnToken } = require('../fixtures/caregiver.fixture');
 
 let mongoServer;
 
@@ -150,7 +150,8 @@ describe('Auth routes', () => {
 
       const res = await request(app).post('/v1/auth/login').send(loginCredentials).expect(httpStatus.UNAUTHORIZED);
 
-      expect(res.body).toEqual({ code: httpStatus.UNAUTHORIZED, message: 'Incorrect email or password' });
+      expect(res.statusCode).toEqual(httpStatus.UNAUTHORIZED)
+      expect(res.body).toEqual({message: 'Incorrect email or password' });
     });
 
     test('should return 401 error if password is wrong', async () => {
@@ -162,7 +163,8 @@ describe('Auth routes', () => {
 
       const res = await request(app).post('/v1/auth/login').send(loginCredentials).expect(httpStatus.UNAUTHORIZED);
 
-      expect(res.body).toEqual({ code: httpStatus.UNAUTHORIZED, message: 'Incorrect email or password' });
+      expect(res.statusCode).toEqual(httpStatus.UNAUTHORIZED)
+      expect(res.body).toEqual({message: 'Incorrect email or password' });
     });
   });
 
@@ -402,18 +404,17 @@ describe('Auth routes', () => {
     });
 
     test('should return 204 and send verification email to the caregiver', async () => {
-      const [dbCaregiver] = await insertCaregivers([caregiverOne]);
+      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
       const sendVerificationEmailSpy = jest.spyOn(emailService, 'sendVerificationEmail');
-      const expires = moment().add(config.jwt.verifyEmailExpirationMinutes, 'minutes');
-      const accessToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.ACCESS);
+
       await request(app)
         .post('/v1/auth/send-verification-email')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.NO_CONTENT);
 
-      expect(sendVerificationEmailSpy).toHaveBeenCalledWith(caregiverOne.email, expect.any(String));
+      expect(sendVerificationEmailSpy).toHaveBeenCalledWith(caregiver.email, expect.any(String));
       const verifyEmailToken = sendVerificationEmailSpy.mock.calls[0][1];
-      const dbVerifyEmailToken = await Token.findOne({ token: verifyEmailToken, caregiver: dbCaregiver.id });
+      const dbVerifyEmailToken = await Token.findOne({ token: verifyEmailToken, caregiver: caregiver.id });
 
       expect(dbVerifyEmailToken).toBeDefined();
     });
@@ -610,26 +611,26 @@ describe('Auth middleware', () => {
     const req = httpMocks.createRequest({ headers: { Authorization: `Bearer ${accessToken}` } });
     const next = jest.fn();
 
-    await auth('anyRight')(req, httpMocks.createResponse(), next);
+    await auth('deleteAny:caregiver')(req, httpMocks.createResponse(), next);
 
     expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: httpStatus.FORBIDDEN, message: 'Forbidden' }));
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: httpStatus.FORBIDDEN, message: 'Access Denied: You do not have sufficient permissions.' }));
   });
 
-  test('should call next with no errors if caregiver does not have required rights but caregiverId is in params', async () => {
-    const [dbCaregiver] = await insertCaregivers([caregiverOne]);
-    const expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
-    const accessToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.ACCESS);
-    const req = httpMocks.createRequest({
-      headers: { Authorization: `Bearer ${accessToken}` },
-      params: { caregiverId: dbCaregiver.id },
-    });
-    const next = jest.fn();
+  // test('should call next with no errors if caregiver does not have required rights but caregiverId is in params', async () => {
+  //   const [dbCaregiver] = await insertCaregivers([caregiverOne]);
+  //   const expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
+  //   const accessToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.ACCESS);
+  //   const req = httpMocks.createRequest({
+  //     headers: { Authorization: `Bearer ${accessToken}` },
+  //     params: { caregiverId: dbCaregiver.id },
+  //   });
+  //   const next = jest.fn();
 
-    await auth('anyRight')(req, httpMocks.createResponse(), next);
+  //   await auth('deleteAny:caregiver')(req, httpMocks.createResponse(), next);
 
-    expect(next).toHaveBeenCalledWith();
-  });
+  //   expect(next).toHaveBeenCalledWith();
+  // });
 
   test('should call next with no errors if caregiver has required rights', async () => {
     const [adminCaregiver] = await insertCaregivers([admin]);
@@ -641,7 +642,7 @@ describe('Auth middleware', () => {
     });
     const next = jest.fn();
 
-    await auth(...roleRights.get('orgAdmin'))(req, httpMocks.createResponse(), next);
+    await auth('readAny:caregiver')(req, httpMocks.createResponse(), next);
 
     expect(next).toHaveBeenCalledWith();
   });

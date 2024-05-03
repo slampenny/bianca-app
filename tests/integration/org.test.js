@@ -90,10 +90,10 @@ describe('Org routes', () => {
   });
 
   it('should update a specific org', async () => {
-    const adminAccessToken = tokenService.generateToken(adminId);
+    const superAdminAccessToken = tokenService.generateToken(superAdminId);
     const res = await request(app)
       .patch(`/v1/orgs/${orgId}`)
-      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .set('Authorization', `Bearer ${superAdminAccessToken}`)
       .send({
         name: 'Updated Org',
         email: 'updatedorg@example.com',
@@ -109,10 +109,10 @@ describe('Org routes', () => {
   });
 
   it('should delete a specific org', async () => {
-    const adminAccessToken = tokenService.generateToken(adminId);
+    const superAdminAccessToken = tokenService.generateToken(superAdminId);
     const res = await request(app)
       .delete(`/v1/orgs/${orgId}`)
-      .set('Authorization', `Bearer ${adminAccessToken}`);
+      .set('Authorization', `Bearer ${superAdminAccessToken}`);
     expect(res.statusCode).toEqual(httpStatus.NO_CONTENT);
   });
 

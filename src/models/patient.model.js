@@ -74,6 +74,14 @@ patientSchema.statics.isEmailTaken = async function (email, excludePatientId) {
   return !!patient;
 };
 
+patientSchema.pre('find', function() {
+  this.where({ deleted: { $ne: true } });
+});
+
+patientSchema.pre('findOne', function() {
+  this.where({ deleted: { $ne: true } });
+});
+
 /**
  * @typedef Patient
  */

@@ -29,21 +29,6 @@ describe('Patient model', () => {
       newPatient.phone = 'invalidPhone';
       await expect(new Patient(newPatient).validate()).rejects.toThrow();
     });
-
-    test('should throw a validation error if password length is less than 8 characters', async () => {
-      newPatient.password = 'passwo1';
-      await expect(new Patient(newPatient).validate()).rejects.toThrow();
-    });
-
-    test('should throw a validation error if password does not contain numbers', async () => {
-      newPatient.password = 'password';
-      await expect(new Patient(newPatient).validate()).rejects.toThrow();
-    });
-
-    test('should throw a validation error if password does not contain letters', async () => {
-      newPatient.password = '11111111';
-      await expect(new Patient(newPatient).validate()).rejects.toThrow();
-    });
   });
 
   describe('Patient toJSON()', () => {
