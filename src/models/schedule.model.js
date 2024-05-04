@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const mongooseDelete = require('mongoose-delete');
 const { toJSON, paginate } = require('./plugins');
 
 const scheduleSchema = mongoose.Schema(
@@ -80,7 +81,15 @@ scheduleSchema.methods.calculateNextCallDate = function() {
 
 scheduleSchema.plugin(toJSON);
 scheduleSchema.plugin(paginate);
+scheduleSchema.plugin(mongooseDelete, { deletedAt : true });
 
+scheduleSchema.pre('find', function() {
+  this.where({ deleted: { $ne: true } });
+});
+
+scheduleSchema.pre('findOne', function() {
+  this.where({ deleted: { $ne: true } });
+});
 /**
  * @typedef Schedule
  */

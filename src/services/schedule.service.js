@@ -2,9 +2,9 @@ const httpStatus = require('http-status');
 const { Schedule, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
 
-const createSchedule = async (scheduleData) => {
+const createSchedule = async (patientId, scheduleData) => {
   // Create the schedule
-  const schedule = new Schedule(scheduleData);
+  const schedule = new Schedule({...scheduleData, patientId});
 
   // Calculate the nextCallDate
   schedule.calculateNextCallDate();
@@ -13,10 +13,9 @@ const createSchedule = async (scheduleData) => {
   const savedSchedule = await schedule.save();
 
   // Add the new schedule's ID to the patient's schedules field
-  const patient = await Patient.findById(schedule.patientId);
-  patient.schedules.push(savedSchedule._id);
+  const patient = await Patient.findById(patientId);
+  patient.schedules.push(savedSchedule.id);
   await patient.save();
-
 
   return savedSchedule;
 };
@@ -82,10 +81,10 @@ const deleteSchedule = async (id) => {
 
   // Remove the schedule's ID from the patient's schedules field
   const patient = await Patient.findById(schedule.patientId);
-  patient.schedules.pull(schedule._id);
+  patient.schedules.pull(schedule.id);
   await patient.save();
 
-  await schedule.remove();
+  await schedule.delete();
   return schedule;
 };
 
