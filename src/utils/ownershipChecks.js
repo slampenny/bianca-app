@@ -24,8 +24,12 @@ const isOwnerCaregiver = (caregiver, targetId) => {
 };
 
 const isOwnerPatient = (caregiver, patientId) => {
+    if (!patientId) {
+        return true;
+    }
+    
     // Ensure caregiver object and patientId are provided, and caregiver has patients array
-    if (!caregiver || !patientId || !caregiver.patients || !Array.isArray(caregiver.patients)) {
+    if (!caregiver || !caregiver.patients || !Array.isArray(caregiver.patients)) {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid parameters for isOwnerPatient function.');
     }
 
@@ -37,7 +41,8 @@ const isOwnerPatient = (caregiver, patientId) => {
 const ownershipChecks = {
     orgs: isOwnerOrg,
     caregiver: isOwnerCaregiver,
-    patients: isOwnerPatient
+    patient: isOwnerPatient
 };
 
 module.exports = ownershipChecks;
+

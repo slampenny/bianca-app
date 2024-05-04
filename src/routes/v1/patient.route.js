@@ -8,14 +8,14 @@ const router = express.Router();
 
 router
   .route('/')
-  .post(auth('managePatients'), validate(patientValidation.createPatient), patientController.createPatient)
-  .get(auth('getPatients'), validate(patientValidation.getPatients), patientController.getPatients);
+  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.createPatient), patientController.createPatient)
+  .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatients), patientController.getPatients);
 
 router
   .route('/:patientId')
-  .get(auth('getPatients'), validate(patientValidation.getPatient), patientController.getPatient)
-  .patch(auth('managePatients'), validate(patientValidation.updatePatient), patientController.updatePatient)
-  .delete(auth('managePatients'), validate(patientValidation.deletePatient), patientController.deletePatient);
+  .get(auth('readOwn:patient', 'readyAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
+  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), patientController.updatePatient)
+  .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(patientValidation.deletePatient), patientController.deletePatient);
 
 // New route for assigning caregiver to a patient
 /**
@@ -49,8 +49,8 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/:patientId/caregiver/:caregiverId')
-  .post(auth('managePatients'), patientController.assignCaregiver);
+  .route('/:patientId/caregivers/:caregiverId')
+  .post(auth('updateOwn:patient', 'updateAny:patient'), patientController.assignCaregiver);
 
 // New route for removing a patient from caregiver
 /**
@@ -84,8 +84,8 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/:patientId/caregiver/:caregiverId')
-  .delete(auth('managePatients'), patientController.removeCaregiver);
+  .route('/:patientId/caregivers/:caregiverId')
+  .delete(auth('deleteOwn:patient', 'deleteAny:patient'), patientController.removeCaregiver);
 
 module.exports = router;
 
@@ -326,41 +326,6 @@ module.exports = router;
  *         $ref: '#/components/responses/NotFound'
  */
 
-// New route for assigning caregiver to a patient
-/**
- * @swagger
- * /patients/{patientId}/caregiver/{caregiverId}:
- *   post:
- *     summary: Assign a caregiver to a patient
- *     description: Only admins can assign caregivers.
- *     tags: [Patients]
- *     parameters:
- *       - in: path
- *         name: patientId
- *         required: true
- *         schema:
- *           type: string
- *         description: Patient ID
- *       - in: path
- *         name: caregiverId
- *         required: true
- *         schema:
- *           type: string
- *         description: Caregiver ID
- *     responses:
- *       "200":
- *         description: Caregiver assigned
- *       "401":
- *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
- *       "404":
- *         $ref: '#/components/responses/NotFound'
- */
-router
-  .route('/:patientId/caregiver/:caregiverId')
-  .post(auth('managePatients'), patientController.assignCaregiver);
-
   /**
  * @swagger
  * /patients/{patientId}/conversations:
@@ -395,7 +360,7 @@ router
  */
 router
 .route('/:patientId/conversations')
-.get(auth('getConversationsByPatient'), validate(patientValidation.getConversationsByPatient), patientController.getConversationsByPatient);
+.get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getConversationsByPatient), patientController.getConversationsByPatient);
 
 /**
  * @swagger
@@ -422,4 +387,6 @@ router
  *       404:
  *         description: Caregivers not found
  */
-router.get(':patientId/caregivers', validate(patientValidation.getCaregiversByPatient), patientController.getCaregiversByPatient);
+router
+  .route(':patientId/caregivers')
+  .get(auth('readAny:caregiver'), validate(patientValidation.getCaregivers), patientController.getCaregivers);

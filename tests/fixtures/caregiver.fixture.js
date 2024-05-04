@@ -6,6 +6,8 @@ const moment = require('moment');
 const { Caregiver } = require('../../src/models');
 const tokenService = require('../../src/services/token.service');
 const { tokenTypes } = require('../../src/config/tokens');
+const { ApiError } = require('@google-cloud/storage');
+const httpStatus = require('http-status');
 
 const password = 'password1';
 const salt = bcrypt.genSaltSync(8);
@@ -55,7 +57,7 @@ const insertCaregivers = async (caregivers) => {
 };
 
 const insertCaregiverAndReturnToken = async (caregiverChoice) => {
-  const [caregiver] = await Caregiver.insertMany([caregiverChoice]);
+  const [caregiver] = await insertCaregivers([caregiverChoice]);
   const expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
   const accessToken = await tokenService.generateToken(caregiver.id, expires, tokenTypes.ACCESS);
 
@@ -67,7 +69,7 @@ const insertCaregiverAndReturnTokenByRole = async (role = "staff") => {
 
   switch (role) {
     case "staff":
-      caregiverChoice = caregiverOneWithPassword;
+      caregiverChoice = caregiverOne;
       break;
     case "orgAdmin":
       caregiverChoice = admin;
@@ -75,9 +77,11 @@ const insertCaregiverAndReturnTokenByRole = async (role = "staff") => {
     case "superAdmin":
       caregiverChoice = superAdmin;
       break;
+    default:
+      throw new ApiError(httpStatus.BAD_REQUEST, `Role ${role} not found`);
   }
 
-  return  await insertCaregiverAndReturnToken(caregiverChoice);
+  return await insertCaregiverAndReturnToken(caregiverChoice);
 };
 
 module.exports = {

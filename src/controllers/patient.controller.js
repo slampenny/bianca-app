@@ -53,13 +53,13 @@ const deletePatient = catchAsync(async (req, res) => {
 
 const assignCaregiver = catchAsync(async (req, res) => {
   const { patientId, caregiverId } = req.params;
-  const updatedPatient = await patientService.assignCaregiver(patientId, caregiverId);
+  const updatedPatient = await patientService.assignCaregiver(caregiverId, patientId);
   res.status(httpStatus.OK).send(updatedPatient);
 });
 
 const removeCaregiver = catchAsync(async (req, res) => {
   const { patientId, caregiverId } = req.params;
-  const updatedPatient = await patientService.removeCaregiver(patientId, caregiverId);
+  const updatedPatient = await patientService.removeCaregiver(caregiverId, patientId);
   res.status(httpStatus.OK).send(updatedPatient);
 });
 
@@ -81,9 +81,9 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(conversations);
 });
 
-const getCaregiversByPatient = catchAsync(async (req, res) => {
+const getCaregivers = catchAsync(async (req, res) => {
   const { patientId } = req.params;
-  const caregivers = await patientService.getCaregiversByPatientId(patientId);
+  const caregivers = await patientService.getCaregivers(patientId);
   if (!caregivers) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregivers not found');
   }
@@ -100,5 +100,5 @@ module.exports = {
   assignCaregiver,
   removeCaregiver,
   getPatientsByCaregiver,
-  getCaregiversByPatient,
+  getCaregivers,
 };

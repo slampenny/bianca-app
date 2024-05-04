@@ -4,7 +4,7 @@ const httpStatus = require('http-status');
 const app = require('../../src/app');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Caregiver, Token } = require('../../src/models');
+const { Caregiver, Token, Org } = require('../../src/models');
 const {
   caregiverOne,
   caregiverTwo,
@@ -35,6 +35,7 @@ afterAll(async () => {
 
 describe('Caregiver routes', () => {
   afterEach(async () => {
+    await Org.deleteMany();
     await Caregiver.deleteMany();
     await Token.deleteMany();
   });

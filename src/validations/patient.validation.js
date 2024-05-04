@@ -4,12 +4,8 @@ const { password, objectId } = require('./custom.validation');
 
 const createPatient = {
   body: Joi.object().keys({
+    org: Joi.string().custom(objectId).optional(),
     email: Joi.string().required().email(),
-    password: Joi.when('role', {
-      is: 'staff',
-      then: Joi.string().required().custom(password),
-      otherwise: Joi.string().optional().allow('').custom(password),
-    }),
     name: Joi.string().required(),
     phone: Joi.string().required().custom((value, helpers) => {
       if (!validator.isMobilePhone(value)) {
@@ -63,7 +59,7 @@ const updatePatient = {
         otherwise: Joi.string().optional().allow('').custom(password),
       }).optional(),
       name: Joi.string().optional(),
-      phone: Joi.string().required().custom((value, helpers) => {
+      phone: Joi.string().optional().custom((value, helpers) => {
         if (!validator.isMobilePhone(value)) {
           return helpers.message('Invalid phone number');
         }
@@ -102,7 +98,7 @@ const getConversationsByPatient = {
   }),
 }
 
-const getCaregiversByPatient = {
+const getCaregivers = {
   params: Joi.object().keys({
     patientId: Joi.string().custom(objectId),
   }),
@@ -115,5 +111,5 @@ module.exports = {
   getPatient,
   updatePatient,
   deletePatient,
-  getCaregiversByPatient,
+  getCaregivers,
 };

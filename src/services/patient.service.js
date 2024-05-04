@@ -1,5 +1,5 @@
 const httpStatus = require('http-status');
-const { Patient } = require('../models');
+const { Caregiver, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 
@@ -87,19 +87,29 @@ const deletePatientById = async (patientId) => {
  * @param {ObjectId} caregiverId
  * @returns {Promise<Patient>}
  */
-const assignCaregiver = async (patientId, caregiverId) => {
+const assignCaregiver = async (caregiverId, patientId) => {
   const patient = await getPatientById(patientId);
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
 
-  const caregiver = await getPatientById(caregiverId);
-  if (!caregiver || caregiver.role !== 'caregiver') {
+  const caregiver = await Caregiver.findById(caregiverId);
+  if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
 
-  patient.caregiver = caregiverId;
-  await patient.save();
+  // Add caregiver to patient's caregivers list
+  if (!patient.caregivers.includes(caregiverId)) {
+    patient.caregivers.push(caregiverId);
+    await patient.save();
+  }
+
+  // Add patient to caregiver's patients list
+  if (!caregiver.patients.includes(patientId)) {
+    caregiver.patients.push(patientId);
+    await caregiver.save();
+  }
+
   return patient;
 };
 
@@ -108,21 +118,35 @@ const assignCaregiver = async (patientId, caregiverId) => {
  * @param {ObjectId} patientId
  * @returns {Promise<Patient>}
  */
-const removeCaregiverPatientById = async (caregiverId, patientId) => {
+const removeCaregiver = async (caregiverId, patientId) => {
   const patient = await getPatientById(patientId);
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
-  if (caregiverId == patientId) {
-    patient.caregiverId = null;
-    await patient.save();
-    return patient;
+
+  const caregiver = await Caregiver.findById(caregiverId);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
-  await patient.remove();
+
+  // Remove caregiver from patient's caregivers list
+  const caregiverIndex = patient.caregivers.indexOf(caregiverId);
+  if (caregiverIndex !== -1) {
+    patient.caregivers.splice(caregiverIndex, 1);
+    await patient.save();
+  }
+
+  // Remove patient from caregiver's patients list
+  const patientIndex = caregiver.patients.indexOf(patientId);
+  if (patientIndex !== -1) {
+    caregiver.patients.splice(patientIndex, 1);
+    await caregiver.save();
+  }
+
   return patient;
 };
 
-const getCaregiversByPatientId = async (patientId) => {
+const getCaregivers = async (patientId) => {
   const patient = await Patient.findById(patientId).populate('caregivers');
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
@@ -138,5 +162,6 @@ module.exports = {
   updatePatientById,
   deletePatientById,
   assignCaregiver,
-  getCaregiversByPatientId,
+  removeCaregiver,
+  getCaregivers,
 };

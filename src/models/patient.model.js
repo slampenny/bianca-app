@@ -60,6 +60,13 @@ const patientSchema = mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        delete ret.deleted;
+        return ret;
+      },
+    },
   }
 );
 
