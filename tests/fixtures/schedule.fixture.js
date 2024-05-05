@@ -1,25 +1,30 @@
 const mongoose = require('mongoose');
 const faker = require('faker');
-const { Schedule } = require('../../src/models');
+const { Patient, Schedule } = require('../../src/models');
 
 // Example schedules for testing
 const scheduleOne = {
   frequency: 'weekly',
   intervals: [{ day: 3, weeks: 1 }], // Wednesday every week
   time: '14:30',
-  nextCallDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Tomorrow
 };
 
 const scheduleTwo = {
   frequency: 'monthly',
   intervals: [{ day: 15 }], // 15th of every month
   time: '09:45',
-  nextCallDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Tomorrow
 };
 
 const insertSchedules = async (schedules) => {
-  return await Schedule.insertMany(schedules);
+  const dbSchedules = schedules.map(data => new Schedule(data));
+  dbSchedules.forEach(schedule => schedule.calculateNextCallDate());
+  return await Schedule.insertMany(dbSchedules.map(schedule => schedule.toObject()));
 };
+
+const insertScheduleAndAddToPatient = async (patient, scheduleParam) => {
+  const [schedule] = await insertSchedules([{patientId: patient.id, ...scheduleParam}]);
+  return schedule;
+}
 
 // const prepareSchedulesWithPatients = async () => {
 //   const [patient1, patient2] = await insertPatients([patientOne, patientTwo]);
@@ -44,4 +49,5 @@ module.exports = {
   scheduleOne,
   scheduleTwo,
   insertSchedules,
+  insertScheduleAndAddToPatient,
 };

@@ -1,7 +1,24 @@
+const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const faker = require('faker');
 const { Patient } = require('../../../src/models');
 
 describe('Patient model', () => {
+
+  let mongoServer;
+
+  beforeAll(async () => {
+    mongoServer = new MongoMemoryServer();
+    await mongoServer.start();
+    const mongoUri = await mongoServer.getUri();
+    await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  });
+
+  afterAll(async () => {
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  });
+
   describe('Patient validation', () => {
     let newPatient;
     beforeEach(() => {

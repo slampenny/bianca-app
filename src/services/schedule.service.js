@@ -6,14 +6,17 @@ const createSchedule = async (patientId, scheduleData) => {
   // Create the schedule
   const schedule = new Schedule({...scheduleData, patientId});
 
-  // Calculate the nextCallDate
-  schedule.calculateNextCallDate();
-
   // Save the schedule
   const savedSchedule = await schedule.save();
 
   // Add the new schedule's ID to the patient's schedules field
   const patient = await Patient.findById(patientId);
+  
+  // Check if the patient exists
+  if (!patient) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+  }
+
   patient.schedules.push(savedSchedule.id);
   await patient.save();
 
@@ -29,11 +32,6 @@ const updateSchedule = async (scheduleId, updateBody) => {
   Object.keys(updateBody).forEach((key) => {
     schedule[key] = updateBody[key];
   });
-
-  // If the frequency or intervals are updated, recalculate the nextCallDate
-  if (updateBody.frequency || updateBody.intervals) {
-    schedule.calculateNextCallDate();
-  }
 
   if (updateBody.patientId && updateBody.patientId !== schedule.patientId.toString()) {
     const oldPatient = await Patient.findById(schedule.patientId);
@@ -54,11 +52,6 @@ const patchSchedule = async (id, updateBody) => {
   Object.keys(updateBody).forEach((key) => {
     schedule[key] = updateBody[key];
   });
-
-  // If the frequency or intervals are updated, recalculate the nextCallDate
-  if (updateBody.frequency || updateBody.intervals) {
-    schedule.calculateNextCallDate();
-  }
 
   // If the patientId is updated, remove the schedule's ID from the old patient's schedules field
   // and add it to the new patient's schedules field

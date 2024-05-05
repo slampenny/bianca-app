@@ -43,41 +43,69 @@ const scheduleSchema = mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        delete ret.deleted;
+        return ret;
+      },
+    },
   }
 );
 
 scheduleSchema.methods.calculateNextCallDate = function() {
-  const now = new Date();
+  const now = new Date(Date.now());
 
-  // Reset nextCallDate to the start of the next day
-  this.nextCallDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  // Set the time for nextCallDate
+  // Reset nextCallDate to the start of the next UTC day
+  this.nextCallDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  // Set the time for nextCallDate using UTC methods
   const [hours, minutes] = this.time.split(':');
-  this.nextCallDate.setHours(Number(hours), Number(minutes), 0);
+  this.nextCallDate.setUTCHours(Number(hours), Number(minutes), 0, 0);
 
   switch (this.frequency) {
     case 'daily':
-      // No changes needed for daily, as we've already set nextCallDate to the start of the next day
+      // For daily, nextCallDate is already set to the tiem field of the next UTC day.
       break;
+
     case 'weekly':
-      const weeklyInterval = this.intervals.find(i => i.day === now.getDay());
-      if (weeklyInterval) {
-        // Add the number of days until the next scheduled day of the week
-        const daysUntilNext = (weeklyInterval.day - now.getDay() + 7) % 7 || 7;
-        this.nextCallDate.setDate(this.nextCallDate.getDate() + daysUntilNext);
-      }
+      let smallestDifference = Infinity; // To find the closest next call date
+      this.intervals.forEach(interval => {
+        const dayDifference = (interval.day - now.getUTCDay() + 7) % 7 || 7;
+        const targetDate = new Date(this.nextCallDate.getTime());
+        targetDate.setUTCDate(targetDate.getUTCDate() + dayDifference);
+        const weeksToAdd = interval.weeks - 1; // Subtract 1 because we already count this week's day
+        targetDate.setUTCDate(targetDate.getUTCDate() + weeksToAdd * 7);
+        // Check if this targetDate is the closest one so far
+        if (targetDate > now && (targetDate < this.nextCallDate || this.nextCallDate <= now)) {
+          this.nextCallDate = new Date(targetDate);
+          smallestDifference = dayDifference;
+        }
+      });
       break;
-    case 'monthly':
-      const monthlyInterval = this.intervals.find(i => i.day === now.getDate());
-      if (monthlyInterval) {
-        // Add the number of days until the next scheduled day of the month
-        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-        const daysUntilNext = (monthlyInterval.day - now.getDate() + daysInMonth) % daysInMonth || daysInMonth;
-        this.nextCallDate.setDate(this.nextCallDate.getDate() + daysUntilNext);
-      }
-      break;
+
+      case 'monthly':
+        this.intervals.forEach(interval => {
+          let month = now.getUTCMonth();
+          let year = now.getUTCFullYear();
+          // Set the target date considering the desired day and adjust for the month's day count
+          let day = Math.min(interval.day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
+          let targetDate = new Date(Date.UTC(year, month, day));
+  
+          if (targetDate <= now) {
+            // If the target date is past or is today, calculate for the next month
+            day = Math.min(interval.day, new Date(Date.UTC(year, month + 2, 0)).getUTCDate()); // Get day count for next month
+            targetDate = new Date(Date.UTC(year, month + 1, day));
+          }
+  
+          // Check if this target date is closer than the previously found date
+          if (targetDate > now && (targetDate < this.nextCallDate || this.nextCallDate <= now)) {
+            this.nextCallDate = new Date(targetDate);
+          }
+        });
+        break;
   }
 };
+
 
 scheduleSchema.plugin(toJSON);
 scheduleSchema.plugin(paginate);
@@ -89,6 +117,13 @@ scheduleSchema.pre('find', function() {
 
 scheduleSchema.pre('findOne', function() {
   this.where({ deleted: { $ne: true } });
+});
+
+// Pre-save middleware to hash password
+scheduleSchema.pre('save', async function (next) {
+  const schedule = this;
+  schedule.calculateNextCallDate();
+  next();
 });
 /**
  * @typedef Schedule

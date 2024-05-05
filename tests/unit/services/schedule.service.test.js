@@ -3,7 +3,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const faker = require('faker');
 const httpStatus = require('http-status');
 const app = require('../../../src/app');
-const { Schedule, Patient } = require('../../../src/models');
+const { Schedule, Patient, Caregiver } = require('../../../src/models');
 const { scheduleService } = require('../../../src/services');
 const {
   scheduleOne,
@@ -30,6 +30,13 @@ afterAll(async () => {
 });
 
 describe('Schedule Service', () => {
+
+  afterEach(async () => {
+    await Caregiver.deleteMany();
+    await Patient.deleteMany();
+    await Schedule.deleteMany();
+  });
+
   describe('createSchedule', () => {
     test('should create a new schedule and add it to the patient\'s schedules', async () => {
       const [patient] = await insertPatients([patientOne]);

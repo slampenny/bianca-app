@@ -15,7 +15,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /patients/{patientId}/schedules:
+ * /schedules/patients/{patientId}:
  *   post:
  *     summary: Create a schedule for a patient
  *     description: Only authorized patients can create schedules.
@@ -57,12 +57,12 @@ const router = express.Router();
  *         $ref: '#/components/responses/Unauthorized'
  */
 router
-  .route('/:patientId')
-  .post(auth('manageSchedules'), validate(scheduleValidation.createSchedule), scheduleController.createSchedule);
+  .route('/patients/:patientId')
+  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(scheduleValidation.createSchedule), scheduleController.createSchedule);
 
 /**
  * @swagger
- * /patients/{patientId}/schedules/{scheduleId}:
+ * /schedules/{scheduleId}:
  *   get:
  *     summary: Get a schedule by ID for a patient
  *     description: Only authorized patients can get a schedule.
@@ -190,10 +190,10 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/:patientId/:scheduleId')
-  .get(auth('getSchedules'), validate(scheduleValidation.getSchedule), scheduleController.getSchedule)
-  .put(auth('manageSchedules'), validate(scheduleValidation.updateSchedule), scheduleController.updateSchedule)
-  .patch(auth('manageSchedules'), validate(scheduleValidation.patchSchedule), scheduleController.patchSchedule)
-  .delete(auth('manageSchedules'), validate(scheduleValidation.deleteSchedule), scheduleController.deleteSchedule);
+  .route('/:scheduleId')
+  .get(auth('readOwn:patient', 'readAny:patient'), validate(scheduleValidation.getSchedule), scheduleController.getSchedule)
+  .put(auth('updateOwn:patient', 'updateAny:patient'), validate(scheduleValidation.updateSchedule), scheduleController.updateSchedule)
+  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(scheduleValidation.patchSchedule), scheduleController.patchSchedule)
+  .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(scheduleValidation.deleteSchedule), scheduleController.deleteSchedule);
 
 module.exports = router;

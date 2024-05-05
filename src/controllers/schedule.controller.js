@@ -11,7 +11,11 @@ const createSchedule = catchAsync(async (req, res) => {
   }
 
   // Create or update the schedule
-  const schedule = await scheduleService.createSchedule(req.patientId, req.body.frequency, req.body.intervals);
+  const schedule = await scheduleService.createSchedule(req.params.patientId, {
+    frequency: req.body.frequency, 
+    intervals: req.body.intervals, 
+    time: req.body.time
+  });
 
   // Send the created schedule
   res.status(httpStatus.CREATED).send(schedule);

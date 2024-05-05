@@ -44,7 +44,7 @@ describe('Caregiver model', () => {
     });
   });
 
-  describe('Patient toJSON()', () => {
+  describe('Caregiver toJSON()', () => {
     test('should not return caregiver password when toJSON is called', () => {
       const newCaregiver = {
         name: faker.name.findName(),

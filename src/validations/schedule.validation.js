@@ -2,10 +2,18 @@ const Joi = require('joi');
 const { objectId } = require('./custom.validation');
 
 const createSchedule = {
-  body: Joi.object().keys({
+  params: Joi.object().keys({
     patientId: Joi.string().custom(objectId),
+  }),
+  body: Joi.object().keys({
     frequency: Joi.string().required(),
-    intervals: Joi.array().items(Joi.string()).required(),
+    intervals: Joi.array().items(
+      Joi.object().keys({
+        day: Joi.number().min(0).max(31).optional(),
+        weeks: Joi.number().min(1).optional(),
+      })
+    ).required(),
+    time: Joi.string().pattern(/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/).required(),
   }),
 };
 
@@ -21,7 +29,13 @@ const updateSchedule = {
   }),
   body: Joi.object().keys({
     frequency: Joi.string().required(),
-    intervals: Joi.array().items(Joi.string()).required(),
+    intervals: Joi.array().items(
+      Joi.object().keys({
+        day: Joi.number().min(0).max(31).optional(),
+        weeks: Joi.number().min(1).optional(),
+      })
+    ).required(),
+    time: Joi.string().pattern(/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/).required(),
   }),
 };
 
@@ -30,8 +44,14 @@ const patchSchedule = {
     scheduleId: Joi.string().custom(objectId),
   }),
   body: Joi.object().keys({
-    frequency: Joi.string(),
-    intervals: Joi.array().items(Joi.string()),
+    frequency: Joi.string().optional(),
+    intervals: Joi.array().items(
+      Joi.object().keys({
+        day: Joi.number().min(0).max(31).optional(),
+        weeks: Joi.number().min(1).optional(),
+      })
+    ).optional(),
+    time: Joi.string().pattern(/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
   }),
 };
 
