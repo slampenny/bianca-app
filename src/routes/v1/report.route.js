@@ -16,7 +16,7 @@ const router = express.Router();
  * /reports:
  *   post:
  *     summary: Generate a report
- *     description: Only authorized users can generate reports.
+ *     description: Only authorized caregivers can generate reports.
  *     tags: [Reports]
  *     requestBody:
  *       required: true

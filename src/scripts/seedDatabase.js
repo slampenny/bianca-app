@@ -1,41 +1,24 @@
 const mongoose = require('mongoose');
 const faker = require('faker');
-const User = require('../models/user.model.js');
-const Call = require('../models/call.model.js');
+const { Org, Caregiver, Patient } = require('../models');
 const config = require('../config/config');
+
+const { orgOne, orgTwo, insertOrgs } = require('../../tests/fixtures/org.fixture');
+const { caregiverOne, caregiverTwo, insertCaregivers } = require('../../tests/fixtures/caregiver.fixture');
+const { patientOne, patientTwo, insertPatients } = require('../../tests/fixtures/patient.fixture');
 
 async function seedDatabase() {
     // Connect to the database
     await mongoose.connect(config.mongoose.url, { useNewUrlParser: true, useUnifiedTopology: true });
 
     // Clear the database
-    await User.deleteMany({});
-    await Call.deleteMany({});
-
-    // Create some users
-    const user1 = await User.create({
-        name: faker.name.findName(),
-        email: faker.internet.email().toLowerCase(),
-        password: 'password1',
-        role: 'user',
-        phone: '+16045624263'//faker.phone.phoneNumberFormat(1)
-    });
-
-    const user2 = await User.create({
-        name: faker.name.findName(),
-        email: faker.internet.email().toLowerCase(),
-        password: 'password2',
-        role: 'user',
-        phone: '+16045624263'//faker.phone.phoneNumberFormat(1)
-    });
-
-    const user3 = await User.create({
-        name: 'fake@example.com',
-        email: 'fake@example.com',
-        password: 'password1',
-        role: 'admin',
-        phone: '+16045624263'//faker.phone.phoneNumberFormat(1)
-    });
+    await Org.deleteMany({});
+    await Caregiver.deleteMany({});
+    await Patient.deleteMany({});
+    await insertOrgs([orgOne, orgTwo]);
+    await insertCaregivers([caregiverOne, caregiverTwo]);
+    
+    await insertPatients([patientOne, patientTwo]);
 
     console.log('Database seeded!');
 }

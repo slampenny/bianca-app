@@ -1,7 +1,9 @@
 const { Message, Conversation } = require('./conversation.model');
 const { Invoice, LineItem } = require('./payment.model');
 module.exports.Token = require('./token.model');
-module.exports.User = require('./user.model');
+module.exports.Org = require('./org.model');
+module.exports.Caregiver = require('./caregiver.model');
+module.exports.Patient = require('./patient.model');
 module.exports.Call = require('./call.model');
 module.exports.Message = Message;
 module.exports.Conversation = Conversation;

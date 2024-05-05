@@ -21,7 +21,7 @@ const router = express.Router();
  *             type: object
  *             required:
  *               - messages
- *               - userId
+ *               - patientId
  *             properties:
  *               messages:
  *                 type: array
@@ -32,7 +32,7 @@ const router = express.Router();
  *                       type: string
  *                     content:
  *                       type: string
- *               userId:
+ *               patientId:
  *                 type: string
  *     responses:
  *       "200":

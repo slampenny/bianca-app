@@ -30,7 +30,7 @@ agenda.define('runSchedules', async (job, done) => {
     logger.info(`Running schedule ${schedule.id}`);
 
     try {
-        twilioCallService.initiateCall(schedule.userId);
+        twilioCallService.initiateCall(schedule.patientId);
         
         // Update the nextCallDate based on the frequency and interval
         schedule.calculateNextCallDate();

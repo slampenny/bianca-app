@@ -1,4 +1,4 @@
-  const { User } = require('../models'); // Assuming User model includes phone number
+  const { Patient } = require('../models'); // Assuming Patient model includes phone number
   const openAiService = require('./openAiService');
   const config = require('../config/config');
   const { Call } = require('../models');

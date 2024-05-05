@@ -7,6 +7,7 @@ const auth = require('../../middlewares/auth');
 const router = express.Router();
 
 router.post('/register', validate(authValidation.register), authController.register);
+router.post('/registerWithInvite', validate(authValidation.register), authController.registerWithInvite);
 router.post('/login', validate(authValidation.login), authController.login);
 router.post('/logout', validate(authValidation.logout), authController.logout);
 router.post('/refresh-tokens', validate(authValidation.refreshTokens), authController.refreshTokens);
@@ -28,7 +29,7 @@ module.exports = router;
  * @swagger
  * /auth/register:
  *   post:
- *     summary: Register as user
+ *     summary: Register as caregiver
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -64,8 +65,8 @@ module.exports = router;
  *             schema:
  *               type: object
  *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
+ *                 caregiver:
+ *                   $ref: '#/components/schemas/Caregiver'
  *                 tokens:
  *                   $ref: '#/components/schemas/AuthTokens'
  *       "400":
@@ -105,8 +106,8 @@ module.exports = router;
  *             schema:
  *               type: object
  *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
+ *                 caregiver:
+ *                   $ref: '#/components/schemas/Caregiver'
  *                 tokens:
  *                   $ref: '#/components/schemas/AuthTokens'
  *       "401":

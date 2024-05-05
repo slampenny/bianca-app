@@ -18,12 +18,12 @@ afterAll(async () => {
 
 describe('Conversation Model Test', () => {
   it('create & save conversation successfully', async () => {
-    const conversationData = { userId: new mongoose.Types.ObjectId() };
+    const conversationData = { patientId: new mongoose.Types.ObjectId() };
     const validConversation = new Conversation(conversationData);
     const savedConversation = await validConversation.save();
 
     expect(savedConversation._id).toBeDefined();
-    expect(savedConversation.userId.toString()).toBe(conversationData.userId.toString());
+    expect(savedConversation.patientId.toString()).toBe(conversationData.patientId.toString());
     expect(savedConversation.messages).toEqual(expect.arrayContaining([]));
   });
 
@@ -32,7 +32,7 @@ describe('Conversation Model Test', () => {
 
 describe('Message Model Test', () => {
   it('create & save message successfully', async () => {
-    const messageData = { role: 'user', content: 'Hello, world!' };
+    const messageData = { role: 'patient', content: 'Hello, world!' };
     const validMessage = new Message(messageData);
     const savedMessage = await validMessage.save();
 

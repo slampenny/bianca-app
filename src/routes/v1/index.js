@@ -1,10 +1,12 @@
 const express = require('express');
 const authRoute = require('./auth.route');
 const chatRoute = require('./chat.route');
+const caregiverRoute = require('./caregiver.route');
 const conversationRoute = require('./conversation.route');
+const orgRoute = require('./org.route');
+const patientRoute = require('./patient.route');
 const reportRoute = require('./report.route');
 const scheduleRoute = require('./schedule.route');
-const userRoute = require('./user.route');
 const twilioRoute = require('./twilioCall.route');
 const docsRoute = require('./docs.route');
 const config = require('../../config/config');
@@ -17,12 +19,24 @@ const defaultRoutes = [
     route: authRoute,
   },
   {
+    path: '/caregivers',
+    route: caregiverRoute,
+  },
+  {
     path: '/chat',
     route: chatRoute,
   },
   {
     path: '/conversations',
     route: conversationRoute,
+  },
+  {
+    path: '/orgs',
+    route: orgRoute,
+  },
+  {
+    path: '/patients',
+    route: patientRoute,
   },
   {
     path: '/reports',
@@ -35,10 +49,6 @@ const defaultRoutes = [
   {
     path: '/twilio',
     route: twilioRoute,
-  },
-  {
-    path: '/users',
-    route: userRoute,
   },
 ];
 
@@ -55,7 +65,7 @@ defaultRoutes.forEach((route) => {
 });
 
 /* istanbul ignore next */
-if (config.env === 'development') {
+if (config.env === 'development' || config.env === 'test') {
   devRoutes.forEach((route) => {
     router.use(route.path, route.route);
   });

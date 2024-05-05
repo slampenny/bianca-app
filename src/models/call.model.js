@@ -4,10 +4,10 @@ const { toJSON, paginate } = require('./plugins');
 // Call Schema
 const callSchema = mongoose.Schema(
   {
-    userId: {
+    patientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'User'
+      ref: 'Patient'
     },
     dateTime: {
       type: Date,

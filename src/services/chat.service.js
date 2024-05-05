@@ -28,7 +28,7 @@ class ChatService {
             // Generate a response from OpenAI
             openaiResponse = await openaiAPI.generateResponseFromOpenAI(
                 messages,
-                conversation.userId.name
+                conversation.patientId.name
             );
 
             return openaiResponse;

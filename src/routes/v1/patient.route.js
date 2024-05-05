@@ -1,37 +1,37 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
-const userValidation = require('../../validations/user.validation');
-const userController = require('../../controllers/user.controller');
+const patientValidation = require('../../validations/patient.validation');
+const patientController = require('../../controllers/patient.controller');
 
 const router = express.Router();
 
 router
   .route('/')
-  .post(auth('manageUsers'), validate(userValidation.createUser), userController.createUser)
-  .get(auth('getUsers'), validate(userValidation.getUsers), userController.getUsers);
+  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.createPatient), patientController.createPatient)
+  .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatients), patientController.getPatients);
 
 router
-  .route('/:userId')
-  .get(auth('getUsers'), validate(userValidation.getUser), userController.getUser)
-  .patch(auth('manageUsers'), validate(userValidation.updateUser), userController.updateUser)
-  .delete(auth('manageUsers'), validate(userValidation.deleteUser), userController.deleteUser);
+  .route('/:patientId')
+  .get(auth('readOwn:patient', 'readyAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
+  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), patientController.updatePatient)
+  .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(patientValidation.deletePatient), patientController.deletePatient);
 
-// New route for assigning caregiver to a user
+// New route for assigning caregiver to a patient
 /**
  * @swagger
- * /users/{userId}/caregiver/{caregiverId}:
+ * /patients/{patientId}/caregiver/{caregiverId}:
  *   post:
- *     summary: Assign a caregiver to a user
+ *     summary: Assign a caregiver to a patient
  *     description: Only admins can assign caregivers.
- *     tags: [Users]
+ *     tags: [Patients]
  *     parameters:
  *       - in: path
- *         name: userId
+ *         name: patientId
  *         required: true
  *         schema:
  *           type: string
- *         description: User ID
+ *         description: Patient ID
  *       - in: path
  *         name: caregiverId
  *         required: true
@@ -49,24 +49,24 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/:userId/caregiver/:caregiverId')
-  .post(auth('manageUsers'), userController.assignCaregiver);
+  .route('/:patientId/caregivers/:caregiverId')
+  .post(auth('updateOwn:patient', 'updateAny:patient'), patientController.assignCaregiver);
 
-// New route for removing a user from caregiver
+// New route for removing a patient from caregiver
 /**
  * @swagger
- * /users/{userId}/caregiver/{caregiverId}:
+ * /patients/{patientId}/caregiver/{caregiverId}:
  *   delete:
- *     summary: Remove a user from a caregiver
+ *     summary: Remove a patient from a caregiver
  *     description: Only admins can assign caregivers.
- *     tags: [Users]
+ *     tags: [Patients]
  *     parameters:
  *       - in: path
- *         name: userId
+ *         name: patientId
  *         required: true
  *         schema:
  *           type: string
- *         description: User ID
+ *         description: Patient ID
  *       - in: path
  *         name: caregiverId
  *         required: true
@@ -84,46 +84,16 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/:userId/caregiver/:caregiverId')
-  .delete(auth('manageUsers'), userController.removeCaregiver);
-
-// New route for getting clients of a caregiver
-/**
- * @swagger
- * /users/caregiver/{caregiverId}/clients:
- *   get:
- *     summary: Get clients for a caregiver
- *     description: Only admins can retrieve clients for a caregiver.
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: caregiverId
- *         required: true
- *         schema:
- *           type: string
- *         description: Caregiver ID
- *     responses:
- *       "200":
- *         description: List of clients retrieved
- *       "401":
- *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
- *       "404":
- *         $ref: '#/components/responses/NotFound'
- */
-router
-  .route('/caregiver/:caregiverId/clients')
-  .get(auth('manageUsers'), userController.getClientsForCaregiver);
-
+  .route('/:patientId/caregivers/:caregiverId')
+  .delete(auth('deleteOwn:patient', 'deleteAny:patient'), patientController.removeCaregiver);
 
 module.exports = router;
 
 /**
  * @swagger
  * tags:
- *   name: Users
- *   description: User management and retrieval
+ *   name: Patients
+ *   description: Patient management and retrieval
  */
 
 /**
@@ -136,11 +106,11 @@ module.exports = router;
 
 /**
  * @swagger
- * /users:
+ * /patients:
  *   post:
- *     summary: Create a user
- *     description: Only admins can create other users.
- *     tags: [Users]
+ *     summary: Create a patient
+ *     description: Only admins can create other Patients.
+ *     tags: [Patients]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -166,21 +136,18 @@ module.exports = router;
  *                 format: password
  *                 minLength: 8
  *                 description: At least one number and one letter
- *               role:
- *                  type: string
- *                  enum: [user, admin]
  *             example:
  *               name: fake name
  *               email: fake@example.com
  *               password: password1
- *               role: user
+ *               role: patient
  *     responses:
  *       "201":
  *         description: Created
  *         content:
  *           application/json:
  *             schema:
- *                $ref: '#/components/schemas/User'
+ *                $ref: '#/components/schemas/Patient'
  *       "400":
  *         $ref: '#/components/responses/DuplicateEmail'
  *       "401":
@@ -189,9 +156,9 @@ module.exports = router;
  *         $ref: '#/components/responses/Forbidden'
  *
  *   get:
- *     summary: Get all users
- *     description: Only admins can retrieve all users.
- *     tags: [Users]
+ *     summary: Get all Patients
+ *     description: Only admins can retrieve all Patients.
+ *     tags: [Patients]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -199,12 +166,12 @@ module.exports = router;
  *         name: name
  *         schema:
  *           type: string
- *         description: User name
+ *         description: Patient name
  *       - in: query
  *         name: role
  *         schema:
  *           type: string
- *         description: User role
+ *         description: Patient role
  *       - in: query
  *         name: sortBy
  *         schema:
@@ -216,7 +183,7 @@ module.exports = router;
  *           type: integer
  *           minimum: 1
  *         default: 10
- *         description: Maximum number of users
+ *         description: Maximum number of Patients
  *       - in: query
  *         name: page
  *         schema:
@@ -235,7 +202,7 @@ module.exports = router;
  *                 results:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/User'
+ *                     $ref: '#/components/schemas/Patient'
  *                 page:
  *                   type: integer
  *                   example: 1
@@ -256,11 +223,11 @@ module.exports = router;
 
 /**
  * @swagger
- * /users/{id}:
+ * /patients/{id}:
  *   get:
- *     summary: Get a user
- *     description: Logged in users can fetch only their own user information. Only admins can fetch other users.
- *     tags: [Users]
+ *     summary: Get a patient
+ *     description: Logged in Patients can fetch only their own patient information. Only admins can fetch other Patients.
+ *     tags: [Patients]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -269,14 +236,14 @@ module.exports = router;
  *         required: true
  *         schema:
  *           type: string
- *         description: User id
+ *         description: Patient id
  *     responses:
  *       "200":
  *         description: OK
  *         content:
  *           application/json:
  *             schema:
- *                $ref: '#/components/schemas/User'
+ *                $ref: '#/components/schemas/Patient'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":
@@ -285,9 +252,9 @@ module.exports = router;
  *         $ref: '#/components/responses/NotFound'
  *
  *   patch:
- *     summary: Update a user
- *     description: Logged in users can only update their own information. Only admins can update other users.
- *     tags: [Users]
+ *     summary: Update a patient
+ *     description: Logged in Patients can only update their own information. Only admins can update other Patients.
+ *     tags: [Patients]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -296,7 +263,7 @@ module.exports = router;
  *         required: true
  *         schema:
  *           type: string
- *         description: User id
+ *         description: Patient id
  *     requestBody:
  *       required: true
  *       content:
@@ -325,7 +292,7 @@ module.exports = router;
  *         content:
  *           application/json:
  *             schema:
- *                $ref: '#/components/schemas/User'
+ *                $ref: '#/components/schemas/Patient'
  *       "400":
  *         $ref: '#/components/responses/DuplicateEmail'
  *       "401":
@@ -336,9 +303,9 @@ module.exports = router;
  *         $ref: '#/components/responses/NotFound'
  *
  *   delete:
- *     summary: Delete a user
- *     description: Logged in users can delete only themselves. Only admins can delete other users.
- *     tags: [Users]
+ *     summary: Delete a patient
+ *     description: Logged in Patients can delete only themselves. Only admins can delete other Patients.
+ *     tags: [Patients]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -347,7 +314,7 @@ module.exports = router;
  *         required: true
  *         schema:
  *           type: string
- *         description: User id
+ *         description: Patient id
  *     responses:
  *       "200":
  *         description: No content
@@ -359,86 +326,22 @@ module.exports = router;
  *         $ref: '#/components/responses/NotFound'
  */
 
-// New route for assigning caregiver to a user
-/**
- * @swagger
- * /users/{userId}/caregiver/{caregiverId}:
- *   post:
- *     summary: Assign a caregiver to a user
- *     description: Only admins can assign caregivers.
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *       - in: path
- *         name: caregiverId
- *         required: true
- *         schema:
- *           type: string
- *         description: Caregiver ID
- *     responses:
- *       "200":
- *         description: Caregiver assigned
- *       "401":
- *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
- *       "404":
- *         $ref: '#/components/responses/NotFound'
- */
-router
-  .route('/:userId/caregiver/:caregiverId')
-  .post(auth('manageUsers'), userController.assignCaregiver);
-
-// New route for getting clients of a caregiver
-/**
- * @swagger
- * /users/caregiver/{caregiverId}/clients:
- *   get:
- *     summary: Get clients for a caregiver
- *     description: Only admins can retrieve clients for a caregiver.
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: caregiverId
- *         required: true
- *         schema:
- *           type: string
- *         description: Caregiver ID
- *     responses:
- *       "200":
- *         description: List of clients retrieved
- *       "401":
- *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
- *       "404":
- *         $ref: '#/components/responses/NotFound'
- */
-router
-  .route('/caregiver/:caregiverId/clients')
-  .get(auth('manageUsers'), userController.getClientsForCaregiver);
-
   /**
  * @swagger
- * /users/{userId}/conversations:
+ * /patients/{patientId}/conversations:
  *   get:
- *     summary: Get conversations by user
- *     description: Logged in users can fetch only their own conversation information. Only admins can fetch other users' conversations.
+ *     summary: Get conversations by patient
+ *     description: Logged in Patients can fetch only their own conversation information. Only admins can fetch other Patients' conversations.
  *     tags: [Conversations]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: userId
+ *         name: patientId
  *         required: true
  *         schema:
  *           type: string
- *         description: User id
+ *         description: Patient id
  *     responses:
  *       "200":
  *         description: OK
@@ -456,5 +359,34 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-.route('/:userId/conversations')
-.get(auth('getConversationsByUser'), validate(userValidation.getConversationsByUser), userController.getConversationsByUser);
+.route('/:patientId/conversations')
+.get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getConversationsByPatient), patientController.getConversationsByPatient);
+
+/**
+ * @swagger
+ * /api/patients/{patientId}/caregivers:
+ *   get:
+ *     summary: Retrieve caregivers of a patient
+ *     description: Retrieve caregivers of a patient by the patient's ID
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         description: Patient ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: An array of caregiver objects
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Caregiver'
+ *       404:
+ *         description: Caregivers not found
+ */
+router
+  .route(':patientId/caregivers')
+  .get(auth('readAny:caregiver'), validate(patientValidation.getCaregivers), patientController.getCaregivers);

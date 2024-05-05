@@ -1,24 +1,21 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const httpStatus = require('http-status');
-const { User } = require('../models');
+const { Org, Conversation, Invoice, LineItem } = require('../models');
 const ApiError = require('../utils/ApiError');
 const mongoose = require('mongoose');
-const { Conversation } = require('./path-to-your-models');
-const Invoice = require('app/sec/models'); // Assuming you have this model
-const LineItem = require('./path-to-your-lineItem-model'); // Assuming you have this model
 
-const createPaymentMethod = async (userId, paymentMethodId) => {
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+const createPaymentMethod = async (orgId, paymentMethodId) => {
+  const org = await Org.findById(orgId);
+  if (!org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
   }
 
   const paymentMethod = await stripe.paymentMethods.attach(paymentMethodId, {
-    customer: user.stripeCustomerId,
+    customer: org.stripeCustomerId,
   });
 
-  user.paymentMethods.push(paymentMethod.id);
-  await user.save();
+  org.paymentMethods.push(paymentMethod.id);
+  await org.save();
 
   return paymentMethod;
 };
@@ -33,33 +30,33 @@ const updatePaymentMethod = async (paymentMethodId, updateBody) => {
   return paymentMethod;
 };
 
-const deletePaymentMethod = async (userId, paymentMethodId) => {
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+const deletePaymentMethod = async (orgId, paymentMethodId) => {
+  const org = await Org.findById(orgId);
+  if (!org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
   }
 
   await stripe.paymentMethods.detach(paymentMethodId);
 
-  const index = user.paymentMethods.indexOf(paymentMethodId);
+  const index = org.paymentMethods.indexOf(paymentMethodId);
   if (index > -1) {
-    user.paymentMethods.splice(index, 1);
+    org.paymentMethods.splice(index, 1);
   }
-  await user.save();
+  await org.save();
 
   return paymentMethodId;
 };
 
-const createLineItemsAndLinkConversations = async (caregiverId, invoiceId) => {
-  const unchargedConversations = await aggregateUnchargedConversations(caregiverId);
+const createLineItemsAndLinkConversations = async (patientId, invoiceId) => {
+  const unchargedConversations = await aggregateUnchargedConversations(patientId);
 
-  for (const userConversations of unchargedConversations) {
-    const { userId, totalDuration, conversationIds } = userConversations;
+  for (const patientConversations of unchargedConversations) {
+    const { patientId, totalDuration, conversationIds } = patientConversations;
     
-    // Create a new line item for this user's conversations
+    // Create a new line item for this patient's conversations
     const lineItem = await LineItem.create({
       invoiceId: invoiceId,
-      userId: userId,
+      patientId: patientId,
       amount: calculateAmount(totalDuration), // You need to define how to calculate the amount based on duration
       description: `Billing for ${totalDuration} seconds of conversation`
     });

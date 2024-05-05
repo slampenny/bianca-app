@@ -5,7 +5,7 @@ const ApiError = require('../utils/ApiError');
 const setPermissions = async (permissionsBody) => {
   const accessControl = await AccessControl.findOneAndUpdate(
     { reportId: permissionsBody.reportId },
-    { $addToSet: { allowedUsers: { $each: permissionsBody.allowedUsers } } },
+    { $addToSet: { allowedCaregivers: { $each: permissionsBody.allowedCaregivers } } },
     { new: true, upsert: true }
   );
   return accessControl;

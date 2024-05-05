@@ -1,4 +1,5 @@
 const express = require('express');
+const i18n = require('i18n');
 const helmet = require('helmet');
 const xss = require('xss-clean');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -15,6 +16,15 @@ const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 
 const app = express();
+
+// i18n configuration
+i18n.configure({
+  locales: ['en', 'es'],
+  directory: __dirname + '/locales',
+  objectNotation: true,
+});
+
+app.use(i18n.init); // This middleware attaches the i18n object to the request
 
 if (config.env !== 'test') {
   app.use(morgan.successHandler);

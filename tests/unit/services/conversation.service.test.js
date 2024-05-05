@@ -18,35 +18,35 @@ afterAll(async () => {
 });
 
 describe('conversationService', () => {
-  it('should create a new conversation for a user', async () => {
-    const userId = mongoose.Types.ObjectId();
-    const conversation = await conversationService.createConversationForUser(userId);
+  it('should create a new conversation for a patient', async () => {
+    const patientId = mongoose.Types.ObjectId();
+    const conversation = await conversationService.createConversationForPatient(patientId);
     expect(conversation).toHaveProperty('_id');
-    expect(conversation).toHaveProperty('userId', userId);
+    expect(conversation).toHaveProperty('patientId', patientId);
   });
 
   it('should add a message to a conversation', async () => {
-    const userId = mongoose.Types.ObjectId();
-    const conversation = await conversationService.createConversationForUser(userId);
+    const patientId = mongoose.Types.ObjectId();
+    const conversation = await conversationService.createConversationForPatient(patientId);
     const messageContent = 'Hello, world!';
-    const updatedConversation = await conversationService.addMessageToConversation(conversation._id, 'user', messageContent);
+    const updatedConversation = await conversationService.addMessageToConversation(conversation._id, 'patient', messageContent);
     expect(updatedConversation.messages).toHaveLength(1);
     const message = await Message.findById(updatedConversation.messages[0]);
     expect(message).toHaveProperty('content', messageContent);
   });
 
   it('should get a conversation by id', async () => {
-    const userId = mongoose.Types.ObjectId();
-    const conversation = await conversationService.createConversationForUser(userId);
+    const patientId = mongoose.Types.ObjectId();
+    const conversation = await conversationService.createConversationForPatient(patientId);
     const fetchedConversation = await conversationService.getConversationById(conversation._id);
     expect(fetchedConversation).toHaveProperty('_id', conversation._id);
   });
 
-  it('should get conversations by user', async () => {
-    const userId = mongoose.Types.ObjectId();
-    await conversationService.createConversationForUser(userId);
-    await conversationService.createConversationForUser(userId);
-    const conversations = await conversationService.getConversationsByUser(userId);
+  it('should get conversations by patient', async () => {
+    const patientId = mongoose.Types.ObjectId();
+    await conversationService.createConversationForPatient(patientId);
+    await conversationService.createConversationForPatient(patientId);
+    const conversations = await conversationService.getConversationsByPatient(patientId);
     expect(conversations).toHaveLength(2);
   });
 });

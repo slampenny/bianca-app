@@ -1,12 +1,14 @@
 const mongoose = require('mongoose');
+const mongooseDelete = require('mongoose-delete');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
 const { toJSON, paginate } = require('./plugins');
 const { roles } = require('../config/roles');
 
-// User Schema
-const userSchema = mongoose.Schema(
+// Caregiver Schema
+const caregiverSchema = mongoose.Schema(
   {
+    org: { type: mongoose.Schema.Types.ObjectId, ref: 'Org' },
     name: {
       type: String,
       required: true,
@@ -28,7 +30,6 @@ const userSchema = mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      lowercase: true,
       validate(value) {
         if (!validator.isMobilePhone (value)) {
           throw new Error('Invalid phone number');
@@ -51,58 +52,64 @@ const userSchema = mongoose.Schema(
     },
     role: {
       type: String,
-      enum: roles,
-      default: 'user',
+      enum: roles, // assuming roles is an array of valid roles
+      default: 'staff',
     },
     isEmailVerified: {
       type: Boolean,
       default: false,
     },
-    caregiver: {
-      type: mongoose.SchemaTypes.ObjectId,
-      ref: 'User',
-      default: null,
-    },
-    schedules: [
-      {
-        type: mongoose.SchemaTypes.ObjectId,
-        ref: 'Schedule',
-      },
-    ],
+    patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        delete ret.deleted;
+        return ret;
+      },
+    },
   }
 );
 
 // Plugin to convert mongoose to JSON, and paginate results
-userSchema.plugin(toJSON);
-userSchema.plugin(paginate);
+caregiverSchema.plugin(toJSON);
+caregiverSchema.plugin(paginate);
+caregiverSchema.plugin(mongooseDelete, { deletedAt : true });
 
 // Static method to check if email is taken
-userSchema.statics.isEmailTaken = async function (email, excludeUserId) {
-  const user = await this.findOne({ email, _id: { $ne: excludeUserId } });
-  return !!user;
+caregiverSchema.statics.isEmailTaken = async function (email, excludeCaregiverId) {
+  const caregiver = await this.findOne({ email, _id: { $ne: excludeCaregiverId } });
+  return !!caregiver;
 };
 
 // Method to check password match
-userSchema.methods.isPasswordMatch = async function (password) {
-  const user = this;
-  return bcrypt.compare(password, user.password);
+caregiverSchema.methods.isPasswordMatch = async function (password) {
+  const caregiver = this;
+  return bcrypt.compare(password, caregiver.password);
 };
 
 // Pre-save middleware to hash password
-userSchema.pre('save', async function (next) {
-  const user = this;
-  if (user.isModified('password')) {
-    user.password = await bcrypt.hash(user.password, 8);
+caregiverSchema.pre('save', async function (next) {
+  const caregiver = this;
+  if (caregiver.isModified('password')) {
+    caregiver.password = await bcrypt.hash(caregiver.password, 8);
   }
   next();
 });
 
-/**
- * @typedef User
- */
-const User = mongoose.model('User', userSchema);
+caregiverSchema.pre('find', function() {
+  this.where({ deleted: { $ne: true } });
+});
 
-module.exports = User;
+caregiverSchema.pre('findOne', function() {
+  this.where({ deleted: { $ne: true } });
+});
+
+/**
+ * @typedef Caregiver
+ */
+const Caregiver = mongoose.model('Caregiver', caregiverSchema);
+
+module.exports = Caregiver;

@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const httpStatus = require('http-status');
 const config = require('../config/config');
-const userService = require('./user.service');
+const caregiverService = require('./caregiver.service');
 const { Token } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
@@ -14,15 +14,20 @@ const { tokenTypes } = require('../config/tokens');
 
 /**
  * Generate token
- * @param {ObjectId} userId
+ * @param {ObjectId} caregiverId
  * @param {Moment} expires
  * @param {string} type
  * @param {string} [secret]
  * @returns {string}
  */
-const generateToken = (userId, expires, type, secret = config.jwt.secret) => {
+const generateToken = (
+  caregiverId, 
+  expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes'), 
+  type = tokenTypes.ACCESS, 
+  secret = config.jwt.secret
+) => {
   const payload = {
-    sub: userId,
+    sub: caregiverId,
     iat: moment().unix(),
     exp: expires.unix(),
     type,
@@ -33,16 +38,16 @@ const generateToken = (userId, expires, type, secret = config.jwt.secret) => {
 /**
  * Save a token
  * @param {string} token
- * @param {ObjectId} userId
+ * @param {ObjectId} caregiverId
  * @param {Moment} expires
  * @param {string} type
  * @param {boolean} [blacklisted]
  * @returns {Promise<Token>}
  */
-const saveToken = async (token, userId, expires, type, blacklisted = false) => {
+const saveToken = async (token, caregiverId, expires, type, blacklisted = false) => {
   const tokenDoc = await Token.create({
     token,
-    user: userId,
+    caregiver: caregiverId,
     expires: expires.toDate(),
     type,
     blacklisted,
@@ -58,7 +63,7 @@ const saveToken = async (token, userId, expires, type, blacklisted = false) => {
  */
 const verifyToken = async (token, type) => {
   const payload = jwt.verify(token, config.jwt.secret);
-  const tokenDoc = await Token.findOne({ token, type, user: payload.sub, blacklisted: false });
+  const tokenDoc = await Token.findOne({ token, type, caregiver: payload.sub, blacklisted: false });
   if (!tokenDoc) {
     throw new Error('Token not found');
   }
@@ -67,16 +72,16 @@ const verifyToken = async (token, type) => {
 
 /**
  * Generate auth tokens
- * @param {User} user
+ * @param {Caregiver} caregiver
  * @returns {Promise<AuthTokens>}
  */
-const generateAuthTokens = async (user) => {
+const generateAuthTokens = async (caregiver) => {
   const accessTokenExpires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
-  const accessToken = generateToken(user.id, accessTokenExpires, tokenTypes.ACCESS);
+  const accessToken = generateToken(caregiver.id, accessTokenExpires, tokenTypes.ACCESS);
 
   const refreshTokenExpires = moment().add(config.jwt.refreshExpirationDays, 'days');
-  const refreshToken = generateToken(user.id, refreshTokenExpires, tokenTypes.REFRESH);
-  await saveToken(refreshToken, user.id, refreshTokenExpires, tokenTypes.REFRESH);
+  const refreshToken = generateToken(caregiver.id, refreshTokenExpires, tokenTypes.REFRESH);
+  await saveToken(refreshToken, caregiver.id, refreshTokenExpires, tokenTypes.REFRESH);
 
   return {
     access: {
@@ -96,25 +101,25 @@ const generateAuthTokens = async (user) => {
  * @returns {Promise<string>}
  */
 const generateResetPasswordToken = async (email) => {
-  const user = await userService.getUserByEmail(email);
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'No users found with this email');
+  const caregiver = await caregiverService.getCaregiverByEmail(email);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No caregivers found with this email');
   }
   const expires = moment().add(config.jwt.resetPasswordExpirationMinutes, 'minutes');
-  const resetPasswordToken = generateToken(user.id, expires, tokenTypes.RESET_PASSWORD);
-  await saveToken(resetPasswordToken, user.id, expires, tokenTypes.RESET_PASSWORD);
+  const resetPasswordToken = generateToken(caregiver.id, expires, tokenTypes.RESET_PASSWORD);
+  await saveToken(resetPasswordToken, caregiver.id, expires, tokenTypes.RESET_PASSWORD);
   return resetPasswordToken;
 };
 
 /**
  * Generate verify email token
- * @param {User} user
+ * @param {Caregiver} caregiver
  * @returns {Promise<string>}
  */
-const generateVerifyEmailToken = async (user) => {
+const generateVerifyEmailToken = async (caregiver) => {
   const expires = moment().add(config.jwt.verifyEmailExpirationMinutes, 'minutes');
-  const verifyEmailToken = generateToken(user.id, expires, tokenTypes.VERIFY_EMAIL);
-  await saveToken(verifyEmailToken, user.id, expires, tokenTypes.VERIFY_EMAIL);
+  const verifyEmailToken = generateToken(caregiver.id, expires, tokenTypes.VERIFY_EMAIL);
+  await saveToken(verifyEmailToken, caregiver.id, expires, tokenTypes.VERIFY_EMAIL);
   return verifyEmailToken;
 };
 

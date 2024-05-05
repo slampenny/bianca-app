@@ -16,7 +16,7 @@ const router = express.Router();
  * /access-control:
  *   post:
  *     summary: Set permissions for a report
- *     description: Only authorized users can set permissions.
+ *     description: Only authorized caregivers can set permissions.
  *     tags: [AccessControl]
  *     requestBody:
  *       required: true
@@ -26,11 +26,11 @@ const router = express.Router();
  *             type: object
  *             required:
  *               - reportId
- *               - allowedUsers
+ *               - allowedCaregivers
  *             properties:
  *               reportId:
  *                 type: string
- *               allowedUsers:
+ *               allowedCaregivers:
  *                 type: array
  *                 items:
  *                   type: string

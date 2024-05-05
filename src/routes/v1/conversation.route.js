@@ -15,18 +15,18 @@ const router = express.Router();
 
 /**
  * @swagger
- * /conversations/user/{userId}:
+ * /conversations/patient/{patientId}:
  *   post:
- *     summary: Create a conversation for a user
- *     description: Only authorized users can create conversations.
+ *     summary: Create a conversation for a patient
+ *     description: Only authorized patients can create conversations.
  *     tags: [Conversations]
  *     parameters:
  *       - in: path
- *         name: userId
+ *         name: patientId
  *         required: true
  *         schema:
  *           type: string
- *         description: The user ID
+ *         description: The patient ID
  *     responses:
  *       "201":
  *         description: Conversation created
@@ -36,15 +36,15 @@ const router = express.Router();
  *         description: Unauthorized
  */
 router
-  .route('/user/:userId')
-  .post(auth('createConversationForUser'), validate(conversationValidation.createConversationForUser), conversationController.createConversationForUser);
+  .route('/patient/:patientId')
+  .post(auth('createConversationForPatient'), validate(conversationValidation.createConversationForPatient), conversationController.createConversationForPatient);
 
 /**
  * @swagger
  * /conversations/{conversationId}:
  *   post:
  *     summary: Add a message to a conversation
- *     description: Only authorized users can add messages to conversations.
+ *     description: Only authorized patients can add messages to conversations.
  *     tags: [Conversations]
  *     parameters:
  *       - in: path
@@ -65,7 +65,7 @@ router
  *             properties:
  *               role:
  *                 type: string
- *                 description: The role of the user adding the message
+ *                 description: The role of the patient adding the message
  *               content:
  *                 type: string
  *                 description: The content of the message
@@ -86,7 +86,7 @@ router
  * /conversations/{id}:
  *   get:
  *     summary: Get a conversation
- *     description: Logged in users can fetch only their own conversation information. Only admins can fetch other conversation.
+ *     description: Logged in patients can fetch only their own conversation information. Only admins can fetch other conversation.
  *     tags: [Conversations]
  *     security:
  *       - bearerAuth: []
