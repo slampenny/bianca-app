@@ -138,6 +138,11 @@ const sendInvite = async (orgId, email) => {
   await emailService.sendInviteEmail(email, inviteLink);
 };
 
+const verifyInvite = async (token) => {
+  const payload = await inviteService.verifyInviteToken(token);
+  return payload.org;
+};
+
 const setRole = async (orgId, caregiverId, role) => {
   const org = await getOrgById(orgId);
   if (!org) {
@@ -169,4 +174,6 @@ module.exports = {
   addCaregiver,
   removeCaregiver,
   setRole,
+  sendInvite,
+  verifyInvite,
 };

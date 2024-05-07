@@ -135,6 +135,14 @@ router
 .patch(auth('updateAny:caregiver'), orgController.setRole);
 
 
+router
+.route('/:orgId/invite')
+.patch(auth('updateOwn:org'), orgController.sendInvite);
+
+router
+.route('/:orgId/verify-invite/{:token}')
+.patch(auth('updateOwn:org'), orgController.verifyInvite);
+
 module.exports = router;
 
 /**
