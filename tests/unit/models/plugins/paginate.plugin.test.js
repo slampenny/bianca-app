@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const setupTestDB = require('../../../utils/setupTestDB');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const paginate = require('../../../../src/models/plugins/paginate.plugin');
 
 const projectSchema = mongoose.Schema({
@@ -33,7 +33,19 @@ const taskSchema = mongoose.Schema({
 taskSchema.plugin(paginate);
 const Task = mongoose.model('Task', taskSchema);
 
-setupTestDB();
+let mongoServer;
+
+beforeAll(async () => {
+  mongoServer = new MongoMemoryServer();
+  await mongoServer.start();
+  const mongoUri = await mongoServer.getUri();
+  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+});
 
 describe('paginate plugin', () => {
   describe('populate option', () => {
