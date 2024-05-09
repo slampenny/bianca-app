@@ -10,14 +10,6 @@ process.on('exit', () => {
   }
 });
 
-/* istanbul ignore next */
-if (config.env !== 'test') {
-  transport
-    .verify()
-    .then(() => logger.info('Connected to email server'))
-    .catch(() => logger.warn('Unable to connect to email server. Make sure you have configured the SMTP options in .env'));
-}
-
 /**
  * Send an email
  * @param {string} to
@@ -37,9 +29,14 @@ const sendEmail = async (to, subject, text) => {
  * @returns {Promise}
  */
 const sendInviteEmail = async (to, inviteLink) => {
-  const subject = i18n.__('inviteEmail.subject');
-  const text = i18n.__('inviteEmail.text', inviteLink);
-  await sendEmail(to, subject, text);
+  try {
+    const subject = i18n.__('inviteEmail.subject');
+    const text = i18n.__('inviteEmail.text', inviteLink);
+    await sendEmail(to, subject, text);
+  } catch (error) {
+    logger.error(`Failed to send invite email: ${error}`);
+    throw error;  // Re-throw the error
+  }
 };
 
 /**
@@ -50,7 +47,7 @@ const sendInviteEmail = async (to, inviteLink) => {
  */
 const sendResetPasswordEmail = async (to, token) => {
   const subject = i18n.__('sendResetPasswordEmail.subject');
-  const text = i18n.__('sendResetPasswordEmail.text', `http://link-to-app/reset-password?token=${token}`);
+  const text = i18n.__('sendResetPasswordEmail.text', `${config.apiUrl}/reset-password?token=${token}`);
   await sendEmail(to, subject, text);
 };
 
@@ -62,7 +59,7 @@ const sendResetPasswordEmail = async (to, token) => {
  */
 const sendVerificationEmail = async (to, token) => {
 const subject = i18n.__('sendVerificationEmail.subject');
-const text = i18n.__('sendVerificationEmail.text', `http://link-to-app/verify-email?token=${token}`);
+const text = i18n.__('sendVerificationEmail.text', `${config.apiUrl}/verify-email?token=${token}`);
 await sendEmail(to, subject, text);
 };
 

@@ -1,6 +1,10 @@
 const { AccessControl } = require('accesscontrol');
 const ac = new AccessControl();
 
+ac.grant('invited')
+  .readOwn('caregiver') // assuming 'caregiver' refers to the caregiver's own caregiver
+  .updateOwn('caregiver')
+
 ac.grant('staff')
   .readOwn('caregiver') // assuming 'caregiver' refers to the caregiver's own caregiver
   .updateOwn('caregiver')
@@ -31,7 +35,7 @@ ac.grant('superAdmin')
   .createAny('patient')
   .deleteAny('patient');
 
-const roles = ['staff', 'orgAdmin', 'superAdmin'];
+const roles = ['invited', 'staff', 'orgAdmin', 'superAdmin'];
 
 module.exports = {
   roles,

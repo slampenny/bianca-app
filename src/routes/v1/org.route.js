@@ -141,7 +141,7 @@ router
 
 router
 .route('/:orgId/verify-invite/{:token}')
-.patch(auth('updateOwn:org'), orgController.verifyInvite);
+.patch(auth('updateOwn:caregiver'), orgController.verifyInvite);
 
 module.exports = router;
 

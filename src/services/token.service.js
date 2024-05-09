@@ -62,11 +62,18 @@ const saveToken = async (token, caregiverId, expires, type, blacklisted = false)
  * @returns {Promise<Token>}
  */
 const verifyToken = async (token, type) => {
-  const payload = jwt.verify(token, config.jwt.secret);
+  let payload;
+  try {
+    payload = jwt.verify(token, config.jwt.secret);
+  } catch (err) {
+    throw new Error('Invalid or expired invite token');
+  }
+
   const tokenDoc = await Token.findOne({ token, type, caregiver: payload.sub, blacklisted: false });
   if (!tokenDoc) {
     throw new Error('Token not found');
   }
+
   return tokenDoc;
 };
 
@@ -93,6 +100,16 @@ const generateAuthTokens = async (caregiver) => {
       expires: refreshTokenExpires.unix(),
     },
   };
+};
+
+const generateInviteToken = async (caregiver) => {
+  const token = generateToken(
+    caregiver.id, 
+    expires = moment().add(config.jwt.inviteExpirationMinutes, 'minutes'), 
+    type = tokenTypes.INVITE,
+  );
+  await saveToken(token, caregiver.id, expires, tokenTypes.INVITE);
+  return token;
 };
 
 /**
@@ -128,6 +145,7 @@ module.exports = {
   saveToken,
   verifyToken,
   generateAuthTokens,
+  generateInviteToken,
   generateResetPasswordToken,
   generateVerifyEmailToken,
 };

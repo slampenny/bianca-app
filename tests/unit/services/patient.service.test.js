@@ -4,7 +4,7 @@ const { Org,  Caregiver, Patient } = require('../../../src/models');
 const patientService = require('../../../src/services/patient.service');
 const caregiverService = require('../../../src/services/caregiver.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
-const { caregiverOne } = require('../../fixtures/caregiver.fixture');
+const { caregiverOneWithPassword } = require('../../fixtures/caregiver.fixture');
 const { patientOne, patientTwo, insertPatients } = require('../../fixtures/patient.fixture');
 
 let mongoServer;
@@ -12,7 +12,7 @@ let mongoServer;
 beforeAll(async () => {
   mongoServer = new MongoMemoryServer();
   await mongoServer.start();
-  const mongoUri = await mongoServer.getUri();
+  const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
 });
 
@@ -77,7 +77,7 @@ describe('patientService', () => {
   it('should assign a caregiver to a patient', async () => {
     const [org] = await insertOrgs([orgOne]);
     const patient = await patientService.createPatient(patientOne);
-    const caregiver = await caregiverService.createCaregiver(org.id, caregiverOne);
+    const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     const updatedPatient = await patientService.assignCaregiver(caregiver.id, patient.id);
     expect(updatedPatient.caregivers.map(id => id.toString())).toEqual(expect.arrayContaining([caregiver.id.toString()]));
   });
@@ -85,7 +85,7 @@ describe('patientService', () => {
   it('should remove a caregiver from a patient', async () => {
     const [org] = await insertOrgs([orgOne]);
     const patient = await patientService.createPatient(patientOne);
-    const caregiver = await caregiverService.createCaregiver(org.id, caregiverOne);
+    const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     await patientService.assignCaregiver(caregiver.id, patient.id);
     const updatedPatient = await patientService.removeCaregiver(caregiver.id, patient.id);
     expect(updatedPatient.caregivers.toObject()).toEqual([]);
@@ -94,7 +94,7 @@ describe('patientService', () => {
   it('should get caregivers by patient id', async () => {
     const [org] = await insertOrgs([orgOne]);
     const patient = await patientService.createPatient(patientOne);
-    const caregiver = await caregiverService.createCaregiver(org.id, caregiverOne);
+    const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     await patientService.assignCaregiver(caregiver.id, patient.id);
     const caregivers = await patientService.getCaregivers(patient.id);
     expect(caregivers).toHaveLength(1);
