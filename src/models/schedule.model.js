@@ -120,7 +120,7 @@ scheduleSchema.pre('findOne', function() {
 });
 
 // Pre-save middleware to hash password
-scheduleSchema.pre('save', async function (next) {
+scheduleSchema.pre('validate', async function (next) {
   const schedule = this;
   schedule.calculateNextCallDate();
   next();
