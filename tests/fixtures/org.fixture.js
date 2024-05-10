@@ -1,11 +1,5 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const faker = require('faker');
 const { Org } = require('../../src/models');
-
-const password = 'password1';
-const salt = bcrypt.genSaltSync(8);
-const hashedPassword = bcrypt.hashSync(password, salt);
 
 const orgOne = {
   caregivers: [],
@@ -24,7 +18,7 @@ const orgTwo = {
 };
 
 const insertOrgs = async (orgs) => {
-  return await Org.insertMany(orgs.map((org) => ({ ...org, password: hashedPassword })));
+  return await Org.insertMany(orgs.map((org) => ({ ...org })));
 };
 
 module.exports = {

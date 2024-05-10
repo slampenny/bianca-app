@@ -1,6 +1,6 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { authService, caregiverService, inviteService, orgService, tokenService, emailService } = require('../services');
+const { authService, caregiverService, orgService, tokenService, emailService } = require('../services');
 
 const register = catchAsync(async (req, res, next) => {
   const org = await orgService.createOrg(
@@ -23,8 +23,8 @@ const register = catchAsync(async (req, res, next) => {
 
 const registerWithInvite = catchAsync(async (req, res) => {
   const { token, ...caregiverInfo } = req.body;
-  const invite = await inviteService.verifyInviteToken(token);
-  const caregiver = await caregiverService.createCaregiver({ ...caregiverInfo, org: invite.org });
+  const invite = await tokenService.verifyToken(token);
+  const caregiver = await caregiverService.createCaregiver({ ...caregiverInfo, org: invite.cargiver.org });
   const tokens = await tokenService.generateAuthTokens(caregiver);
   res.status(httpStatus.CREATED).send({ caregiver, tokens });
 });

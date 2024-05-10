@@ -56,6 +56,20 @@ const setRole = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(updatedOrg);
 });
 
+const sendInvite = catchAsync(async (req, res) => {
+  const { orgId } = req.params;
+  const { email } = req.body;
+  await orgService.sendInvite(orgId, email);
+  res.status(httpStatus.OK);
+});
+
+const verifyInvite = catchAsync(async (req, res) => {
+  const { token } = req.query;
+  const { caregiverBody } = req.body;
+  const orgId = await orgService.verifyInvite(token, caregiverBody);
+  res.status(httpStatus.OK).send({ orgId });
+});
+
 module.exports = {
   createOrg,
   getOrgs,
@@ -65,4 +79,6 @@ module.exports = {
   addCaregiver,
   removeCaregiver,
   setRole,
+  sendInvite,
+  verifyInvite
 };

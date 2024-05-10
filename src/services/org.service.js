@@ -1,10 +1,10 @@
 const httpStatus = require('http-status');
 const { Org, Caregiver, Patient } = require('../models');
 const config = require('../config/config');
-const inviteService = require('./invite.service');
 const emailService = require('./email.service');
+const tokenService = require('./token.service');
+const { tokenTypes } = require('../config/tokens');
 const ApiError = require('../utils/ApiError');
-const logger = require('../config/logger');
 
 /**
  * Create a org and a caregiver
@@ -132,10 +132,45 @@ const removeCaregiver = async (orgId, caregiverId) => {
   return org;
 };
 
-const sendInvite = async (orgId, email) => {
-  const inviteToken = await inviteService.generateInviteToken(orgId, email);
-  const inviteLink = `${config.app.url}/signup?token=${inviteToken}`;
+const sendInvite = async (orgId, name, email, phone) => {
+
+  const org = await Org.findById(orgId);
+  if (!org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
+  }
+
+  let caregiver = await Caregiver.findOne({ email });
+
+  if (!caregiver) {
+    caregiver = new Caregiver({
+      org: orgId,
+      name,
+      email,
+      phone,
+      role: 'invited',
+    });
+
+    await caregiver.save();
+    org.caregivers.push(caregiver);
+    await org.save();
+  }
+
+  const inviteToken = await tokenService.generateInviteToken(caregiver);
+  const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
   await emailService.sendInviteEmail(email, inviteLink);
+
+  return inviteToken;
+};
+
+const verifyInvite = async (token, caregiverBody={}) => {
+  const payload = await tokenService.verifyToken(token, tokenTypes.INVITE);
+  const caregiver = await Caregiver.findById(payload.caregiver);
+  
+  // Update the caregiver document with the fields in caregiverBody
+  caregiver.set(caregiverBody);
+  await caregiver.save();
+  
+  return await setRole(caregiver.org, caregiver.id, "staff")
 };
 
 const setRole = async (orgId, caregiverId, role) => {
@@ -156,7 +191,7 @@ const setRole = async (orgId, caregiverId, role) => {
   caregiver.role = role;
   await caregiver.save();
 
-  return org;
+  return caregiver;
 };
 
 module.exports = {
@@ -169,4 +204,6 @@ module.exports = {
   addCaregiver,
   removeCaregiver,
   setRole,
+  sendInvite,
+  verifyInvite,
 };

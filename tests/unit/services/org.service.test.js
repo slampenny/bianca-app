@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const orgService = require('../../../src/services/org.service');
 const { Org, Caregiver } = require('../../../src/models');
-const { caregiverOne, caregiverTwo, admin, insertCaregivers } = require('../../fixtures/caregiver.fixture');
-const { orgOne, orgTwo, insertOrgs } = require('../../fixtures/org.fixture');
+const { caregiverOne, caregiverTwo, caregiverOneWithPassword, insertCaregivers } = require('../../fixtures/caregiver.fixture');
+const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 
 let mongoServer;
 
@@ -29,7 +29,7 @@ describe('orgService', () => {
   });
 
   it('should create a new org and a caregiver', async () => {
-    const org = await orgService.createOrg(orgOne, caregiverOne);
+    const org = await orgService.createOrg(orgOne, caregiverOneWithPassword);
     expect(org).toHaveProperty('id');
     expect(org).toHaveProperty('name', orgOne.name);
     expect(org).toHaveProperty('email', orgOne.email);

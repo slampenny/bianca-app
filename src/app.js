@@ -22,6 +22,9 @@ i18n.configure({
   locales: ['en', 'es'],
   directory: __dirname + '/locales',
   objectNotation: true,
+  logWarnFn: function(msg) {
+    // do nothing
+  },
 });
 
 app.use(i18n.init); // This middleware attaches the i18n object to the request
