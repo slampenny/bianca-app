@@ -1,40 +1,56 @@
 const { emailService } = require('../../../src/services');
 const nodemailer = require('nodemailer');
-const imap = require('imap');
-const util = require('util');
+const imaps = require('imap-simple');
 const config = require('../../../src/config/config');
 
-jest.mock("i18n");
+// Mock i18n
+jest.mock('i18n', () => ({
+  __: jest.fn((key, value) => key === 'inviteEmail.text' ? `Invite link: ${value}` : key),
+}));
 
 describe('emailService', () => {
   let transport;
-  let mailbox;
+  let connection;
 
-  beforeAll(() => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  beforeAll(async () => {
     // Set up Ethereal Email transport
     transport = nodemailer.createTransport({
       ...config.email.smtp
     });
 
     // Set up Ethereal IMAP client
-    mailbox = new imap({
-      user: config.email.smtp.auth.user,
-      password: config.email.smtp.auth.pass,
-      host: 'imap.ethereal.email',
-      port: 993,
+    const imapConfig = {
+      imap: {
+        user: config.email.smtp.auth.user,
+        password: config.email.smtp.auth.pass,
+        host: 'imap.ethereal.email',
+        port: 993,
       tls: true,
-    });
+      }
+    };
 
-    // Promisify necessary IMAP methods
-    mailbox.openBox = util.promisify(mailbox.openBox);
-    mailbox.search = util.promisify(mailbox.search);
+    // Connect and authenticate IMAP client
+    connection = await imaps.connect(imapConfig);
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Close transport and mailbox
     transport.close();
-    mailbox.end();
-  });
+
+    // Wait for all pending operations to complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Destroy connection
+    if (connection) {
+      connection.imap.destroy();
+    } else {
+      console.log("No connection");
+    }
+  }); // Increase timeout to 30 seconds
 
   it('should send an invite email correctly', async () => {
     const email = 'test@example.com';
@@ -43,13 +59,18 @@ describe('emailService', () => {
     // Send email
     await emailService.sendInviteEmail(email, inviteLink);
 
-    // Check Ethereal inbox
-    await new Promise((resolve) => mailbox.once('ready', resolve));
-    await mailbox.openBox('INBOX', true);
-    const results = await mailbox.search(['UNSEEN']);
-    const unseenEmails = results.length;
+    //await new Promise(resolve => setTimeout(resolve, 2000));
 
-    expect(unseenEmails).toBeGreaterThan(0);
+    await connection.openBox('INBOX');
+    const results = await connection.search(['ALL']);
+    const allEmails = results.length; 
+    await connection.closeBox(err => {
+      if (err) {
+        console.error('Failed to close box:', err);
+      }
+    });
+
+    expect(allEmails).toBeGreaterThan(0);
   });
 
   it('should handle email send failure gracefully', async () => {

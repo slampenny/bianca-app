@@ -12,7 +12,10 @@ const {
 } = require('../../fixtures/caregiver.fixture');
 const { Caregiver, Org, Token } = require('../../../src/models');
 
-jest.mock("i18n");
+// Mock i18n
+jest.mock('i18n', () => ({
+  __: jest.fn((key, value) => key === 'inviteEmail.text' ? `Invite link: ${value}` : key),
+}));
 
 let mongoServer;
 
