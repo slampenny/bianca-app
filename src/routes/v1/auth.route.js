@@ -41,6 +41,7 @@ module.exports = router;
  *               - name
  *               - email
  *               - password
+ *               - phone
  *             properties:
  *               name:
  *                 type: string
@@ -51,12 +52,14 @@ module.exports = router;
  *               password:
  *                 type: string
  *                 format: password
- *                 minLength: 8
  *                 description: At least one number and one letter
+ *               phone:
+ *                 type: string
  *             example:
  *               name: fake name
  *               email: fake@example.com
  *               password: password1
+ *               phone: "+1234567890"
  *     responses:
  *       "201":
  *         description: Created
@@ -230,7 +233,6 @@ module.exports = router;
  *               password:
  *                 type: string
  *                 format: password
- *                 minLength: 8
  *                 description: At least one number and one letter
  *             example:
  *               password: password1
