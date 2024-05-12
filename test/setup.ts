@@ -39,8 +39,6 @@ jest.mock("expo-localization", () => ({
   getLocales: () => [{ languageTag: "en-US", textDirection: "ltr" }],
 }))
 
-declare const tron // eslint-disable-line @typescript-eslint/no-unused-vars
-
 declare global {
   let __TEST__: boolean
 }

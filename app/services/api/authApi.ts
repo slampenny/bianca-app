@@ -1,20 +1,20 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { DEFAULT_API_CONFIG } from './api';
-import { User } from './api.types';
+import { Org, Caregiver } from './api.types';
 import type { AuthTokens } from '../../store/authSlice'
 
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: fetchBaseQuery({ baseUrl: DEFAULT_API_CONFIG.url }),
   endpoints: (builder) => ({
-    register: builder.mutation<User, { name: string, email: string, password: string }>({
+    register: builder.mutation<{org: Org, tokens: any}, { name: string, email: string, password: string, phone: string }>({
       query: (data) => ({
         url: '/auth/register',
         method: 'POST',
         body: data,
       }),
     }),
-    login: builder.mutation<{user: User, tokens: any}, { email: string, password: string }>({
+    login: builder.mutation<{caregiver: Caregiver, tokens: any}, { email: string, password: string }>({
       query: (data) => ({
         url: '/auth/login',
         method: 'POST',
@@ -56,7 +56,7 @@ export const authApi = createApi({
         body: data,
       }),
     }),
-    sendVerificationEmail: builder.mutation<void, User>({
+    sendVerificationEmail: builder.mutation<void, Caregiver>({
       query: (data) => ({
         url: '/auth/send-verification-email',
         method: 'POST',

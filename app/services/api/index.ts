@@ -1,2 +1,6 @@
 export * from "./api"
 export * from "./api.types"
+export * from "./authApi"
+export * from "./caregiverApi"
+//export * from "./patientApi"
+export * from "./scheduleApi"

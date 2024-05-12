@@ -1,11 +1,30 @@
-// User.ts
-export interface User {
+// Caregiver.ts
+export interface Caregiver {
   id?: string;
   name: string;
   email: string;
   phone: string;
-  role: 'user' | 'caregiver' |'admin'; 
-  caregiver: string | null; // Assuming this is the ID of the caregiver
+  role: 'invited' | 'staff' |'ordAdmin'; 
+  org: Org;
+  patients: Patient[]; // Assuming this is the ID of the caregiver  
+}
+
+export interface Org {
+  id?: string;
+  name: string;
+  email: string;
+  phone: string;
+  caregivers: Caregiver[];
+  patients: Patient[];
+}
+
+export interface Patient {
+  id?: string;
+  name: string;
+  email: string;
+  phone: string;
+  org: Org;
+  caregivers: Caregiver[]; // Assuming this is the ID of the caregiver
   schedules: Schedule[];
 }
 
@@ -16,7 +35,7 @@ export interface Interval {
 
 export interface Schedule {
   id?: string;
-  userId?: string | null;
+  patient?: string | null;
   frequency: 'daily' | 'weekly' | 'monthly';
   intervals: Interval[];
   time: string;

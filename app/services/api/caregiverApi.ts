@@ -2,7 +2,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { DEFAULT_API_CONFIG } from './api';
 import { RootState } from '../../store/store';
-import { User } from './api.types';
+import { Caregiver } from './api.types';
 
 export const caregiverApi = createApi({
   reducerPath: 'caregiverApi',
@@ -17,25 +17,51 @@ export const caregiverApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    assignCaregiver: builder.mutation<void, { userId: string, caregiverId: string }>({
-      query: ({ userId, caregiverId }) => ({
-        url: `/users/${userId}/caregiver/${caregiverId}`,
+    createCaregiver: builder.mutation<void, { caregiver: Caregiver }>({
+      query: ({ caregiver }) => ({
+        url: `/caregivers`,
         method: 'POST',
+        body: caregiver,
       }),
     }),
-    removeCaregiver: builder.mutation<void, { userId: string, caregiverId: string }>({
-      query: ({ userId, caregiverId }) => ({
-        url: `/users/${userId}/caregiver/${caregiverId}`,
+    getAllCaregivers: builder.query<void, void>({
+      query: () => `/caregivers`,
+    }),
+    getCaregiver: builder.query<void, { id: string }>({
+      query: ({ id }) => `/caregivers/${id}`,
+    }),
+    updateCaregiver: builder.mutation<{ caregiver: Caregiver }, { id: string, caregiver: any }>({
+      query: ({ id, caregiver }) => ({
+        url: `/caregivers/${id}`,
+        method: 'PATCH',
+        body: caregiver,
+      }),
+    }),
+    deleteCaregiver: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `/caregivers/${id}`,
         method: 'DELETE',
       }),
     }),
-    getClientsForCaregiver: builder.query<void, User | null >({
+    assignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+      query: ({ patientId, caregiverId }) => ({
+        url: `/patients/${patientId}/caregiver/${caregiverId}`,
+        method: 'POST',
+      }),
+    }),
+    removeCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+      query: ({ patientId, caregiverId }) => ({
+        url: `/patients/${patientId}/caregiver/${caregiverId}`,
+        method: 'DELETE',
+      }),
+    }),
+    getPatientForCaregiver: builder.query<void, Caregiver | null >({
       query: (caregiver) => {
         if (caregiver === null) {
           throw new Error("No caregiver provided");
         }
         return {
-          url: `/users/caregiver/${caregiver.id}/clients`,
+          url: `/caregivers/${caregiver.id}/patients`,
           method: 'GET',
         }
 
@@ -47,6 +73,10 @@ export const caregiverApi = createApi({
 export const {
   useAssignCaregiverMutation,
   useRemoveCaregiverMutation,
-  useGetClientsForCaregiverQuery,
-  // ...other hooks...
+  useCreateCaregiverMutation,
+  useGetAllCaregiversQuery,
+  useGetCaregiverQuery,
+  useUpdateCaregiverMutation,
+  useDeleteCaregiverMutation,
+  useGetPatientForCaregiverQuery,
 } = caregiverApi;

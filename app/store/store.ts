@@ -1,16 +1,16 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import counterReducer from "./counterSlice";
 import authReducer from "./authSlice";
+import orgReducer from "./orgSlice";
 import caregiverReducer from "./caregiverSlice";
 import scheduleReducer from "./scheduleSlice";
-import userReducer from "./userSlice";
 import { authApi } from '../services/api/authApi'; // import your authApi
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from "redux-persist";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { orgApi } from "app/services/api/orgApi";
 import { caregiverApi } from "app/services/api/caregiverApi";
 import { scheduleApi } from "app/services/api/scheduleApi";
-import { userApi } from "app/services/api/userApi";
 
 const persistConfig = {
   key: "root",
@@ -20,14 +20,14 @@ const persistConfig = {
 
 const rootReducer = combineReducers({
   counter: counterReducer,
+  org: orgReducer,
   caregiver: caregiverReducer,
   schedule: scheduleReducer,
   auth: authReducer,
-  user: userReducer,
   [authApi.reducerPath]: authApi.reducer, // add authApi.reducer
+  [orgApi.reducerPath]: orgApi.reducer, // add authApi.reducer
   [caregiverApi.reducerPath]: caregiverApi.reducer, // add caregiverApi.reducer
   [scheduleApi.reducerPath]: scheduleApi.reducer, // add scheduleApi.reducer
-  [userApi.reducerPath]: userApi.reducer, // add userApi.reducer
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -39,7 +39,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(authApi.middleware, caregiverApi.middleware, scheduleApi.middleware, userApi.middleware),
+    }).concat(authApi.middleware, orgApi.middleware, caregiverApi.middleware, scheduleApi.middleware),
 });
 
 export const persistor = persistStore(store);

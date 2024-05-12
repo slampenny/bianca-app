@@ -1,11 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
-import { User } from '../services/api/api.types';
+import { Caregiver } from '../services/api/api.types';
 import { caregiverApi } from 'app/services/api/caregiverApi';
 
 interface CaregiverState {
-  caregiver: User | null;
-  selectedUsers: User[]; // Array of selected users
+  caregiver: Caregiver | null;
+  selectedUsers: Caregiver[]; // Array of selected users
 }
 
 const initialState: CaregiverState = {
@@ -17,10 +17,10 @@ export const caregiverSlice = createSlice({
   name: 'caregiver',
   initialState,
   reducers: {
-    setCaregiver: (state, action: PayloadAction<User | null>) => {
+    setCaregiver: (state, action: PayloadAction<Caregiver | null>) => {
       state.caregiver = action.payload;
     },
-    setSelectedUsers: (state, action: PayloadAction<User[]>) => {
+    setSelectedUsers: (state, action: PayloadAction<Caregiver[]>) => {
       state.selectedUsers = action.payload;
     },
     clearCaregiver: (state) => {

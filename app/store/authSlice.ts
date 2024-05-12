@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { authApi } from "../services/api/authApi";
-import { userApi } from "../services/api/userApi"; 
-import { User } from '../services/api/api.types';
+import { caregiverApi } from "../services/api/caregiverApi"; 
+import { Caregiver } from '../services/api/api.types';
 import { RootState } from "./store";
 
 export interface AuthTokens {
@@ -18,7 +18,7 @@ export interface AuthTokens {
 interface AuthState {
   tokens: AuthTokens | null; // This is the JWT token  
   authEmail: string;
-  currentUser: User | null;
+  currentUser: Caregiver | null;
 }
 
 const initialState: AuthState = {
@@ -40,11 +40,11 @@ export const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.register.matchFulfilled, (state, { payload }) => {
-      console.log("logging in");
-      state.currentUser = payload;
+      state.currentUser = payload.org.caregivers[0];
+      state.tokens = payload.tokens;
     });
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      state.currentUser = payload.user;
+      state.currentUser = payload.caregiver;
       state.tokens = payload.tokens;
     });
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
@@ -55,10 +55,10 @@ export const authSlice = createSlice({
     builder.addMatcher(authApi.endpoints.refreshTokens.matchFulfilled, (state, { payload }) => {
       state.tokens = payload.tokens;
     });
-    builder.addMatcher(userApi.endpoints.updateUser.matchFulfilled, (state, { payload }) => {
+    builder.addMatcher(caregiverApi.endpoints.updateCaregiver.matchFulfilled, (state, { payload }) => {
       // Check if the updated user is the same as the current user
-      if (state.currentUser && payload.user.id === state.currentUser.id) {
-        state.currentUser = payload.user;
+      if (state.currentUser && payload.caregiver.id === state.currentUser.id) {
+        state.currentUser = payload.caregiver;
       }
     });
   },
