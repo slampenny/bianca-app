@@ -1,12 +1,35 @@
 // Caregiver.ts
+export interface NewUser {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+}
+
+export interface CaregiverPages {
+  limit: Number,
+  page: Number,
+  results: Caregiver[],
+  totalPages: Number,
+  totalResults: Number,
+}
+
 export interface Caregiver {
   id?: string;
   name: string;
   email: string;
   phone: string;
-  role: 'invited' | 'staff' |'ordAdmin'; 
-  org: Org;
+  role: 'invited' | 'staff' |'orgAdmin'; 
+  org: Org | string | null;
   patients: Patient[]; // Assuming this is the ID of the caregiver  
+}
+
+export interface OrgPages {
+    limit: Number,
+    page: Number,
+    results: Org[],
+    totalPages: Number,
+    totalResults: Number,
 }
 
 export interface Org {
@@ -14,8 +37,17 @@ export interface Org {
   name: string;
   email: string;
   phone: string;
+  isEmailVerified: boolean;
   caregivers: Caregiver[];
   patients: Patient[];
+}
+
+export interface PatientPages {
+  limit: Number,
+  page: Number,
+  results: Patient[],
+  totalPages: Number,
+  totalResults: Number,
 }
 
 export interface Patient {
@@ -40,6 +72,26 @@ export interface Schedule {
   intervals: Interval[];
   time: string;
   isActive: boolean;
+}
+
+export interface Message {
+  id?: string;
+  role: string;
+  content: string;
+}
+
+export interface Conversation {
+  id?: string;
+  callSid: string;
+  patientId: string;
+  lineItemId: string | null;
+  messages: Message[];
+  history: string;
+  analyzedData: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
 }
 
 /**

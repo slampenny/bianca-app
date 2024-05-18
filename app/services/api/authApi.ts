@@ -36,10 +36,11 @@ export const authApi = createApi({
         }
       }
     }),
-    refreshTokens: builder.mutation<{ tokens: any }, void>({
-      query: () => ({
+    refreshTokens: builder.mutation<{ tokens: any }, { refreshToken: string }>({
+      query: ({ refreshToken }) => ({
         url: '/auth/refresh-tokens',
         method: 'POST',
+        body: { refreshToken },
       }),
     }),
     forgotPassword: builder.mutation<void, { email: string }>({

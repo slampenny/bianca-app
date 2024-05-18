@@ -57,8 +57,8 @@ export const authSlice = createSlice({
     });
     builder.addMatcher(caregiverApi.endpoints.updateCaregiver.matchFulfilled, (state, { payload }) => {
       // Check if the updated user is the same as the current user
-      if (state.currentUser && payload.caregiver.id === state.currentUser.id) {
-        state.currentUser = payload.caregiver;
+      if (state.currentUser && payload.id === state.currentUser.id) {
+        state.currentUser = payload;
       }
     });
   },

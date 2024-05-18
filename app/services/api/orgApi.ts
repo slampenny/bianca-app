@@ -2,7 +2,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { DEFAULT_API_CONFIG } from './api';
 import { RootState } from '../../store/store';
-import { Org } from './api.types';
+import { Org, OrgPages } from './api.types';
 
 export const orgApi = createApi({
   reducerPath: 'orgApi',
@@ -17,30 +17,22 @@ export const orgApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    // Existing endpoints...
-    createOrg: builder.mutation<void, { org: Org }>({
-      query: ({ org }) => ({
-        url: `/orgs`,
-        method: 'POST',
-        body: org,
-      }),
-    }),
-    getAllOrgs: builder.query<void, void>({
+    getAllOrgs: builder.query<OrgPages, { name?: string, role?: string, sortBy?: string, limit?: number, page?: number }>({
       query: () => `/orgs`,
     }),
-    getOrg: builder.query<void, { id: string }>({
-      query: ({ id }) => `/orgs/${id}`,
+    getOrg: builder.query<Org, { orgId: string }>({
+      query: ({ orgId }) => `/orgs/${orgId}`,
     }),
-    updateOrg: builder.mutation<{ org: Org }, { id: string, org: any }>({
-      query: ({ id, org }) => ({
-        url: `/orgs/${id}`,
+    updateOrg: builder.mutation<{ org: Org }, { orgId: string, org: any }>({
+      query: ({ orgId, org }) => ({
+        url: `/orgs/${orgId}`,
         method: 'PATCH',
         body: org,
       }),
     }),
-    deleteOrg: builder.mutation<void, { id: string }>({
-      query: ({ id }) => ({
-        url: `/orgs/${id}`,
+    deleteOrg: builder.mutation<void, { orgId: string }>({
+      query: ({ orgId }) => ({
+        url: `/orgs/${orgId}`,
         method: 'DELETE',
       }),
     }),
@@ -79,8 +71,6 @@ export const orgApi = createApi({
 });
 
 export const {
-  // Existing hooks...
-  useCreateOrgMutation,
   useGetAllOrgsQuery,
   useGetOrgQuery,
   useUpdateOrgMutation,

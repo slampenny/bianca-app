@@ -1,0 +1,86 @@
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { DEFAULT_API_CONFIG } from './api';
+import { RootState } from '../../store/store';
+import { Patient, PatientPages, Caregiver, Conversation } from './api.types';
+
+export const patientApi = createApi({
+  reducerPath: 'patientApi',
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: DEFAULT_API_CONFIG.url,
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as RootState).auth.tokens?.access?.token;
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
+  }),
+  endpoints: (builder) => ({
+    createPatient: builder.mutation<Patient, Partial<Patient>>({
+      query: (patient) => ({
+        url: `/patients`,
+        method: 'POST',
+        body: patient,
+      }),
+    }),
+    getAllPatients: builder.query<PatientPages, { name?: string, role?: string, sortBy?: string, limit?: number, page?: number }>({
+      query: (params) => ({
+        url: '/patients',
+        method: 'GET',
+        params,
+      }),
+    }),
+    getPatient: builder.query<Patient, { id: string }>({
+      query: ({ id }) => `/patients/${id}`,
+    }),
+    updatePatient: builder.mutation<Patient, { id: string, patient: Partial<Patient> }>({
+      query: ({ id, patient }) => ({
+        url: `/patients/${id}`,
+        method: 'PATCH',
+        body: patient,
+      }),
+    }),
+    deletePatient: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `/patients/${id}`,
+        method: 'DELETE',
+      }),
+    }),
+    assignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+      query: ({ patientId, caregiverId }) => ({
+        url: `/patients/${patientId}/caregivers/${caregiverId}`,
+        method: 'POST',
+      }),
+    }),
+    removeCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+      query: ({ patientId, caregiverId }) => ({
+        url: `/patients/${patientId}/caregivers/${caregiverId}`,
+        method: 'DELETE',
+      }),
+    }),
+    getConversationsByPatient: builder.query<Conversation[], { patientId: string }>({
+      query: ({ patientId }) => ({
+        url: `/patients/${patientId}/conversations`,
+        method: 'GET',
+      }),
+    }),
+    getCaregivers: builder.query<Caregiver[], { patientId: string }>({
+      query: ({ patientId }) => ({
+        url: `/patients/${patientId}/caregivers`,
+        method: 'GET',
+      }),
+    }),
+  }),
+});
+
+export const {
+  useCreatePatientMutation,
+  useGetAllPatientsQuery,
+  useGetPatientQuery,
+  useUpdatePatientMutation,
+  useDeletePatientMutation,
+  useAssignCaregiverMutation,
+  useRemoveCaregiverMutation,
+  useGetConversationsByPatientQuery,
+  useGetCaregiversQuery,
+} = patientApi;

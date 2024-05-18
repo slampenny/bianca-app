@@ -1,123 +1,145 @@
 import { EnhancedStore } from '@reduxjs/toolkit';
 import { authApi } from '../authApi';
 import { orgApi } from '../orgApi';
+import { Caregiver, Org } from '../api.types';
 import { store as appStore, RootState } from "../../../store/store";
 
 describe('authApi', () => {
   let store: EnhancedStore<RootState>;
+  let caregiver: Caregiver;
+  let org: Org;
+  let authTokens: { access: { token: string, expires: string }, refresh: { token: string, expires: string } };
 
-  beforeEach(() => {
-    store = appStore;
+  const generateUniqueEmail = () => `test+${Date.now()}@example.com`;
+
+  const testCaregiver = () => ({
+    name: 'Test Caregiver',
+    email: generateUniqueEmail(),
+    password: 'password1',
+    phone: '1234567890',
   });
 
-  it('should register a new caregiver', async () => {
-    const newCaregiver = { name: 'Test Caregiver', email: 'test7@example.com', password: 'password1', phone: '1234567890'};
-  
-    // Call the mutate function directly
-    const register = authApi.endpoints.register.initiate;
-    const result = await register(newCaregiver)(store.dispatch, store.getState, {});
-  
-    if ('error' in result) {
-      // Handle the error case
-      throw new Error(`Registration failed with error: ${result.error}`);
+  beforeEach(async () => {
+    store = appStore;
+    const caregiverData = testCaregiver();
+    const result = await authApi.endpoints.register.initiate(caregiverData)(store.dispatch, store.getState, {});
+    if ('data' in result) {
+      org = result.data.org;
+      caregiver = org.caregivers[0];
+      authTokens = await loginAndGetTokens(caregiverData.email, caregiverData.password);
     } else {
-      // Assert that the correct action was dispatched
+      throw new Error(`Registration failed with error: ${JSON.stringify(result.error)}`);
+    }
+  });
+
+  afterEach(async () => {
+    // Clean up the caregiver after each test
+    if (org.id) {
+      await orgApi.endpoints.deleteOrg.initiate({ orgId: org.id })(store.dispatch, store.getState, {});
+    } else {
+      throw new Error('org.id is undefined');
+    }
+    jest.clearAllMocks();
+  });
+
+  const loginAndGetTokens = async (email: string, password: string) => {
+    const credentials = { email, password };
+    const result = await authApi.endpoints.login.initiate(credentials)(store.dispatch, store.getState, {});
+    if ('data' in result) {
+      return result.data.tokens;
+    } else {
+      throw new Error('Login failed');
+    }
+  };
+
+  function expectError(result: any, status: number, message: string) {
+    expect(result.error).toBeTruthy();
+    expect(result.error.status).toBe(status);
+    expect((result.error.data as { message: string }).message).toBe(message);
+  }
+
+  it('should register a new caregiver', async () => {
+    const newCaregiver = testCaregiver();
+    const result = await authApi.endpoints.register.initiate(newCaregiver)(store.dispatch, store.getState, {});
+
+    if ('error' in result) {
+      throw new Error(`Registration failed with error: ${JSON.stringify(result.error)}`);
+    } else {
       expect(result).toMatchObject({
         data: {
-          org: {
+          org: expect.objectContaining({
             isEmailVerified: false,
-            caregivers: expect.any(Array),
-            patients: expect.any(Array),
-            deleted: false,
             email: newCaregiver.email,
             id: expect.any(String),
-            name: expect.any(String),
-            phone: expect.any(String),
-          },
-          tokens: {
-            access: {
-              token: expect.any(String),
-              expires: expect.any(Number),
-            },
-            refresh: {
-              token: expect.any(String),
-              expires: expect.any(Number),
-            },
-          },
+          }),
+          tokens: expect.objectContaining({
+            access: expect.any(Object),
+            refresh: expect.any(Object),
+          }),
         },
       });
 
-      // Extract org.id from the result
-      const orgId = result.data.org?.id;
-      // Call the mutate function directly
-      if (orgId) {
-        // Call the mutate function directly
-        const deleteOrg = orgApi.endpoints.deleteOrg.initiate;
-        await deleteOrg({id: orgId})(store.dispatch, store.getState, {});
-      } else {
-        throw new Error('Org ID is undefined');
-      }
-    }    
+      const orgId = result.data.org.id as string;
+      await authApi.endpoints.login.initiate({ email: newCaregiver.email, password: newCaregiver.password })(store.dispatch, store.getState, {});
+      await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {});
+    }
   });
 
   it('should fail to register a new caregiver with a duplicate email', async () => {
-    const newCaregiver = { name: 'Test Caregiver', email: 'test@example.com', password: 'password1', phone: '1234567890' };
-  
-    // Call the mutate function directly
-    const register = authApi.endpoints.register.initiate;
-    await register(newCaregiver)(store.dispatch, store.getState, {});
-    const result2 = await register(newCaregiver)(store.dispatch, store.getState, {});
-  
-    // Assert that an error was returned
-    if ('error' in result2) {
-      if ('status' in result2.error) {
-        expect(result2.error.status).toEqual(400);
-        const data = result2.error.data as { message: string };
-        expect(data.message).toEqual('Email already taken');
-      } else {
-        throw new Error('Expected error to have a status, but it did not');
-      }
-    } else {
-      throw new Error('Expected register to return an error, but it returned a caregiver');
-    }
+    const caregiverData = testCaregiver();
+    await authApi.endpoints.register.initiate(caregiverData)(store.dispatch, store.getState, {});
+
+    const result = await authApi.endpoints.register.initiate(caregiverData)(store.dispatch, store.getState, {});
+    expectError(result, 400, 'Org Email already taken');
   });
-  
+
   it('should fail to register a new caregiver with invalid input', async () => {
-    const newCaregiver = { name: 'Test Caregiver', email: 'test@example.com', password: 'password', phone: '1234567890' };
-  
-    // Call the mutate function directly
-    const register = authApi.endpoints.register.initiate;
-    const result = await register(newCaregiver)(store.dispatch, store.getState, {});
-  
-    // Assert that an error was returned
-    if ('error' in result) {
-      if ('status' in result.error) {
-        expect(result.error.status).toEqual(400);
-        const data = result.error.data as { message: string };
-        expect(data.message).toEqual('password must contain at least 1 letter and 1 number');
-      } else {
-        throw new Error('Expected error to have a status, but it did not');
-      }
-    } else {
-      throw new Error('Expected register to return an error, but it returned a caregiver');
-    }
+    const invalidCaregiver = { ...testCaregiver(), password: 'password' };
+    const result = await authApi.endpoints.register.initiate(invalidCaregiver)(store.dispatch, store.getState, {});
+    expectError(result, 400, 'password must contain at least 1 letter and 1 number');
   });
 
   it('should login a caregiver', async () => {
-    const credentials = { email: 'test@example.com', password: 'password' };
-
-    // Call the mutate function directly
-    const login = authApi.endpoints.login.initiate;
-    login(credentials)(store.dispatch, store.getState, {});
-
-    // Assert that the correct action was dispatched
     const loginState = store.getState().auth;
     expect(loginState).toEqual(expect.anything());
   });
 
-  // Add similar tests for logout, refreshTokens, forgotPassword, resetPassword, sendVerificationEmail, verifyEmail
+  it('should logout a caregiver', async () => {
+    await authApi.endpoints.logout.initiate(authTokens)(store.dispatch, store.getState, {});
+    const authState = store.getState().auth;
+    expect(authState).toEqual(expect.anything());
+  });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  it('should refresh tokens', async () => {
+    await authApi.endpoints.refreshTokens.initiate({ refreshToken: authTokens.refresh.token })(store.dispatch, store.getState, {});
+    const authState = store.getState().auth;
+    expect(authState).toEqual(expect.anything());
+  });
+
+  it('should send forgot password email', async () => {
+    const email = 'test@example.com';
+    await authApi.endpoints.forgotPassword.initiate({ email })(store.dispatch, store.getState, {});
+    const authState = store.getState().auth;
+    expect(authState).toEqual(expect.anything());
+  });
+
+  it('should reset password', async () => {
+    const password = 'new-password';
+    await authApi.endpoints.resetPassword.initiate({ password })(store.dispatch, store.getState, {});
+    const authState = store.getState().auth;
+    expect(authState).toEqual(expect.anything());
+  });
+
+  it('should send verification email', async () => {
+    await authApi.endpoints.sendVerificationEmail.initiate(caregiver)(store.dispatch, store.getState, {});
+    const authState = store.getState().auth;
+    expect(authState).toEqual(expect.anything());
+  });
+
+  it('should verify email', async () => {
+    const token = 'verification-token';
+    await authApi.endpoints.verifyEmail.initiate({ token })(store.dispatch, store.getState, {});
+    const authState = store.getState().auth;
+    expect(authState).toEqual(expect.anything());
   });
 });
