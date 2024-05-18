@@ -54,11 +54,11 @@ orgSchema.plugin(paginate);
 orgSchema.plugin(mongooseDelete, { deletedAt : true });
 
 orgSchema.pre('find', function() {
-  this.where({ deleted: { $ne: true } });
+  this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 
 orgSchema.pre('findOne', function() {
-  this.where({ deleted: { $ne: true } });
+  this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 
 // Static method to check if email is taken
@@ -69,12 +69,12 @@ orgSchema.statics.isEmailTaken = async function (email, excludeOrgId) {
 
 orgSchema.statics.createOrgAndCaregiver = async function (orgBody, caregiverBody) {
   if (await this.isEmailTaken(orgBody.email)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Org Email already taken');
   }
 
   const Caregiver = this.model('Caregiver');
   if (await Caregiver.isEmailTaken(caregiverBody.email)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Caregiver Email already taken');
   }
   const caregiver = await Caregiver.create({ ...caregiverBody, role: 'orgAdmin' });
   const org = await this.create({ ...orgBody, caregivers: [caregiver] });

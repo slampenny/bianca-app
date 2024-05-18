@@ -83,6 +83,14 @@ caregiverSchema.plugin(toJSON);
 caregiverSchema.plugin(paginate);
 caregiverSchema.plugin(mongooseDelete, { deletedAt : true });
 
+caregiverSchema.pre('find', function() {
+  this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
+});
+
+caregiverSchema.pre('findOne', function() {
+  this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
+});
+
 // Static method to check if email is taken
 caregiverSchema.statics.isEmailTaken = async function (email, excludeCaregiverId) {
   const caregiver = await this.findOne({ email, _id: { $ne: excludeCaregiverId } });

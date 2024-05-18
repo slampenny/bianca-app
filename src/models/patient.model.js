@@ -82,11 +82,11 @@ patientSchema.statics.isEmailTaken = async function (email, excludePatientId) {
 };
 
 patientSchema.pre('find', function() {
-  this.where({ deleted: { $ne: true } });
+  this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 
 patientSchema.pre('findOne', function() {
-  this.where({ deleted: { $ne: true } });
+  this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 
 /**

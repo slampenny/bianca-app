@@ -112,6 +112,11 @@ const addCaregiver = async (orgId, caregiverId) => {
   if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
+
+  if (org.caregivers.includes(caregiverId)) {
+    throw new ApiError(httpStatus.CONFLICT, 'Caregiver already assigned to this org');
+  }
+    
   org.caregivers.push(caregiverId);
   await org.save();
   return org;

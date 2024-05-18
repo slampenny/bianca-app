@@ -74,6 +74,22 @@ describe('orgService', () => {
     expect(updatedOrg.caregivers.map(String)).toEqual(expect.arrayContaining([cg.id.toString()]));
   });
 
+  it('should not allow adding the same caregiver twice', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const [cg] = await insertCaregivers([caregiverTwo]);
+
+    // Add the caregiver to the org for the first time
+    const updatedOrg = await orgService.addCaregiver(org.id, cg.id);
+    expect(updatedOrg.caregivers.map(String)).toEqual(expect.arrayContaining([cg.id.toString()]));
+
+    // Try to add the same caregiver to the org again
+    await expect(orgService.addCaregiver(org.id, cg.id)).rejects.toThrow();
+
+    // Check that the org's caregivers array has not changed
+    const orgAfterSecondAdd = await orgService.getOrgById(org.id);
+    expect(orgAfterSecondAdd.caregivers.map(String)).toEqual(updatedOrg.caregivers.map(String));
+  });
+
   it('should remove a caregiver from an org', async () => {
     const [org] = await insertOrgs([orgOne]);
     const [cg] = await insertCaregivers([{
