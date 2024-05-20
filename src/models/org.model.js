@@ -78,6 +78,8 @@ orgSchema.statics.createOrgAndCaregiver = async function (orgBody, caregiverBody
   }
   const caregiver = await Caregiver.create({ ...caregiverBody, role: 'orgAdmin' });
   const org = await this.create({ ...orgBody, caregivers: [caregiver] });
+  caregiver.org = org.id;
+  await caregiver.save();
 
   return org;
 };

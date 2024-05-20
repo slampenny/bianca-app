@@ -7,12 +7,12 @@ const enumerateErrorFormat = winston.format((info) => {
   }
   return info;
 });
-
+console.log("CONfIG ENV:" + config.env);
 const logger = winston.createLogger({
-  level: config.env === 'development' ? 'debug' : 'info',
+  level: ['development', 'test'].includes(config.env) ? 'debug' : 'info',
   format: winston.format.combine(
     enumerateErrorFormat(),
-    config.env === 'development' ? winston.format.colorize() : winston.format.uncolorize(),
+    ['development', 'test'].includes(config.env) ? winston.format.colorize() : winston.format.uncolorize(),
     winston.format.splat(),
     winston.format.printf(({ level, message }) => `${level}: ${message}`)
   ),
@@ -22,5 +22,7 @@ const logger = winston.createLogger({
     }),
   ],
 });
+
+console.log("LOG_LEVEL:" + logger.level);
 
 module.exports = logger;

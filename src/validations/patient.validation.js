@@ -52,6 +52,7 @@ const updatePatient = {
   }),
   body: Joi.object()
     .keys({
+      org: Joi.string().custom(objectId).optional(),
       email: Joi.string().email().optional(),
       password: Joi.when('role', {
         is: 'staff',

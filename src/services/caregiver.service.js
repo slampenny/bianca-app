@@ -21,8 +21,8 @@ const createCaregiver = async (orgId, caregiverBody) => {
   }
 
   const caregiver = await Caregiver.create(caregiverBody);
-  caregiver.org = org;
-  caregiver.save();
+  caregiver.org = org.id;
+  await caregiver.save();
 
   // Add caregiver to org's caregivers array
   org.caregivers.push(caregiver._id);
@@ -91,30 +91,32 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
  * @returns {Promise<Caregiver>}
  */
 const deleteCaregiverById = async (caregiverId) => {
-  const caregiver = await getCaregiverById(caregiverId);
+  logger.debug(`Removing caregiver ${JSON.stringify(caregiverId)}`);
+  const caregiver = await Caregiver.findById(caregiverId);
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
   try {
+    logger.debug(`Removing caregiver ${JSON.stringify(caregiver)}`);
     // Remove caregiver from org's caregivers array
     const org = await Org.findById(caregiver.org).populate('caregivers');
     org.caregivers = org.caregivers.filter(id => !id.equals(caregiverId));
     await org.save();
-    console.log(`Caregiver removed from org ${org._id}`);
+    logger.debug(`Caregiver removed from org ${org._id}`);
   
     // Remove caregiver from all patients' caregivers array
     const patients = await Patient.find({ caregivers: { $in: [mongoose.Types.ObjectId(caregiverId)] } });
-    console.log(`Found ${patients.length} patients for caregiver ${caregiverId}`);
+    logger.debug(`Found ${patients.length} patients for caregiver ${caregiverId}`);
     for (let patient of patients) {
       patient.caregivers = patient.caregivers.filter(id => !id.equals(caregiverId));
       await patient.save();
-      console.log(`Caregiver ${caregiverId} removed from patient ${patient._id}`);
+      logger.debug(`Caregiver ${caregiverId} removed from patient ${patient._id}`);
     }
   
     // Remove caregiver
     await caregiver.delete();
-    logger.info(`Caregiver ${caregiverId} deleted`);
+    logger.debug(`Caregiver ${caregiverId} deleted`);
   } catch (error) {
     throw new ApiError(httpStatus.BAD_REQUEST, `Error while removing caregiver ${caregiverId}: ${JSON.stringify(error)}`);
   }

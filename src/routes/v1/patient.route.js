@@ -415,6 +415,7 @@ module.exports = router;
  *   get:
  *     summary: Retrieve caregivers of a patient
  *     description: Retrieve caregivers of a patient by the patient's ID
+ *     tags: [Patients]
  *     parameters:
  *       - in: path
  *         name: patientId

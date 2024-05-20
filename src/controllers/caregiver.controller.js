@@ -49,7 +49,6 @@ const updatePatient = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
-
 const deletePatient = catchAsync(async (req, res) => {
   const { patientId } = req.params;
   const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, patientId);

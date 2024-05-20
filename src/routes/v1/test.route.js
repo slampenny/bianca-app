@@ -1,18 +1,16 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
-const chatController = require('../../controllers/chat.controller');
+const testController = require('../../controllers/test.controller');
 
 const router = express.Router();
 
-// Existing routes...
-
 /**
  * @swagger
- * /chat/test:
+ * /test/chat:
  *   post:
  *     summary: Test the chatWith function
  *     description: This is for testing purposes only.
- *     tags: [Chat]
+ *     tags: [Test]
  *     requestBody:
  *       required: true
  *       content:
@@ -40,15 +38,15 @@ const router = express.Router();
  *       "400":
  *         $ref: '#/components/responses/BadRequest'
  */
-router.post('/test', chatController.testChatWith);
+router.post('/chat', testController.testChatWith);
 
 /**
  * @swagger
- * /chat/test-summarize:
+ * /test/summarize:
  *   post:
  *     summary: Test the summarizeConversation function
  *     description: This is for testing purposes only.
- *     tags: [Chat]
+ *     tags: [Test]
  *     requestBody:
  *       required: true
  *       content:
@@ -66,6 +64,21 @@ router.post('/test', chatController.testChatWith);
  *       "400":
  *         $ref: '#/components/responses/BadRequest'
  */
-router.post('/test-summarize', chatController.testSummarize);
+router.post('/summarize', testController.testSummarize);
+
+/**
+ * @swagger
+ * /test/clean:
+ *   post:
+ *     summary: Test the summarizeConversation function
+ *     description: This is for testing purposes only.
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: Clean response
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.post('/clean', testController.testCleanDB);
 
 module.exports = router;

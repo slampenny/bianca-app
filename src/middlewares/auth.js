@@ -2,16 +2,25 @@ const passport = require('passport');
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
-const { ac } = require('../config/roles');  // Your AccessControl setup
+const { ac } = require('../config/roles'); 
 const ownershipChecks = require('../utils/ownershipChecks');
 const logger = require('../config/logger');
 
 const verifyCallback = (req, resolve, reject, requiredRights) => async (err, caregiver, info) => {
     if (err || info || !caregiver) {
         logger.error(err || 'JWT token not valid');
+
+        if (!caregiver) {
+            logger.error('Request URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
+            logger.error('Caregiver not defined.');
+        }
         return reject(new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate'));
     }
     req.caregiver = caregiver;
+    
+    if (!caregiver.role) {
+        throw new Error('Caregiver role is not set');
+    }
 
     if (caregiver.role === 'superAdmin') {
         return resolve();
@@ -27,23 +36,31 @@ const verifyCallback = (req, resolve, reject, requiredRights) => async (err, car
 
     for (let permission of requiredRights) {
         const [action] = permission.split(':');
-        const result = ac.can(caregiver.role)[action](resource);
 
-        if (result.granted) {
-            // If any "Any" permission is granted, resolve immediately
-            if (action.includes('Any')) {
-                return resolve();
-            }
-
-            // If "Own" permission is required but not granted, check ownership
-            if (action.includes('Own')) {
-                const isOwner = ownershipChecks[resource](caregiver, resourceId);
-                if (isOwner) {
-                    // If the user is the owner, resolve the promise
+        try {
+            const result = ac.can(caregiver.role)[action](resource);
+            
+            if (result.granted) {
+                // If any "Any" permission is granted, resolve immediately
+                if (action.includes('Any')) {
                     return resolve();
                 }
-                
+
+                // If "Own" permission is required but not granted, check ownership
+                if (action.includes('Own')) {
+                    const isOwner = ownershipChecks[resource](caregiver, resourceId);
+                    if (isOwner) {
+                        // If the user is the owner, resolve the promise
+                        return resolve();
+                    }
+                }
             }
+        } catch (error) {
+            logger.error('Error in permission check:', error);
+            logger.error('Caregiver role:', caregiver.role);
+            logger.error('Action:', action);
+            logger.error('Resource:', resource);
+            throw error; // re-throw the error after logging
         }
     }
 

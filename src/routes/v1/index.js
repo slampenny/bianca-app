@@ -1,12 +1,12 @@
 const express = require('express');
 const authRoute = require('./auth.route');
-const chatRoute = require('./chat.route');
 const caregiverRoute = require('./caregiver.route');
 const conversationRoute = require('./conversation.route');
 const orgRoute = require('./org.route');
 const patientRoute = require('./patient.route');
 const reportRoute = require('./report.route');
 const scheduleRoute = require('./schedule.route');
+const testRoute = require('./test.route');
 const twilioRoute = require('./twilioCall.route');
 const docsRoute = require('./docs.route');
 const config = require('../../config/config');
@@ -21,10 +21,6 @@ const defaultRoutes = [
   {
     path: '/caregivers',
     route: caregiverRoute,
-  },
-  {
-    path: '/chat',
-    route: chatRoute,
   },
   {
     path: '/conversations',
@@ -57,6 +53,10 @@ const devRoutes = [
   {
     path: '/docs',
     route: docsRoute,
+  },
+  {
+    path: '/test',
+    route: testRoute,
   },
 ];
 

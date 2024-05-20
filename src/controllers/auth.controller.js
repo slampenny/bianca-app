@@ -18,7 +18,7 @@ const register = catchAsync(async (req, res, next) => {
   );
 
   const tokens = await tokenService.generateAuthTokens(org.caregivers[0]);
-  res.status(httpStatus.CREATED).send({ org, tokens });
+  res.status(httpStatus.CREATED).send({ org, caregiver: org.caregivers[0], tokens });
 });
 
 const registerWithInvite = catchAsync(async (req, res) => {
