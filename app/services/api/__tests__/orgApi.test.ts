@@ -1,47 +1,35 @@
 import { EnhancedStore } from '@reduxjs/toolkit';
-import { authApi } from '../authApi';
-import { orgApi } from '../orgApi';
-import { Org } from '../api.types';
+import { Org, orgApi } from '../';
 import { store as appStore, RootState } from "../../../store/store";
-
+import { registerNewOrgAndCaregiver, cleanTestDatabase } from '../../../../test/helpers';
+import { newCaregiver } from '../../../../test/fixtures/caregiver.fixture';
 describe('orgApi', () => {
+    // const testOrg = (): Org => ({
+    //     name: 'Test Org',
+    //     email: generateUniqueEmail(),
+    //     phone: '1234567890',
+    //     isEmailVerified: false,
+    //     caregivers: [],
+    //     patients: [],
+    // });
+
     let store: EnhancedStore<RootState>;
     let org: Org;
     let orgId: string;
-
-    const generateUniqueEmail = () => `test+${Date.now()}@example.com`;
-
-    const testOrg = (): Org => ({
-        name: 'Test Org',
-        email: generateUniqueEmail(),
-        phone: '1234567890',
-        isEmailVerified: false,
-        caregivers: [],
-        patients: [],
-    });
+    // let caregiverId: string;
+    // let authTokens: { access: { token: string, expires: string }, refresh: { token: string, expires: string } };
 
     beforeEach(async () => {
         store = appStore;
-        const orgData = testOrg();
-        const caregiverData = {
-            name: 'Test Caregiver',
-            email: orgData.email,
-            password: 'password1',
-            phone: '1234567890',
-        };
-        const result = await authApi.endpoints.register.initiate(caregiverData)(store.dispatch, store.getState, {});
-        if ('data' in result) {
-            org = result.data.org;
-            orgId = org.id as string;
-        } else {
-            throw new Error(`Registration failed with error: ${JSON.stringify(result.error)}`);
-        }
+        const response = await registerNewOrgAndCaregiver(newCaregiver.name, newCaregiver.email, newCaregiver.password, newCaregiver.phone);
+        org = response.org;
+        orgId = org.id as string;
+        // caregiverId = response.caregiver.id as string;
+        // authTokens = response.tokens;
     });
-
+    
     afterEach(async () => {
-        if (orgId) {
-            await orgApi.endpoints.deleteOrg.initiate({ orgId: orgId })(store.dispatch, store.getState, {});
-        }
+        await cleanTestDatabase();
         jest.clearAllMocks();
     });
 

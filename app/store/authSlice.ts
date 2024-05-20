@@ -40,7 +40,7 @@ export const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.register.matchFulfilled, (state, { payload }) => {
-      state.currentUser = payload.org.caregivers[0];
+      state.currentUser = payload.caregiver;
       state.tokens = payload.tokens;
     });
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {

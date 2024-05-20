@@ -39,18 +39,18 @@ export const caregiverApi = createApi({
         method: 'DELETE',
       }),
     }),
-    assignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
-      query: ({ patientId, caregiverId }) => ({
-        url: `/caregivers/${caregiverId}/patients/${patientId}`,
-        method: 'POST',
-      }),
-    }),
-    removeCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
-      query: ({ patientId, caregiverId }) => ({
-        url: `/caregivers/${caregiverId}/patients/${patientId}`,
-        method: 'DELETE',
-      }),
-    }),
+    // assignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+    //   query: ({ patientId, caregiverId }) => ({
+    //     url: `/caregivers/${caregiverId}/patients/${patientId}`,
+    //     method: 'POST',
+    //   }),
+    // }),
+    // removeCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+    //   query: ({ patientId, caregiverId }) => ({
+    //     url: `/caregivers/${caregiverId}/patients/${patientId}`,
+    //     method: 'DELETE',
+    //   }),
+    // }),
     getPatientForCaregiver: builder.query<Patient, { patientId: string, caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/caregivers/${caregiverId}/patients/${patientId}`,
@@ -72,8 +72,8 @@ export const caregiverApi = createApi({
 });
 
 export const {
-  useAssignCaregiverMutation,
-  useRemoveCaregiverMutation,
+  // useAssignCaregiverMutation,
+  // useRemoveCaregiverMutation,
   useGetAllCaregiversQuery,
   useGetCaregiverQuery,
   useUpdateCaregiverMutation,

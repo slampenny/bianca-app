@@ -20,7 +20,7 @@ export interface Caregiver {
   email: string;
   phone: string;
   role: 'invited' | 'staff' |'orgAdmin'; 
-  org: Org | string | null;
+  org: string | null;
   patients: Patient[]; // Assuming this is the ID of the caregiver  
 }
 
@@ -38,8 +38,8 @@ export interface Org {
   email: string;
   phone: string;
   isEmailVerified: boolean;
-  caregivers: Caregiver[];
-  patients: Patient[];
+  caregivers: string[];
+  patients: string[];
 }
 
 export interface PatientPages {
@@ -55,9 +55,9 @@ export interface Patient {
   name: string;
   email: string;
   phone: string;
-  org: Org;
-  caregivers: Caregiver[]; // Assuming this is the ID of the caregiver
-  schedules: Schedule[];
+  org: string | null;
+  caregivers: string[]; 
+  schedules: string[];
 }
 
 export interface Interval {

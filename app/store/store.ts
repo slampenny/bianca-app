@@ -4,10 +4,7 @@ import authReducer from './authSlice';
 import orgReducer from './orgSlice';
 import caregiverReducer from './caregiverSlice';
 import scheduleReducer from './scheduleSlice';
-import { authApi } from '../services/api/authApi';
-import { orgApi } from '../services/api/orgApi';
-import { caregiverApi } from '../services/api/caregiverApi';
-import { scheduleApi } from '../services/api/scheduleApi';
+import { authApi, orgApi, caregiverApi, scheduleApi, patientApi } from '../services/api/';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,6 +24,7 @@ const rootReducer = combineReducers({
   [authApi.reducerPath]: authApi.reducer,
   [orgApi.reducerPath]: orgApi.reducer,
   [caregiverApi.reducerPath]: caregiverApi.reducer,
+  [patientApi.reducerPath]: patientApi.reducer,
   [scheduleApi.reducerPath]: scheduleApi.reducer,
 });
 
@@ -39,7 +37,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(authApi.middleware, orgApi.middleware, caregiverApi.middleware, scheduleApi.middleware),
+    }).concat(authApi.middleware, orgApi.middleware, caregiverApi.middleware, patientApi.middleware, scheduleApi.middleware),
 });
 
 export const persistor = persistStore(store);

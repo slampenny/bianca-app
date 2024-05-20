@@ -52,7 +52,7 @@ export const patientApi = createApi({
         method: 'POST',
       }),
     }),
-    removeCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+    unassignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/patients/${patientId}/caregivers/${caregiverId}`,
         method: 'DELETE',
@@ -80,7 +80,7 @@ export const {
   useUpdatePatientMutation,
   useDeletePatientMutation,
   useAssignCaregiverMutation,
-  useRemoveCaregiverMutation,
+  useUnassignCaregiverMutation,
   useGetConversationsByPatientQuery,
   useGetCaregiversQuery,
 } = patientApi;
