@@ -12,7 +12,6 @@ const {
   Schedule,
   Token, 
 } = require('../models');
-const AccessControl = require('../models/accessControl.model');
 
 const swaggerDef = {
   openapi: '3.0.0',
@@ -31,7 +30,6 @@ const swaggerDef = {
       Call: m2s(Call),
       Org: m2s(Org),
       Patient: m2s(Patient),
-      AccessControl: m2s(AccessControl),
       Token: m2s(Token),
       AuthToken: {
         title: 'AuthToken',

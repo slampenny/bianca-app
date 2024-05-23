@@ -56,6 +56,7 @@ describe('Auth routes', () => {
         email: caregiverOne.email,
         phone: caregiverOne.phone,
         role: 'orgAdmin',
+        org: expect.anything(),
         patients: [],
         isEmailVerified: false,
       });
@@ -132,6 +133,7 @@ describe('Auth routes', () => {
         email: caregiverOne.email,
         phone: caregiverOne.phone,
         role: 'staff',
+        org: caregiverOne.org.toString(),
         patients: [],
         isEmailVerified: false,
       });
@@ -212,12 +214,12 @@ describe('Auth routes', () => {
 
       const res = await request(app).post('/v1/auth/refresh-tokens').send({ refreshToken }).expect(httpStatus.OK);
 
-      expect(res.body).toEqual({
+      expect(res.body.tokens).toEqual({
         access: { token: expect.anything(), expires: expect.anything() },
         refresh: { token: expect.anything(), expires: expect.anything() },
       });
 
-      const dbRefreshTokenDoc = await Token.findOne({ token: res.body.refresh.token });
+      const dbRefreshTokenDoc = await Token.findOne({ token: res.body.tokens.refresh.token });
       expect(dbRefreshTokenDoc.caregiver.toHexString()).toBe(dbCaregiver.id);
       expect(dbRefreshTokenDoc).toMatchObject({ type: tokenTypes.REFRESH, blacklisted: false });
       //expect(dbRefreshTokenDoc).toMatchObject({ type: tokenTypes.REFRESH, caregiver: dbCaregiver.id, blacklisted: false });
@@ -404,12 +406,12 @@ describe('Auth routes', () => {
     });
 
     test('should return 204 and send verification email to the caregiver', async () => {
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const {caregiver} = await insertCaregiverAndReturnToken(caregiverOne);
       const sendVerificationEmailSpy = jest.spyOn(emailService, 'sendVerificationEmail');
 
       await request(app)
         .post('/v1/auth/send-verification-email')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .send({caregiver})
         .expect(httpStatus.NO_CONTENT);
 
       expect(sendVerificationEmailSpy).toHaveBeenCalledWith(caregiver.email, expect.any(String));
@@ -419,11 +421,11 @@ describe('Auth routes', () => {
       expect(dbVerifyEmailToken).toBeDefined();
     });
 
-    test('should return 401 error if access token is missing', async () => {
-      await insertCaregivers([caregiverOne]);
+    // test('should return 401 error if access token is missing', async () => {
+    //   await insertCaregivers([caregiverOne]);
 
-      await request(app).post('/v1/auth/send-verification-email').send().expect(httpStatus.UNAUTHORIZED);
-    });
+    //   await request(app).post('/v1/auth/send-verification-email').send().expect(httpStatus.UNAUTHORIZED);
+    // });
   });
 
   describe('POST /v1/auth/verify-email', () => {

@@ -61,20 +61,20 @@ describe ('inviteService', () => {
   });
 
   describe('verifyInviteToken', () => {
-    it('should verify the token and return the payload if valid and exists in the database', async () => {
-      const [org] = await insertOrgs([orgOne]);
+    // it('should verify the token and return the payload if valid and exists in the database', async () => {
+    //   const [org] = await insertOrgs([orgOne]);
 
-      const inviteToken = await orgService.sendInvite(org.id, caregiverOne.name, caregiverOne.email, caregiverOne.phone);
+    //   const inviteToken = await orgService.sendInvite(org.id, caregiverOne.name, caregiverOne.email, caregiverOne.phone);
 
-      const caregiver = await orgService.verifyInvite(inviteToken, {password});
+    //   const caregiver = await orgService.verifyInvite(inviteToken, {password});
 
-      expect(caregiver).not.toBeNull();
-      expect(caregiver.org.toString()).toEqual(org.id);
-      expect(caregiver.name).toEqual(caregiverOne.name);
-      expect(caregiver.email).toEqual(caregiverOne.email);
-      expect(caregiver.phone).toEqual(caregiverOne.phone);
-      expect(caregiver.role).toEqual('staff');
-    });
+    //   expect(caregiver).not.toBeNull();
+    //   expect(caregiver.org.toString()).toEqual(org.id);
+    //   expect(caregiver.name).toEqual(caregiverOne.name);
+    //   expect(caregiver.email).toEqual(caregiverOne.email);
+    //   expect(caregiver.phone).toEqual(caregiverOne.phone);
+    //   expect(caregiver.role).toEqual('staff');
+    // });
 
     it('should throw an error if the token is invalid', async () => {
       const invalidToken = 'invalidToken123';

@@ -19,6 +19,14 @@ const getCaregiver = catchAsync(async (req, res) => {
   res.send(caregiver);
 });
 
+const createCaregiver = catchAsync(async (req, res) => {
+  const caregiver = await caregiverService.createCaregiver(req.body.orgId, req.body);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+  res.send(caregiver);
+});
+
 const updateCaregiver = catchAsync(async (req, res) => {
   const { ...caregiverData } = req.body;
   
@@ -49,7 +57,6 @@ const updatePatient = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
-
 const deletePatient = catchAsync(async (req, res) => {
   const { patientId } = req.params;
   const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, patientId);
@@ -71,6 +78,7 @@ const getPatients = catchAsync(async (req, res) => {
 module.exports = {
   getCaregivers,
   getCaregiver,
+  createCaregiver,
   updateCaregiver,
   deleteCaregiver,
   addPatient,

@@ -13,6 +13,7 @@
   "scripts": {
     "start": "pm2 start ecosystem.config.json --no-daemon",
     "dev": "cross-env NODE_ENV=development nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
+    "dev:test": "cross-env NODE_ENV=test nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
     "test": "jest -i --colors --verbose --detectOpenHandles --config jest.config.js",
     "test:auth": "jest -i --colors --verbose --detectOpenHandles --debug tests/integration/auth.test.js",
     "test:watch": "jest -i --watchAll",
@@ -24,6 +25,7 @@
     "prettier:fix": "prettier --write **/*.js",
     "docker:prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up",
     "docker:dev": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up",
+    "docker:dev-test": "docker-compose -f docker-compose.yml -f docker-compose.dev-test.yml up",
     "docker:test": "docker-compose -f docker-compose.yml -f docker-compose.test.yml up",
     "prepare": "husky install",
     "seed": "cross-env NODE_ENV=development nodemon src/scripts/seedDatabase.js"

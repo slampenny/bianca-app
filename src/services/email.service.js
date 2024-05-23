@@ -47,7 +47,7 @@ const sendInviteEmail = async (to, inviteLink) => {
  */
 const sendResetPasswordEmail = async (to, token) => {
   const subject = i18n.__('sendResetPasswordEmail.subject');
-  const text = i18n.__('sendResetPasswordEmail.text', `${config.apiUrl}/reset-password?token=${token}`);
+  const text = i18n.__('sendResetPasswordEmail.text', `${config.apiUrl}/auth/reset-password?token=${token}`);
   await sendEmail(to, subject, text);
 };
 

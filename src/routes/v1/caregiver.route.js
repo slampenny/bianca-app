@@ -9,7 +9,6 @@ const router = express.Router();
 router
   .route('/')
   .get(auth('readAny:caregiver'), validate(caregiverValidation.getCaregivers), caregiverController.getCaregivers);
-  // .post(auth('createAny:caregiver'), validate(caregiverValidation.createCaregiver), caregiverController.createCaregiver);
 
 router
   .route('/:caregiverId')
@@ -19,16 +18,12 @@ router
 
 router
   .route('/:caregiverId/patients/:patientId')
-  .post(auth('createAny:patients'), caregiverController.addPatient)
-  .delete(auth('deleteAny:patients'), caregiverController.removePatient);
+  .post(auth('createAny:patient'), caregiverController.addPatient)
+  .delete(auth('deleteAny:patient'), caregiverController.removePatient);
 
 router
   .route('/:caregiverId/patients')
-  .get(auth('readOwn:patients', 'readAny:patients'), caregiverController.getPatients);
-
-router
-  .route('/:caregiverId/patients/:patientId')
-  .get(auth('readOwn:patients', 'readAny:patients'), caregiverController.getPatient);
+  .get(auth('readOwn:patient', 'readAny:patient'), caregiverController.getPatients);
 
 module.exports = router;
 
@@ -285,37 +280,6 @@ module.exports = router;
  *     responses:
  *       "200":
  *         description: List of patients retrieved
- *       "401":
- *         $ref: '#/components/responses/Unauthorized'
- *       "403":
- *         $ref: '#/components/responses/Forbidden'
- *       "404":
- *         $ref: '#/components/responses/NotFound'
- */
-
-/**
- * @swagger
- * /caregivers/{caregiverId}/patients/{patientId}:
- *   get:
- *     summary: Get patient for a caregiver
- *     description: Only admins and the caregiver who services them can retrieve patients for a caregiver.
- *     tags: [Caregivers]
- *     parameters:
- *       - in: path
- *         name: caregiverId
- *         required: true
- *         schema:
- *           type: string
- *         description: Caregiver ID
- *       - in: path
- *         name: patientId
- *         required: true
- *         schema:
- *           type: string
- *         description: Patient ID
- *     responses:
- *       "200":
- *         description: The patient retrieved
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":

@@ -1,6 +1,6 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { chatService } = require('../services');
+const { chatService, testService } = require('../services');
 
 const testChatWith = catchAsync(async (req, res) => {
   const response = await chatService.chatWith(req.body);
@@ -13,7 +13,13 @@ const testSummarize = catchAsync(async (req, res) => {
   res.send(response);
 });
 
+const testCleanDB = catchAsync(async (req, res) => {
+  await testService.cleanDB();
+  res.status(httpStatus.OK).send();
+});
+
 module.exports = {
   testChatWith,
   testSummarize,
+  testCleanDB,
 };

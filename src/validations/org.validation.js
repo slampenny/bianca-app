@@ -21,6 +21,7 @@ const createOrg = {
       name: Joi.string().required(),
       phone: Joi.string().required(),
       password: Joi.string().required(),
+      org: Joi.string().custom(objectId),
       role: Joi.string().required().valid('orgAdmin', 'staff'),
       patients: Joi.array().items(Joi.string().custom(objectId)),
     }),

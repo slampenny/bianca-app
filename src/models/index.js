@@ -9,5 +9,4 @@ module.exports.Message = Message;
 module.exports.Conversation = Conversation;
 module.exports.Report = require('./report.model');
 module.exports.Schedule = require('./schedule.model');
-module.exports.AccessControl = require('./accessControl.model');
 
