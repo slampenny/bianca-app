@@ -9,7 +9,6 @@ const router = express.Router();
 router
   .route('/')
   .get(auth('readAny:caregiver'), validate(caregiverValidation.getCaregivers), caregiverController.getCaregivers);
-  // .post(auth('createAny:caregiver'), validate(caregiverValidation.createCaregiver), caregiverController.createCaregiver);
 
 router
   .route('/:caregiverId')
@@ -19,12 +18,12 @@ router
 
 router
   .route('/:caregiverId/patients/:patientId')
-  .post(auth('createAny:patients'), caregiverController.addPatient)
-  .delete(auth('deleteAny:patients'), caregiverController.removePatient);
+  .post(auth('createAny:patient'), caregiverController.addPatient)
+  .delete(auth('deleteAny:patient'), caregiverController.removePatient);
 
 router
   .route('/:caregiverId/patients')
-  .get(auth('readOwn:patients', 'readAny:patients'), caregiverController.getPatients);
+  .get(auth('readOwn:patient', 'readAny:patient'), caregiverController.getPatients);
 
 module.exports = router;
 

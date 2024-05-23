@@ -17,7 +17,6 @@ router
   .patch(auth('updateOwn:org'), validate(orgValidation.updateOrg), orgController.updateOrg)
   .delete(auth('deleteOwn:org'), validate(orgValidation.deleteOrg), orgController.deleteOrg);
 
-// New route for assigning caregiver to a org
 /**
  * @swagger
  * /orgs/{orgId}/caregiver/{caregiverId}:

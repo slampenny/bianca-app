@@ -1,5 +1,6 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
+const logger = require('../config/logger');
 const { authService, caregiverService, orgService, tokenService, emailService } = require('../services');
 
 const register = catchAsync(async (req, res, next) => {
@@ -43,7 +44,7 @@ const logout = catchAsync(async (req, res) => {
 
 const refreshTokens = catchAsync(async (req, res) => {
   const tokens = await authService.refreshAuth(req.body.refreshToken);
-  res.send({ ...tokens });
+  res.send({ tokens });
 });
 
 const forgotPassword = catchAsync(async (req, res) => {
@@ -58,8 +59,8 @@ const resetPassword = catchAsync(async (req, res) => {
 });
 
 const sendVerificationEmail = catchAsync(async (req, res) => {
-  const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.caregiver);
-  await emailService.sendVerificationEmail(req.caregiver.email, verifyEmailToken);
+  const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.body.caregiver);
+  await emailService.sendVerificationEmail(req.body.caregiver.email, verifyEmailToken);
   res.status(httpStatus.NO_CONTENT).send();
 });
 

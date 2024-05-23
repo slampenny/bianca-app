@@ -13,7 +13,7 @@ router
 
 router
   .route('/:patientId')
-  .get(auth('readOwn:patient', 'readyAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
+  .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
   .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), patientController.updatePatient)
   .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(patientValidation.deletePatient), patientController.deletePatient);
 

@@ -3,13 +3,12 @@ const { password, objectId } = require('./custom.validation');
 
 const createCaregiver = {
   body: Joi.object().keys({
+    orgId: Joi.required().custom(objectId),
     email: Joi.string().required().email(),
     name: Joi.string().required(),
     phone: Joi.string().required(),
+    password: Joi.string().required().custom(password),
     patients: Joi.array().items(Joi.string().custom(objectId)),
-  }),
-  params: Joi.object().keys({
-    orgId: Joi.required().custom(objectId),
   }),
 };
 

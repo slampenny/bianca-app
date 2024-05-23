@@ -63,6 +63,7 @@ describe('Caregiver routes', () => {
         email: caregiver.email,
         phone: caregiver.phone,
         role: caregiver.role,
+        org: caregiver.org.toHexString()  ,
         patients: expect.any(Array),
         isEmailVerified: false,
       });
@@ -276,6 +277,7 @@ describe('Caregiver routes', () => {
         name: caregiver.name,
         phone: caregiver.phone,
         role: caregiver.role,
+        org: null,
         patients: expect.any(Array),
         isEmailVerified: false,
       });
@@ -429,6 +431,7 @@ describe('Caregiver routes', () => {
         email: updateBody.email,
         phone: caregiver.phone,
         role: 'staff',
+        org: null,
         patients: caregiver.patients.toObject(),
         isEmailVerified: false,
       });

@@ -8,12 +8,7 @@ const logger = require('../config/logger');
 
 const verifyCallback = (req, resolve, reject, requiredRights) => async (err, caregiver, info) => {
     if (err || info || !caregiver) {
-        logger.error(err || 'JWT token not valid');
-
-        if (!caregiver) {
-            logger.error('Request URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
-            logger.error('Caregiver not defined.');
-        }
+        logger.info(err || 'JWT token not valid');
         return reject(new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate'));
     }
     req.caregiver = caregiver;

@@ -91,23 +91,19 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
  * @returns {Promise<Caregiver>}
  */
 const deleteCaregiverById = async (caregiverId) => {
-  logger.debug(`Removing caregiver ${JSON.stringify(caregiverId)}`);
   const caregiver = await Caregiver.findById(caregiverId);
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
   try {
-    logger.debug(`Removing caregiver ${JSON.stringify(caregiver)}`);
     // Remove caregiver from org's caregivers array
     const org = await Org.findById(caregiver.org).populate('caregivers');
     org.caregivers = org.caregivers.filter(id => !id.equals(caregiverId));
     await org.save();
-    logger.debug(`Caregiver removed from org ${org._id}`);
   
     // Remove caregiver from all patients' caregivers array
     const patients = await Patient.find({ caregivers: { $in: [mongoose.Types.ObjectId(caregiverId)] } });
-    logger.debug(`Found ${patients.length} patients for caregiver ${caregiverId}`);
     for (let patient of patients) {
       patient.caregivers = patient.caregivers.filter(id => !id.equals(caregiverId));
       await patient.save();
@@ -116,7 +112,6 @@ const deleteCaregiverById = async (caregiverId) => {
   
     // Remove caregiver
     await caregiver.delete();
-    logger.debug(`Caregiver ${caregiverId} deleted`);
   } catch (error) {
     throw new ApiError(httpStatus.BAD_REQUEST, `Error while removing caregiver ${caregiverId}: ${JSON.stringify(error)}`);
   }

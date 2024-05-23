@@ -1,5 +1,7 @@
 const express = require('express');
-const auth = require('../../middlewares/auth');
+const validate = require('../../middlewares/validate');
+const caregiverValidation = require('../../validations/caregiver.validation');
+const caregiverController = require('../../controllers/caregiver.controller');
 const testController = require('../../controllers/test.controller');
 
 const router = express.Router();
@@ -53,11 +55,22 @@ router.post('/chat', testController.testChatWith);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - conversationId
  *             properties:
- *               conversationId:
+ *               name:
  *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: must be unique
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *                 description: At least one number and one letter
+ *             example:
+ *               name: fake name
+ *               email: fake@example.com
+ *               password: password1
  *     responses:
  *       "200":
  *         description: Summarization response
@@ -80,5 +93,51 @@ router.post('/summarize', testController.testSummarize);
  *         $ref: '#/components/responses/BadRequest'
  */
 router.post('/clean', testController.testCleanDB);
+
+/**
+ * @swagger
+ * /test/create-caregiver:
+ *   post:
+ *     summary: Test the summarizeConversation function
+ *     description: This is for testing purposes only.
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               orgId:
+ *                  type: string
+ *                  format: uuid
+ *                  description: Organization id
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: must be unique
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *                 description: At least one number and one letter
+ *             example:
+ *               orgId: 60d0fe4f3d6a4e0015f8d8d0
+ *               name: fake name
+ *               email: fake@example.com
+ *               password: password1
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *                $ref: '#/components/schemas/Caregiver'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.post('/create-caregiver', validate(caregiverValidation.createCaregiver), caregiverController.createCaregiver);
 
 module.exports = router;
