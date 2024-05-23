@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { getCurrentUser } from '../store/authSlice';
-import { useUpdateUserMutation } from '../services/api/userApi';
+import { useUpdateCaregiverMutation } from '../services/api/caregiverApi';
 
 export function PaymentInfoScreen() {
   const currentUser = useSelector(getCurrentUser);
-  const [updateUser] = currentUser ? useUpdateUserMutation() : [() => {}];
+  const [updateUser] = currentUser ? useUpdateCaregiverMutation() : [() => {}];
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -23,7 +23,7 @@ export function PaymentInfoScreen() {
     if (currentUser && currentUser.id) {
       updateUser({
         id: currentUser.id,
-        user: {
+        caregiver: {
           ...currentUser,
           name,
           email,

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSelector } from 'react-redux';
+import { Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { getCurrentUser } from '../store/authSlice';
-import { useUpdateUserMutation } from '../services/api/userApi';
+import { useUpdateCaregiverMutation } from '../services/api/caregiverApi';
 
 export function CaregiverScreen() {
   const currentUser = useSelector(getCurrentUser);
-  const [updateUser] = currentUser ? useUpdateUserMutation() : [() => {}];
+  const [updateCaregiver] = currentUser ? useUpdateCaregiverMutation() : [() => {}];
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -21,9 +21,9 @@ export function CaregiverScreen() {
 
   const handleSave = () => {
     if (currentUser && currentUser.id) {
-      updateUser({
+      updateCaregiver({
         id: currentUser.id,
-        user: {
+        caregiver: {
           ...currentUser,
           name,
           email,

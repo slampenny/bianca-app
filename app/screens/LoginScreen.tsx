@@ -1,20 +1,16 @@
 import React, { useState, useRef, useEffect, FC } from "react";
 import { TextInput, View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
+import { StackNavigationProp } from '@react-navigation/stack';
 import { useLoginMutation, useLogoutMutation } from "../services/api/authApi";
 import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail, getAuthTokens } from "../store/authSlice";
+import { LoginStackParamList } from "app/navigators/navigationTypes";
 
-import { NativeStackScreenProps } from "@react-navigation/native-stack"
+type LoginScreenNavigationProp = StackNavigationProp<LoginStackParamList, 'Login'>;
 
-// Define the type for the navigation stack parameters
-type LoginStackParamList = {
-  Login: undefined; // No parameters expected for the Login route
-  MainTabsWithDrawer: undefined; // No parameters expected for the Welcome route
-  // ... other routes in the stack
-};
-
-// Define the type for the Login screen's props
-type LoginScreenProps = NativeStackScreenProps<LoginStackParamList, 'Login'>;
+interface LoginScreenProps {
+  navigation: LoginScreenNavigationProp;
+}
 
 export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -36,7 +32,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       setAuthPassword("");
       dispatch(setAuthEmail(""));
       if (tokens) {
-        logout(tokens).unwrap();
+        logout({refreshToken: tokens.refresh.token}).unwrap();
       }
     };
   }, [dispatch, logout, tokens]);
@@ -46,10 +42,19 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     try {
       const result = await loginAPI({ email: authEmail, password: authPassword }).unwrap();
       dispatch(setAuthTokens(result.tokens));
-      navigation.navigate('MainTabsWithDrawer');
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const handleRegisterPress = () => {
+    // Navigate to the Register screen
+    navigation.navigate('Register');
+  };
+
+  const handleForgotPasswordPress = () => {
+    // Navigate to the Forgot Password screen
+    navigation.navigate('ForgotPassword');
   };
 
   // When you want to focus the password input after submitting the email
@@ -90,6 +95,12 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       <TouchableOpacity style={styles.button} onPress={handleLoginPress}>
         <Text style={styles.buttonText}>LOGIN</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={handleRegisterPress}>
+        <Text style={styles.buttonText}>REGISTER</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.linkButton} onPress={handleForgotPasswordPress}>
+        <Text style={styles.linkButtonText}>Forgot Password?</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -126,11 +137,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 5,
     marginTop: 10,
+    marginBottom: 10,
   },
   buttonText: {
     color: 'white',
     textAlign: 'center',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  linkButton: {
+    marginTop: 10,
+  },
+  linkButtonText: {
+    color: '#3498db',
+    textAlign: 'center',
+    fontSize: 16,
   },
 });

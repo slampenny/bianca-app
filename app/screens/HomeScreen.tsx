@@ -1,34 +1,34 @@
 import React from 'react';
-import { View, Text, Button, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useGetClientsForCaregiverQuery } from '../services/api/caregiverApi';
+import { useGetPatientsForCaregiverQuery } from '../services/api/caregiverApi';
 import { getCurrentUser } from '../store/authSlice';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { setSelectedUser } from '../store/userSlice'; // import the action
-import { User } from '../services/api/api.types';
-import { MainTabsParamList } from '../navigators/MainTabs';
-import { useAssignCaregiverMutation } from '../services/api/caregiverApi'; // adjust the path as necessary
+import { Caregiver, Patient } from '../services/api/api.types';
+import { MainTabsParamList } from 'app/navigators/navigationTypes';
+import { useAssignCaregiverMutation } from '../services/api/patientApi'; // adjust the path as necessary
 import { ScrollView } from 'react-native-gesture-handler';
 
 export function HomeScreen() {
   const dispatch = useDispatch(); // get the dispatch function
-  const currentUser : User | null = useSelector(getCurrentUser);
-  const { data: users = [] } = useGetClientsForCaregiverQuery(currentUser); // use the hook directly
+  const currentUser : Caregiver | null = useSelector(getCurrentUser);
+  const { data: patients = [] } = (currentUser && currentUser.id) ? useGetPatientsForCaregiverQuery(currentUser.id) : { data: [] };
   const navigation = useNavigation<NavigationProp<MainTabsParamList>>();
   const [assignCaregiver] = useAssignCaregiverMutation(); // use the hook at the top level
 
-  const handleUserPress = (user: User) => { // assuming User is the type of your user objects
+  const handlePatientPress = (user: Patient) => { // assuming User is the type of your user objects
     dispatch(setSelectedUser(user)); // dispatch the action to set the selected user
-    navigation.navigate('UserScreen');
+    navigation.navigate('CaregiverScreen');
   };
 
   const handleAddUser = () => {
-    navigation.navigate('UserScreen');
+    navigation.navigate('CaregiverScreen');
   };
 
   const handleSignUp = () => {
     if (currentUser && currentUser.id) {
-      assignCaregiver({ userId: currentUser.id, caregiverId: currentUser.id });
+      assignCaregiver({ patientId: currentUser.id, caregiverId: currentUser.id });
     } else {
       console.error('Current user is null');
     }
@@ -38,16 +38,16 @@ export function HomeScreen() {
     <ScrollView style={styles.container}>
       <Text style={styles.welcomeText}>Welcome, {currentUser ? currentUser.name : 'Guest'}</Text>
       <View style={styles.body}>
-        {users.length === 0 ? (
+        {patients.length === 0 ? (
           <Text style={styles.noUsersText}>
             No users found. Please add new users or sign up for the service.
           </Text>
         ) : (
           <FlatList
-            data={users}
-            keyExtractor={(item : User, index) => item.id || String(index)}
+            data={patients}
+            keyExtractor={(item : Patient, index) => item.id || String(index)}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.userButton} onPress={() => handleUserPress(item)}>
+              <TouchableOpacity style={styles.userButton} onPress={() => handlePatientPress(item)}>
                 <Text style={styles.userButtonText}>{item.name}</Text>
               </TouchableOpacity>
             )}

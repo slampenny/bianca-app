@@ -26,7 +26,7 @@ export const LogoutScreen = () => {
 
   useEffect(() => {
     if (tokens) {
-      logout(tokens).unwrap();
+      logout({refreshToken: tokens.refresh.token}).unwrap();
     }
   }, [logout, tokens]);
 

@@ -38,6 +38,7 @@
     "@react-navigation/drawer": "^6.6.11",
     "@react-navigation/native": "^6.0.2",
     "@react-navigation/native-stack": "^6.0.2",
+    "@react-navigation/stack": "^6.3.29",
     "@reduxjs/toolkit": "^2.2.1",
     "@shopify/flash-list": "^1.6.3",
     "apisauce": "3.0.1",
