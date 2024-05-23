@@ -1,24 +1,27 @@
 import { EnhancedStore } from '@reduxjs/toolkit';
-import { caregiverApi } from '../';
+import { orgApi, caregiverApi } from '../';
 import { store as appStore, RootState } from '../../../store/store';
-import { cleanTestDatabase, registerNewOrgAndCaregiver } from '../../../../test/helpers';
+import { registerNewOrgAndCaregiver, createCaregiver } from '../../../../test/helpers';
 import { newCaregiver } from '../../../../test/fixtures/caregiver.fixture';
 import { Caregiver } from '../api.types';
 
 describe('caregiverApi', () => {
   let store: EnhancedStore<RootState>;
   let caregiverId: string;
+  let orgId: string;
   // let authTokens: { access: { token: string, expires: string }, refresh: { token: string, expires: string } };
 
   beforeEach(async () => {
     store = appStore;
-    const response = await registerNewOrgAndCaregiver(newCaregiver.name, newCaregiver.email, newCaregiver.password, newCaregiver.phone);
+    const testCaregiver = newCaregiver();
+    const response = await registerNewOrgAndCaregiver(testCaregiver.name, testCaregiver.email, testCaregiver.password, testCaregiver.phone);
     caregiverId = response.caregiver.id as string;
+    orgId = response.org.id as string;
     // authTokens = response.tokens;
   });
   
   afterEach(async () => {
-    await cleanTestDatabase();
+    await orgApi.endpoints.deleteOrg.initiate({ orgId: orgId })(store.dispatch, store.getState, {});
     jest.clearAllMocks();
   });
 
@@ -27,8 +30,16 @@ describe('caregiverApi', () => {
     if ('error' in result) {
       throw new Error(`Get all caregivers failed with error: ${JSON.stringify(result.error)}`);
     } else {
-      expect(result.data).toBeInstanceOf(Object);
-      expect(result.data?.results).toBeInstanceOf(Array);
+      expect(result.data).toEqual(expect.objectContaining({
+        results: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.any(String),
+            name: expect.any(String),
+            email: expect.any(String),
+            phone: expect.any(String),
+          })
+        ])
+      }));
     }
   });
 
@@ -37,12 +48,12 @@ describe('caregiverApi', () => {
     if ('error' in result) {
       throw new Error(`Get caregiver failed with error: ${JSON.stringify(result.error)}`);
     } else {
-      expect(result.data).toMatchObject({
+      expect(result.data).toEqual(expect.objectContaining({
         id: caregiverId,
         name: expect.any(String),
         email: expect.any(String),
         phone: expect.any(String),
-      });
+      }));
     }
   });
 
@@ -63,7 +74,10 @@ describe('caregiverApi', () => {
   });
 
   it('should delete a caregiver', async () => {
-    const result = await caregiverApi.endpoints.deleteCaregiver.initiate({ id: caregiverId })(store.dispatch, store.getState, {});
+    const newData = newCaregiver();
+    const createdCaregiver = await createCaregiver(orgId, newData);
+
+    const result = await caregiverApi.endpoints.deleteCaregiver.initiate({ id: createdCaregiver.id as string })(store.dispatch, store.getState, {});
     if ('error' in result) {
       throw new Error(`Remove caregiver failed with error: ${JSON.stringify(result.error)}`);
     } else {
@@ -74,17 +88,20 @@ describe('caregiverApi', () => {
 
 describe('caregiverApi - patients', () => {
   let store: EnhancedStore<RootState>;
+  let orgId: string;
   let caregiverId: string;
   // let authTokens: { access: { token: string, expires: string }, refresh: { token: string, expires: string } };
 
   beforeEach(async () => {
     store = appStore;
-    const response = await registerNewOrgAndCaregiver(newCaregiver.name, newCaregiver.email, newCaregiver.password, newCaregiver.phone);
+    const testCaregiver = newCaregiver();
+    const response = await registerNewOrgAndCaregiver(testCaregiver.name, testCaregiver.email, testCaregiver.password, testCaregiver.phone);
     caregiverId = response.caregiver.id as string;
+    orgId = response.org.id as string;
   });
   
   afterEach(async () => {
-    await cleanTestDatabase();
+    await orgApi.endpoints.deleteOrg.initiate({ orgId: orgId })(store.dispatch, store.getState, {});
     jest.clearAllMocks();
   });
 
@@ -130,9 +147,5 @@ describe('caregiverApi - patients', () => {
     } else {
       expect(result.data).toBeInstanceOf(Array);
     }
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
   });
 });

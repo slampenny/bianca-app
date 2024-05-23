@@ -1,19 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { authApi } from "../services/api/authApi";
 import { caregiverApi } from "../services/api/caregiverApi"; 
-import { Caregiver } from '../services/api/api.types';
+import { AuthTokens, Caregiver } from '../services/api/api.types';
 import { RootState } from "./store";
-
-export interface AuthTokens {
-  access: {
-    expires: string;
-    token: string;
-  },
-  refresh: {
-    expires: string;
-    token: string;
-  }
-}
 
 interface AuthState {
   tokens: AuthTokens | null; // This is the JWT token  

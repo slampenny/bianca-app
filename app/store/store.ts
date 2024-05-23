@@ -1,5 +1,4 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
-import counterReducer from './counterSlice';
 import authReducer from './authSlice';
 import orgReducer from './orgSlice';
 import caregiverReducer from './caregiverSlice';
@@ -16,7 +15,6 @@ const persistConfig = {
 };
 
 const rootReducer = combineReducers({
-  counter: counterReducer,
   org: orgReducer,
   caregiver: caregiverReducer,
   schedule: scheduleReducer,

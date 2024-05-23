@@ -6,6 +6,17 @@ export interface NewUser {
   password: string;
 }
 
+export interface AuthTokens {
+  access: {
+    expires: string;
+    token: string;
+  },
+  refresh: {
+    expires: string;
+    token: string;
+  }
+}
+
 export interface CaregiverPages {
   limit: Number,
   page: Number,

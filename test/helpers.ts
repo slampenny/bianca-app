@@ -27,12 +27,36 @@ export function generateUniqueEmail() {
 export async function cleanTestDatabase() {
   try {
     await axios.post(`${DEFAULT_API_CONFIG.url}test/clean`);
-    console.log('Test database cleaned');
   } catch (error) {
     console.error('Failed to clean test database', error);
   }
 };
 
+export async function createCaregiver(orgId: string, caregiver: Partial<Caregiver>) {
+  try {
+    const response = await axios.post(`${DEFAULT_API_CONFIG.url}test/create-caregiver`, { orgId, ...caregiver });
+    return response.data as Caregiver;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Failed to create a caregiver', {
+        message: error.message,
+        name: error.name,
+      });
+    } else if (axios.isAxiosError(error)) {
+      console.error('Failed to create a caregiver', {
+        message: error.message,
+        name: error.name,
+        config: error.config,
+        code: error.code,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+      });
+    } else {
+      console.error('Failed to create a caregiver', error);
+    }
+    throw new Error('Failed to create a caregiver');
+  }
+}
 
 export async function loginAndGetTokens(email: string, password: string) {
   const credentials = { email, password };
@@ -40,9 +64,9 @@ export async function loginAndGetTokens(email: string, password: string) {
   if ('data' in result) {
     return result.data.tokens;
   } else {
-    throw new Error('Login failed');
+    throw new Error(`Login failed ${JSON.stringify(result.error)}`);
   }
-};
+}
 
 export function expectError(result: any, status: number, message: string) {
   expect(result.error).toBeTruthy();

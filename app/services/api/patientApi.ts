@@ -46,13 +46,13 @@ export const patientApi = createApi({
         method: 'DELETE',
       }),
     }),
-    assignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+    assignCaregiver: builder.mutation<Patient, { patientId: string, caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/patients/${patientId}/caregivers/${caregiverId}`,
         method: 'POST',
       }),
     }),
-    unassignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
+    unassignCaregiver: builder.mutation<Patient, { patientId: string, caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/patients/${patientId}/caregivers/${caregiverId}`,
         method: 'DELETE',

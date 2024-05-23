@@ -7,10 +7,10 @@ const EXCEPTIONS: string[] = [
   // "welcomeScreen.readyForLaunch",
 ]
 
-function iterate(obj, stack, array) {
+function iterate(obj: Record<string, any>, stack: string, array: string[]): string[] {
   for (const property in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, property)) {
-      if (typeof (obj as object)[property] === "object") {
+      if (typeof obj[property] === "object" && obj[property] !== null) {
         iterate(obj[property], `${stack}.${property}`, array)
       } else {
         array.push(`${stack.slice(1)}.${property}`)

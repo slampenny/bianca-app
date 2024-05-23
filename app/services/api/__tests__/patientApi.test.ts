@@ -1,26 +1,28 @@
 import { EnhancedStore } from '@reduxjs/toolkit';
-import { patientApi } from '../';
+import { orgApi, patientApi } from '../';
 import { store as appStore, RootState } from "../../../store/store";
-import { registerNewOrgAndCaregiver, createPatientInOrg, cleanTestDatabase } from "../../../../test/helpers";
+import { registerNewOrgAndCaregiver, createPatientInOrg } from "../../../../test/helpers";
 import { newCaregiver } from '../../../../test/fixtures/caregiver.fixture';
 import { Org, Patient } from '../api.types';
 
 describe('patientApi', () => {
   let store: EnhancedStore<RootState>;
   let org: Org;
-  // let orgId: string;
+  let orgId: string;
   let caregiverId: string;
   let patient: Patient;
   let patientId: string;
 
   beforeEach(async () => {
     store = appStore;
-    const response = await registerNewOrgAndCaregiver(newCaregiver.name, newCaregiver.email, newCaregiver.password, newCaregiver.phone);
+    const testCaregiver = newCaregiver();
+    const response = await registerNewOrgAndCaregiver(testCaregiver.name, testCaregiver.email, testCaregiver.password, testCaregiver.phone);
     caregiverId = response.caregiver.id as string;
     org = response.org;
+    orgId = response.org.id as string;
     // authTokens = response.tokens;
 
-    const result = await createPatientInOrg(org, newCaregiver.email, newCaregiver.password) as Patient;
+    const result = await createPatientInOrg(org, testCaregiver.email, testCaregiver.password) as Patient;
     if ('error' in result) {
       throw new Error(`Create patient failed with error: ${JSON.stringify(result.error)}`);
     } else {
@@ -30,7 +32,7 @@ describe('patientApi', () => {
   });
   
   afterEach(async () => {
-    await cleanTestDatabase();
+    await orgApi.endpoints.deleteOrg.initiate({ orgId: orgId })(store.dispatch, store.getState, {});
     jest.clearAllMocks();
   });
 
@@ -116,18 +118,19 @@ describe('patientApi', () => {
     if ('error' in result) {
       throw new Error(`Assign caregiver failed with error: ${JSON.stringify(result.error)}`);
     } else {
-      expect(result.data).toBeUndefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.caregivers).toContain(caregiverId);
     }
   });
 
   it('should remove a caregiver from a patient', async () => {
-    const caregiverId = 'testCaregiverId'; // Replace with actual caregiverId
     const result = await patientApi.endpoints.unassignCaregiver.initiate({ patientId, caregiverId })(store.dispatch, store.getState, {});
 
     if ('error' in result) {
       throw new Error(`Remove caregiver failed with error: ${JSON.stringify(result.error)}`);
     } else {
-      expect(result.data).toBeUndefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.caregivers).toEqual([]);
     }
   });
 

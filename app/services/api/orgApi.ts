@@ -9,7 +9,7 @@ export const orgApi = createApi({
   baseQuery: fetchBaseQuery({ 
     baseUrl: DEFAULT_API_CONFIG.url,
     prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.tokens?.access;
+      const token = (getState() as RootState).auth.tokens?.access.token;
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }

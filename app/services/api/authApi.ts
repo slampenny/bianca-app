@@ -1,11 +1,12 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { DEFAULT_API_CONFIG } from './api';
-import { Org, Caregiver } from './api.types';
-import type { AuthTokens } from '../../store/authSlice'
+import { Org, Caregiver, AuthTokens } from './api.types';
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({ baseUrl: DEFAULT_API_CONFIG.url }),
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: DEFAULT_API_CONFIG.url
+  }),
   endpoints: (builder) => ({
     register: builder.mutation<{org: Org, caregiver: Caregiver, tokens: any}, { name: string, email: string, password: string, phone: string }>({
       query: (data) => ({
@@ -21,22 +22,16 @@ export const authApi = createApi({
         body: data,
       }),
     }),
-    logout: builder.mutation({
-      query: (authTokens: AuthTokens | null) => {
-        if (authTokens === null) {
-          throw new Error("No auth tokens provided");
-        }
+    logout: builder.mutation<void, { refreshToken: string }>({
+      query: ({refreshToken}) => {
         return {
           url: '/auth/logout',
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${authTokens.access.token}`, // Include the authToken in the request headers
-          },
-          body: { refreshToken: authTokens.refresh.token },
+          body: { refreshToken },
         }
       }
     }),
-    refreshTokens: builder.mutation<{ tokens: any }, { refreshToken: string }>({
+    refreshTokens: builder.mutation<{ tokens: AuthTokens }, { refreshToken: string }>({
       query: ({ refreshToken }) => ({
         url: '/auth/refresh-tokens',
         method: 'POST',
@@ -50,25 +45,19 @@ export const authApi = createApi({
         body: data,
       }),
     }),
-    resetPassword: builder.mutation<void, { password: string }>({
-      query: (data) => ({
-        url: '/auth/reset-password',
-        method: 'POST',
-        body: data,
-      }),
-    }),
+    //this is backend functionality, not frontend
+    // resetPassword: builder.mutation<void, { token: string, password: string }>({
+    //   query: ({token, password}) => ({
+    //     url: `/auth/reset-password?token=${token}`,
+    //     method: 'POST',
+    //     body: password,
+    //   }),
+    // }),
     sendVerificationEmail: builder.mutation<void, Caregiver>({
-      query: (data) => ({
+      query: (caregiver) => ({
         url: '/auth/send-verification-email',
         method: 'POST',
-        body: data,
-      }),
-    }),
-    verifyEmail: builder.mutation<void, { token: string }>({
-      query: (data) => ({
-        url: '/auth/verify-email',
-        method: 'POST',
-        body: data,
+        body: {caregiver},
       }),
     }),
   }),
@@ -80,7 +69,5 @@ export const {
   useLogoutMutation,
   useRefreshTokensMutation,
   useForgotPasswordMutation,
-  useResetPasswordMutation,
   useSendVerificationEmailMutation,
-  useVerifyEmailMutation,
 } = authApi;
