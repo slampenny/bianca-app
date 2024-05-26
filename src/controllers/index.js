@@ -1,3 +1,4 @@
+module.exports.alertController = require('./alert.controller');
 module.exports.authController = require('./auth.controller');
 module.exports.caregiverController = require('./caregiver.controller');
 module.exports.conversationController = require('./conversation.controller');

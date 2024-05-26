@@ -60,6 +60,15 @@ const insertCaregivers = async (caregivers) => {
   return await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, password: hashedPassword })));
 };
 
+const insertCaregiversAndAddToOrg = async (org, caregivers) => {
+  const insertedCaregivers = await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, org: org.id, password: hashedPassword })));
+  // Add the inserted caregivers to the org.caregivers array
+  org.caregivers.push(...insertedCaregivers.map(caregiver => caregiver._id));
+  await org.save();
+
+  return insertedCaregivers;
+};
+
 const insertCaregiverAndReturnToken = async (caregiverChoice) => {
   const [caregiver] = await insertCaregivers([caregiverChoice]);
   const expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
@@ -98,6 +107,7 @@ module.exports = {
   admin,
   superAdmin,
   insertCaregivers,
+  insertCaregiversAndAddToOrg,
   insertCaregiverAndReturnToken,
   insertCaregiverAndReturnTokenByRole
 };

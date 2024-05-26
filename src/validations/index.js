@@ -1,3 +1,4 @@
+module.exports.alertValidation = require('./alert.validation');
 module.exports.authValidation = require('./auth.validation');
 module.exports.caregiverValidation = require('./caregiver.validation');
 module.exports.conversationValidation = require('./conversation.validation');

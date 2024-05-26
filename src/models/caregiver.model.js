@@ -112,14 +112,6 @@ caregiverSchema.pre('save', async function (next) {
   next();
 });
 
-caregiverSchema.pre('find', function() {
-  this.where({ deleted: { $ne: true } });
-});
-
-caregiverSchema.pre('findOne', function() {
-  this.where({ deleted: { $ne: true } });
-});
-
 /**
  * @typedef Caregiver
  */

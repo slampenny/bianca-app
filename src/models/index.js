@@ -1,5 +1,6 @@
 const { Message, Conversation } = require('./conversation.model');
 const { Invoice, LineItem } = require('./payment.model');
+module.exports.Alert = require('./alert.model');
 module.exports.Token = require('./token.model');
 module.exports.Org = require('./org.model');
 module.exports.Caregiver = require('./caregiver.model');

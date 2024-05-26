@@ -1,3 +1,4 @@
+module.exports.alertService = require('./alert.service');
 module.exports.authService = require('./auth.service');
 module.exports.chatService = require('./chat.service');
 module.exports.caregiverService = require('./caregiver.service');

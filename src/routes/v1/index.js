@@ -1,4 +1,5 @@
 const express = require('express');
+const alertRoute = require('./alert.route');
 const authRoute = require('./auth.route');
 const caregiverRoute = require('./caregiver.route');
 const conversationRoute = require('./conversation.route');
@@ -14,6 +15,10 @@ const config = require('../../config/config');
 const router = express.Router();
 
 const defaultRoutes = [
+  {
+    path: '/alert',
+    route: alertRoute,
+  },
   {
     path: '/auth',
     route: authRoute,

@@ -11,7 +11,10 @@ ac.grant('staff')
   .deleteOwn('caregiver')
   .readOwn('patient') // assuming this role can view their assigned patients
   .updateOwn('patient')
-  .deleteOwn('patient');
+  .deleteOwn('patient')
+  .readOwn('alert')
+  .updateOwn('alert')
+  .deleteOwn('alert');
 
 ac.grant('orgAdmin')
   .extend('staff') // inherit all permissions of 'staff'
@@ -23,7 +26,10 @@ ac.grant('orgAdmin')
   .deleteAny('caregiver')
   .readAny('patient')
   .updateAny('patient')
-  .deleteAny('patient');
+  .deleteAny('patient')
+  .readAny('alert')
+  .updateAny('alert')
+  .deleteAny('alert');
 
 ac.grant('superAdmin')
   .extend('orgAdmin') // inherit all permissions of 'orgAdmin'
@@ -33,7 +39,10 @@ ac.grant('superAdmin')
   .createAny('caregiver')
   .deleteAny('caregiver')
   .createAny('patient')
-  .deleteAny('patient');
+  .deleteAny('patient')
+  .readAny('alert')
+  .updateAny('alert')
+  .deleteAny('alert');
 
 const roles = ['invited', 'staff', 'orgAdmin', 'superAdmin'];
 
