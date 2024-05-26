@@ -1,5 +1,6 @@
 export * from "./api"
 export * from "./api.types"
+export * from "./alertApi"
 export * from "./authApi"
 export * from "./orgApi"
 export * from "./caregiverApi"

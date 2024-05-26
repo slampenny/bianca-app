@@ -4,8 +4,8 @@ import axios from 'axios';
 import { DEFAULT_API_CONFIG } from '../app/services/api/api';
 
 import { store as appStore } from "../app/store/store"
-import { authApi, patientApi } from "../app/services/api/"
-import { Org, Caregiver, Patient } from "../app/services/api/api.types"
+import { alertApi, authApi, patientApi } from "../app/services/api/"
+import { Alert, Org, Caregiver, Patient } from "../app/services/api/api.types"
 
 export function setupApiStore(api: any) {
   const store = configureStore({
@@ -31,6 +31,14 @@ export async function cleanTestDatabase() {
     console.error('Failed to clean test database', error);
   }
 };
+
+export async function registerNewAlert(alert: Partial<Alert>): Promise<Alert> {
+  const result = await alertApi.endpoints.createAlert.initiate(alert)(appStore.dispatch, appStore.getState, {});
+  if ('error' in result) {
+    throw new Error(`Register new alert failed with error: ${JSON.stringify(result.error)}`);
+  }
+  return result.data;
+}
 
 export async function createCaregiver(orgId: string, caregiver: Partial<Caregiver>) {
   try {

@@ -19,11 +19,11 @@ export function HomeScreen() {
 
   const handlePatientPress = (user: Patient) => { // assuming User is the type of your user objects
     dispatch(setSelectedUser(user)); // dispatch the action to set the selected user
-    navigation.navigate('CaregiverScreen');
+    navigation.navigate('PatientScreen');
   };
 
   const handleAddUser = () => {
-    navigation.navigate('CaregiverScreen');
+    navigation.navigate('PatientScreen');
   };
 
   const handleSignUp = () => {

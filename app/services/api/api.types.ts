@@ -35,6 +35,29 @@ export interface Caregiver {
   patients: Patient[]; // Assuming this is the ID of the caregiver  
 }
 
+export interface AlertPages {
+  limit: Number,
+  page: Number,
+  results: Alert[],
+  totalPages: Number,
+  totalResults: Number,
+}
+
+export type CreatedModel = 'Patient' | 'Caregiver' | 'Org';
+export type AlertVisibility = 'orgAdmin' | 'allCaregivers' | 'assignedCaregivers';
+export type AlertImportance = 'low' | 'medium' | 'high';
+
+export interface Alert {
+  id?: string;
+  message: string;
+  importance: AlertImportance;
+  createdBy: string; // Assuming this is the ID of the creator
+  createdModel: CreatedModel;
+  visibility: AlertVisibility;
+  readBy: string[]; // Assuming these are the IDs of the caregivers who have read the alert
+  relevanceUntil?: Date;
+}
+
 export interface OrgPages {
     limit: Number,
     page: Number,
