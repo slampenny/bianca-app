@@ -82,7 +82,7 @@ describe('Alert routes', () => {
       .set('Authorization', `Bearer ${caregiverToken}`);
   
     expect(res.statusCode).toEqual(httpStatus.OK);
-    expect(res.body._id).toEqual(alertId.toString());
+    expect(res.body.id).toEqual(alertId.toString());
   });
 
   it('should update a specific alert', async () => {

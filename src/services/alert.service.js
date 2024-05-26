@@ -10,7 +10,7 @@ const getAlertById = async (alertId, caregiverId) => {
     const alert = await Alert.findOne({
         _id: alertId,
         relevanceUntil: { $gte: new Date() }  // Ensure the alert is still relevant
-    }).lean();
+    });
 
     if (!alert) {
         throw new ApiError(httpStatus.NOT_FOUND, 'Alert not found');

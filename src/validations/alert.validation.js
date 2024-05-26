@@ -19,7 +19,7 @@ const getAlerts = {
   }),
 };
 
-const getAlert = {
+const getAlertById = {
   params: Joi.object().keys({
     alertId: Joi.string().custom(objectId).required(),
   }),
@@ -51,7 +51,7 @@ const deleteAlert = {
 module.exports = {
   createAlert,
   getAlerts,
-  getAlert,
+  getAlertById,
   updateAlert,
   markAlertAsRead,
   deleteAlert,

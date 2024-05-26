@@ -13,7 +13,7 @@ router
 
 router
   .route('/:alertId')
-  .get(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.getAlertById), alertController.getAlert)
+  .get(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.getAlertById), alertController.getAlertById)
   .patch(auth('updateOwn:alert', 'updateAny:alert'), validate(alertValidation.updateAlert), alertController.updateAlert)
   .delete(auth('deleteOwn:alert', 'deleteAny:alert'), validate(alertValidation.deleteAlert), alertController.deleteAlert);
 
