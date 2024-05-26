@@ -42,7 +42,8 @@ const isOwnerPatient = (caregiver, targetId) => {
 const ownershipChecks = {
     org: isOwnerOrg,
     caregiver: isOwnerCaregiver,
-    patient: isOwnerPatient
+    patient: isOwnerPatient,
+    alert: () => {return true;},
 };
 
 module.exports = ownershipChecks;

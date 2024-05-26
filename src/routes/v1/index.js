@@ -16,7 +16,7 @@ const router = express.Router();
 
 const defaultRoutes = [
   {
-    path: '/alert',
+    path: '/alerts',
     route: alertRoute,
   },
   {

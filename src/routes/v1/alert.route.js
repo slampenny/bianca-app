@@ -8,18 +8,18 @@ const router = express.Router();
 
 router
   .route('/')
-  .post(auth('updateOwn:alert, updateAny:alert'), validate(alertValidation.createAlert), alertController.createAlert)
-  .get(auth('readOwn:alert, readAny:alert'), validate(alertValidation.getAlerts), alertController.getAlerts);
+  .post(auth('updateOwn:alert', 'updateAny:alert'), validate(alertValidation.createAlert), alertController.createAlert)
+  .get(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.getAlerts), alertController.getAlerts);
 
 router
   .route('/:alertId')
-  .get(auth('readOwn:alert, readAny:alert'), validate(alertValidation.getAlertById), alertController.getAlert)
-  .patch(auth('updateOwn:alert, updateAny:alert'), validate(alertValidation.updateAlert), alertController.updateAlert)
-  .delete(auth('deleteOwn:alert, deleteAny:alert'), validate(alertValidation.deleteAlert), alertController.deleteAlert);
+  .get(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.getAlertById), alertController.getAlert)
+  .patch(auth('updateOwn:alert', 'updateAny:alert'), validate(alertValidation.updateAlert), alertController.updateAlert)
+  .delete(auth('deleteOwn:alert', 'deleteAny:alert'), validate(alertValidation.deleteAlert), alertController.deleteAlert);
 
 router
   .route('/:alertId/markAsRead')
-  .post(auth('readOwn:alert, readAny:alert'), validate(alertValidation.markAlertAsRead), alertController.markAlertAsRead);
+  .post(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.markAlertAsRead), alertController.markAlertAsRead);
 
 module.exports = router;
 
@@ -70,7 +70,6 @@ module.exports = router;
  *         content:
  *           application/json:
  *             schema:
-jSON:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Alert'

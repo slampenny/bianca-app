@@ -2,6 +2,7 @@ const m2s = require('mongoose-to-swagger');
 const config = require('../config/config');
 const { version } = require('../../package.json');
 const {
+  Alert,
   Caregiver,  
   Conversation, 
   Call,
@@ -25,6 +26,7 @@ const swaggerDef = {
   },
   components: {
     schemas: {
+      Alert: m2s(Alert),
       Caregiver: m2s(Caregiver, { omitFields: ['password', 'isEmailVerified'] }),
       Conversation: m2s(Conversation),
       Call: m2s(Call),

@@ -9,6 +9,7 @@ const createAlert = {
     createdModel: Joi.string().valid('Patient', 'Caregiver', 'Org').required(),
     visibility: Joi.string().valid('orgAdmin', 'allCaregivers', 'assignedCaregivers').required(),
     relevanceUntil: Joi.date().optional(),
+    readBy: Joi.array().items(Joi.string().custom(objectId)),
   }),
 };
 

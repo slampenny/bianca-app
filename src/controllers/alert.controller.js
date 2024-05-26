@@ -27,17 +27,20 @@ const getAlerts = catchAsync(async (req, res) => {
 });
 
 const updateAlert = catchAsync(async (req, res) => {
-    const alert = await alertService.updateAlertById(req.params.id, req.body);
+    const { alertId } = req.params;  // ID of the alert to retrieve
+    const alert = await alertService.updateAlertById(alertId, req.body);
     res.send(alert);
 });
 
 const markAlertAsRead = catchAsync(async (req, res) => {
-    const alert = await alertService.markAlertAsRead(req.params.id, req.user._id);
+    const { alertId } = req.params;  // ID of the alert to retrieve
+    const alert = await alertService.markAlertAsRead(alertId, req.user._id);
     res.send(alert);
 });
 
 const deleteAlert = catchAsync(async (req, res) => {
-    await alertService.deleteAlertById(req.params.id);
+    const { alertId } = req.params;  // ID of the alert to retrieve
+    await alertService.deleteAlertById(alertId);
     res.status(204).send();
 });
 

@@ -141,8 +141,6 @@ const generateVerifyEmailToken = async (caregiver) => {
 };
 
 module.exports = {
-  generateToken,
-  saveToken,
   verifyToken,
   generateAuthTokens,
   generateInviteToken,
