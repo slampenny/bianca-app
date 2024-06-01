@@ -13,7 +13,8 @@ const ApiError = require('../../src/utils/ApiError');
 const { Org, Caregiver, Token } = require('../../src/models');
 const { roleRights } = require('../../src/config/roles');
 const { tokenTypes } = require('../../src/config/tokens');
-const { caregiverOne, caregiverOneWithPassword, password, fakeId, admin, insertCaregivers, caregiverTwo, insertCaregiverAndReturnToken } = require('../fixtures/caregiver.fixture');
+const { caregiverOne, caregiverOneWithPassword, password, fakeId, admin, insertCaregivers, caregiverTwo, insertCaregiverAndReturnToken, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
+const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 
 let mongoServer;
 
@@ -119,7 +120,8 @@ describe('Auth routes', () => {
 
   describe('POST /v1/auth/login', () => {
     test('should return 200 and login caregiver if email and password match', async () => {
-      await insertCaregivers([caregiverOneWithPassword]);
+      const [org] = await insertOrgs([orgOne]);
+      await insertCaregiversAndAddToOrg (org, [caregiverOneWithPassword]);
       const loginCredentials = {
         email: caregiverOneWithPassword.email,
         password: password,
@@ -133,7 +135,9 @@ describe('Auth routes', () => {
         email: caregiverOne.email,
         phone: caregiverOne.phone,
         role: 'staff',
-        org: caregiverOne.org.toString(),
+        org: expect.objectContaining({
+          id: org.id
+        }),
         patients: [],
         isEmailVerified: false,
       });

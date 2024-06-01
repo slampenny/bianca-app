@@ -4,7 +4,6 @@ const caregiverService = require('./caregiver.service');
 const Token = require('../models/token.model');
 const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
-const logger = require('../config/logger');
 /**
  * Login with caregivername and password
  * @param {string} email
@@ -12,7 +11,7 @@ const logger = require('../config/logger');
  * @returns {Promise<Caregiver>}
  */
 const loginCaregiverWithEmailAndPassword = async (email, password) => {
-  const caregiver = await caregiverService.getCaregiverByEmail(email);
+  const caregiver = await caregiverService.getPopulatedCaregiverByEmail(email);
   if (!caregiver || !(await caregiver.isPasswordMatch(password))) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
   }
@@ -42,9 +41,10 @@ const refreshAuth = async (refreshToken) => {
     const refreshTokenDoc = await tokenService.verifyToken(refreshToken, tokenTypes.REFRESH);
     const caregiver = await caregiverService.getCaregiverById(refreshTokenDoc.caregiver);
     if (!caregiver) {
-      throw new Error();
+      throw new ApiError(httpStatus.UNAUTHORIZED, `Caregiver not found: ${refreshTokenDoc.caregiver}`);
     }
     await refreshTokenDoc.remove();
+
     return tokenService.generateAuthTokens(caregiver);
   } catch (error) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate');
@@ -62,7 +62,7 @@ const resetPassword = async (resetPasswordToken, newPassword) => {
     const resetPasswordTokenDoc = await tokenService.verifyToken(resetPasswordToken, tokenTypes.RESET_PASSWORD);
     const caregiver = await caregiverService.getCaregiverById(resetPasswordTokenDoc.caregiver);
     if (!caregiver) {
-      throw new Error();
+      throw new ApiError(httpStatus.UNAUTHORIZED, `Caregiver not found: ${refreshTokenDoc.caregiver}`);
     }
     await caregiverService.updateCaregiverById(caregiver.id, { password: newPassword });
     await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.RESET_PASSWORD });
@@ -81,7 +81,7 @@ const verifyEmail = async (verifyEmailToken) => {
     const verifyEmailTokenDoc = await tokenService.verifyToken(verifyEmailToken, tokenTypes.VERIFY_EMAIL);
     const caregiver = await caregiverService.getCaregiverById(verifyEmailTokenDoc.caregiver);
     if (!caregiver) {
-      throw new Error();
+      throw new ApiError(httpStatus.UNAUTHORIZED, `Caregiver not found: ${refreshTokenDoc.caregiver}`);
     }
     await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.VERIFY_EMAIL });
     await caregiverService.updateCaregiverById(caregiver.id, { isEmailVerified: true });

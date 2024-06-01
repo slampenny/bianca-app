@@ -71,10 +71,9 @@ const insertCaregiversAndAddToOrg = async (org, caregivers) => {
 
 const insertCaregiverAndReturnToken = async (caregiverChoice) => {
   const [caregiver] = await insertCaregivers([caregiverChoice]);
-  const expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes');
-  const accessToken = tokenService.generateToken(caregiver.id, expires, tokenTypes.ACCESS);
+  const authTokens = await tokenService.generateAuthTokens(caregiver);
 
-  return { caregiver, accessToken };
+  return { caregiver, accessToken: authTokens.access.token };
 };
 
 const insertCaregiverAndReturnTokenByRole = async (role = "staff") => {

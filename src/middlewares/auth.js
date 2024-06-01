@@ -14,7 +14,7 @@ const verifyCallback = (req, resolve, reject, requiredRights) => async (err, car
     req.caregiver = caregiver;
     
     if (!caregiver.role) {
-        throw new Error('Caregiver role is not set');
+        throw new ApiError(httpStatus.UNAUTHORIZED, 'Caregiver role is not set');
     }
 
     if (caregiver.role === 'superAdmin') {
@@ -51,11 +51,7 @@ const verifyCallback = (req, resolve, reject, requiredRights) => async (err, car
                 }
             }
         } catch (error) {
-            logger.error('Error in permission check:', error);
-            logger.error('Caregiver role:', caregiver.role);
-            logger.error('Action:', action);
-            logger.error('Resource:', resource);
-            throw error; // re-throw the error after logging
+            return reject(new ApiError(httpStatus.INTERNAL_SERVER_ERROR, JSON.stringify(error)));
         }
     }
 

@@ -1,6 +1,6 @@
 const Joi = require('joi');
 const validator = require('validator');
-const { objectId, password } = require('./custom.validation');
+const { objectId } = require('./custom.validation');
 
 const createOrg = {
   body: Joi.object().keys({

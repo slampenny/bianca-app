@@ -66,6 +66,17 @@ const getCaregiverByEmail = async (email) => {
   return await Caregiver.findOne({ email });
 };
 
+const getPopulatedCaregiverByEmail = async (email) => {
+  return await Caregiver.findOne({ email })
+    .populate({
+      path: 'patients',
+      populate: {
+        path: 'schedules',
+        model: 'Schedule'
+      }
+    });
+};
+
 /**
  * Update caregiver by id
  * @param {ObjectId} caregiverId
@@ -215,6 +226,7 @@ module.exports = {
   queryCaregivers,
   getCaregiverById,
   getCaregiverByEmail,
+  getPopulatedCaregiverByEmail,
   updateCaregiverById,
   deleteCaregiverById,
   addPatient,

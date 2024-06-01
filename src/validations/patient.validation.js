@@ -52,13 +52,9 @@ const updatePatient = {
   }),
   body: Joi.object()
     .keys({
+      id: Joi.string().custom(objectId).optional(),
       org: Joi.string().custom(objectId).optional(),
       email: Joi.string().email().optional(),
-      password: Joi.when('role', {
-        is: 'staff',
-        then: Joi.string().required().custom(password),
-        otherwise: Joi.string().optional().allow('').custom(password),
-      }).optional(),
       name: Joi.string().optional(),
       phone: Joi.string().optional().custom((value, helpers) => {
         if (!validator.isMobilePhone(value)) {
@@ -66,6 +62,7 @@ const updatePatient = {
         }
         return value;
       }),
+      isEmailVerified: Joi.boolean().required(),
       caregivers: Joi.array().optional(),
       schedules: Joi.array().items(
         Joi.object().keys({
