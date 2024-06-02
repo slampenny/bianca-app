@@ -1,37 +1,29 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useGetPatientsForCaregiverQuery } from '../services/api/caregiverApi';
 import { getCurrentUser } from '../store/authSlice';
+import { setPatient, getPatients, clearPatient } from '../store/patientSlice';
+import { setSchedules } from '../store/scheduleSlice';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { setSelectedUser } from '../store/userSlice'; // import the action
 import { Caregiver, Patient } from '../services/api/api.types';
-import { MainTabsParamList } from 'app/navigators/navigationTypes';
-import { useAssignCaregiverMutation } from '../services/api/patientApi'; // adjust the path as necessary
+import { PatientStackParamList } from 'app/navigators/navigationTypes';
 import { ScrollView } from 'react-native-gesture-handler';
 
 export function HomeScreen() {
   const dispatch = useDispatch(); // get the dispatch function
   const currentUser : Caregiver | null = useSelector(getCurrentUser);
-  const { data: patients = [] } = (currentUser && currentUser.id) ? useGetPatientsForCaregiverQuery(currentUser.id) : { data: [] };
-  const navigation = useNavigation<NavigationProp<MainTabsParamList>>();
-  const [assignCaregiver] = useAssignCaregiverMutation(); // use the hook at the top level
+  const patients = useSelector(getPatients);
+  const navigation = useNavigation<NavigationProp<PatientStackParamList>>();
 
-  const handlePatientPress = (user: Patient) => { // assuming User is the type of your user objects
-    dispatch(setSelectedUser(user)); // dispatch the action to set the selected user
+  const handlePatientPress = (patient: Patient) => { // assuming User is the type of your user objects
+    dispatch(setPatient(patient)); // dispatch the action to set the selected user
+    dispatch(setSchedules(patient.schedules));
     navigation.navigate('PatientScreen');
   };
 
-  const handleAddUser = () => {
+  const handleAddPatient = () => {
+    dispatch(clearPatient());
     navigation.navigate('PatientScreen');
-  };
-
-  const handleSignUp = () => {
-    if (currentUser && currentUser.id) {
-      assignCaregiver({ patientId: currentUser.id, caregiverId: currentUser.id });
-    } else {
-      console.error('Current user is null');
-    }
   };
 
   return (
@@ -39,28 +31,23 @@ export function HomeScreen() {
       <Text style={styles.welcomeText}>Welcome, {currentUser ? currentUser.name : 'Guest'}</Text>
       <View style={styles.body}>
         {patients.length === 0 ? (
-          <Text style={styles.noUsersText}>
-            No users found. Please add new users or sign up for the service.
-          </Text>
+          <Text style={styles.noUsersText}>No patients found</Text>
         ) : (
           <FlatList
             data={patients}
             keyExtractor={(item : Patient, index) => item.id || String(index)}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.userButton} onPress={() => handlePatientPress(item)}>
+              <Pressable style={styles.userButton} onPress={() => handlePatientPress(item)}>
                 <Text style={styles.userButtonText}>{item.name}</Text>
-              </TouchableOpacity>
+              </Pressable>
             )}
           />
         )}
       </View>
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddUser}>
-          <Text style={styles.addButtonText}>ADD NEW USER</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
-          <Text style={styles.signUpButtonText}>SIGN UP</Text>
-        </TouchableOpacity>
+        <Pressable style={styles.addButton} onPress={handleAddPatient}>
+          <Text style={styles.addButtonText}>Add Patient</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );

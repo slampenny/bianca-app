@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 
 export const ForgotPasswordScreen = () => {
   const handleResetPassword = () => {
@@ -10,9 +10,9 @@ export const ForgotPasswordScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Forgot Password</Text>
       <TextInput style={styles.input} placeholder="Email" />
-      <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+      <Pressable style={styles.button} onPress={handleResetPassword}>
         <Text style={styles.buttonText}>RESET PASSWORD</Text>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 }

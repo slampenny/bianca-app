@@ -32,6 +32,7 @@ import { customFontsToLoad } from "./theme"
 import Config from "./config"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { ViewStyle } from "react-native"
+import useRefreshToken from "./effects/useRefreshToken"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -48,6 +49,11 @@ const config = {
 
 interface AppProps {
   hideSplashScreen: () => Promise<boolean>
+}
+
+function InnerApp() {
+  useRefreshToken();
+  return null;
 }
 
 /**
@@ -106,6 +112,7 @@ function App(props: AppProps) {
                 initialState={initialNavigationState}
                 onStateChange={onNavigationStateChange}
               />
+              <InnerApp />
             </PersistGate>
           </Provider>
         </GestureHandlerRootView>

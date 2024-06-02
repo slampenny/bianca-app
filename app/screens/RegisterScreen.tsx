@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useRegisterMutation } from '../services/api/authApi'; // Adjust the path as necessary
 
 export const RegisterScreen = () => {
@@ -98,9 +98,9 @@ export const RegisterScreen = () => {
         onChangeText={setPhone}
         keyboardType="phone-pad"
       />
-      <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={isLoading}>
+      <Pressable style={styles.button} onPress={handleRegister} disabled={isLoading}>
         <Text style={styles.buttonText}>REGISTER</Text>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 };

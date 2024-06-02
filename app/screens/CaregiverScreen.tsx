@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { getCurrentUser } from '../store/authSlice';
 import { useUpdateCaregiverMutation } from '../services/api/caregiverApi';
 
@@ -54,9 +54,9 @@ export function CaregiverScreen() {
         value={phone}
         onChangeText={setPhone}
       />
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
+      <Pressable style={styles.button} onPress={handleSave}>
         <Text style={styles.buttonText}>SAVE</Text>
-      </TouchableOpacity>
+      </Pressable>
     </ScrollView>
   );
 }

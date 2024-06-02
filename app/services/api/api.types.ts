@@ -91,7 +91,7 @@ export interface Patient {
   phone: string;
   org: string | null;
   caregivers: string[]; 
-  schedules: string[];
+  schedules: Schedule[];
 }
 
 export interface Interval {
@@ -100,7 +100,7 @@ export interface Interval {
 }
 
 export interface Schedule {
-  id?: string;
+  id: string | null;
   patient?: string | null;
   frequency: 'daily' | 'weekly' | 'monthly';
   intervals: Interval[];

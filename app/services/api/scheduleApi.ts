@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { DEFAULT_API_CONFIG } from './api';
 import { RootState } from '../../store/store';
+import { Schedule } from './api.types'; 
 
 export const scheduleApi = createApi({
   reducerPath: 'scheduleApi',
@@ -15,35 +16,42 @@ export const scheduleApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    createSchedule: builder.mutation<void, any>({
-      query: (data) => ({
-        url: '/schedules',
+    createSchedule: builder.mutation<Schedule, { patientId: string; data: Partial<Schedule> }>({
+      query: ({ patientId, data }) => ({
+        url: `/schedules/patients/${patientId}`,
         method: 'POST',
         body: data,
       }),
+      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
-    getSchedule: builder.query<void, { scheduleId: string }>({
-      query: ({ scheduleId }) => `/schedules/${scheduleId}`,
+    getSchedule: builder.query<Schedule, { scheduleId: string }>({
+      query: ({ scheduleId }) => ({
+        url: `/schedules/${scheduleId}`,
+      }),
+      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
-    updateSchedule: builder.mutation<void, { scheduleId: string, data: any }>({
+    updateSchedule: builder.mutation<Schedule, { scheduleId: string; data: Partial<Schedule> }>({
       query: ({ scheduleId, data }) => ({
         url: `/schedules/${scheduleId}`,
         method: 'PUT',
         body: data,
       }),
+      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
-    patchSchedule: builder.mutation<void, { scheduleId: string, data: any }>({
+    patchSchedule: builder.mutation<Schedule, { scheduleId: string; data: Partial<Schedule> }>({
       query: ({ scheduleId, data }) => ({
         url: `/schedules/${scheduleId}`,
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
-    deleteSchedule: builder.mutation<void, { scheduleId: string }>({
+    deleteSchedule: builder.mutation<{ success: boolean }, { scheduleId: string }>({
       query: ({ scheduleId }) => ({
         url: `/schedules/${scheduleId}`,
         method: 'DELETE',
       }),
+      transformResponse: () => ({ success: true }),
     }),
   }),
 });

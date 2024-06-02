@@ -11,6 +11,7 @@ export type AppStackParamList = {
 export type MainTabsParamList = {
     HomeScreen: undefined;
     CaregiverScreen: undefined;
+    AlertScreen: undefined;
 };
 
 // DrawerParamList.ts
@@ -24,6 +25,12 @@ export type LoginStackParamList = {
     Login: undefined;
     Register: undefined;
     ForgotPassword: undefined;
+  };
+
+  export type PatientStackParamList = {
+    HomeScreen: undefined;
+    PatientScreen: undefined;
+    ScheduleScreen: undefined;
   };
   
 

@@ -1,63 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
+import { Text, View, Pressable, FlatList, StyleSheet } from 'react-native';
 import { getCurrentUser } from '../store/authSlice';
-import { useUpdateAlertMutation } from '../services/api/alertApi';
+import { Alert } from '../services/api/api.types';
+import { useGetAllAlertsQuery, useMarkAllAsReadMutation, useMarkAlertAsReadMutation } from '../services/api';
 
 export function AlertScreen() {
   const currentUser = useSelector(getCurrentUser);
-  const [updateAlert] = currentUser ? useUpdateAlertMutation() : [() => {}];
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [selectedAlert, setSelectedAlert] = useState<string|null>(null);
+  const { data: alerts = [], isFetching } = useGetAllAlertsQuery();
+  const [markAllAsRead, { isSuccess }] = useMarkAllAsReadMutation();
+  const [markAlertAsRead] = useMarkAlertAsReadMutation();
+  const dispatch = useDispatch();
 
   useEffect(() => {
-    if (currentUser) {
-      setName(currentUser.name);
-      setEmail(currentUser.email);
-      setPhone(currentUser.phone);
+    if (isSuccess) {
+      dispatch(markAllAsRead(alerts));
     }
-  }, [currentUser]);
+  }, [isSuccess, dispatch, alerts]);
 
-  const handleSave = () => {
-    if (currentUser && currentUser.id) {
-      updateAlert({
-        id: currentUser.id,
-        alert: {
-          ...currentUser,
-          name,
-          email,
-          phone,
-        },
-      });
+  const handleAlertPress = async (alert: Alert) => {
+    if (alert.id) {
+      setSelectedAlert(alert.id);
+      if (!alert.readBy) {
+        await markAlertAsRead({ alertId: alert.id });
+      }
     }
   };
 
+  // Call the mutation when the "Mark all as read" button is pressed
+  const handleMarkAllAsRead = async () => {
+    await markAllAsRead({alerts});
+  };
+
+  const renderItem = ({ item }: { item: Alert }) => (
+    <Pressable onPress={() => handleAlertPress(item)}>
+      <Text style={styles.alertText}>
+        {selectedAlert === item.id ? item.message : `${item.message.substring(0, 10)}...`}
+      </Text>
+    </Pressable>
+  );
+
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Alert Information</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Name"
-        value={name}
-        onChangeText={setName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Phone"
-        value={phone}
-        onChangeText={setPhone}
-      />
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>SAVE</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    <View style={styles.container}>
+      <Pressable onPress={handleMarkAllAsRead}>
+        <Text>Mark all as read</Text>
+      </Pressable>
+      <Text>Mark all as read</Text>
+      {isFetching ? (
+        <Text>Loading...</Text>
+      ) : (
+        <FlatList
+          data={alerts}
+          renderItem={renderItem}
+          keyExtractor={item => item.id || ''}
+        />
+      )}
+    </View>
   );
 }
 
@@ -67,28 +66,8 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
+  alertText: {
+    fontSize: 16,
     marginBottom: 10,
-    padding: 10,
-  },
-  button: {
-    backgroundColor: '#3498db',
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 });

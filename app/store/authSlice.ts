@@ -12,7 +12,7 @@ interface AuthState {
 
 const initialState: AuthState = {
   tokens: null,
-  authEmail: "jaycee.dibbert43@gmail.com",
+  authEmail: "fake@example.org",
   currentUser: null,
 };
 
@@ -42,7 +42,14 @@ export const authSlice = createSlice({
       state.currentUser = null;
     });
     builder.addMatcher(authApi.endpoints.refreshTokens.matchFulfilled, (state, { payload }) => {
+      console.log('refreshed tokens', JSON.stringify(payload.tokens));
       state.tokens = payload.tokens;
+    });
+    // Add this block
+    builder.addMatcher(authApi.endpoints.refreshTokens.matchRejected, (state) => {
+      console.log('Failed to refresh tokens');
+      state.tokens = null;
+      state.currentUser = null;
     });
     builder.addMatcher(caregiverApi.endpoints.updateCaregiver.matchFulfilled, (state, { payload }) => {
       // Check if the updated user is the same as the current user

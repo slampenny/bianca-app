@@ -3,6 +3,7 @@ import alertReducer from './alertSlice';
 import authReducer from './authSlice';
 import orgReducer from './orgSlice';
 import caregiverReducer from './caregiverSlice';
+import patientReducer from './patientSlice';
 import scheduleReducer from './scheduleSlice';
 import { alertApi, authApi, orgApi, caregiverApi, scheduleApi, patientApi } from '../services/api/';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
@@ -18,6 +19,7 @@ const persistConfig = {
 const rootReducer = combineReducers({
   org: orgReducer,
   caregiver: caregiverReducer,
+  patient: patientReducer,
   schedule: scheduleReducer,
   auth: authReducer,
   alert: alertReducer,
@@ -38,10 +40,23 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(alertApi.middleware, authApi.middleware, orgApi.middleware, caregiverApi.middleware, patientApi.middleware, scheduleApi.middleware),
+    })
+    .concat(
+      alertApi.middleware, 
+      authApi.middleware, 
+      orgApi.middleware, 
+      caregiverApi.middleware, 
+      patientApi.middleware, 
+      scheduleApi.middleware
+    ),
 });
 
 export const persistor = persistStore(store);
+
+// Clear store in development mode
+if (process.env.NODE_ENV === 'development') {
+  persistor.purge();
+}
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

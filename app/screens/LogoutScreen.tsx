@@ -1,5 +1,5 @@
 import React, { useEffect, FC } from "react";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, Pressable, Text } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { useLogoutMutation } from "../services/api/authApi";
 import { getAuthTokens } from "../store/authSlice";
@@ -40,9 +40,9 @@ export const LogoutScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>You have been logged out</Text>
-      <TouchableOpacity style={styles.button} onPress={handleLogoutPress}>
+      <Pressable style={styles.button} onPress={handleLogoutPress}>
         <Text style={styles.buttonText}>GO TO LOGIN</Text>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 };

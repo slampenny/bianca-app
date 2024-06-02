@@ -51,6 +51,13 @@ export const alertApi = createApi({
         method: 'POST',
       }),
     }),
+    markAllAsRead: builder.mutation<Alert, { alerts: Alert[] }>({
+      query: ({ alerts }) => ({
+        url: `/alerts/markAsRead`,
+        method: 'PATCH',
+        body: alerts,
+      }),
+    }),
   }),
 });
 
@@ -61,4 +68,5 @@ export const {
   useUpdateAlertMutation,
   useDeleteAlertMutation,
   useMarkAlertAsReadMutation,
+  useMarkAllAsReadMutation,
 } = alertApi;

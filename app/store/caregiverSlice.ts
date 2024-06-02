@@ -5,12 +5,12 @@ import { Caregiver } from '../services/api/api.types';
 
 interface CaregiverState {
   caregiver: Caregiver | null;
-  selectedUsers: Caregiver[]; // Array of selected users
+  caregivers: Caregiver[]; // Array of selected users
 }
 
 const initialState: CaregiverState = {
   caregiver: null,
-  selectedUsers: [],
+  caregivers: [],
 };
 
 export const caregiverSlice = createSlice({
@@ -20,29 +20,29 @@ export const caregiverSlice = createSlice({
     setCaregiver: (state, action: PayloadAction<Caregiver | null>) => {
       state.caregiver = action.payload;
     },
-    setSelectedUsers: (state, action: PayloadAction<Caregiver[]>) => {
-      state.selectedUsers = action.payload;
+    setCaregivers: (state, action: PayloadAction<Caregiver[]>) => {
+      state.caregivers = action.payload;
     },
     clearCaregiver: (state) => {
       state.caregiver = null;
     },
-    clearSelectedUsers: (state) => {
-      state.selectedUsers = [];
+    clearCaregivers: (state) => {
+      state.caregivers = [];
     },
-    removeSelectedUser: (state, action: PayloadAction<string>) => {
-      state.selectedUsers = state.selectedUsers.filter(user => user.id !== action.payload);
+    removeCaregiver: (state, action: PayloadAction<string>) => {
+      state.caregivers = state.caregivers.filter(caregiver => caregiver.id !== action.payload);
     },
   },
   extraReducers: (builder) => {
     // builder.addMatcher(caregiverApi.endpoints.removeCaregiver.matchFulfilled, (state, { payload }) => {
-    //   state.selectedUsers = state.selectedUsers.filter(user => user.id !== payload);
+    //   state.caregivers = state.caregivers.filter(user => user.id !== payload);
     // });
   }
 });
 
-export const { setCaregiver, setSelectedUsers, clearCaregiver, clearSelectedUsers, removeSelectedUser } = caregiverSlice.actions;
+export const { setCaregiver, setCaregivers, clearCaregiver, clearCaregivers, removeCaregiver } = caregiverSlice.actions;
 
 export const selectCaregiver = (state: RootState) => state.caregiver.caregiver;
-export const selectSelectedUsers = (state: RootState) => state.caregiver.selectedUsers;
+export const selectCaregivers = (state: RootState) => state.caregiver.caregivers;
 
 export default caregiverSlice.reducer;

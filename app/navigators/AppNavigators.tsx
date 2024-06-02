@@ -1,7 +1,7 @@
 import { createStackNavigator } from '@react-navigation/stack';
 import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from "app/screens";
 import MainTabsWithDrawer from './MainTabsWithDrawer';
-import { AppStackParamList, LoginStackParamList } from './navigationTypes'; // Ensure this path is correct
+import { AppStackParamList, LoginStackParamList } from './navigationTypes';
 
 const Stack = createStackNavigator<AppStackParamList>();
 const LoginStack = createStackNavigator<LoginStackParamList>();

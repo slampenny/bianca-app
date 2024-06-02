@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, FC } from "react";
-import { TextInput, View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { TextInput, View, StyleSheet, Pressable, Text } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useLoginMutation, useLogoutMutation } from "../services/api/authApi";
@@ -26,7 +26,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true);
 
   useEffect(() => {
-    dispatch(setAuthEmail("jaycee.dibbert43@gmail.com"));
+    dispatch(setAuthEmail("negascout@gmail.com"));
     setAuthPassword("password1");
     return () => {
       setAuthPassword("");
@@ -92,15 +92,15 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           onSubmitEditing={handleLoginPress}
         />
       </View>
-      <TouchableOpacity style={styles.button} onPress={handleLoginPress}>
+      <Pressable style={styles.button} onPress={handleLoginPress}>
         <Text style={styles.buttonText}>LOGIN</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={handleRegisterPress}>
+      </Pressable>
+      <Pressable style={styles.button} onPress={handleRegisterPress}>
         <Text style={styles.buttonText}>REGISTER</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.linkButton} onPress={handleForgotPasswordPress}>
+      </Pressable>
+      <Pressable style={styles.linkButton} onPress={handleForgotPasswordPress}>
         <Text style={styles.linkButtonText}>Forgot Password?</Text>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 };

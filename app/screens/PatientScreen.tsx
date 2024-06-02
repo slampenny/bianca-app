@@ -1,94 +1,210 @@
-import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { getCurrentUser } from '../store/authSlice';
-import { useUpdatePatientMutation } from '../services/api/patientApi';
+import React, { useState, useEffect } from "react"
+import { useSelector } from "react-redux"
+import {
+  Text,
+  TextInput,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  TouchableWithoutFeedback,
+} from "react-native"
+import { useNavigation, NavigationProp } from "@react-navigation/native"
+import { PatientStackParamList } from "app/navigators/navigationTypes"
+import { getPatient } from "../store/patientSlice"
+import {
+  useCreatePatientMutation,
+  useUpdatePatientMutation,
+  useDeletePatientMutation,
+} from "../services/api/patientApi"
+import { LoadingScreen } from "./LoadingScreen" // import the LoadingScreen component
 
 export function PatientScreen() {
-  const currentUser = useSelector(getCurrentUser);
-  const [updatePatient] = currentUser ? useUpdatePatientMutation() : [() => {}];
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const navigation = useNavigation<NavigationProp<PatientStackParamList>>()
+  const patient = useSelector(getPatient)
+  const [updatePatient, { isLoading: isUpdating, error: updateError }] = useUpdatePatientMutation()
+  const [createPatient, { isLoading: isCreating, error: createError }] = useCreatePatientMutation()
+  const [deletePatient, { isLoading: isDeleting, error: deleteError }] = useDeletePatientMutation()
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [emailError, setEmailError] = useState("")
+  const [phoneError, setPhoneError] = useState("")
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
-    if (currentUser) {
-      setName(currentUser.name);
-      setEmail(currentUser.email);
-      setPhone(currentUser.phone);
+    if (patient) {
+      setName(patient.name)
+      setEmail(patient.email)
+      setPhone(patient.phone)
     }
-  }, [currentUser]);
+  }, [patient])
+
+  const handleDelete = () => {
+    if (confirmDelete && patient && patient.id) {
+      deletePatient({ id: patient.id })
+        .unwrap()
+        .then(() => navigation.navigate("HomeScreen"))
+    } else {
+      setConfirmDelete(true)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setConfirmDelete(false)
+  }
+
+  const validateEmail = (email: string) => {
+    setEmail(email)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setEmailError("Invalid email format")
+    } else {
+      setEmailError("")
+    }
+  }
+
+  const validatePhone = (phone: string) => {
+    setPhone(phone)
+    const phoneRegex = /^\d{10}$/ // Adjust this regex to match the phone number format you want
+    if (!phoneRegex.test(phone)) {
+      setPhoneError("Invalid phone format")
+    } else {
+      setPhoneError("")
+    }
+  }
+
+  const handleManageSchedules = () => {
+    navigation.navigate('ScheduleScreen');
+  };
 
   const handleSave = () => {
-    if (currentUser && currentUser.id) {
+    if (patient && patient.id) {
       updatePatient({
-        id: currentUser.id,
+        id: patient.id,
         patient: {
-          ...currentUser,
+          ...patient,
           name,
           email,
           phone,
         },
-      });
+      })
+        .unwrap()
+        .then(() => navigation.navigate("HomeScreen"))
+    } else {
+      createPatient({
+        name,
+        email,
+        phone,
+      })
+        .unwrap()
+        .then(() => navigation.navigate("HomeScreen"))
     }
-  };
+  }
+
+  if (isCreating || isUpdating || isDeleting) {
+    return <LoadingScreen /> // use the LoadingScreen component
+  }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Patient Information</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Name"
-        value={name}
-        onChangeText={setName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Phone"
-        value={phone}
-        onChangeText={setPhone}
-      />
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>SAVE</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
+    <TouchableWithoutFeedback onPress={handleCancelDelete}>
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>Patient Information</Text>
+        {createError && "data" in createError && (
+          <Text style={styles.error}>
+            Error: {(createError.data as { message: string }).message}
+          </Text>
+        )}
+        {updateError && "data" in updateError && (
+          <Text style={styles.error}>
+            Error: {(updateError.data as { message: string }).message}
+          </Text>
+        )}
+        <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={validateEmail}
+        />
+        {emailError && <Text style={styles.error}>{emailError}</Text>}
+        <TextInput
+          style={styles.input}
+          placeholder="Phone"
+          value={phone}
+          onChangeText={validatePhone}
+        />
+        {phoneError && <Text style={styles.error}>{phoneError}</Text>}
+        <Pressable
+          style={[
+            styles.button,
+            (!email || !phone || !!emailError || !!phoneError) && styles.buttonDisabled,
+          ]}
+          onPress={handleSave}
+          disabled={!email || !phone || !!emailError || !!phoneError}
+        >
+          <Text style={styles.buttonText}>SAVE</Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.button,
+            (!email || !phone || !!emailError || !!phoneError) && styles.buttonDisabled,
+          ]}
+          onPress={handleDelete}
+          disabled={!patient || !patient.id}
+        >
+          <Text style={styles.buttonText}>{confirmDelete ? "CONFIRM DELETE" : "DELETE"}</Text>
+        </Pressable>
+        <Pressable
+          style={styles.button}
+          onPress={handleManageSchedules}
+        >
+          <Text style={styles.buttonText}>Manage Schedules</Text>
+        </Pressable>
+      </ScrollView>
+    </TouchableWithoutFeedback>
+  )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 20,
   },
   input: {
     height: 40,
-    borderColor: 'gray',
+    borderColor: "gray",
     borderWidth: 1,
     marginBottom: 10,
     padding: 10,
   },
   button: {
-    backgroundColor: '#3498db',
+    backgroundColor: "#3498db",
     padding: 15,
     borderRadius: 5,
-    alignItems: 'center',
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  buttonDisabled: {
+    backgroundColor: "#3498db",
+    opacity: 0.5,
+    padding: 15,
+    borderRadius: 5,
+    alignItems: "center",
     marginBottom: 10,
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
-});
+  error: {
+    color: "red",
+    // Add any other styles you want
+  },
+})
