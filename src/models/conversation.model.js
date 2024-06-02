@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
 
-const messageSchema = new mongoose.Schema({
+const messageSchema = mongoose.Schema({
   role: String,
   content: String,
 });

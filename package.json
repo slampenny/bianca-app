@@ -16,7 +16,6 @@
     "dev:test": "cross-env NODE_ENV=test nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
     "test": "jest -i --colors --verbose --detectOpenHandles --config jest.config.js",
     "test:auth": "jest -i --colors --verbose --detectOpenHandles --debug tests/integration/auth.test.js",
-    "test:watch": "jest -i --watchAll",
     "coverage": "jest -i --coverage",
     "coverage:coveralls": "jest -i --coverage --coverageReporters=text-lcov | coveralls",
     "lint": "eslint .",

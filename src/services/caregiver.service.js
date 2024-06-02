@@ -153,9 +153,10 @@ const addPatient = async (caregiverId, patientId) => {
 
   // Add caregiver to patient's caregivers array
   patient.caregivers.push(caregiverId);
+  patient.org = caregiver.org.id;
   await patient.save();
 
-  return caregiver;
+  return patient;
 };
 
 /**

@@ -12,7 +12,6 @@ const createPatient = async (patientBody) => {
   if (await Patient.isEmailTaken(patientBody.email)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
-  patientBody.role = patientBody.role || 'patient'; // set the role to 'patient' if it's not provided
   return await Patient.create(patientBody);
 };
 

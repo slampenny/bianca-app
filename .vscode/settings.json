@@ -1,4 +1,7 @@
 {
     "jest.pathToJest": "node_modules/.bin/jest",
-    "jest.jestCommandLine": "yarn test"
+    "jest.jestCommandLine": "yarn test",
+    "jest.runMode": {
+        "type": "on-demand"
+    }
 }

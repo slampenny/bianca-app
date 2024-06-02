@@ -10,7 +10,7 @@ const createAlert = catchAsync(async (req, res) => {
 
 const getAlertById = catchAsync(async (req, res) => {
     const { alertId } = req.params;  // ID of the alert to retrieve
-    const caregiverId = req.caregiver.id;  // Assuming the caregiver's ID is stored in req.user._id
+    const caregiverId = req.caregiver;  // Assuming the caregiver's ID is stored in req.user._id
     //logger.debug(`Fetching alert with ID: ${alertId} for caregiver with ID: ${caregiverId}`);
     const alert = await alertService.getAlertById(alertId, caregiverId);
     if (!alert) {
@@ -23,7 +23,7 @@ const getAlertById = catchAsync(async (req, res) => {
 const getAlerts = catchAsync(async (req, res) => {
     // Assuming 'showRead' is passed as a query parameter to toggle visibility of read alerts
     const showRead = req.query.showRead === 'true';
-    const alerts = await alertService.getAlerts(req.caregiver.id, showRead);
+    const alerts = await alertService.getAlerts(req.caregiver, showRead);
     res.send(alerts);
 });
 
@@ -35,7 +35,7 @@ const updateAlert = catchAsync(async (req, res) => {
 
 const markAlertAsRead = catchAsync(async (req, res) => {
     const { alertId } = req.params;  // ID of the alert to retrieve
-    const alert = await alertService.markAlertAsRead(alertId, req.caregiver.id);
+    const alert = await alertService.markAlertAsRead(alertId, req.caregiver);
     res.send(alert);
 });
 

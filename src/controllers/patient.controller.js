@@ -8,20 +8,24 @@ const {
   patientService, 
   scheduleService 
 } = require('../services');
+
+const {
+  PatientDTO
+} = require('../dtos');
+
 const logger = require('../config/logger');
 
 const createPatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
-  const patient = await patientService.createPatient(patientData);
+  let patient = await patientService.createPatient(patientData);
   
   if (schedules) {
     for (const schedule of schedules) {
       await scheduleService.createSchedule({patientId: patient.id, ...schedule});
     }
   }
-  await caregiverService.addPatient(req.caregiver, patient.id);
-
-  res.status(httpStatus.CREATED).send(patient);
+  patient = await caregiverService.addPatient(req.caregiver, patient.id);
+  res.status(httpStatus.CREATED).send(PatientDTO(patient));
 });
 
 const getPatients = catchAsync(async (req, res) => {
@@ -36,7 +40,7 @@ const getPatient = catchAsync(async (req, res) => {
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
-  res.send(patient);
+  res.send(PatientDTO(patient));
 });
 
 const updatePatient = catchAsync(async (req, res) => {
@@ -48,7 +52,7 @@ const updatePatient = catchAsync(async (req, res) => {
       await scheduleService.updateSchedule(schedule.id, {...schedule});
     }
   }
-  res.send(patient);
+  res.send(PatientDTO(patient));
 });
 
 const deletePatient = catchAsync(async (req, res) => {
@@ -59,13 +63,13 @@ const deletePatient = catchAsync(async (req, res) => {
 const assignCaregiver = catchAsync(async (req, res) => {
   const { patientId, caregiverId } = req.params;
   const updatedPatient = await patientService.assignCaregiver(caregiverId, patientId);
-  res.status(httpStatus.OK).send(updatedPatient);
+  res.status(httpStatus.OK).send(PatientDTO(updatedPatient));
 });
 
 const removeCaregiver = catchAsync(async (req, res) => {
   const { patientId, caregiverId } = req.params;
   const updatedPatient = await patientService.removeCaregiver(caregiverId, patientId);
-  res.status(httpStatus.OK).send(updatedPatient);
+  res.status(httpStatus.OK).send(PatientDTO(updatedPatient));
 });
 
 const getPatientsByCaregiver = catchAsync(async (req, res) => {
