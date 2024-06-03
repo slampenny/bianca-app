@@ -55,7 +55,7 @@ export const patientSlice = createSlice({
   }
 });
 
-export const { setPatient, setPatients, clearPatient, clearPatients, removeSelectedPatient } = patientSlice.actions;
+export const { setPatient, setPatients, clearPatient, clearPatients } = patientSlice.actions;
 
 export const getPatient = (state: RootState) => state.patient.patient;
 export const getPatients = (state: RootState) => state.patient.patients;

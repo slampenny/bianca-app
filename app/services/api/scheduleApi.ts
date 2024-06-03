@@ -22,13 +22,11 @@ export const scheduleApi = createApi({
         method: 'POST',
         body: data,
       }),
-      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
     getSchedule: builder.query<Schedule, { scheduleId: string }>({
       query: ({ scheduleId }) => ({
         url: `/schedules/${scheduleId}`,
       }),
-      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
     updateSchedule: builder.mutation<Schedule, { scheduleId: string; data: Partial<Schedule> }>({
       query: ({ scheduleId, data }) => ({
@@ -36,7 +34,6 @@ export const scheduleApi = createApi({
         method: 'PUT',
         body: data,
       }),
-      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
     patchSchedule: builder.mutation<Schedule, { scheduleId: string; data: Partial<Schedule> }>({
       query: ({ scheduleId, data }) => ({
@@ -44,14 +41,12 @@ export const scheduleApi = createApi({
         method: 'PATCH',
         body: data,
       }),
-      transformResponse: (response: { schedule: Schedule }) => response.schedule,
     }),
     deleteSchedule: builder.mutation<{ success: boolean }, { scheduleId: string }>({
       query: ({ scheduleId }) => ({
         url: `/schedules/${scheduleId}`,
         method: 'DELETE',
       }),
-      transformResponse: () => ({ success: true }),
     }),
   }),
 });

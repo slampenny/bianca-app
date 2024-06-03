@@ -1,27 +1,48 @@
 import { EnhancedStore } from '@reduxjs/toolkit';
-import { scheduleApi } from '../'; // Adjust the import path to your scheduleApi
+import { orgApi, scheduleApi } from '../'; // Adjust the import path to your scheduleApi
 import { store as appStore, RootState } from "../../../store/store";
-import { setupSchedule, setupPatient } from "../../../../test/helpers"; // Create these helpers if not already existing
-import { Schedule, Patient } from '../api.types';
+import { newSchedule } from "../../../../test/fixtures/schedule.fixture";
+import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture";
+import { registerNewOrgAndCaregiver, createPatientInOrg } from '../../../../test/helpers';
+import { Org, Schedule, Patient } from '../api.types';
 
 describe('scheduleApi', () => {
   let store: EnhancedStore<RootState>;
   let patient: Patient;
   let schedule: Schedule;
+  let org: Org;
+  let orgId: string;
   let patientId: string;
   let scheduleId: string;
 
   beforeEach(async () => {
     store = appStore;
-    patient = await setupPatient();
-    patientId = patient.id;
-    schedule = await setupSchedule(patientId);
-    scheduleId = schedule.id;
+    const testCaregiver = newCaregiver();
+    const response = await registerNewOrgAndCaregiver(testCaregiver.name, testCaregiver.email, testCaregiver.password, testCaregiver.phone);
+    org = response.org;
+    orgId = response.org.id as string;
+    // authTokens = response.tokens;
+
+    const result = await createPatientInOrg(org, testCaregiver.email, testCaregiver.password) as Patient;
+    if ('error' in result) {
+      throw new Error(`Create patient failed with error: ${JSON.stringify(result.error)}`);
+    } else {
+      patient = result;
+      patientId = patient.id as string;
+    }
+
+    const resultSchedule = await scheduleApi.endpoints.createSchedule.initiate({ patientId, data: newSchedule() })(store.dispatch, store.getState, {});
+    if ('data' in resultSchedule) {
+      schedule = resultSchedule.data;
+    } else {
+      throw new Error(`Create schedule failed with error: ${JSON.stringify(result)}`);
+    }
+    scheduleId = schedule.id as string;
   });
 
   afterEach(async () => {
     // Clean up actions if required
-    await scheduleApi.endpoints.deleteSchedule.initiate({ scheduleId })(store.dispatch, store.getState, {});
+    await orgApi.endpoints.deleteOrg.initiate({ orgId: orgId })(store.dispatch, store.getState, {});
     jest.clearAllMocks();
   });
 
@@ -32,30 +53,38 @@ describe('scheduleApi', () => {
       time: '10:00'
     };
 
-    const result = await store.dispatch(scheduleApi.endpoints.createSchedule.initiate({ patientId, data: newSchedule }));
+    const result = await scheduleApi.endpoints.createSchedule.initiate({ patientId, data: newSchedule })(store.dispatch, store.getState, {});
     
-    expect(result.data).toMatchObject({
-      id: expect.any(String),
-      frequency: newSchedule.frequency,
-      intervals: expect.arrayContaining([
-        expect.objectContaining({
-          day: 3,
-          weeks: 1
-        })
-      ]),
-      time: newSchedule.time
-    });
+    if ('data' in result) {
+      expect(result.data).toMatchObject({
+        id: expect.any(String),
+        frequency: newSchedule.frequency,
+        intervals: expect.arrayContaining([
+          expect.objectContaining({
+            day: 3,
+            weeks: 1
+          })
+        ]),
+        time: newSchedule.time
+      });
+    } else {
+      throw new Error(`Create schedule failed with error: ${JSON.stringify(result)}`);
+    }
   });
 
   it('should get a schedule', async () => {
-    const result = await store.dispatch(scheduleApi.endpoints.getSchedule.initiate({ scheduleId }));
+    const result = await scheduleApi.endpoints.getSchedule.initiate({ scheduleId })(store.dispatch, store.getState, {});
     
-    expect(result.data).toMatchObject({
-      id: scheduleId,
-      frequency: schedule.frequency,
-      intervals: schedule.intervals,
-      time: schedule.time
-    });
+    if ('data' in result) {
+      expect(result.data).toMatchObject({
+        id: scheduleId,
+        frequency: schedule.frequency,
+        intervals: schedule.intervals,
+        time: schedule.time
+      });
+    } else {
+      throw new Error(`Get schedule failed with error: ${JSON.stringify(result)}`);
+    }
   });
   it('should update a schedule', async () => {
     const updatedSchedule: Partial<Schedule> = {
@@ -64,23 +93,31 @@ describe('scheduleApi', () => {
       time: '14:00'
     };
 
-    const result = await store.dispatch(scheduleApi.endpoints.updateSchedule.initiate({ scheduleId, data: updatedSchedule }));
+    const result = await scheduleApi.endpoints.updateSchedule.initiate({ scheduleId, data: updatedSchedule })(store.dispatch, store.getState, {});
     
-    expect(result.data).toMatchObject({
-      id: scheduleId,
-      frequency: 'monthly',
-      intervals: expect.arrayContaining([
-        expect.objectContains({
-          day: 15
-        })
-      ]),
-      time: '14:00'
-    });
+    if ('data' in result) {
+      expect(result.data).toMatchObject({
+        id: scheduleId,
+        frequency: 'monthly',
+        intervals: expect.arrayContaining([
+          expect.objectContaining({
+            day: 15
+          })
+        ]),
+        time: '14:00'
+      });
+    } else {
+      throw new Error(`Create schedule failed with error: ${JSON.stringify(result)}`);
+    }
   });
   it('should delete a schedule', async () => {
-    const result = await store.dispatch(scheduleApi.endpoints.deleteSchedule.initiate({ scheduleId }));
-    
-    expect(result.data).toEqual({ success: true });
+    const result = await scheduleApi.endpoints.deleteSchedule.initiate({ scheduleId })(store.dispatch, store.getState, {});
+    console.log (`result: ${JSON.stringify(result)}`);
+    if ('data' in result) {
+      expect(result.data).toBeNull();
+    } else {
+      throw new Error(`Create schedule failed with error: ${JSON.stringify(result)}`);
+    }
   });
 });
 

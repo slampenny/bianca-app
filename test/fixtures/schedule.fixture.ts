@@ -1,8 +1,12 @@
-export function newCaregiver() {
-    return {
-      name: "Test Caregiver",
-      email: `test${Math.floor(Math.random() * 10000)}@example.com`,
-      password: "password1",
-      phone: "1234567890",
-    };
-  }
+import { Schedule } from '../../app/services/api/api.types';
+
+export function newSchedule() {
+  const newSchedule: Partial<Schedule> = {
+    frequency: 'weekly',
+    intervals: [{ day: 3, weeks: 1 }],
+    time: '10:00',
+    isActive: true,
+  };
+
+  return newSchedule;
+}
