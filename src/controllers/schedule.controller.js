@@ -2,6 +2,7 @@ const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const { scheduleService }  = require('../services');
 const ApiError = require('../utils/ApiError');
+const logger = require('../config/logger');
 
 // Create a new schedule or update an existing one
 const createSchedule = catchAsync(async (req, res) => {
@@ -29,7 +30,7 @@ const updateSchedule = catchAsync(async (req, res) => {
   }
 
   // Update the schedule
-  const schedule = await scheduleService.updateSchedule(req.params.scheduleId, req.body.frequency, req.body.intervals);
+  const schedule = await scheduleService.updateSchedule(req.params.scheduleId, req.body);
 
   // Send the updated schedule
   res.send(schedule);
