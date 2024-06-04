@@ -1,6 +1,8 @@
 // patient.dto.js
+const ScheduleDTO = require('./schedule.dto');
+
 const PatientDTO = (patient) => {
-  const { _id, name, email, phone, isEmailVerified, createdAt, updatedAt, org, caregivers, schedules } = patient;
+  const { _id, name, email, phone, isEmailVerified, org, caregivers, schedules } = patient;
 
   const id = _id;
   const orgId = org ? (typeof org === 'object' ? org._id : org) : null;
@@ -8,6 +10,7 @@ const PatientDTO = (patient) => {
   // Transform caregivers to only include IDs
   const caregiverIds = caregivers.map((caregiver) => (typeof caregiver === 'object' ? caregiver._id : caregiver));
 
+  const scheduleDTOs = schedules.map(ScheduleDTO);
   return {
     id,
     name,
@@ -16,6 +19,7 @@ const PatientDTO = (patient) => {
     isEmailVerified,
     org: orgId,
     caregivers: caregiverIds,
+    schedules: scheduleDTOs,
   };
 };
 

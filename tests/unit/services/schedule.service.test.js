@@ -44,7 +44,7 @@ describe('Schedule Service', () => {
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
       expect(schedule).toHaveProperty('id');
-      expect(schedule.patientId.toString()).toEqual(patient.id.toString());
+      expect(schedule.patient.toString()).toEqual(patient.id.toString());
 
       const updatedPatient = await Patient.findById(patient.id);
       expect(updatedPatient.schedules.map(id => id.toString())).toContainEqual(schedule.id.toString());

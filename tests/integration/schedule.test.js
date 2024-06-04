@@ -70,7 +70,7 @@ describe('Schedule routes', () => {
         ]),
         isActive: true,
         nextCallDate: expect.any(String),
-        patientId: expect.any(String),
+        patient: expect.any(String),
         time: scheduleOne.time,
       });
     });
@@ -100,7 +100,7 @@ describe('Schedule routes', () => {
         ]),
         isActive: schedule.isActive,
         nextCallDate: expect.any(String),
-        patientId: expect.any(String),
+        patient: expect.any(String),
         time: schedule.time,
       });
     });
@@ -131,7 +131,7 @@ describe('Schedule routes', () => {
         intervals: expect.arrayContaining(scheduleTwo.intervals.map(interval => expect.objectContaining(interval))),
         isActive: schedule.isActive,
         nextCallDate: expect.any(String),
-        patientId: expect.any(String),
+        patient: expect.any(String),
         time: scheduleTwo.time,
       });
     });

@@ -3,6 +3,7 @@ const catchAsync = require('../utils/catchAsync');
 const { scheduleService }  = require('../services');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const ScheduleDTO = require('../dtos/schedule.dto');
 
 // Create a new schedule or update an existing one
 const createSchedule = catchAsync(async (req, res) => {
@@ -19,7 +20,7 @@ const createSchedule = catchAsync(async (req, res) => {
   });
 
   // Send the created schedule
-  res.status(httpStatus.CREATED).send(schedule);
+  res.status(httpStatus.CREATED).send(ScheduleDTO(schedule));
 });
 
 // Update an existing schedule
@@ -33,7 +34,7 @@ const updateSchedule = catchAsync(async (req, res) => {
   const schedule = await scheduleService.updateSchedule(req.params.scheduleId, req.body);
 
   // Send the updated schedule
-  res.send(schedule);
+  res.send(ScheduleDTO(schedule));
 });
 
 // Patch an existing schedule
@@ -42,7 +43,7 @@ const patchSchedule = catchAsync(async (req, res) => {
   const schedule = await scheduleService.patchSchedule(req.params.scheduleId, req.body);
 
   // Send the patched schedule
-  res.send(schedule);
+  res.send(ScheduleDTO(schedule));
 });
 
 // Delete a schedule
@@ -65,7 +66,7 @@ const getSchedule = catchAsync(async (req, res) => {
   }
 
   // Send the schedule
-  res.send(schedule);
+  res.send(ScheduleDTO(schedule));
 });
 
 module.exports = {
