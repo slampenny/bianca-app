@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { getCurrentUser } from '../store/authSlice';
 import { setPatient, getPatients, clearPatient } from '../store/patientSlice';
-import { setSchedules } from '../store/scheduleSlice';
+import { setSchedules, clearSchedules } from '../store/scheduleSlice';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { Caregiver, Patient } from '../services/api/api.types';
 import { PatientStackParamList } from 'app/navigators/navigationTypes';
@@ -23,6 +23,7 @@ export function HomeScreen() {
 
   const handleAddPatient = () => {
     dispatch(clearPatient());
+    dispatch(clearSchedules());
     navigation.navigate('PatientScreen');
   };
 

@@ -21,20 +21,19 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   const [time, setTime] = useState(initialSchedule.time)
 
   useEffect(() => {
-    const newSchedule: Schedule = { id, frequency, intervals, isActive, time }
-    if (id) {
-      newSchedule.id = id
-    }
-    if (patient) {
-      newSchedule.patient = patient
-    }
-    setFrequency(newSchedule.frequency)
-    setIntervals(newSchedule.intervals)
-    setIsActive(newSchedule.isActive)
-    setTime(newSchedule.time)
-    setSchedule(newSchedule)
-    onScheduleChange(newSchedule)
-  }, [id, patient, frequency, intervals, isActive, time])
+    setId(initialSchedule.id);
+    setPatient(initialSchedule.patient);
+    setFrequency(initialSchedule.frequency);
+    setIntervals(initialSchedule.intervals);
+    setIsActive(initialSchedule.isActive);
+    setTime(initialSchedule.time);
+  }, [initialSchedule]);
+  
+  useEffect(() => {
+    const newSchedule: Schedule = { id, patient, frequency, intervals, isActive, time };
+    setSchedule(newSchedule);
+    onScheduleChange(newSchedule);
+  }, [id, patient, frequency, intervals, isActive, time]);
 
   const handleDayChange = (dayIndex: number, isChecked: boolean) => {
     let newIntervals

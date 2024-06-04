@@ -1,5 +1,5 @@
 import { EnhancedStore } from '@reduxjs/toolkit';
-import { orgApi, scheduleApi } from '../'; // Adjust the import path to your scheduleApi
+import { orgApi, patientApi, scheduleApi } from '../'; // Adjust the import path to your scheduleApi
 import { store as appStore, RootState } from "../../../store/store";
 import { newSchedule } from "../../../../test/fixtures/schedule.fixture";
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture";
@@ -67,6 +67,25 @@ describe('scheduleApi', () => {
         ]),
         time: newSchedule.time
       });
+
+      const resultPatient = await patientApi.endpoints.getPatient.initiate({ id: patientId })(store.dispatch, store.getState, {});
+      if ('data' in resultPatient) {
+        expect(resultPatient.data).toMatchObject({
+          schedules: expect.arrayContaining([
+            expect.objectContaining({
+              id: expect.any(String),
+              frequency: newSchedule.frequency,
+              intervals: expect.arrayContaining([
+                expect.objectContaining({
+                  day: 3,
+                  weeks: 1
+                })
+              ]),
+              time: newSchedule.time
+            })
+          ])
+        });
+      }
     } else {
       throw new Error(`Create schedule failed with error: ${JSON.stringify(result)}`);
     }

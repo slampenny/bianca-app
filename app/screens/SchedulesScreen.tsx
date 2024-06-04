@@ -3,13 +3,19 @@ import { View, Text, ScrollView, StyleSheet, Button } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import { Picker } from "@react-native-picker/picker"
 import ScheduleComponent from "../components/Schedule"
-import { useCreateScheduleMutation, useUpdateScheduleMutation, useDeleteScheduleMutation } from "../services/api/scheduleApi"
+import {
+  useCreateScheduleMutation,
+  useUpdateScheduleMutation,
+  useDeleteScheduleMutation,
+} from "../services/api/scheduleApi"
 import { getSchedules, setSchedule, getSchedule } from "../store/scheduleSlice"
 import { LoadingScreen } from "./LoadingScreen"
 import { Schedule } from "app/services/api"
+import { getPatient } from "app/store/patientSlice"
 
 export const SchedulesScreen = () => {
   const dispatch = useDispatch()
+  const selectedPatient = useSelector(getPatient)
   const selectedSchedule = useSelector(getSchedule)
   const schedules = useSelector(getSchedules)
   const [updateSchedule, { isLoading: isUpdating, isError: isUpdatingError }] =
@@ -21,23 +27,24 @@ export const SchedulesScreen = () => {
 
   const handleSave = async () => {
     if (selectedSchedule && selectedSchedule.id) {
-        await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule })
-        dispatch(setSchedule(selectedSchedule))
-      } else {
-        await createNewSchedule(selectedSchedule)
-        dispatch(setSchedule(selectedSchedule))
+      await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule })
+    } else {
+      if (selectedPatient && selectedPatient.id && selectedSchedule) {
+        await createNewSchedule({ patientId: selectedPatient.id, data: selectedSchedule })
       }
+    }
   }
 
   const handleDelete = async () => {
     if (selectedSchedule && selectedSchedule.id) {
-      await deleteSchedule({scheduleId: selectedSchedule.id}) // You need to create this mutation in your scheduleApi
-      dispatch(setSchedule(null))
+      await deleteSchedule({ scheduleId: selectedSchedule.id })
+    } else {
+      console.error("No schedule selected to delete.")
     }
   }
 
   const handleScheduleChange = (newSchedule: Schedule) => {
-    dispatch(setSchedule(newSchedule));
+    dispatch(setSchedule(newSchedule))
   }
 
   if (isUpdating || isCreating || isDeleting) {
@@ -63,6 +70,7 @@ export const SchedulesScreen = () => {
             onValueChange={(itemValue) => {
               const selected = schedules.find((schedule) => schedule.id === itemValue)
               if (selected) {
+                console.log("Selected schedule", selected);
                 dispatch(setSchedule(selected))
               }
             }}

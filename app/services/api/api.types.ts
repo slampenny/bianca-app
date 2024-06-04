@@ -100,7 +100,7 @@ export interface Interval {
 }
 
 export interface Schedule {
-  id: string | null;
+  id?: string | null | undefined;
   patient?: string | null;
   frequency: 'daily' | 'weekly' | 'monthly';
   intervals: Interval[];

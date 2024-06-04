@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { RootState } from "./store";
 import { Schedule } from '../services/api/api.types';
-import { patientApi } from "../services/api";
+import { patientApi, scheduleApi } from "../services/api";
 
 interface ScheduleState {
   schedule: Schedule;
@@ -9,7 +9,6 @@ interface ScheduleState {
 }
 
 const defaultSchedule: Schedule = {
-  id: null,
   patient: null,
   frequency: 'weekly',
   intervals: [],
@@ -31,9 +30,16 @@ export const scheduleSlice = createSlice({
         state.schedule = defaultSchedule;
       } else {
         state.schedule = action.payload;
+        const index = state.schedules.findIndex(schedule => schedule.id === state.schedule.id);
+        if (index !== -1) {
+          state.schedules[index] = state.schedule;
+        }
       }
     },
     setSchedules: (state, action: PayloadAction<Schedule[]>) => {
+      if (action.payload.length > 0) {
+        state.schedule = action.payload[0];
+      }
       state.schedules = action.payload;
     },
     clearSchedule: (state) => {
@@ -52,6 +58,37 @@ export const scheduleSlice = createSlice({
     builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state) => {
       state.schedule = defaultSchedule;
       state.schedules = [];
+    });
+    builder.addMatcher(scheduleApi.endpoints.createSchedule.matchFulfilled, (state, { payload }) => {
+      state.schedule = payload;
+      state.schedules.push(payload);
+    });
+    builder.addMatcher(scheduleApi.endpoints.patchSchedule.matchFulfilled, (state, { payload }) => {
+      state.schedule = payload;
+    
+      const index = state.schedules.findIndex(schedule => schedule.id === payload.id);
+      if (index !== -1) {
+        state.schedules[index] = payload;
+      }
+    });
+    builder.addMatcher(scheduleApi.endpoints.updateSchedule.matchFulfilled, (state, { payload }) => {
+      state.schedule = payload;
+    
+      const index = state.schedules.findIndex(schedule => schedule.id === payload.id);
+      if (index !== -1) {
+        state.schedules[index] = payload;
+      }
+    });
+    builder.addMatcher(scheduleApi.endpoints.deleteSchedule.matchFulfilled, (state) => {
+      if (state.schedule) {
+        state.schedules = state.schedules.filter(schedule => schedule.id !== state.schedule!.id);
+      }
+
+      if (state.schedules.length > 0) {
+        state.schedule = state.schedules[0];
+      } else {
+        state.schedule = defaultSchedule;
+      }
     });
   }
 });
