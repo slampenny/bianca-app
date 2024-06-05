@@ -80,8 +80,9 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.form}>
-        <Text style={styles.label}>Start:</Text>
+        <Text style={styles.headerText}>Schedule</Text>
         <View style={styles.pickerContainer}>
+          <Text style={styles.label}>Start:</Text>
           <Picker
             selectedValue={time}
             onValueChange={(itemValue) => {
@@ -97,7 +98,6 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
 
         <Text style={styles.label}>Frequncy:</Text>
         <Picker style={styles.picker} selectedValue={frequency} onValueChange={setFrequency}>
-          <Picker.Item label="--Please choose an option--" value="" />
           <Picker.Item label="Daily" value="daily" />
           <Picker.Item label="Weekly" value="weekly" />
           <Picker.Item label="Monthly" value="monthly" />
@@ -112,6 +112,9 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
                   <View key={day} style={styles.checkboxContainer}>
                     <Text style={styles.checkboxLabel}>{day}</Text>
                     <Switch
+                      trackColor={{ false: "#767577", true: "#81b0ff" }}
+                      thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}
+                      ios_backgroundColor="#3e3e3e"
                       value={selectedDays.includes(index)}
                       onValueChange={(isChecked) => handleDayChange(index, isChecked)}
                     />
@@ -125,18 +128,21 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
 
       {schedule && (
         <View style={styles.eventDetails}>
+          <Text style={styles.eventTitle}>Schedule Details</Text>
           <Text style={styles.eventText}>Schedule: {formatSchedule(schedule)}</Text>
           <Text style={styles.eventText}>Frequency: {schedule.frequency}</Text>
         </View>
       )}
-
-      <Switch
-        trackColor={{ false: "#767577", true: "#81b0ff" }}
-        thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}
-        ios_backgroundColor="#3e3e3e"
-        onValueChange={setIsActive}
-        value={isActive}
-      />
+      <View style={styles.checkboxContainer}>
+        <Text style={styles.checkboxLabel}>Active:</Text>
+        <Switch
+          trackColor={{ false: "#767577", true: "#81b0ff" }}
+          thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}
+          ios_backgroundColor="#3e3e3e"
+          onValueChange={setIsActive}
+          value={isActive}
+        />
+      </View>
     </View>
   )
 }
@@ -161,36 +167,19 @@ const styles = StyleSheet.create({
     color: "#7F8C8D",
     marginBottom: 5,
   },
-  input: {
-    height: 40,
-    borderColor: "#BDC3C7",
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 20,
-    padding: 10,
-  },
   picker: {
     height: 50,
     backgroundColor: "#fff",
     borderColor: "#BDC3C7",
     borderWidth: 1,
     borderRadius: 5,
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: "#3498DB",
-    padding: 15,
-    borderRadius: 5,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 18,
-    textAlign: "center",
+    marginBottom: 10,
   },
   eventDetails: {
     padding: 20,
     backgroundColor: "#fff",
     borderRadius: 5,
+    marginTop: 20,
   },
   eventTitle: {
     fontSize: 22,
@@ -209,13 +198,28 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 20,
     overflow: "hidden",
+    padding: 10,
   },
   checkboxContainer: {
     flexDirection: "row",
+    marginTop: 20,
     marginBottom: 20,
+    alignItems: "center",
   },
   checkboxLabel: {
-    margin: 8,
+    flex: 1,
+    fontSize: 16,
+    color: "#7F8C8D",
+  },
+  switchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  switchLabel: {
+    fontSize: 18,
+    color: "#7F8C8D",
+    marginRight: 10,
   },
 })
 
