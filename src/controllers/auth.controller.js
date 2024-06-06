@@ -1,8 +1,8 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const logger = require('../config/logger');
-const { authService, caregiverService, orgService, tokenService, emailService } = require('../services');
-const { CaregiverDTO } = require('../dtos');
+const { authService, caregiverService, orgService, tokenService, emailService, alertService } = require('../services');
+const { AlertDTO, CaregiverDTO } = require('../dtos');
 
 const register = catchAsync(async (req, res, next) => {
   const org = await orgService.createOrg(
@@ -35,9 +35,11 @@ const registerWithInvite = catchAsync(async (req, res) => {
 const login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
   const caregiver = await authService.loginCaregiverWithEmailAndPassword(email, password);
+  const alerts = await alertService.getAlerts(caregiver.id);
+  const alertDTOs = alerts.map((alert) => AlertDTO(alert));
   const caregiverDTO = CaregiverDTO(caregiver);
   const tokens = await tokenService.generateAuthTokens(caregiver);
-  res.send({ caregiver: caregiverDTO, tokens });
+  res.send({ caregiver: caregiverDTO, alerts: alertDTOs, tokens });
 });
 
 const logout = catchAsync(async (req, res) => {
