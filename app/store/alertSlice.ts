@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
+import { authApi } from '../services/api';
 import { Alert } from '../services/api/api.types';
 
 interface AlertState {
@@ -18,14 +19,24 @@ export const alertSlice = createSlice({
   reducers: {
     setAlert: (state, action: PayloadAction<Alert | null>) => {
       state.selectedAlert = action.payload;
+      if (state.selectedAlert) {
+        const index = state.alerts.findIndex(alert => alert.id === state.selectedAlert!.id);
+        if (index !== -1) {
+          state.alerts[index] = state.selectedAlert;
+        }
+      }
     },
     setAlerts: (state, action: PayloadAction<Alert[]>) => {
+      if (action.payload.length > 0) {
+        state.selectedAlert = action.payload[0];
+      }
       state.alerts = action.payload;
     },
     clearAlert: (state) => {
       state.selectedAlert = null;
     },
     clearAlerts: (state) => {
+      state.selectedAlert = null;
       state.alerts = [];
     },
     removeSelectedAlert: (state, action: PayloadAction<string>) => {
@@ -49,9 +60,9 @@ export const alertSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // builder.addMatcher(alertApi.endpoints.removeAlert.matchFulfilled, (state, { payload }) => {
-    //   state.selectedUsers = state.selectedUsers.filter(user => user.id !== payload);
-    // });
+    builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
+      state.alerts = payload.alerts;
+    });
   }
 });
 

@@ -1,6 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { DEFAULT_API_CONFIG } from './api';
-import { Org, Caregiver, AuthTokens } from './api.types';
+import { Alert, Org, Caregiver, AuthTokens } from './api.types';
 
 export const authApi = createApi({
   reducerPath: 'authApi',
@@ -15,7 +15,7 @@ export const authApi = createApi({
         body: data,
       }),
     }),
-    login: builder.mutation<{caregiver: Caregiver, tokens: any}, { email: string, password: string }>({
+    login: builder.mutation<{caregiver: Caregiver, alerts: Alert[], tokens: any}, { email: string, password: string }>({
       query: (data) => ({
         url: '/auth/login',
         method: 'POST',
