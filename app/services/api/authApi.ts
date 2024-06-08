@@ -45,14 +45,13 @@ export const authApi = createApi({
         body: data,
       }),
     }),
-    //this is backend functionality, not frontend
-    // resetPassword: builder.mutation<void, { token: string, password: string }>({
-    //   query: ({token, password}) => ({
-    //     url: `/auth/reset-password?token=${token}`,
-    //     method: 'POST',
-    //     body: password,
-    //   }),
-    // }),
+    resetPassword: builder.mutation<void, { token: string, password: string }>({
+      query: ({token, password}) => ({
+        url: `/auth/reset-password?token=${token}`,
+        method: 'POST',
+        body: password,
+      }),
+    }),
     sendVerificationEmail: builder.mutation<void, Caregiver>({
       query: (caregiver) => ({
         url: '/auth/send-verification-email',
@@ -68,6 +67,7 @@ export const {
   useLoginMutation,
   useLogoutMutation,
   useRefreshTokensMutation,
+  useResetPasswordMutation,
   useForgotPasswordMutation,
   useSendVerificationEmailMutation,
 } = authApi;

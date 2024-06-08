@@ -1,46 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { getCurrentUser } from '../store/authSlice';
-import { useUpdateCaregiverMutation } from '../services/api/caregiverApi';
-import AvatarPicker from 'app/components/AvatarPicker';
+import { getOrg } from '../store/orgSlice';
+import { useUpdateOrgMutation } from '../services/api/orgApi';
 
-export function CaregiverScreen() {
-  const currentUser = useSelector(getCurrentUser);
-  const [updateCaregiver] = currentUser ? useUpdateCaregiverMutation() : [() => {}];
+export function OrgScreen() {
+  const currentOrg = useSelector(getOrg);
+  const [updateOrg] = currentOrg ? useUpdateOrgMutation() : [() => {}];
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
   useEffect(() => {
-    if (currentUser) {
-      setName(currentUser.name);
-      setAvatar(currentUser.avatar);
-      setEmail(currentUser.email);
-      setPhone(currentUser.phone);
+    if (currentOrg) {
+      setName(currentOrg.name);
+      setEmail(currentOrg.email);
+      setPhone(currentOrg.phone);
     }
-  }, [currentUser]);
+  }, [currentOrg]);
 
   const handleSave = () => {
-    if (currentUser && currentUser.id) {
-      updateCaregiver({
-        id: currentUser.id,
-        caregiver: {
-          ...currentUser,
+    if (currentOrg && currentOrg.id) {
+      updateOrg({
+        orgId: currentOrg.id,
+        org: {
+          ...currentOrg,
           name,
-          avatar,
           email,
           phone,
         },
       });
     }
   };
-  
+
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Caregiver Information</Text>
-      <AvatarPicker initialAvatar={avatar} onAvatarChanged={setAvatar} />
+      <Text style={styles.title}>Org Information</Text>
       <TextInput
         style={styles.input}
         placeholder="Name"

@@ -1,4 +1,5 @@
 export * from "./AutoImage"
+export * from "./AvatarPicker"
 export * from "./Button"
 export * from "./Card"
 export * from "./Header"

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
+import { AutoImage, Card } from 'app/components';
 import { useSelector, useDispatch } from 'react-redux';
 import { getCurrentUser } from '../store/authSlice';
 import { setPatient, getPatients, clearPatient } from '../store/patientSlice';
@@ -38,9 +39,17 @@ export function HomeScreen() {
             data={patients}
             keyExtractor={(item : Patient, index) => item.id || String(index)}
             renderItem={({ item }) => (
-              <Pressable style={styles.userButton} onPress={() => handlePatientPress(item)}>
-                <Text style={styles.userButtonText}>{item.name}</Text>
-              </Pressable>
+              <Card
+                LeftComponent={<AutoImage source={{ uri: item.avatar }} style={{width: 50, height: 50}} />}
+                RightComponent={
+                  <Pressable style={styles.userButton} onPress={() => handlePatientPress(item)}>
+                    <Text style={styles.userButtonText}>Edit</Text>
+                  </Pressable>
+                }
+                content={item.name}
+              >
+
+              </Card>
             )}
           />
         )}

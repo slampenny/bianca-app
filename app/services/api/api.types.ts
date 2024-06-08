@@ -28,11 +28,11 @@ export interface CaregiverPages {
 export interface Caregiver {
   id?: string;
   name: string;
+  avatar: string;
   email: string;
   phone: string;
-  role: 'invited' | 'staff' |'orgAdmin'; 
-  org: string | null;
-  patients: Patient[]; // Assuming this is the ID of the caregiver  
+  org: Org | string | null;
+  patients: Patient[] | string[]; // Assuming this is the ID of the caregiver  
 }
 
 export interface AlertPages {
@@ -69,6 +69,7 @@ export interface OrgPages {
 export interface Org {
   id?: string;
   name: string;
+  avatar: string;
   email: string;
   phone: string;
   isEmailVerified: boolean;
@@ -87,6 +88,7 @@ export interface PatientPages {
 export interface Patient {
   id?: string;
   name: string;
+  avatar: string;
   email: string;
   phone: string;
   org: string | null;

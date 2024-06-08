@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
 import { Org, Caregiver } from '../services/api/api.types';
+import { authApi } from 'app/services/api';
 
 interface OrgState {
   org: Org | null;
@@ -23,16 +24,16 @@ export const orgSlice = createSlice({
       state.org = null;
     },
   },
-  // extraReducers: (builder) => {
-  //   builder.addMatcher(orgApi.endpoints.removeCaregiver.matchFulfilled, (state, { payload }) => {
-  //     state.caregivers = state.caregivers.filter(caregiver => caregiver.id !== payload);
-  //   });
-  // }
+  extraReducers: (builder) => {
+    builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
+      state.org = payload.caregiver.org as Org;
+    });
+  }
 });
 
 export const { setOrg, clearOrg } = orgSlice.actions;
 
-export const selectOrg = (state: RootState) => state.org.org;
-export const selectSelectedCaregivers = (state: RootState) => state.org.caregivers;
+export const getOrg = (state: RootState) => state.org.org;
+export const getSelectedCaregivers = (state: RootState) => state.org.caregivers;
 
 export default orgSlice.reducer;

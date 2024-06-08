@@ -24,7 +24,8 @@ export type DrawerParamList = {
 export type LoginStackParamList = {
     Login: undefined;
     Register: undefined;
-    ForgotPassword: undefined;
+    RequestReset: undefined;
+    ConfirmReset: undefined;
   };
 
   export type PatientStackParamList = {

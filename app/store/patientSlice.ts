@@ -32,9 +32,7 @@ export const patientSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      state.patients = payload.caregiver.patients;
-
-      console.log('state.patients', JSON.stringify(state.patients));
+      state.patients = payload.caregiver.patients as Patient[];
     });
     builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state, { payload }) => {
       state.patient = payload;

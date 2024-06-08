@@ -1,7 +1,7 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { MainTabs } from './MainTabs';
-import { LogoutScreen, PaymentInfoScreen, RegisterScreen, ForgotPasswordScreen } from 'app/screens';
+import { LogoutScreen, PaymentInfoScreen } from 'app/screens';
 import { useSelector } from 'react-redux';
 import { DrawerParamList } from './navigationTypes';
 import { isAuthenticated } from 'app/store/authSlice';

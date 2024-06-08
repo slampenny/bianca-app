@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { Alert } from '../services/api/api.types';
 import { useMarkAllAsReadMutation, useMarkAlertAsReadMutation, useGetAllAlertsQuery } from '../services/api';
 import { LoadingScreen } from './LoadingScreen';
-import { Button, ListItem, ListView, Text } from '../components';
+import { Button, EmptyState, ListItem, ListView, Text } from '../components';
 import { getAlerts } from 'app/store/alertSlice';
 
 export function AlertScreen() {
@@ -47,7 +47,10 @@ export function AlertScreen() {
       {isFetching ? (
         <LoadingScreen />
       ) : alerts.length === 0 ? (
-        <Text style={{ textAlign: 'center', fontSize: 24, margin: 20}}>No alerts</Text>
+        <EmptyState
+          style={{ padding: 10 }}
+          content="No alerts"
+        />  
       ) : (
         <>
           <ListView

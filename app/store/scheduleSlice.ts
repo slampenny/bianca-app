@@ -9,7 +9,6 @@ interface ScheduleState {
 }
 
 const defaultSchedule: Schedule = {
-  patient: null,
   frequency: 'weekly',
   intervals: [],
   time: '',

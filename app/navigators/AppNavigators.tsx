@@ -1,5 +1,5 @@
 import { createStackNavigator } from '@react-navigation/stack';
-import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from "app/screens";
+import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen } from "app/screens";
 import MainTabsWithDrawer from './MainTabsWithDrawer';
 import { AppStackParamList, LoginStackParamList } from './navigationTypes';
 
@@ -16,6 +16,7 @@ export const UnauthStack = () => (
   <LoginStack.Navigator screenOptions={{ headerShown: false }}>
     <LoginStack.Screen name="Login" component={LoginScreen} />
     <LoginStack.Screen name="Register" component={RegisterScreen} />
-    <LoginStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <LoginStack.Screen name="RequestReset" component={RequestResetScreen} />
+    <LoginStack.Screen name="ConfirmReset" component={ConfirmResetScreen} />
   </LoginStack.Navigator>
 );

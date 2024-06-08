@@ -54,7 +54,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
 
   const handleForgotPasswordPress = () => {
     // Navigate to the Forgot Password screen
-    navigation.navigate('ForgotPassword');
+    navigation.navigate('RequestReset');
   };
 
   // When you want to focus the password input after submitting the email
