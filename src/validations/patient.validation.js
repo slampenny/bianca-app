@@ -6,6 +6,7 @@ const createPatient = {
   body: Joi.object().keys({
     org: Joi.string().custom(objectId).optional(),
     email: Joi.string().required().email(),
+    avatar: Joi.string().optional(),
     name: Joi.string().required(),
     phone: Joi.string().required().custom((value, helpers) => {
       if (!validator.isMobilePhone(value)) {
@@ -54,6 +55,7 @@ const updatePatient = {
     .keys({
       id: Joi.string().custom(objectId).optional(),
       org: Joi.string().custom(objectId).optional(),
+      avatar: Joi.string().optional(),
       email: Joi.string().email().optional(),
       name: Joi.string().optional(),
       phone: Joi.string().optional().custom((value, helpers) => {

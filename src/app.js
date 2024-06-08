@@ -49,7 +49,7 @@ app.options('*', cors());
 app.use(passport.initialize());
 passport.use('jwt', jwtStrategy);
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // limit repeated failed requests to auth endpoints
 if (config.env === 'production') {

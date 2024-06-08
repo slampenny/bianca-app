@@ -102,6 +102,9 @@ const configVars = {
     gender: 'FEMALE',
     encoding: 'MP3',
   },
+  multer: {
+    dest: path.join(__dirname, '../../uploads'),
+  },
   twilio: {
     phone: envVars.TWILIO_PHONENUMBER,
     apiUrl: 'https://be0e-70-68-70-88.ngrok-free.app',

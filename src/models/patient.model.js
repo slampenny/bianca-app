@@ -11,6 +11,11 @@ const patientSchema = mongoose.Schema(
       required: true,
       trim: true,
     },
+    avatar: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     email: {
       type: String,
       required: true,

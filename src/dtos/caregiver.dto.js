@@ -3,7 +3,7 @@ const OrgDTO = require("./org.dto");
 
 const CaregiverDTO = (caregiver) => {
     const {
-      _id, name, avatar, email, phone, role, isEmailVerified, createdAt, updatedAt, org, patients
+      _id, name, avatar, email, phone, isEmailVerified, org, patients
     } = caregiver;
   
     const id = _id;
@@ -22,7 +22,6 @@ const CaregiverDTO = (caregiver) => {
       avatar,
       email,
       phone,
-      role,
       isEmailVerified,
       org: orgDetails,
       patients: patientDetails

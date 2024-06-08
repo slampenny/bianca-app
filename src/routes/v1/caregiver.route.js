@@ -1,6 +1,9 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
+const config = require('../../config/config');
+const multer = require('multer');
+const upload = multer({ dest: config.multer.dest });
 const caregiverValidation = require('../../validations/caregiver.validation');
 const caregiverController = require('../../controllers/caregiver.controller');
 
@@ -13,7 +16,7 @@ router
 router
   .route('/:caregiverId')
   .get(auth('readOwn:caregiver', 'readAny:caregiver'), validate(caregiverValidation.getCaregiver), caregiverController.getCaregiver)
-  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.updateCaregiver), caregiverController.updateCaregiver)
+  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), upload.single('avatar'), validate(caregiverValidation.updateCaregiver), caregiverController.updateCaregiver)
   .delete(auth('deleteOwn:caregiver', 'deleteAny:caregiver'), validate(caregiverValidation.deleteCaregiver), caregiverController.deleteCaregiver);
 
 router

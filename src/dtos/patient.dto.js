@@ -2,7 +2,7 @@
 const ScheduleDTO = require('./schedule.dto');
 
 const PatientDTO = (patient) => {
-  const { _id, name, email, phone, isEmailVerified, org, caregivers, schedules } = patient;
+  const { _id, name, avatar, email, phone, isEmailVerified, org, caregivers, schedules } = patient;
 
   const id = _id;
   const orgId = org ? (typeof org === 'object' ? org._id : org) : null;
@@ -14,6 +14,7 @@ const PatientDTO = (patient) => {
   return {
     id,
     name,
+    avatar,
     email,
     phone,
     isEmailVerified,

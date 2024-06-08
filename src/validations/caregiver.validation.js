@@ -5,6 +5,7 @@ const createCaregiver = {
   body: Joi.object().keys({
     orgId: Joi.required().custom(objectId),
     email: Joi.string().required().email(),
+    avatar: Joi.string().optional(),
     name: Joi.string().required(),
     phone: Joi.string().required(),
     password: Joi.string().required().custom(password),
@@ -34,9 +35,13 @@ const updateCaregiver = {
   }),
   body: Joi.object()
     .keys({
+      id: Joi.required().custom(objectId),
+      org: Joi.required().custom(objectId),
       email: Joi.string().email(),
+      avatar: Joi.string().optional(),
       name: Joi.string(),
       phone: Joi.string(),
+      isEmailVerified: Joi.boolean(),
       password: Joi.string().required().custom(password).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)),
     })
