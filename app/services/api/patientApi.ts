@@ -16,12 +16,23 @@ export const patientApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    createPatient: builder.mutation<Patient, Partial<Patient>>({
-      query: (patient) => ({
-        url: `/patients`,
-        method: 'POST',
-        body: patient,
-      }),
+    createPatient: builder.mutation<Patient, { patient: Partial<Patient>, avatar?: File }>({
+      query: ({patient, avatar}) => {
+        const formData = new FormData();
+        Object.keys(patient).forEach(key => {
+          formData.append(key, (patient as { [key: string]: any })[key]);
+        });
+
+        if (avatar) {
+          formData.append('avatar', avatar);
+        }
+
+        return {
+          url: `/patients`,
+          method: 'POST',
+          body: formData,
+        };
+      }
     }),
     getAllPatients: builder.query<PatientPages, { name?: string, role?: string, sortBy?: string, limit?: number, page?: number }>({
       query: (params) => ({
@@ -33,12 +44,23 @@ export const patientApi = createApi({
     getPatient: builder.query<Patient, { id: string }>({
       query: ({ id }) => `/patients/${id}`,
     }),
-    updatePatient: builder.mutation<Patient, { id: string, patient: Partial<Patient> }>({
-      query: ({ id, patient }) => ({
-        url: `/patients/${id}`,
-        method: 'PATCH',
-        body: patient,
-      }),
+    updatePatient: builder.mutation<Patient, { id: string, patient: Partial<Patient>, avatar?: File }>({
+      query: ({ id, patient, avatar }) => {
+        const formData = new FormData();
+        Object.keys(patient).forEach(key => {
+          formData.append(key, (patient as { [key: string]: any })[key]);
+        });
+
+        if (avatar) {
+          formData.append('avatar', avatar);
+        }
+
+        return {
+          url: `/patients/${id}`,
+          method: 'PATCH',
+          body: formData,
+        };
+      }
     }),
     deletePatient: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({

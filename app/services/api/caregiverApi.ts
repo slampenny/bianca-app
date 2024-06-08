@@ -52,7 +52,7 @@ export const caregiverApi = createApi({
         return {
           url: `/caregivers/${id}`,
           method: 'PATCH',
-          body: caregiver,
+          body: formData,
         };
       },
     }),

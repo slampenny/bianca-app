@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
 } from "react-native"
+import AvatarPicker from "../components/AvatarPicker"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { PatientStackParamList } from "app/navigators/navigationTypes"
 import { getPatient } from "../store/patientSlice"
@@ -25,6 +26,7 @@ export function PatientScreen() {
   const [createPatient, { isLoading: isCreating, error: createError }] = useCreatePatientMutation()
   const [deletePatient, { isLoading: isDeleting, error: deleteError }] = useDeletePatientMutation()
   const [name, setName] = useState("")
+  const [avatar, setAvatar] = useState('');
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [emailError, setEmailError] = useState("")
@@ -34,6 +36,7 @@ export function PatientScreen() {
   useEffect(() => {
     if (patient) {
       setName(patient.name)
+      setAvatar(patient.avatar)
       setEmail(patient.email)
       setPhone(patient.phone)
     }
@@ -84,6 +87,7 @@ export function PatientScreen() {
         patient: {
           ...patient,
           name,
+          avatar,
           email,
           phone,
         },
@@ -92,9 +96,12 @@ export function PatientScreen() {
         .then(() => navigation.navigate("HomeScreen"))
     } else {
       createPatient({
-        name,
-        email,
-        phone,
+        patient: {
+          name,
+          avatar,
+          email,
+          phone,
+        },
       })
         .unwrap()
         .then(() => navigation.navigate("HomeScreen"))
@@ -119,6 +126,12 @@ export function PatientScreen() {
             Error: {(updateError.data as { message: string }).message}
           </Text>
         )}
+        {deleteError && "data" in deleteError && (
+          <Text style={styles.error}>
+            Error: {(deleteError.data as { message: string }).message}
+          </Text>
+        )}
+        <AvatarPicker initialAvatar={avatar} onAvatarChanged={setAvatar} />
         <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
         <TextInput
           style={styles.input}
