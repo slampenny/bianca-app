@@ -13,10 +13,16 @@ const {
   PatientDTO
 } = require('../dtos');
 
-const logger = require('../config/logger');
-
 const createPatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
+  const file = req.file; // This is the uploaded file
+
+  // Check if a file was uploaded
+  if (file) {
+    // You can now save the file's path to the caregiver's avatar field
+    patientData.avatar = file.path;
+  }
+
   let patient = await patientService.createPatient(patientData);
   
   if (schedules) {
@@ -45,6 +51,14 @@ const getPatient = catchAsync(async (req, res) => {
 
 const updatePatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
+
+  const file = req.file; // This is the uploaded file
+
+  // Check if a file was uploaded
+  if (file) {
+    // You can now save the file's path to the caregiver's avatar field
+    patientData.avatar = file.path;
+  }
   
   const patient = await patientService.updatePatientById(req.params.patientId, patientData);
   if (schedules) {

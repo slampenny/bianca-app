@@ -1,6 +1,9 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
+const config = require('../../config/config');
+const multer = require('multer');
+const upload = multer({ dest: config.multer.dest });
 const patientValidation = require('../../validations/patient.validation');
 const patientController = require('../../controllers/patient.controller');
 
@@ -8,13 +11,13 @@ const router = express.Router();
 
 router
   .route('/')
-  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.createPatient), patientController.createPatient)
+  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.createPatient), upload.single('avatar'), patientController.createPatient)
   .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatients), patientController.getPatients);
 
 router
   .route('/:patientId')
   .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
-  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), patientController.updatePatient)
+  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), upload.single('avatar'), patientController.updatePatient)
   .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(patientValidation.deletePatient), patientController.deletePatient);
 
 router
