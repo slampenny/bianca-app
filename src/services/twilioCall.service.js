@@ -5,12 +5,14 @@ const { Conversation, Message, Patient } = require('../models');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const httpStatus = require('http-status');
+const { alertService, patientService } = require('.');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const initiateCall = async (patientId) => {
   
+  logger.info(`Initiating call for patient with ID: ${patientId}`);
   const patient = await Patient.findById(patientId);
   if (!patient || !patient.phone) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient or phone number not found');
@@ -57,19 +59,43 @@ const prepareCall = (req) => {
 
 const handleRealTimeInteraction = async (callSid, speechResult, callStatus) => {
     logger.info(`In Handle Real Time Interaction function with callSid: ${callSid}, speechResult: ${speechResult}, and callStatus: ${callStatus}`);
+    
+    logger.info(`Retrieving the conversation with these params: ${callSid}`);
+    const conversation = await Conversation.findOne({ callSid }).populate('patientId');
+    if (!conversation) {
+      logger.error(`No conversation found with callSid: ${callSid}`);
+      throw new Error(`No conversation found with callSid: ${callSid}`);
+    }
+
     if (!speechResult) {
       // A timeout occurred
       logger.info('A timeout occurred');
       const twiml = new VoiceResponse();
       twiml.say(`I didn't hear anything. I'll phone back later`);
-      return twiml.toString();
-    }
 
-    logger.info(`Save the patient's speech to the conversation with these params: ${callSid} and ${speechResult}`);
-    const conversation = await Conversation.findOne({ callSid }).populate('patientId');
-    if (!conversation) {
-      logger.error(`No conversation found with callSid: ${callSid}`);
-      throw new Error(`No conversation found with callSid: ${callSid}`);
+      const patient = await patientService.getPatientById(conversation.patientId);
+      const call = await twilioClient.calls(callSid).fetch();
+      if (call.status === 'completed') {
+        await alertService.createAlert({
+          message: `The call with patient ${patient.name} timed out`,
+          importance: 'low',
+          createdBy: patient.id,
+          createdModel: 'Patient',
+          visibility: 'assignedCaregivers',
+          relevanceUntil: moment().add(1, 'week').toISOString(),
+        });
+      } else if (call.status === 'no-answer') {
+        await alertService.createAlert({
+          message: `Patient ${patient.name} didn't answer the call`,
+          importance: 'medium',
+          createdBy: patient.id,
+          createdModel: 'Patient',
+          visibility: 'assignedCaregivers',
+          relevanceUntil: moment().add(2, 'week').toISOString(),
+        });
+      }
+
+      return twiml.toString();
     }
 
     const patientMessage = new Message({ role: 'patient', content: speechResult });
@@ -101,12 +127,6 @@ const handleRealTimeInteraction = async (callSid, speechResult, callStatus) => {
       twiml.redirect(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
         
       return twiml.toString();
-      // logger.info(`Prepare the call for the next patient speech`);
-      // const twiml = new VoiceResponse();
-      // twiml.say(chatGptResponse);
-      // twiml.redirect(`${config.twilio.apiUrl}/v1/twilio/prepare-call`);
-      
-      // return twiml.toString();
     } catch (err) { 
       logger.error(`Error with ChatGPT: ${err}, so we hang up the call`);
     }

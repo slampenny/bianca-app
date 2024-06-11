@@ -20,7 +20,7 @@ class ChatService {
      * @returns {Promise<String>} - The response from ChatGPT
      */
     async chatWith(conversation) {
-        console.log(`Backend - Preparing to Send Message`);
+        logger.info(`Backend - Preparing to Send Message`);
         try {
             let messages = conversation.messages,
                 openaiResponse
@@ -94,7 +94,7 @@ class ChatService {
                         expires: Date.now() + 1000 * 60 * 60, // 1 hour
                     });
 
-                    console.log('Generated signed URL successfully');
+                    logger.info('Generated signed URL successfully');
 
                     resolve(url);
                 });

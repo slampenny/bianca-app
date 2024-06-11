@@ -20,7 +20,7 @@ const alertSchema = new mongoose.Schema(
     createdModel: {
       type: String,
       required: true,
-      enum: ['Patient', 'Caregiver', 'Org'],
+      enum: ['Patient', 'Caregiver', 'Org', 'Schedule'],
     },
     visibility: {
       type: String,

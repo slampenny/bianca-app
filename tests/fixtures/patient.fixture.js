@@ -25,6 +25,7 @@ const insertPatientsAndAddToCaregiver = async (caregiver, patients) => {
   const patientsWithCaregiver = patients.map(patient => ({
     ...patient,
     caregiver: caregiver.id,
+    org: caregiver.org,
   }));
 
   const dbPatients = await Patient.insertMany(patientsWithCaregiver);
