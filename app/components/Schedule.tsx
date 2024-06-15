@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { View, Text, StyleSheet, Switch } from "react-native"
 import { Picker } from "@react-native-picker/picker"
+import { Toggle } from "."
 import { Schedule } from "../services/api/api.types"
 
 interface ScheduleScreenProps {
@@ -111,13 +112,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
                 return (
                   <View key={day} style={styles.checkboxContainer}>
                     <Text style={styles.checkboxLabel}>{day}</Text>
-                    <Switch
-                      trackColor={{ false: "#767577", true: "#81b0ff" }}
-                      thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}
-                      ios_backgroundColor="#3e3e3e"
-                      value={selectedDays.includes(index)}
-                      onValueChange={(isChecked) => handleDayChange(index, isChecked)}
-                    />
+                    <Toggle value={selectedDays.includes(index)} onValueChange={(isChecked) => handleDayChange(index, isChecked)} variant="checkbox" />
                   </View>
                 )
               },

@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect, FC } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, FC } from "react";
 import { TextInput, View, StyleSheet, Pressable, Text } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useLoginMutation, useLogoutMutation } from "../services/api/authApi";
 import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail, getAuthTokens } from "../store/authSlice";
 import { LoginStackParamList } from "app/navigators/navigationTypes";
+import { Button, Header, Screen, TextField } from "app/components";
 
 type LoginScreenNavigationProp = StackNavigationProp<LoginStackParamList, 'Login'>;
 
@@ -24,6 +25,14 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
 
   const [authPassword, setAuthPassword] = useState("password1");
   const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      header: () => <Header titleTx='loginScreen.signIn' />,
+    })
+  }, [])
 
   useEffect(() => {
     dispatch(setAuthEmail("negascout@gmail.com"));
@@ -44,6 +53,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       dispatch(setAuthTokens(result.tokens));
     } catch (error) {
       console.error(error);
+      setErrorMessage("Failed to log in. Please check your email and password.");
     }
   };
 
@@ -65,26 +75,24 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign In</Text>
+    <Screen style={styles.container}>
+      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
+        <TextField
           value={authEmail}
           onChangeText={(value) => dispatch(setAuthEmail(value))}
-          placeholder="Email"
+          placeholderTx="loginScreen.emailFieldLabel"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="next"
           onSubmitEditing={focusPasswordInput}
         />
-        <TextInput
+        <TextField
           ref={authPasswordInput}
-          style={styles.input}
           value={authPassword}
           onChangeText={setAuthPassword}
-          placeholder="Password"
+          placeholderTx="loginScreen.passwordFieldLabel"
           secureTextEntry={isAuthPasswordHidden}
           autoCapitalize="none"
           autoCorrect={false}
@@ -92,16 +100,18 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           onSubmitEditing={handleLoginPress}
         />
       </View>
-      <Pressable style={styles.button} onPress={handleLoginPress}>
-        <Text style={styles.buttonText}>LOGIN</Text>
-      </Pressable>
-      <Pressable style={styles.button} onPress={handleRegisterPress}>
-        <Text style={styles.buttonText}>REGISTER</Text>
-      </Pressable>
+      <Button
+        tx="loginScreen.signIn"
+        onPress={handleLoginPress}
+      />
+      <Button
+        tx="loginScreen.register"
+        onPress={handleRegisterPress}
+      />
       <Pressable style={styles.linkButton} onPress={handleForgotPasswordPress}>
         <Text style={styles.linkButtonText}>Forgot Password?</Text>
       </Pressable>
-    </View>
+    </Screen>
   );
 };
 
@@ -152,5 +162,9 @@ const styles = StyleSheet.create({
     color: '#3498db',
     textAlign: 'center',
     fontSize: 16,
+  },
+  error: {
+    color: 'red',
+    marginBottom: 20,
   },
 });
