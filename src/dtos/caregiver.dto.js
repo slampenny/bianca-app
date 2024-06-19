@@ -1,3 +1,4 @@
+const { ObjectId } = require('mongodb');
 const PatientDTO = require("./patient.dto");
 const OrgDTO = require("./org.dto");
 
@@ -8,12 +9,12 @@ const CaregiverDTO = (caregiver) => {
   
     const id = _id;
     
-    // Transform the org using OrgDTO, ensuring it handles both populated and ID-only cases
-    const orgDetails = OrgDTO(org);
-  
-    // Transform patients using PatientDTO if they are populated or just return their IDs
-    const patientDetails = patients.map(patient => 
-      typeof patient === 'object' ? PatientDTO(patient) : { id: patient }
+    // Check if org is an ObjectId, if so, convert it to string
+    const orgId = org instanceof ObjectId ? org.toString() : OrgDTO(org);
+
+    // Check if patients are ObjectIds, if so, convert them to strings
+    const patientIds = patients.map(patient => 
+      patient instanceof ObjectId ? patient.toString() : PatientDTO(patient)
     );
   
     return {
@@ -23,8 +24,8 @@ const CaregiverDTO = (caregiver) => {
       email,
       phone,
       isEmailVerified,
-      org: orgDetails,
-      patients: patientDetails
+      org: orgId,
+      patients: patientIds
     };
   }
   

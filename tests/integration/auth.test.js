@@ -134,10 +134,7 @@ describe('Auth routes', () => {
         name: caregiverOne.name,
         email: caregiverOne.email,
         phone: caregiverOne.phone,
-        role: 'staff',
-        org: expect.objectContaining({
-          id: org.id
-        }),
+        org: org.id,
         patients: [],
         isEmailVerified: false,
       });

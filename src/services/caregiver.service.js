@@ -66,8 +66,8 @@ const getCaregiverByEmail = async (email) => {
   return await Caregiver.findOne({ email });
 };
 
-const getPopulatedCaregiverByEmail = async (email) => {
-  return await Caregiver.findOne({ email })
+const getLoginCaregiverData = async (email) => {
+  const caregiver = await Caregiver.findOne({ email })
     .populate({
       path: 'patients',
       populate: {
@@ -75,6 +75,15 @@ const getPopulatedCaregiverByEmail = async (email) => {
         model: 'Schedule'
       }
     });
+  
+  if (!caregiver) {
+    return null;
+  }
+
+  return { 
+    caregiver,
+    patients: caregiver.patients,
+  }
 };
 
 /**
@@ -153,7 +162,7 @@ const addPatient = async (caregiverId, patientId) => {
 
   // Add caregiver to patient's caregivers array
   patient.caregivers.push(caregiverId);
-  patient.org = caregiver.org.id;
+  patient.org = caregiver.org;
   await patient.save();
 
   return patient;
@@ -227,7 +236,7 @@ module.exports = {
   queryCaregivers,
   getCaregiverById,
   getCaregiverByEmail,
-  getPopulatedCaregiverByEmail,
+  getLoginCaregiverData,
   updateCaregiverById,
   deleteCaregiverById,
   addPatient,

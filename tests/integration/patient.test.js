@@ -81,6 +81,7 @@ describe('Patient routes', () => {
         name: patient.name,
         email: patient.email,
         phone: patient.phone,
+        org: patient.org.toString(),
         isEmailVerified: patient.isEmailVerified,
         caregivers: expect.arrayContaining([]),
         schedules: expect.arrayContaining([]),
@@ -110,6 +111,7 @@ describe('Patient routes', () => {
         name: updateBody.name,
         email: updateBody.email.toLowerCase(),
         phone: patient.phone,
+        org: patient.org.toString(),
         isEmailVerified: patient.isEmailVerified,
         caregivers: expect.arrayContaining([]),
         schedules: expect.arrayContaining([]),
@@ -145,7 +147,7 @@ describe('Patient routes', () => {
 
       expect(res.body).toEqual({
         id: patient.id,
-        org: null,
+        org: patient.org.toString(),
         name: patient.name,
         email: patient.email,
         phone: patient.phone,
@@ -170,7 +172,7 @@ describe('Patient routes', () => {
 
       expect(res.body).toEqual({
         id: patient.id,
-        org: null,
+        org: patient.org.toString(),
         name: patient.name,
         email: patient.email,
         phone: patient.phone,

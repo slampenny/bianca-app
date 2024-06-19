@@ -11,11 +11,11 @@ const { tokenTypes } = require('../config/tokens');
  * @returns {Promise<Caregiver>}
  */
 const loginCaregiverWithEmailAndPassword = async (email, password) => {
-  const caregiver = await caregiverService.getPopulatedCaregiverByEmail(email);
-  if (!caregiver || !(await caregiver.isPasswordMatch(password))) {
+  const login = await caregiverService.getLoginCaregiverData(email);
+  if (!login || !(await login.caregiver.isPasswordMatch(password))) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
   }
-  return caregiver;
+  return login;
 };
 
 /**

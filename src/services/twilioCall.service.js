@@ -5,7 +5,7 @@ const { Conversation, Message, Patient } = require('../models');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const httpStatus = require('http-status');
-const { alertService, patientService } = require('.');
+const { alertService } = require('.');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -73,7 +73,7 @@ const handleRealTimeInteraction = async (callSid, speechResult, callStatus) => {
       const twiml = new VoiceResponse();
       twiml.say(`I didn't hear anything. I'll phone back later`);
 
-      const patient = await patientService.getPatientById(conversation.patientId);
+      const patient = await Patient.findById(conversation.patientId);
       const call = await twilioClient.calls(callSid).fetch();
       if (call.status === 'completed') {
         await alertService.createAlert({

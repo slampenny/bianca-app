@@ -64,7 +64,7 @@ const updatePatient = {
         }
         return value;
       }),
-      isEmailVerified: Joi.boolean().required(),
+      isEmailVerified: Joi.boolean().optional(),
       caregivers: Joi.array().optional(),
       schedules: Joi.array().items(
         Joi.object().keys({

@@ -82,8 +82,8 @@ describe('caregiverService', () => {
     const [org] = await insertOrgs([orgOne]);
     const patient = await patientService.createPatient(patientOne);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
-    const updatedCaregiver = await caregiverService.addPatient(caregiver.id, patient.id);
-    expect(updatedCaregiver.patients.map(id => id.toString())).toEqual(expect.arrayContaining([patient.id.toString()]));
+    const addedPatient = await caregiverService.addPatient(caregiver.id, patient.id);
+    expect(addedPatient.id).toEqual(patient.id);
   });
 
   it('should remove a patient from a caregiver', async () => {

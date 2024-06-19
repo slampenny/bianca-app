@@ -22,7 +22,7 @@ describe('Schedule model', () => {
     let newSchedule;
     beforeEach(() => {
       newSchedule = {
-        patientId: new mongoose.Types.ObjectId(),
+        patient: new mongoose.Types.ObjectId(),
         frequency: 'daily',
         intervals: [],
         isActive: true,

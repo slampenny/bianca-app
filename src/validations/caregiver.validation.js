@@ -35,13 +35,13 @@ const updateCaregiver = {
   }),
   body: Joi.object()
     .keys({
-      id: Joi.required().custom(objectId),
-      org: Joi.required().custom(objectId),
-      email: Joi.string().email(),
+      id: Joi.required().custom(objectId).optional(),
+      org: Joi.required().custom(objectId).optional(),
+      email: Joi.string().email().optional(),
       avatar: Joi.string().optional(),
-      name: Joi.string(),
-      phone: Joi.string(),
-      isEmailVerified: Joi.boolean(),
+      name: Joi.string().optional(),
+      phone: Joi.string().optional(),
+      isEmailVerified: Joi.boolean().optional(),
       password: Joi.string().required().custom(password).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)),
     })

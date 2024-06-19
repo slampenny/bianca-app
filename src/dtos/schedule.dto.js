@@ -17,6 +17,7 @@ const ScheduleDTO = (schedule) => {
     frequency,
     intervals: intervalData,
     isActive,
+    nextCallDate,
     time,
   };
 };

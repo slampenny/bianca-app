@@ -34,12 +34,14 @@ const registerWithInvite = catchAsync(async (req, res) => {
 
 const login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
-  const caregiver = await authService.loginCaregiverWithEmailAndPassword(email, password);
+  const { caregiver, patients } = await authService.loginCaregiverWithEmailAndPassword(email, password);
+  
   const alerts = await alertService.getAlerts(caregiver.id);
   const alertDTOs = alerts.map((alert) => AlertDTO(alert));
+  const patientDTOs = patients.map((patient) => PatientDTO(patient));
   const caregiverDTO = CaregiverDTO(caregiver);
   const tokens = await tokenService.generateAuthTokens(caregiver);
-  res.send({ caregiver: caregiverDTO, alerts: alertDTOs, tokens });
+  res.send({ caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
 });
 
 const logout = catchAsync(async (req, res) => {
