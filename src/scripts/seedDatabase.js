@@ -4,8 +4,8 @@ const { Org, Caregiver, Patient } = require('../models');
 const config = require('../config/config');
 
 const { orgOne, orgTwo, insertOrgs } = require('../../tests/fixtures/org.fixture');
-const { caregiverOne, caregiverTwo, insertCaregivers } = require('../../tests/fixtures/caregiver.fixture');
-const { patientOne, patientTwo, insertPatients } = require('../../tests/fixtures/patient.fixture');
+const { caregiverOne, caregiverTwo, insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.fixture');
+const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = require('../../tests/fixtures/patient.fixture');
 
 async function seedDatabase() {
     // Connect to the database
@@ -15,10 +15,13 @@ async function seedDatabase() {
     await Org.deleteMany({});
     await Caregiver.deleteMany({});
     await Patient.deleteMany({});
-    await insertOrgs([orgOne, orgTwo]);
-    await insertCaregivers([caregiverOne, caregiverTwo]);
+    const [org1, org2] = await insertOrgs([orgOne, orgTwo]);
+    caregiverOne.org = org1._id;
+    caregiverTwo.org = org2._id;
     
-    await insertPatients([patientOne, patientTwo]);
+    const [caregiver1] = await insertCaregiversAndAddToOrg(org1, [caregiverOne, caregiverTwo]);
+    
+    await insertPatientsAndAddToCaregiver(caregiver1, [patientOne, patientTwo]);
 
     console.log('Database seeded!');
 }
