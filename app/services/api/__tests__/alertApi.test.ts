@@ -88,7 +88,7 @@ describe('alertApi', () => {
     } else {
       expect(result.data).toMatchObject({
         id: alertId,
-        readBy: expect.arrayContaining([expect.any(String)]),
+        readBy: expect.arrayContaining([expect.any(Object)]),
       });
     }
   });

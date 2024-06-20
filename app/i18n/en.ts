@@ -1,3 +1,4 @@
+
 const en = {
   common: {
     ok: "OK!",
@@ -39,6 +40,7 @@ const en = {
     passwordFieldLabel: "Password",
     emailFieldPlaceholder: "Enter your email address",
     passwordFieldPlaceholder: "Super secret password here",
+    forgotPassword: "Forgot Password?",
     hint: "Hint: you can use any email address and your favorite password :)",
   },
   registerScreen: {
@@ -47,6 +49,7 @@ const en = {
     emailFieldLabel: "Email",
     phoneFieldLabel: "Phone",
     passwordFieldLabel: "Password",
+    goBack : "Go Back",
     confirmPasswordFieldLabel: "Confirm Password",
     organizationNameFieldLabel: "Orginization Name",
     nameFieldPlaceholder: "Enter your name",
@@ -57,7 +60,13 @@ const en = {
     organizationNameFieldPlaceholder: "Enter your Orginization's Name",
     organizationButton: "Organization",
     individualButton: "Individual"
-  }
+  },
+  requestResetScreen: {
+    title: "Request Password Reset",
+    emailFieldLabel: "Email",
+    emailFieldPlaceholder: "Enter your email address",
+    requestReset: "Request Reset",
+  },
 }
 
 export default en

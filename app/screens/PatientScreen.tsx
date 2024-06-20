@@ -10,20 +10,19 @@ import {
 } from "react-native"
 import AvatarPicker from "../components/AvatarPicker"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
-import { PatientStackParamList } from "app/navigators/navigationTypes"
+import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { getPatient } from "../store/patientSlice"
 import {
   useCreatePatientMutation,
   useUpdatePatientMutation,
   useDeletePatientMutation,
-  useUploadPatientAvatarMutation,
 } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen" // import the LoadingScreen component
 
 export function PatientScreen() {
-  const navigation = useNavigation<NavigationProp<PatientStackParamList>>()
+  const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
   const patient = useSelector(getPatient)
-  const [uploadAvatar] = patient ? useUploadPatientAvatarMutation() : [() => {}];
+  //const [uploadAvatar] = patient ? useUploadPatientAvatarMutation() : [() => {}];
   const [updatePatient, { isLoading: isUpdating, error: updateError }] = useUpdatePatientMutation()
   const [createPatient, { isLoading: isCreating, error: createError }] = useCreatePatientMutation()
   const [deletePatient, { isLoading: isDeleting, error: deleteError }] = useDeletePatientMutation()
@@ -48,7 +47,7 @@ export function PatientScreen() {
     if (confirmDelete && patient && patient.id) {
       deletePatient({ id: patient.id })
         .unwrap()
-        .then(() => navigation.navigate("HomeScreen"))
+        .then(() => navigation.navigate("Home"))
     } else {
       setConfirmDelete(true)
     }
@@ -79,7 +78,7 @@ export function PatientScreen() {
   }
 
   const handleManageSchedules = () => {
-    navigation.navigate('ScheduleScreen');
+    navigation.navigate('Schedule');
   };
 
   const handleSave = async () => {
@@ -95,7 +94,7 @@ export function PatientScreen() {
         }
       })
         .unwrap()
-        .then(() => navigation.navigate("HomeScreen"))
+        .then(() => navigation.navigate("Home"))
       // if (avatar !== patient.avatar) {
       //   console.log('avatar', avatar);
       //   await uploadAvatar({
@@ -122,7 +121,7 @@ export function PatientScreen() {
           //   })
           //   newPatient.avatar = avatar;
           // }
-          navigation.navigate("HomeScreen")
+          navigation.navigate("Home")
         })
     }
   }

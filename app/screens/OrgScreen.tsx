@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { getOrg } from '../store/orgSlice';
 import { useUpdateOrgMutation } from '../services/api/orgApi';
 import { LoadingScreen } from './LoadingScreen';
@@ -9,8 +10,9 @@ import { Caregiver } from 'app/services/api';
 import { setCaregiver, getCaregivers } from 'app/store/caregiverSlice';
 
 export function OrgScreen() {
+  const navigation = useNavigation();
   const currentOrg = useSelector(getOrg);
-  const [updateOrg] = currentOrg ? useUpdateOrgMutation() : [() => {}];
+  const [updateOrg, { isError, error }] = useUpdateOrgMutation();
   const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -25,9 +27,9 @@ export function OrgScreen() {
     }
   }, [currentOrg]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (currentOrg && currentOrg.id) {
-      updateOrg({
+      await updateOrg({
         orgId: currentOrg.id,
         org: {
           ...currentOrg,
@@ -36,6 +38,10 @@ export function OrgScreen() {
           phone,
         },
       });
+    }
+
+    if (!isError) {
+      navigation.goBack();
     }
   };
 
@@ -65,6 +71,15 @@ export function OrgScreen() {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Org Information</Text>
+      {isError && <Text style={styles.errorText}>
+        {
+          'status' in error && 'data' in error 
+            ? `Status: ${error.status}, Data: ${JSON.stringify(error.data)}`
+            : 'message' in error 
+              ? error.message 
+              : error.error
+        }
+      </Text>}
       <TextInput
         style={styles.input}
         placeholder="Name"
@@ -113,6 +128,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 10,
     padding: 10,
+  },
+  errorText: {
+    color: 'red',
   },
   button: {
     backgroundColor: '#3498db',

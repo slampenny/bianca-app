@@ -1,8 +1,8 @@
-import React, { useState, useLayoutEffect } from 'react';
-import { Text, StyleSheet, View } from 'react-native';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { StyleSheet, View, Pressable } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { useRegisterMutation } from '../services/api/authApi'; // Adjust the path as necessary
-import { Button, Header, Screen, TextField } from 'app/components';
+import { Button, Header, Screen, Text, TextField } from 'app/components';
 import { LoginStackParamList } from 'app/navigators/navigationTypes';
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Register'>) => {
@@ -13,7 +13,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Reg
       headerShown: true,
       header: () => <Header titleTx='registerScreen.title' />,
     })
-  }, [])
+  }, [navigation]);
 
   const [register, { isLoading }] = useRegisterMutation();
 
@@ -25,6 +25,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Reg
   const [errorMessage, setErrorMessage] = useState('');
   const [accountType, setAccountType] = useState('individual'); // 'individual' or 'organization'
   const [organizationName, setOrganizationName] = useState('');
+  const [shouldRegister, setShouldRegister] = useState(false);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,40 +42,49 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Reg
     return phoneRegex.test(phone);
   };
 
-  const handleRegister = async () => {
+  const validateInputs = () => {
     if (name.trim() === '') {
-      setErrorMessage('Name cannot be empty');
-      return;
+      return 'Name cannot be empty';
+    } else if (!validateEmail(email)) {
+      return 'Please enter a valid email address';
+    } else if (!validatePassword(password)) {
+      return 'Password must contain at least one letter and one number';
+    } else if (password !== confirmPassword) {
+      return 'Passwords do not match';
+    } else if (!validatePhone(phone)) {
+      return 'Phone number must contain at least 10 digits';
+    } else if (accountType === 'organization' && organizationName.trim() === '') {
+      return 'Organization name cannot be empty';
     }
-    if (!validateEmail(email)) {
-      setErrorMessage('Please enter a valid email address');
-      return;
-    }
-    if (!validatePassword(password)) {
-      setErrorMessage('Password must contain at least one letter and one number');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match');
-      return;
-    }
-    if (!validatePhone(phone)) {
-      setErrorMessage('Phone number must contain at least 10 digits');
-      return;
-    }
-    setErrorMessage('');
+    
+    return '';
+  };
 
-    if (accountType === 'organization' && organizationName.trim() === '') {
-      setErrorMessage('Organization name cannot be empty');
-      return;
+  useEffect(() => {
+    const registerUser = async () => {
+      try {
+        const result = await register({ name, email, password, phone }).unwrap();
+        if (result) {
+          setErrorMessage('Registration successful!');
+        }
+      } catch (err) {
+        setErrorMessage('Registration Failed');
+      }
+    };
+  
+    if (shouldRegister) {
+      const error = validateInputs();
+      if (error) {
+        setErrorMessage(error);
+        setShouldRegister(false);
+      } else {
+        registerUser().finally(() => setShouldRegister(false));
+      }
     }
+  }, [shouldRegister, name, email, password, phone, register]);
 
-    try {
-      await register({ name, email, password, phone }).unwrap();
-      setErrorMessage('Registration successful!');
-    } catch (err) {
-      setErrorMessage('Registration Failed');
-    }
+  const handleRegister = () => {
+    setShouldRegister(true);
   };
 
   return (
@@ -109,49 +119,53 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Reg
           onChangeText={setName}
           autoCapitalize="words"
         />
-      <TextField
-        placeholderTx="registerScreen.emailFieldPlaceholder"
-        labelTx='registerScreen.emailFieldLabel'
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextField
-        placeholderTx="registerScreen.passwordFieldPlaceholder"
-        labelTx='registerScreen.passwordFieldLabel'
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-      <TextField
-        placeholderTx="registerScreen.confirmPasswordFieldPlaceholder"
-        labelTx='registerScreen.confirmPasswordFieldLabel'
-        secureTextEntry
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-      />
-      <TextField
-        placeholderTx="registerScreen.phoneFieldPlaceholder"
-        labelTx='registerScreen.phoneFieldLabel'
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
-      {accountType === 'organization' ? (
         <TextField
-          placeholderTx="registerScreen.organizationNameFieldPlaceholder"
-          labelTx='registerScreen.organizationNameFieldLabel'
-          value={organizationName}
-          onChangeText={setOrganizationName}
+          placeholderTx="registerScreen.emailFieldPlaceholder"
+          labelTx='registerScreen.emailFieldLabel'
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
-      ) : null}
-      <Button
-          onPress={handleRegister}
-          disabled={isLoading}
-          tx="registerScreen.title"
-          style={styles.submitButton}
+        <TextField
+          placeholderTx="registerScreen.passwordFieldPlaceholder"
+          labelTx='registerScreen.passwordFieldLabel'
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
         />
+        <TextField
+          placeholderTx="registerScreen.confirmPasswordFieldPlaceholder"
+          labelTx='registerScreen.confirmPasswordFieldLabel'
+          secureTextEntry
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+        />
+        <TextField
+          placeholderTx="registerScreen.phoneFieldPlaceholder"
+          labelTx='registerScreen.phoneFieldLabel'
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+        {accountType === 'organization' ? (
+          <TextField
+            placeholderTx="registerScreen.organizationNameFieldPlaceholder"
+            labelTx='registerScreen.organizationNameFieldLabel'
+            value={organizationName}
+            onChangeText={setOrganizationName}
+          />
+        ) : null}
+        <Button
+            onPress={handleRegister}
+            disabled={isLoading}
+            tx="registerScreen.title"
+            style={styles.submitButton}
+          />
+
+        <Pressable style={styles.linkButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.linkButtonText} tx="registerScreen.goBack"/>
+        </Pressable>
       </View>
     </Screen>
   );
@@ -174,6 +188,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 10,
     backgroundColor: '#fff',
+  },
+  linkButton: {
+    marginTop: 10,
+  },
+  linkButtonText: {
+    color: '#3498db',
+    textAlign: 'center',
+    fontSize: 16,
   },
   submitButton: {
     backgroundColor: 'blue',

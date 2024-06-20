@@ -7,7 +7,7 @@ import { setPatient, getPatientsForCaregiver, clearPatient } from '../store/pati
 import { setSchedules, clearSchedules } from '../store/scheduleSlice';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { Caregiver, Patient } from '../services/api/api.types';
-import { PatientStackParamList } from 'app/navigators/navigationTypes';
+import { HomeStackParamList } from 'app/navigators/navigationTypes';
 import { ScrollView } from 'react-native-gesture-handler';
 import { RootState } from '../store/store';
 
@@ -15,18 +15,18 @@ export function HomeScreen() {
   const dispatch = useDispatch(); // get the dispatch function
   const currentUser : Caregiver | null = useSelector(getCurrentUser);
   const patients = useSelector((state: RootState) => currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []);
-  const navigation = useNavigation<NavigationProp<PatientStackParamList>>();
+  const navigation = useNavigation<NavigationProp<HomeStackParamList>>();
 
   const handlePatientPress = (patient: Patient) => { // assuming User is the type of your user objects
     dispatch(setPatient(patient)); // dispatch the action to set the selected user
     dispatch(setSchedules(patient.schedules));
-    navigation.navigate('PatientScreen');
+    navigation.navigate('Patient');
   };
 
   const handleAddPatient = () => {
     dispatch(clearPatient());
     dispatch(clearSchedules());
-    navigation.navigate('PatientScreen');
+    navigation.navigate('Patient');
   };
 
   return (

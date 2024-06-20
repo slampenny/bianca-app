@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, FC } from "react";
-import { TextInput, View, StyleSheet, Pressable, Text } from "react-native";
+import { TextInput, View, StyleSheet, Pressable } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useLoginMutation, useLogoutMutation } from "../services/api/authApi";
 import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail, getAuthTokens } from "../store/authSlice";
 import { LoginStackParamList } from "app/navigators/navigationTypes";
-import { Button, Header, Screen, TextField } from "app/components";
+import { Button, Header, Screen, Text, TextField } from "app/components";
 
 type LoginScreenNavigationProp = StackNavigationProp<LoginStackParamList, 'Login'>;
 
@@ -35,7 +35,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   }, [])
 
   useEffect(() => {
-    dispatch(setAuthEmail("negascout@gmail.com"));
+    dispatch(setAuthEmail("fake@example.org"));
     setAuthPassword("password1");
     return () => {
       setAuthPassword("");
@@ -82,6 +82,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           value={authEmail}
           onChangeText={(value) => dispatch(setAuthEmail(value))}
           placeholderTx="loginScreen.emailFieldLabel"
+          labelTx="loginScreen.emailFieldLabel"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -93,6 +94,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           value={authPassword}
           onChangeText={setAuthPassword}
           placeholderTx="loginScreen.passwordFieldLabel"
+          labelTx="loginScreen.passwordFieldLabel"
           secureTextEntry={isAuthPasswordHidden}
           autoCapitalize="none"
           autoCorrect={false}
@@ -109,7 +111,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         onPress={handleRegisterPress}
       />
       <Pressable style={styles.linkButton} onPress={handleForgotPasswordPress}>
-        <Text style={styles.linkButtonText}>Forgot Password?</Text>
+        <Text style={styles.linkButtonText} tx="loginScreen.forgotPassword"/>
       </Pressable>
     </Screen>
   );
@@ -132,15 +134,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
   },
-  input: {
-    backgroundColor: 'white',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#dedede',
-    marginBottom: 10,
-  },
+  // input: {
+  //   backgroundColor: 'white',
+  //   paddingHorizontal: 15,
+  //   paddingVertical: 10,
+  //   borderRadius: 5,
+  //   borderWidth: 1,
+  //   borderColor: '#dedede',
+  //   marginBottom: 10,
+  // },
   button: {
     backgroundColor: '#3498db',
     paddingVertical: 10,

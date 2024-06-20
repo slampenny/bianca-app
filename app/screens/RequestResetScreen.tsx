@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { StackScreenProps } from '@react-navigation/stack';
+import { LoginStackParamList } from 'app/navigators/navigationTypes';
+import { Screen, Text, TextField } from 'app/components'; // Import the Text component from the component library
 import { useForgotPasswordMutation } from '../services/api/authApi'; // Adjust the path as necessary
 
-export const RequestResetScreen = () => {
+export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, 'Register'>) => {
+  const { navigation } = props;
+
   const [requestReset, { isLoading }] = useForgotPasswordMutation();
 
   const [email, setEmail] = useState('');
@@ -29,21 +34,25 @@ export const RequestResetScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Reset Password</Text>
+    <Screen style={styles.container}>
+      <Text style={styles.title} tx="requestResetScreen.title"/>
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-      <TextInput
+      <TextField
         style={styles.input}
-        placeholder="Email"
+        labelTx='requestResetScreen.emailFieldLabel'
+        placeholderTx="requestResetScreen.emailFieldPlaceholder"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
       />
       <Pressable style={styles.button} onPress={handleRequestReset} disabled={isLoading}>
-        <Text style={styles.buttonText}>SEND RESET CODE</Text>
+        <Text style={styles.buttonText} tx="requestResetScreen.requestReset"/>
       </Pressable>
-    </View>
+      <Pressable style={styles.linkButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.linkButtonText} tx="registerScreen.goBack"/>
+      </Pressable>
+    </Screen>
   );
 };
 
@@ -58,6 +67,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  linkButton: {
+    marginTop: 10,
+  },
+  linkButtonText: {
+    color: '#3498db',
+    textAlign: 'center',
+    fontSize: 16,
   },
   input: {
     height: 40,
