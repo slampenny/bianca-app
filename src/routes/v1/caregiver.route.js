@@ -16,8 +16,13 @@ router
 router
   .route('/:caregiverId')
   .get(auth('readOwn:caregiver', 'readAny:caregiver'), validate(caregiverValidation.getCaregiver), caregiverController.getCaregiver)
-  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), upload.single('avatar'), validate(caregiverValidation.updateCaregiver), caregiverController.updateCaregiver)
+  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.updateCaregiver), caregiverController.updateCaregiver)
   .delete(auth('deleteOwn:caregiver', 'deleteAny:caregiver'), validate(caregiverValidation.deleteCaregiver), caregiverController.deleteCaregiver);
+
+router
+  .route('/:caregiverId/avatar')
+  .post(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.uploadCaregiverAvatar), upload.single('avatar'), caregiverController.uploadCaregiverAvatar)
+  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.uploadCaregiverAvatar), upload.single('avatar'), caregiverController.uploadCaregiverAvatar);
 
 router
   .route('/:caregiverId/patients/:patientId')

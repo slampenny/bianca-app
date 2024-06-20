@@ -11,14 +11,20 @@ const router = express.Router();
 
 router
   .route('/')
-  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.createPatient), upload.single('avatar'), patientController.createPatient)
+  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.createPatient), patientController.createPatient)
   .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatients), patientController.getPatients);
 
 router
   .route('/:patientId')
   .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
-  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), upload.single('avatar'), patientController.updatePatient)
+  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), patientController.updatePatient)
   .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(patientValidation.deletePatient), patientController.deletePatient);
+
+  router
+  .route('/:patientId/avatar')
+  .post(auth('updateOwn:patient', 'updateAny:patient'), upload.single('avatar'), patientController.uploadPatientAvatar)
+  .patch(auth('updateOwn:patient', 'updateAny:patient'), upload.single('avatar'), patientController.uploadPatientAvatar);
+
 
 router
   .route('/:patientId/caregivers/:caregiverId')

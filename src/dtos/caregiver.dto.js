@@ -9,12 +9,12 @@ const CaregiverDTO = (caregiver) => {
   
     const id = _id;
     
-    // Check if org is an ObjectId, if so, convert it to string
-    const orgId = org instanceof ObjectId ? org.toString() : OrgDTO(org);
+    // Check if org is an object, if so, extract the _id
+    const orgId = org instanceof ObjectId ? org : org._id;
 
     // Check if patients are ObjectIds, if so, convert them to strings
     const patientIds = patients.map(patient => 
-      patient instanceof ObjectId ? patient.toString() : PatientDTO(patient)
+      patient instanceof ObjectId ? patient.toString() : patient._id
     );
   
     return {

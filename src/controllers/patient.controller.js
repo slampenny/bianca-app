@@ -1,5 +1,6 @@
 const httpStatus = require('http-status');
 const pick = require('../utils/pick');
+const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { 
@@ -69,6 +70,17 @@ const updatePatient = catchAsync(async (req, res) => {
   res.send(PatientDTO(patient));
 });
 
+const uploadPatientAvatar = catchAsync(async (req, res) => {
+  if (!req.file) {
+    logger.error('No file uploaded');
+    return res.status(400).send({ message: 'No file uploaded' });
+  }
+
+  const file = req.file; // This is the uploaded file
+  const patient = await patientService.updatePatientById(req.params.patientId, { avatar: file.path });
+  res.send(patient);
+});
+
 const deletePatient = catchAsync(async (req, res) => {
   await patientService.deletePatientById(req.params.patientId);
   res.status(httpStatus.NO_CONTENT).send();
@@ -119,6 +131,7 @@ module.exports = {
   getPatient,
   getConversationsByPatient,
   updatePatient,
+  uploadPatientAvatar,
   deletePatient,
   assignCaregiver,
   removeCaregiver,

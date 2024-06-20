@@ -31,6 +31,7 @@ const updateSchedule = {
   body: Joi.object().keys({
     id: Joi.string().custom(objectId),
     patient: Joi.string().custom(objectId),
+    nextCallDate: Joi.string().optional(),
     frequency: Joi.string().required(),
     intervals: Joi.array().items(
       Joi.object().keys({

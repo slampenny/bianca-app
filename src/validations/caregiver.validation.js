@@ -49,6 +49,18 @@ const updateCaregiver = {
     .unknown(false), // Disallow fields that are not defined in the schema
 };
 
+const uploadCaregiverAvatar = {
+  params: Joi.object().keys({
+    caregiverId: Joi.required().custom(objectId),
+  }),
+  body: Joi.object()
+    .keys({
+      avatar: Joi.string(),
+    })
+    .min(1)
+    .unknown(false), // Disallow fields that are not defined in the schema
+};
+
 const deleteCaregiver = {
   params: Joi.object().keys({
     caregiverId: Joi.string().custom(objectId),
@@ -87,6 +99,7 @@ module.exports = {
   getCaregivers,
   getCaregiver,
   updateCaregiver,
+  uploadCaregiverAvatar,
   deleteCaregiver,
   addPatient,
   removePatient,

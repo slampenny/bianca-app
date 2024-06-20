@@ -29,15 +29,13 @@ const createCaregiver = catchAsync(async (req, res) => {
 
 const updateCaregiver = catchAsync(async (req, res) => {
   const { org, patients, ...caregiverData } = req.body;
-  const file = req.file; // This is the uploaded file
-
-  // Check if a file was uploaded
-  if (file) {
-    // You can now save the file's path to the caregiver's avatar field
-    caregiverData.avatar = file.path;
-  }
-  
   const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, caregiverData);
+  res.send(caregiver);
+});
+
+const uploadCaregiverAvatar = catchAsync(async (req, res) => {
+  const file = req.file; // This is the uploaded file
+  const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, { avatar: file.path });
   res.send(caregiver);
 });
 
@@ -87,6 +85,7 @@ module.exports = {
   getCaregiver,
   createCaregiver,
   updateCaregiver,
+  uploadCaregiverAvatar,
   deleteCaregiver,
   addPatient,
   removePatient,

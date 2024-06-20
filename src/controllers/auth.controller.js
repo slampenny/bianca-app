@@ -1,8 +1,7 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const logger = require('../config/logger');
 const { authService, caregiverService, orgService, tokenService, emailService, alertService } = require('../services');
-const { AlertDTO, CaregiverDTO } = require('../dtos');
+const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
 
 const register = catchAsync(async (req, res, next) => {
   const org = await orgService.createOrg(
@@ -41,7 +40,7 @@ const login = catchAsync(async (req, res, next) => {
   const patientDTOs = patients.map((patient) => PatientDTO(patient));
   const caregiverDTO = CaregiverDTO(caregiver);
   const tokens = await tokenService.generateAuthTokens(caregiver);
-  res.send({ caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
+  res.send({ org: OrgDTO(caregiver.org), caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
 });
 
 const logout = catchAsync(async (req, res) => {

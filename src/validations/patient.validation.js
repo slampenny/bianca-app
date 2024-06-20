@@ -4,7 +4,7 @@ const { password, objectId } = require('./custom.validation');
 
 const createPatient = {
   body: Joi.object().keys({
-    org: Joi.string().custom(objectId).optional(),
+    org: Joi.string().custom(objectId),
     email: Joi.string().required().email(),
     avatar: Joi.string().optional(),
     name: Joi.string().required(),
@@ -17,7 +17,8 @@ const createPatient = {
     caregivers: Joi.array().optional(),
     schedules: Joi.array().items(
       Joi.object().keys({
-        patientId: Joi.string().custom(objectId).optional(),
+        patient: Joi.string().custom(objectId).optional(),
+        nextCallDate: Joi.string().optional(),
         frequency: Joi.string().valid('daily', 'weekly', 'monthly'),
         intervals: Joi.array().items(
           Joi.object().keys({
@@ -69,7 +70,8 @@ const updatePatient = {
       schedules: Joi.array().items(
         Joi.object().keys({
           id: Joi.required().custom(objectId),
-          patientId: Joi.string().custom(objectId).optional(),
+          patient: Joi.string().custom(objectId).optional(),
+          nextCallDate: Joi.string().optional(),
           frequency: Joi.string().valid('daily', 'weekly', 'monthly'),
           intervals: Joi.array().items(
             Joi.object().keys({
@@ -81,6 +83,18 @@ const updatePatient = {
           isActive: Joi.boolean(),
         })
       ).optional(),
+    })
+    .min(1)
+    .unknown(false), // Disallow fields that are not defined in the schema
+};
+
+const uploadPatientAvatar = {
+  params: Joi.object().keys({
+    patientId: Joi.required().custom(objectId),
+  }),
+  body: Joi.object()
+    .keys({
+      avatar: Joi.string(),
     })
     .min(1)
     .unknown(false), // Disallow fields that are not defined in the schema
@@ -110,6 +124,7 @@ module.exports = {
   getPatients,
   getPatient,
   updatePatient,
+  uploadPatientAvatar,
   deletePatient,
   getCaregivers,
 };

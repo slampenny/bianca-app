@@ -68,6 +68,7 @@ const getCaregiverByEmail = async (email) => {
 
 const getLoginCaregiverData = async (email) => {
   const caregiver = await Caregiver.findOne({ email })
+    .populate('org')
     .populate({
       path: 'patients',
       populate: {
@@ -81,6 +82,7 @@ const getLoginCaregiverData = async (email) => {
   }
 
   return { 
+    org: caregiver.org,
     caregiver,
     patients: caregiver.patients,
   }
