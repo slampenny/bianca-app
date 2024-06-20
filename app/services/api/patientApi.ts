@@ -16,21 +16,12 @@ export const patientApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    createPatient: builder.mutation<Patient, { patient: Partial<Patient>, avatar?: File }>({
-      query: ({patient, avatar}) => {
-        const formData = new FormData();
-        Object.keys(patient).forEach(key => {
-          formData.append(key, (patient as { [key: string]: any })[key]);
-        });
-
-        if (avatar) {
-          formData.append('avatar', avatar);
-        }
-
+    createPatient: builder.mutation<Patient, { patient: Partial<Patient> }>({
+      query: ({patient}) => {
         return {
           url: `/patients`,
           method: 'POST',
-          body: formData,
+          body: patient,
         };
       }
     }),
@@ -44,23 +35,25 @@ export const patientApi = createApi({
     getPatient: builder.query<Patient, { id: string }>({
       query: ({ id }) => `/patients/${id}`,
     }),
-    updatePatient: builder.mutation<Patient, { id: string, patient: Partial<Patient>, avatar?: File }>({
-      query: ({ id, patient, avatar }) => {
-        const formData = new FormData();
-        Object.keys(patient).forEach(key => {
-          formData.append(key, (patient as { [key: string]: any })[key]);
-        });
-
-        if (avatar) {
-          formData.append('avatar', avatar);
-        }
-
+    updatePatient: builder.mutation<Patient, { id: string, patient: Partial<Patient> }>({
+      query: ({ id, patient }) => {
         return {
           url: `/patients/${id}`,
           method: 'PATCH',
-          body: formData,
+          body: patient,
         };
       }
+    }),
+    uploadPatientAvatar: builder.mutation<void, { id: string, avatar: string }>({
+      query: ({ id, avatar }) => {
+        const formData = new FormData();
+        formData.append('avatar', avatar);
+        return {
+          url: `/patients/${id}/avatar`,
+          method: 'POST',
+          body: formData,
+        };
+      },
     }),
     deletePatient: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
@@ -99,6 +92,7 @@ export const {
   useCreatePatientMutation,
   useGetAllPatientsQuery,
   useGetPatientQuery,
+  useUploadPatientAvatarMutation,
   useUpdatePatientMutation,
   useDeletePatientMutation,
   useAssignCaregiverMutation,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { MainTabs } from './MainTabs';
-import { LogoutScreen, PaymentInfoScreen } from 'app/screens';
+import { LogoutScreen, OrgScreen, PaymentInfoScreen } from 'app/screens';
 import { useSelector } from 'react-redux';
 import { DrawerParamList } from './navigationTypes';
 import { isAuthenticated } from 'app/store/authSlice';
@@ -19,6 +19,7 @@ export default function MainTabsWithDrawer() {
   return (
     <Drawer.Navigator initialRouteName="Home">
       <Drawer.Screen name="Home" component={MainTabs} />
+      <Drawer.Screen name="Org" component={OrgScreen} />
       <Drawer.Screen name="Payment" component={PaymentInfoScreen} />
       <Drawer.Screen name="Logout" component={LogoutScreen} />
     </Drawer.Navigator>

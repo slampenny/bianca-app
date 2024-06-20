@@ -3,10 +3,15 @@ import { useSelector } from 'react-redux';
 import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { getOrg } from '../store/orgSlice';
 import { useUpdateOrgMutation } from '../services/api/orgApi';
+import { LoadingScreen } from './LoadingScreen';
+import { AutoImage, Card, ListItem, ListView } from 'app/components';
+import { Caregiver } from 'app/services/api';
+import { setCaregiver, getCaregivers } from 'app/store/caregiverSlice';
 
 export function OrgScreen() {
   const currentOrg = useSelector(getOrg);
   const [updateOrg] = currentOrg ? useUpdateOrgMutation() : [() => {}];
+  const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -16,6 +21,7 @@ export function OrgScreen() {
       setName(currentOrg.name);
       setEmail(currentOrg.email);
       setPhone(currentOrg.phone);
+      setIsLoading(false);
     }
   }, [currentOrg]);
 
@@ -32,6 +38,29 @@ export function OrgScreen() {
       });
     }
   };
+
+  const handleCaregiverPress = async (caregiver: Caregiver) => {
+    setCaregiver(caregiver);
+  };
+
+  const renderItem = ({ item }: { item: Caregiver }) => (
+    <ListItem onPress={() => handleCaregiverPress(item)}>
+      <Card
+          LeftComponent={<AutoImage source={{ uri: item.avatar }} style={{width: 50, height: 50}} />}
+          RightComponent={
+            <Pressable style={styles.userButton} onPress={() => handleCaregiverPress(item)}>
+              <Text style={styles.userButtonText}>Edit</Text>
+            </Pressable>
+          }
+          content={item.name}
+        >
+        </Card>
+    </ListItem>
+  );
+
+  if (isLoading) {
+    return <LoadingScreen />; // Return a loading screen while the data is being fetched
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -57,6 +86,12 @@ export function OrgScreen() {
       <Pressable style={styles.button} onPress={handleSave}>
         <Text style={styles.buttonText}>SAVE</Text>
       </Pressable>
+      <ListView
+        data={currentOrg?.caregivers || []}
+        renderItem={renderItem}
+        keyExtractor={item => item.id || ''}
+      >
+      </ListView>
     </ScrollView>
   );
 }
@@ -90,5 +125,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  userButton: {
+    backgroundColor: '#3498DB',
+    padding: 15,
+    borderRadius: 5,
+    marginVertical: 10,
+  },
+  userButtonText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
   },
 });

@@ -16,12 +16,14 @@ import {
   useCreatePatientMutation,
   useUpdatePatientMutation,
   useDeletePatientMutation,
+  useUploadPatientAvatarMutation,
 } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen" // import the LoadingScreen component
 
 export function PatientScreen() {
   const navigation = useNavigation<NavigationProp<PatientStackParamList>>()
   const patient = useSelector(getPatient)
+  const [uploadAvatar] = patient ? useUploadPatientAvatarMutation() : [() => {}];
   const [updatePatient, { isLoading: isUpdating, error: updateError }] = useUpdatePatientMutation()
   const [createPatient, { isLoading: isCreating, error: createError }] = useCreatePatientMutation()
   const [deletePatient, { isLoading: isDeleting, error: deleteError }] = useDeletePatientMutation()
@@ -80,9 +82,9 @@ export function PatientScreen() {
     navigation.navigate('ScheduleScreen');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (patient && patient.id) {
-      updatePatient({
+      await updatePatient({
         id: patient.id,
         patient: {
           ...patient,
@@ -90,10 +92,18 @@ export function PatientScreen() {
           avatar,
           email,
           phone,
-        },
+        }
       })
         .unwrap()
         .then(() => navigation.navigate("HomeScreen"))
+      // if (avatar !== patient.avatar) {
+      //   console.log('avatar', avatar);
+      //   await uploadAvatar({
+      //     id: patient.id,
+      //     avatar,
+      //   })
+      //   patient.avatar = avatar;
+      //}
     } else {
       createPatient({
         patient: {
@@ -104,7 +114,16 @@ export function PatientScreen() {
         },
       })
         .unwrap()
-        .then(() => navigation.navigate("HomeScreen"))
+        .then((newPatient) => {
+          // if (avatar && newPatient && newPatient.id) {
+          //   uploadAvatar({
+          //     id: newPatient.id,
+          //     avatar,
+          //   })
+          //   newPatient.avatar = avatar;
+          // }
+          navigation.navigate("HomeScreen")
+        })
     }
   }
 

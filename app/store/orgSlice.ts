@@ -26,7 +26,7 @@ export const orgSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      state.org = payload.caregiver.org as Org;
+      state.org = payload.org as Org;
     });
   }
 });

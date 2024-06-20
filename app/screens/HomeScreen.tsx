@@ -3,17 +3,18 @@ import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
 import { AutoImage, Card } from 'app/components';
 import { useSelector, useDispatch } from 'react-redux';
 import { getCurrentUser } from '../store/authSlice';
-import { setPatient, getPatients, clearPatient } from '../store/patientSlice';
+import { setPatient, getPatientsForCaregiver, clearPatient } from '../store/patientSlice';
 import { setSchedules, clearSchedules } from '../store/scheduleSlice';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { Caregiver, Patient } from '../services/api/api.types';
 import { PatientStackParamList } from 'app/navigators/navigationTypes';
 import { ScrollView } from 'react-native-gesture-handler';
+import { RootState } from '../store/store';
 
 export function HomeScreen() {
   const dispatch = useDispatch(); // get the dispatch function
   const currentUser : Caregiver | null = useSelector(getCurrentUser);
-  const patients = useSelector(getPatients);
+  const patients = useSelector((state: RootState) => currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []);
   const navigation = useNavigation<NavigationProp<PatientStackParamList>>();
 
   const handlePatientPress = (patient: Patient) => { // assuming User is the type of your user objects
@@ -48,7 +49,6 @@ export function HomeScreen() {
                 }
                 content={item.name}
               >
-
               </Card>
             )}
           />

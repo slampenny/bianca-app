@@ -42,7 +42,7 @@ describe('patientApi', () => {
       email: `test${Math.floor(Math.random() * 10000)}@example.com`,
       phone: '1234567890',
     };
-    const result = await patientApi.endpoints.createPatient.initiate(newPatient)(store.dispatch, store.getState, {});
+    const result = await patientApi.endpoints.createPatient.initiate({patient: newPatient})(store.dispatch, store.getState, {});
 
     if ('error' in result) {
         throw new Error(`Create patient failed with error: ${JSON.stringify(result.error)}`);

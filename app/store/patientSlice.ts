@@ -5,12 +5,12 @@ import { authApi, patientApi } from 'app/services/api';
 
 interface PatientState {
   patient: Patient | null;
-  patients: Patient[]; // Array of selected users
+  patients: Record<string, Patient[]>; // Map caregiver IDs to arrays of patients
 }
 
 const initialState: PatientState = {
   patient: null,
-  patients: [],
+  patients: {},
 };
 
 export const patientSlice = createSlice({
@@ -20,44 +20,61 @@ export const patientSlice = createSlice({
     setPatient: (state, action: PayloadAction<Patient | null>) => {
       state.patient = action.payload;
     },
-    setPatients: (state, action: PayloadAction<Patient[]>) => {
-      state.patients = action.payload;
+    setPatientsForCaregiver: (state, action: PayloadAction<{ caregiverId: string, patients: Patient[] }>) => {
+      state.patients[action.payload.caregiverId] = action.payload.patients;
     },
     clearPatient: (state) => {
       state.patient = null;
     },
     clearPatients: (state) => {
-      state.patients = [];
+      state.patients = {};
     },
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      state.patients = payload.caregiver.patients as Patient[];
+      if (!state.patients[payload.caregiver.id!]) {
+        state.patients[payload.caregiver.id!] = [];
+      }
+      payload.patients.forEach((patient: Patient) => {
+        state.patients[payload.caregiver.id!].push(patient);
+      });
     });
     builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state, { payload }) => {
       state.patient = payload;
-      state.patients.push(payload);
+      if (state.patient && state.patient.caregivers) {
+        state.patient.caregivers.forEach((caregiverId: string) => {
+          if (!state.patients[caregiverId]) {
+            state.patients[caregiverId] = [];
+          }
+          state.patients[caregiverId].push(payload);
+        });
+      }
     });
     builder.addMatcher(patientApi.endpoints.updatePatient.matchFulfilled, (state, { payload }) => {
       state.patient = payload;
-    
-      const index = state.patients.findIndex(patient => patient.id === payload.id);
-      if (index !== -1) {
-        state.patients[index] = payload;
+      if (state.patient && state.patient.caregivers) {
+        state.patient.caregivers.forEach((caregiverId: string) => {
+          const index = state.patients[caregiverId]?.findIndex(patient => patient.id === payload.id);
+          if (index !== -1) {
+            state.patients[caregiverId][index] = payload;
+          }
+        });
       }
     });
     builder.addMatcher(patientApi.endpoints.deletePatient.matchFulfilled, (state) => {
-      if (state.patient) {
-        state.patients = state.patients.filter(patient => patient.id !== state.patient!.id);
+      if (state.patient && state.patient.caregivers) {
+        state.patient.caregivers.forEach((caregiverId: string) => {
+          state.patients[caregiverId] = state.patients[caregiverId]?.filter(patient => patient.id !== state.patient!.id);
+        });
       }
       state.patient = null;
     });
   }
 });
 
-export const { setPatient, setPatients, clearPatient, clearPatients } = patientSlice.actions;
+export const { setPatient, setPatientsForCaregiver, clearPatient, clearPatients } = patientSlice.actions;
 
 export const getPatient = (state: RootState) => state.patient.patient;
-export const getPatients = (state: RootState) => state.patient.patients;
+export const getPatientsForCaregiver = (state: RootState, caregiverId: string) => state.patient.patients[caregiverId];
 
 export default patientSlice.reducer;

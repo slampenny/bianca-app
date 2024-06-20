@@ -104,7 +104,7 @@ export async function createPatientInOrg(org: Org, email: string, password: stri
     email: `test${Math.floor(Math.random() * 10000)}@example.com`,
     phone: "1234567890",
   }
-  const result = await patientApi.endpoints.createPatient.initiate(newPatient)(
+  const result = await patientApi.endpoints.createPatient.initiate({patient: newPatient})(
     appStore.dispatch,
     appStore.getState,
     {},

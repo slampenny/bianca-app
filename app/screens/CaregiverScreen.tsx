@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { getCurrentUser } from '../store/authSlice';
-import { useUpdateCaregiverMutation } from '../services/api/caregiverApi';
+import { useUpdateCaregiverMutation, useUploadAvatarMutation } from '../services/api/caregiverApi';
 import AvatarPicker from 'app/components/AvatarPicker';
 
 export function CaregiverScreen() {
   const currentUser = useSelector(getCurrentUser);
   const [updateCaregiver] = currentUser ? useUpdateCaregiverMutation() : [() => {}];
+  const [uploadAvatar] = currentUser ? useUploadAvatarMutation() : [() => {}];
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState('');
   const [email, setEmail] = useState('');
@@ -24,15 +25,24 @@ export function CaregiverScreen() {
 
   const handleSave = () => {
     if (currentUser && currentUser.id) {
+      const updatedCaregiver = {
+        ...currentUser,
+        name,
+        email,
+        phone,
+      };
+  
+      if (avatar !== currentUser.avatar) {
+        uploadAvatar({
+          id: currentUser.id,
+          avatar,
+        });
+        updatedCaregiver.avatar = avatar;
+      }
+  
       updateCaregiver({
         id: currentUser.id,
-        caregiver: {
-          ...currentUser,
-          name,
-          avatar,
-          email,
-          phone,
-        },
+        caregiver: updatedCaregiver,
       });
     }
   };

@@ -26,32 +26,22 @@ export const caregiverApi = createApi({
     getCaregiver: builder.query<Caregiver, { id: string }>({
       query: ({ id }) => `/caregivers/${id}`,
     }),
-    updateCaregiver: builder.mutation<Caregiver, { id: string, caregiver: Partial<Caregiver>, avatar?: File }>({
-      query: ({ id, caregiver, avatar }) => {
-        const formData = new FormData();
-        Object.keys(caregiver).forEach(key => {
-          formData.append(key, (caregiver as { [key: string]: any })[key]);
-        });
-
-        if (avatar) {
-          formData.append('avatar', avatar);
-        }
-
-        // Ensure caregiver.org is just its ObjectId
-        if (caregiver.org && typeof caregiver.org === 'object' && caregiver.org.id) {
-          caregiver.org = caregiver.org.id;
-        }
-
-        // Ensure each patient in the patients array is just its ObjectId
-        if (Array.isArray(caregiver.patients)) {
-          caregiver.patients = caregiver.patients.map(patient => 
-            (typeof patient === 'object' && patient.id) ? patient.id : patient
-          ) as string[];
-        }
-
+    updateCaregiver: builder.mutation<Caregiver, { id: string, caregiver: Partial<Caregiver> }>({
+      query: ({ id, caregiver }) => {
         return {
           url: `/caregivers/${id}`,
           method: 'PATCH',
+          body: caregiver,
+        };
+      },
+    }),
+    uploadAvatar: builder.mutation<void, { id: string, avatar: string }>({
+      query: ({ id, avatar }) => {
+        const formData = new FormData();
+        formData.append('avatar', avatar);
+        return {
+          url: `/caregivers/${id}/avatar`,
+          method: 'POST',
           body: formData,
         };
       },
@@ -100,6 +90,7 @@ export const {
   useGetAllCaregiversQuery,
   useGetCaregiverQuery,
   useUpdateCaregiverMutation,
+  useUploadAvatarMutation,
   useDeleteCaregiverMutation,
   useGetPatientForCaregiverQuery,
   useGetPatientsForCaregiverQuery,

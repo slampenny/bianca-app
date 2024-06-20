@@ -31,8 +31,8 @@ export interface Caregiver {
   avatar: string;
   email: string;
   phone: string;
-  org: Org | string | null;
-  patients: Patient[] | string[]; // Assuming this is the ID of the caregiver  
+  org: string;
+  patients: string[]; // Assuming this is the ID of the caregiver  
 }
 
 export interface AlertPages {

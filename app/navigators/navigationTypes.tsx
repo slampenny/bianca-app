@@ -17,6 +17,7 @@ export type MainTabsParamList = {
 // DrawerParamList.ts
 export type DrawerParamList = {
     Home: undefined;  // This points to the MainTabs
+    Org: undefined;
     Payment: undefined;
     Logout: undefined;
 };
