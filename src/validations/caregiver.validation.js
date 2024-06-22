@@ -15,6 +15,7 @@ const createCaregiver = {
 
 const getCaregivers = {
   query: Joi.object().keys({
+    org: Joi.string().custom(objectId),
     name: Joi.string(),
     role: Joi.string(),
     sortBy: Joi.string(),
