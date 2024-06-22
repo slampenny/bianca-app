@@ -16,7 +16,7 @@ export const caregiverApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    getAllCaregivers: builder.query<CaregiverPages, { name?: string, role?: string, sortBy?: string, limit?: number, page?: number }>({
+    getAllCaregivers: builder.query<CaregiverPages, { org?: string, name?: string, role?: string, sortBy?: string, limit?: number, page?: number }>({
       query: (params) => ({
         url: '/caregivers',
         method: 'GET',

@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, FC } from "react";
+import React, { useState, useRef, useEffect, FC } from "react";
 import { TextInput, View, StyleSheet, Pressable } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { StackNavigationProp } from '@react-navigation/stack';
-import { useLoginMutation, useLogoutMutation } from "../services/api/authApi";
-import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail, getAuthTokens } from "../store/authSlice";
+import { useLoginMutation } from "../services/api/authApi";
+import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail } from "../store/authSlice";
 import { LoginStackParamList } from "app/navigators/navigationTypes";
 import { Button, Header, Screen, Text, TextField } from "app/components";
 
@@ -16,23 +16,21 @@ interface LoginScreenProps {
 export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const dispatch = useDispatch();
   const [loginAPI] = useLoginMutation();
-  const [logout] = useLogoutMutation();
 
   const authPasswordInput = useRef<TextInput>(null);
   const validationError = useSelector(getValidationError);
   const authEmail = useSelector(getAuthEmail);
-  const tokens = useSelector(getAuthTokens);
 
   const [authPassword, setAuthPassword] = useState("password1");
   const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      header: () => <Header titleTx='loginScreen.signIn' />,
-    })
-  }, [])
+  // useLayoutEffect(() => {
+  //   navigation.setOptions({
+  //     headerShown: true,
+  //     header: () => <Header titleTx='loginScreen.signIn' />,
+  //   })
+  // }, [])
 
   useEffect(() => {
     dispatch(setAuthEmail("fake@example.org"));
@@ -40,11 +38,8 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     return () => {
       setAuthPassword("");
       dispatch(setAuthEmail(""));
-      if (tokens) {
-        logout({refreshToken: tokens.refresh.token}).unwrap();
-      }
     };
-  }, [dispatch, logout, tokens]);
+  }, []);
 
   const handleLoginPress = async () => {
     if (validationError) return;
@@ -76,32 +71,31 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
 
   return (
     <Screen style={styles.container}>
+      <Header titleTx="loginScreen.signIn" />
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-      <View style={styles.inputContainer}>
-        <TextField
-          value={authEmail}
-          onChangeText={(value) => dispatch(setAuthEmail(value))}
-          placeholderTx="loginScreen.emailFieldLabel"
-          labelTx="loginScreen.emailFieldLabel"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="next"
-          onSubmitEditing={focusPasswordInput}
-        />
-        <TextField
-          ref={authPasswordInput}
-          value={authPassword}
-          onChangeText={setAuthPassword}
-          placeholderTx="loginScreen.passwordFieldLabel"
-          labelTx="loginScreen.passwordFieldLabel"
-          secureTextEntry={isAuthPasswordHidden}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
-          onSubmitEditing={handleLoginPress}
-        />
-      </View>
+      <TextField
+        value={authEmail}
+        onChangeText={(value) => dispatch(setAuthEmail(value))}
+        placeholderTx="loginScreen.emailFieldLabel"
+        labelTx="loginScreen.emailFieldLabel"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="next"
+        onSubmitEditing={focusPasswordInput}
+      />
+      <TextField
+        ref={authPasswordInput}
+        value={authPassword}
+        onChangeText={setAuthPassword}
+        placeholderTx="loginScreen.passwordFieldLabel"
+        labelTx="loginScreen.passwordFieldLabel"
+        secureTextEntry={isAuthPasswordHidden}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="done"
+        onSubmitEditing={handleLoginPress}
+      />
       <Button
         tx="loginScreen.signIn"
         onPress={handleLoginPress}

@@ -43,6 +43,10 @@ const en = {
     forgotPassword: "Forgot Password?",
     hint: "Hint: you can use any email address and your favorite password :)",
   },
+  logoutScreen: {
+    logoutButton: "Logout",
+    logoutMessage: "Are you sure?",
+  },
   registerScreen: {
     title: "Register",
     nameFieldLabel: "Name",

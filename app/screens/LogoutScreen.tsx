@@ -1,49 +1,35 @@
-import React, { useEffect, FC } from "react";
-import { View, StyleSheet, Pressable, Text } from "react-native";
-import { useDispatch, useSelector } from "react-redux";
+import React from "react";
+import { StyleSheet } from "react-native";
+import { useSelector } from "react-redux";
 import { useLogoutMutation } from "../services/api/authApi";
 import { getAuthTokens } from "../store/authSlice";
-import { useNavigation, NavigationProp } from '@react-navigation/native';
-
-import { NativeStackScreenProps } from "@react-navigation/native-stack"
-
-// Define the type for the navigation stack parameters
-type LogoutStackParamList = {
-  Logout: undefined; // No parameters expected for the Logout route
-  Login: undefined; // No parameters expected for the Login route
-  // ... other routes in the stack
-};
-
-// Define the type for the Logout screen's props
-type LogoutScreenProps = NativeStackScreenProps<LogoutStackParamList, 'Logout'>;
+import { Button, Screen, Text } from "app/components";
 
 export const LogoutScreen = () => {
-  const navigation = useNavigation<LogoutScreenProps['navigation']>();
-  const dispatch = useDispatch();
   const [logout] = useLogoutMutation();
 
   const tokens = useSelector(getAuthTokens);
 
-  useEffect(() => {
+  const handleLogoutPress = async () => {
     if (tokens) {
-      logout({refreshToken: tokens.refresh.token}).unwrap();
+      try {
+        await logout({ refreshToken: tokens.refresh.token }).unwrap();
+        // Perform any additional actions needed after successful logout
+      } catch (error) {
+        console.error("Logout failed", error);
+        // Handle logout failure (e.g., display a message or log the error)
+      }
     }
-  }, [logout, tokens]);
-
-  const handleLogoutPress = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>You have been logged out</Text>
-      <Pressable style={styles.button} onPress={handleLogoutPress}>
-        <Text style={styles.buttonText}>GO TO LOGIN</Text>
-      </Pressable>
-    </View>
+    <Screen style={styles.container}>
+      <Text style={styles.title} tx="logoutScreen.logoutMessage"/>
+      <Button
+        tx="logoutScreen.logoutButton"
+        onPress={handleLogoutPress}
+      />
+    </Screen>
   );
 };
 

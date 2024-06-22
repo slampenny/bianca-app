@@ -1,22 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { getOrg } from '../store/orgSlice';
 import { useUpdateOrgMutation } from '../services/api/orgApi';
+import { Caregiver } from 'app/services/api/api.types';
 import { LoadingScreen } from './LoadingScreen';
 import { AutoImage, Card, ListItem, ListView } from 'app/components';
-import { Caregiver } from 'app/services/api';
-import { setCaregiver, getCaregivers } from 'app/store/caregiverSlice';
+import { useGetAllCaregiversQuery } from 'app/services/api';
+import { setCaregiver, setCaregivers, getCaregivers } from 'app/store/caregiverSlice';
+import { navigate, goBack } from 'app/navigators';
+
 
 export function OrgScreen() {
-  const navigation = useNavigation();
+  const dispatch = useDispatch();
   const currentOrg = useSelector(getOrg);
+  const caregivers = useSelector(getCaregivers);
   const [updateOrg, { isError, error }] = useUpdateOrgMutation();
   const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+
+  const { data: caregiverData, isFetching: isFetchingCaregivers } = useGetAllCaregiversQuery(
+    { org: currentOrg?.id },
+    { skip: !currentOrg?.id }
+  );  
 
   useEffect(() => {
     if (currentOrg) {
@@ -26,6 +34,12 @@ export function OrgScreen() {
       setIsLoading(false);
     }
   }, [currentOrg]);
+
+  useEffect(() => {
+    if (caregiverData && !isFetchingCaregivers) {
+      dispatch(setCaregivers(caregiverData.results));
+    }
+  }, [caregiverData, isFetchingCaregivers, dispatch]);
 
   const handleSave = async () => {
     if (currentOrg && currentOrg.id) {
@@ -41,12 +55,13 @@ export function OrgScreen() {
     }
 
     if (!isError) {
-      navigation.goBack();
+      goBack();
     }
   };
 
   const handleCaregiverPress = async (caregiver: Caregiver) => {
-    setCaregiver(caregiver);
+    dispatch(setCaregiver(caregiver));
+    navigate("Caregiver");
   };
 
   const renderItem = ({ item }: { item: Caregiver }) => (
@@ -64,7 +79,7 @@ export function OrgScreen() {
     </ListItem>
   );
 
-  if (isLoading) {
+  if (isLoading || isFetchingCaregivers) {
     return <LoadingScreen />; // Return a loading screen while the data is being fetched
   }
 
@@ -102,7 +117,7 @@ export function OrgScreen() {
         <Text style={styles.buttonText}>SAVE</Text>
       </Pressable>
       <ListView
-        data={currentOrg?.caregivers || []}
+        data={caregivers || []}
         renderItem={renderItem}
         keyExtractor={item => item.id || ''}
       >

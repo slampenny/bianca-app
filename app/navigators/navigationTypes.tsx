@@ -1,9 +1,16 @@
 import { NavigationContainerProps } from '@react-navigation/native';
 
 export type AppStackParamList = {
-  LoadingScreen: undefined;
   Login: undefined;
   MainTabsWithDrawer: undefined;
+  HomeTab: undefined;
+  Caregiver: undefined;
+  Alert: undefined;
+  Home: undefined; // This points to the MainTabs
+  Org: undefined;
+  Payment: undefined;
+  Logout: undefined;
+  Patient: undefined;
 };
 
 export type MainTabsParamList = {
