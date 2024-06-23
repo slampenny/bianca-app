@@ -22,7 +22,8 @@ const getAlertById = catchAsync(async (req, res) => {
 
 const getAlerts = catchAsync(async (req, res) => {
     // Assuming 'showRead' is passed as a query parameter to toggle visibility of read alerts
-    const showRead = req.query.showRead === 'true';
+    //const showRead = req.query.showRead === 'true';
+    const showRead = true;
     const alerts = await alertService.getAlerts(req.caregiver, showRead);
     res.send(alerts);
 });
@@ -39,6 +40,24 @@ const markAlertAsRead = catchAsync(async (req, res) => {
     res.send(alert);
 });
 
+const markAllAsRead = catchAsync(async (req, res) => {
+    const { alertIds } = req.body; // Step 1: Extract alertIds from the request body
+    const successfullyMarkedAlerts = []; // To store IDs of successfully marked alerts
+
+    for (const alertId of alertIds) { // Step 2: Iterate over alertIds
+        try {
+            let alert = await alertService.markAlertAsRead(alertId, req.caregiver); // Attempt to mark each alert as read
+            successfullyMarkedAlerts.push(alert); // If successful, add to the list
+        } catch (error) {
+            // Optionally handle errors, e.g., logging or ignoring failed attempts
+            logger.error(`Failed to mark alert ${alertId} as read:`, error);
+        }
+    }
+
+    // Step 4: Return the IDs of successfully marked alerts
+    res.status(200).json({ successfullyMarkedAlerts });
+});
+
 const deleteAlert = catchAsync(async (req, res) => {
     const { alertId } = req.params;  // ID of the alert to retrieve
     await alertService.deleteAlertById(alertId);
@@ -51,5 +70,6 @@ module.exports = {
     getAlerts,
     updateAlert,
     markAlertAsRead,
+    markAllAsRead,
     deleteAlert
 };

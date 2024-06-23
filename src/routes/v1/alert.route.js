@@ -18,8 +18,13 @@ router
   .delete(auth('deleteOwn:alert', 'deleteAny:alert'), validate(alertValidation.deleteAlert), alertController.deleteAlert);
 
 router
-  .route('/:alertId/markAsRead')
+  .route('/markAsRead/:alertId')
   .post(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.markAlertAsRead), alertController.markAlertAsRead);
+
+router
+  .route('/markAsRead')
+  .post(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.markAllAsRead), alertController.markAllAsRead);
+
 
 module.exports = router;
 
