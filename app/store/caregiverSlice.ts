@@ -42,7 +42,7 @@ export const caregiverSlice = createSlice({
 
 export const { setCaregiver, setCaregivers, clearCaregiver, clearCaregivers, removeCaregiver } = caregiverSlice.actions;
 
-export const selectCaregiver = (state: RootState) => state.caregiver.caregiver;
+export const getCaregiver = (state: RootState) => state.caregiver.caregiver;
 export const getCaregivers = (state: RootState) => state.caregiver.caregivers;
 
 export default caregiverSlice.reducer;

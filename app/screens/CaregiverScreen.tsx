@@ -1,47 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { getCurrentUser } from '../store/authSlice';
+import { getCaregiver } from '../store/caregiverSlice';
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from '../services/api/caregiverApi';
 import AvatarPicker from 'app/components/AvatarPicker';
 
 export function CaregiverScreen() {
-  const currentUser = useSelector(getCurrentUser);
-  const [updateCaregiver] = currentUser ? useUpdateCaregiverMutation() : [() => {}];
-  const [uploadAvatar] = currentUser ? useUploadAvatarMutation() : [() => {}];
+  const caregiver = useSelector(getCaregiver);
+  const [updateCaregiver] = caregiver ? useUpdateCaregiverMutation() : [() => {}];
+  const [uploadAvatar] = caregiver ? useUploadAvatarMutation() : [() => {}];
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
   useEffect(() => {
-    if (currentUser) {
-      setName(currentUser.name);
-      setAvatar(currentUser.avatar);
-      setEmail(currentUser.email);
-      setPhone(currentUser.phone);
+    if (caregiver) {
+      setName(caregiver.name);
+      setAvatar(caregiver.avatar);
+      setEmail(caregiver.email);
+      setPhone(caregiver.phone);
     }
-  }, [currentUser]);
+  }, [caregiver]);
 
   const handleSave = () => {
-    if (currentUser && currentUser.id) {
+    if (caregiver && caregiver.id) {
       const updatedCaregiver = {
-        ...currentUser,
+        ...caregiver,
         name,
         email,
         phone,
       };
   
-      if (avatar !== currentUser.avatar) {
+      if (avatar !== caregiver.avatar) {
         uploadAvatar({
-          id: currentUser.id,
+          id: caregiver.id,
           avatar,
         });
         updatedCaregiver.avatar = avatar;
       }
   
       updateCaregiver({
-        id: currentUser.id,
+        id: caregiver.id,
         caregiver: updatedCaregiver,
       });
     }

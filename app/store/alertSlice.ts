@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
-import { authApi } from '../services/api';
+import { authApi, alertApi } from '../services/api';
 import { Alert } from '../services/api/api.types';
 
 interface AlertState {
@@ -42,26 +42,46 @@ export const alertSlice = createSlice({
     removeSelectedAlert: (state, action: PayloadAction<string>) => {
       state.alerts = state.alerts.filter(alert => alert.id !== action.payload);
     },
-    markAlertAsRead: (state, action: PayloadAction<{ alertId: string; caregiverId: string }>) => {
-      const { alertId, caregiverId } = action.payload;
-      const alert = state.alerts.find((alert) => alert.id === alertId);
-      if (alert && !alert.readBy.includes(caregiverId)) {
-        alert.readBy.push(caregiverId);
-      }
-    },
-    markAllAsRead: (state, action: PayloadAction<string>) => {
-      const caregiverId = action.payload;
-      state.alerts = state.alerts.map(alert => {
-        if (!alert.readBy.includes(caregiverId)) {
-          return { ...alert, readBy: [...alert.readBy, caregiverId] };
-        }
-        return alert;
-      });
-    },
+    // markAlertAsRead: (state, action: PayloadAction<{ alertId: string; caregiverId: string }>) => {
+    //   const { alertId, caregiverId } = action.payload;
+    //   const alert = state.alerts.find((alert) => alert.id === alertId);
+    //   if (alert && !alert.readBy.includes(caregiverId)) {
+    //     alert.readBy.push(caregiverId);
+    //   }
+    // },
+    // markAllAsRead: (state, action: PayloadAction<string>) => {
+    //   const caregiverId = action.payload;
+    //   state.alerts = state.alerts.map(alert => {
+    //     if (!alert.readBy.includes(caregiverId)) {
+    //       return { ...alert, readBy: [...alert.readBy, caregiverId] };
+    //     }
+    //     return alert;
+    //   });
+    // },
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
       state.alerts = payload.alerts;
+    });
+    builder.addMatcher(alertApi.endpoints.markAllAsRead.matchFulfilled, (state, { payload }) => {
+      // Iterate through each alert in the payload
+      payload.forEach((alertFromPayload) => {
+        // Find the index of the alert in state.alerts that matches the current alert's ID
+        const index = state.alerts.findIndex((alertInState) => alertInState.id === alertFromPayload.id);
+        // If a matching alert is found, replace it
+        if (index !== -1) {
+          state.alerts[index] = alertFromPayload;
+        }
+      });
+    });
+
+    builder.addMatcher(alertApi.endpoints.markAlertAsRead.matchFulfilled, (state, { payload }) => {
+      // Find the index of the alert in state.alerts that matches the current alert's ID
+      const index = state.alerts.findIndex((alertInState) => alertInState.id === payload.id);
+      // If a matching alert is found, replace it
+      if (index !== -1) {
+        state.alerts[index] = payload;
+      }
     });
   }
 });

@@ -87,13 +87,13 @@ export function OrgScreen() {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Org Information</Text>
       {isError && <Text style={styles.errorText}>
-        {
-          'status' in error && 'data' in error 
-            ? `Status: ${error.status}, Data: ${JSON.stringify(error.data)}`
-            : 'message' in error 
-              ? error.message 
-              : error.error
-        }
+      {
+        'status' in error && 'data' in error 
+          ? `Status: ${error.status}, Data: ${JSON.stringify(error.data)}`
+          : 'error' in error 
+            ? error.error
+            : 'Unknown error'
+      }
       </Text>}
       <TextInput
         style={styles.input}
