@@ -107,7 +107,7 @@ const configVars = {
   },
   twilio: {
     phone: envVars.TWILIO_PHONENUMBER,
-    apiUrl: 'https://bfb3-85-228-197-119.ngrok-free.app',
+    apiUrl: 'https://505b-174-4-88-96.ngrok-free.app',
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
   },

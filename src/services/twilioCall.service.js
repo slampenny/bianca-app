@@ -6,6 +6,7 @@ const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const httpStatus = require('http-status');
 const { alertService } = require('.');
+const { getExpectedTwilioSignature } = require('twilio/lib/webhooks/webhooks');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -15,9 +16,11 @@ const initiateCall = async (patientId) => {
   logger.info(`Initiating call for patient with ID: ${patientId}`);
   const patient = await Patient.findById(patientId);
   if (!patient || !patient.phone) {
+    logger.error(`Patient or phone number not found`);
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient or phone number not found');
   }
   
+  logger.info(`Creating a call ${config.twilio.apiUrl}/v1/twilio/prepare-call?initial=true for patient with phone number: ${patient.phone}`);
   const call = await twilioClient.calls.create({
     url: `${config.twilio.apiUrl}/v1/twilio/prepare-call?initial=true`, // Endpoint to prepare call
     to: patient.phone,
@@ -27,6 +30,8 @@ const initiateCall = async (patientId) => {
     statusCallbackMethod: 'POST', // HTTP method to use for the webhook request
   });
 
+  const sig = getExpectedTwilioSignature(config.twilio.authToken, `${config.twilio.apiUrl}/v1/twilio/prepare-call?initial=true`, {});
+  logger.info(`Signature: ${sig}`);
   const previousConversation = await Conversation.find({ patientId: patientId }).sort({ createdAt: -1 }).limit(1);
 
   const conversation = new Conversation({ 
@@ -35,6 +40,8 @@ const initiateCall = async (patientId) => {
     history: previousConversation.length > 0 ? previousConversation[0].history : null 
   });
   await conversation.save();
+
+  logger.info(`Call initiated with SID: ${call.sid}`);
 
   return call.sid;
 };

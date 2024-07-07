@@ -7,22 +7,29 @@ const enumerateErrorFormat = winston.format((info) => {
   }
   return info;
 });
-console.log("CONfIG ENV:" + config.env);
+
+console.log("CONFIG ENV:", config.env);
+
 const logger = winston.createLogger({
   level: ['development', 'test'].includes(config.env) ? 'debug' : 'info',
   format: winston.format.combine(
     enumerateErrorFormat(),
-    ['development', 'test'].includes(config.env) ? winston.format.colorize() : winston.format.uncolorize(),
-    winston.format.splat(),
-    winston.format.printf(({ level, message }) => `${level}: ${message}`)
+    winston.format.timestamp(),
+    winston.format.printf(({ timestamp, level, message }) => `${timestamp} ${level}: ${message}`),
   ),
   transports: [
     new winston.transports.Console({
       stderrLevels: ['error'],
     }),
   ],
+  exceptionHandlers: [
+    new winston.transports.Console()
+  ],
+  rejectionHandlers: [
+    new winston.transports.Console()
+  ]
 });
 
-console.log("LOG_LEVEL:" + logger.level);
+logger.debug("Logger initialized at level: " + logger.level);
 
 module.exports = logger;

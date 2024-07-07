@@ -96,6 +96,21 @@ router.post('/clean', testController.testCleanDB);
 
 /**
  * @swagger
+ * /test/call:
+ *   post:
+ *     summary: Test the call with twilio feature
+ *     description: This is for testing purposes only.
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: the call was initiated
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.post('/call', testController.testCall);
+
+/**
+ * @swagger
  * /test/create-caregiver:
  *   post:
  *     summary: Test the summarizeConversation function
