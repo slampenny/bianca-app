@@ -5,7 +5,8 @@ import orgReducer from './orgSlice';
 import caregiverReducer from './caregiverSlice';
 import patientReducer from './patientSlice';
 import scheduleReducer from './scheduleSlice';
-import { alertApi, authApi, orgApi, caregiverApi, scheduleApi, patientApi } from '../services/api/';
+import conversationReducer from './conversationSlice';
+import { alertApi, authApi, orgApi, caregiverApi, scheduleApi, patientApi, conversationApi } from '../services/api/';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,9 +24,11 @@ const rootReducer = combineReducers({
   schedule: scheduleReducer,
   auth: authReducer,
   alert: alertReducer,
+  conversation: conversationReducer,
   [alertApi.reducerPath]: alertApi.reducer,
   [authApi.reducerPath]: authApi.reducer,
   [orgApi.reducerPath]: orgApi.reducer,
+  [conversationApi.reducerPath]: conversationApi.reducer,
   [caregiverApi.reducerPath]: caregiverApi.reducer,
   [patientApi.reducerPath]: patientApi.reducer,
   [scheduleApi.reducerPath]: scheduleApi.reducer,
@@ -47,7 +50,8 @@ export const store = configureStore({
       orgApi.middleware, 
       caregiverApi.middleware, 
       patientApi.middleware, 
-      scheduleApi.middleware
+      scheduleApi.middleware,
+      conversationApi.middleware,
     ),
 });
 

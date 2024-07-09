@@ -97,6 +97,6 @@ export const {
   useDeletePatientMutation,
   useAssignCaregiverMutation,
   useUnassignCaregiverMutation,
-  useGetConversationsByPatientQuery,
+  //useGetConversationsByPatientQuery,
   useGetCaregiversQuery,
 } = patientApi;

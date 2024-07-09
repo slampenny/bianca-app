@@ -37,6 +37,7 @@ export type HomeStackParamList = {
   Home: undefined;
   Patient: undefined;
   Schedule: undefined;
+  Conversations: undefined;
 };
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {}

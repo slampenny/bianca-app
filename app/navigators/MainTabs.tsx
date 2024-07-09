@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { HomeScreen, CaregiverScreen, AlertScreen, PatientScreen, SchedulesScreen } from 'app/screens';
+import { HomeScreen, ConversationsScreen, CaregiverScreen, AlertScreen, PatientScreen, SchedulesScreen } from 'app/screens';
 import { MainTabsParamList } from './navigationTypes';
 
 const Stack = createStackNavigator();
@@ -12,6 +12,7 @@ function HomeStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Patient" component={PatientScreen} />
       <Stack.Screen name="Schedule" component={SchedulesScreen} />
+      <Stack.Screen name="Conversations" component={ConversationsScreen} />
     </Stack.Navigator>
   );
 }

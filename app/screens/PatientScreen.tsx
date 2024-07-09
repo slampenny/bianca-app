@@ -81,6 +81,10 @@ export function PatientScreen() {
     navigation.navigate('Schedule');
   };
 
+  const handleManageConversations = () => {
+    navigation.navigate("Conversations");
+  };
+
   const handleSave = async () => {
     if (patient && patient.id) {
       await updatePatient({
@@ -190,6 +194,9 @@ export function PatientScreen() {
           onPress={handleManageSchedules}
         >
           <Text style={styles.buttonText}>Manage Schedules</Text>
+        </Pressable>
+        <Pressable style={styles.button} onPress={handleManageConversations}>
+          <Text style={styles.buttonText}>Manage Conversations</Text>
         </Pressable>
       </ScrollView>
     </TouchableWithoutFeedback>
