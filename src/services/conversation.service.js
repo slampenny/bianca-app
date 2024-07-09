@@ -22,7 +22,7 @@ const addMessageToConversation = async (conversationId, role, content) => {
 };
 
 const getConversationById = async (id) => {
-  const conversation = await Conversation.findById(id);
+  const conversation = await Conversation.findById(id).populate('messages');
   if (!conversation) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
@@ -30,7 +30,7 @@ const getConversationById = async (id) => {
 };
 
 const getConversationsByPatient = async (patientId) => {
-  const conversations = await Conversation.find({ patientId });
+  const conversations = await Conversation.find({ patientId }).populate('messages');
   if (!conversations) {
     throw new ApiError(httpStatus.NOT_FOUND, `No conversation found for patient <${patientId}>`);
   }
