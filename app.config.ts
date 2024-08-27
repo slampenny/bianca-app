@@ -22,5 +22,15 @@ module.exports = ({ config }: ConfigContext): Partial<ExpoConfig> => {
       require("./plugins/withSplashScreen").withSplashScreen,
       require("./plugins/withFlipperDisabled").withFlipperDisabled,
     ],
+    extra: {
+      eas: {
+        projectId: "fb5ec1ef-180c-455a-8b64-2c41f9c8ca2d"
+      }
+    },
+    owner: "negascout",
+    slug: "bianca",
+    ios: {
+      bundleIdentifier: "com.negascout.bianca"
+    }
   }
 }

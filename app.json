@@ -1,10 +1,10 @@
 {
-  "name": "bianca=app-frontend",
-  "displayName": "bianca=app-frontend",
+  "name": "bianca_app_frontend",
+  "displayName": "bianca",
   "expo": {
-    "name": "bianca=app-frontend",
-    "slug": "bianca=app-frontend",
-    "scheme": "bianca=app-frontend",
+    "name": "bianca_app_frontend",
+    "slug": "bianca_app_frontend",
+    "scheme": "bianca",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-all.png",
@@ -22,7 +22,7 @@
     ],
     "android": {
       "icon": "./assets/images/app-icon-android-legacy.png",
-      "package": "com.bianca=app-frontend",
+      "package": "com.bianca_app_frontend",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
         "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
@@ -36,7 +36,7 @@
     "ios": {
       "icon": "./assets/images/app-icon-ios.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.bianca=app-frontend",
+      "bundleIdentifier": "com.bianca_app_frontend",
       "splash": {
         "image": "./assets/images/splash-logo-ios-mobile.png",
         "tabletImage": "./assets/images/splash-logo-ios-tablet.png",
