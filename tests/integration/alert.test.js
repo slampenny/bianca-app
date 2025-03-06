@@ -110,4 +110,130 @@ describe('Alert routes', () => {
     const alert = await Alert.findById(alertId);
     expect(alert).toBeNull();
   });
+
+  it('should filter alerts by read status when showRead=true', async () => {
+    // Create a read alert (non-empty readBy) and an unread alert (empty readBy)
+    const readAlert = {
+      ...alertTwo,
+      message: 'Read Alert',
+      createdBy: caregiver.id,
+      createdModel: 'Caregiver',
+      readBy: [caregiver.id] // Mark as read
+    };
+  
+    const unreadAlert = {
+      ...alertTwo,
+      message: 'Unread Alert',
+      createdBy: caregiver.id,
+      createdModel: 'Caregiver',
+      readBy: [] // Unread
+    };
+  
+    // Insert both alerts
+    await request(app)
+      .post('/v1/alerts')
+      .set('Authorization', `Bearer ${caregiverToken}`)
+      .send(readAlert);
+  
+    await request(app)
+      .post('/v1/alerts')
+      .set('Authorization', `Bearer ${caregiverToken}`)
+      .send(unreadAlert);
+  
+    // Now request alerts with the showRead filter enabled
+    const res = await request(app)
+      .get('/v1/alerts?showRead=true')
+      .set('Authorization', `Bearer ${caregiverToken}`);
+  
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    // Verify that every alert in the response has a non-empty readBy array
+    res.body.forEach(alert => {
+      expect(Array.isArray(alert.readBy)).toBe(true);
+      expect(alert.readBy.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should filter alerts by read status when showRead=true', async () => {
+    // Create a read alert (non-empty readBy) and an unread alert (empty readBy)
+    const readAlert = {
+      ...alertTwo,
+      message: 'Read Alert',
+      createdBy: caregiver.id,
+      createdModel: 'Caregiver',
+      readBy: [caregiver.id] // Mark as read
+    };
+  
+    const unreadAlert = {
+      ...alertTwo,
+      message: 'Unread Alert',
+      createdBy: caregiver.id,
+      createdModel: 'Caregiver',
+      readBy: [] // Unread
+    };
+  
+    // Insert both alerts
+    await request(app)
+      .post('/v1/alerts')
+      .set('Authorization', `Bearer ${caregiverToken}`)
+      .send(readAlert);
+  
+    await request(app)
+      .post('/v1/alerts')
+      .set('Authorization', `Bearer ${caregiverToken}`)
+      .send(unreadAlert);
+  
+    // Now request alerts with the showRead filter enabled
+    const res = await request(app)
+      .get('/v1/alerts?showRead=true')
+      .set('Authorization', `Bearer ${caregiverToken}`);
+  
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    // Verify that every alert in the response has a non-empty readBy array
+    res.body.forEach(alert => {
+      expect(Array.isArray(alert.readBy)).toBe(true);
+      expect(alert.readBy.length).toBeGreaterThan(0);
+    });
+  });
+  it('should filter alerts by unread status when showRead=false', async () => {
+    // Create a read alert (non-empty readBy) and an unread alert (empty readBy)
+    const readAlert = {
+      ...alertTwo,
+      message: 'Read Alert',
+      createdBy: caregiver.id,
+      createdModel: 'Caregiver',
+      readBy: [caregiver.id] // Mark as read
+    };
+  
+    const unreadAlert = {
+      ...alertTwo,
+      message: 'Unread Alert',
+      createdBy: caregiver.id,
+      createdModel: 'Caregiver',
+      readBy: [] // Unread
+    };
+  
+    // Insert both alerts
+    await request(app)
+      .post('/v1/alerts')
+      .set('Authorization', `Bearer ${caregiverToken}`)
+      .send(readAlert);
+  
+    await request(app)
+      .post('/v1/alerts')
+      .set('Authorization', `Bearer ${caregiverToken}`)
+      .send(unreadAlert);
+  
+    // Request alerts with the showRead filter set to false
+    const res = await request(app)
+      .get('/v1/alerts?showRead=false')
+      .set('Authorization', `Bearer ${caregiverToken}`);
+  
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    // Verify that every alert in the response has an empty readBy array (i.e. unread)
+    res.body.forEach(alert => {
+      expect(Array.isArray(alert.readBy)).toBe(true);
+      expect(alert.readBy.length).toEqual(0);
+    });
+  });
+  
 });

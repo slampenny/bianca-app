@@ -13,7 +13,7 @@ const AlertDTO = (alert) => {
       createdModel,
       visibility,
       readBy,
-      relevanceUntil,
+      relevanceUntil: relevanceUntil ? new Date(relevanceUntil).toISOString() : null,
     };
   };
   

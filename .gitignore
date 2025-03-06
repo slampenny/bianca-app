@@ -1,6 +1,10 @@
 # Dependencies
 node_modules
-
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+.vscode
 # yarn error logs
 yarn-error.log
 

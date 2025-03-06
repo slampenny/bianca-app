@@ -38,9 +38,10 @@ describe('alertService', () => {
     [org] = await insertOrgs([orgOne]);
     [caregiver] = await insertCaregiversAndAddToOrg(org, [admin]);
     [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
-    [alert] = await insertAlerts(caregiver, 'Caregiver', [alertOne, expiredAlert]);
+    [alert] = await insertAlerts(caregiver, 'Caregiver', [alertOne]);
     [alert2] = await insertAlerts(caregiver, 'Caregiver', [alertTwo]);
-    await insertAlerts(caregiver, 'Caregiver', [alertThree]);
+    [alert3] = await insertAlerts(caregiver, 'Caregiver', [alertThree]);
+    await insertAlerts(caregiver, 'Caregiver', [expiredAlert]);
   });
 
   it('should create a new alert', async () => {
@@ -77,9 +78,18 @@ describe('alertService', () => {
   });
 
   it('should only return relevant and unread alerts to a caregiver', async () => {
+    await alertService.markAlertAsRead(alert.id, caregiver.id);
     const alerts = await alertService.getAlerts(caregiver.id, false);
+
     expect(alerts).not.toContainEqual(expect.objectContaining({ _id: expiredAlert._id }));
-    expect(alerts).not.toContainEqual(expect.objectContaining({ _id: alertOne._id })); // Assuming alertOne is read
+    expect(alerts).not.toContainEqual(expect.objectContaining({ _id: alertOne._id }));
+    expect(alerts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ _id: alert2._id }),
+        expect.objectContaining({ _id: alert3._id }),
+      ])
+    );
+    expect(alerts).toHaveLength(2);
   });
 
   it('should filter alerts based on caregiver role', async () => {
@@ -87,19 +97,18 @@ describe('alertService', () => {
     const adminAlerts = await alertService.getAlerts(caregiver.id, true);
     const regularAlerts = await alertService.getAlerts(notAdmin.id, true);
 
-    // Debugging
-    console.log('adminAlerts:', adminAlerts);
-    console.log('alert.id:', alert.id);
-
     expect(adminAlerts).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: alert2.id }), // Visible to orgAdmin only
+        expect.objectContaining({ _id: alert2._id }),
       ])
     );
     expect(regularAlerts).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: alert2.id }), // Visible to orgAdmin only
-        ])
-      );
+      expect.arrayContaining([
+        expect.objectContaining({ _id: alert2._id }),
+      ])
+    );
   });
+
+  
+  
 });

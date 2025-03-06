@@ -55,7 +55,10 @@ const getAlerts = async (caregiverId, showRead = false) => {
     };
 
     if (!showRead) {
-        conditions.readBy = { $ne: caregiverId };
+        conditions.$or = [
+            { readBy: { $ne: caregiverId } },
+            { readBy: { $size: 0 } }
+        ];
     }
 
     const alerts = await Alert.find(conditions);

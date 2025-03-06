@@ -11,6 +11,7 @@ const {
 } = require('../services');
 
 const {
+  ConversationDTO,
   PatientDTO
 } = require('../dtos');
 
@@ -113,7 +114,7 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
   }
 
   const conversations = await conversationService.getConversationsByPatient(patientId);
-  res.status(httpStatus.OK).send(conversations);
+  res.status(httpStatus.OK).send(conversations.map(ConversationDTO));
 });
 
 const getCaregivers = catchAsync(async (req, res) => {

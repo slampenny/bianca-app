@@ -6,16 +6,16 @@ services:
     command: yarn dev
     ports:
       - "9229:9229"
-  ngrok:
-    container_name: ngrok
-    image: ngrok/ngrok
-    restart: unless-stopped
-    command: 'http bianca-app:3000'
-    depends_on:
-      - bianca-app
-    ports:
-        - '4040:4040'
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    networks:
-      - node-network
+  # ngrok:
+  #   container_name: ngrok
+  #   image: ngrok/ngrok
+  #   restart: unless-stopped
+  #   command: 'http bianca-app:3000'
+  #   depends_on:
+  #     - bianca-app
+  #   ports:
+  #       - '4040:4040'
+  #   environment:
+  #     - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+  #   networks:
+  #     - node-network
