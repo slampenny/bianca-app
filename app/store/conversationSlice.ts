@@ -17,8 +17,8 @@ const defaultConversation: Conversation = {
   history: '',
   analyzedData: {},
   metadata: {},
-  startTime: new Date(),
-  endTime: new Date(),
+  startTime: new Date().toISOString(),
+  endTime: new Date().toISOString(),
   duration: 0,
 };
 

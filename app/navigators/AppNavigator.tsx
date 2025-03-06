@@ -15,7 +15,7 @@ export const AppNavigator: React.FC<NavigationProps> = () => {
 
   // Define back button behavior
   useBackButtonHandler((routeName) => {
-    return ['Home', 'Login'].includes(routeName); // Example routes where pressing back should exit the app
+    return true; //['Home', 'Login'].includes(routeName); // Example routes where pressing back should exit the app
   });
 
   // Navigation state persistence setup

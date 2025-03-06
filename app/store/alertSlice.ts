@@ -42,22 +42,6 @@ export const alertSlice = createSlice({
     removeSelectedAlert: (state, action: PayloadAction<string>) => {
       state.alerts = state.alerts.filter(alert => alert.id !== action.payload);
     },
-    // markAlertAsRead: (state, action: PayloadAction<{ alertId: string; caregiverId: string }>) => {
-    //   const { alertId, caregiverId } = action.payload;
-    //   const alert = state.alerts.find((alert) => alert.id === alertId);
-    //   if (alert && !alert.readBy.includes(caregiverId)) {
-    //     alert.readBy.push(caregiverId);
-    //   }
-    // },
-    // markAllAsRead: (state, action: PayloadAction<string>) => {
-    //   const caregiverId = action.payload;
-    //   state.alerts = state.alerts.map(alert => {
-    //     if (!alert.readBy.includes(caregiverId)) {
-    //       return { ...alert, readBy: [...alert.readBy, caregiverId] };
-    //     }
-    //     return alert;
-    //   });
-    // },
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {

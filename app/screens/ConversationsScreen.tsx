@@ -1,100 +1,201 @@
-import React, { useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
-import { useSelector } from "react-redux";
-import { useGetConversationsByPatientQuery } from "../services/api/conversationApi";
-import { getPatient } from "../store/patientSlice";
+import React, { useEffect } from "react"
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  FlatList,
+  Pressable
+} from "react-native"
+import { useSelector } from "react-redux"
+import { useGetConversationsByPatientQuery } from "../services/api/conversationApi"
+import { getPatient } from "../store/patientSlice"
+import { Conversation, Message } from "../services/api/api.types"
 
 export function ConversationsScreen() {
-  const patient = useSelector(getPatient);
+  const patient = useSelector(getPatient)
 
   const {
     data: conversations,
     error,
     isLoading,
     refetch,
-  } = useGetConversationsByPatientQuery({ patientId: patient?.id as string }, { skip: !patient?.id });
+  } = useGetConversationsByPatientQuery(
+    { patientId: patient?.id as string },
+    { skip: !patient?.id }
+  )
 
   useEffect(() => {
     if (patient?.id) {
-      refetch();
+      refetch()
     }
-  }, [patient?.id, refetch]);
+  }, [patient?.id, refetch])
 
   if (!patient) {
     return (
       <View style={styles.container}>
-        <Text style={styles.error}>No patient selected</Text>
+        <Header title="Conversations" />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No patient selected</Text>
+        </View>
       </View>
-    );
+    )
   }
-  console.log(conversations);
+
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    return (
+      <View style={styles.conversationCard}>
+        <Text style={styles.conversationTitle}>
+          Conversation ID: {item.id}
+        </Text>
+
+        {item.messages.map((message: Message, index: number) => (
+          <View
+            key={`${item.id}-${index}`}
+            style={[
+              styles.messageBubble,
+              // Example of slightly different background for patient vs doctor
+              message.role === "patient"
+                ? styles.patientBubble
+                : styles.doctorBubble,
+            ]}
+          >
+            <Text style={styles.messageRole}>
+              {message.role}:
+            </Text>
+            <Text style={styles.messageText}>
+              {message.content}
+            </Text>
+          </View>
+        ))}
+      </View>
+    )
+  }
+
+  const renderEmpty = () => (
+    <Text style={styles.noConversationsText}>
+      No conversations to display
+    </Text>
+  )
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Conversations</Text>
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
-      ) : error ? (
-        <Text style={styles.error}>Error fetching conversations</Text>
-      ) : conversations && conversations.length > 0 ? (
-        conversations.map((conversation) => (
-          <View key={conversation.id} style={styles.conversation}>
-            <Text style={styles.conversationText}>
-              Conversation ID: {conversation.id}
-            </Text>
-            {conversation.messages.map((message, index) => (
-              <View key={index} style={styles.message}>
-                <Text style={styles.messageText}>
-                  {message.role}: {message.content}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ))
-      ) : (
-        <Text style={styles.noConversations}>No conversations to display</Text>
+    <View style={styles.container}>
+
+      {/* Loading/Error States */}
+      {isLoading && (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#3498db" />
+        </View>
       )}
-    </ScrollView>
-  );
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            Error fetching conversations
+          </Text>
+        </View>
+      )}
+
+      {/* Conversations List */}
+      {!isLoading && !error && (
+        <FlatList
+          data={conversations}
+          keyExtractor={(item) => item.id}
+          renderItem={renderConversation}
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+    </View>
+  )
+}
+
+/** Example Header component */
+function Header({ title }: { title: string }) {
+  return (
+    <View style={styles.header}>
+      <Text style={styles.headerTitle}>{title}</Text>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: "#ecf0f1",
+  },
+  header: {
     backgroundColor: "#fff",
+    paddingVertical: 16,
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2c3e50",
   },
-  conversation: {
-    marginBottom: 15,
-    padding: 15,
-    borderRadius: 5,
-    backgroundColor: "#f5f5f5",
+  loaderContainer: {
+    padding: 20,
   },
-  conversationText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 10,
+  errorContainer: {
+    padding: 20,
+    alignItems: "center",
   },
-  message: {
-    marginBottom: 10,
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: "#e0e0e0",
-  },
-  messageText: {
-    fontSize: 14,
-  },
-  noConversations: {
-    fontSize: 16,
-    color: "gray",
-  },
-  error: {
+  errorText: {
     fontSize: 16,
     color: "red",
   },
-});
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  conversationCard: {
+    backgroundColor: "#fff",
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 6,
+
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+
+    // Android elevation
+    elevation: 2,
+  },
+  conversationTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: "#2c3e50",
+  },
+  messageBubble: {
+    padding: 10,
+    marginBottom: 8,
+    borderRadius: 6,
+  },
+  patientBubble: {
+    backgroundColor: "#d0ebff", // Light blue
+  },
+  doctorBubble: {
+    backgroundColor: "#e2ffd0", // Light green
+  },
+  messageRole: {
+    fontWeight: "bold",
+    marginBottom: 4,
+    color: "#2c3e50",
+  },
+  messageText: {
+    fontSize: 14,
+    color: "#2c3e50",
+  },
+  noConversationsText: {
+    fontSize: 16,
+    color: "#7f8c8d",
+    textAlign: "center",
+    marginTop: 20,
+  },
+})

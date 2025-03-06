@@ -49,7 +49,6 @@ export function CaregiverScreen() {
   
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Caregiver Information</Text>
       <AvatarPicker initialAvatar={avatar} onAvatarChanged={setAvatar} />
       <TextInput
         style={styles.input}

@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   TouchableWithoutFeedback,
+  View,
 } from "react-native"
 import AvatarPicker from "../components/AvatarPicker"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
@@ -17,17 +18,17 @@ import {
   useUpdatePatientMutation,
   useDeletePatientMutation,
 } from "../services/api/patientApi"
-import { LoadingScreen } from "./LoadingScreen" // import the LoadingScreen component
+import { LoadingScreen } from "./LoadingScreen"
 
-export function PatientScreen() {
+function PatientScreen() {
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
   const patient = useSelector(getPatient)
-  //const [uploadAvatar] = patient ? useUploadPatientAvatarMutation() : [() => {}];
   const [updatePatient, { isLoading: isUpdating, error: updateError }] = useUpdatePatientMutation()
   const [createPatient, { isLoading: isCreating, error: createError }] = useCreatePatientMutation()
   const [deletePatient, { isLoading: isDeleting, error: deleteError }] = useDeletePatientMutation()
+
   const [name, setName] = useState("")
-  const [avatar, setAvatar] = useState('');
+  const [avatar, setAvatar] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [emailError, setEmailError] = useState("")
@@ -69,7 +70,7 @@ export function PatientScreen() {
 
   const validatePhone = (phone: string) => {
     setPhone(phone)
-    const phoneRegex = /^\d{10}$/ // Adjust this regex to match the phone number format you want
+    const phoneRegex = /^\d{10}$/
     if (!phoneRegex.test(phone)) {
       setPhoneError("Invalid phone format")
     } else {
@@ -78,12 +79,12 @@ export function PatientScreen() {
   }
 
   const handleManageSchedules = () => {
-    navigation.navigate('Schedule');
-  };
+    navigation.navigate("Schedule")
+  }
 
   const handleManageConversations = () => {
-    navigation.navigate("Conversations");
-  };
+    navigation.navigate("Conversations")
+  }
 
   const handleSave = async () => {
     if (patient && patient.id) {
@@ -95,18 +96,10 @@ export function PatientScreen() {
           avatar,
           email,
           phone,
-        }
+        },
       })
         .unwrap()
         .then(() => navigation.navigate("Home"))
-      // if (avatar !== patient.avatar) {
-      //   console.log('avatar', avatar);
-      //   await uploadAvatar({
-      //     id: patient.id,
-      //     avatar,
-      //   })
-      //   patient.avatar = avatar;
-      //}
     } else {
       createPatient({
         patient: {
@@ -117,87 +110,89 @@ export function PatientScreen() {
         },
       })
         .unwrap()
-        .then((newPatient) => {
-          // if (avatar && newPatient && newPatient.id) {
-          //   uploadAvatar({
-          //     id: newPatient.id,
-          //     avatar,
-          //   })
-          //   newPatient.avatar = avatar;
-          // }
-          navigation.navigate("Home")
-        })
+        .then(() => navigation.navigate("Home"))
     }
   }
 
   if (isCreating || isUpdating || isDeleting) {
-    return <LoadingScreen /> // use the LoadingScreen component
+    return <LoadingScreen />
   }
 
   return (
     <TouchableWithoutFeedback onPress={handleCancelDelete}>
-      <ScrollView style={styles.container}>
-        <Text style={styles.title}>Patient Information</Text>
-        {createError && "data" in createError && (
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {(createError || updateError || deleteError) && (
           <Text style={styles.error}>
-            Error: {(createError.data as { message: string }).message}
+            {createError && "data" in createError
+              ? `Error: ${(createError.data as { message: string }).message}`
+              : updateError && "data" in updateError
+              ? `Error: ${(updateError.data as { message: string }).message}`
+              : deleteError && "data" in deleteError
+              ? `Error: ${(deleteError.data as { message: string }).message}`
+              : "An error occurred"}
           </Text>
         )}
-        {updateError && "data" in updateError && (
-          <Text style={styles.error}>
-            Error: {(updateError.data as { message: string }).message}
-          </Text>
-        )}
-        {deleteError && "data" in deleteError && (
-          <Text style={styles.error}>
-            Error: {(deleteError.data as { message: string }).message}
-          </Text>
-        )}
-        <AvatarPicker initialAvatar={avatar} onAvatarChanged={setAvatar} />
-        <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={validateEmail}
-        />
-        {emailError && <Text style={styles.error}>{emailError}</Text>}
-        <TextInput
-          style={styles.input}
-          placeholder="Phone"
-          value={phone}
-          onChangeText={validatePhone}
-        />
-        {phoneError && <Text style={styles.error}>{phoneError}</Text>}
-        <Pressable
-          style={[
-            styles.button,
-            (!email || !phone || !!emailError || !!phoneError) && styles.buttonDisabled,
-          ]}
-          onPress={handleSave}
-          disabled={!email || !phone || !!emailError || !!phoneError}
-        >
-          <Text style={styles.buttonText}>SAVE</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.button,
-            (!email || !phone || !!emailError || !!phoneError) && styles.buttonDisabled,
-          ]}
-          onPress={handleDelete}
-          disabled={!patient || !patient.id}
-        >
-          <Text style={styles.buttonText}>{confirmDelete ? "CONFIRM DELETE" : "DELETE"}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.button}
-          onPress={handleManageSchedules}
-        >
-          <Text style={styles.buttonText}>Manage Schedules</Text>
-        </Pressable>
-        <Pressable style={styles.button} onPress={handleManageConversations}>
-          <Text style={styles.buttonText}>Manage Conversations</Text>
-        </Pressable>
+
+        <View style={styles.formCard}>
+          <AvatarPicker initialAvatar={avatar} onAvatarChanged={setAvatar} />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Name"
+            placeholderTextColor="#7f8c8d"
+            value={name}
+            onChangeText={setName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor="#7f8c8d"
+            value={email}
+            onChangeText={validateEmail}
+          />
+          {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
+          <TextInput
+            style={styles.input}
+            placeholder="Phone"
+            placeholderTextColor="#7f8c8d"
+            value={phone}
+            onChangeText={validatePhone}
+          />
+          {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
+
+          <Pressable
+            style={[
+              styles.button,
+              (!email || !phone || emailError || phoneError) && styles.buttonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!email || !phone || !!emailError || !!phoneError}
+          >
+            <Text style={styles.buttonText}>SAVE</Text>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.button,
+              styles.deleteButton,
+              (!patient || !patient.id) && styles.buttonDisabled,
+            ]}
+            onPress={handleDelete}
+            disabled={!patient || !patient.id}
+          >
+            <Text style={styles.buttonText}>
+              {confirmDelete ? "CONFIRM DELETE" : "DELETE"}
+            </Text>
+          </Pressable>
+
+          <Pressable style={styles.button} onPress={handleManageSchedules}>
+            <Text style={styles.buttonText}>Manage Schedules</Text>
+          </Pressable>
+
+          <Pressable style={styles.button} onPress={handleManageConversations}>
+            <Text style={styles.buttonText}>Manage Conversations</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </TouchableWithoutFeedback>
   )
@@ -206,43 +201,73 @@ export function PatientScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#ecf0f1",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
+  contentContainer: {
+    padding: 20,
+  },
+  header: {
+    backgroundColor: "#fff",
+    paddingVertical: 16,
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
     marginBottom: 20,
   },
-  input: {
-    height: 40,
-    borderColor: "gray",
-    borderWidth: 1,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#2c3e50",
+  },
+  error: {
+    color: "red",
+    textAlign: "center",
     marginBottom: 10,
-    padding: 10,
+  },
+  formCard: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 6,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  input: {
+    height: 45,
+    borderColor: "#bdc3c7",
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 15,
+    fontSize: 16,
+    color: "#2c3e50",
+  },
+  fieldError: {
+    color: "red",
+    fontSize: 14,
+    marginBottom: 10,
   },
   button: {
     backgroundColor: "#3498db",
-    padding: 15,
+    paddingVertical: 15,
     borderRadius: 5,
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 15,
+  },
+  deleteButton: {
+    backgroundColor: "#e74c3c",
   },
   buttonDisabled: {
-    backgroundColor: "#3498db",
-    opacity: 0.5,
-    padding: 15,
-    borderRadius: 5,
-    alignItems: "center",
-    marginBottom: 10,
+    opacity: 0.6,
   },
   buttonText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "bold",
-  },
-  error: {
-    color: "red",
-    // Add any other styles you want
+    fontWeight: "600",
   },
 })
+
+export { PatientScreen }

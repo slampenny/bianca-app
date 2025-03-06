@@ -43,7 +43,7 @@ const config = {
     Login: {
       path: "",
     },
-    MainTabsWithDrawer: "MainTabsWithDrawer",
+    MainTabs: "MainTabs",
   },
 }
 

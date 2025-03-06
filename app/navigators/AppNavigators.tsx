@@ -1,6 +1,6 @@
 import { createStackNavigator } from '@react-navigation/stack';
 import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen } from "app/screens";
-import MainTabsWithDrawer from './MainTabsWithDrawer';
+import MainTabs from './MainTabs';
 import { AppStackParamList, LoginStackParamList } from './navigationTypes';
 
 const Stack = createStackNavigator<AppStackParamList>();
@@ -8,7 +8,7 @@ const LoginStack = createStackNavigator<LoginStackParamList>();
 
 export const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="MainTabsWithDrawer" component={MainTabsWithDrawer} />
+    <Stack.Screen name="MainTabs" component={MainTabs} />
   </Stack.Navigator>
 );
 

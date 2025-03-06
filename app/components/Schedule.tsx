@@ -13,7 +13,6 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   initialSchedule,
   onScheduleChange,
 }) => {
-  const [schedule, setSchedule] = useState(initialSchedule)
   const [id, setId] = useState(initialSchedule.id)
   const [patient, setPatient] = useState(initialSchedule.patient)
   const [frequency, setFrequency] = useState(initialSchedule.frequency)
@@ -22,33 +21,28 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   const [time, setTime] = useState(initialSchedule.time)
 
   useEffect(() => {
-    setId(initialSchedule.id);
-    setPatient(initialSchedule.patient);
-    setFrequency(initialSchedule.frequency);
-    setIntervals(initialSchedule.intervals);
-    setIsActive(initialSchedule.isActive);
-    setTime(initialSchedule.time);
-  }, [initialSchedule]);
+    setId(initialSchedule.id)
+    setPatient(initialSchedule.patient)
+    setFrequency(initialSchedule.frequency)
+    setIntervals(initialSchedule.intervals)
+    setIsActive(initialSchedule.isActive)
+    setTime(initialSchedule.time)
+  }, [initialSchedule])
   
   useEffect(() => {
-    const newSchedule: Schedule = { id, patient, frequency, intervals, isActive, time };
-    setSchedule(newSchedule);
-    onScheduleChange(newSchedule);
-  }, [id, patient, frequency, intervals, isActive, time]);
+    const newSchedule: Schedule = { id, patient, frequency, intervals, isActive, time }
+    onScheduleChange(newSchedule)
+  }, [id, patient, frequency, intervals, isActive, time])
 
   const handleDayChange = (dayIndex: number, isChecked: boolean) => {
-    let newIntervals
-    if (isChecked) {
-      newIntervals = [...intervals, { day: dayIndex }]
-    } else {
-      newIntervals = intervals.filter((interval) => interval.day !== dayIndex)
-    }
+    const newIntervals = isChecked
+      ? [...intervals, { day: dayIndex }]
+      : intervals.filter((interval) => interval.day !== dayIndex)
     setIntervals(newIntervals)
   }
 
   const formatSchedule = (schedule: Schedule) => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-
     switch (schedule.frequency) {
       case "daily":
         return `Every day at ${schedule.time}`
@@ -57,79 +51,91 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
           const selectedDays = schedule.intervals
             .map((interval) => days[interval.day || 0])
             .join(", ")
-          return `Every ${selectedDays} at ${time}`
+          return `Every ${selectedDays} at ${schedule.time}`
         } else {
-          return `Every ${schedule.intervals.length > 0 ? schedule.intervals[0].day : 0} at ${time}`
+          return `Every week at ${schedule.time}`
         }
       case "monthly":
         return `Every month on the ${
           schedule.intervals.length > 0 ? schedule.intervals[0].day : 0
-        }th at ${time}`
+        }th at ${schedule.time}`
       default:
         return ""
     }
   }
 
-  const times = []
+  const times: string[] = []
   for (let i = 0; i < 24; i++) {
     for (let j = 0; j < 60; j += 15) {
-      const time = (i < 10 ? "0" + i : i) + ":" + (j < 10 ? "0" + j : j)
-      times.push(time)
+      const formattedTime =
+        (i < 10 ? "0" + i : i) + ":" + (j < 10 ? "0" + j : j)
+      times.push(formattedTime)
     }
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.form}>
-        <Text style={styles.headerText}>Schedule</Text>
-        <View style={styles.pickerContainer}>
-          <Text style={styles.label}>Start:</Text>
+      <Text style={styles.title}>Schedule</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Start Time</Text>
+        <View style={styles.pickerWrapper}>
           <Picker
             selectedValue={time}
-            onValueChange={(itemValue) => {
-              setTime(itemValue)
-            }}
+            onValueChange={(itemValue) => setTime(itemValue)}
             style={styles.picker}
+            itemStyle={styles.pickerItem}
           >
-            {times.map((time, index) => (
-              <Picker.Item key={index} label={time} value={time} />
+            {times.map((t, index) => (
+              <Picker.Item key={index} label={t} value={t} />
             ))}
           </Picker>
         </View>
-
-        <Text style={styles.label}>Frequncy:</Text>
-        <Picker style={styles.picker} selectedValue={frequency} onValueChange={setFrequency}>
-          <Picker.Item label="Daily" value="daily" />
-          <Picker.Item label="Weekly" value="weekly" />
-          <Picker.Item label="Monthly" value="monthly" />
-        </Picker>
-
-        {frequency === "weekly" && (
-          <View>
-            {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
-              (day, index) => {
-                const selectedDays = intervals.map((interval) => interval.day)
-                return (
-                  <View key={day} style={styles.checkboxContainer}>
-                    <Text style={styles.checkboxLabel}>{day}</Text>
-                    <Toggle value={selectedDays.includes(index)} onValueChange={(isChecked) => handleDayChange(index, isChecked)} variant="checkbox" />
-                  </View>
-                )
-              },
-            )}
-          </View>
-        )}
       </View>
 
-      {schedule && (
-        <View style={styles.eventDetails}>
-          <Text style={styles.eventTitle}>Schedule Details</Text>
-          <Text style={styles.eventText}>Schedule: {formatSchedule(schedule)}</Text>
-          <Text style={styles.eventText}>Frequency: {schedule.frequency}</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Frequency</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={frequency}
+            onValueChange={setFrequency}
+            style={styles.picker}
+            itemStyle={styles.pickerItem}
+          >
+            <Picker.Item label="Daily" value="daily" />
+            <Picker.Item label="Weekly" value="weekly" />
+            <Picker.Item label="Monthly" value="monthly" />
+          </Picker>
+        </View>
+      </View>
+
+      {frequency === "weekly" && (
+        <View style={styles.weeklyContainer}>
+          {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
+            (day, index) => {
+              const selectedDays = intervals.map((interval) => interval.day)
+              return (
+                <View key={day} style={styles.dayRow}>
+                  <Text style={styles.dayLabel}>{day}</Text>
+                  <Toggle
+                    value={selectedDays.includes(index)}
+                    onValueChange={(isChecked) => handleDayChange(index, isChecked)}
+                    variant="checkbox"
+                  />
+                </View>
+              )
+            }
+          )}
         </View>
       )}
-      <View style={styles.checkboxContainer}>
-        <Text style={styles.checkboxLabel}>Active:</Text>
+
+      <View style={styles.detailsCard}>
+        <Text style={styles.detailsTitle}>Schedule Details</Text>
+        <Text style={styles.detailsText}>Schedule: {formatSchedule({ id, patient, frequency, intervals, isActive, time })}</Text>
+        <Text style={styles.detailsText}>Frequency: {frequency}</Text>
+      </View>
+
+      <View style={styles.switchContainer}>
+        <Text style={styles.switchLabel}>Active:</Text>
         <Switch
           trackColor={{ false: "#767577", true: "#81b0ff" }}
           thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}
@@ -146,75 +152,92 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: "#ECF0F1",
+    backgroundColor: "#ecf0f1",
   },
-  headerText: {
-    fontSize: 24,
+  title: {
+    fontSize: 26,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: "#2c3e50",
+    textAlign: "center",
     marginBottom: 20,
   },
-  form: {
+  formGroup: {
     marginBottom: 20,
   },
   label: {
     fontSize: 18,
-    color: "#7F8C8D",
-    marginBottom: 5,
+    color: "#7f8c8d",
+    marginBottom: 8,
+  },
+  pickerWrapper: {
+    backgroundColor: "#fff",
+    borderColor: "#bdc3c7",
+    borderWidth: 1,
+    borderRadius: 5,
+    overflow: "hidden",
   },
   picker: {
     height: 50,
+    width: "100%",
+  },
+  pickerItem: {
+    height: 50,
+  },
+  weeklyContainer: {
     backgroundColor: "#fff",
-    borderColor: "#BDC3C7",
+    borderColor: "#bdc3c7",
     borderWidth: 1,
     borderRadius: 5,
-    marginBottom: 10,
+    padding: 10,
+    marginBottom: 20,
   },
-  eventDetails: {
-    padding: 20,
+  dayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomColor: "#ecf0f1",
+    borderBottomWidth: 1,
+  },
+  dayLabel: {
+    fontSize: 16,
+    color: "#2c3e50",
+  },
+  detailsCard: {
     backgroundColor: "#fff",
+    padding: 20,
     borderRadius: 5,
-    marginTop: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  eventTitle: {
+  detailsTitle: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: "#2c3e50",
     marginBottom: 10,
   },
-  eventText: {
-    fontSize: 18,
-    color: "#7F8C8D",
-    marginBottom: 10,
-  },
-  pickerContainer: {
-    borderColor: "#BDC3C7",
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 20,
-    overflow: "hidden",
-    padding: 10,
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    marginTop: 20,
-    marginBottom: 20,
-    alignItems: "center",
-  },
-  checkboxLabel: {
-    flex: 1,
+  detailsText: {
     fontSize: 16,
-    color: "#7F8C8D",
+    color: "#7f8c8d",
+    marginBottom: 5,
   },
   switchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 5,
+    borderColor: "#bdc3c7",
+    borderWidth: 1,
   },
   switchLabel: {
     fontSize: 18,
-    color: "#7F8C8D",
-    marginRight: 10,
+    color: "#2c3e50",
   },
 })
 

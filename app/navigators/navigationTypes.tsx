@@ -2,27 +2,44 @@ import { NavigationContainerProps } from '@react-navigation/native';
 
 export type AppStackParamList = {
   Login: undefined;
-  MainTabsWithDrawer: undefined;
-  HomeTab: undefined;
-  Caregiver: undefined;
-  Alert: undefined;
-  Home: undefined; // This points to the MainTabs
-  Org: undefined;
-  Payment: undefined;
-  Logout: undefined;
-  Patient: undefined;
-};
-
-export type MainTabsParamList = {
-  HomeTab: undefined;
-  Caregiver: undefined;
-  Alert: undefined;
+  MainTabs: undefined;
 };
 
 export type DrawerParamList = {
-  Home: undefined;  // This points to the MainTabs
+  Home: undefined;
+  Profile: undefined;
+  Alert: undefined;
   Org: undefined;
   Payment: undefined;
+  Logout: undefined;
+};
+
+export type HomeStackParamList = {
+  Home: undefined;
+  Patient: undefined;
+  Schedule: undefined;
+  Conversations: undefined;
+};
+
+export type ProfileStackParamList = {
+  Profile: undefined;
+};
+
+export type AlertStackParamList = {
+  Alert: undefined;
+};
+
+export type OrgStackParamList = {
+  Org: undefined;
+  Caregivers: undefined;
+  Caregiver: undefined;
+};
+
+export type PaymentStackParamList = {
+  Payment: undefined;
+};
+
+export type LogoutStackParamList = {
   Logout: undefined;
 };
 
@@ -31,13 +48,6 @@ export type LoginStackParamList = {
   Register: undefined;
   RequestReset: undefined;
   ConfirmReset: undefined;
-};
-
-export type HomeStackParamList = {
-  Home: undefined;
-  Patient: undefined;
-  Schedule: undefined;
-  Conversations: undefined;
 };
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {}

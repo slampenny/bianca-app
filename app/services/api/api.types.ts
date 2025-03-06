@@ -125,8 +125,8 @@ export interface Conversation {
   history: string;
   analyzedData: Record<string, unknown>;
   metadata: Record<string, unknown>;
-  startTime: Date;
-  endTime: Date;
+  startTime: string;
+  endTime: string;
   duration: number;
 }
 

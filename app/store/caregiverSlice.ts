@@ -6,11 +6,13 @@ import { authApi } from 'app/services/api';
 interface CaregiverState {
   caregiver: Caregiver | null;
   caregivers: Caregiver[]; // Array of selected users
+  currentOrg: string | null;
 }
 
 const initialState: CaregiverState = {
   caregiver: null,
   caregivers: [],
+  currentOrg: null,
 };
 
 export const caregiverSlice = createSlice({
@@ -32,17 +34,21 @@ export const caregiverSlice = createSlice({
     removeCaregiver: (state, action: PayloadAction<string>) => {
       state.caregivers = state.caregivers.filter(caregiver => caregiver.id !== action.payload);
     },
+    setCurrentOrg: (state, action: PayloadAction<string>) => {
+      state.currentOrg = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
       state.caregiver = payload.caregiver;
-    });
+    })
   }
 });
 
-export const { setCaregiver, setCaregivers, clearCaregiver, clearCaregivers, removeCaregiver } = caregiverSlice.actions;
+export const { setCaregiver, setCaregivers, clearCaregiver, clearCaregivers, removeCaregiver, setCurrentOrg } = caregiverSlice.actions;
 
 export const getCaregiver = (state: RootState) => state.caregiver.caregiver;
 export const getCaregivers = (state: RootState) => state.caregiver.caregivers;
+export const getCurrentOrg = (state: RootState) => state.caregiver.currentOrg;
 
 export default caregiverSlice.reducer;
