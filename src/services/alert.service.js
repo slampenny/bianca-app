@@ -26,45 +26,55 @@ const getAlertById = async (alertId, caregiverId) => {
 
 const getAlerts = async (caregiverId, showRead = false) => {
     const caregiver = await Caregiver.findById(caregiverId)
-                                      .populate({ path: 'org', select: 'caregivers' }) // Assuming 'caregivers' is an array of IDs
-                                      .populate({ path: 'patients', select: '_id' }); // Only populate patient IDs
-
+      .populate({ path: 'org', select: 'caregivers' }) // Assuming 'caregivers' is an array of IDs
+      .populate({ path: 'patients', select: '_id' }); // Only populate patient IDs
+  
     if (!caregiver) {
-        throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+      throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
     }
-
+  
     let visibilityConditions;
     if (caregiver.role === 'orgAdmin') {
-        // Org admins see alerts for all caregivers and orgAdmin-specific alerts
-        visibilityConditions = { $in: ['orgAdmin', 'allCaregivers'] };
+      // Org admins see alerts for all caregivers and orgAdmin-specific alerts
+      visibilityConditions = { $in: ['orgAdmin', 'allCaregivers'] };
     } else if (caregiver.role === 'staff') {
-        // Regular staff see only alerts for all caregivers
-        visibilityConditions = { $eq: 'allCaregivers' };
+      // Regular staff see only alerts for all caregivers
+      visibilityConditions = { $eq: 'allCaregivers' };
     } else {
-        // 'invited' role or any other roles not specified shouldn't see any alerts
-        visibilityConditions = { $eq: 'none' }; // 'none' is a placeholder; adjust as needed
+      // 'invited' role or any other roles not specified shouldn't see any alerts
+      visibilityConditions = { $eq: 'none' }; // 'none' is a placeholder; adjust as needed
     }
-
-    const conditions = {
-        $or: [
-            { createdBy: caregiver._id },
-            { createdBy: { $in: caregiver.org.caregivers }, visibility: visibilityConditions },
-            { createdBy: { $in: caregiver.patients.map(pt => pt._id) }, visibility: 'assignedCaregivers' }
-        ],
-        relevanceUntil: { $gte: new Date() }
+  
+    // Original conditions for relevant alerts
+    const baseConditions = {
+      $or: [
+        { createdBy: caregiver._id },
+        { createdBy: { $in: caregiver.org.caregivers }, visibility: visibilityConditions },
+        { createdBy: { $in: caregiver.patients.map(pt => pt._id) }, visibility: 'assignedCaregivers' }
+      ],
+ //     relevanceUntil: { $gte: new Date() }
     };
-
+  
     if (!showRead) {
-        conditions.$or = [
-            { readBy: { $ne: caregiverId } },
-            { readBy: { $size: 0 } }
-        ];
+      // Combine the base conditions with an extra condition ensuring the alert hasn't been read
+      // using an $and operator.
+      const unreadCondition = {
+        $or: [
+          { readBy: { $exists: false } },
+          { readBy: { $eq: [] } },
+          { readBy: { $not: { $elemMatch: { $eq: caregiverId } } } }
+        ]
+      };
+      // Final query requires both base conditions and the unread condition.
+      const conditions = { $and: [baseConditions, unreadCondition] };
+      const alerts = await Alert.find(conditions);
+      return alerts;
+    } else {
+      // If showRead is true, just use base conditions.
+      const alerts = await Alert.find(baseConditions);
+      return alerts;
     }
-
-    const alerts = await Alert.find(conditions);
-    return alerts;
-};
-
+  };
 
 const updateAlertById = async (alertId, updateBody) => {
     const alert = await Alert.findById(alertId);
