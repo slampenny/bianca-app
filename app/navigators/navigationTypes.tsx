@@ -3,6 +3,7 @@ import { NavigationContainerProps } from '@react-navigation/native';
 export type AppStackParamList = {
   Login: undefined;
   MainTabs: undefined;
+  Profile: undefined;
 };
 
 export type DrawerParamList = {

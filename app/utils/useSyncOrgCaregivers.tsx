@@ -11,6 +11,7 @@ export function useSyncOrgCaregivers() {
   const orgId = currentUser?.org || null;
 
   // Query caregivers for this org
+  console.log('orgId:', orgId);
   const { data: caregiversData } = useGetAllCaregiversQuery({ org: orgId }, { skip: !orgId });
 
   // If the org changes, update it in the slice

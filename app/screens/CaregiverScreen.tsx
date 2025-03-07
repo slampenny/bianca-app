@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Text, TextInput, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { Text, TextInput, ScrollView, Pressable, StyleSheet, View } from 'react-native';
 import { getCaregiver } from '../store/caregiverSlice';
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from '../services/api/caregiverApi';
 import AvatarPicker from 'app/components/AvatarPicker';
@@ -13,6 +13,7 @@ export function CaregiverScreen() {
   const [avatar, setAvatar] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (caregiver) {
@@ -23,7 +24,7 @@ export function CaregiverScreen() {
     }
   }, [caregiver]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (caregiver && caregiver.id) {
       const updatedCaregiver = {
         ...caregiver,
@@ -31,24 +32,30 @@ export function CaregiverScreen() {
         email,
         phone,
       };
-  
-      if (avatar !== caregiver.avatar) {
-        uploadAvatar({
-          id: caregiver.id,
-          avatar,
-        });
-        updatedCaregiver.avatar = avatar;
+
+      try {
+        if (avatar !== caregiver.avatar) {
+          await uploadAvatar({ id: caregiver.id, avatar }).unwrap();
+          updatedCaregiver.avatar = avatar;
+        }
+        await updateCaregiver({ id: caregiver.id, caregiver: updatedCaregiver }).unwrap();
+        setSuccessMessage('Your profile has been updated successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } catch (error) {
+        setSuccessMessage('Failed to update your profile. Please try again.');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        console.error('Failed to update caregiver:', error);
       }
-  
-      updateCaregiver({
-        id: caregiver.id,
-        caregiver: updatedCaregiver,
-      });
     }
   };
-  
+
   return (
     <ScrollView style={styles.container}>
+      {successMessage && (
+        <View style={styles.messageContainer}>
+          <Text style={styles.messageText}>{successMessage}</Text>
+        </View>
+      )}
       <AvatarPicker initialAvatar={avatar} onAvatarChanged={setAvatar} />
       <TextInput
         style={styles.input}
@@ -81,10 +88,16 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  messageContainer: {
+    backgroundColor: '#d4edda',
+    padding: 10,
+    marginBottom: 15,
+    borderRadius: 5,
+  },
+  messageText: {
+    color: '#155724',
+    fontSize: 16,
+    textAlign: 'center',
   },
   input: {
     height: 40,

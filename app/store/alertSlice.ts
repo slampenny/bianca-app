@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
 import { authApi, alertApi } from '../services/api';
 import { Alert } from '../services/api/api.types';
+import { getCurrentUser } from './authSlice';
 
 interface AlertState {
   selectedAlert: Alert | null;
@@ -74,5 +75,16 @@ export const { setAlert, setAlerts, clearAlert, clearAlerts, removeSelectedAlert
 
 export const getSelectedAlert = (state: RootState) => state.alert.selectedAlert;
 export const getAlerts = (state: RootState) => state.alert.alerts;
+
+export const selectUnreadAlertCount = (state: RootState) => {
+  const currentUser = getCurrentUser(state); // Get the current user
+  if (!currentUser || !currentUser.id) { // Check if currentUser and currentUser.id exist
+    return 0; // If no current user or no user ID, no unread alerts
+  }
+
+  return state.alert.alerts.filter(alert => {
+    return !alert.readBy.includes(currentUser.id); // Check if current user's ID is in readBy
+  }).length;
+};
 
 export default alertSlice.reducer;

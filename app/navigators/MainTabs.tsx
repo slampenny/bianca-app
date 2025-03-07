@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import { 
   HomeScreen, 
   PatientScreen, 
@@ -17,6 +18,7 @@ import { DrawerParamList } from './navigationTypes';
 import ProfileButton from 'app/components/ProfileButton';
 import { useSelector } from 'react-redux';
 import { getCurrentUser } from 'app/store/authSlice';
+import { selectUnreadAlertCount } from 'app/store/alertSlice';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator<DrawerParamList>();
@@ -35,6 +37,7 @@ function HomeStack() {
       <Stack.Screen name="Patient" component={PatientScreen} />
       <Stack.Screen name="Schedule" component={SchedulesScreen} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
+      <Stack.Screen name="Profile" component={CaregiverScreen} />
     </Stack.Navigator>
   );
 }
@@ -93,16 +96,44 @@ function LogoutStack() {
 }
 
 export default function MainTabNavigator() {
+  const unreadAlertCount = useSelector(selectUnreadAlertCount); // Get unread alert count
+
   return (
-    <Tab.Navigator initialRouteName="Home" screenOptions={{
-      headerShown: false, // Each stack handles its own header
-      tabBarActiveTintColor: "#3498db",
-      tabBarInactiveTintColor: "#7f8c8d",
-    }}>
+    <Tab.Navigator 
+      initialRouteName="Home"
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: '#3498db',
+        tabBarInactiveTintColor: '#7f8c8d',
+        tabBarShowLabel: false, // Hide default labels
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Org') {
+            iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'Payment') {
+            iconName = focused ? 'card' : 'card-outline';
+          } else if (route.name === 'Alert') {
+            iconName = focused ? 'alert-circle' : 'alert-circle-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+      })}
+    >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Org" component={OrgStack} />
       <Tab.Screen name="Payment" component={PaymentStack} />
-      <Tab.Screen name="Alert" component={AlertStack} />
+      <Tab.Screen
+        name="Alert"
+        component={AlertStack}
+        options={{
+          tabBarLabel: 'Alert', // Custom label
+          tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : null, // Show badge if unread count > 0
+        }}
+      />
     </Tab.Navigator>
   );
 }
