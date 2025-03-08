@@ -36,4 +36,4 @@ phases:
 artifacts:
   files:
     - imagedefinitions.json
-    - appspec.yml
+    - devops/appspec.yml

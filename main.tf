@@ -178,6 +178,45 @@ resource "aws_iam_role_policy_attachment" "codebuild_ecr_policy_attach" {
   policy_arn = aws_iam_policy.codebuild_ecr_policy.arn
 }
 
+resource "aws_iam_policy" "codebuild_ecs_policy" {
+  name        = "CodeBuildECSPolicy"
+  description = "Allow CodeBuild to register ECS task definitions"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "ecs:RegisterTaskDefinition",
+        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/${var.service_name}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codebuild_ecs_policy_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_ecs_policy.arn
+}
+
+resource "aws_iam_policy" "codebuild_pass_role_policy" {
+  name        = "CodeBuildPassRolePolicy"
+  description = "Allow CodeBuild to pass the ECS task execution role"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "iam:PassRole",
+        Resource = "arn:aws:iam::${var.aws_account_id}:role/${var.ecs_execution_role_name}"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codebuild_pass_role_policy_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_pass_role_policy.arn
+}
 
 resource "aws_iam_role_policy_attachment" "codebuild_policy" {
   role       = aws_iam_role.codebuild_role.name
@@ -282,6 +321,33 @@ resource "aws_iam_role" "codepipeline_role" {
         ],
         Resource = aws_codebuild_project.bianca_project.arn
       }]
+    })
+  }
+
+  inline_policy {
+    name   = "CodePipelineCodeDeployAccess"
+    policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [
+        {
+          Sid    = "AllowCodeDeployActions",
+          Effect = "Allow",
+          Action = [
+            "codedeploy:CreateDeployment",
+            "codedeploy:GetDeploymentConfig",
+            "codedeploy:RegisterApplicationRevision",
+            "codedeploy:GetDeployment",
+            "codedeploy:GetApplicationRevision",
+            "codedeploy:ListDeploymentConfigs",
+            "codedeploy:ListDeploymentGroups"
+          ],
+          Resource = [
+            "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentgroup:${var.application_name}/${var.deployment_group_name}",
+            "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentconfig:CodeDeployDefault.ECSAllAtOnce",
+            "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:application:${var.application_name}"
+          ]
+        }
+      ]
     })
   }
 }
