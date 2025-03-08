@@ -30,8 +30,8 @@ phases:
       - echo Writing image definitions file...
       - printf '[{"name":"bianca-app-backend","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - echo Updating appspec.yml with the new task definition ARN...
-      - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-      - sed -i 's|PLACEHOLDER_FOR_TASK_DEFINITION_ARN|'"$NEW_TASK_DEFINITION"'|g' appspec.yml
+      - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://devops/task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      - sed -i 's|PLACEHOLDER_FOR_TASK_DEFINITION_ARN|'"$NEW_TASK_DEFINITION"'|g' devops/appspec.yml
 
 artifacts:
   files:

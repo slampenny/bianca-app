@@ -51,6 +51,12 @@ variable "github_branch" {
   default = "main"
 }
 
+variable "github_app_connection_arn" {
+  description = "The ARN of the GitHub App connection to use for CodePipeline."
+  default = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+  type        = string
+}
+
 /*
   The name of the Secrets Manager secret holding your GitHub token.
   (e.g. "MySecretsManagerSecret")
@@ -128,79 +134,6 @@ resource "aws_ecr_repository" "app_repo" {
   name = var.repository_name
 }
 
-data "aws_iam_policy_document" "codepipeline_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["codepipeline.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "codepipeline_role" {
-  name               = var.codepipeline_role_name
-  assume_role_policy = data.aws_iam_policy_document.codepipeline_assume.json
-}
-
-resource "aws_iam_role_policy_attachment" "codepipeline_policy" {
-  role       = aws_iam_role.codepipeline_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess"
-}
-
-resource "aws_iam_policy" "codepipeline_secretsmanager_policy" {
-  name        = "CodePipelineSecretsManagerAccess"
-  description = "Allow CodePipeline to access the GitHub token from Secrets Manager"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Sid    = "AllowGetSecretValue",
-        Effect = "Allow",
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ],
-        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret}*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "codepipeline_secretsmanager_attachment" {
-  role       = aws_iam_role.codepipeline_role.name
-  policy_arn = aws_iam_policy.codepipeline_secretsmanager_policy.arn
-}
-
-resource "aws_iam_policy" "codepipeline_s3_policy" {
-  name        = "CodePipelineS3AccessPolicy"
-  description = "Allow CodePipeline to put objects in the artifact bucket"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Sid    = "AllowPutObject",
-        Effect = "Allow",
-        Action = [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:GetObjectVersion",
-          "s3:ListBucket"
-        ],
-        Resource = [
-          "arn:aws:s3:::${var.bucket_name}",
-          "arn:aws:s3:::${var.bucket_name}/*"
-        ]
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "codepipeline_s3_attach" {
-  role       = aws_iam_role.codepipeline_role.name
-  policy_arn = aws_iam_policy.codepipeline_s3_policy.arn
-}
-
-
 data "aws_iam_policy_document" "codebuild_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -216,9 +149,59 @@ resource "aws_iam_role" "codebuild_role" {
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume.json
 }
 
+resource "aws_iam_policy" "codebuild_ecr_policy" {
+  name        = "CodeBuildECRPolicy"
+  description = "Allow CodeBuild to push Docker images to ECR"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowECRPush",
+        Effect   = "Allow",
+        Action   = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codebuild_ecr_policy_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_ecr_policy.arn
+}
+
+
 resource "aws_iam_role_policy_attachment" "codebuild_policy" {
   role       = aws_iam_role.codebuild_role.name
   policy_arn = "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess"
+}
+
+data "aws_iam_policy_document" "ecs_exec_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ecs_execution_role" {
+  name               = var.ecs_execution_role_name
+  assume_role_policy = data.aws_iam_policy_document.ecs_exec_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 data "aws_iam_policy_document" "codedeploy_assume" {
@@ -241,24 +224,138 @@ resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
 }
 
-data "aws_iam_policy_document" "ecs_exec_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
+resource "aws_iam_role" "codepipeline_role" {
+  name = var.codepipeline_role_name
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "codepipeline.amazonaws.com" }
+    }]
+  })
+
+  inline_policy {
+    name   = "CodePipelineSecretsManagerAccess"
+    policy = jsonencode({
+      Version   = "2012-10-17",
+      Statement = [{
+        Sid      = "AllowGetSecretValue",
+        Effect   = "Allow",
+        Action   = "secretsmanager:GetSecretValue",
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret}*"
+      }]
+    })
+  }
+
+  inline_policy {
+    name   = "CodePipelineS3AccessPolicy"
+    policy = jsonencode({
+      Version   = "2012-10-17",
+      Statement = [{
+        Sid      = "AllowS3Actions",
+        Effect   = "Allow",
+        Action   = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:ListBucket"
+        ],
+        Resource = [
+          "arn:aws:s3:::${var.bucket_name}",
+          "arn:aws:s3:::${var.bucket_name}/*"
+        ]
+      }]
+    })
+  }
+
+  inline_policy {
+    name   = "CodePipelineCodeBuildAccess"
+    policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [{
+        Sid      = "AllowCodeBuildActions",
+        Effect   = "Allow",
+        Action   = [
+          "codebuild:StartBuild",
+          "codebuild:BatchGetBuilds"
+        ],
+        Resource = aws_codebuild_project.bianca_project.arn
+      }]
+    })
   }
 }
 
-resource "aws_iam_role" "ecs_execution_role" {
-  name               = var.ecs_execution_role_name
-  assume_role_policy = data.aws_iam_policy_document.ecs_exec_assume.json
+resource "aws_iam_role_policy_attachment" "codepipeline_policy" {
+  role       = aws_iam_role.codepipeline_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
-  role       = aws_iam_role.ecs_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+resource "aws_iam_policy" "codepipeline_connection_policy" {
+  name        = "CodePipelineConnectionPolicy"
+  description = "Allow CodePipeline to use the GitHub App-based connection"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "codestar-connections:UseConnection",
+        Resource = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codepipeline_connection_policy_attach" {
+  role       = aws_iam_role.codepipeline_role.name
+  policy_arn = aws_iam_policy.codepipeline_connection_policy.arn
+}
+
+resource "aws_iam_policy" "codebuild_logs_policy" {
+  name        = "CodeBuildLogsPolicy"
+  description = "Allow CodeBuild to create log groups, log streams, and put log events in CloudWatch Logs"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codebuild_logs_policy_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_logs_policy.arn
+}
+
+resource "aws_iam_policy" "codebuild_artifact_access" {
+  name        = "CodeBuildArtifactAccessPolicy"
+  description = "Allow CodeBuild to read from and write artifacts to the CodePipeline artifact bucket"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ],
+        Resource = "arn:aws:s3:::${var.bucket_name}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codebuild_artifact_access_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_artifact_access.arn
 }
 
 resource "aws_ecs_cluster" "cluster" {
@@ -386,6 +483,7 @@ resource "aws_codebuild_project" "bianca_project" {
 
   source {
     type     = "CODEPIPELINE"
+    buildspec = "devops/buildspec.yml"
   }
 }
 
@@ -456,17 +554,15 @@ resource "aws_codepipeline" "bianca_pipeline" {
     action {
       name             = "SourceAction"
       category         = "Source"
-      owner            = "ThirdParty"
-      provider         = "GitHub"
+      owner            = "AWS"
+      provider         = "CodeStarSourceConnection"  # Even though we are using a GitHub App, this provider name remains
       version          = "1"
       output_artifacts = ["SourceOutput"]
       configuration = {
-        Owner      = var.github_owner
-        Repo       = var.github_repo
-        Branch     = var.github_branch
-        OAuthToken = "{{resolve:secretsmanager:${var.secrets_manager_secret}:SecretString:GitHubToken}}"
+        ConnectionArn    = var.github_app_connection_arn
+        FullRepositoryId = "${var.github_owner}/${var.github_repo}"
+        BranchName       = var.github_branch
       }
-  
       run_order = 1
     }
   }
