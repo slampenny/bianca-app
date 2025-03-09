@@ -69,6 +69,10 @@ app.use(helmet());
 // v1 api routes
 app.use('/v1', routes);
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Log incoming requests
 app.use((req, res, next) => {
   //console.log(`Incoming request: ${req.method} ${req.url}`);

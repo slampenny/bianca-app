@@ -93,7 +93,11 @@ resource "aws_lb_target_group" "app_tg_blue" {
   target_type = "ip"
 
   health_check {
-    path = "/health"
+    path                = "/health"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 2
   }
 }
 
@@ -105,7 +109,11 @@ resource "aws_lb_target_group" "app_tg_green" {
   target_type = "ip"
 
   health_check {
-    path = "/health"
+    path                = "/health"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 2
   }
 }
 
@@ -372,6 +380,28 @@ resource "aws_iam_role_policy_attachment" "codedeploy_ecs_createtaskset_policy_a
   role       = aws_iam_role.codedeploy_role.name
   policy_arn = aws_iam_policy.codedeploy_ecs_createtaskset_policy.arn
 }
+
+resource "aws_iam_policy" "codedeploy_ecs_deletetaskset_policy" {
+  name        = "CodeDeployECSDeleteTaskSetPolicy"
+  description = "Allow CodeDeploy to delete ECS task sets during blue/green deployments"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowDeleteTaskSet",
+        Effect   = "Allow",
+        Action   = "ecs:DeleteTaskSet",
+        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-set/${var.cluster_name}/${var.service_name}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codedeploy_ecs_deletetaskset_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_ecs_deletetaskset_policy.arn
+}
+
 
 resource "aws_iam_policy" "codedeploy_pass_role_policy" {
   name        = "CodeDeployPassRolePolicy"
