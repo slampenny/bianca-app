@@ -28,6 +28,7 @@
     "docker:test": "docker-compose -f docker-compose.yml -f docker-compose.test.yml up",
     "prepare": "husky install",
     "seed": "cross-env NODE_ENV=development nodemon src/scripts/seedDatabase.js",
+    "terraform:taint": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest taint aws_ecs_service.app_service",
     "terraform:init": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest init",
     "terraform:plan": "docker run --rm -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest plan  -no-color -input=false",
     "terraform:apply": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest apply -auto-approve",

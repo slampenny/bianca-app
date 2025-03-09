@@ -517,13 +517,14 @@ resource "aws_ecs_service" "app_service" {
     assign_public_ip = true
   }
 
-  # load_balancer {
-  #   target_group_arn = aws_lb_target_group.app_tg_blue.arn
-  #   container_name   = var.container_name
-  #   container_port   = var.container_port
-  # }
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app_tg_green.arn
+    container_name   = var.container_name
+    container_port   = var.container_port
+  }
+
   lifecycle {
-    ignore_changes = [ task_definition, load_balancer ]
+    ignore_changes = [ task_definition ]
   }
 
   depends_on = [
@@ -531,6 +532,7 @@ resource "aws_ecs_service" "app_service" {
     aws_lb_listener.test_listener
   ]
 }
+
 
 resource "aws_codebuild_project" "bianca_project" {
   name         = "bianca"
@@ -580,9 +582,6 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
   }
 
   load_balancer_info {
-    # target_group_info {
-    #   name = var.target_group_name
-    # }
     target_group_pair_info {
       prod_traffic_route {
         listener_arns = [aws_lb_listener.prod_listener.arn]
@@ -591,10 +590,10 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
         listener_arns = [aws_lb_listener.test_listener.arn]
       }
       target_group {
-        name = aws_lb_target_group.app_tg_blue.name
+        name = aws_lb_target_group.app_tg_green.name  # Primary target group is green
       }
       target_group {
-        name = aws_lb_target_group.app_tg_green.name
+        name = aws_lb_target_group.app_tg_blue.name   # Secondary target group is blue
       }
     }
   }
@@ -604,6 +603,7 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
     service_name = aws_ecs_service.app_service.name
   }
 }
+
 
 resource "aws_codepipeline" "bianca_pipeline" {
   name     = "BiancaPipeline"

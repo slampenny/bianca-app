@@ -3,17 +3,8 @@ Resources:
   - TargetService:
       Type: AWS::ECS::Service
       Properties:
-        #TaskDefinition: "arn:aws:ecs:us-east-2:730335291008:task-definition/bianca-webapp:14"  # Update this with the actual ARN dynamically during deployment
         TaskDefinition: "PLACEHOLDER_FOR_TASK_DEFINITION_ARN"
         LoadBalancerInfo:
           ContainerName: "bianca-app-backend"
           ContainerPort: 80
         PlatformVersion: "LATEST"
-        CapacityProviderStrategy:
-          - Base: 1
-            CapacityProvider: "FARGATE_SPOT"
-            Weight: 2
-          - Base: 0
-            CapacityProvider: "FARGATE"
-            Weight: 1
-# Uncomment and configure the optional sections as necessary
