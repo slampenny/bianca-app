@@ -76,4 +76,8 @@ if (config.env === 'development' || config.env === 'test') {
   });
 }
 
+router.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 module.exports = router;

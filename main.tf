@@ -91,6 +91,10 @@ resource "aws_lb_target_group" "app_tg_blue" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+
+  health_check {
+    path = "/health"
+  }
 }
 
 resource "aws_lb_target_group" "app_tg_green" {
@@ -99,6 +103,10 @@ resource "aws_lb_target_group" "app_tg_green" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+
+  health_check {
+    path = "/health"
+  }
 }
 
 variable "container_name" {
@@ -106,7 +114,7 @@ variable "container_name" {
 }
 
 variable "container_port" {
-  default = 80
+  default = 3000
 }
 
 variable "vpc_id" {
@@ -124,10 +132,6 @@ variable "security_group_id" {
 
 resource "aws_s3_bucket" "artifact_bucket" {
   bucket = var.bucket_name
-
-  # versioning {
-  #   enabled = true
-  # }
 }
 
 resource "aws_ecr_repository" "app_repo" {
@@ -261,6 +265,133 @@ resource "aws_iam_role" "codedeploy_role" {
 resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
   role       = aws_iam_role.codedeploy_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+}
+
+resource "aws_iam_policy" "codedeploy_ecs_policy" {
+  name        = "CodeDeployECSPolicy"
+  description = "Allow CodeDeploy to describe ECS services"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid: "AllowDescribeServices",
+        Effect: "Allow",
+        Action: "ecs:DescribeServices",
+        Resource: "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/${var.cluster_name}/${var.service_name}"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_ecs_policy.arn
+}
+
+resource "aws_iam_policy" "codedeploy_s3_policy" {
+  name        = "CodeDeployS3Policy"
+  description = "Allow CodeDeploy to read deployment artifacts from S3"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowS3Access",
+        Effect   = "Allow",
+        Action   = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:ListBucket"
+        ],
+        Resource = [
+          "arn:aws:s3:::${var.bucket_name}",
+          "arn:aws:s3:::${var.bucket_name}/*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codedeploy_s3_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_s3_policy.arn
+}
+
+resource "aws_iam_policy" "codedeploy_elbv2_policy" {
+  name        = "CodeDeployELBV2Policy"
+  description = "Allow CodeDeploy to perform operations on ELBv2"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowDescribeELBv2",
+        Effect   = "Allow",
+        Action   = [
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeRules",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetHealth"
+        ],
+        Resource = "*"
+      },
+      {
+        Sid      = "AllowModifyELBv2",
+        Effect   = "Allow",
+        Action   = [
+          "elasticloadbalancing:ModifyListener",
+          "elasticloadbalancing:ModifyRule",
+          "elasticloadbalancing:ModifyTargetGroup"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codedeploy_elbv2_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_elbv2_policy.arn
+}
+
+resource "aws_iam_policy" "codedeploy_ecs_createtaskset_policy" {
+  name        = "CodeDeployECSCreatetasksetPolicy"
+  description = "Allow CodeDeploy to create ECS task sets for blue/green deployments"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowCreateTaskSet",
+        Effect   = "Allow",
+        Action   = "ecs:CreateTaskSet",
+        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-set/${var.cluster_name}/${var.service_name}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codedeploy_ecs_createtaskset_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_ecs_createtaskset_policy.arn
+}
+
+resource "aws_iam_policy" "codedeploy_pass_role_policy" {
+  name        = "CodeDeployPassRolePolicy"
+  description = "Allow CodeDeploy to pass the ECS task execution role"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowPassECSExecutionRole",
+        Effect   = "Allow",
+        Action   = "iam:PassRole",
+        Resource = "arn:aws:iam::${var.aws_account_id}:role/${var.ecs_execution_role_name}"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codedeploy_pass_role_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_pass_role_policy.arn
 }
 
 resource "aws_iam_role" "codepipeline_role" {
