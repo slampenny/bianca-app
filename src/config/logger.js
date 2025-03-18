@@ -15,18 +15,23 @@ const logger = winston.createLogger({
   format: winston.format.combine(
     enumerateErrorFormat(),
     winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => `${timestamp} ${level}: ${message}`),
+    winston.format.printf(({ timestamp, level, message }) => `${timestamp} ${level}: ${message}`)
   ),
   transports: [
+    // Log to the console
     new winston.transports.Console({
-      stderrLevels: ['error'],
+      stderrLevels: ['error']
     }),
+    // Log to a file (logs/app.log)
+    new winston.transports.File({ filename: 'logs/app.log' })
   ],
   exceptionHandlers: [
-    new winston.transports.Console()
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/exceptions.log' })
   ],
   rejectionHandlers: [
-    new winston.transports.Console()
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/rejections.log' })
   ]
 });
 
