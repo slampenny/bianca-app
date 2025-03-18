@@ -63,9 +63,9 @@ const configVars = {
   env: envVars.NODE_ENV,
   port: 3000,
   authEnabled: true,//process.env.NODE_ENV !== 'development',
-  apiUrl: 'http://0.0.0.0:3000/v1',
+  apiUrl: 'http://localhost:3000/v1',
   mongoose: {
-    url: ((envVars.MONGODB_URL) ? envVars.MONGODB_URL: 'mongodb://0.0.0.0:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
+    url: ((envVars.MONGODB_URL) ? envVars.MONGODB_URL: 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {
       useCreateIndex: true,
       useNewUrlParser: true,
@@ -122,7 +122,7 @@ const configVars = {
 
 if (envVars.NODE_ENV === 'production') {
   configVars.apiUrl = 'http://app.myphonefriend.com/v1';
-  configVars.mongoose.url = 'mongodb://mongo:27017/bianca-app';
+  configVars.mongoose.url = 'mongodb://localhost:27017/bianca-app';
   configVars.email.smtp.secure = true;
   configVars.twilio.apiUrl = 'https://app.myphonefriend.com';
 }

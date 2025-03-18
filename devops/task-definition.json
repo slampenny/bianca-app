@@ -16,7 +16,11 @@
       "environment": [
         {
           "name": "MONGODB_URL",
-          "value": "mongodb://mongodb:27017/bianca-app"
+          "value": "mongodb://localhost:27017/bianca-app"
+        },
+        {
+          "name": "NODE_ENV",
+          "value": "production"
         }
       ]
     },
