@@ -507,6 +507,22 @@ resource "aws_iam_role_policy" "ecs_task_role_policy" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_task_secrets_policy" {
+  name = "ecs-task-secrets-policy"
+  role = aws_iam_role.ecs_task_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "AllowSecretsManagerGetSecretValue"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = "arn:aws:secretsmanager:us-east-2:730335291008:secret:MySecretsManagerSecret-LyB1aP"
+      }
+    ]
+  })
+}
 
 # CodePipeline Role
 resource "aws_iam_role" "codepipeline_role" {

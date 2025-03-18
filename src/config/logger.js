@@ -1,6 +1,12 @@
 const winston = require('winston');
 const config = require('./config');
 
+const logDir = 'logs';
+
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir);
+}
+
 const enumerateErrorFormat = winston.format((info) => {
   if (info instanceof Error) {
     Object.assign(info, { message: info.stack });
@@ -23,15 +29,15 @@ const logger = winston.createLogger({
       stderrLevels: ['error']
     }),
     // Log to a file (logs/app.log)
-    new winston.transports.File({ filename: 'logs/app.log' })
+    new winston.transports.File({ filename: path.join(logDir, 'error.log') })
   ],
   exceptionHandlers: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/exceptions.log' })
+    new winston.transports.File({ filename: path.join(logDir, 'exceptions.log') })
   ],
   rejectionHandlers: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/rejections.log' })
+    new winston.transports.File({ filename: path.join(logDir, 'rejections.log') })
   ]
 });
 
