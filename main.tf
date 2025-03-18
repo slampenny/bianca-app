@@ -3,6 +3,10 @@ provider "aws" {
   profile = var.aws_profile
 }
 
+##############################
+# Variables
+##############################
+
 variable "aws_profile" {
   default = "jordan"
 }
@@ -53,14 +57,10 @@ variable "github_branch" {
 
 variable "github_app_connection_arn" {
   description = "The ARN of the GitHub App connection to use for CodePipeline."
-  default = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+  default     = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
   type        = string
 }
 
-/*
-  The name of the Secrets Manager secret holding your GitHub token.
-  (e.g. "MySecretsManagerSecret")
-*/
 variable "secrets_manager_secret" {
   default = "MySecretsManagerSecret"
 }
@@ -85,38 +85,6 @@ variable "load_balancer_name" {
   default = "bianca-load-balancer"
 }
 
-resource "aws_lb_target_group" "app_tg_blue" {
-  name        = "bianca-target-group-blue"
-  port        = var.container_port    # e.g. 80
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
-
-  health_check {
-    path                = "/health"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 3
-    unhealthy_threshold = 2
-  }
-}
-
-resource "aws_lb_target_group" "app_tg_green" {
-  name        = "bianca-target-group-green"
-  port        = var.container_port    # e.g. 80
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
-
-  health_check {
-    path                = "/health"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 3
-    unhealthy_threshold = 2
-  }
-}
-
 variable "container_name" {
   default = "bianca-app-backend"
 }
@@ -134,9 +102,69 @@ variable "subnet_ids" {
   default = ["subnet-016b6aba534de1845", "subnet-0c7b38f9439f97b3e", "subnet-006892e47fe84433f"]
 }
 
-variable "security_group_id" {
-  default = "sg-0e3774173bebafaab"
+##############################
+# Security Group
+##############################
+
+resource "aws_security_group" "bianca_app_sg" {
+  name   = "bianca-app-sg"
+  vpc_id = var.vpc_id
+
+  ingress {
+    description = "Allow traffic on port 3000 from self (ALB to ECS)"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    self        = true
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
+
+##############################
+# ALB Target Groups
+##############################
+
+resource "aws_lb_target_group" "app_tg_blue" {
+  name        = "bianca-target-group-blue"
+  port        = var.container_port    # e.g. 3000
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 2
+  }
+}
+
+resource "aws_lb_target_group" "app_tg_green" {
+  name        = "bianca-target-group-green"
+  port        = var.container_port    # e.g. 3000
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 2
+  }
+}
+
+##############################
+# S3 Bucket and ECR Repository
+##############################
 
 resource "aws_s3_bucket" "artifact_bucket" {
   bucket = var.bucket_name
@@ -146,6 +174,11 @@ resource "aws_ecr_repository" "app_repo" {
   name = var.repository_name
 }
 
+##############################
+# IAM Roles and Policies
+##############################
+
+# CodeBuild Role
 data "aws_iam_policy_document" "codebuild_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -165,7 +198,7 @@ resource "aws_iam_policy" "codebuild_ecr_policy" {
   name        = "CodeBuildECRPolicy"
   description = "Allow CodeBuild to push Docker images to ECR"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Sid      = "AllowECRPush",
@@ -194,7 +227,7 @@ resource "aws_iam_policy" "codebuild_ecs_policy" {
   name        = "CodeBuildECSPolicy"
   description = "Allow CodeBuild to register ECS task definitions"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Effect   = "Allow",
@@ -214,7 +247,7 @@ resource "aws_iam_policy" "codebuild_pass_role_policy" {
   name        = "CodeBuildPassRolePolicy"
   description = "Allow CodeBuild to pass the ECS task execution role"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Effect   = "Allow",
@@ -235,26 +268,7 @@ resource "aws_iam_role_policy_attachment" "codebuild_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess"
 }
 
-data "aws_iam_policy_document" "ecs_exec_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "ecs_execution_role" {
-  name               = var.ecs_execution_role_name
-  assume_role_policy = data.aws_iam_policy_document.ecs_exec_assume.json
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
-  role       = aws_iam_role.ecs_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
+# CodeDeploy Role
 data "aws_iam_policy_document" "codedeploy_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -279,17 +293,37 @@ resource "aws_iam_policy" "codedeploy_ecs_policy" {
   name        = "CodeDeployECSPolicy"
   description = "Allow CodeDeploy to describe ECS services"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
-        Sid: "AllowDescribeServices",
-        Effect: "Allow",
-        Action: "ecs:DescribeServices",
-        Resource: "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/${var.cluster_name}/${var.service_name}"
+        Sid      = "AllowDescribeServices",
+        Effect   = "Allow",
+        Action   = "ecs:DescribeServices",
+        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/${var.cluster_name}/${var.service_name}"
       }
     ]
   })
 }
+
+resource "aws_iam_policy" "codedeploy_pass_task_role_policy" {
+  name        = "CodeDeployPassTaskRolePolicy"
+  description = "Allow CodeDeploy to pass the ECS task role"
+  policy      = jsonencode({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: "Allow",
+        Action: "iam:PassRole",
+        Resource: "arn:aws:iam::${var.aws_account_id}:role/ecsTaskRole"
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "codedeploy_pass_task_role_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_pass_task_role_policy.arn
+}
+
 
 resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attach" {
   role       = aws_iam_role.codedeploy_role.name
@@ -300,7 +334,7 @@ resource "aws_iam_policy" "codedeploy_s3_policy" {
   name        = "CodeDeployS3Policy"
   description = "Allow CodeDeploy to read deployment artifacts from S3"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Sid      = "AllowS3Access",
@@ -328,7 +362,7 @@ resource "aws_iam_policy" "codedeploy_elbv2_policy" {
   name        = "CodeDeployELBV2Policy"
   description = "Allow CodeDeploy to perform operations on ELBv2"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Sid      = "AllowDescribeELBv2",
@@ -364,7 +398,7 @@ resource "aws_iam_policy" "codedeploy_ecs_createtaskset_policy" {
   name        = "CodeDeployECSCreatetasksetPolicy"
   description = "Allow CodeDeploy to create ECS task sets for blue/green deployments"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Sid      = "AllowCreateTaskSet",
@@ -385,7 +419,7 @@ resource "aws_iam_policy" "codedeploy_ecs_deletetaskset_policy" {
   name        = "CodeDeployECSDeleteTaskSetPolicy"
   description = "Allow CodeDeploy to delete ECS task sets during blue/green deployments"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Sid      = "AllowDeleteTaskSet",
@@ -402,12 +436,11 @@ resource "aws_iam_role_policy_attachment" "codedeploy_ecs_deletetaskset_policy_a
   policy_arn = aws_iam_policy.codedeploy_ecs_deletetaskset_policy.arn
 }
 
-
 resource "aws_iam_policy" "codedeploy_pass_role_policy" {
   name        = "CodeDeployPassRolePolicy"
   description = "Allow CodeDeploy to pass the ECS task execution role"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Sid      = "AllowPassECSExecutionRole",
@@ -424,6 +457,58 @@ resource "aws_iam_role_policy_attachment" "codedeploy_pass_role_policy_attach" {
   policy_arn = aws_iam_policy.codedeploy_pass_role_policy.arn
 }
 
+# ECS Execution Role
+resource "aws_iam_role" "ecs_execution_role" {
+  name               = var.ecs_execution_role_name
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# ECS Task Role (required for ECS Exec)
+resource "aws_iam_role" "ecs_task_role" {
+  name               = "ecsTaskRole"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_task_role_policy" {
+  name = "ecsTaskRolePolicy"
+  role = aws_iam_role.ecs_task_role.id
+  policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+
+# CodePipeline Role
 resource "aws_iam_role" "codepipeline_role" {
   name = var.codepipeline_role_name
   assume_role_policy = jsonencode({
@@ -472,7 +557,7 @@ resource "aws_iam_role" "codepipeline_role" {
   inline_policy {
     name   = "CodePipelineCodeBuildAccess"
     policy = jsonencode({
-      Version = "2012-10-17",
+      Version   = "2012-10-17",
       Statement = [{
         Sid      = "AllowCodeBuildActions",
         Effect   = "Allow",
@@ -488,7 +573,7 @@ resource "aws_iam_role" "codepipeline_role" {
   inline_policy {
     name   = "CodePipelineCodeDeployAccess"
     policy = jsonencode({
-      Version = "2012-10-17",
+      Version   = "2012-10-17",
       Statement = [
         {
           Sid    = "AllowCodeDeployActions",
@@ -522,12 +607,12 @@ resource "aws_iam_policy" "codepipeline_connection_policy" {
   name        = "CodePipelineConnectionPolicy"
   description = "Allow CodePipeline to use the GitHub App-based connection"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
         Effect   = "Allow",
         Action   = "codestar-connections:UseConnection",
-        Resource = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+        Resource = "arn:aws:codeconnections:us-east-2:${var.aws_account_id}:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
       }
     ]
   })
@@ -542,11 +627,11 @@ resource "aws_iam_policy" "codebuild_logs_policy" {
   name        = "CodeBuildLogsPolicy"
   description = "Allow CodeBuild to create log groups, log streams, and put log events in CloudWatch Logs"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
-        Effect = "Allow",
-        Action = [
+        Effect   = "Allow",
+        Action   = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
@@ -566,11 +651,11 @@ resource "aws_iam_policy" "codebuild_artifact_access" {
   name        = "CodeBuildArtifactAccessPolicy"
   description = "Allow CodeBuild to read from and write artifacts to the CodePipeline artifact bucket"
   policy      = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [
       {
-        Effect = "Allow",
-        Action = [
+        Effect   = "Allow",
+        Action   = [
           "s3:GetObject",
           "s3:PutObject"
         ],
@@ -585,44 +670,12 @@ resource "aws_iam_role_policy_attachment" "codebuild_artifact_access_attach" {
   policy_arn = aws_iam_policy.codebuild_artifact_access.arn
 }
 
+##############################
+# ECS Cluster, Task Definition, and Service
+##############################
+
 resource "aws_ecs_cluster" "cluster" {
   name = var.cluster_name
-}
-
-resource "aws_lb" "app_lb" {
-  name               = var.load_balancer_name
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [var.security_group_id]
-  subnets            = var.subnet_ids
-}
-
-resource "aws_lb_listener" "prod_listener" {
-  load_balancer_arn = aws_lb.app_lb.arn
-  port              = 80
-  protocol          = "HTTP"
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg_green.arn
-  }
-}
-
-data "aws_acm_certificate" "test_cert" {
-  domain      = "*.myphonefriend.com"
-  statuses    = ["ISSUED"]
-  most_recent = true
-}
-
-resource "aws_lb_listener" "test_listener" {
-  load_balancer_arn = aws_lb.app_lb.arn
-  port              = 443
-  protocol          = "HTTPS"
-  certificate_arn   = data.aws_acm_certificate.test_cert.arn  # Define this variable with your ACM certificate ARN
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg_blue.arn
-  }
 }
 
 resource "aws_ecs_task_definition" "app_task" {
@@ -632,6 +685,7 @@ resource "aws_ecs_task_definition" "app_task" {
   cpu                      = "256"
   memory                   = "512"
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([
     {
@@ -673,8 +727,8 @@ resource "aws_ecs_service" "app_service" {
   }
 
   network_configuration {
-    subnets         = var.subnet_ids
-    security_groups = [var.security_group_id]
+    subnets          = var.subnet_ids
+    security_groups  = [aws_security_group.bianca_app_sg.id]
     assign_public_ip = true
   }
 
@@ -684,8 +738,10 @@ resource "aws_ecs_service" "app_service" {
     container_port   = var.container_port
   }
 
+  enable_execute_command = true
+
   lifecycle {
-    ignore_changes = [ task_definition ]
+    ignore_changes = [ task_definition, desired_count, load_balancer ]
   }
 
   depends_on = [
@@ -694,6 +750,49 @@ resource "aws_ecs_service" "app_service" {
   ]
 }
 
+##############################
+# Load Balancer and Listeners
+##############################
+
+resource "aws_lb" "app_lb" {
+  name               = var.load_balancer_name
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.bianca_app_sg.id]
+  subnets            = var.subnet_ids
+}
+
+resource "aws_lb_listener" "prod_listener" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg_green.arn
+  }
+}
+
+data "aws_acm_certificate" "test_cert" {
+  domain      = "*.myphonefriend.com"
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
+
+resource "aws_lb_listener" "test_listener" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = data.aws_acm_certificate.test_cert.arn
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg_blue.arn
+  }
+}
+
+##############################
+# CodeBuild Project
+##############################
 
 resource "aws_codebuild_project" "bianca_project" {
   name         = "bianca"
@@ -711,10 +810,14 @@ resource "aws_codebuild_project" "bianca_project" {
   }
 
   source {
-    type     = "CODEPIPELINE"
+    type      = "CODEPIPELINE"
     buildspec = "devops/buildspec.yml"
   }
 }
+
+##############################
+# CodeDeploy Application and Deployment Group
+##############################
 
 resource "aws_codedeploy_app" "bianca_app" {
   name             = var.application_name
@@ -722,9 +825,9 @@ resource "aws_codedeploy_app" "bianca_app" {
 }
 
 resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
-  app_name              = aws_codedeploy_app.bianca_app.name
-  deployment_group_name = var.deployment_group_name
-  service_role_arn      = aws_iam_role.codedeploy_role.arn
+  app_name               = aws_codedeploy_app.bianca_app.name
+  deployment_group_name  = var.deployment_group_name
+  service_role_arn       = aws_iam_role.codedeploy_role.arn
   deployment_config_name = "CodeDeployDefault.ECSAllAtOnce"
 
   deployment_style {
@@ -734,7 +837,7 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
 
   blue_green_deployment_config {
     terminate_blue_instances_on_deployment_success {
-      action                         = "TERMINATE"
+      action                           = "TERMINATE"
       termination_wait_time_in_minutes = 5
     }
     deployment_ready_option {
@@ -751,10 +854,10 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
         listener_arns = [aws_lb_listener.test_listener.arn]
       }
       target_group {
-        name = aws_lb_target_group.app_tg_green.name  # Primary target group is green
+        name = aws_lb_target_group.app_tg_green.name
       }
       target_group {
-        name = aws_lb_target_group.app_tg_blue.name   # Secondary target group is blue
+        name = aws_lb_target_group.app_tg_blue.name
       }
     }
   }
@@ -765,6 +868,9 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
   }
 }
 
+##############################
+# CodePipeline
+##############################
 
 resource "aws_codepipeline" "bianca_pipeline" {
   name     = "BiancaPipeline"
@@ -782,7 +888,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       name             = "SourceAction"
       category         = "Source"
       owner            = "AWS"
-      provider         = "CodeStarSourceConnection"  # Even though we are using a GitHub App, this provider name remains
+      provider         = "CodeStarSourceConnection"  # Using GitHub App-based connection
       version          = "1"
       output_artifacts = ["SourceOutput"]
       configuration = {
