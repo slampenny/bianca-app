@@ -815,6 +815,22 @@ resource "aws_codebuild_project" "bianca_project" {
   }
 }
 
+resource "aws_iam_role_policy" "codebuild_pass_task_role_policy" {
+  name = "CodeBuildPassTaskRolePolicy"
+  role = aws_iam_role.codebuild_role.id
+  policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "iam:PassRole",
+        Resource = "arn:aws:iam::${var.aws_account_id}:role/ecsTaskRole"
+      }
+    ]
+  })
+}
+
+
 ##############################
 # CodeDeploy Application and Deployment Group
 ##############################
