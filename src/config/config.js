@@ -2,92 +2,72 @@ const dotenv = require('dotenv');
 const path = require('path');
 const Joi = require('joi');
 const AWS = require('aws-sdk');
+const deasync = require('deasync');
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const envVarsSchema = Joi.object()
-  .keys({
-    NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
-    JWT_SECRET: Joi.string().required().description('JWT secret key'),
-    MONGODB_URL: Joi.string().description('path to connect with mongo server'),
-    SMTP_USERNAME: Joi.string().description('username for email server'),
-    SMTP_PASSWORD: Joi.string().description('password for email server'),
-    TWILIO_PHONENUMBER: Joi.string().description('twilio phone number'),
-    TWILIO_ACCOUNTSID: Joi.string().description('twilio account sid'),
-    TWILIO_AUTHTOKEN: Joi.string().description('twilio auth token'),
-    TWILIO_VOICEURL:  Joi.string().description('twilio voice url'),
-    OPENAI_API_KEY: Joi.string().description('open ai key'),
-    STRIPE_SECRET_KEY: Joi.string().description('stripe secret key'),
-  })
-  .unknown();
+const envVarsSchema = Joi.object({
+  NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
+  JWT_SECRET: Joi.string().required(),
+  MONGODB_URL: Joi.string(),
+  SMTP_USERNAME: Joi.string(),
+  SMTP_PASSWORD: Joi.string(),
+  TWILIO_PHONENUMBER: Joi.string(),
+  TWILIO_ACCOUNTSID: Joi.string(),
+  TWILIO_AUTHTOKEN: Joi.string(),
+  TWILIO_VOICEURL: Joi.string(),
+  OPENAI_API_KEY: Joi.string(),
+  STRIPE_SECRET_KEY: Joi.string()
+}).unknown();
 
-// Create a Secrets Manager client
 const client = new AWS.SecretsManager();
 
 async function getSecretValue(secretName) {
   try {
     const data = await client.getSecretValue({ SecretId: secretName }).promise();
-    if ('SecretString' in data) {
-      const secret = data.SecretString;
-      return secret;
-    } else {
-      // If the secret is binary, convert it to ASCII
-      const decodedBinarySecret = Buffer.from(data.SecretBinary, 'base64').toString('ascii');
-      return decodedBinarySecret;
-    }
+    if (data.SecretString) return data.SecretString;
+    return Buffer.from(data.SecretBinary, 'base64').toString('ascii');
   } catch (err) {
     console.error('Error retrieving secrets:', err);
     return '{}';
   }
 }
 
-// Export an async function that returns the config
 async function loadConfig() {
-  // Load secrets from AWS if in production
   if (process.env.NODE_ENV === 'production') {
     try {
-      // Replace 'MySecret' with the name of your secret in AWS Secrets Manager
       const secretData = await getSecretValue('MySecretsManagerSecret');
       const secrets = JSON.parse(secretData);
-      console.log('Secrets retrieved successfully:', Object.keys(secrets));
-      
-      // Overwrite the environment variables with the secrets
       process.env = { ...process.env, ...secrets };
     } catch (error) {
       console.error('Failed to load secrets:', error);
     }
   }
-  
-  // Validate environment variables after possibly loading secrets
-  const { value: envVars, error } = envVarsSchema.prefs({ errors: { label: 'key' } }).validate(process.env);
-  
+  const { value: envVars, error } = envVarsSchema.validate(process.env, { errors: { label: 'key' } });
   if (error) {
     throw new Error(`Config validation error: ${error.message}`);
   }
-
   const configVars = {
     env: envVars.NODE_ENV,
     port: 3000,
-    authEnabled: true, //process.env.NODE_ENV !== 'development',
+    authEnabled: true,
     apiUrl: 'http://localhost:3000/v1',
     mongoose: {
-      url: ((envVars.MONGODB_URL) ? envVars.MONGODB_URL : 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
+      url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
       options: {
         useCreateIndex: true,
         useNewUrlParser: true,
-        useUnifiedTopology: true,
-      },
+        useUnifiedTopology: true
+      }
     },
-    billing: {
-      ratePerMinute: 0.1,
-    },
+    billing: { ratePerMinute: 0.1 },
     jwt: {
       secret: envVars.JWT_SECRET,
       accessExpirationMinutes: 30,
       refreshExpirationDays: 30,
       resetPasswordExpirationMinutes: 10,
       verifyEmailExpirationMinutes: 10,
-      inviteExpirationMinutes: 10080,
+      inviteExpirationMinutes: 10080
     },
     email: {
       smtp: {
@@ -97,33 +77,29 @@ async function loadConfig() {
         requireTLS: true,
         auth: {
           user: envVars.SMTP_USERNAME,
-          pass: envVars.SMTP_PASSWORD,
-        },
+          pass: envVars.SMTP_PASSWORD
+        }
       },
-      from: 'support@bianca-app.com',
+      from: 'support@bianca-app.com'
     },
     google: {
       language: 'en-US',
       name: 'en-US-News-L',
       gender: 'FEMALE',
-      encoding: 'MP3',
+      encoding: 'MP3'
     },
-    multer: {
-      dest: path.join(__dirname, '../../uploads'),
-    },
+    multer: { dest: path.join(__dirname, '../../uploads') },
     twilio: {
       phone: envVars.TWILIO_PHONENUMBER,
       apiUrl: 'https://505b-174-4-88-96.ngrok-free.app',
       accountSid: envVars.TWILIO_ACCOUNTSID,
-      authToken: envVars.TWILIO_AUTHTOKEN,
+      authToken: envVars.TWILIO_AUTHTOKEN
     },
     openai: {
       apiKey: envVars.OPENAI_API_KEY,
-      model: "gpt-3.5-turbo"
+      model: 'gpt-3.5-turbo'
     },
-    stripe: {
-      secretKey: envVars.STRIPE_SECRET_KEY,
-    }
+    stripe: { secretKey: envVars.STRIPE_SECRET_KEY }
   };
 
   if (envVars.NODE_ENV === 'production') {
@@ -132,8 +108,18 @@ async function loadConfig() {
     configVars.email.smtp.secure = true;
     configVars.twilio.apiUrl = 'https://app.myphonefriend.com';
   }
-
   return configVars;
 }
 
-module.exports = loadConfig();
+let config;
+let done = false;
+loadConfig()
+  .then(cfg => {
+    config = cfg;
+    done = true;
+  })
+  .catch(err => {
+    throw err;
+  });
+deasync.loopWhile(() => !done);
+module.exports = config;
