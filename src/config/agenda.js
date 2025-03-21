@@ -64,7 +64,7 @@ async function runSchedules() {
 }
 
 // Define your centralized job
-agenda.define('runSchedules', async (job, done) => {
+agenda.define('runSchedules', { concurrency: 1, lockLifetime: 600000 }, async (job, done) => {
   await runSchedules();
   done();
 });

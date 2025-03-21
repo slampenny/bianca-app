@@ -111,11 +111,11 @@ resource "aws_security_group" "bianca_app_sg" {
   vpc_id = var.vpc_id
 
   ingress {
-    description = "Allow traffic on port 3000 from self (ALB to ECS)"
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    self        = true
+    description      = "Allow ALB (alb_sg) traffic on port 3000"
+    from_port        = 3000
+    to_port          = 3000
+    protocol         = "tcp"
+    security_groups  = [aws_security_group.alb_sg.id]
   }
 
   egress {
@@ -125,6 +125,36 @@ resource "aws_security_group" "bianca_app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
+
+resource "aws_security_group" "alb_sg" {
+  name   = "alb-sg"
+  vpc_id = var.vpc_id
+
+  ingress {
+    description = "HTTP from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS from anywhere"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 
 ##############################
 # ALB Target Groups
@@ -288,6 +318,28 @@ resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
   role       = aws_iam_role.codedeploy_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
 }
+
+resource "aws_iam_policy" "codedeploy_update_service_policy" {
+  name        = "CodeDeployUpdateServicePolicy"
+  description = "Allow CodeDeploy to update the primary task set on ECS services"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowUpdateServicePrimaryTaskSet",
+        Effect   = "Allow",
+        Action   = "ecs:UpdateServicePrimaryTaskSet",
+        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/${var.cluster_name}/${var.service_name}"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codedeploy_update_service_policy_attach" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = aws_iam_policy.codedeploy_update_service_policy.arn
+}
+
 
 resource "aws_iam_policy" "codedeploy_ecs_policy" {
   name        = "CodeDeployECSPolicy"
@@ -774,7 +826,7 @@ resource "aws_lb" "app_lb" {
   name               = var.load_balancer_name
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.bianca_app_sg.id]
+  security_groups    = [aws_security_group.alb_sg.id]
   subnets            = var.subnet_ids
 }
 
@@ -901,6 +953,30 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
 }
 
 ##############################
+# Route 53
+##############################
+
+# 1. Lookup the hosted zone for myphonefriend.com
+data "aws_route53_zone" "myphonefriend" {
+  name         = "myphonefriend.com."
+  private_zone = false
+}
+
+# 2. Create (or update) the Alias record for app.myphonefriend.com
+resource "aws_route53_record" "app_subdomain" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "app.myphonefriend.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.app_lb.dns_name   # Your ALB's DNS name
+    zone_id                = aws_lb.app_lb.zone_id    # The hosted zone ID of your ALB
+    evaluate_target_health = true
+  }
+}
+
+
+##############################
 # CodePipeline
 ##############################
 
@@ -967,4 +1043,33 @@ resource "aws_codepipeline" "bianca_pipeline" {
       run_order = 1
     }
   }
+}
+
+# Create a domain identity for SES
+resource "aws_ses_domain_identity" "ses_identity" {
+  domain = "myphonefriend.com"
+}
+
+# Create a TXT record for domain verification in Route 53
+resource "aws_route53_record" "ses_verification" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "_amazonses.${aws_ses_domain_identity.ses_identity.domain}"
+  type    = "TXT"
+  ttl     = 600
+  records = [aws_ses_domain_identity.ses_identity.verification_token]
+}
+
+# Enable DKIM for the domain
+resource "aws_ses_domain_dkim" "ses_dkim" {
+  domain = aws_ses_domain_identity.ses_identity.domain
+}
+
+# Create CNAME records for DKIM verification (SES generates 3 DKIM tokens)
+resource "aws_route53_record" "ses_dkim_record" {
+  count   = 3
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.ses_identity.domain}"
+  type    = "CNAME"
+  ttl     = 600
+  records = ["${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
 }

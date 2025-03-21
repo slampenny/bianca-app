@@ -4,6 +4,7 @@ const Joi = require('joi');
 const AWS = require('aws-sdk');
 const deasync = require('deasync');
 
+
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const envVarsSchema = Joi.object({
@@ -80,7 +81,7 @@ async function loadConfig() {
           pass: envVars.SMTP_PASSWORD
         }
       },
-      from: 'support@bianca-app.com'
+      from: 'support@myphonefriend.com'
     },
     google: {
       language: 'en-US',
@@ -103,10 +104,14 @@ async function loadConfig() {
   };
 
   if (envVars.NODE_ENV === 'production') {
+    AWS.config.update({ region: 'us-east-2' })
+    const ses = new AWS.SES({ apiVersion: '2010-12-01' })
+
     configVars.apiUrl = 'http://app.myphonefriend.com/v1';
     configVars.mongoose.url = 'mongodb://localhost:27017/bianca-app';
     configVars.email.smtp.secure = true;
     configVars.twilio.apiUrl = 'https://app.myphonefriend.com';
+    configVars.email.smtp = {SES: { ses, aws: AWS }};
   }
   return configVars;
 }

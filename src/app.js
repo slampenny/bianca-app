@@ -100,4 +100,6 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+require('./agenda');
+
 module.exports = app;
