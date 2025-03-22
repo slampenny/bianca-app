@@ -164,6 +164,8 @@ const sendInvite = async (orgId, name, email, phone) => {
     await caregiver.save();
     org.caregivers.push(caregiver);
     await org.save();
+
+    return caregiver;
   }
 
   const inviteToken = await tokenService.generateInviteToken(caregiver);

@@ -58,9 +58,9 @@ const setRole = catchAsync(async (req, res) => {
 
 const sendInvite = catchAsync(async (req, res) => {
   const { orgId } = req.params;
-  const { email } = req.body;
-  await orgService.sendInvite(orgId, email);
-  res.status(httpStatus.OK);
+  const { name, email, phone } = req.body;
+  const caregiver = await orgService.sendInvite(orgId, name, email, phone);
+  res.status(httpStatus.OK).send(caregiver);
 });
 
 const verifyInvite = catchAsync(async (req, res) => {
