@@ -136,7 +136,7 @@ router
 
 router
 .route('/:orgId/invite')
-.patch(auth('updateOwn:org'), orgController.sendInvite);
+.patch(/*auth('updateOwn:org'),*/ orgController.sendInvite);
 
 router
 .route('/:orgId/verify-invite/{:token}')

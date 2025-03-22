@@ -6,5 +6,9 @@
 	"sendVerificationEmail": {
 		"subject": "sendVerificationEmail.subject",
 		"text": "sendVerificationEmail.text"
+	},
+	"inviteEmail": {
+		"subject": "inviteEmail.subject",
+		"text": "inviteEmail.text"
 	}
 }
