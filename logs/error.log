@@ -1,9 +1,0 @@
-2025-03-20T00:56:38.230Z debug: Logger initialized at level: debug
-2025-03-20T00:56:39.463Z info: Connected to MongoDB
-2025-03-20T00:56:39.464Z info: Listening to port 3000
-2025-03-20T00:56:51.706Z info: GET /v1/docs/ 200 - 5.589 ms
-2025-03-20T00:56:51.751Z info: GET /v1/docs/swagger-ui-init.js 200 - 0.820 ms
-2025-03-20T00:56:51.755Z info: GET /v1/docs/swagger-ui.css 200 - 6.982 ms
-2025-03-20T00:56:51.762Z info: GET /v1/docs/swagger-ui-standalone-preset.js 200 - 4.053 ms
-2025-03-20T00:56:51.793Z info: GET /v1/docs/swagger-ui-bundle.js 200 - 3.782 ms
-2025-03-20T00:56:51.895Z info: GET /v1/docs/favicon-32x32.png 200 - 1.069 ms
