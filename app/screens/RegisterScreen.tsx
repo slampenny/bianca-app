@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { StyleSheet, View, Pressable } from 'react-native';
-import { StackScreenProps } from '@react-navigation/stack';
-import { useRegisterMutation } from '../services/api/authApi'; // Adjust the path as necessary
-import { Button, Header, Screen, Text, TextField } from 'app/components';
-import { LoginStackParamList } from 'app/navigators/navigationTypes';
+import React, { useState, useEffect, useLayoutEffect } from 'react'
+import { StyleSheet, View, Pressable, ScrollView } from 'react-native'
+import { StackScreenProps } from '@react-navigation/stack'
+import { useRegisterMutation } from '../services/api/authApi'
+import { Button, Text, TextField } from 'app/components'
+import { LoginStackParamList } from 'app/navigators/navigationTypes'
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Register'>) => {
   const { navigation } = props
@@ -11,117 +11,106 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Reg
   useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
-      header: () => <Header titleTx='registerScreen.title' />,
+      header: () => (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Register</Text>
+        </View>
+      ),
     })
-  }, [navigation]);
+  }, [navigation])
 
-  const [register, { isLoading }] = useRegisterMutation();
+  const [register, { isLoading }] = useRegisterMutation()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [phone, setPhone] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [accountType, setAccountType] = useState('individual')
+  const [organizationName, setOrganizationName] = useState('')
+  const [shouldRegister, setShouldRegister] = useState(false)
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [accountType, setAccountType] = useState('individual'); // 'individual' or 'organization'
-  const [organizationName, setOrganizationName] = useState('');
-  const [shouldRegister, setShouldRegister] = useState(false);
-
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validatePassword = (password: string) => {
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/; // Minimum eight characters, at least one letter and one number
-    return passwordRegex.test(password);
-  };
-
-  const validatePhone = (phone: string) => {
-    const phoneRegex = /^\d{10,}$/; // Validates that the phone number has at least 10 digits
-    return phoneRegex.test(phone);
-  };
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const validatePassword = (password: string) =>
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(password)
+  const validatePhone = (phone: string) => /^\d{10,}$/.test(phone)
 
   const validateInputs = () => {
-    if (name.trim() === '') {
-      return 'Name cannot be empty';
-    } else if (!validateEmail(email)) {
-      return 'Please enter a valid email address';
-    } else if (!validatePassword(password)) {
-      return 'Password must contain at least one letter and one number';
-    } else if (password !== confirmPassword) {
-      return 'Passwords do not match';
-    } else if (!validatePhone(phone)) {
-      return 'Phone number must contain at least 10 digits';
-    } else if (accountType === 'organization' && organizationName.trim() === '') {
-      return 'Organization name cannot be empty';
-    }
-    
-    return '';
-  };
+    if (name.trim() === '') return 'Name cannot be empty'
+    if (!validateEmail(email)) return 'Please enter a valid email address'
+    if (!validatePassword(password))
+      return 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+    if (password !== confirmPassword) return 'Passwords do not match'
+    if (!validatePhone(phone)) return 'Phone number must contain at least 10 digits'
+    if (accountType === 'organization' && organizationName.trim() === '')
+      return 'Organization name cannot be empty'
+    return ''
+  }
 
   useEffect(() => {
     const registerUser = async () => {
       try {
-        const result = await register({ name, email, password, phone }).unwrap();
+        const result = await register({ name, email, password, phone }).unwrap()
         if (result) {
-          setErrorMessage('Registration successful!');
+          setErrorMessage('Registration successful!')
         }
-      } catch (err) {
-        setErrorMessage('Registration Failed');
-      }
-    };
-  
-    if (shouldRegister) {
-      const error = validateInputs();
-      if (error) {
-        setErrorMessage(error);
-        setShouldRegister(false);
-      } else {
-        registerUser().finally(() => setShouldRegister(false));
+      } catch {
+        setErrorMessage('Registration Failed')
       }
     }
-  }, [shouldRegister, name, email, password, phone, register]);
+
+    if (shouldRegister) {
+      const error = validateInputs()
+      if (error) {
+        setErrorMessage(error)
+        setShouldRegister(false)
+      } else {
+        registerUser().finally(() => setShouldRegister(false))
+      }
+    }
+  }, [shouldRegister, name, email, password, phone, register])
 
   const handleRegister = () => {
-    setShouldRegister(true);
-  };
+    setShouldRegister(true)
+  }
 
   return (
-    <Screen 
-      preset="scroll"
-      style={styles.container}
-      contentContainerStyle={{justifyContent: 'center', alignItems: 'center'}}
+    <ScrollView
+      contentContainerStyle={styles.contentContainer}
+      keyboardShouldPersistTaps="handled"
     >
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-      <View style={styles.buttonContainer}>
-        <Button
-          tx="registerScreen.individualButton"
-          onPress={() => setAccountType('individual')} 
-          style={accountType === 'individual' ? styles.selectedButton : styles.button}
-        />
-        <Button
-          tx="registerScreen.organizationButton"
-          onPress={() => setAccountType('organization')} 
-          style={accountType === 'organization' ? styles.selectedButton : styles.button}
-        />
-      </View>
-      <Text style={styles.explanationText}>
-        {accountType === 'individual' 
-          ? 'Register as an individual if you are signing up for personal use.' 
-          : 'Register as an organization if you are signing up on behalf of a company or group.'}
-      </Text>
       <View style={styles.formContainer}>
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+        <View style={styles.buttonContainer}>
+          <Button
+            tx="registerScreen.individualButton"
+            onPress={() => setAccountType('individual')}
+            style={accountType === 'individual' ? styles.selectedButton : styles.button}
+          />
+          <Button
+            tx="registerScreen.organizationButton"
+            onPress={() => setAccountType('organization')}
+            style={accountType === 'organization' ? styles.selectedButton : styles.button}
+          />
+        </View>
+
+        <Text style={styles.explanationText}>
+          {accountType === 'individual'
+            ? 'Register as an individual for personal use.'
+            : 'Register as an organization for company or group use.'}
+        </Text>
+
         <TextField
           placeholderTx="registerScreen.nameFieldPlaceholder"
-          labelTx='registerScreen.nameFieldLabel'
+          labelTx="registerScreen.nameFieldLabel"
           value={name}
           onChangeText={setName}
           autoCapitalize="words"
         />
         <TextField
           placeholderTx="registerScreen.emailFieldPlaceholder"
-          labelTx='registerScreen.emailFieldLabel'
+          labelTx="registerScreen.emailFieldLabel"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -129,80 +118,66 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, 'Reg
         />
         <TextField
           placeholderTx="registerScreen.passwordFieldPlaceholder"
-          labelTx='registerScreen.passwordFieldLabel'
+          labelTx="registerScreen.passwordFieldLabel"
           secureTextEntry
           value={password}
           onChangeText={setPassword}
         />
         <TextField
           placeholderTx="registerScreen.confirmPasswordFieldPlaceholder"
-          labelTx='registerScreen.confirmPasswordFieldLabel'
+          labelTx="registerScreen.confirmPasswordFieldLabel"
           secureTextEntry
           value={confirmPassword}
           onChangeText={setConfirmPassword}
         />
         <TextField
           placeholderTx="registerScreen.phoneFieldPlaceholder"
-          labelTx='registerScreen.phoneFieldLabel'
+          labelTx="registerScreen.phoneFieldLabel"
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
         />
-        {accountType === 'organization' ? (
+        {accountType === 'organization' && (
           <TextField
             placeholderTx="registerScreen.organizationNameFieldPlaceholder"
-            labelTx='registerScreen.organizationNameFieldLabel'
+            labelTx="registerScreen.organizationNameFieldLabel"
             value={organizationName}
             onChangeText={setOrganizationName}
           />
-        ) : null}
-        <Button
-            onPress={handleRegister}
-            disabled={isLoading}
-            tx="registerScreen.title"
-            style={styles.submitButton}
-          />
+        )}
+
+        <Button onPress={handleRegister} disabled={isLoading} tx="registerScreen.title" />
 
         <Pressable style={styles.linkButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.linkButtonText} tx="registerScreen.goBack"/>
+          <Text style={styles.linkButtonText} tx="registerScreen.goBack" />
         </Pressable>
       </View>
-    </Screen>
-  );
-};
+    </ScrollView>
+  )
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-    padding: 20,
+  contentContainer: {
+    flexGrow: 1,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    backgroundColor: '#ecf0f1',
   },
   formContainer: {
-    width: '100%',
-    paddingHorizontal: 20,
+    flex: 1,
+    justifyContent: 'center',
   },
-  input: {
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 10,
+  header: {
     backgroundColor: '#fff',
+    paddingVertical: 20,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderColor: '#ddd',
   },
-  linkButton: {
-    marginTop: 10,
-  },
-  linkButtonText: {
-    color: '#3498db',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  submitButton: {
-    backgroundColor: 'blue',
-    color: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 4,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#2c3e50',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -211,29 +186,37 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    margin: 10,
+    marginHorizontal: 5,
     backgroundColor: 'lightgray',
     borderRadius: 4,
-    padding: 10,
-    justifyContent: 'center',
+    paddingVertical: 10,
     alignItems: 'center',
   },
   selectedButton: {
     flex: 1,
-    margin: 10,
-    backgroundColor: 'blue',
+    marginHorizontal: 5,
+    backgroundColor: '#3498db',
     borderRadius: 4,
-    padding: 10,
-    justifyContent: 'center',
+    paddingVertical: 10,
     alignItems: 'center',
   },
   explanationText: {
     fontSize: 14,
     color: 'gray',
     marginBottom: 20,
+    textAlign: 'center',
   },
   errorText: {
     color: 'red',
     marginBottom: 10,
+    textAlign: 'center',
   },
-});
+  linkButton: {
+    marginTop: 15,
+  },
+  linkButtonText: {
+    color: '#3498db',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+})
