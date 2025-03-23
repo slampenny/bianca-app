@@ -22,7 +22,13 @@ const insertSchedules = async (schedules) => {
 };
 
 const insertScheduleAndAddToPatient = async (patient, scheduleParam) => {
-  const [schedule] = await insertSchedules([{patient: patient.id, ...scheduleParam}]);
+  // Create the schedule with the patient field
+  const [schedule] = await insertSchedules([{ patient: patient._id, ...scheduleParam }]);
+  
+  // Update the patient document with the new schedule's _id
+  patient.schedules.push(schedule._id);
+  await patient.save();
+  
   return schedule;
 }
 

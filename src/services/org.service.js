@@ -144,7 +144,6 @@ const removeCaregiver = async (orgId, caregiverId) => {
 };
 
 const sendInvite = async (orgId, name, email, phone) => {
-
   const org = await Org.findById(orgId);
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
@@ -165,15 +164,18 @@ const sendInvite = async (orgId, name, email, phone) => {
     org.caregivers.push(caregiver);
     await org.save();
 
+    // Generate invite token and send email
+    const inviteToken = await tokenService.generateInviteToken(caregiver);
+    const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
+    await emailService.sendInviteEmail(email, inviteLink);
+
     return caregiver;
   }
 
-  const inviteToken = await tokenService.generateInviteToken(caregiver);
-  const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
-  await emailService.sendInviteEmail(email, inviteLink);
-
-  return inviteToken;
+  // Option 1: Throw error if caregiver already exists.
+  throw new ApiError(httpStatus.CONFLICT, 'Caregiver already invited');
 };
+
 
 const verifyInvite = async (token, caregiverBody={}) => {
   const payload = await tokenService.verifyToken(token, tokenTypes.INVITE);

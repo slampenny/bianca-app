@@ -43,15 +43,27 @@ async function runSchedules() {
   });
 
   for (const schedule of schedules) {
-    const interval = schedule.intervals.find(i => 
+    const interval = schedule.intervals.find(i =>
       i.day === (schedule.frequency === 'weekly' ? now.getDay() : now.getDate())
     );
     if (!interval) continue;
 
     logger.info(`Running schedule ${schedule.id}`);
-
+    
+    // Check that the schedule has a valid patient id
+    if (!schedule.patient) {
+      logger.error(`Schedule ${schedule.id} has no patient assigned.`);
+      continue;
+    }
+    
     const patient = await patientService.getPatientById(schedule.patient);
+    if (!patient) {
+      logger.error(`Patient with ID ${schedule.patient} not found for schedule ${schedule.id}`);
+      continue;
+    }
+    
     try {
+      logger.info(`Initiating call for patient with ID: ${schedule.patient}`);
       await twilioCallService.initiateCall(schedule.patient);
       
       await alertService.createAlert({
@@ -79,4 +91,8 @@ async function runSchedules() {
   }
 }
 
-module.exports = agenda;
+
+module.exports = {
+  agenda,
+  runSchedules
+};
