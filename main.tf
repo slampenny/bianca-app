@@ -813,8 +813,8 @@ resource "aws_ecs_service" "app_service" {
   }
 
   depends_on = [
-    aws_lb_listener.prod_listener,
-    aws_lb_listener.test_listener
+    aws_lb_listener.http_listener,
+    aws_lb_listener.https_listener
   ]
 }
 
@@ -830,13 +830,31 @@ resource "aws_lb" "app_lb" {
   subnets            = var.subnet_ids
 }
 
-resource "aws_lb_listener" "prod_listener" {
+resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.app_lb.arn
   port              = 80
   protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301" # Or "HTTP_302" for temporary redirect
+    }
+  }
+}
+
+resource "aws_lb_listener" "https_listener" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = data.aws_acm_certificate.test_cert.arn
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg_green.arn
+    target_group_arn = aws_lb_target_group.app_tg_green.arn # Or blue, depending on initial state
   }
 }
 
@@ -844,18 +862,6 @@ data "aws_acm_certificate" "test_cert" {
   domain      = "*.myphonefriend.com"
   statuses    = ["ISSUED"]
   most_recent = true
-}
-
-resource "aws_lb_listener" "test_listener" {
-  load_balancer_arn = aws_lb.app_lb.arn
-  port              = 443
-  protocol          = "HTTPS"
-  certificate_arn   = data.aws_acm_certificate.test_cert.arn
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg_blue.arn
-  }
 }
 
 ##############################
@@ -932,10 +938,10 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
   load_balancer_info {
     target_group_pair_info {
       prod_traffic_route {
-        listener_arns = [aws_lb_listener.prod_listener.arn]
+        listener_arns = [aws_lb_listener.https_listener.arn]
       }
       test_traffic_route {
-        listener_arns = [aws_lb_listener.test_listener.arn]
+        listener_arns = [aws_lb_listener.http_listener.arn]
       }
       target_group {
         name = aws_lb_target_group.app_tg_green.name

@@ -63,6 +63,32 @@ conversationSchema.pre('save', function (next) {
   next();
 });
 
+conversationSchema.statics.aggregateUnchargedConversations = async function(patientId) {
+  return await this.aggregate([
+    { 
+      $match: { 
+        patientId: mongoose.Types.ObjectId(patientId),
+        lineItemId: null 
+      } 
+    },
+    { 
+      $group: {
+        _id: "$patientId",
+        totalDuration: { $sum: "$duration" },
+        conversationIds: { $push: "$_id" }
+      }
+    },
+    { 
+      $project: {
+        patientId: "$_id",
+        totalDuration: 1,
+        conversationIds: 1,
+        _id: 0
+      }
+    }
+  ]);
+};
+
 // Plugins for JSON conversion and pagination
 conversationSchema.plugin(toJSON);
 conversationSchema.plugin(paginate);

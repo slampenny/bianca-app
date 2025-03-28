@@ -2,6 +2,10 @@
     "jest.pathToJest": "node_modules/.bin/jest",
     "jest.jestCommandLine": "yarn test",
     "jest.runMode": {
-        "type": "on-demand"
+      "type": "on-demand"
+    },
+    "terminal.integrated.env.linux": {
+        "NODE_NO_IOURING": "1"
     }
-}
+  }
+  

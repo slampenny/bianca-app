@@ -25,7 +25,7 @@ describe('alertService', () => {
   let org;
   let caregiver;
   let patient;
-  let alert, alert2;
+  let alert1, alert2;
 
   afterEach(async () => {
     await Alert.deleteMany();
@@ -36,50 +36,53 @@ describe('alertService', () => {
 
   beforeEach(async () => {
     [org] = await insertOrgs([orgOne]);
-    [caregiver] = await insertCaregiversAndAddToOrg(org, [admin]);
-    [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
-    [alert] = await insertAlerts(caregiver, 'Caregiver', [alertOne]);
-    [alert2] = await insertAlerts(caregiver, 'Caregiver', [alertTwo]);
-    [alert3] = await insertAlerts(caregiver, 'Caregiver', [alertThree]);
-    await insertAlerts(caregiver, 'Caregiver', [expiredAlert]);
+    [adminCargiver] = await insertCaregiversAndAddToOrg(org, [admin]);
+    [patient] = await insertPatientsAndAddToCaregiver(adminCargiver, [patientOne]);
+    [alert1] = await insertAlerts(adminCargiver, 'Caregiver', [alertOne]);
+    [alert2] = await insertAlerts(adminCargiver, 'Caregiver', [alertTwo]);
+    [alert3] = await insertAlerts(adminCargiver, 'Caregiver', [alertThree]);
+    await insertAlerts(adminCargiver, 'Caregiver', [expiredAlert]);
   });
 
   it('should create a new alert', async () => {
-    const alert = await alertService.createAlert({
+    const alertNew = await alertService.createAlert({
       ...alertOne,
-      createdBy: caregiver.id,
+      createdBy: adminCargiver.id,
       createdModel: 'Caregiver',
     });
-    expect(alert).toHaveProperty('id');
-    expect(alert).toHaveProperty('message', alertOne.message);
-    expect(alert).toHaveProperty('importance', alertOne.importance);
+    expect(alertNew).toHaveProperty('id');
+    expect(alertNew).toHaveProperty('message', alertOne.message);
+    expect(alertNew).toHaveProperty('importance', alertOne.importance);
   });
 
   it('should get an alert by id', async () => {
-    const fetchedAlert = await alertService.getAlertById(alert.id);
-    expect(fetchedAlert._id.toString()).toBe(alert._id.toString());
+    const fetchedAlert = await alertService.getAlertById(alert1.id);
+    expect(fetchedAlert._id.toString()).toBe(alert1._id.toString());
   });
 
   it('should update an alert by id', async () => {
     const updateBody = { message: 'Updated Message' };
-    const updatedAlert = await alertService.updateAlertById(alert.id, updateBody);
+    const updatedAlert = await alertService.updateAlertById(alert1.id, updateBody);
     expect(updatedAlert).toHaveProperty('message', updateBody.message);
   });
 
   it('should mark an alert as read', async () => {
-    const updatedAlert = await alertService.markAlertAsRead(alert.id);
+    const updatedAlert = await alertService.markAlertAsRead(alert1.id);
     expect(updatedAlert.readBy).toEqual(expect.any(Array));
     expect(updatedAlert.readBy).not.toContain(expect.arrayContaining([undefined]));
   });
 
   it('should delete an alert by id', async () => {
-    await alertService.deleteAlertById(alert.id);
-    await expect(alertService.getAlertById(alert.id)).rejects.toThrow('Alert not found');
+    await alertService.deleteAlertById(alert1.id);
+    await expect(alertService.getAlertById(alert1.id)).rejects.toThrow('Alert not found');
   });
 
   it('should only return relevant and unread alerts to a caregiver', async () => {
-    await alertService.markAlertAsRead(alert.id, caregiver.id);
-    const alerts = await alertService.getAlerts(caregiver.id, false);
+    console.log('alert1.id constructor:', alert1.id.constructor.name);
+  console.log('caregiver.id constructor:', adminCargiver.id.constructor.name);
+
+    await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
+    const alerts = await alertService.getAlerts(adminCargiver.id, false);
 
     expect(alerts).not.toContainEqual(expect.objectContaining({ _id: expiredAlert._id }));
     expect(alerts).not.toContainEqual(expect.objectContaining({ _id: alertOne._id }));
@@ -94,7 +97,7 @@ describe('alertService', () => {
 
   it('should filter alerts based on caregiver role', async () => {
     const [notAdmin] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
-    const adminAlerts = await alertService.getAlerts(caregiver.id, true);
+    const adminAlerts = await alertService.getAlerts(adminCargiver.id, true);
     const regularAlerts = await alertService.getAlerts(notAdmin.id, true);
 
     expect(adminAlerts).toEqual(

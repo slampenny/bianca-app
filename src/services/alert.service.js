@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const httpStatus = require('http-status');
 const { Alert, Caregiver } = require('../models');
 const ApiError = require('../utils/ApiError');
@@ -25,56 +26,56 @@ const getAlertById = async (alertId, caregiverId) => {
 };
 
 const getAlerts = async (caregiverId, showRead = false) => {
-    const caregiver = await Caregiver.findById(caregiverId)
-      .populate({ path: 'org', select: 'caregivers' }) // Assuming 'caregivers' is an array of IDs
-      .populate({ path: 'patients', select: '_id' }); // Only populate patient IDs
+  if (!mongoose.Types.ObjectId.isValid(caregiverId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiverId format');
+  }
   
-    if (!caregiver) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
-    }
-  
-    let visibilityConditions;
-    if (caregiver.role === 'orgAdmin') {
-      // Org admins see alerts for all caregivers and orgAdmin-specific alerts
-      visibilityConditions = { $in: ['orgAdmin', 'allCaregivers'] };
-    } else if (caregiver.role === 'staff') {
-      // Regular staff see only alerts for all caregivers
-      visibilityConditions = { $eq: 'allCaregivers' };
-    } else {
-      // 'invited' role or any other roles not specified shouldn't see any alerts
-      visibilityConditions = { $eq: 'none' }; // 'none' is a placeholder; adjust as needed
-    }
-  
-    // Original conditions for relevant alerts
-    const baseConditions = {
-      $or: [
-        { createdBy: caregiver._id },
-        { createdBy: { $in: caregiver.org.caregivers }, visibility: visibilityConditions },
-        { createdBy: { $in: caregiver.patients.map(pt => pt._id) }, visibility: 'assignedCaregivers' }
-      ],
- //     relevanceUntil: { $gte: new Date() }
-    };
-  
-    if (!showRead) {
-      // Combine the base conditions with an extra condition ensuring the alert hasn't been read
-      // using an $and operator.
-      const unreadCondition = {
+  const caregiver = await Caregiver.findById(caregiverId)
+    .populate({ path: 'org', select: 'caregivers' })
+    .populate({ path: 'patients', select: '_id' });
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+
+  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId); // Convert caregiverId to ObjectId
+
+  let visibilityConditions;
+  if (caregiver.role === 'orgAdmin') {
+    visibilityConditions = { $in: ['orgAdmin', 'allCaregivers'] };
+  } else if (caregiver.role === 'staff') {
+    visibilityConditions = { $eq: 'allCaregivers' };
+  } else {
+    visibilityConditions = { $eq: 'none' };
+  }
+
+  const baseConditions = {
+    $and: [
+      {
         $or: [
-          { readBy: { $exists: false } },
-          { readBy: { $eq: [] } },
-          { readBy: { $not: { $elemMatch: { $eq: caregiverId } } } }
+          { createdBy: caregiver._id },
+          { createdBy: { $in: caregiver.org.caregivers }, visibility: visibilityConditions },
+          { createdBy: { $in: caregiver.patients.map(pt => pt._id) }, visibility: 'assignedCaregivers' }
         ]
-      };
-      // Final query requires both base conditions and the unread condition.
-      const conditions = { $and: [baseConditions, unreadCondition] };
-      const alerts = await Alert.find(conditions);
-      return alerts;
-    } else {
-      // If showRead is true, just use base conditions.
-      const alerts = await Alert.find(baseConditions);
-      return alerts;
-    }
+      },
+      { relevanceUntil: { $gte: new Date() } } // ADDED RELEVANCE FILTER
+    ]
   };
+
+  if (showRead) {
+    const alerts = await Alert.find(baseConditions);
+    return alerts;
+  } else {
+    // Only include alerts that have NOT been read by the caregiver.
+    const conditions = {
+      $and: [
+        baseConditions,
+        { readBy: { $not: { $elemMatch: { $eq: objectCaregiverId } } } } // Use ObjectId for comparison
+      ]
+    };
+    const alerts = await Alert.find(conditions);
+    return alerts;
+  }
+};
 
 const updateAlertById = async (alertId, updateBody) => {
     const alert = await Alert.findById(alertId);
@@ -87,15 +88,16 @@ const updateAlertById = async (alertId, updateBody) => {
 };
 
 const markAlertAsRead = async (alertId, caregiverId) => {
-    const alert = await Alert.findById(alertId);
-    if (!alert) {
-        throw new ApiError(httpStatus.NOT_FOUND, 'Alert not found');
-    }
-    if (!alert.readBy.includes(caregiverId)) {
-        alert.readBy.push(caregiverId);
-        await alert.save();
-    }
-    return alert;
+  const alert = await Alert.findById(alertId);
+  if (!alert) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Alert not found');
+  }
+  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId); // Convert to ObjectId
+  if (!alert.readBy.some(id => id.equals(objectCaregiverId))) { // Use .equals() for ObjectId comparison
+    alert.readBy.push(objectCaregiverId);
+    await alert.save();
+  }
+  return alert;
 };
 
 const deleteAlertById = async (alertId) => {

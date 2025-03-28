@@ -3,6 +3,7 @@ const httpStatus = require('http-status');
 const { Org, Conversation, Invoice, LineItem } = require('../models');
 const ApiError = require('../utils/ApiError');
 const mongoose = require('mongoose');
+const config = require('../config/config');
 
 const createPaymentMethod = async (orgId, paymentMethodId) => {
   const org = await Org.findById(orgId);
@@ -47,34 +48,55 @@ const deletePaymentMethod = async (orgId, paymentMethodId) => {
   return paymentMethodId;
 };
 
-const createLineItemsAndLinkConversations = async (patientId, invoiceId) => {
-  const unchargedConversations = await aggregateUnchargedConversations(patientId);
-
-  for (const patientConversations of unchargedConversations) {
-    const { patientId, totalDuration, conversationIds } = patientConversations;
-    
-    // Create a new line item for this patient's conversations
-    const lineItem = await LineItem.create({
-      invoiceId: invoiceId,
-      patientId: patientId,
-      amount: calculateAmount(totalDuration), // You need to define how to calculate the amount based on duration
-      description: `Billing for ${totalDuration} seconds of conversation`
-    });
-
-    // Link conversations to the newly created lineItem
-    await linkConversationsToLineItem(conversationIds, lineItem._id);
+/**
+ * Creates an invoice by aggregating unbilled conversations and embedding line items.
+ * This function creates the invoice (which the customer will later pay)
+ * and then updates the conversations to reference the created invoice.
+ */
+const createInvoiceFromConversations = async (patientId) => {
+  // Aggregate all unbilled conversations for the given patient.
+  const unchargedConversations = await Conversation.aggregateUnchargedConversations(patientId);
+  
+  if (!unchargedConversations.length) {
+    throw new Error('No uncharged conversations found');
   }
-};
 
-const aggregateUnchargedConversations = async (caregiverId) => {
-  // This function remains largely unchanged, ensure it selects conversations with lineItemId: null
-};
+  // Build line items and compute the total amount.
+  let totalAmount = 0;
+  const lineItems = unchargedConversations.map((group) => {
+    const { totalDuration } = group;
+    const amount = calculateAmount(totalDuration);
+    totalAmount += amount;
+    return {
+      patientId,
+      amount,
+      description: `Billing for ${totalDuration} seconds of conversation`
+    };
+  });
 
-const linkConversationsToLineItem = async (conversationIds, lineItemId) => {
+  // Create the invoice. Note: No paymentMethod or transactionId is attached,
+  // as the invoice represents a bill to be paid by the customer later.
+  const invoice = await Invoice.create({
+    caregiverId: patientId, // adjust as needed if caregiverId differs from patientId
+    date: new Date(),
+    status: 'pending',
+    lineItems,
+    totalAmount
+  });
+
+  // Link all conversations to the created invoice.
+  // Since line items are embedded and don't have independent _ids,
+  // we simply mark the conversations as invoiced by setting their lineItemId to the invoice's _id.
+  const conversationIds = unchargedConversations.reduce((acc, group) => {
+    return acc.concat(group.conversationIds);
+  }, []);
+
   await Conversation.updateMany(
     { _id: { $in: conversationIds } },
-    { $set: { lineItemId: mongoose.Types.ObjectId(lineItemId) } }
+    { $set: { lineItemId: mongoose.Types.ObjectId(invoice._id) } }
   );
+
+  return invoice;
 };
 
 const calculateAmount = (totalDuration) => {
@@ -88,5 +110,5 @@ module.exports = {
   getPaymentMethod,
   updatePaymentMethod,
   deletePaymentMethod,
-  createLineItemsAndLinkConversations,
+  createInvoiceFromConversations,
 };

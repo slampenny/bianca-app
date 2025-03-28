@@ -23,7 +23,8 @@ const getAlertById = catchAsync(async (req, res) => {
 const getAlerts = catchAsync(async (req, res) => {
     // Assuming 'showRead' is passed as a query parameter to toggle visibility of read alerts
     const showRead = req.query.showRead === 'true';
-    const alerts = await alertService.getAlerts(req.caregiver, showRead);
+    console.log('showRead:', showRead);
+    const alerts = await alertService.getAlerts(req.caregiver.id, showRead);
     res.send(alerts);
 });
 
@@ -35,7 +36,7 @@ const updateAlert = catchAsync(async (req, res) => {
 
 const markAlertAsRead = catchAsync(async (req, res) => {
     const { alertId } = req.params;  // ID of the alert to retrieve
-    const alert = await alertService.markAlertAsRead(alertId, req.caregiver);
+    const alert = await alertService.markAlertAsRead(alertId, req.caregiver.id);
     res.send(alert);
 });
 
@@ -45,7 +46,7 @@ const markAllAsRead = catchAsync(async (req, res) => {
 
     for (const alertId of alertIds) { // Step 2: Iterate over alertIds
         try {
-            let alert = await alertService.markAlertAsRead(alertId, req.caregiver); // Attempt to mark each alert as read
+            let alert = await alertService.markAlertAsRead(alertId, req.caregiver.id); // Attempt to mark each alert as read
             successfullyMarkedAlerts.push(alert); // If successful, add to the list
         } catch (error) {
             // Optionally handle errors, e.g., logging or ignoring failed attempts

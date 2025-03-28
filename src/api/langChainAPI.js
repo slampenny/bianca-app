@@ -3,7 +3,7 @@ const { LLMChain } = require("langchain/chains"); // Import the LLMChain class f
 const { OpenAI } = require("@langchain/openai"); // Import the OpenAIClient class from the @langchain/openai package
 const { PromptTemplate } = require("@langchain/core/prompts"); // Import the PromptTemplate class from the @langchain/core package
 const { templates } = require("../templates/templates"); // Import the templates from the local templates directory
-const config = require("../config/config");
+const config = require("../config/config"); // Import the configuration settings
 
 // Create a new instance of the OpenAI client
 const llm = new OpenAI({

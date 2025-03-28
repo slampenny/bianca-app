@@ -1,3 +1,4 @@
+// app.js
 const express = require('express');
 const i18n = require('i18n');
 const helmet = require('helmet');
@@ -8,7 +9,9 @@ const cors = require('cors');
 const passport = require('passport');
 const bodyParser = require('body-parser');
 const httpStatus = require('http-status');
-const config = require('./config/config');
+
+// Instead of using global.appConfig directly, we fall back to the synchronous config.
+const config = global.appConfig || require('./config/config');
 const morgan = require('./config/morgan');
 const { jwtStrategy } = require('./config/passport');
 const { authLimiter } = require('./middlewares/rateLimiter');
@@ -18,6 +21,7 @@ const ApiError = require('./utils/ApiError');
 const logger = require('./config/logger');
 
 const app = express();
+
 // Trust proxy headers
 app.set('trust proxy', true);
 
@@ -30,43 +34,43 @@ i18n.configure({
     // do nothing
   },
 });
+app.use(i18n.init); // Attach i18n to the request
 
-app.use(i18n.init); // This middleware attaches the i18n object to the request
-
-//if (config.env !== 'test') {
+// Log HTTP requests if not in test mode
+// if (config.env !== 'test') {
   app.use(morgan.successHandler);
   app.use(morgan.errorHandler);
-//}
+// }
 
 // Parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// sanitize request data
+// Sanitize request data
 app.use(xss());
 app.use(mongoSanitize());
 
-// gzip compression
+// Gzip compression
 app.use(compression());
 
-// enable cors
+// Enable CORS
 app.use(cors());
 app.options('*', cors());
 
-// jwt authentication
+// JWT authentication
 app.use(passport.initialize());
 passport.use('jwt', jwtStrategy);
 
 app.use(express.json({ limit: '50mb' }));
 
-// limit repeated failed requests to auth endpoints
+// Rate limiting for auth endpoints in production
 if (config.env === 'production') {
   app.use('/v1/auth', authLimiter);
 }
 
-// set security HTTP headers
+// Set security HTTP headers
 app.use(helmet());
 
-// v1 api routes
+// v1 API routes
 app.use('/v1', routes);
 
 app.get('/health', (req, res) => {
@@ -75,31 +79,30 @@ app.get('/health', (req, res) => {
 
 // Log incoming requests
 app.use((req, res, next) => {
-  //console.log(`Incoming request: ${req.method} ${req.url}`);
   logger.debug(`Incoming request: ${req.method} ${req.url}`);
   next();
 });
 
-// send back a 404 error for any unknown api request
+// 404 handler for unknown routes
 app.use((req, res, next) => {
   next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
 });
 
-// convert error to ApiError, if needed
+// Error conversion and handling
 app.use(errorConverter);
-
-// handle error
 app.use(errorHandler);
 
 // Handle uncaught exceptions and rejections
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
 });
-
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-require('./config/agenda');
+// Start background jobs, etc.
+if (process.env.NODE_ENV !== 'test') {
+  require('./config/agenda');
+}
 
 module.exports = app;
