@@ -315,6 +315,26 @@ resource "aws_iam_role_policy_attachment" "codebuild_ecs_policy_attach" {
   policy_arn = aws_iam_policy.codebuild_ecs_policy.arn
 }
 
+resource "aws_iam_policy" "codebuild_ecs_describe_policy" {
+  name        = "CodeBuildECSDescribePolicy"
+  description = "Allow CodeBuild to describe ECS task definitions"
+  policy      = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "ecs:DescribeTaskDefinition",
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codebuild_ecs_describe_policy_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_ecs_describe_policy.arn
+}
+
 resource "aws_iam_policy" "codebuild_pass_role_policy" {
   name        = "CodeBuildPassRolePolicy"
   description = "Allow CodeBuild to pass the ECS task execution role"
@@ -905,6 +925,10 @@ resource "aws_lb_listener" "http_listener" {
       status_code = "HTTP_301" # Or "HTTP_302" for temporary redirect
     }
   }
+
+  lifecycle {
+    ignore_changes = [default_action]
+  }
 }
 
 resource "aws_lb_listener" "https_listener" {
@@ -917,6 +941,10 @@ resource "aws_lb_listener" "https_listener" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app_tg_green.arn # Or blue, depending on initial state
+  }
+
+  lifecycle {
+    ignore_changes = [default_action]
   }
 }
 

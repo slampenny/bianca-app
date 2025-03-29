@@ -1,4 +1,4 @@
-FROM node:18-buster
+FROM public.ecr.aws/docker/library/node:18-buster
 
 # Create app directory
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
