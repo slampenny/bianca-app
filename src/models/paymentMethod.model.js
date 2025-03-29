@@ -1,45 +1,66 @@
 const mongoose = require('mongoose');
-const { toJSON, paginate } = require('./plugins');
+const { toJSON } = require('./plugins');
 
 const paymentMethodSchema = mongoose.Schema(
   {
-    patientId: {
-      type: mongoose.SchemaTypes.ObjectId,
-      required: true,
-      ref: 'Patient'
-    },
-    stripeCustomerId: {
-      type: String,
-      required: true,
-    },
     stripePaymentMethodId: {
       type: String,
       required: true,
+      unique: true,
     },
-    stripeSubscriptionId: {
-      type: String,
+    org: {
+      type: mongoose.SchemaTypes.ObjectId,
+      ref: 'Org',
       required: true,
     },
-    isActive: {
+    isDefault: {
       type: Boolean,
-      default: true,
+      default: false,
     },
-    lastPaymentDate: {
-      type: Date,
-      required: true
-    }
+    type: {
+      type: String,
+      required: true,
+      enum: ['card', 'bank_account', 'us_bank_account'],
+    },
+    // Card details
+    brand: String,
+    last4: String,
+    expMonth: Number,
+    expYear: Number,
+    // Bank account details
+    bankName: String,
+    accountType: String,
+    // Common metadata
+    billingDetails: {
+      name: String,
+      email: String,
+      phone: String,
+      address: {
+        line1: String,
+        line2: String,
+        city: String,
+        state: String,
+        postal_code: String,
+        country: String,
+      },
+    },
+    metadata: {
+      type: Map,
+      of: String,
+      default: {},
+    },
   },
   {
     timestamps: true,
   }
 );
 
+// add plugin that converts mongoose to json
 paymentMethodSchema.plugin(toJSON);
-paymentMethodSchema.plugin(paginate);
 
 /**
- * @typedef Schedule
+ * @typedef PaymentMethod
  */
-const paymentMethod = mongoose.model('PaymentMethod', paymentMethodSchema);
+const PaymentMethod = mongoose.model('PaymentMethod', paymentMethodSchema);
 
-module.exports = paymentMethodSchema;
+module.exports = PaymentMethod;

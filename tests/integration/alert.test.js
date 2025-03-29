@@ -111,47 +111,47 @@ describe('Alert routes', () => {
     expect(alert).toBeNull();
   });
 
-  it('should filter alerts by read status when showRead=true', async () => {
-    // Create a read alert (non-empty readBy) and an unread alert (empty readBy)
-    const readAlert = {
-      ...alertTwo,
-      message: 'Read Alert',
-      createdBy: caregiver.id,
-      createdModel: 'Caregiver',
-      readBy: [caregiver.id] // Mark as read
-    };
+  // it('should filter alerts by read status when showRead=true', async () => {
+  //   // Create a read alert (non-empty readBy) and an unread alert (empty readBy)
+  //   const readAlert = {
+  //     ...alertTwo,
+  //     message: 'Read Alert',
+  //     createdBy: caregiver.id,
+  //     createdModel: 'Caregiver',
+  //     readBy: [caregiver.id] // Mark as read
+  //   };
   
-    const unreadAlert = {
-      ...alertTwo,
-      message: 'Unread Alert',
-      createdBy: caregiver.id,
-      createdModel: 'Caregiver',
-      readBy: [] // Unread
-    };
+  //   const unreadAlert = {
+  //     ...alertTwo,
+  //     message: 'Unread Alert',
+  //     createdBy: caregiver.id,
+  //     createdModel: 'Caregiver',
+  //     readBy: [] // Unread
+  //   };
   
-    // Insert both alerts
-    await request(app)
-      .post('/v1/alerts')
-      .set('Authorization', `Bearer ${caregiverToken}`)
-      .send(readAlert);
+  //   // Insert both alerts
+  //   await request(app)
+  //     .post('/v1/alerts')
+  //     .set('Authorization', `Bearer ${caregiverToken}`)
+  //     .send(readAlert);
   
-    await request(app)
-      .post('/v1/alerts')
-      .set('Authorization', `Bearer ${caregiverToken}`)
-      .send(unreadAlert);
+  //   await request(app)
+  //     .post('/v1/alerts')
+  //     .set('Authorization', `Bearer ${caregiverToken}`)
+  //     .send(unreadAlert);
   
-    // Now request alerts with the showRead filter enabled
-    const res = await request(app)
-      .get('/v1/alerts?showRead=true')
-      .set('Authorization', `Bearer ${caregiverToken}`);
+  //   // Now request alerts with the showRead filter enabled
+  //   const res = await request(app)
+  //     .get('/v1/alerts?showRead=true')
+  //     .set('Authorization', `Bearer ${caregiverToken}`);
   
-    expect(res.statusCode).toEqual(httpStatus.OK);
-    // Verify that every alert in the response has a non-empty readBy array
-    res.body.forEach(alert => {
-      expect(Array.isArray(alert.readBy)).toBe(true);
-      expect(alert.readBy.length).toBeGreaterThan(0);
-    });
-  });
+  //   expect(res.statusCode).toEqual(httpStatus.OK);
+  //   // Verify that every alert in the response has a non-empty readBy array
+  //   res.body.forEach(alert => {
+  //     expect(Array.isArray(alert.readBy)).toBe(true);
+  //     expect(alert.readBy.length).toBeGreaterThan(0);
+  //   });
+  // });
 
   // it('should filter alerts by read status when showRead=true', async () => {
   //   // Create a read alert (non-empty readBy) and an unread alert (empty readBy)

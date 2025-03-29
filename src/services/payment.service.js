@@ -1,4 +1,4 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('../config/stripe');
 const httpStatus = require('http-status');
 const { Org, Conversation, Invoice, LineItem } = require('../models');
 const ApiError = require('../utils/ApiError');

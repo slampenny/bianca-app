@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('../../../src/config/stripe');
 const { Org, Conversation, Invoice, LineItem } = require('../../../src/models');
 const paymentService = require('../../../src/services/payment.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');

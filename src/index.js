@@ -1,32 +1,48 @@
 // index.js
 const mongoose = require('mongoose');
-const loadConfig = require('./config/config'); // returns a baseline config object with loadSecrets
+const config = require('./config/config');
+const logger = require('./config/logger');
 
 async function startServer() {
   try {
-    // Load the baseline config.
-    const config = await loadConfig();
-    // In production, enhance the baseline config with secrets.
+    // Load secrets before initializing other components
+    // This ensures config has all secret values before being used
     await config.loadSecrets();
-    // Set the global config so that modules (like logger) can access it.
-    global.appConfig = config;
     
-    // Now require modules that depend on config.
+    // Now require modules that depend on config
     const app = require('./app');
-    const logger = require('./config/logger');
     const { Conversation } = require('./models');
-
-    // Connect to MongoDB.
+    
+    // Connect to MongoDB
     await mongoose.connect(config.mongoose.url, config.mongoose.options);
     logger.info('Connected to MongoDB');
+    
     Conversation.ensureIndexes(); // TODO: Move ensureIndexes() to the build process in production
-
-    // Start the Express server.
+    
+    // Log configuration info
+    logger.info(`Environment: ${config.env}`);
+    if (config.env === 'production') {
+      logger.info('Running in production mode');
+    } else {
+      logger.info(`API URL: ${config.apiUrl}`);
+    }
+    
+    // Log Stripe mode for verification
+    if (config.stripe && config.stripe.mode) {
+      logger.info(`Stripe mode: ${config.stripe.mode}`);
+      
+      // Warn if using live keys in non-production
+      if (config.env !== 'production' && config.stripe.mode === 'live') {
+        logger.warn('⚠️ WARNING: Using Stripe live keys in non-production environment!');
+      }
+    }
+    
+    // Start the Express server
     const server = app.listen(config.port, () => {
       logger.info(`Listening on port ${config.port}`);
     });
-
-    // Graceful shutdown handlers.
+    
+    // Graceful shutdown handlers
     const exitHandler = () => {
       if (server) {
         server.close(() => {
@@ -37,15 +53,14 @@ async function startServer() {
         process.exit(1);
       }
     };
-
+    
     const unexpectedErrorHandler = (error) => {
       logger.error(error);
       exitHandler();
     };
-
+    
     process.on('uncaughtException', unexpectedErrorHandler);
     process.on('unhandledRejection', unexpectedErrorHandler);
-
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received');
       if (server) {
