@@ -17,8 +17,8 @@ const router = express.Router();
  * @swagger
  * /orgs/{orgId}/payment-methods:
  *   post:
- *     summary: Create a payment method
- *     description: Create and attach a Stripe payment method to an organization.
+ *     summary: Attach a payment method
+ *     description: Attach a Stripe payment method to an organization. The payment method must be created client-side using Stripe.js.
  *     tags: [PaymentMethods]
  *     security:
  *       - bearerAuth: []
@@ -40,7 +40,7 @@ const router = express.Router();
  *             properties:
  *               paymentMethodId:
  *                 type: string
- *                 description: Stripe payment method ID
+ *                 description: Stripe payment method ID created client-side
  *     responses:
  *       "201":
  *         description: Created
@@ -90,8 +90,8 @@ router
   .route('/orgs/:orgId/payment-methods')
   .post(
     auth('createAny:paymentMethod'),
-    validate(paymentMethodValidation.createPaymentMethod),
-    paymentMethodController.createPaymentMethod
+    validate(paymentMethodValidation.attachPaymentMethod),
+    paymentMethodController.attachPaymentMethod
   )
   .get(
     auth('readAny:paymentMethod'),
@@ -169,8 +169,8 @@ router
  *         $ref: '#/components/responses/NotFound'
  *
  *   delete:
- *     summary: Delete a payment method
- *     description: Delete a payment method and detach it from Stripe.
+ *     summary: Detach a payment method
+ *     description: Detach a payment method from an organization and from Stripe.
  *     tags: [PaymentMethods]
  *     security:
  *       - bearerAuth: []
@@ -213,8 +213,8 @@ router
   )
   .delete(
     auth('deleteAny:paymentMethod'),
-    validate(paymentMethodValidation.deletePaymentMethod),
-    paymentMethodController.deletePaymentMethod
+    validate(paymentMethodValidation.detachPaymentMethod),
+    paymentMethodController.detachPaymentMethod
   );
 
 module.exports = router;

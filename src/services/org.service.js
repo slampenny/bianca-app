@@ -169,7 +169,7 @@ const sendInvite = async (orgId, name, email, phone) => {
     const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
     await emailService.sendInviteEmail(email, inviteLink);
 
-    return caregiver;
+    return {caregiver: caregiver, inviteToken: inviteToken};
   }
 
   // Option 1: Throw error if caregiver already exists.

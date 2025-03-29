@@ -45,6 +45,15 @@ const orgSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Stripe integration fields
+    stripeCustomerId: {
+      type: String,
+      trim: true,
+    },
+    paymentMethods: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PaymentMethod',
+    }],
     caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },

@@ -1,7 +1,7 @@
 const Joi = require('joi');
 const { objectId } = require('./custom.validation');
 
-const createPaymentMethod = {
+const attachPaymentMethod = {
   params: Joi.object().keys({
     orgId: Joi.string().required().custom(objectId),
   }),
@@ -30,7 +30,7 @@ const setDefaultPaymentMethod = {
   }),
 };
 
-const deletePaymentMethod = {
+const detachPaymentMethod = {
   params: Joi.object().keys({
     orgId: Joi.string().required().custom(objectId),
     paymentMethodId: Joi.string().required().custom(objectId),
@@ -38,9 +38,9 @@ const deletePaymentMethod = {
 };
 
 module.exports = {
-  createPaymentMethod,
+  attachPaymentMethod,
   getOrgPaymentMethods,
   getPaymentMethod,
   setDefaultPaymentMethod,
-  deletePaymentMethod,
+  detachPaymentMethod,
 };

@@ -10,6 +10,7 @@ module.exports.LineItem = LineItem;
 module.exports.Call = require('./call.model');
 module.exports.Message = Message;
 module.exports.Conversation = Conversation;
+module.exports.PaymentMethod = require('./paymentMethod.model');
 module.exports.Report = require('./report.model');
 module.exports.Schedule = require('./schedule.model');
 

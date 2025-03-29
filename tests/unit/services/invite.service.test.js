@@ -44,7 +44,7 @@ describe ('inviteService', () => {
 
       jest.spyOn(emailService, 'sendInviteEmail').mockImplementation(() => {});
 
-      const inviteToken = await orgService.sendInvite(org.id, caregiverOne.name, caregiverOne.email, caregiverOne.phone);
+      const {inviteToken} = await orgService.sendInvite(org.id, caregiverOne.name, caregiverOne.email, caregiverOne.phone);
 
       const caregiver = await Caregiver.findOne({ email: caregiverOne.email });
 
