@@ -1,26 +1,24 @@
 version: 0.2
-
 env:
   variables:
     AWS_DEFAULT_REGION: "us-east-2"
     AWS_ACCOUNT_ID: "730335291008"
-    REPOSITORY_NAME: "bianca-app-backend"  # Ensure this matches your actual ECR repository name
-
-phases: 
+    REPOSITORY_NAME: "bianca-app-backend"
+    TASK_DEFINITION_FAMILY: "bianca-service"
+phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      
+     
   build:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
       - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
       - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
-
   post_build:
     commands:
       - echo Build completed on `date`
@@ -31,10 +29,13 @@ phases:
       - printf '[{"name":"bianca-app-backend","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - echo Copying AppSpec file to artifact root...
       - cp devops/appspec.yml appspec.yml
-      - echo Updating appspec.yml with the new task definition ARN...
-      - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://devops/task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-      - sed -i 's|PLACEHOLDER_FOR_TASK_DEFINITION_ARN|'"$NEW_TASK_DEFINITION"'|g' appspec.yml
-
+      - echo Getting current task definition...
+      - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $TASK_DEFINITION_FAMILY --query 'taskDefinition' --output json)
+      - echo Updating task definition with new image...
+      - echo $TASK_DEFINITION | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' > task-def.json
+      - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      - echo $NEW_TASK_DEFINITION
+      - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.yml
 artifacts:
   files:
     - imagedefinitions.json
