@@ -155,6 +155,48 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
+##############################
+# EFS for MongoDB Persistence
+##############################
+
+# Create an EFS file system for MongoDB data
+resource "aws_efs_file_system" "mongodb_data" {
+  creation_token = "mongodb-data"
+  
+  tags = {
+    Name = "MongoDB Data"
+  }
+}
+
+# Create mount targets in each subnet
+resource "aws_efs_mount_target" "mongodb_mount" {
+  count           = length(var.subnet_ids)
+  file_system_id  = aws_efs_file_system.mongodb_data.id
+  subnet_id       = var.subnet_ids[count.index]
+  security_groups = [aws_security_group.efs_sg.id]
+}
+
+# Security group for EFS
+resource "aws_security_group" "efs_sg" {
+  name        = "mongodb-efs-sg"
+  description = "Allow NFS traffic from ECS tasks"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "NFS from ECS tasks"
+    from_port       = 2049
+    to_port         = 2049
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bianca_app_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
 
 ##############################
 # ALB Target Groups
@@ -755,6 +797,16 @@ resource "aws_ecs_task_definition" "app_task" {
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
+  # Add volume configuration for MongoDB
+  volume {
+    name = "mongodb-data"
+    
+    efs_volume_configuration {
+      file_system_id = aws_efs_file_system.mongodb_data.id
+      root_directory = "/"
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name         = var.container_name
@@ -765,19 +817,29 @@ resource "aws_ecs_task_definition" "app_task" {
         hostPort      = var.container_port
         protocol      = "tcp"
       }]
-      environment = [{
-        name  = "MONGODB_URL"
-        value = "mongodb://mongodb:27017/bianca-app"
-      }]
+      environment = [
+        {
+          name  = "MONGODB_URL"
+          value = "mongodb://mongodb:27017/bianca-app"
+        },
+        {
+          name  = "NODE_ENV"
+          value = "production"
+        }
+      ]
     },
     {
-      name         = "mongo"
+      name         = "mongodb"
       image        = "mongo:4.2.1-bionic"
       essential    = true
       portMappings = [{
         containerPort = 27017
         hostPort      = 27017
         protocol      = "tcp"
+      }]
+      mountPoints = [{
+        sourceVolume  = "mongodb-data"
+        containerPath = "/data/db"
       }]
     }
   ])
@@ -904,7 +966,6 @@ resource "aws_iam_role_policy" "codebuild_pass_task_role_policy" {
   })
 }
 
-
 ##############################
 # CodeDeploy Application and Deployment Group
 ##############################
@@ -980,7 +1041,6 @@ resource "aws_route53_record" "app_subdomain" {
     evaluate_target_health = true
   }
 }
-
 
 ##############################
 # CodePipeline
