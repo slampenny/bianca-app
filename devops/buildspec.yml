@@ -34,7 +34,8 @@ phases:
       - echo Updating task definition with new image...
       - echo $TASK_DEFINITION | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
       - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
-      - echo "NEW_TASK_DEFINITION: $NEW_TASK_DEFINITION"
+      - |
+        echo "NEW_TASK_DEFINITION: $NEW_TASK_DEFINITION"
       - echo "Showing appspec.yml before replacement:"
       - cat appspec.yml
       - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.yml
