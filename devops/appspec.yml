@@ -7,3 +7,4 @@ Resources:
         LoadBalancerInfo:
           ContainerName: "bianca-app-backend"
           ContainerPort: 3000
+        PlatformVersion: "LATEST"
