@@ -35,6 +35,8 @@ phases:
       - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query taskDefinition.taskDefinitionArn --output text)
       - cp devops/appspec.yml appspec.yml
       - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.yml
+      - echo "Contents of appspec.yml after modification:"  # Add this line
+      - cat appspec.yml  
 artifacts:
   files:
     - appspec.yml
