@@ -42,3 +42,4 @@ artifacts:
     - appspec.yml
     - imagedefinitions.json
     - task-def.json
+  base-directory: /
