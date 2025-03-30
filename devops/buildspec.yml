@@ -39,7 +39,7 @@ phases:
       - cat appspec.yml  
 artifacts:
   files:
-    - appspec.yml
-    - imagedefinitions.json
-    - task-def.json
+    - ./appspec.yml
+    - ./imagedefinitions.json
+    - ./task-def.json
   base-directory: /
