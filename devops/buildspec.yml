@@ -32,19 +32,18 @@ phases:
       - echo $TASK_DEFINITION | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
       - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
       - echo "NEW_TASK_DEFINITION: $NEW_TASK_DEFINITION"
-      - echo 'version: 0.0' > appspec.yml
-      - echo 'Resources:' >> appspec.yml
-      - echo '  - TargetService:' >> appspec.yml
-      - echo '      Type: AWS::ECS::Service' >> appspec.yml
-      - echo '      Properties:' >> appspec.yml
-      - echo '        TaskDefinition: "'$NEW_TASK_DEFINITION'"' >> appspec.yml
-      - echo '        LoadBalancerInfo:' >> appspec.yml
-      - echo '          ContainerName: "bianca-app-backend"' >> appspec.yml
-      - echo '          ContainerPort: 3000' >> appspec.yml
+      - echo "version: 0.0" > appspec.yml
+      - echo "Resources:" >> appspec.yml
+      - echo "  - TargetService:" >> appspec.yml
+      - echo "      Type: AWS::ECS::Service" >> appspec.yml
+      - echo "      Properties:" >> appspec.yml
+      - echo "        TaskDefinition: \"$NEW_TASK_DEFINITION\"" >> appspec.yml
+      - echo "        LoadBalancerInfo:" >> appspec.yml
+      - echo "          ContainerName: \"bianca-app-backend\"" >> appspec.yml
+      - echo "          ContainerPort: 3000" >> appspec.yml
       - echo "FINAL APPSPEC CONTENT:"
       - cat appspec.yml
 artifacts:
   files:
     - appspec.yml
     - imagedefinitions.json
-    - task-def.json
