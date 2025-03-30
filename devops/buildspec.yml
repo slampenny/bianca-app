@@ -12,7 +12,6 @@ phases:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-     
   build:
     commands:
       - echo Build started on `date`
@@ -30,30 +29,20 @@ phases:
       - echo Getting current task definition...
       - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $TASK_DEFINITION_FAMILY --query 'taskDefinition' --output json)
       - echo Updating task definition with new image...
-      - |
-        echo $TASK_DEFINITION | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
-      - echo "TASK DEFINITION JSON CONTENT:"
-      - cat task-def.json
+      - echo $TASK_DEFINITION | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
       - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
       - echo "NEW_TASK_DEFINITION: $NEW_TASK_DEFINITION"
-      - echo "Creating AppSpec file directly..."
-      - |
-        cat > appspec.yml << 'EOF'
-        version: 0.0
-        Resources:
-          - TargetService:
-              Type: AWS::ECS::Service
-              Properties:
-                TaskDefinition: "TASK_DEFINITION_PLACEHOLDER"
-                LoadBalancerInfo:
-                  ContainerName: "bianca-app-backend"
-                  ContainerPort: 3000
-        EOF
-      - sed -i "s|TASK_DEFINITION_PLACEHOLDER|$NEW_TASK_DEFINITION|g" appspec.yml
+      - echo 'version: 0.0' > appspec.yml
+      - echo 'Resources:' >> appspec.yml
+      - echo '  - TargetService:' >> appspec.yml
+      - echo '      Type: AWS::ECS::Service' >> appspec.yml
+      - echo '      Properties:' >> appspec.yml
+      - echo '        TaskDefinition: "'$NEW_TASK_DEFINITION'"' >> appspec.yml
+      - echo '        LoadBalancerInfo:' >> appspec.yml
+      - echo '          ContainerName: "bianca-app-backend"' >> appspec.yml
+      - echo '          ContainerPort: 3000' >> appspec.yml
       - echo "FINAL APPSPEC CONTENT:"
       - cat appspec.yml
-      - echo "Validating YAML syntax..."
-      - python -c "import yaml; yaml.safe_load(open('appspec.yml'))" || echo "YAML validation failed"
 artifacts:
   files:
     - appspec.yml
