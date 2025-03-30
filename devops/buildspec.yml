@@ -27,21 +27,35 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - echo Writing image definitions file...
       - printf '[{"name":"bianca-app-backend","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
-      - echo Copying AppSpec file to artifact root...
-      - cp devops/appspec.yml appspec.yml
       - echo Getting current task definition...
       - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $TASK_DEFINITION_FAMILY --query 'taskDefinition' --output json)
       - echo Updating task definition with new image...
-      - echo $TASK_DEFINITION | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
-      - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
       - |
-        echo "NEW_TASK_DEFINITION: $NEW_TASK_DEFINITION"
-      - echo "Showing appspec.yml before replacement:"
+        echo $TASK_DEFINITION | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
+      - echo "TASK DEFINITION JSON CONTENT:"
+      - cat task-def.json
+      - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      - echo "NEW_TASK_DEFINITION: $NEW_TASK_DEFINITION"
+      - echo "Creating AppSpec file directly..."
+      - |
+        cat > appspec.yml << 'EOF'
+        version: 0.0
+        Resources:
+          - TargetService:
+              Type: AWS::ECS::Service
+              Properties:
+                TaskDefinition: "TASK_DEFINITION_PLACEHOLDER"
+                LoadBalancerInfo:
+                  ContainerName: "bianca-app-backend"
+                  ContainerPort: 3000
+        EOF
+      - sed -i "s|TASK_DEFINITION_PLACEHOLDER|$NEW_TASK_DEFINITION|g" appspec.yml
+      - echo "FINAL APPSPEC CONTENT:"
       - cat appspec.yml
-      - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.yml
-      - echo "Showing appspec.yml after replacement:"
-      - cat appspec.yml
+      - echo "Validating YAML syntax..."
+      - python -c "import yaml; yaml.safe_load(open('appspec.yml'))" || echo "YAML validation failed"
 artifacts:
   files:
-    - imagedefinitions.json
     - appspec.yml
+    - imagedefinitions.json
+    - task-def.json
