@@ -872,9 +872,9 @@ resource "aws_ecs_service" "app_service" {
   launch_type     = "FARGATE"
   desired_count   = 1
 
-  deployment_controller {
-    type = "CODE_DEPLOY"
-  }
+  # deployment_controller {
+  #   type = "CODE_DEPLOY"
+  # }
 
   network_configuration {
     subnets          = var.subnet_ids
@@ -890,9 +890,9 @@ resource "aws_ecs_service" "app_service" {
 
   enable_execute_command = true
 
-  lifecycle {
-    ignore_changes = [ task_definition, desired_count, load_balancer ]
-  }
+  # lifecycle {
+  #   ignore_changes = [ task_definition, desired_count, load_balancer ]
+  # }
 
   depends_on = [
     aws_lb_listener.http_listener,
@@ -1028,9 +1028,6 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
     target_group_pair_info {
       prod_traffic_route {
         listener_arns = [aws_lb_listener.https_listener.arn]
-      }
-      test_traffic_route {
-        listener_arns = [aws_lb_listener.http_listener.arn]
       }
       target_group {
         name = aws_lb_target_group.app_tg_green.name

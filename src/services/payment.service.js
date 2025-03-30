@@ -60,6 +60,43 @@ const calculateAmount = (totalDuration) => {
   return totalMinutes * config.billing.ratePerMinute;
 };
 
+const listInvoicesByOrg = async (orgId, filters = {}) => {
+  const query = { org: orgId };
+
+  if (filters.status) {
+    query.status = filters.status;
+  }
+
+  if (filters.dueDate) {
+    // Filter for invoices due on or before the specified date
+    query.dueDate = { $lte: new Date(filters.dueDate) };
+  }
+
+  return await Invoice.find(query).populate('lineItems');
+};
+
+const listInvoicesByPatient = async (patientId, filters = {}) => {
+  // Assumes a patient invoice is identified by a line item matching the patient
+  let invoices = await Invoice.find({}).populate({
+    path: 'lineItems',
+    match: { patientId }
+  });
+  invoices = invoices.filter(inv => inv.lineItems && inv.lineItems.length);
+
+  // Apply additional filters if provided
+  if (filters.status) {
+    invoices = invoices.filter(inv => inv.status === filters.status);
+  }
+  if (filters.dueDate) {
+    const dueDateFilter = new Date(filters.dueDate);
+    invoices = invoices.filter(inv => new Date(inv.dueDate) <= dueDateFilter);
+  }
+
+  return invoices;
+};
+
 module.exports = {
   createInvoiceFromConversations,
+  listInvoicesByOrg,
+  listInvoicesByPatient,
 };
