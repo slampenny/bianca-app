@@ -33,7 +33,7 @@ phases:
       - cat task-def-original.json | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' > task-def-with-image.json
       - cat task-def-with-image.json | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
       - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query taskDefinition.taskDefinitionArn --output text)
-      - cp appspec.yml appspec.yml.template
+      - cp devops/appspec.yml appspec.yml
       - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.yml
 artifacts:
   files:
