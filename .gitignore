@@ -3,6 +3,7 @@ logs
 node_modules
 .terraform/
 .terraform.lock.hcl
+.terraform*
 terraform.tfstate
 terraform.tfstate.backup
 .vscode

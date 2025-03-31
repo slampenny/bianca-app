@@ -93,7 +93,7 @@ const baselineConfig = {
 // Set production-specific defaults
 if (envVars.NODE_ENV === 'production') {
   baselineConfig.apiUrl = 'http://app.myphonefriend.com/v1';
-  baselineConfig.mongoose.url = 'mongodb://mongo:27017/bianca-app';
+  baselineConfig.mongoose.url = 'mongodb://mongodb:27017/bianca-app';
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = 'https://app.myphonefriend.com';
 }
@@ -170,8 +170,7 @@ baselineConfig.loadSecrets = async () => {
     
     return baselineConfig;
   } catch (err) {
-    console.error('Failed to load secrets:', err);
-    throw err;
+    console.error('Error retrieving secret:', error.code, error.message);
   }
 };
 

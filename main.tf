@@ -638,6 +638,23 @@ resource "aws_iam_role_policy" "ecs_task_secrets_policy" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_execution_secrets_policy" {
+  name = "ecs-execution-secrets-policy"
+  role = aws_iam_role.ecs_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "AllowSecretsManagerGetSecretValue"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = "arn:aws:secretsmanager:us-east-2:730335291008:secret:MySecretsManagerSecret-LyB1aP"
+      }
+    ]
+  })
+}
+
 # CodePipeline Role
 resource "aws_iam_role" "codepipeline_role" {
   name = var.codepipeline_role_name
@@ -872,9 +889,9 @@ resource "aws_ecs_service" "app_service" {
   launch_type     = "FARGATE"
   desired_count   = 1
 
-  # deployment_controller {
-  #   type = "CODE_DEPLOY"
-  # }
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
 
   network_configuration {
     subnets          = var.subnet_ids
@@ -890,9 +907,9 @@ resource "aws_ecs_service" "app_service" {
 
   enable_execute_command = true
 
-  # lifecycle {
-  #   ignore_changes = [ task_definition, desired_count, load_balancer ]
-  # }
+  lifecycle {
+    ignore_changes = [ task_definition, desired_count, load_balancer ]
+  }
 
   depends_on = [
     aws_lb_listener.http_listener,
