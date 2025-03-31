@@ -1,10 +1,12 @@
 version: 0.2
+
 env:
   variables:
     AWS_DEFAULT_REGION: us-east-2
     AWS_ACCOUNT_ID: 730335291008
     REPOSITORY_NAME: bianca-app-backend
     TASK_DEFINITION_FAMILY: bianca-service
+
 phases:
   pre_build:
     commands:
@@ -33,12 +35,12 @@ phases:
       - cat task-def-original.json | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' > task-def-with-image.json
       - cat task-def-with-image.json | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
       - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query taskDefinition.taskDefinitionArn --output text)
-      - cp devops/appspec.yml appspec.yml
-      - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.yml
-      - echo "Contents of appspec.yml after modification:"  # Add this line
-      - cat appspec.yml  
+      - cp devops/appspec.json appspec.json
+      - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.json
+      - echo "Contents of appspec.json after modification:"
+      - cat appspec.json  
 artifacts:
   files:
-    - appspec.yml
+    - appspec.json
     - imagedefinitions.json
     - task-def.json
