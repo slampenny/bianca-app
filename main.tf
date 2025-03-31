@@ -864,7 +864,7 @@ resource "aws_ecs_task_definition" "app_task" {
           value = "production"
         },
         {
-          name  = "JWT_TOKEN"
+          name  = "JWT_SECRET"
           value = "temp-secret-bianca"
         }
       ]
