@@ -6,4 +6,5 @@ Resources:
         TaskDefinition: "<TASK_DEFINITION>"
         LoadBalancerInfo:
           ContainerName: "bianca-app-backend"
-          ContainerPort: 80
+          ContainerPort: 3000
+        PlatformVersion: "LATEST"
