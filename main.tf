@@ -862,6 +862,10 @@ resource "aws_ecs_task_definition" "app_task" {
         {
           name  = "NODE_ENV"
           value = "production"
+        },
+        {
+          name  = "JWT_TOKEN"
+          value = "temp-secret-bianca"
         }
       ]
     },

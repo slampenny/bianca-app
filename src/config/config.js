@@ -10,7 +10,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 // Define the environment variable schema
 const envVarsSchema = Joi.object({
   NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
-  JWT_SECRET: Joi.string().required(),
+  JWT_SECRET: Joi.string(),
   MONGODB_URL: Joi.string(),
   SMTP_USERNAME: Joi.string(),
   SMTP_PASSWORD: Joi.string(),
