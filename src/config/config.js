@@ -171,7 +171,8 @@ baselineConfig.loadSecrets = async () => {
     
     return baselineConfig;
   } catch (err) {
-    console.error('Error retrieving secret:', error.code, error.message);
+    console.error('Error retrieving secret:', err.code, err.message);
+    return baselineConfig;
   }
 };
 
