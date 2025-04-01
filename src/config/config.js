@@ -96,6 +96,7 @@ if (envVars.NODE_ENV === 'production') {
   baselineConfig.mongoose.url = 'mongodb://mongodb:27017/bianca-app';
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = 'https://app.myphonefriend.com';
+  baselineConfig.jwt.secret = 'your-production-secret'; // Replace with your production secret
 }
 
 // Add method to load secrets from AWS Secrets Manager
