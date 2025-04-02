@@ -93,7 +93,7 @@ const baselineConfig = {
 // Set production-specific defaults
 if (envVars.NODE_ENV === 'production') {
   baselineConfig.apiUrl = 'http://app.myphonefriend.com/v1';
-  baselineConfig.mongoose.url = 'mongodb://mongodb:27017/bianca-app';
+  baselineConfig.mongoose.url = 'mongodb://localhost:27017/bianca-app';
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = 'https://app.myphonefriend.com';
   baselineConfig.jwt.secret = 'your-production-secret'; // Replace with your production secret

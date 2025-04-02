@@ -198,6 +198,32 @@ resource "aws_security_group" "efs_sg" {
   }
 }
 
+resource "aws_efs_file_system_policy" "mongodb_policy" {
+  file_system_id = aws_efs_file_system.mongodb_data.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowECSAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite"
+        ]
+        Resource = aws_efs_file_system.mongodb_data.arn
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "true"
+          }
+        }
+      }
+    ]
+  })
+}
+
 ##############################
 # ALB Target Groups
 ##############################
@@ -857,7 +883,7 @@ resource "aws_ecs_task_definition" "app_task" {
       environment = [
         {
           name  = "MONGODB_URL"
-          value = "mongodb://mongodb:27017/bianca-app"
+          value = "mongodb://localhost:27017/bianca-app"
         },
         {
           name  = "NODE_ENV"
