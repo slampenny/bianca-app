@@ -22,6 +22,10 @@ const logger = require('./config/logger');
 
 const app = express();
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Trust proxy headers
 app.set('trust proxy', true);
 
@@ -72,10 +76,6 @@ app.use(helmet());
 
 // v1 API routes
 app.use('/v1', routes);
-
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
 
 // Log incoming requests
 app.use((req, res, next) => {
