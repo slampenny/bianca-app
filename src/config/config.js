@@ -125,11 +125,6 @@ baselineConfig.loadSecrets = async () => {
       baselineConfig.jwt.secret = secrets.JWT_SECRET;
     }
     
-    // MongoDB
-    if (secrets.MONGODB_URL) {
-      baselineConfig.mongoose.url = secrets.MONGODB_URL;
-    }
-    
     // Email
     if (secrets.SMTP_USERNAME) {
       baselineConfig.email.smtp.auth.user = secrets.SMTP_USERNAME;
