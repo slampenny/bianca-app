@@ -6,18 +6,20 @@ const logger = require('./config/logger');
 async function startServer() {
   try {
     // Load secrets before initializing other components
-    // This ensures config has all secret values before being used
     await config.loadSecrets();
     
     // Now require modules that depend on config
     const app = require('./app');
     const { Conversation } = require('./models');
     
-    // Connect to MongoDB
-    await mongoose.connect(config.mongoose.url, config.mongoose.options);
-    logger.info('Connected to MongoDB');
-    
-    Conversation.ensureIndexes(); // TODO: Move ensureIndexes() to the build process in production
+    // Attempt to connect to MongoDB but do not block server startup on failure
+    try {
+      await mongoose.connect(config.mongoose.url, config.mongoose.options);
+      logger.info('Connected to MongoDB');
+      Conversation.ensureIndexes(); // Ensure indexes if connected
+    } catch (mongoError) {
+      console.error('MongoDB connection failed. Continuing without database connection:', mongoError);
+    }
     
     // Log configuration info
     logger.info(`Environment: ${config.env}`);
@@ -27,11 +29,8 @@ async function startServer() {
       logger.info(`API URL: ${config.apiUrl}`);
     }
     
-    // Log Stripe mode for verification
     if (config.stripe && config.stripe.mode) {
       logger.info(`Stripe mode: ${config.stripe.mode}`);
-      
-      // Warn if using live keys in non-production
       if (config.env !== 'production' && config.stripe.mode === 'live') {
         logger.warn('⚠️ WARNING: Using Stripe live keys in non-production environment!');
       }
