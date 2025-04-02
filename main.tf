@@ -260,6 +260,16 @@ resource "aws_lb_target_group" "app_tg_green" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "app_log_group" {
+  name              = "/ecs/${var.container_name}"
+  retention_in_days = 14
+}
+
+resource "aws_cloudwatch_log_group" "mongodb_log_group" {
+  name              = "/ecs/mongodb"
+  retention_in_days = 14
+}
+
 ##############################
 # S3 Bucket and ECR Repository
 ##############################
@@ -860,57 +870,61 @@ resource "aws_ecs_task_definition" "app_task" {
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
-  # Add volume configuration for MongoDB
-  volume {
-    name = "mongodb-data"
-    
-    efs_volume_configuration {
-      file_system_id = aws_efs_file_system.mongodb_data.id
-      root_directory = "/"
-    }
-  }
-
   container_definitions = jsonencode([
     {
-      name         = var.container_name
-      image        = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest"
-      essential    = true
+      name         = var.container_name,
+      image        = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest",
+      essential    = true,
       portMappings = [{
-        containerPort = var.container_port
-        hostPort      = var.container_port
+        containerPort = var.container_port,
+        hostPort      = var.container_port,
         protocol      = "tcp"
-      }]
+      }],
       environment = [
         {
-          name  = "MONGODB_URL"
+          name  = "MONGODB_URL",
           value = "mongodb://localhost:27017/bianca-app"
         },
         {
-          name  = "NODE_ENV"
+          name  = "NODE_ENV",
           value = "production"
         },
         {
-          name  = "JWT_SECRET"
+          name  = "JWT_SECRET",
           value = "temp-secret-bianca"
         }
-      ]
+      ],
+      logConfiguration = {
+        logDriver = "awslogs",
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.app_log_group.name,
+          "awslogs-region"        = var.aws_region,
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
     },
     {
-      name         = "mongodb"
-      image        = "mongo:4.2.1-bionic"
-      essential    = true
+      name         = "mongodb",
+      image        = "mongo:4.2.1-bionic",
+      essential    = true,
       portMappings = [{
-        containerPort = 27017
-        hostPort      = 27017
+        containerPort = 27017,
+        hostPort      = 27017,
         protocol      = "tcp"
-      }]
-      mountPoints = [{
-        sourceVolume  = "mongodb-data"
-        containerPath = "/data/db"
-      }]
+      }],
+      logConfiguration = {
+        logDriver = "awslogs",
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.mongodb_log_group.name,
+          "awslogs-region"        = var.aws_region,
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+      # If you're temporarily not mounting the EFS volume, you can leave out the mountPoints.
     }
   ])
 }
+
 
 resource "aws_ecs_service" "app_service" {
   name            = var.service_name
