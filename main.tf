@@ -979,16 +979,8 @@ resource "aws_lb_listener" "http_listener" {
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301" # Or "HTTP_302" for temporary redirect
-    }
-  }
-
-  lifecycle {
-    ignore_changes = [default_action]
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg_green.arn
   }
 }
 
@@ -1001,7 +993,7 @@ resource "aws_lb_listener" "https_listener" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg_green.arn # Or blue, depending on initial state
+    target_group_arn = aws_lb_target_group.app_tg_green.arn
   }
 
   lifecycle {
