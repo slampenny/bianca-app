@@ -12,6 +12,7 @@ import {
   AlertScreen, 
   OrgScreen, 
   PaymentInfoScreen, 
+  ProfileScreen,
   LogoutScreen 
 } from 'app/screens';
 import { DrawerParamList } from './navigationTypes';
@@ -37,7 +38,8 @@ function HomeStack() {
       <Stack.Screen name="Patient" component={PatientScreen} />
       <Stack.Screen name="Schedule" component={SchedulesScreen} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
-      <Stack.Screen name="Profile" component={CaregiverScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Logout" component={LogoutScreen} />
     </Stack.Navigator>
   );
 }

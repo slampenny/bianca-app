@@ -73,8 +73,8 @@ export const caregiverSlice = createSlice({
     // Handle invite: when a caregiver is invited successfully via orgApi sendInvite,
     // add the returned caregiver to the caregivers array.
     builder.addMatcher(orgApi.endpoints.sendInvite.matchFulfilled, (state, { payload }) => {
-      console.log('[caregiverSlice] orgApi.sendInvite.matchFulfilled, payload:', payload);
-      state.caregivers.push(payload);
+      console.log('[caregiverSlice] orgApi.sendInvite.matchFulfilled, payload:', payload.caregiver);
+      state.caregivers.push(payload.caregiver);
     });
   }
 });

@@ -83,7 +83,7 @@ export const orgApi = createApi({
         };
       },
     }),
-    sendInvite: builder.mutation<Caregiver, { orgId: string, name: string, email: string, phone: string }>({
+    sendInvite: builder.mutation<{ caregiver: Caregiver; token: string }, { orgId: string, name: string, email: string, phone: string }>({
       query: ({ orgId, name, email, phone }) => {
         console.log('[orgApi] sendInvite mutation called for orgId:', orgId, 'with name:', name, 'email:', email, 'phone:', phone);
         return {

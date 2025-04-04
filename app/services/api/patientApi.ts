@@ -37,21 +37,28 @@ export const patientApi = createApi({
     }),
     updatePatient: builder.mutation<Patient, { id: string, patient: Partial<Patient> }>({
       query: ({ id, patient }) => {
+        const { schedules, ...filteredPatient } = patient;
+
         return {
           url: `/patients/${id}`,
           method: 'PATCH',
-          body: patient,
+          body: filteredPatient,
         };
       }
     }),
-    uploadPatientAvatar: builder.mutation<void, { id: string, avatar: string }>({
+    uploadPatientAvatar: builder.mutation<Caregiver, { id: string, avatar: Blob | File }>({
       query: ({ id, avatar }) => {
         const formData = new FormData();
-        formData.append('avatar', avatar);
+        
+        // Properly append the avatar as a file/blob
+        formData.append('avatar', avatar, 'avatar.jpg');
+        
         return {
           url: `/patients/${id}/avatar`,
           method: 'POST',
           body: formData,
+          // Don't set content-type header, browser will set it with proper boundary
+          formData: true,
         };
       },
     }),

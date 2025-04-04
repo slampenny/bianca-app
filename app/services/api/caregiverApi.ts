@@ -5,7 +5,7 @@ import { Caregiver, CaregiverPages, Patient } from './api.types';
 
 export const caregiverApi = createApi({
   reducerPath: 'caregiverApi',
-  baseQuery: fetchBaseQuery({ 
+  baseQuery: fetchBaseQuery({
     baseUrl: DEFAULT_API_CONFIG.url,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as RootState).auth.tokens?.access?.token;
@@ -28,21 +28,45 @@ export const caregiverApi = createApi({
     }),
     updateCaregiver: builder.mutation<Caregiver, { id: string, caregiver: Partial<Caregiver> }>({
       query: ({ id, caregiver }) => {
+        const filteredData: Partial<Caregiver> = {};
+    
+        // Explicitly handle each field with proper typing
+        if ('name' in caregiver && caregiver.name !== undefined) {
+          filteredData.name = caregiver.name;
+        }
+        
+        if ('email' in caregiver && caregiver.email !== undefined) {
+          filteredData.email = caregiver.email;
+        }
+        
+        if ('phone' in caregiver && caregiver.phone !== undefined) {
+          filteredData.phone = caregiver.phone;
+        }
+        
+        if ('avatar' in caregiver && caregiver.avatar !== undefined) {
+          filteredData.avatar = caregiver.avatar;
+        }
+
         return {
           url: `/caregivers/${id}`,
           method: 'PATCH',
-          body: caregiver,
+          body: filteredData,
         };
       },
     }),
-    uploadAvatar: builder.mutation<void, { id: string, avatar: string }>({
+    uploadAvatar: builder.mutation<Caregiver, { id: string, avatar: Blob | File }>({
       query: ({ id, avatar }) => {
         const formData = new FormData();
-        formData.append('avatar', avatar);
+        
+        // Properly append the avatar as a file/blob
+        formData.append('avatar', avatar, 'avatar.jpg');
+        
         return {
           url: `/caregivers/${id}/avatar`,
           method: 'POST',
           body: formData,
+          // Don't set content-type header, browser will set it with proper boundary
+          formData: true,
         };
       },
     }),
@@ -52,18 +76,6 @@ export const caregiverApi = createApi({
         method: 'DELETE',
       }),
     }),
-    // assignCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
-    //   query: ({ patientId, caregiverId }) => ({
-    //     url: `/caregivers/${caregiverId}/patients/${patientId}`,
-    //     method: 'POST',
-    //   }),
-    // }),
-    // removeCaregiver: builder.mutation<void, { patientId: string, caregiverId: string }>({
-    //   query: ({ patientId, caregiverId }) => ({
-    //     url: `/caregivers/${caregiverId}/patients/${patientId}`,
-    //     method: 'DELETE',
-    //   }),
-    // }),
     getPatientForCaregiver: builder.query<Patient, { patientId: string, caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/caregivers/${caregiverId}/patients/${patientId}`,
@@ -85,8 +97,6 @@ export const caregiverApi = createApi({
 });
 
 export const {
-  // useAssignCaregiverMutation,
-  // useRemoveCaregiverMutation,
   useGetAllCaregiversQuery,
   useGetCaregiverQuery,
   useUpdateCaregiverMutation,

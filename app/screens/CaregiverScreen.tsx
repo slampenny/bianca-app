@@ -109,7 +109,7 @@ function CaregiverScreen() {
           updatedCaregiver.avatar = avatar;
         }
         await updateCaregiver({ id: caregiver.id, caregiver: updatedCaregiver }).unwrap();
-        navigation.navigate("CaregiverList");
+        navigation.navigate("Caregivers");
       } catch (error) {
         // Handle update error as needed
       }
@@ -117,7 +117,7 @@ function CaregiverScreen() {
       // Invite branch
       try {
         if (currentOrg) {
-          const invitedCaregiver = await sendInvite({
+          const {caregiver: invitedCaregiver} = await sendInvite({
             orgId: currentOrg,
             name,
             email,
@@ -127,7 +127,7 @@ function CaregiverScreen() {
           dispatch(clearCaregiver());
           setTimeout(() => {
             setSuccessMessage("");
-            navigation.navigate("CaregiverList");
+            navigation.navigate("Caregivers");
           }, 2000);
         }
       } catch (error: any) {
