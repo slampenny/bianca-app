@@ -7,11 +7,33 @@ const config = require('../config/config');
 const path = require('path');
 
 const getCaregivers = catchAsync(async (req, res) => {
-  const filter = pick(req.query, ['name', 'role']);
+  console.log("getCaregivers called");
+  console.log("Request caregiver:", req.caregiver);
+
+  // Start with query filters for name and role from req.query
+  let filter = pick(req.query, ['name', 'role']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
+
+  // If the requesting caregiver's role is 'invited' or 'staff',
+  // restrict the result to only itself.
+  if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
+    // Use _id instead of id
+    filter._id = req.caregiver._id;
+    console.log("Filtering by caregiver _id:", req.caregiver._id);
+  } else {
+    // Otherwise, return caregivers in the same organization.
+    filter.org = req.caregiver.org;
+    console.log("Filtering by organization:", req.caregiver.org);
+  }
+
+  console.log("Final filter:", filter);
+
   const result = await caregiverService.queryCaregivers(filter, options);
+  console.log("Query result:", result);
+
   res.send(result);
 });
+
 
 const getCaregiver = catchAsync(async (req, res) => {
   const caregiver = await caregiverService.getCaregiverById(req.params.caregiverId);

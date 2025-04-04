@@ -11,7 +11,7 @@ const router = express.Router();
 
 router
   .route('/')
-  .get(auth('readAny:caregiver'), validate(caregiverValidation.getCaregivers), caregiverController.getCaregivers);
+  .get(auth(), validate(caregiverValidation.getCaregivers), caregiverController.getCaregivers);
 
 router
   .route('/:caregiverId')
