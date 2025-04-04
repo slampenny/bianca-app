@@ -1,6 +1,7 @@
 # Dependencies
 logs
 node_modules
+uploads/
 .terraform/
 .terraform.lock.hcl
 .terraform*

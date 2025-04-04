@@ -3,6 +3,8 @@ const pick = require('../utils/pick');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { caregiverService } = require('../services');
+const config = require('../config/config');
+const path = require('path');
 
 const getCaregivers = catchAsync(async (req, res) => {
   const filter = pick(req.query, ['name', 'role']);
@@ -34,8 +36,21 @@ const updateCaregiver = catchAsync(async (req, res) => {
 });
 
 const uploadCaregiverAvatar = catchAsync(async (req, res) => {
-  const file = req.file; // This is the uploaded file
-  const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, { avatar: file.path });
+  const file = req.file;
+  if (!file) {
+    throw new Error("No file uploaded");
+  }
+  // Extract the filename from the file path
+  const filename = path.basename(file.path);
+  // Construct an absolute URL for the avatar using the request's protocol and host (which should be your backend's host and port)
+  const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
+
+  // Update the caregiver with this URL
+  const caregiver = await caregiverService.updateCaregiverById(
+    req.params.caregiverId, 
+    { avatar: avatarUrl }
+  );
+  
   res.send(caregiver);
 });
 

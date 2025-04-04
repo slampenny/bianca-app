@@ -33,6 +33,7 @@ const baselineConfig = {
   env: envVars.NODE_ENV,
   port: 3000,
   authEnabled: true,
+  baseUrl: 'http://localhost:3000',
   apiUrl: 'http://localhost:3000/v1',
   mongoose: {
     url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),

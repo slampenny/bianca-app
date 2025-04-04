@@ -3,6 +3,8 @@ const pick = require('../utils/pick');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
+const config = require('../config/config');
+const path = require('path');
 const { 
   caregiverService, 
   conversationService, 
@@ -53,14 +55,6 @@ const getPatient = catchAsync(async (req, res) => {
 
 const updatePatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
-
-  const file = req.file; // This is the uploaded file
-
-  // Check if a file was uploaded
-  if (file) {
-    // You can now save the file's path to the caregiver's avatar field
-    patientData.avatar = file.path;
-  }
   
   const patient = await patientService.updatePatientById(req.params.patientId, patientData);
   if (schedules) {
@@ -72,13 +66,21 @@ const updatePatient = catchAsync(async (req, res) => {
 });
 
 const uploadPatientAvatar = catchAsync(async (req, res) => {
-  if (!req.file) {
-    logger.error('No file uploaded');
-    return res.status(400).send({ message: 'No file uploaded' });
+  const file = req.file;
+  if (!file) {
+    throw new Error("No file uploaded");
   }
+  // Extract the filename from the file path
+  const filename = path.basename(file.path);
+  // Construct an absolute URL for the avatar using the request's protocol and host (which should be your backend's host and port)
+  const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
 
-  const file = req.file; // This is the uploaded file
-  const patient = await patientService.updatePatientById(req.params.patientId, { avatar: file.path });
+  // Update the caregiver with this URL
+  const patient = await patientService.updatePatientById(
+    req.params.patientId, 
+    { avatar: avatarUrl }
+  );
+  
   res.send(patient);
 });
 

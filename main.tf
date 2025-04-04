@@ -870,6 +870,14 @@ resource "aws_ecs_task_definition" "app_task" {
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
+  volume {
+    name = "mongodb-data"
+    efs_volume_configuration {
+      file_system_id = aws_efs_file_system.mongodb_data.id
+      root_directory = "/"
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name         = var.container_name,
@@ -911,6 +919,10 @@ resource "aws_ecs_task_definition" "app_task" {
         containerPort = 27017,
         hostPort      = 27017,
         protocol      = "tcp"
+      }],
+      mountPoints = [{
+        sourceVolume  = "mongodb-data",
+        containerPath = "/data/db"
       }],
       logConfiguration = {
         logDriver = "awslogs",

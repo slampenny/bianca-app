@@ -53,13 +53,7 @@ const updateCaregiver = {
 const uploadCaregiverAvatar = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
-  }),
-  body: Joi.object()
-    .keys({
-      avatar: Joi.string(),
-    })
-    .min(1)
-    .unknown(false), // Disallow fields that are not defined in the schema
+  })
 };
 
 const deleteCaregiver = {

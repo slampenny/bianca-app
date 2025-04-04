@@ -23,6 +23,7 @@ const createPatient = {
         intervals: Joi.array().items(
           Joi.object().keys({
             day: Joi.number().integer().min(0).max(6), // 0-6 for days of the week
+            weeks: Joi.number().integer().optional(), // number of weeks between each run for weekly schedules
           })
         ),
         time: Joi.string().pattern(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
@@ -77,6 +78,7 @@ const updatePatient = {
             Joi.object().keys({
               _id: Joi.string().custom(objectId).optional(),
               day: Joi.number().integer().min(0).max(6), // 0-6 for days of the week
+              weeks: Joi.number().integer().optional(), // number of weeks between each run for weekly schedules
             })
           ),
           time: Joi.string().pattern(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
@@ -92,12 +94,6 @@ const uploadPatientAvatar = {
   params: Joi.object().keys({
     patientId: Joi.required().custom(objectId),
   }),
-  body: Joi.object()
-    .keys({
-      avatar: Joi.string(),
-    })
-    .min(1)
-    .unknown(false), // Disallow fields that are not defined in the schema
 };
 
 const deletePatient = {

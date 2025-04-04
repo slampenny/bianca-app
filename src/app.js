@@ -9,9 +9,8 @@ const cors = require('cors');
 const passport = require('passport');
 const bodyParser = require('body-parser');
 const httpStatus = require('http-status');
-
-// Instead of using global.appConfig directly, we fall back to the synchronous config.
-const config = global.appConfig || require('./config/config');
+const path = require('path'); 
+const config = require('./config/config');
 const morgan = require('./config/morgan');
 const { jwtStrategy } = require('./config/passport');
 const { authLimiter } = require('./middlewares/rateLimiter');
@@ -73,6 +72,10 @@ if (config.env === 'production') {
 
 // Set security HTTP headers
 app.use(helmet());
+
+// Serve static files from uploads directory
+
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // v1 API routes
 app.use('/v1', routes);
