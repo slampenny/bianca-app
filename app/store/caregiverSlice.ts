@@ -76,6 +76,12 @@ export const caregiverSlice = createSlice({
       console.log('[caregiverSlice] orgApi.sendInvite.matchFulfilled, payload:', payload.caregiver);
       state.caregivers.push(payload.caregiver);
     });
+
+    builder.addMatcher(caregiverApi.endpoints.getAllCaregivers.matchFulfilled, (state, { payload }) => {
+      console.log('[caregiverSlice] caregiverApi.getAllCaregivers.matchFulfilled, payload:', payload);
+      // If the API returns a paginated object, you might need to extract the docs property.
+      state.caregivers = payload.results;
+    });
   }
 });
 

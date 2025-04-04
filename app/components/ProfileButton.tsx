@@ -1,10 +1,12 @@
-// ProfileButton.tsx
 import React from 'react'
-import { Pressable, Text, StyleSheet } from 'react-native'
+import { Pressable, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useSelector } from 'react-redux'
 import { getCurrentUser } from 'app/store/authSlice'
 import { AutoImage } from 'app/components'
+
+// Use a remote placeholder image URL (e.g., Gravatar's default "mystery person")
+const defaultAvatarUrl = 'https://www.gravatar.com/avatar/?d=mp'
 
 const ProfileButton: React.FC = () => {
   const navigation = useNavigation()
@@ -14,11 +16,14 @@ const ProfileButton: React.FC = () => {
       style={styles.profileButton}
       onPress={() => navigation.navigate('Profile')}
     >
-      {currentUser?.avatar ? (
-        <AutoImage source={{ uri: currentUser.avatar }} style={styles.avatar} />
-      ) : (
-        <Text style={styles.profileText}>Profile</Text>
-      )}
+      <AutoImage
+        source={
+          currentUser?.avatar
+            ? { uri: currentUser.avatar }
+            : { uri: defaultAvatarUrl }
+        }
+        style={styles.avatar}
+      />
     </Pressable>
   )
 }
@@ -32,10 +37,6 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     resizeMode: 'cover',
-  },
-  profileText: {
-    fontSize: 16,
-    color: '#3498db',
   },
 })
 

@@ -13,9 +13,16 @@ import AvatarPicker from "../components/AvatarPicker"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver, getCurrentOrg, clearCaregiver } from "../store/caregiverSlice"
-import { useUpdateCaregiverMutation, useUploadAvatarMutation, useDeleteCaregiverMutation } from "../services/api/caregiverApi"
+import {
+  useUpdateCaregiverMutation,
+  useUploadAvatarMutation,
+  useDeleteCaregiverMutation,
+} from "../services/api/caregiverApi"
 import { useSendInviteMutation } from "../services/api/orgApi"
 import { LoadingScreen } from "./LoadingScreen"
+
+// Remote default image URL (Gravatar "mystery person")
+const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
 
 function CaregiverScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
@@ -33,6 +40,7 @@ function CaregiverScreen() {
 
   const [name, setName] = useState("")
   const [avatar, setAvatar] = useState("")
+  const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null)
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [emailError, setEmailError] = useState("")
@@ -95,59 +103,57 @@ function CaregiverScreen() {
 
   const handleSave = async () => {
     if (caregiver && caregiver.id) {
-      // Update existing caregiver branch remains the same...
+      // Update branch for an existing caregiver
       const updatedCaregiver = {
         ...caregiver,
         name,
         avatar,
         email,
         phone,
-      };
+      }
       try {
-        if (avatar !== caregiver.avatar) {
-          await uploadAvatar({ id: caregiver.id, avatar }).unwrap();
-          updatedCaregiver.avatar = avatar;
+        // If the avatar has changed and there's a new blob, upload it first.
+        if (avatar !== caregiver.avatar && avatarBlob) {
+          await uploadAvatar({ id: caregiver.id, avatar: avatarBlob }).unwrap()
+          updatedCaregiver.avatar = avatar
         }
-        await updateCaregiver({ id: caregiver.id, caregiver: updatedCaregiver }).unwrap();
-        navigation.navigate("Caregivers");
+        await updateCaregiver({ id: caregiver.id, caregiver: updatedCaregiver }).unwrap()
+        navigation.navigate("Caregivers")
       } catch (error) {
         // Handle update error as needed
       }
     } else {
-      // Invite branch
+      // Invite branch for new caregiver
       try {
         if (currentOrg) {
-          const {caregiver: invitedCaregiver} = await sendInvite({
+          const { caregiver: invitedCaregiver } = await sendInvite({
             orgId: currentOrg,
             name,
             email,
             phone,
-          }).unwrap();
-          setSuccessMessage(`Invitation sent to ${invitedCaregiver.name}!`);
-          dispatch(clearCaregiver());
+          }).unwrap()
+          setSuccessMessage(`Invitation sent to ${invitedCaregiver.name}!`)
+          dispatch(clearCaregiver())
           setTimeout(() => {
-            setSuccessMessage("");
-            navigation.navigate("Caregivers");
-          }, 2000);
+            setSuccessMessage("")
+            navigation.navigate("Caregivers")
+          }, 2000)
         }
       } catch (error: any) {
-        // Check if the error message indicates the caregiver was already invited.
         if (error?.data?.message === "Caregiver already invited") {
-          setSuccessMessage("This email is already invited.");
-          // Optionally, clear the form or perform other UI updates.
+          setSuccessMessage("This email is already invited.")
           setTimeout(() => {
-            setSuccessMessage("");
-          }, 2000);
+            setSuccessMessage("")
+          }, 2000)
         } else {
-          // Display a generic error
-          setSuccessMessage("An error occurred while sending the invite.");
+          setSuccessMessage("An error occurred while sending the invite.")
           setTimeout(() => {
-            setSuccessMessage("");
-          }, 2000);
+            setSuccessMessage("")
+          }, 2000)
         }
       }
     }
-  };  
+  }
 
   if (isUpdating || isDeleting || isInviting) {
     return <LoadingScreen />
@@ -173,7 +179,13 @@ function CaregiverScreen() {
         ) : null}
 
         <View style={styles.formCard}>
-          <AvatarPicker initialAvatar={avatar} onAvatarChanged={setAvatar} />
+          <AvatarPicker 
+            initialAvatar={avatar || defaultAvatarUrl}
+            onAvatarChanged={({ uri, blob }) => {
+              setAvatar(uri)
+              if (blob) setAvatarBlob(blob)
+            }} 
+          />
 
           <TextInput
             style={styles.input}
