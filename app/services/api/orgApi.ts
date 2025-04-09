@@ -63,7 +63,7 @@ export const orgApi = createApi({
       },
       invalidatesTags: ['Caregiver'],
     }),
-    removeCaregiver: builder.mutation<void, { orgId: string, caregiverId: string }>({
+    removeCaregiver: builder.mutation<Caregiver, { orgId: string, caregiverId: string }>({
       query: ({ orgId, caregiverId }) => {
         console.log('[orgApi] removeCaregiver mutation called for orgId:', orgId, 'caregiverId:', caregiverId);
         return {

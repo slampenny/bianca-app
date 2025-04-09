@@ -69,11 +69,10 @@ export async function createCaregiver(orgId: string, caregiver: Partial<Caregive
 export async function loginAndGetTokens(email: string, password: string) {
   const credentials = { email, password };
   const result = await authApi.endpoints.login.initiate(credentials)(appStore.dispatch, appStore.getState, {});
-  if ('data' in result) {
-    return result.data.tokens;
-  } else {
+  if (!result.data) {
     throw new Error(`Login failed ${JSON.stringify(result.error)}`);
   }
+  return result.data.tokens;
 }
 
 export function expectError(result: any, status: number, message: string) {

@@ -83,7 +83,7 @@ export const selectUnreadAlertCount = (state: RootState) => {
   }
 
   return state.alert.alerts.filter(alert => {
-    return !alert.readBy.includes(currentUser.id); // Check if current user's ID is in readBy
+    return !alert.readBy.includes(currentUser.id!); // Use non-null assertion to ensure currentUser.id is a string
   }).length;
 };
 

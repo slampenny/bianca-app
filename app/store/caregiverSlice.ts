@@ -62,12 +62,14 @@ export const caregiverSlice = createSlice({
       }
     });
     // Handle caregiver deletion via orgApi removeCaregiver endpoint
+    // Use caregiverId from action.meta.arg since payload is void.
     builder.addMatcher(orgApi.endpoints.removeCaregiver.matchFulfilled, (state, { payload }) => {
-      console.log('[caregiverSlice] orgApi.removeCaregiver.matchFulfilled, payload:', payload);
-      // Assuming payload contains an object with the removed caregiver's id
-      state.caregivers = state.caregivers.filter(cg => cg.id !== payload.id);
-      if (state.caregiver && state.caregiver.id === payload.id) {
-        state.caregiver = null;
+      if (payload?.id) {
+        console.log('[caregiverSlice] orgApi.removeCaregiver.matchFulfilled, removed id:', payload.id);
+        state.caregivers = state.caregivers.filter(cg => cg.id !== payload.id);
+        if (state.caregiver && state.caregiver.id === payload.id) {
+          state.caregiver = null;
+        }
       }
     });
     // Handle invite: when a caregiver is invited successfully via orgApi sendInvite,

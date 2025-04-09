@@ -25,6 +25,8 @@ export interface CaregiverPages {
   totalResults: Number,
 }
 
+export type CaregiverRole = 'admin' | 'staff' | 'orgAdmin' | 'superAdmin';
+
 export interface Caregiver {
   id?: string;
   name: string;
@@ -32,6 +34,7 @@ export interface Caregiver {
   email: string;
   phone: string;
   org: string;
+  role: CaregiverRole;
   patients: string[]; // Assuming this is the ID of the caregiver  
 }
 
@@ -68,6 +71,7 @@ export interface OrgPages {
 
 export interface Org {
   id?: string;
+  stripeCustomerId: string;
   name: string;
   avatar: string;
   email: string;
@@ -129,6 +133,72 @@ export interface Conversation {
   endTime: string;
   duration: number;
 }
+
+// api.types.ts
+export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'void' | 'overdue';
+
+export interface LineItem {
+  _id: string;
+  patientId: string;
+  invoiceId?: string;
+  amount: number;
+  description: string;
+  periodStart?: string;
+  periodEnd?: string;
+  quantity?: number;
+  unitPrice?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Invoice {
+  _id: string;
+  org: string;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  status: InvoiceStatus;
+  totalAmount: number;
+  paymentMethod?: string;
+  stripePaymentIntentId?: string;
+  stripeInvoiceId?: string;
+  paidAt?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lineItems?: LineItem[];
+}
+
+export interface PaymentMethod {
+  id?: string;
+  stripePaymentMethodId: string;
+  org: string;
+  isDefault: boolean;
+  type: 'card' | 'bank_account' | 'us_bank_account';
+  brand?: string;
+  last4?: string;
+  expMonth?: number;
+  expYear?: number;
+  bankName?: string;
+  accountType?: string;
+  billingDetails?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      state?: string;
+      postal_code?: string;
+      country?: string;
+    };
+  };
+  metadata?: Record<string, string>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 
 /**
  * The options used to configure apisauce.

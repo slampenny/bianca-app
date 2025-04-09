@@ -1,16 +1,16 @@
 const { getDefaultConfig } = require('@expo/metro-config');
-const path = require('path');
+const defaultConfig = getDefaultConfig(__dirname);
 
-/** @type {import('expo/metro-config').MetroConfig} */
-const config = getDefaultConfig(__dirname);
-
-config.projectRoot = __dirname; // Add this line
-
-config.transformer.getTransformOptions = async () => ({
-  transform: {
-    experimentalImportSupport: false,
-    inlineRequires: true,
+module.exports = {
+  ...defaultConfig,
+  projectRoot: __dirname,
+  transformer: {
+    ...defaultConfig.transformer,
+    getTransformOptions: async () => ({
+      transform: {
+        experimentalImportSupport: false,
+        inlineRequires: true,
+      },
+    }),
   },
-});
-
-module.exports = config;
+};

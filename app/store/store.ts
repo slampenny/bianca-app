@@ -4,9 +4,11 @@ import authReducer from './authSlice';
 import orgReducer from './orgSlice';
 import caregiverReducer from './caregiverSlice';
 import patientReducer from './patientSlice';
+import paymentReducer from './paymentSlice';
+import paymentMethodReducer from './paymentMethodSlice';
 import scheduleReducer from './scheduleSlice';
 import conversationReducer from './conversationSlice';
-import { alertApi, authApi, orgApi, caregiverApi, scheduleApi, patientApi, conversationApi } from '../services/api/';
+import { alertApi, authApi, orgApi, caregiverApi, scheduleApi, patientApi, paymentApi, paymentMethodApi, conversationApi } from '../services/api/';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,12 +27,16 @@ const rootReducer = combineReducers({
   auth: authReducer,
   alert: alertReducer,
   conversation: conversationReducer,
+  payment: paymentReducer,
+  paymentMethod: paymentMethodReducer,
   [alertApi.reducerPath]: alertApi.reducer,
   [authApi.reducerPath]: authApi.reducer,
   [orgApi.reducerPath]: orgApi.reducer,
   [conversationApi.reducerPath]: conversationApi.reducer,
   [caregiverApi.reducerPath]: caregiverApi.reducer,
   [patientApi.reducerPath]: patientApi.reducer,
+  [paymentApi.reducerPath]: paymentApi.reducer,
+  [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
   [scheduleApi.reducerPath]: scheduleApi.reducer,
 });
 
@@ -50,6 +56,8 @@ export const store = configureStore({
       orgApi.middleware, 
       caregiverApi.middleware, 
       patientApi.middleware, 
+      paymentApi.middleware,
+      paymentMethodApi.middleware,
       scheduleApi.middleware,
       conversationApi.middleware,
     ),

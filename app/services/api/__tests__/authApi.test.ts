@@ -1,3 +1,4 @@
+// app/services/api/__tests__/authApi.test.ts
 import { EnhancedStore } from '@reduxjs/toolkit';
 import { orgApi, authApi } from '../';
 import { AuthTokens, Caregiver } from '../api.types';
@@ -13,14 +14,14 @@ describe('authApi', () => {
   let authTokens: AuthTokens;
 
   beforeAll(async () => {
-    cleanTestDatabase();
+    await cleanTestDatabase();
   });
 
   beforeEach(async () => {
     store = appStore;
     testCaregiver = newCaregiver();
     const result = await authApi.endpoints.register.initiate(testCaregiver)(store.dispatch, store.getState, {});
-    if ('data' in result) {
+    if ('data' in result && result.data) {
       orgId = result.data.org.id as string;
       caregiver = result.data.caregiver;
       authTokens = result.data.tokens;
@@ -30,7 +31,7 @@ describe('authApi', () => {
   });
 
   afterEach(async () => {
-    await orgApi.endpoints.deleteOrg.initiate({ orgId: orgId })(store.dispatch, store.getState, {});
+    await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {});
     jest.clearAllMocks();
   });
 
@@ -46,21 +47,21 @@ describe('authApi', () => {
   });
 
   it('should login a caregiver', async () => {
-    const result = await authApi.endpoints.login.initiate({email: testCaregiver.email, password: testCaregiver.password})(store.dispatch, store.getState, {});
+    const result = await authApi.endpoints.login.initiate({ email: testCaregiver.email, password: testCaregiver.password })(store.dispatch, store.getState, {});
     expect(result).toEqual(expect.anything());
   });
 
   it('should logout a caregiver', async () => {
-    await authApi.endpoints.logout.initiate({refreshToken: authTokens.refresh.token})(store.dispatch, store.getState, {});
+    await authApi.endpoints.logout.initiate({ refreshToken: authTokens.refresh.token })(store.dispatch, store.getState, {});
     const authState = store.getState().auth;
     expect(authState).toEqual(expect.anything());
 
-    await authApi.endpoints.login.initiate({email: testCaregiver.email, password: testCaregiver.password})(store.dispatch, store.getState, {});
+    await authApi.endpoints.login.initiate({ email: testCaregiver.email, password: testCaregiver.password })(store.dispatch, store.getState, {});
   });
 
   it('should refresh tokens', async () => {
     const refreshResult = await authApi.endpoints.refreshTokens.initiate({ refreshToken: authTokens.refresh.token })(store.dispatch, store.getState, {});
-    if ('data' in refreshResult) {
+    if ('data' in refreshResult && refreshResult.data) {
       expect(refreshResult.data.tokens.access).toBeDefined();
       expect(refreshResult.data.tokens.refresh).toBeDefined();
     } else {
@@ -71,40 +72,18 @@ describe('authApi', () => {
   it('should send forgot password email', async () => {
     try {
       await authApi.endpoints.forgotPassword.initiate({ email: testCaregiver.email })(store.dispatch, store.getState, {});
-      // If the above line throws an error, the catch block will handle it.
-      // If it doesn't throw, we consider it a success.
-      expect(true).toBe(true); // This is just to indicate the request succeeded without any returned data.
+      expect(true).toBe(true);
     } catch (error) {
       fail('The forgot password request should not fail');
     }
   });
-
-  //this is backend functionality, not frontend
-  // it('should reset password', async () => {
-  //   // First, initiate the forgot password process
-  //   const email = 'test@example.com';
-  //   const forgotPasswordResult = await authApi.endpoints.forgotPassword.initiate({ email })(store.dispatch, store.getState, {});
-  //   expect(forgotPasswordResult).toEqual(expect.anything());
-
-  //   const password = 'new-password1';
-  //   await authApi.endpoints.resetPassword.initiate({ token, password })(store.dispatch, store.getState, {});
-  //   const authState = store.getState().auth;
-  //   expect(authState).toEqual(expect.anything());
-  // });
 
   it('should send verification email', async () => {
     try {
       await authApi.endpoints.sendVerificationEmail.initiate(caregiver)(store.dispatch, store.getState, {});
-      expect(true).toBe(true); // This is just to indicate the request succeeded without any returned data.
+      expect(true).toBe(true);
     } catch (error) {
-      fail('The forgot password request should not fail');
+      fail('The send verification email request should not fail');
     }
   });
-
-  // it('should verify email', async () => {
-  //   const token = 'verification-token';
-  //   await authApi.endpoints.verifyEmail.initiate({ token })(store.dispatch, store.getState, {});
-  //   const authState = store.getState().auth;
-  //   expect(authState).toEqual(expect.anything());
-  // });
 });

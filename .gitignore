@@ -33,6 +33,8 @@ local.properties
 *.hprof
 .cxx/
 
+build-*
+
 # node.js
 #
 node_modules/

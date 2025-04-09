@@ -82,14 +82,14 @@ describe('alertApi', () => {
   });
 
   it('should mark an alert as read', async () => {
-    const result = await alertApi.endpoints.markAlertAsRead.initiate({ alertId: alertId })(store.dispatch, store.getState, {});
+    const result = await alertApi.endpoints.markAlertAsRead.initiate({ alertId })(store.dispatch, store.getState, {});
     if ('error' in result) {
       throw new Error(`Mark alert as read failed with error: ${JSON.stringify(result.error)}`);
     } else {
       expect(result.data).toMatchObject({
         id: alertId,
-        readBy: expect.arrayContaining([expect.any(Object)]),
+        readBy: expect.arrayContaining([expect.any(String)]),
       });
     }
-  });
+  });  
 });
