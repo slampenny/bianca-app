@@ -5,6 +5,7 @@ const caregiverRoute = require('./caregiver.route');
 const conversationRoute = require('./conversation.route');
 const orgRoute = require('./org.route');
 const patientRoute = require('./patient.route');
+const paymentRoute = require('./payment.route');
 const paymentMethodRoute = require('./paymentMethod.route');
 const reportRoute = require('./report.route');
 const scheduleRoute = require('./schedule.route');
@@ -43,6 +44,10 @@ const defaultRoutes = [
   {
     path: '/payment-methods',
     route: paymentMethodRoute,
+  },
+  {
+    path: '/payments',
+    route: paymentRoute,
   },
   {
     path: '/reports',

@@ -37,7 +37,7 @@ const router = express.Router();
  */
 router
   .route('/patient/:patientId')
-  .post(auth('createConversationForPatient'), validate(conversationValidation.createConversationForPatient), conversationController.createConversationForPatient);
+  .post(auth('updateAny:conversation'), validate(conversationValidation.createConversationForPatient), conversationController.createConversationForPatient);
 
 /**
  * @swagger
@@ -79,7 +79,7 @@ router
  */
 router
   .route('/:conversationId')
-  .post(auth('addMessageToConversation'), validate(conversationValidation.addMessageToConversation), conversationController.addMessageToConversation);
+  .post(auth('updateAny:conversation'), validate(conversationValidation.addMessageToConversation), conversationController.addMessageToConversation);
 
   /**
  * @swagger
@@ -113,6 +113,6 @@ router
  */
 router
 .route('/')
-.get(auth('getConversation'), validate(conversationValidation.getConversation), conversationController.getConversation);
+.get(auth('readAny:conversation'), validate(conversationValidation.getConversation), conversationController.getConversation);
 
 module.exports = router;

@@ -289,22 +289,35 @@ const detachPaymentMethod = async (orgId, paymentMethodId) => {
       'Cannot detach the default payment method. Set another payment method as default first.'
     );
   }
-  
   try {
-    // First detach from Stripe
-    await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
-    
-    // Then delete from our database
-    await PaymentMethod.deleteOne({ _id: paymentMethodId });
-    
-    // Remove reference from the org
-    const index = org.paymentMethods.indexOf(paymentMethodId);
-    if (index > -1) {
-      org.paymentMethods.splice(index, 1);
-      await org.save();
+    try {
+      // First detach from Stripe
+      await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
+      
+      // Then delete from our database
+      await PaymentMethod.deleteOne({ _id: paymentMethodId });
+      
+      // Remove reference from the org
+      const index = org.paymentMethods.indexOf(paymentMethodId);
+      if (index > -1) {
+        org.paymentMethods.splice(index, 1);
+        await org.save();
+      }
+      
+      return paymentMethodId;
+    } catch (stripeError) {
+      // If the error is that the payment method isn't attached, we can proceed
+      // with deleting it from our database anyway
+      if (stripeError.message && stripeError.message.includes('not attached to a customer')) {
+        logger.warn(`Payment method ${paymentMethodId} not found in Stripe, proceeding with local deletion`);
+      } else {
+        // For other Stripe errors, re-throw
+        throw stripeError;
+      }
+
+      // Proceed with deleting from database and updating org
+      await PaymentMethod.deleteOne({ _id: paymentMethodId });
     }
-    
-    return paymentMethodId;
   } catch (error) {
     logger.error(`Error detaching payment method ${paymentMethodId}:`, error);
     throw new ApiError(

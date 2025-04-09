@@ -1132,6 +1132,15 @@ resource "aws_route53_record" "app_subdomain" {
   }
 }
 
+resource "aws_route53_record" "wordpress_apex" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "myphonefriend.com"  # or "www.myphonefriend.com" if you prefer
+  type    = "A"
+  ttl     = "300"
+  records = ["192.254.225.221"]  # Replace with your HostGator server's IP address
+}
+
+
 ##############################
 # CodePipeline
 ##############################

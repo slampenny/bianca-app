@@ -15,7 +15,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /orgs/{orgId}/payment-methods:
+ * /payment-methods/orgs/{orgId}:
  *   post:
  *     summary: Attach a payment method
  *     description: Attach a Stripe payment method to an organization. The payment method must be created client-side using Stripe.js.
@@ -87,7 +87,7 @@ const router = express.Router();
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/orgs/:orgId/payment-methods')
+  .route('/orgs/:orgId')
   .post(
     auth('createAny:paymentMethod'),
     validate(paymentMethodValidation.attachPaymentMethod),
@@ -101,7 +101,7 @@ router
 
 /**
  * @swagger
- * /orgs/{orgId}/payment-methods/{paymentMethodId}:
+ * /payment-methods/orgs/{orgId}/{paymentMethodId}:
  *   get:
  *     summary: Get a payment method
  *     description: Get detailed information about a specific payment method.
@@ -200,7 +200,7 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/orgs/:orgId/payment-methods/:paymentMethodId')
+  .route('/orgs/:orgId/:paymentMethodId')
   .get(
     auth('readAny:paymentMethod'),
     validate(paymentMethodValidation.getPaymentMethod),

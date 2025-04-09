@@ -45,20 +45,22 @@ describe('paymentService', () => {
   });
 
   describe('Invoice and LineItem functions', () => {
-    it('should create an invoice from conversations and link them', async () => {
-      // Insert an organization
+    it('should create an invoice using the real aggregation pipeline and compute the math correctly', async () => {
+      // Insert an organization.
       const [org] = await insertOrgs([orgOne]);
       
-      // Create a patient associated with the org
+      // Create a patient associated with the org.
       const patientData = { ...patientOne, org: org._id };
       const [patient] = await insertPatients([patientData]);
       
-      // Insert two conversations for the patient with no invoice link
+      // Insert two conversations for the patient with no invoice link.
+      // First conversation: 120 seconds (2 minutes).
+      // Second conversation: 180 seconds (3 minutes).
       await insertConversations([
         { 
           ...conversationOne, 
           patientId: patient._id, 
-          duration: 120, // 2 minutes
+          duration: 120,
           lineItemId: null,
           startTime: new Date('2023-01-01T10:00:00Z'),
           endTime: new Date('2023-01-01T10:02:00Z')
@@ -66,36 +68,23 @@ describe('paymentService', () => {
         { 
           ...conversationTwo, 
           patientId: patient._id, 
-          duration: 180, // 3 minutes
+          duration: 180,
           lineItemId: null,
           startTime: new Date('2023-01-02T14:00:00Z'),
           endTime: new Date('2023-01-02T14:03:00Z')
         }
       ]);
-     
-      // Stub the aggregate function on Conversation model
-      const aggregatedResult = [{
-        patientId: patient._id,
-        totalDuration: 300, // 120 + 180 seconds = 5 minutes
-        startDate: new Date('2023-01-01T10:00:00Z'),
-        endDate: new Date('2023-01-02T14:03:00Z'),
-        conversationIds: [] // will be filled after inserting conversations
-      }];
-     
-      // Get all inserted conversation IDs for patient
-      const conversations = await Conversation.find({ patientId: patient._id });
-      aggregatedResult[0].conversationIds = conversations.map(conv => conv._id);
-     
-      // Mock the aggregateUnchargedConversations to return our aggregatedResult
-      Conversation.aggregateUnchargedConversations = jest.fn().mockResolvedValue(aggregatedResult);
-     
-      // Execute the service method
+      
+      // IMPORTANT: Do NOT stub Conversation.aggregateUnchargedConversations.
+      // Let the real aggregation pipeline run against the inserted conversations.
+      
+      // Execute the service method to create an invoice.
       const invoice = await paymentService.createInvoiceFromConversations(patient._id);
       
-      // Calculate expected amount based on config
-      const expectedAmount = (300/60) * config.billing.ratePerMinute; // 5 minutes at configured rate
+      // The total duration should be 120 + 180 = 300 seconds (5 minutes).
+      const expectedAmount = (300 / 60) * config.billing.ratePerMinute;
       
-      // Verify invoice properties
+      // Verify invoice properties.
       expect(invoice).toBeDefined();
       expect(invoice.org.toString()).toBe(org._id.toString());
       expect(invoice.status).toBe('pending');
@@ -104,18 +93,19 @@ describe('paymentService', () => {
       expect(invoice.dueDate).toBeDefined();
       expect(invoice.invoiceNumber).toMatch(/^INV-\d{6}$/);
       
-      // Verify line items were created
+      // Verify that a line item was created with the expected values.
       const lineItems = await LineItem.find({ invoiceId: invoice._id });
       expect(lineItems).toHaveLength(1);
       
       const lineItem = lineItems[0];
       expect(lineItem.patientId.toString()).toBe(patient._id.toString());
       expect(lineItem.amount).toBe(expectedAmount);
-      expect(lineItem.quantity).toBe(5); // 5 minutes
+      // The line item quantity should be the total duration in minutes (5 minutes).
+      expect(lineItem.quantity).toBe(5);
       expect(lineItem.unitPrice).toBe(config.billing.ratePerMinute);
       expect(lineItem.description).toContain('300 seconds');
       
-      // Verify conversations are updated with the invoice ID
+      // Verify that all conversations for the patient have been updated with the created line item ID.
       const updatedConversations = await Conversation.find({ patientId: patient._id });
       updatedConversations.forEach(conv => {
         expect(conv.lineItemId?.toString()).toBe(lineItem._id.toString());

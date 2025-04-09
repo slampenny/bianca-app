@@ -6,6 +6,7 @@ module.exports.conversationService = require('./conversation.service');
 module.exports.emailService = require('./email.service');
 module.exports.orgService = require('./org.service');
 module.exports.patientService = require('./patient.service');
+module.exports.paymentService = require('./payment.service');
 module.exports.paymentMethodService = require('./paymentMethod.service');
 module.exports.scheduleService = require('./schedule.service');
 module.exports.testService = require('./test.service');
