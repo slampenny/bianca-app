@@ -138,7 +138,7 @@ export interface Conversation {
 export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'void' | 'overdue';
 
 export interface LineItem {
-  _id: string;
+  id: string;
   patientId: string;
   invoiceId?: string;
   amount: number;
@@ -152,7 +152,7 @@ export interface LineItem {
 }
 
 export interface Invoice {
-  _id: string;
+  id: string;
   org: string;
   invoiceNumber: string;
   issueDate: string;

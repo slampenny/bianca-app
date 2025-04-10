@@ -1,31 +1,126 @@
-import React from 'react'
-import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native'
+import React, { useState } from 'react'
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  FlatList,
+  ActivityIndicator,
+} from 'react-native'
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs'
+import { useSelector } from 'react-redux'
+import { getCurrentUser } from '../store/authSlice'
+import { getOrg } from 'app/store/orgSlice'
+import { useGetPaymentMethodsQuery } from 'app/services/api/paymentMethodApi'
+import { useGetInvoicesByOrgQuery } from 'app/services/api/paymentApi'
 
-// Dummy data for payment methods
-const dummyPaymentMethods = [
-  { id: '1', type: 'Credit Card', brand: 'Visa', last4: '4242' },
-  { id: '2', type: 'PayPal', email: 'user@example.com' },
-]
+function ExpandableInvoice({ invoice }: { invoice: any }) {
+  const [expanded, setExpanded] = useState(false)
+  const formattedDate = new Date(invoice.issueDate).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  const formattedAmount = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(invoice.totalAmount)
 
-// Dummy billing info
-const billingInfo = {
-  currentPlan: 'Premium',
-  nextBillingDate: '2025-03-01',
-  pastInvoices: [
-    { id: 'inv1', date: '2025-01-01', amount: '$9.99' },
-    { id: 'inv2', date: '2024-12-01', amount: '$9.99' },
-  ],
+  return (
+    <View style={styles.invoiceContainer}>
+      <Pressable
+        onPress={() => setExpanded(prev => !prev)}
+        style={styles.invoiceHeader}
+      >
+        <Text style={styles.invoiceHeaderText}>
+          {formattedDate} - {formattedAmount}
+        </Text>
+        <Text style={styles.expandIcon}>{expanded ? '▲' : '▼'}</Text>
+      </Pressable>
+      {expanded && (
+        <View style={styles.invoiceDetails}>
+          <Text style={styles.detailText}>Invoice Number: {invoice.invoiceNumber}</Text>
+          <Text style={styles.detailText}>Status: {invoice.status}</Text>
+          <Text style={styles.detailText}>
+            Issue Date: {new Date(invoice.issueDate).toLocaleString()}
+          </Text>
+          <Text style={styles.detailText}>
+            Due Date: {new Date(invoice.dueDate).toLocaleString()}
+          </Text>
+          {invoice.notes && (
+            <Text style={styles.detailText}>Notes: {invoice.notes}</Text>
+          )}
+        </View>
+      )}
+    </View>
+  )
 }
 
 function PaymentMethodsScreen() {
+  const currentUser = useSelector(getCurrentUser)
+  const org = useSelector(getOrg)
+
+  if (!currentUser) {
+    return (
+      <View style={styles.screenContainer}>
+        <Text style={styles.emptyText}>No user data available.</Text>
+      </View>
+    )
+  }
+  if (!org || !org.id) {
+    return (
+      <View style={styles.screenContainer}>
+        <Text style={styles.emptyText}>No organization data available.</Text>
+      </View>
+    )
+  }
+
+  const orgId: string = org.id.toString()
+  const {
+    data: paymentMethods,
+    error: paymentMethodsError,
+    isLoading: paymentMethodsLoading,
+  } = useGetPaymentMethodsQuery(orgId)
+
+  if (paymentMethodsLoading) {
+    return (
+      <View style={styles.screenContainer}>
+        <ActivityIndicator size="large" color="#3498db" />
+      </View>
+    )
+  }
+
+  let methods: any[] = paymentMethods || []
+  if (paymentMethodsError) {
+    if ('status' in paymentMethodsError && paymentMethodsError.status !== 404) {
+      return (
+        <View style={styles.screenContainer}>
+          <Text style={styles.emptyText}>
+            Error loading payment methods: {JSON.stringify(paymentMethodsError)}
+          </Text>
+        </View>
+      )
+    }
+    methods = []
+  }
+
   const renderMethod = ({ item }: { item: any }) => (
     <View style={styles.methodCard}>
-      <Text style={styles.methodText}>
-        {item.type === 'Credit Card'
-          ? `${item.brand} **** ${item.last4}`
-          : `PayPal: ${item.email}`}
-      </Text>
+      <View style={styles.methodContent}>
+        <Text style={styles.methodIcon}>
+          {item.type === 'card' ? '💳' : '🅿️'}
+        </Text>
+        <View style={styles.methodDetails}>
+          <Text style={styles.methodTitle}>
+            {item.type === 'card'
+              ? `${item.brand ?? 'Card'} **** ${item.last4 ?? '----'}`
+              : `PayPal: ${item.email ?? 'N/A'}`}
+          </Text>
+          {item.isDefault && (
+            <Text style={styles.methodSubTitle}>Default Payment Method</Text>
+          )}
+        </View>
+      </View>
       <Pressable
         style={styles.editButton}
         onPress={() => console.log('Edit payment method', item)}
@@ -38,8 +133,10 @@ function PaymentMethodsScreen() {
   return (
     <View style={styles.screenContainer}>
       <FlatList
-        data={dummyPaymentMethods}
-        keyExtractor={(item) => item.id}
+        data={methods}
+        keyExtractor={item =>
+          item.id ? item.id.toString() : Math.random().toString()
+        }
         renderItem={renderMethod}
         contentContainerStyle={styles.listContentContainer}
         ListEmptyComponent={
@@ -57,18 +154,64 @@ function PaymentMethodsScreen() {
 }
 
 function BillingInfoScreen() {
+  const currentUser = useSelector(getCurrentUser)
+  const org = useSelector(getOrg)
+
+  if (!currentUser) {
+    return (
+      <View style={styles.screenContainer}>
+        <Text style={styles.emptyText}>No user data available.</Text>
+      </View>
+    )
+  }
+  if (!org || !org.id) {
+    return (
+      <View style={styles.screenContainer}>
+        <Text style={styles.emptyText}>No organization data available.</Text>
+      </View>
+    )
+  }
+
+  const queryParam = { orgId: org ? org.id.toString() : '' };
+  const {
+    data: invoices,
+    error: invoicesError,
+    isLoading: invoicesLoading,
+  } = useGetInvoicesByOrgQuery(queryParam, { skip: !org })
+
+  const currentPlan = 'Premium'
+  const nextBillingDate = '2025-03-01'
+
+  if (invoicesLoading) {
+    return (
+      <View style={styles.screenContainer}>
+        <ActivityIndicator size="large" color="#3498db" />
+      </View>
+    )
+  }
+
+  if (invoicesError || !invoices) {
+    return (
+      <View style={styles.screenContainer}>
+        <Text style={styles.emptyText}>Error loading invoices.</Text>
+      </View>
+    )
+  }
+
   return (
     <View style={styles.screenContainer}>
-      <Text style={styles.billingHeader}>Current Plan: {billingInfo.currentPlan}</Text>
-      <Text style={styles.billingHeader}>Next Billing Date: {billingInfo.nextBillingDate}</Text>
+      <Text style={styles.billingHeader}>Current Plan: {currentPlan}</Text>
+      <Text style={styles.billingHeader}>Next Billing Date: {nextBillingDate}</Text>
       <Text style={styles.sectionTitle}>Past Invoices:</Text>
-      {billingInfo.pastInvoices.map((invoice) => (
-        <View key={invoice.id} style={styles.invoiceCard}>
-          <Text style={styles.invoiceText}>
-            {invoice.date} - {invoice.amount}
-          </Text>
-        </View>
-      ))}
+      <FlatList
+        data={invoices}
+        keyExtractor={invoice => invoice.id.toString()}
+        renderItem={({ item }) => <ExpandableInvoice invoice={item} />}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No invoices available.</Text>
+        }
+      />
     </View>
   )
 }
@@ -83,7 +226,7 @@ export function PaymentInfoScreen() {
         tabBarInactiveTintColor: '#7f8c8d',
         tabBarLabelStyle: { fontSize: 16, fontWeight: '600' },
         tabBarStyle: { backgroundColor: '#fff' },
-        indicatorStyle: { backgroundColor: '#3498db' },
+        tabBarIndicatorStyle: { backgroundColor: '#3498db' },
       }}
     >
       <Tab.Screen name="Payment Methods" component={PaymentMethodsScreen} />
@@ -103,23 +246,39 @@ const styles = StyleSheet.create({
   },
   methodCard: {
     backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 6,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    // iOS shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    // Android elevation
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  methodText: {
+  methodContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  methodIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  methodDetails: {
+    justifyContent: 'center',
+  },
+  methodTitle: {
     fontSize: 16,
+    fontWeight: '500',
     color: '#2c3e50',
+  },
+  methodSubTitle: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 4,
   },
   editButton: {
     backgroundColor: '#3498db',
@@ -161,18 +320,42 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
-  invoiceCard: {
+  invoiceContainer: {
+    marginBottom: 10,
     backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 8,
-    // iOS shadow
+    borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    // Android elevation
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  invoiceHeader: {
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f7f7f7',
+  },
+  invoiceHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  expandIcon: {
+    fontSize: 16,
+    color: '#3498db',
+  },
+  invoiceDetails: {
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#ecf0f1',
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#2c3e50',
+    marginVertical: 2,
   },
   invoiceText: {
     fontSize: 14,

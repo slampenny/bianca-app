@@ -120,14 +120,16 @@ function PatientScreen() {
 
         if (avatarBlob) {
           try {
-            const uploadResult = await uploadAvatar({ id: createdPatient.id, avatar: avatarBlob }).unwrap();
-            if (uploadResult && uploadResult.avatar) {
-              const newAvatar =
-                uploadResult.avatar.startsWith("http")
-                  ? uploadResult.avatar
-                  : `${API_BASE_URL}${uploadResult.avatar}`;
-              finalPatient = { ...createdPatient, avatar: newAvatar };
-              finalPatient = await updatePatient({ id: createdPatient.id, patient: finalPatient }).unwrap();
+            if (createdPatient.id && avatarBlob) {
+              const uploadResult = await uploadAvatar({ id: createdPatient.id, avatar: avatarBlob }).unwrap();
+              if (uploadResult && uploadResult.avatar) {
+                const newAvatar =
+                  uploadResult.avatar.startsWith("http")
+                    ? uploadResult.avatar
+                    : `${API_BASE_URL}${uploadResult.avatar}`;
+                finalPatient = { ...createdPatient, avatar: newAvatar };
+                finalPatient = await updatePatient({ id: createdPatient.id, patient: finalPatient }).unwrap();
+              }
             }
           } catch (err) {
             console.error("Avatar upload error:", err);
