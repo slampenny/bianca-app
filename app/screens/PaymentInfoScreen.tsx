@@ -39,7 +39,8 @@ function PaymentMethodsScreen() {
   }
 
   const orgId = org.id.toString();
-  const paymentPageUrl = `${Config.paymentMethodGatewayUrl}?orgId=${orgId}&token=${jwt}`; // Replace with actual token
+  console.log('React Native JWT:', jwt);
+  const paymentPageUrl = `${Config.paymentMethodGatewayUrl}/${orgId}/${jwt}`; // Replace with actual token
 
   return (
     <View style={styles.screenContainer}>

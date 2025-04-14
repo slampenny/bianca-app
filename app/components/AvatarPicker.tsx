@@ -126,12 +126,12 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({
         <Text style={styles.selectButtonText}>Select Image</Text>
       </Pressable>
       
-      {/* Debug text to show the current image URI */}
+      {/* Debug text to show the current image URI
       {__DEV__ && image && (
         <Text style={styles.debugText}>
           Image: {image.substring(0, 30)}...
         </Text>
-      )}
+      )} */}
     </View>
   )
 }
