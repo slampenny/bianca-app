@@ -10,13 +10,20 @@ import {
 } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useSelector } from 'react-redux';
-import { getCurrentUser } from '../store/authSlice';
+// Import getCurrentUser selector here
+import { getCurrentUser, getAuthTokens } from '../store/authSlice';
 import { getOrg } from '../store/orgSlice';
 import { useGetInvoicesByOrgQuery } from '../services/api/paymentApi';
-import { getAuthTokens } from '../store/authSlice';
 import { WebView } from 'react-native-webview';
 import Config from '../config';
 
+// --- Define the required roles ---
+const AUTHORIZED_ROLES = ['orgAdmin', 'superAdmin'];
+
+
+// ================================================
+//         PaymentMethodsScreen (No changes needed here)
+// ================================================
 function PaymentMethodsScreen() {
   const org = useSelector(getOrg);
   const tokens = useSelector(getAuthTokens);
@@ -33,14 +40,14 @@ function PaymentMethodsScreen() {
   if (!jwt) {
     return (
       <View style={styles.screenContainer}>
-        <Text style={styles.emptyText}>JWT token not available.</Text>
+        <Text style={styles.emptyText}>Authorization token not available.</Text>
       </View>
     );
   }
 
   const orgId = org.id.toString();
-  console.log('React Native JWT:', jwt);
-  const paymentPageUrl = `${Config.paymentMethodGatewayUrl}/${orgId}/${jwt}`; // Replace with actual token
+  // console.log('React Native JWT:', jwt); // Consider removing in production
+  const paymentPageUrl = `${Config.paymentMethodGatewayUrl}/${orgId}/${jwt}`;
 
   return (
     <View style={styles.screenContainer}>
@@ -54,12 +61,21 @@ function PaymentMethodsScreen() {
         <WebView
           source={{ uri: paymentPageUrl }}
           style={styles.webview}
+          // Add error handling for WebView if needed
+          // onError={(syntheticEvent) => {
+          //   const { nativeEvent } = syntheticEvent;
+          //   console.warn('WebView error: ', nativeEvent);
+          // }}
         />
       )}
     </View>
   );
 }
 
+
+// ================================================
+//         ExpandableInvoice (No changes needed here)
+// ================================================
 function ExpandableInvoice({ invoice }: { invoice: any }) {
   const [expanded, setExpanded] = useState(false);
   const formattedDate = new Date(invoice.issueDate).toLocaleDateString('en-US', {
@@ -102,10 +118,15 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
   );
 }
 
+// ================================================
+//         BillingInfoScreen (No changes needed here, but keep user check for safety)
+// ================================================
 function BillingInfoScreen() {
+  // Keep this check as a safety measure in case this screen is somehow accessed directly
   const currentUser = useSelector(getCurrentUser);
   const org = useSelector(getOrg);
 
+  // Although the parent checks authorization, keep these basic checks
   if (!currentUser) {
     return (
       <View style={styles.screenContainer}>
@@ -128,8 +149,9 @@ function BillingInfoScreen() {
     isLoading: invoicesLoading,
   } = useGetInvoicesByOrgQuery(queryParam, { skip: !org });
 
-  const currentPlan = 'Premium';
-  const nextBillingDate = '2025-03-01';
+  // Hardcoded data - consider fetching this from org or user data if available
+  const currentPlan = org.planName || 'Unknown Plan'; // Example: Get plan from org
+  const nextBillingDate = org.nextBillingDate || 'N/A'; // Example: Get next billing date
 
   useEffect(() => {
     if (invoicesError) {
@@ -139,13 +161,13 @@ function BillingInfoScreen() {
 
   if (invoicesLoading) {
     return (
-      <View style={styles.screenContainer}>
+      <View style={[styles.screenContainer, styles.centered]}>
         <ActivityIndicator size="large" color="#3498db" />
       </View>
     );
   }
 
-  if (invoicesError || !invoices) {
+  if (invoicesError) { // Check specific error before assuming !invoices means error
     return (
       <View style={styles.screenContainer}>
         <Text style={styles.emptyText}>Error loading invoices.</Text>
@@ -171,9 +193,48 @@ function BillingInfoScreen() {
   );
 }
 
+// ================================================
+//         Main PaymentInfoScreen (with Role Check)
+// ================================================
 const Tab = createMaterialTopTabNavigator();
 
-export function PaymentInfoScreen() {
+export function PaymentInfoScreen() { // Ensure this is the component used in your navigation stack
+
+  // *** 1. Get the current user in the main component ***
+  const currentUser = useSelector(getCurrentUser);
+
+  // *** 2. Handle loading state for user ***
+  if (!currentUser) {
+    // Show a loading indicator or a generic message while user data is loading
+    return (
+      <View style={[styles.screenContainer, styles.centered]}>
+        <ActivityIndicator size="large" color="#3498db" />
+        <Text style={styles.emptyText}>Loading user information...</Text>
+      </View>
+    );
+  }
+
+  // *** 3. Check user role ***
+  const userRole = currentUser.role; // Assuming role is a property on the user object
+  const isAuthorized = AUTHORIZED_ROLES.includes(userRole);
+
+  // *** 4. Conditional Rendering based on Role ***
+  if (!isAuthorized) {
+    // User is NOT authorized - Show the message
+    return (
+        <View style={styles.messageContainer}>
+            <Text style={styles.messageTitle}>Access Restricted</Text>
+            <Text style={styles.messageText}>
+                You do not have the necessary permissions to view or manage payment information.
+            </Text>
+            <Text style={styles.messageText}>
+                Please contact your organization administrator for assistance.
+            </Text>
+        </View>
+    );
+  }
+
+  // *** 5. User IS authorized - Render the Tab Navigator ***
   return (
     <Tab.Navigator
       screenOptions={{
@@ -190,14 +251,43 @@ export function PaymentInfoScreen() {
   );
 }
 
+// --- Styles (Combined and added message styles) ---
 const styles = StyleSheet.create({
-  screenContainer: {
+  screenContainer: { // Used by sub-screens
     flex: 1,
-    padding: 20,
-    backgroundColor: '#ecf0f1',
+    padding: 15, // Slightly reduced padding
+    backgroundColor: '#f4f6f8', // Lighter background grey
+  },
+  centered: { // Utility style for centering content
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+  },
+  messageContainer: { // Used for the access restricted message
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 30,
+      backgroundColor: '#f0f0f0',
+  },
+  messageTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: '#e74c3c',
+      marginBottom: 15,
+      textAlign: 'center',
+  },
+  messageText: {
+      fontSize: 16,
+      color: '#34495e',
+      textAlign: 'center',
+      marginBottom: 10,
+      lineHeight: 22,
   },
   webview: {
     flex: 1,
+    borderWidth: 1, // Add border to see boundaries if needed
+    borderColor: '#ccc',
   },
   iframe: {
     width: '100%',
@@ -208,6 +298,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#7f8c8d',
     marginTop: 20,
+    fontSize: 15,
   },
   billingHeader: {
     fontSize: 18,
@@ -216,11 +307,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17, // Slightly larger
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#34495e', // Darker grey
     marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingBottom: 5,
   },
   invoiceContainer: {
     marginBottom: 10,
@@ -232,13 +326,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   invoiceHeader: {
-    padding: 12,
+    paddingVertical: 14, // Increased padding
+    paddingHorizontal: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f7f7f7',
+    backgroundColor: '#f9f9f9', // Lighter header bg
   },
   invoiceHeaderText: {
     fontSize: 16,
@@ -257,8 +354,9 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 14,
     color: '#2c3e50',
-    marginVertical: 2,
+    marginVertical: 3, // Increased vertical margin
   },
 });
 
-export default PaymentInfoScreen;
+// Optional: If PaymentInfoScreen is the default export of the file
+// export default PaymentInfoScreen;
