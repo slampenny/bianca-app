@@ -1,16 +1,20 @@
+// seedDatabase.js
 const mongoose = require('mongoose');
 const faker = require('faker');
-const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule } = require('../models');
+const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
 const config = require('../config/config');
 
-const { orgOne, orgTwo, insertOrgs } = require('../../tests/fixtures/org.fixture');
-const { caregiverOne, caregiverTwo, admin, insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.fixture');
+const { orgOne, insertOrgs } = require('../../tests/fixtures/org.fixture');
+// Use only these two caregivers to be in the same org:
+const { caregiverOne, admin, insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.fixture');
 const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = require('../../tests/fixtures/patient.fixture');
 const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = require('../../tests/fixtures/alert.fixture');
 const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = require('../../tests/fixtures/schedule.fixture');
 const { conversationOne, conversationTwo, insertConversations } = require('../../tests/fixtures/conversation.fixture');
+const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = require('../../tests/fixtures/paymentMethod.fixture');
 
 async function seedDatabase() {
+  try {
     // Connect to the database
     await mongoose.connect(config.mongoose.url, { useNewUrlParser: true, useUnifiedTopology: true });
 
@@ -22,32 +26,73 @@ async function seedDatabase() {
     await Conversation.deleteMany({});
     await Message.deleteMany({});
     await Schedule.deleteMany({});
+    await PaymentMethod.deleteMany({});
+    await Invoice.deleteMany({});
     console.log('Cleared the database');
 
-    // Insert organizations
-    const [org1, org2] = await insertOrgs([orgOne, orgTwo]);
-    caregiverOne.org = org1._id;
-    caregiverTwo.org = org2._id;
+    // Insert a single organization
+    const [org1] = await insertOrgs([orgOne]);
+    console.log('Inserted org:', org1);
 
-    // Insert caregivers and add to organizations
-    const [caregiver1] = await insertCaregiversAndAddToOrg(org1, [caregiverOne, caregiverTwo, admin]);
+    // Set both caregivers to belong to the same org.
+    caregiverOne.org = org1._id;
+    admin.org = org1._id;
+
+    // Insert caregivers and add them to org1.
+    // This will insert both admin and caregiverOne to org1.
+    const [caregiver] = await insertCaregiversAndAddToOrg(org1, [admin, caregiverOne]);
+    console.log('Inserted caregivers:', caregiver);
 
     // Insert alerts
-    await insertAlerts(caregiver1, 'Caregiver', [alertOne, alertTwo, alertThree, expiredAlert]);
+    await insertAlerts(caregiver, 'Caregiver', [alertOne, alertTwo, alertThree, expiredAlert]);
 
-    // Insert patients and add to caregiver
-    const [patient1, patient2] = await insertPatientsAndAddToCaregiver(caregiver1, [patientOne, patientTwo]);
-    // Generate and insert conversations for patients
+    // Insert patients and add them to the caregiver.
+    const [patient1, patient2] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne, patientTwo]);
+    console.log('Inserted patients:', patient1, patient2);
+
+    // Insert conversations for patients.
     conversationOne.patientId = patient1._id;
     conversationTwo.patientId = patient2._id;
     await insertConversations([conversationOne, conversationTwo]);
+    console.log('Inserted conversations');
 
-    // Now seed schedules for one or both patients:
-    // This function creates a schedule and updates the patient’s schedules array
-    const scheduleForPatient1 = await insertScheduleAndAddToPatient(patient1, scheduleOne);
-    const scheduleForPatient2 = await insertScheduleAndAddToPatient(patient2, scheduleTwo);
+    // Seed schedules for patients.
+    await insertScheduleAndAddToPatient(patient1, scheduleOne);
+    await insertScheduleAndAddToPatient(patient2, scheduleTwo);
+    console.log('Inserted schedules');
+
+    // ----------------------
+    // SEED PAYMENT DATA
+    // ----------------------
+    console.log('Seeding PaymentMethod and Invoice data...');
+
+    // Insert dummy PaymentMethods for org1 using your fixture.
+    const paymentMethods = await insertPaymentMethods(org1, [paymentMethodOne, paymentMethodTwo]);
+    console.log('Seeded PaymentMethods:', paymentMethods);
+
+    // Create a dummy invoice for org1.
+    const dummyInvoiceData = {
+      org: org1._id,
+      invoiceNumber: 'INV-000001',
+      issueDate: new Date(),
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      status: 'pending',
+      totalAmount: 100,
+      paymentMethod: paymentMethods[0]._id,
+      stripePaymentIntentId: 'pi_test',
+      stripeInvoiceId: 'in_test',
+      notes: 'Dummy invoice seeded for frontend display',
+    };
+
+    const invoiceRecord = await Invoice.create(dummyInvoiceData);
+    console.log('Seeded Invoice:', invoiceRecord);
 
     console.log('Database seeded!');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error seeding database:', error);
+    process.exit(1);
+  }
 }
 
-seedDatabase().catch(console.error);
+seedDatabase();

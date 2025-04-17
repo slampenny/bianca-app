@@ -1,21 +1,31 @@
-version: '3'
+# Remove the version: '3' line if you still have it - it's obsolete
 
 services:
   bianca-app:
+    build: .
     container_name: bianca-app
     command: yarn dev
     ports:
       - "9229:9229"
-  # ngrok:
-  #   container_name: ngrok
-  #   image: ngrok/ngrok
-  #   restart: unless-stopped
-  #   command: 'http bianca-app:3000'
-  #   depends_on:
-  #     - bianca-app
-  #   ports:
-  #       - '4040:4040'
-  #   environment:
-  #     - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-  #   networks:
-  #     - node-network
+    # Add other necessary configurations like build context, volumes, etc.
+    networks: # <-- Add this network assignment
+      - node-network
+
+  ngrok:
+    container_name: ngrok
+    image: ngrok/ngrok
+    restart: unless-stopped
+    command: 'http bianca-app:3000'
+    depends_on:
+      - bianca-app
+    ports:
+      - '4040:4040'
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} # Make sure this is set in your .env file
+    networks: # <-- Ensure this network assignment exists
+      - node-network
+
+# Define the network at the top level
+networks: # <-- Add this whole block
+  node-network:
+    driver: bridge # Use the default bridge driver

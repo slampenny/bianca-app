@@ -1,34 +1,71 @@
+// validateTwilioRequest.js
 const twilio = require('twilio');
 const config = require('../config/config');
-const logger = require('../config/logger');
+const logger = require('../config/logger'); // Your updated logger
 const crypto = require('crypto');
 
-const getExpectedTwilioSignature = (authToken, url, params) => {
-  const sortedParams = Object.keys(params).sort().map(key => `${key}${params[key]}`).join('');
-  const data = url + sortedParams;
-  return crypto.createHmac('sha1', authToken).update(Buffer.from(data, 'utf-8')).digest('base64');
-};
-
 const validateTwilioRequest = (req, res, next) => {
-  const twilioSignature = req.headers['x-twilio-signature'];
-  const requestUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    logger.info('>>> ENTERING validateTwilioRequest middleware');
+    const twilioSignature = req.headers['x-twilio-signature'];
 
-  logger.info(`Validating Twilio request with signature: ${twilioSignature}`);
-  logger.info(`Request URL: ${requestUrl}`);
-  logger.info(`Request body: ${JSON.stringify(req.body)}`);
-  logger.info(`Headers: ${JSON.stringify(req.headers)}`);
+    // --- URL Reconstruction ---
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const originalUrl = req.originalUrl;
+    const fullRequestUrl = `${protocol}://${host}${originalUrl}`; // Keep original with query if present
 
-  const isValid = twilio.validateRequestWithBody(config.twilio.authToken, twilioSignature, requestUrl, req.body);
+    // --- ADJUSTMENT: Create URL *without* query string specifically for validation ---
+    // Based on comparison between app logs and Twilio debugger, Twilio might be signing
+    // POST webhooks without including the query string in the signature base.
+    const validationUrl = fullRequestUrl.split('?')[0];
+    // --- END ADJUSTMENT ---
 
-  if (!isValid) {
-    const expectedSignature = getExpectedTwilioSignature(config.twilio.authToken, requestUrl, req.body);
-    logger.error('Invalid Twilio Signature');
-    logger.error(`Expected Signature: ${expectedSignature}`);
-    logger.error(`Twilio Signature: ${twilioSignature}`);
-    return res.status(401).send({ message: 'Invalid Twilio Signature' });
-  }
+    logger.info(`Validating Twilio request. Signature Header: ${twilioSignature ? 'Present' : 'MISSING'}`);
+    logger.info(`Full Request URL Seen by App: ${fullRequestUrl}`); // Log the full URL seen
+    logger.info(`URL Used for Validation Check: ${validationUrl}`); // Log the URL we'll actually use
 
-  next();
+    if (!twilioSignature) {
+        logger.error('Invalid Twilio Request: Missing X-Twilio-Signature header.');
+        res.status(403).type('text/xml').send('<Response><Say>Authentication Error: Missing signature.</Say></Response>');
+        return;
+    }
+
+    const params = req.body || {};
+
+    // --- DETAILED LOGGING BEFORE VALIDATION ---
+    console.log('\n--- Validating Request ---');
+    console.log(`AuthToken Status: ${config.twilio.authToken && config.twilio.authToken.length > 10 ? 'LOADED' : 'MISSING or Invalid Length'}`);
+    console.log('Received Signature:', twilioSignature);
+    console.log('Validation URL Used:', validationUrl); // Log URL being used for the check
+    console.log('Validation Params:', JSON.stringify(params, null, 2));
+    console.log('--------------------------');
+    // --- END DETAILED LOGGING ---
+
+    const isValid = twilio.validateRequestWithBody(
+        config.twilio.authToken,
+        twilioSignature,
+        validationUrl, // <<< Use the URL WITHOUT the query string
+        params
+    );
+
+    // --- LOG VALIDATION RESULT ---
+    console.log('isValid Result:', isValid);
+    console.log('--- Validation Attempt End ---\n');
+    // --- END RESULT LOG ---
+
+    if (!isValid) {
+        logger.error('Invalid Twilio Signature (Official Validator Returned False)');
+        logger.error(`Full Request URL was: ${fullRequestUrl}`); // Log original URL for context
+        logger.error(`Validation URL Used: ${validationUrl}`);
+        logger.error(`Failed Signature: ${twilioSignature}`);
+        logger.error(`Failed Params: ${JSON.stringify(params)}`);
+
+        res.status(403).type('text/xml').send('<Response><Say>Authentication Error: Invalid signature.</Say></Response>');
+        return;
+    }
+
+    logger.info('>>> Twilio validation successful.');
+    next();
 };
 
 module.exports = validateTwilioRequest;

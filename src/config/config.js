@@ -15,9 +15,10 @@ const envVarsSchema = Joi.object({
   SMTP_USERNAME: Joi.string(),
   SMTP_PASSWORD: Joi.string(),
   TWILIO_PHONENUMBER: Joi.string(),
-  TWILIO_ACCOUNTSID: Joi.string(),
-  TWILIO_AUTHTOKEN: Joi.string(),
+  TWILIO_ACCOUNTSID: Joi.string().required(),
+  TWILIO_AUTHTOKEN: Joi.string().required(),
   TWILIO_VOICEURL: Joi.string(),
+  PUBLIC_TUNNEL_URL: Joi.string(),
   OPENAI_API_KEY: Joi.string(),
   STRIPE_SECRET_KEY: Joi.string(),
   STRIPE_PUBLISHABLE_KEY: Joi.string()
@@ -74,7 +75,7 @@ const baselineConfig = {
   multer: { dest: path.join(__dirname, '../../uploads') },
   twilio: {
     phone: envVars.TWILIO_PHONENUMBER,
-    apiUrl: 'https://505b-174-4-88-96.ngrok-free.app',
+    apiUrl: envVars.PUBLIC_TUNNEL_URL,
     accountSid: envVars.TWILIO_ACCOUNTSID,
     authToken: envVars.TWILIO_AUTHTOKEN,
     playbackUrl: 'https://default-playback-url.com'
