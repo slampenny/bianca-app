@@ -12,7 +12,6 @@ const scheduleRoute = require('./schedule.route');
 const testRoute = require('./test.route');
 const twilioRoute = require('./twilioCall.route');
 const docsRoute = require('./docs.route');
-const config = require('../../config/config');
 
 const router = express.Router();
 
@@ -80,10 +79,10 @@ defaultRoutes.forEach((route) => {
 });
 
 /* istanbul ignore next */
-if (config.env === 'development' || config.env === 'test') {
+//if (config.env === 'development' || config.env === 'test') {
   devRoutes.forEach((route) => {
     router.use(route.path, route.route);
   });
-}
+//}
 
 module.exports = router;

@@ -1,77 +1,73 @@
-// ../controllers/twilioCall.controller.js
-const httpStatus = require('http-status');
-// const ApiError = require('../utils/ApiError'); // Keep if used by catchAsync or error handler
-const catchAsync = require('../utils/catchAsync');
-const { twilioCallService } = require('../services');
-const logger = require('../config/logger');
-const VoiceResponse = require('twilio').twiml.VoiceResponse; // Needed for fallback error
+// controllers/twilioCall.controller.js
+// Updated based on user's provided controller structure and Realtime API integration needs.
 
+const httpStatus = require('http-status');
+const catchAsync = require('../utils/catchAsync'); // Using user's async wrapper
+const { twilioCallService } = require('../services'); // Using user's service name
+const logger = require('../config/logger');
+// const VoiceResponse = require('twilio').twiml.VoiceResponse; // Only needed if constructing complex TwiML here
+
+// Controller to initiate the call
 const initiateCall = catchAsync(async (req, res) => {
-    logger.info(`[Controller] Initiating call request received.`);
-    const { patientId } = req.body;
-    // Assuming initiateCall throws ApiError on failure which catchAsync handles
-    await twilioCallService.initiateCall(patientId);
-    logger.info(`[Controller] Call initiation successful for patientId: ${patientId}`);
-    res.status(httpStatus.OK).json({ message: 'Call initiated successfully' });
+  logger.info(`[Controller] Initiating call request received.`);
+  const { patientId } = req.body; // Assuming patientId comes from req.body
+  if (!patientId) {
+    // Added basic validation check
+    return res.status(httpStatus.BAD_REQUEST).send({ message: 'Patient ID is required' });
+  }
+  // Assuming initiateCall now sets up the call for <Connect><Stream>
+  // It might return callSid or handle errors internally
+  await twilioCallService.initiateCall(patientId);
+  logger.info(`[Controller] Call initiation request processed for patientId: ${patientId}`);
+  // Aligning response with user's example
+  res.status(httpStatus.OK).json({ message: 'Call initiated successfully' });
 });
 
+// **NEW:** Controller to handle the initial TwiML request for <Connect><Stream>
+// This replaces the old 'prepareCall' logic for the main interaction flow.
+const handleStartStream = (req, res) => {
+  // IMPORTANT: Apply Twilio request validation middleware in the route definition!
+  logger.info(`[Controller] handleStartStream invoked. CallSid: ${req.body.CallSid}`);
+  // This service function should now generate TwiML with <Connect><Stream>
+  const twiml = twilioCallService.generateStreamTwiML(req);
+  res.type('text/xml');
+  res.send(twiml);
+};
+
+// Controller to handle the final status callback
+const handleEndCall = catchAsync(async (req, res) => {
+  // IMPORTANT: Apply Twilio request validation middleware in the route definition!
+  logger.info(`[Controller] endCall invoked. CallSid: ${req.body.CallSid}, Status: ${req.body.CallStatus}`);
+  // Service function performs cleanup, summarization, etc.
+  await twilioCallService.endCall(req);
+  // Acknowledge Twilio's status callback with an empty TwiML response
+  logger.info(`[Controller] endCall processing complete for CallSid: ${req.body.CallSid}. Sending ACK response.`);
+  res.type('text/xml').send('<Response/>'); // Aligning response with user's example
+});
+
+
+// **OBSOLETE Controllers for Realtime API flow:**
+// These handlers are part of the old <Gather> workflow and are replaced by
+// handleStartStream and the WebSocket server logic.
+/*
 const prepareCall = catchAsync(async (req, res) => {
-    // Log entry, service function has more detail
-    logger.info(`[Controller] prepareCall invoked. CallSid: ${req.body.CallSid || 'N/A - Initial'}`);
-    const responseTwiML = await twilioCallService.prepareCall(req);
-    res.type('text/xml').send(responseTwiML);
+    logger.info(`[Controller] prepareCall invoked (OBSOLETE for stream). CallSid: ${req.body.CallSid || 'N/A - Initial'}`);
+    const responseTwiML = await twilioCallService.prepareCall(req); // Old service logic
+    res.type('text/xml').send(responseTwiML);
 });
 
 const handleRealTimeInteraction = catchAsync(async (req, res) => {
-    // Log entry, service function has more detail
-    logger.info(`[Controller] handleRealTimeInteraction invoked. CallSid: ${req.body.CallSid}`);
-    // --- FIX: Pass the entire req object ---
-    const responseTwiML = await twilioCallService.handleRealTimeInteraction(req);
-    res.type('text/xml').send(responseTwiML);
+    logger.info(`[Controller] handleRealTimeInteraction invoked (OBSOLETE for stream). CallSid: ${req.body.CallSid}`);
+    const responseTwiML = await twilioCallService.handleRealTimeInteraction(req); // Old service logic
+    res.type('text/xml').send(responseTwiML);
 });
+*/
 
-const endCall = catchAsync(async (req, res) => {
-    // Log entry, service function has more detail
-    logger.info(`[Controller] endCall invoked. CallSid: ${req.body.CallSid}, Status: ${req.body.CallStatus}`);
-    // --- FIX: Pass the entire req object ---
-    await twilioCallService.endCall(req);
-    // --- FIX: Send empty TwiML response to acknowledge Twilio's status callback ---
-    logger.info(`[Controller] endCall processing complete for CallSid: ${req.body.CallSid}. Sending ACK response.`);
-    res.type('text/xml').send('<Response/>');
-});
 
 module.exports = {
-    endCall,
-    initiateCall,
-    handleRealTimeInteraction,
-    prepareCall
+  initiateCall,
+  handleStartStream, // New handler for the streaming TwiML
+  handleEndCall,
+  // prepareCall, // Obsolete for stream flow
+  // handleRealTimeInteraction, // Obsolete for stream flow
 };
-
-// Ensure your global error handler (used by catchAsync) also handles errors gracefully.
-// For Twilio webhooks, it might need to send a TwiML <Say> error message + <Hangup/>
-// Example snippet for error handler:
-/*
-const errorHandler = (err, req, res, next) => {
-  logger.error(err);
-
-  // Check if the request path likely expects TwiML
-  const isTwilioWebhook = req.originalUrl.includes('/twilio/'); // Adjust check as needed
-
-  if (isTwilioWebhook && !res.headersSent) {
-    const twiml = new VoiceResponse();
-    twiml.say('An unexpected application error occurred. Please try again later. Goodbye.');
-    twiml.hangup();
-    res.status(500).type('text/xml').send(twiml.toString());
-  } else if (!res.headersSent) {
-    // Default JSON error response
-    res.status(err.statusCode || 500).send({
-      code: err.statusCode || 500,
-      message: err.message || 'Internal Server Error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-    });
-  } else {
-      // If headers already sent, delegate to default Express handler
-      next(err);
-  }
-};
-*/

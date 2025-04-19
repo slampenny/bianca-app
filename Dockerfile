@@ -7,7 +7,8 @@ WORKDIR /usr/src/bianca-app
 RUN apt-get update && apt-get install -y \
   libssl-dev \
   ca-certificates \
-  curl
+  curl \
+  ffmpeg
 
 # Pre-download MongoDB binary
 RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-debian10-6.0.9.tgz && \
