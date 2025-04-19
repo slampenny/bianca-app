@@ -11,19 +11,19 @@ services:
     networks: # <-- Add this network assignment
       - node-network
 
-  ngrok:
-    container_name: ngrok
-    image: ngrok/ngrok
-    restart: unless-stopped
-    command: 'http bianca-app:3000'
-    depends_on:
-      - bianca-app
-    ports:
-      - '4040:4040'
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} # Make sure this is set in your .env file
-    networks: # <-- Ensure this network assignment exists
-      - node-network
+  # ngrok:
+  #   container_name: ngrok
+  #   image: ngrok/ngrok
+  #   restart: unless-stopped
+  #   command: 'http bianca-app:3000 --log=stdout '
+  #   depends_on:
+  #     - bianca-app
+  #   ports:
+  #     - '4040:4040'
+  #   environment:
+  #     - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} # Make sure this is set in your .env file
+  #   networks: # <-- Ensure this network assignment exists
+  #     - node-network
 
 # Define the network at the top level
 networks: # <-- Add this whole block
