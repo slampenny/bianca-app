@@ -50,7 +50,9 @@ async function startServer() {
     const server = http.createServer(app);
     // Add this debugging listener before initializing WebSocket server
     server.on('upgrade', (request, socket, head) => {
-      logger.info(`[WebSocket Service] Upgrade request received: ${request.url}, headers: ${JSON.stringify(request.headers)}`);
+      logger.info(
+        `[WebSocket Service] Upgrade request received: ${request.url}, headers: ${JSON.stringify(request.headers)}`
+      );
     });
 
     // Initialize and attach the WebSocket server to the HTTP server
@@ -84,10 +86,10 @@ async function startServer() {
 
     process.on('uncaughtException', unexpectedErrorHandler);
     process.on('unhandledRejection', (reason, promise) => {
-        // Log both reason and promise for better debugging
-        logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-        // Don't necessarily exit immediately on unhandled rejection, depends on severity
-        // exitHandler(); // Uncomment if you want unhandled rejections to stop the server
+      // Log both reason and promise for better debugging
+      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+      // Don't necessarily exit immediately on unhandled rejection, depends on severity
+      // exitHandler(); // Uncomment if you want unhandled rejections to stop the server
     });
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received');

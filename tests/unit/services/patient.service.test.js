@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Org,  Caregiver, Patient } = require('../../../src/models');
+const { Org, Caregiver, Patient } = require('../../../src/models');
 const patientService = require('../../../src/services/patient.service');
 const caregiverService = require('../../../src/services/caregiver.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
@@ -63,7 +63,7 @@ describe('patientService', () => {
   });
 
   it('should query patients', async () => {
-    await insertPatients([patientOne, patientTwo])
+    await insertPatients([patientOne, patientTwo]);
     const patients = await patientService.queryPatients({}, {});
     expect(patients).toEqual({
       results: expect.any(Array),
@@ -73,15 +73,15 @@ describe('patientService', () => {
       totalResults: 2,
     });
   });
-  
+
   it('should assign a caregiver to a patient', async () => {
     const [org] = await insertOrgs([orgOne]);
     const patient = await patientService.createPatient(patientOne);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     const updatedPatient = await patientService.assignCaregiver(caregiver.id, patient.id);
-    expect(updatedPatient.caregivers.map(id => id.toString())).toEqual(expect.arrayContaining([caregiver.id.toString()]));
+    expect(updatedPatient.caregivers.map((id) => id.toString())).toEqual(expect.arrayContaining([caregiver.id.toString()]));
   });
-  
+
   it('should remove a caregiver from a patient', async () => {
     const [org] = await insertOrgs([orgOne]);
     const patient = await patientService.createPatient(patientOne);
@@ -90,7 +90,7 @@ describe('patientService', () => {
     const updatedPatient = await patientService.removeCaregiver(caregiver.id, patient.id);
     expect(updatedPatient.caregivers.toObject()).toEqual([]);
   });
-  
+
   it('should get caregivers by patient id', async () => {
     const [org] = await insertOrgs([orgOne]);
     const patient = await patientService.createPatient(patientOne);

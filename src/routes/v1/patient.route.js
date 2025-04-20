@@ -1,8 +1,9 @@
 const express = require('express');
+const multer = require('multer');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const config = require('../../config/config');
-const multer = require('multer');
+
 const upload = multer({ dest: config.multer.dest });
 const patientValidation = require('../../validations/patient.validation');
 const patientController = require('../../controllers/patient.controller');
@@ -11,20 +12,31 @@ const router = express.Router();
 
 router
   .route('/')
-  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.createPatient), patientController.createPatient)
+  .post(
+    auth('updateOwn:patient', 'updateAny:patient'),
+    validate(patientValidation.createPatient),
+    patientController.createPatient
+  )
   .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatients), patientController.getPatients);
 
 router
   .route('/:patientId')
   .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
-  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(patientValidation.updatePatient), patientController.updatePatient)
-  .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(patientValidation.deletePatient), patientController.deletePatient);
+  .patch(
+    auth('updateOwn:patient', 'updateAny:patient'),
+    validate(patientValidation.updatePatient),
+    patientController.updatePatient
+  )
+  .delete(
+    auth('deleteOwn:patient', 'deleteAny:patient'),
+    validate(patientValidation.deletePatient),
+    patientController.deletePatient
+  );
 
-  router
+router
   .route('/:patientId/avatar')
   .post(auth('updateOwn:patient', 'updateAny:patient'), upload.single('avatar'), patientController.uploadPatientAvatar)
   .patch(auth('updateOwn:patient', 'updateAny:patient'), upload.single('avatar'), patientController.uploadPatientAvatar);
-
 
 router
   .route('/:patientId/caregivers/:caregiverId')
@@ -33,7 +45,11 @@ router
 
 router
   .route('/:patientId/conversations')
-  .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getConversationsByPatient), patientController.getConversationsByPatient);
+  .get(
+    auth('readOwn:patient', 'readAny:patient'),
+    validate(patientValidation.getConversationsByPatient),
+    patientController.getConversationsByPatient
+  );
 
 router
   .route('/:patientId/caregivers')

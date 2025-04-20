@@ -16,25 +16,25 @@ const scheduleTwo = {
 };
 
 const insertSchedules = async (schedules) => {
-  const dbSchedules = schedules.map(data => new Schedule(data));
-  dbSchedules.forEach(schedule => schedule.calculateNextCallDate());
-  return await Schedule.insertMany(dbSchedules.map(schedule => schedule.toObject()));
+  const dbSchedules = schedules.map((data) => new Schedule(data));
+  dbSchedules.forEach((schedule) => schedule.calculateNextCallDate());
+  return await Schedule.insertMany(dbSchedules.map((schedule) => schedule.toObject()));
 };
 
 const insertScheduleAndAddToPatient = async (patient, scheduleParam) => {
   // Create the schedule with the patient field
   const [schedule] = await insertSchedules([{ patient: patient._id, ...scheduleParam }]);
-  
+
   // Update the patient document with the new schedule's _id
   patient.schedules.push(schedule._id);
   await patient.save();
-  
+
   return schedule;
-}
+};
 
 // const prepareSchedulesWithPatients = async () => {
 //   const [patient1, patient2] = await insertPatients([patientOne, patientTwo]);
-  
+
 //   // Assign patient IDs to the schedules
 //   scheduleOne.patientId = patient1._id;
 //   scheduleTwo.patientId = patient2._id;

@@ -45,7 +45,6 @@ const handleEndCall = catchAsync(async (req, res) => {
   res.type('text/xml').send('<Response/>'); // Aligning response with user's example
 });
 
-
 // **OBSOLETE Controllers for Realtime API flow:**
 // These handlers are part of the old <Gather> workflow and are replaced by
 // handleStartStream and the WebSocket server logic.
@@ -62,7 +61,6 @@ const handleRealTimeInteraction = catchAsync(async (req, res) => {
     res.type('text/xml').send(responseTwiML);
 });
 */
-
 
 module.exports = {
   initiateCall,

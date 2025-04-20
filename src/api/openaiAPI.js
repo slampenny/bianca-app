@@ -1,8 +1,9 @@
-const OpenAI = require("openai");
-const config = require("../config/config");
-const logger = require("../config/logger");
-const openai = new OpenAI({apiKey: config.openai.apiKey});
-const { prompts } = require("../templates/prompts");
+const OpenAI = require('openai');
+const config = require('../config/config');
+const logger = require('../config/logger');
+
+const openai = new OpenAI({ apiKey: config.openai.apiKey });
+const { prompts } = require('../templates/prompts');
 
 const openaiAPI = {
   async generateResponseFromOpenAI(messages, userName) {
@@ -28,5 +29,5 @@ const openaiAPI = {
 };
 
 module.exports = {
-  openaiAPI
+  openaiAPI,
 };

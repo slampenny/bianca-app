@@ -1,10 +1,10 @@
 const WebSocket = require('ws');
-const config = require('../config/config');
-const logger = require('../config/logger');
-const { Message } = require('../models');
 const stream = require('stream');
 const prism = require('prism-media');
 const { Buffer } = require('buffer');
+const config = require('../config/config');
+const logger = require('../config/logger');
+const { Message } = require('../models');
 
 const openAIConnections = new Map();
 const readyToStreamAudio = new Set();
@@ -40,7 +40,9 @@ const debounceCommit = (callSid) => {
 };
 
 const connect = (callSid, conversationId, initialPrompt) => {
-    logger.info(`[OpenAI Realtime] CONNECT INVOKED for ${callSid}. notifyWebSocketService is ${typeof notifyWebSocketService}`);
+  logger.info(
+    `[OpenAI Realtime] CONNECT INVOKED for ${callSid}. notifyWebSocketService is ${typeof notifyWebSocketService}`
+  );
 
   if (openAIConnections.has(callSid)) {
     logger.warn(`[OpenAI Realtime] Connection already exists for CallSid: ${callSid}`);
@@ -63,7 +65,6 @@ const connect = (callSid, conversationId, initialPrompt) => {
   ws.on('unexpected-response', (req, res) => {
     logger.error(`[OpenAI Realtime] Unexpected response: ${res.statusCode}`);
   });
-  
 
   ws.on('open', () => {
     logger.info(`[OpenAI Realtime] WebSocket opened for CallSid: ${callSid}`);
@@ -82,10 +83,12 @@ const connect = (callSid, conversationId, initialPrompt) => {
         const sessionConfig = {
           type: 'session.update',
           session: {
-            instructions: initialPrompt || "You are Bianca, a helpful AI assistant from the patient's care team. Greet the patient warmly and ask how you can help today.",
+            instructions:
+              initialPrompt ||
+              "You are Bianca, a helpful AI assistant from the patient's care team. Greet the patient warmly and ask how you can help today.",
             voice: 'alloy',
             output_audio_format: 'pcm16',
-            tts_first: true
+            tts_first: true,
           },
         };
         ws.send(JSON.stringify(sessionConfig));
@@ -101,7 +104,7 @@ const connect = (callSid, conversationId, initialPrompt) => {
                 type: 'input_text',
                 text: 'Hello, are you there?',
               },
-            ]
+            ],
           },
         };
         ws.send(JSON.stringify(initialUserMessage));
@@ -128,7 +131,8 @@ const connect = (callSid, conversationId, initialPrompt) => {
 
           const chunks = [];
 
-          passthrough.pipe(encoder)
+          passthrough
+            .pipe(encoder)
             .on('data', (chunk) => chunks.push(chunk))
             .on('end', () => {
               const ulaw = Buffer.concat(chunks).toString('base64');
@@ -139,7 +143,7 @@ const connect = (callSid, conversationId, initialPrompt) => {
             });
         }
       } else if (message.type === 'conversation.item.created') {
-        const item = message.item;
+        const { item } = message;
         if (item.type === 'message' && (item.role === 'assistant' || item.role === 'user') && item.content) {
           const contentText = Array.isArray(item.content)
             ? item.content.map((part) => part.text || '').join(' ')
@@ -204,58 +208,57 @@ const connect = (callSid, conversationId, initialPrompt) => {
 };
 
 const decodeUlawToPcm = (ulawBase64) => {
-    const inputBuffer = Buffer.from(ulawBase64, 'base64');
-    const decoder = new prism.Decoder({ type: 'ulaw', rate: 8000, channels: 1 });
-    const output = new stream.PassThrough();
-    const outputChunks = [];
-  
-    output.on('data', chunk => outputChunks.push(chunk));
-    output.on('end', () => {});
-    output.on('error', err => {
-      logger.error(`[OpenAI Realtime] Decoder error: ${err.message}`);
-    });
-  
-    const input = new stream.PassThrough();
-    input.end(inputBuffer);
-    input.pipe(decoder).pipe(output);
-  
-    return new Promise((resolve) => {
-      output.on('end', () => {
-        const combined = Buffer.concat(outputChunks);
-        resolve(combined.toString('base64'));
-      });
-    });
-  };
+  const inputBuffer = Buffer.from(ulawBase64, 'base64');
+  const decoder = new prism.Decoder({ type: 'ulaw', rate: 8000, channels: 1 });
+  const output = new stream.PassThrough();
+  const outputChunks = [];
 
-  const sendAudioChunk = async (callSid, audioChunkBase64) => {
-    logger.debug(`[OpenAI Realtime] Received audio chunk for ${callSid}. Size: ${audioChunkBase64.length}`);
+  output.on('data', (chunk) => outputChunks.push(chunk));
+  output.on('end', () => {});
+  output.on('error', (err) => {
+    logger.error(`[OpenAI Realtime] Decoder error: ${err.message}`);
+  });
 
-    if (!audioChunkBase64 || typeof audioChunkBase64 !== 'string' || audioChunkBase64.trim() === '') {
-      logger.warn(`[OpenAI Realtime] Skipping empty or invalid audio chunk for ${callSid}`);
-      return;
-    }
-  
-    if (!readyToStreamAudio.has(callSid) || !waitForSessionStarted.get(callSid)) {
-      logger.debug(`[OpenAI Realtime] Buffering audio for ${callSid} (session not ready)`);
-      if (!pendingAudioChunks.has(callSid)) pendingAudioChunks.set(callSid, []);
-      pendingAudioChunks.get(callSid).push(audioChunkBase64);
-      return;
-    }
-  
-    const ws = openAIConnections.get(callSid);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const pcmBase64 = await decodeUlawToPcm(audioChunkBase64);
-      const message = {
-        type: 'input_audio_buffer.append',
-        audio: pcmBase64,
-      };
-      ws.send(JSON.stringify(message));
-      debounceCommit(callSid);
-    } else {
-      logger.warn(`[OpenAI Realtime] WebSocket not open or not found for sending audio, CallSid: ${callSid}`);
-    }
-  };
-  
+  const input = new stream.PassThrough();
+  input.end(inputBuffer);
+  input.pipe(decoder).pipe(output);
+
+  return new Promise((resolve) => {
+    output.on('end', () => {
+      const combined = Buffer.concat(outputChunks);
+      resolve(combined.toString('base64'));
+    });
+  });
+};
+
+const sendAudioChunk = async (callSid, audioChunkBase64) => {
+  logger.debug(`[OpenAI Realtime] Received audio chunk for ${callSid}. Size: ${audioChunkBase64.length}`);
+
+  if (!audioChunkBase64 || typeof audioChunkBase64 !== 'string' || audioChunkBase64.trim() === '') {
+    logger.warn(`[OpenAI Realtime] Skipping empty or invalid audio chunk for ${callSid}`);
+    return;
+  }
+
+  if (!readyToStreamAudio.has(callSid) || !waitForSessionStarted.get(callSid)) {
+    logger.debug(`[OpenAI Realtime] Buffering audio for ${callSid} (session not ready)`);
+    if (!pendingAudioChunks.has(callSid)) pendingAudioChunks.set(callSid, []);
+    pendingAudioChunks.get(callSid).push(audioChunkBase64);
+    return;
+  }
+
+  const ws = openAIConnections.get(callSid);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    const pcmBase64 = await decodeUlawToPcm(audioChunkBase64);
+    const message = {
+      type: 'input_audio_buffer.append',
+      audio: pcmBase64,
+    };
+    ws.send(JSON.stringify(message));
+    debounceCommit(callSid);
+  } else {
+    logger.warn(`[OpenAI Realtime] WebSocket not open or not found for sending audio, CallSid: ${callSid}`);
+  }
+};
 
 const sendTextMessage = (callSid, text, role = 'user', metadata = {}) => {
   const ws = openAIConnections.get(callSid);
@@ -276,7 +279,7 @@ const sendTextMessage = (callSid, text, role = 'user', metadata = {}) => {
             type: 'input_text',
             text,
           },
-        ]
+        ],
       };
     }
 

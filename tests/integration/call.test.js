@@ -1,9 +1,9 @@
 const request = require('supertest');
 const httpStatus = require('http-status');
-const app = require('../../src/app');
-const logger = require('../../src/config/logger');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const app = require('../../src/app');
+const logger = require('../../src/config/logger');
 const { Alert, Org, Caregiver, Patient, Schedule } = require('../../src/models');
 const { caregiverOne, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { alertOne, insertAlerts } = require('../fixtures/alert.fixture');
@@ -15,7 +15,7 @@ const { scheduleOne, insertScheduleAndAddToPatient } = require('../fixtures/sche
 let mongoServer;
 
 beforeAll(async () => {
-    mongoServer = new MongoMemoryServer();
+  mongoServer = new MongoMemoryServer();
   await mongoServer.start();
   const mongoUri = await mongoServer.getUri();
   await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -38,7 +38,7 @@ describe('Call routes', () => {
     [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
     [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
     const schedules = await insertScheduleAndAddToPatient(patient, scheduleOne);
-    const alerts = await insertAlerts(caregiver, "Caregiver", [alertOne]);
+    const alerts = await insertAlerts(caregiver, 'Caregiver', [alertOne]);
   });
 
   afterEach(async () => {
@@ -51,7 +51,7 @@ describe('Call routes', () => {
 
   it('should test that the correct user gets a call', async () => {
     logger.info('calling twilio');
-    //await twilioCallService.initiateCall(patient.id);
+    // await twilioCallService.initiateCall(patient.id);
   });
 
   // it('should all users who are scheduled to get a call, get a call', async () => {

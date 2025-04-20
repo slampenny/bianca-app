@@ -1,29 +1,18 @@
 const request = require('supertest');
-const faker = require('faker');
-const httpStatus = require('http-status');
-const app = require('../../src/app');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Patient, Token, Caregiver, Schedule } = require('../../src/models');
-const {
-  patientOne,
-  patientTwo,
-  insertPatients,
-  insertPatientsAndAddToCaregiver,
-} = require('../fixtures/patient.fixture');
+const app = require('../../src/app');
+const httpStatus = require('http-status');
+const { Patient, Token, Caregiver, Schedule, Org } = require('../../src/models');
+const { insertOrgs } = require('../fixtures/org.fixture');
+const { patientOne, insertPatients } = require('../fixtures/patient.fixture');
 const {
   caregiverOne,
   admin,
-  insertCaregiverAndReturnToken,
-  insertCaregiverAndReturnTokenByRole,
-  insertCaregivers,
+  insertCaregivertoOrgAndReturnToken,
+  insertCaregivertoOrgAndReturnTokenByRole,
 } = require('../fixtures/caregiver.fixture');
-const {
-  scheduleOne,
-  scheduleTwo,
-  insertSchedules,
-  insertScheduleAndAddToPatient,
-} = require('../fixtures/schedule.fixture');
+const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
 
 let mongoServer;
 
@@ -41,6 +30,7 @@ afterAll(async () => {
 
 describe('Schedule routes', () => {
   afterEach(async () => {
+    await Org.deleteMany();
     await Caregiver.deleteMany();
     await Patient.deleteMany();
     await Schedule.deleteMany();
@@ -49,8 +39,9 @@ describe('Schedule routes', () => {
 
   describe('POST /v1/schedules', () => {
     test('should create a new schedule and return 201', async () => {
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
-      const [ patient ] = await insertPatients([patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
+      const [patient] = await insertPatients([patientOne]);
 
       const res = await request(app)
         .post(`/v1/schedules/patients/${patient.id}`)
@@ -78,8 +69,9 @@ describe('Schedule routes', () => {
 
   describe('GET /v1/schedules/:scheduleId', () => {
     test('should return 200 and a schedule if data is ok', async () => {
-      const { accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
-      const [ patient ] = await insertPatients([patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [patient] = await insertPatients([patientOne]);
       const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
 
       const res = await request(app)
@@ -108,8 +100,9 @@ describe('Schedule routes', () => {
 
   describe('PATCH /v1/schedules/:scheduleId', () => {
     test('should update a schedule and return 200', async () => {
-      const { accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
-      const [ patient ] = await insertPatients([patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [patient] = await insertPatients([patientOne]);
       const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
 
       const updateBody = {
@@ -128,7 +121,7 @@ describe('Schedule routes', () => {
         id: schedule.id,
         caregivers: expect.arrayContaining([]),
         frequency: scheduleTwo.frequency,
-        intervals: expect.arrayContaining(scheduleTwo.intervals.map(interval => expect.objectContaining(interval))),
+        intervals: expect.arrayContaining(scheduleTwo.intervals.map((interval) => expect.objectContaining(interval))),
         isActive: schedule.isActive,
         nextCallDate: expect.any(String),
         patient: expect.any(String),
@@ -139,8 +132,9 @@ describe('Schedule routes', () => {
 
   describe('DELETE /v1/schedules/:scheduleId', () => {
     test('should delete a schedule and return 204', async () => {
-      const { accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
-      const [ patient ] = await insertPatients([patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [patient] = await insertPatients([patientOne]);
       const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
 
       await request(app)

@@ -48,7 +48,12 @@ function handleOpenAINotification(callSid, type, data) {
       logger.info(`[WebSocket Service] OpenAI connection ready for ${callSid}.`);
       break;
     case 'text_message':
-      logger.info(`[WebSocket Service] Text message from OpenAI for ${callSid} (role: ${data.role}): ${data.content.substring(0, 50)}...`);
+      logger.info(
+        `[WebSocket Service] Text message from OpenAI for ${callSid} (role: ${data.role}): ${data.content.substring(
+          0,
+          50
+        )}...`
+      );
       break;
     case 'response_done':
       logger.info(`[WebSocket Service] OpenAI response done for ${callSid}.`);
@@ -72,18 +77,19 @@ function handleOpenAINotification(callSid, type, data) {
 }
 
 const openAIService = require('./openai.realtime.service');
+
 openAIService.setNotificationCallback(handleOpenAINotification);
 
 const initializeWebSocketServer = (server) => {
   const wss = new WebSocket.Server({ server });
 
   wss.on('connection', async (ws, req) => {
-    logger.info('[WebSocket Service] New WS connection attempt: ' + req.url);
+    logger.info(`[WebSocket Service] New WS connection attempt: ${req.url}`);
     logger.info(`[WebSocket Service] headers: ${JSON.stringify(req.headers, null, 2)}`);
     logger.info(`[WebSocket Service] url: ${req.url}`);
     logger.info(`[WebSocket Service] connection IP: ${req.socket.remoteAddress}`);
     logger.info(`[WebSocket Service] connection method: ${req.method}`);
-    
+
     const { pathname } = url.parse(req.url);
     const pathSegments = pathname.split('/');
     const callSid = pathSegments[pathSegments.length - 1];
@@ -96,20 +102,24 @@ const initializeWebSocketServer = (server) => {
 
     logger.info(`[WebSocket Service] Twilio client connected for CallSid: ${callSid}`);
     twilioConnections.set(callSid, ws);
+    ws.send(JSON.stringify({ event: 'connected' }));
+    logger.info(`[WebSocket Service] Sent 'connected' event back to Twilio for ${callSid}`);
 
     let conversation;
     let conversationId;
     try {
       conversation = await Conversation.findOne({ callSid });
       if (!conversation) {
-          logger.warn(`[WebSocket Service] No conversation found in DB for CallSid: ${callSid}. Creating temporary placeholder.`);
-          conversation = new Conversation({
-            callSid,
-            // Add default fields as needed
-            messages: [],
-            createdAt: new Date()
-          });
-          await conversation.save(); // This ensures you have an _id for conversationId
+        logger.warn(
+          `[WebSocket Service] No conversation found in DB for CallSid: ${callSid}. Creating temporary placeholder.`
+        );
+        conversation = new Conversation({
+          callSid,
+          // Add default fields as needed
+          messages: [],
+          createdAt: new Date(),
+        });
+        await conversation.save(); // This ensures you have an _id for conversationId
         // logger.error(`[WebSocket Service] No conversation found in DB for CallSid: ${callSid}. Closing.`);
         // ws.close();
         // cleanupConnection(callSid);
@@ -125,7 +135,8 @@ const initializeWebSocketServer = (server) => {
       return;
     }
 
-    const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team. Greet the patient warmly and ask how you can help today.";
+    const initialPrompt =
+      "You are Bianca, a helpful AI assistant from the patient's care team. Greet the patient warmly and ask how you can help today.";
     logger.info(`[WebSocket Service] Connecting to OpenAI Realtime for ${callSid} with convId: ${conversationId}`);
     try {
       openAIService.connect(callSid, conversationId, initialPrompt);

@@ -1,5 +1,5 @@
-const stripe = require('../config/stripe');
 const httpStatus = require('http-status');
+const stripe = require('../config/stripe');
 const { Org, PaymentMethod } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
@@ -100,18 +100,15 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
     return dbPaymentMethod;
   } catch (error) {
     logger.error(`Error attaching payment method to org ${orgId}:`, error);
-    
+
     // Handle specific Stripe errors
     if (error.type === 'StripeCardError') {
       throw new ApiError(httpStatus.BAD_REQUEST, `Card error: ${error.message}`);
     } else if (error.type === 'StripeInvalidRequestError') {
       throw new ApiError(httpStatus.BAD_REQUEST, `Invalid request: ${error.message}`);
     }
-    
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Error processing payment method'
-    );
+
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error processing payment method');
   }
 };
 
@@ -123,11 +120,11 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
 const getPaymentMethod = async (paymentMethodId) => {
   // First check our database for the payment method
   const dbPaymentMethod = await PaymentMethod.findById(paymentMethodId);
-  
+
   if (dbPaymentMethod) {
     return dbPaymentMethod;
   }
-  
+
   // If not found in our database, try to retrieve from Stripe directly
   try {
     const stripePaymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
@@ -148,7 +145,7 @@ const listPaymentMethods = async (orgId) => {
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
   }
-  
+
   // Return payment methods from our database
   return PaymentMethod.find({ org: orgId }).sort({ isDefault: -1, createdAt: -1 });
 };
@@ -166,17 +163,17 @@ const updatePaymentMethod = async (paymentMethodId, updateBody) => {
     if (!dbPaymentMethod) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Payment method not found');
     }
-    
+
     // Determine what can be updated in Stripe
     const stripeUpdateData = {};
-    
+
     if (updateBody.billingDetails) {
       stripeUpdateData.billing_details = {
         name: updateBody.billingDetails.name,
         email: updateBody.billingDetails.email,
         phone: updateBody.billingDetails.phone,
       };
-      
+
       if (updateBody.billingDetails.address) {
         stripeUpdateData.billing_details.address = {
           line1: updateBody.billingDetails.address.line1,
@@ -188,28 +185,25 @@ const updatePaymentMethod = async (paymentMethodId, updateBody) => {
         };
       }
     }
-    
+
     // Update in Stripe if there are valid fields to update
     if (Object.keys(stripeUpdateData).length > 0) {
       await stripe.paymentMethods.update(dbPaymentMethod.stripePaymentMethodId, stripeUpdateData);
     }
-    
+
     // Then update in our database
     Object.assign(dbPaymentMethod, updateBody);
     await dbPaymentMethod.save();
-    
+
     return dbPaymentMethod;
   } catch (error) {
     logger.error(`Error updating payment method ${paymentMethodId}:`, error);
-    
+
     if (error.type === 'StripeInvalidRequestError') {
       throw new ApiError(httpStatus.BAD_REQUEST, `Invalid request: ${error.message}`);
     }
-    
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Error updating payment method'
-    );
+
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error updating payment method');
   }
 };
 
@@ -224,16 +218,16 @@ const setDefaultPaymentMethod = async (orgId, paymentMethodId) => {
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
   }
-  
+
   const paymentMethod = await PaymentMethod.findOne({
     _id: paymentMethodId,
     org: orgId,
   });
-  
+
   if (!paymentMethod) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Payment method not found');
   }
-  
+
   try {
     // First set as default in Stripe
     await stripe.customers.update(org.stripeCustomerId, {
@@ -241,23 +235,17 @@ const setDefaultPaymentMethod = async (orgId, paymentMethodId) => {
         default_payment_method: paymentMethod.stripePaymentMethodId,
       },
     });
-    
+
     // Then update in our database
-    await PaymentMethod.updateMany(
-      { org: orgId },
-      { $set: { isDefault: false } }
-    );
-    
+    await PaymentMethod.updateMany({ org: orgId }, { $set: { isDefault: false } });
+
     paymentMethod.isDefault = true;
     await paymentMethod.save();
-    
+
     return paymentMethod;
   } catch (error) {
     logger.error(`Error setting default payment method for org ${orgId}:`, error);
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Error setting default payment method'
-    );
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error setting default payment method');
   }
 };
 
@@ -272,16 +260,16 @@ const detachPaymentMethod = async (orgId, paymentMethodId) => {
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
   }
-  
+
   const paymentMethod = await PaymentMethod.findOne({
     _id: paymentMethodId,
     org: orgId,
   });
-  
+
   if (!paymentMethod) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Payment method not found');
   }
-  
+
   // Check if it's the default payment method
   if (paymentMethod.isDefault) {
     throw new ApiError(
@@ -293,17 +281,17 @@ const detachPaymentMethod = async (orgId, paymentMethodId) => {
     try {
       // First detach from Stripe
       await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
-      
+
       // Then delete from our database
       await PaymentMethod.deleteOne({ _id: paymentMethodId });
-      
+
       // Remove reference from the org
       const index = org.paymentMethods.indexOf(paymentMethodId);
       if (index > -1) {
         org.paymentMethods.splice(index, 1);
         await org.save();
       }
-      
+
       return paymentMethodId;
     } catch (stripeError) {
       // If the error is that the payment method isn't attached, we can proceed
@@ -320,10 +308,7 @@ const detachPaymentMethod = async (orgId, paymentMethodId) => {
     }
   } catch (error) {
     logger.error(`Error detaching payment method ${paymentMethodId}:`, error);
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Error detaching payment method'
-    );
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error detaching payment method');
   }
 };
 

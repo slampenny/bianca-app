@@ -3,7 +3,7 @@ const faker = require('faker');
 const { PaymentMethod } = require('../../src/models');
 
 const paymentMethodOne = {
-  stripePaymentMethodId: 'pm_test_' + faker.datatype.uuid().replace(/-/g, ''),
+  stripePaymentMethodId: `pm_test_${faker.datatype.uuid().replace(/-/g, '')}`,
   type: 'card',
   isDefault: false,
   brand: 'visa',
@@ -19,13 +19,13 @@ const paymentMethodOne = {
       city: faker.address.city(),
       state: faker.address.stateAbbr(),
       postal_code: faker.address.zipCode(),
-      country: 'US'
-    }
-  }
+      country: 'US',
+    },
+  },
 };
 
 const paymentMethodTwo = {
-  stripePaymentMethodId: 'pm_test_' + faker.datatype.uuid().replace(/-/g, ''),
+  stripePaymentMethodId: `pm_test_${faker.datatype.uuid().replace(/-/g, '')}`,
   type: 'card',
   isDefault: false,
   brand: 'mastercard',
@@ -35,8 +35,8 @@ const paymentMethodTwo = {
   billingDetails: {
     name: faker.name.findName(),
     email: faker.internet.email(),
-    phone: faker.phone.phoneNumber()
-  }
+    phone: faker.phone.phoneNumber(),
+  },
 };
 
 /**
@@ -50,7 +50,7 @@ const insertPaymentMethods = async (org, paymentMethodsArray) => {
     ...paymentMethod,
     org: org._id,
   }));
-  
+
   return PaymentMethod.insertMany(paymentMethods);
 };
 

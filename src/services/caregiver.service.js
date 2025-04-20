@@ -1,7 +1,7 @@
 const httpStatus = require('http-status');
+const mongoose = require('mongoose');
 const { Org, Caregiver, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
-const mongoose = require('mongoose');
 const logger = require('../config/logger');
 /**
  * Create a caregiver
@@ -73,19 +73,19 @@ const getLoginCaregiverData = async (email) => {
       path: 'patients',
       populate: {
         path: 'schedules',
-        model: 'Schedule'
-      }
+        model: 'Schedule',
+      },
     });
-  
+
   if (!caregiver) {
     return null;
   }
 
-  return { 
+  return {
     org: caregiver.org,
     caregiver,
     patients: caregiver.patients,
-  }
+  };
 };
 
 /**
@@ -121,17 +121,17 @@ const deleteCaregiverById = async (caregiverId) => {
   try {
     // Remove caregiver from org's caregivers array
     const org = await Org.findById(caregiver.org).populate('caregivers');
-    org.caregivers = org.caregivers.filter(id => !id.equals(caregiverId));
+    org.caregivers = org.caregivers.filter((id) => !id.equals(caregiverId));
     await org.save();
-  
+
     // Remove caregiver from all patients' caregivers array
     const patients = await Patient.find({ caregivers: { $in: [mongoose.Types.ObjectId(caregiverId)] } });
-    for (let patient of patients) {
-      patient.caregivers = patient.caregivers.filter(id => !id.equals(caregiverId));
+    for (const patient of patients) {
+      patient.caregivers = patient.caregivers.filter((id) => !id.equals(caregiverId));
       await patient.save();
       logger.debug(`Caregiver ${caregiverId} removed from patient ${patient._id}`);
     }
-  
+
     // Remove caregiver
     await caregiver.delete();
   } catch (error) {
@@ -181,18 +181,18 @@ const removePatient = async (caregiverId, patientId) => {
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
-  
+
   const patient = await getPatientById(patientId);
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
 
   // Remove patient from caregiver's patients array
-  caregiver.patients = caregiver.patients.filter(id => !id.equals(patientId));
+  caregiver.patients = caregiver.patients.filter((id) => !id.equals(patientId));
   await caregiver.save();
 
   // Remove caregiver from patient's caregivers array
-  patient.caregivers = patient.caregivers.filter(id => !id.equals(caregiverId));
+  patient.caregivers = patient.caregivers.filter((id) => !id.equals(caregiverId));
   await patient.save();
 
   return caregiver;
@@ -244,5 +244,5 @@ module.exports = {
   addPatient,
   removePatient,
   getPatients,
-  checkCaregiverOwnsPatient
+  checkCaregiverOwnsPatient,
 };

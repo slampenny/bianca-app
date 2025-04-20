@@ -25,7 +25,8 @@ describe('alertService', () => {
   let org;
   let caregiver;
   let patient;
-  let alert1, alert2;
+  let alert1;
+  let alert2;
 
   afterEach(async () => {
     await Alert.deleteMany();
@@ -79,7 +80,7 @@ describe('alertService', () => {
 
   it('should only return relevant and unread alerts to a caregiver', async () => {
     console.log('alert1.id constructor:', alert1.id.constructor.name);
-  console.log('caregiver.id constructor:', adminCargiver.id.constructor.name);
+    console.log('caregiver.id constructor:', adminCargiver.id.constructor.name);
 
     await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
     const alerts = await alertService.getAlerts(adminCargiver.id, false);
@@ -87,10 +88,7 @@ describe('alertService', () => {
     expect(alerts).not.toContainEqual(expect.objectContaining({ _id: expiredAlert._id }));
     expect(alerts).not.toContainEqual(expect.objectContaining({ _id: alertOne._id }));
     expect(alerts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ _id: alert2._id }),
-        expect.objectContaining({ _id: alert3._id }),
-      ])
+      expect.arrayContaining([expect.objectContaining({ _id: alert2._id }), expect.objectContaining({ _id: alert3._id })])
     );
     expect(alerts).toHaveLength(2);
   });
@@ -100,18 +98,7 @@ describe('alertService', () => {
     const adminAlerts = await alertService.getAlerts(adminCargiver.id, true);
     const regularAlerts = await alertService.getAlerts(notAdmin.id, true);
 
-    expect(adminAlerts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ _id: alert2._id }),
-      ])
-    );
-    expect(regularAlerts).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ _id: alert2._id }),
-      ])
-    );
+    expect(adminAlerts).toEqual(expect.arrayContaining([expect.objectContaining({ _id: alert2._id })]));
+    expect(regularAlerts).not.toEqual(expect.arrayContaining([expect.objectContaining({ _id: alert2._id })]));
   });
-
-  
-  
 });

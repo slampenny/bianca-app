@@ -57,7 +57,7 @@ if (config.env !== 'production') {
       },
     };
   };
-  
+
   /**
    * Create a test payment method for testing
    * @param {string} type - The payment method type (card, bank_account)
@@ -67,15 +67,18 @@ if (config.env !== 'production') {
   stripe.createTestPaymentMethod = async (type = 'card', options = {}) => {
     // Default to a test Visa card if not specified
     const defaultCard = stripe.getTestCards().visa;
-    
+
     const paymentMethodData = {
-      type: type,
-      [type]: type === 'card' ? {
-        number: options.number || defaultCard.number,
-        exp_month: options.exp_month || defaultCard.exp_month,
-        exp_year: options.exp_year || defaultCard.exp_year,
-        cvc: options.cvc || defaultCard.cvc,
-      } : {},
+      type,
+      [type]:
+        type === 'card'
+          ? {
+              number: options.number || defaultCard.number,
+              exp_month: options.exp_month || defaultCard.exp_month,
+              exp_year: options.exp_year || defaultCard.exp_year,
+              cvc: options.cvc || defaultCard.cvc,
+            }
+          : {},
       billing_details: options.billing_details || {
         name: 'Test User',
         email: 'test@example.com',
@@ -88,7 +91,7 @@ if (config.env !== 'production') {
         },
       },
     };
-    
+
     return stripe.paymentMethods.create(paymentMethodData);
   };
 }

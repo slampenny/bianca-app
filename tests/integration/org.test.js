@@ -1,8 +1,8 @@
 const request = require('supertest');
 const httpStatus = require('http-status');
-const app = require('../../src/app');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const app = require('../../src/app');
 const { Org, Caregiver, Token } = require('../../src/models');
 const { caregiverOne, caregiverTwo, admin, insertCaregivers, superAdmin } = require('../fixtures/caregiver.fixture');
 const { orgOne, orgTwo, insertOrgs } = require('../fixtures/org.fixture');
@@ -29,7 +29,6 @@ describe('Org routes', () => {
   let superAdminId;
 
   beforeEach(async () => {
-
     // Insert caregivers before each test
     const caregivers = await insertCaregivers([caregiverOne, admin, superAdmin]);
     caregiverId = caregivers[0].id;
@@ -52,18 +51,18 @@ describe('Org routes', () => {
   it('should create a new org and a caregiver', async () => {
     const res = await request(app)
       .post('/v1/orgs')
-      .send({ org: orgTwo, caregiver: {...caregiverTwo, password: "password1"} });
-  
+      .send({ org: orgTwo, caregiver: { ...caregiverTwo, password: 'password1' } });
+
     expect(res.statusCode).toEqual(httpStatus.CREATED);
     expect(res.body.name).toEqual(orgTwo.name);
     expect(res.body.email).toEqual(orgTwo.email);
-  
+
     // Check that the org has been created in the database
     const org = await Org.findById(res.body.id);
     expect(org).not.toBeNull();
     expect(org.name).toEqual(orgTwo.name);
     expect(org.email).toEqual(orgTwo.email);
-  
+
     // Check that the caregiver has been created in the database
     const caregiver = await Caregiver.findOne({ email: caregiverTwo.email });
     expect(caregiver).not.toBeNull();
@@ -73,46 +72,37 @@ describe('Org routes', () => {
 
   it('should get all orgs', async () => {
     const superAdminAccessToken = tokenService.generateToken(superAdminId);
-    const res = await request(app)
-      .get('/v1/orgs')
-      .set('Authorization', `Bearer ${superAdminAccessToken}`);
+    const res = await request(app).get('/v1/orgs').set('Authorization', `Bearer ${superAdminAccessToken}`);
     expect(res.statusCode).toEqual(200);
     expect(Array.isArray(res.body.results)).toBe(true);
   });
 
   it('should get a specific org', async () => {
     const superAdminAccessToken = tokenService.generateToken(superAdminId);
-    const res = await request(app)
-      .get(`/v1/orgs/${orgId}`)
-      .set('Authorization', `Bearer ${superAdminAccessToken}`)
+    const res = await request(app).get(`/v1/orgs/${orgId}`).set('Authorization', `Bearer ${superAdminAccessToken}`);
     expect(res.statusCode).toEqual(200);
     expect(res.body.id).toEqual(orgId);
   });
 
   it('should update a specific org', async () => {
     const superAdminAccessToken = tokenService.generateToken(superAdminId);
-    const res = await request(app)
-      .patch(`/v1/orgs/${orgId}`)
-      .set('Authorization', `Bearer ${superAdminAccessToken}`)
-      .send({
-        name: 'Updated Org',
-        email: 'updatedorg@example.com',
-      });
+    const res = await request(app).patch(`/v1/orgs/${orgId}`).set('Authorization', `Bearer ${superAdminAccessToken}`).send({
+      name: 'Updated Org',
+      email: 'updatedorg@example.com',
+    });
     expect(res.statusCode).toEqual(httpStatus.OK);
     expect(res.body.name).toEqual('Updated Org');
     expect(res.body.email).toEqual('updatedorg@example.com');
 
     // Check that the org has been updated in the database
-    let org = await Org.findById(orgId);
+    const org = await Org.findById(orgId);
     expect(org.name).toEqual('Updated Org');
     expect(org.email).toEqual('updatedorg@example.com');
   });
 
   it('should delete a specific org', async () => {
     const superAdminAccessToken = tokenService.generateToken(superAdminId);
-    const res = await request(app)
-      .delete(`/v1/orgs/${orgId}`)
-      .set('Authorization', `Bearer ${superAdminAccessToken}`);
+    const res = await request(app).delete(`/v1/orgs/${orgId}`).set('Authorization', `Bearer ${superAdminAccessToken}`);
     expect(res.statusCode).toEqual(httpStatus.NO_CONTENT);
   });
 
@@ -137,7 +127,7 @@ describe('Org routes', () => {
     expect(res.statusCode).toEqual(200);
   });
 
-  it('should change a caregiver\'s role', async () => {
+  it("should change a caregiver's role", async () => {
     const adminAccessToken = tokenService.generateToken(adminId);
     const org = await orgService.getOrgById(orgId);
     const caregiver = await Caregiver.findById(caregiverId);
@@ -148,7 +138,7 @@ describe('Org routes', () => {
       .patch(`/v1/orgs/${orgId}/caregiver/${caregiverId}/role`)
       .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
-        role: 'orgAdmin'
+        role: 'orgAdmin',
       });
     expect(res.statusCode).toEqual(200);
   });

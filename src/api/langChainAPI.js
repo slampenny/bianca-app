@@ -1,9 +1,9 @@
 // Import the necessary modules and packages
-const { LLMChain } = require("langchain/chains"); // Import the LLMChain class from the langchain package
-const { OpenAI } = require("@langchain/openai"); // Import the OpenAIClient class from the @langchain/openai package
-const { PromptTemplate } = require("@langchain/core/prompts"); // Import the PromptTemplate class from the @langchain/core package
-const { templates } = require("../templates/templates"); // Import the templates from the local templates directory
-const config = require("../config/config"); // Import the configuration settings
+const { LLMChain } = require('langchain/chains'); // Import the LLMChain class from the langchain package
+const { OpenAI } = require('@langchain/openai'); // Import the OpenAIClient class from the @langchain/openai package
+const { PromptTemplate } = require('@langchain/core/prompts'); // Import the PromptTemplate class from the @langchain/core package
+const { templates } = require('../templates/templates'); // Import the templates from the local templates directory
+const config = require('../config/config'); // Import the configuration settings
 
 // Create a new instance of the OpenAI client
 const llm = new OpenAI({
@@ -24,7 +24,7 @@ const langChainAPI = {
       // Create a new PromptTemplate instance
       const prompt = new PromptTemplate({
         template,
-        inputVariables: ["prompt", "history", "userdomain"],
+        inputVariables: ['prompt', 'history', 'userdomain'],
       });
 
       // Format the history using the PromptTemplate instance
@@ -36,10 +36,10 @@ const langChainAPI = {
       // Create a new LLMChain instance
       const chain = new LLMChain({
         llm,
-        prompt: prompt,
+        prompt,
       });
       // Log the creation of the LLMChain instance
-      console.log("LangChain - LLM Chain created");
+      console.log('LangChain - LLM Chain created');
       // Call the LLMChain instance with the formatted history and get the result
       const result = await chain.call({
         prompt: message,
@@ -61,5 +61,5 @@ const langChainAPI = {
 
 // Export the langChainAPI object
 module.exports = {
-  langChainAPI
+  langChainAPI,
 };

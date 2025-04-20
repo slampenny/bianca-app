@@ -58,7 +58,11 @@ const router = express.Router();
  */
 router
   .route('/patients/:patientId')
-  .post(auth('updateOwn:patient', 'updateAny:patient'), validate(scheduleValidation.createSchedule), scheduleController.createSchedule);
+  .post(
+    auth('updateOwn:patient', 'updateAny:patient'),
+    validate(scheduleValidation.createSchedule),
+    scheduleController.createSchedule
+  );
 
 /**
  * @swagger
@@ -192,8 +196,20 @@ router
 router
   .route('/:scheduleId')
   .get(auth('readOwn:patient', 'readAny:patient'), validate(scheduleValidation.getSchedule), scheduleController.getSchedule)
-  .put(auth('updateOwn:patient', 'updateAny:patient'), validate(scheduleValidation.updateSchedule), scheduleController.updateSchedule)
-  .patch(auth('updateOwn:patient', 'updateAny:patient'), validate(scheduleValidation.patchSchedule), scheduleController.patchSchedule)
-  .delete(auth('deleteOwn:patient', 'deleteAny:patient'), validate(scheduleValidation.deleteSchedule), scheduleController.deleteSchedule);
+  .put(
+    auth('updateOwn:patient', 'updateAny:patient'),
+    validate(scheduleValidation.updateSchedule),
+    scheduleController.updateSchedule
+  )
+  .patch(
+    auth('updateOwn:patient', 'updateAny:patient'),
+    validate(scheduleValidation.patchSchedule),
+    scheduleController.patchSchedule
+  )
+  .delete(
+    auth('deleteOwn:patient', 'deleteAny:patient'),
+    validate(scheduleValidation.deleteSchedule),
+    scheduleController.deleteSchedule
+  );
 
 module.exports = router;

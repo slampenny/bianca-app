@@ -1,25 +1,17 @@
 const httpStatus = require('http-status');
+const path = require('path');
 const pick = require('../utils/pick');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const config = require('../config/config');
-const path = require('path');
-const { 
-  caregiverService, 
-  conversationService, 
-  patientService, 
-  scheduleService 
-} = require('../services');
+const { caregiverService, conversationService, patientService, scheduleService } = require('../services');
 
-const {
-  ConversationDTO,
-  PatientDTO
-} = require('../dtos');
+const { ConversationDTO, PatientDTO } = require('../dtos');
 
 const createPatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
-  const file = req.file; // This is the uploaded file
+  const { file } = req; // This is the uploaded file
 
   // Check if a file was uploaded
   if (file) {
@@ -28,10 +20,10 @@ const createPatient = catchAsync(async (req, res) => {
   }
 
   let patient = await patientService.createPatient(patientData);
-  
+
   if (schedules) {
     for (const schedule of schedules) {
-      await scheduleService.createSchedule({patientId: patient.id, ...schedule});
+      await scheduleService.createSchedule({ patientId: patient.id, ...schedule });
     }
   }
   patient = await caregiverService.addPatient(req.caregiver, patient.id);
@@ -55,20 +47,20 @@ const getPatient = catchAsync(async (req, res) => {
 
 const updatePatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
-  
+
   const patient = await patientService.updatePatientById(req.params.patientId, patientData);
   if (schedules) {
     for (const schedule of schedules) {
-      await scheduleService.updateSchedule(schedule.id, {...schedule});
+      await scheduleService.updateSchedule(schedule.id, { ...schedule });
     }
   }
   res.send(PatientDTO(patient));
 });
 
 const uploadPatientAvatar = catchAsync(async (req, res) => {
-  const file = req.file;
+  const { file } = req;
   if (!file) {
-    throw new Error("No file uploaded");
+    throw new Error('No file uploaded');
   }
   // Extract the filename from the file path
   const filename = path.basename(file.path);
@@ -76,11 +68,8 @@ const uploadPatientAvatar = catchAsync(async (req, res) => {
   const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
 
   // Update the caregiver with this URL
-  const patient = await patientService.updatePatientById(
-    req.params.patientId, 
-    { avatar: avatarUrl }
-  );
-  
+  const patient = await patientService.updatePatientById(req.params.patientId, { avatar: avatarUrl });
+
   res.send(patient);
 });
 

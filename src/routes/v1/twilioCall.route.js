@@ -16,20 +16,14 @@ const twilioAuthMiddleware = (req, res, next) => {
 
     logger.debug(`[Twilio Route] Validating Request: URL=${url}, Params=${JSON.stringify(params)}, Sig=${signature}`);
 
-    const isValid = twilio.validateRequest(
-      config.twilio.authToken,
-      signature,
-      url,
-      params
-    );
+    const isValid = twilio.validateRequest(config.twilio.authToken, signature, url, params);
 
     if (isValid) {
       logger.info('[Twilio Route] Twilio request signature validated successfully.');
       return next();
-    } else {
-      logger.error('[Twilio Route] Twilio request signature validation failed.');
-      return res.status(403).type('text/plain').send('Twilio request validation failed.');
     }
+    logger.error('[Twilio Route] Twilio request signature validation failed.');
+    return res.status(403).type('text/plain').send('Twilio request validation failed.');
   } catch (error) {
     logger.error('[Twilio Route] Error during Twilio request validation:', error);
     return res.status(500).type('text/plain').send('Error during request validation.');
@@ -65,11 +59,7 @@ const twilioAuthMiddleware = (req, res, next) => {
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  */
-router.post(
-  '/initiate',
-  validate(twilioCallValidation.initiate),
-  twilioCallController.initiateCall
-);
+router.post('/initiate', validate(twilioCallValidation.initiate), twilioCallController.initiateCall);
 
 /**
  * @swagger
@@ -123,12 +113,7 @@ router.post(
  *       "403":
  *         description: Twilio validation failed.
  */
-router.post(
-  '/end-call',
-  express.urlencoded({ extended: false }),
-  twilioAuthMiddleware,
-  twilioCallController.handleEndCall
-);
+router.post('/end-call', express.urlencoded({ extended: false }), twilioAuthMiddleware, twilioCallController.handleEndCall);
 
 // Obsolete endpoints (commented out)
 /**

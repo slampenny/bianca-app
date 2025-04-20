@@ -36,7 +36,7 @@ const orgSchema = mongoose.Schema(
       trim: true,
       lowercase: true,
       validate(value) {
-        if (!validator.isMobilePhone (value)) {
+        if (!validator.isMobilePhone(value)) {
           throw new Error('Invalid phone number');
         }
       },
@@ -50,10 +50,12 @@ const orgSchema = mongoose.Schema(
       type: String,
       trim: true,
     },
-    paymentMethods: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'PaymentMethod',
-    }],
+    paymentMethods: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'PaymentMethod',
+      },
+    ],
     caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
@@ -65,13 +67,13 @@ const orgSchema = mongoose.Schema(
 // Plugin to convert mongoose to JSON, and paginate results
 orgSchema.plugin(toJSON);
 orgSchema.plugin(paginate);
-orgSchema.plugin(mongooseDelete, { deletedAt : true });
+orgSchema.plugin(mongooseDelete, { deletedAt: true });
 
-orgSchema.pre('find', function() {
+orgSchema.pre('find', function () {
   this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 
-orgSchema.pre('findOne', function() {
+orgSchema.pre('findOne', function () {
   this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 

@@ -7,24 +7,26 @@ const scheduleSchema = mongoose.Schema(
     patient: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient'
+      ref: 'Patient',
     },
     frequency: {
       type: String,
       required: true,
-      enum: ['daily', 'weekly', 'monthly']
+      enum: ['daily', 'weekly', 'monthly'],
     },
     intervals: {
-      type: [{
-        day: { type: Number }, // 0-6 for days of the week if weekly, 1-31 for days of the month if monthly
-        weeks: { type: Number } // number of weeks between each run for weekly schedules
-      }],
+      type: [
+        {
+          day: { type: Number }, // 0-6 for days of the week if weekly, 1-31 for days of the month if monthly
+          weeks: { type: Number }, // number of weeks between each run for weekly schedules
+        },
+      ],
       validate: {
-        validator: function (v) {
+        validator(v) {
           return this.frequency === 'daily' || (Array.isArray(v) && v.length > 0);
         },
-        message: props => `intervals is required for weekly and monthly frequencies`
-      }
+        message: (props) => `intervals is required for weekly and monthly frequencies`,
+      },
     },
     isActive: {
       type: Boolean,
@@ -34,12 +36,12 @@ const scheduleSchema = mongoose.Schema(
     time: {
       type: String,
       required: true,
-      match: /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/ // Validates time in HH:mm format
+      match: /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, // Validates time in HH:mm format
     },
     nextCallDate: {
       type: Date,
-      required: true
-    }
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -53,7 +55,7 @@ const scheduleSchema = mongoose.Schema(
   }
 );
 
-scheduleSchema.methods.calculateNextCallDate = function() {
+scheduleSchema.methods.calculateNextCallDate = function () {
   const now = new Date(Date.now());
 
   // Reset nextCallDate to the start of the next UTC day
@@ -69,7 +71,7 @@ scheduleSchema.methods.calculateNextCallDate = function() {
 
     case 'weekly':
       let smallestDifference = Infinity; // To find the closest next call date
-      this.intervals.forEach(interval => {
+      this.intervals.forEach((interval) => {
         const dayDifference = (interval.day - now.getUTCDay() + 7) % 7 || 7;
         const targetDate = new Date(this.nextCallDate.getTime());
         targetDate.setUTCDate(targetDate.getUTCDate() + dayDifference);
@@ -83,39 +85,38 @@ scheduleSchema.methods.calculateNextCallDate = function() {
       });
       break;
 
-      case 'monthly':
-        this.intervals.forEach(interval => {
-          let month = now.getUTCMonth();
-          let year = now.getUTCFullYear();
-          // Set the target date considering the desired day and adjust for the month's day count
-          let day = Math.min(interval.day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
-          let targetDate = new Date(Date.UTC(year, month, day));
-  
-          if (targetDate <= now) {
-            // If the target date is past or is today, calculate for the next month
-            day = Math.min(interval.day, new Date(Date.UTC(year, month + 2, 0)).getUTCDate()); // Get day count for next month
-            targetDate = new Date(Date.UTC(year, month + 1, day));
-          }
-  
-          // Check if this target date is closer than the previously found date
-          if (targetDate > now && (targetDate < this.nextCallDate || this.nextCallDate <= now)) {
-            this.nextCallDate = new Date(targetDate);
-          }
-        });
-        break;
+    case 'monthly':
+      this.intervals.forEach((interval) => {
+        const month = now.getUTCMonth();
+        const year = now.getUTCFullYear();
+        // Set the target date considering the desired day and adjust for the month's day count
+        let day = Math.min(interval.day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
+        let targetDate = new Date(Date.UTC(year, month, day));
+
+        if (targetDate <= now) {
+          // If the target date is past or is today, calculate for the next month
+          day = Math.min(interval.day, new Date(Date.UTC(year, month + 2, 0)).getUTCDate()); // Get day count for next month
+          targetDate = new Date(Date.UTC(year, month + 1, day));
+        }
+
+        // Check if this target date is closer than the previously found date
+        if (targetDate > now && (targetDate < this.nextCallDate || this.nextCallDate <= now)) {
+          this.nextCallDate = new Date(targetDate);
+        }
+      });
+      break;
   }
 };
 
-
 scheduleSchema.plugin(toJSON);
 scheduleSchema.plugin(paginate);
-scheduleSchema.plugin(mongooseDelete, { deletedAt : true });
+scheduleSchema.plugin(mongooseDelete, { deletedAt: true });
 
-scheduleSchema.pre('find', function() {
+scheduleSchema.pre('find', function () {
   this.where({ deleted: { $ne: true } });
 });
 
-scheduleSchema.pre('findOne', function() {
+scheduleSchema.pre('findOne', function () {
   this.where({ deleted: { $ne: true } });
 });
 

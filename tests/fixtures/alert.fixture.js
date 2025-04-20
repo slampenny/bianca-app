@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
-const { Alert } = require('../../src/models');
 const faker = require('faker');
+const { Alert } = require('../../src/models');
 
 const alertOne = {
   message: faker.lorem.sentence(),
   importance: 'low',
   visibility: 'allCaregivers',
   relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
-  readBy: []
+  readBy: [],
 };
 
 const alertTwo = {
@@ -15,7 +15,7 @@ const alertTwo = {
   importance: 'high',
   visibility: 'assignedCaregivers',
   relevanceUntil: new Date(Date.now() + 1000 * 60 * 60), // 1 hour from now
-  readBy: []
+  readBy: [],
 };
 
 const alertThree = {
@@ -23,7 +23,7 @@ const alertThree = {
   importance: 'urgent',
   visibility: 'orgAdmin',
   relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 48), // 48 hours from now
-  readBy: []
+  readBy: [],
 };
 
 const expiredAlert = {
@@ -31,16 +31,16 @@ const expiredAlert = {
   importance: 'medium',
   visibility: 'allCaregivers',
   relevanceUntil: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-  readBy: []
+  readBy: [],
 };
 
 const insertAlerts = async (sourceObj, createdModel, alerts) => {
-    const alertsCreatedByCaregiver = alerts.map(alert => ({
-        ...alert,
-        createdBy: sourceObj.id,
-        createdModel: createdModel,
-    }));
-    return await Alert.insertMany(alertsCreatedByCaregiver);
+  const alertsCreatedByCaregiver = alerts.map((alert) => ({
+    ...alert,
+    createdBy: sourceObj.id,
+    createdModel,
+  }));
+  return await Alert.insertMany(alertsCreatedByCaregiver);
 };
 
 module.exports = {
@@ -48,5 +48,5 @@ module.exports = {
   alertTwo,
   alertThree,
   expiredAlert,
-  insertAlerts
+  insertAlerts,
 };

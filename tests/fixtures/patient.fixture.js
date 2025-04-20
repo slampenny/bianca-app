@@ -6,14 +6,14 @@ const patientOne = {
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
-  schedules: []
+  schedules: [],
 };
 
 const patientTwo = {
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
-  schedules: []
+  schedules: [],
 };
 
 const insertPatients = async (patients) => {
@@ -22,7 +22,7 @@ const insertPatients = async (patients) => {
 
 const insertPatientsAndAddToCaregiver = async (caregiver, patients) => {
   // Add caregiver.id to each patient
-  const patientsWithCaregiver = patients.map(patient => ({
+  const patientsWithCaregiver = patients.map((patient) => ({
     ...patient,
     caregiver: caregiver.id,
     org: caregiver.org,

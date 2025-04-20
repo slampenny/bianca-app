@@ -83,18 +83,18 @@ const deleteOrgById = async (orgId) => {
 
   // Soft delete all caregivers that belong to the org
   const caregivers = await Caregiver.find({ org: orgId });
-  for (let caregiver of caregivers) {
+  for (const caregiver of caregivers) {
     await caregiver.delete();
   }
 
   // Soft delete all patients that belong to the org
   const patients = await Patient.find({ org: orgId });
-  for (let patient of patients) {
+  for (const patient of patients) {
     await patient.delete();
 
     // Soft delete all schedules that belong to the patient
     const schedules = await Schedule.find({ patient: patient.id });
-    for (let schedule of schedules) {
+    for (const schedule of schedules) {
       await schedule.delete();
     }
   }
@@ -122,7 +122,7 @@ const addCaregiver = async (orgId, caregiverId) => {
   if (org.caregivers.includes(caregiverId)) {
     throw new ApiError(httpStatus.CONFLICT, 'Caregiver already assigned to this org');
   }
-    
+
   org.caregivers.push(caregiverId);
   await org.save();
   return org;
@@ -169,23 +169,22 @@ const sendInvite = async (orgId, name, email, phone) => {
     const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
     await emailService.sendInviteEmail(email, inviteLink);
 
-    return {caregiver: caregiver, inviteToken: inviteToken};
+    return { caregiver, inviteToken };
   }
 
   // Option 1: Throw error if caregiver already exists.
   throw new ApiError(httpStatus.CONFLICT, 'Caregiver already invited');
 };
 
-
-const verifyInvite = async (token, caregiverBody={}) => {
+const verifyInvite = async (token, caregiverBody = {}) => {
   const payload = await tokenService.verifyToken(token, tokenTypes.INVITE);
   const caregiver = await Caregiver.findById(payload.caregiver);
-  
+
   // Update the caregiver document with the fields in caregiverBody
   caregiver.set(caregiverBody);
   await caregiver.save();
-  
-  return await setRole(caregiver.org, caregiver.id, "staff")
+
+  return await setRole(caregiver.org, caregiver.id, 'staff');
 };
 
 const setRole = async (orgId, caregiverId, role) => {

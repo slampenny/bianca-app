@@ -5,7 +5,6 @@ const { Patient } = require('../models');
 const twilioController = require('./twilioCall.controller');
 const logger = require('../config/logger');
 
-
 const testChatWith = catchAsync(async (req, res) => {
   const response = await chatService.chatWith(req.body);
   res.send(response);
@@ -26,14 +25,13 @@ const testCall = catchAsync(async (req, res) => {
   const patient = await Patient.findOne().sort({ createdAt: 1 }).exec();
   const sid = await twilioCallService.initiateCall(patient.id);
   logger.info(`[Test] Call initiated, SID: ${sid}`);
-  
+
   // wait briefly to ensure Twilio calls webhook
   setTimeout(() => {
     logger.info(`[Test] Call should be active now`);
     res.status(httpStatus.OK).send({ sid });
   }, 5000); // allow Twilio 5s to fetch TwiML and connect to stream
 });
-
 
 module.exports = {
   testCall,

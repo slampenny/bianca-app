@@ -1,7 +1,7 @@
 const winston = require('winston');
 
 const logger = winston.createLogger({
-  //level: process.env.NO DE_ENV === 'production' ? 'info' : 'debug',
+  // level: process.env.NO DE_ENV === 'production' ? 'info' : 'debug',
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
@@ -9,19 +9,19 @@ const logger = winston.createLogger({
   ),
   transports: [
     new winston.transports.Console({
-      stderrLevels: ['error'] // 'error' level logs go to STDERR; all others to STDOUT
-    })
+      stderrLevels: ['error'], // 'error' level logs go to STDERR; all others to STDOUT
+    }),
   ],
   exceptionHandlers: [
     new winston.transports.Console({
-      stderrLevels: ['error']
-    })
+      stderrLevels: ['error'],
+    }),
   ],
   rejectionHandlers: [
     new winston.transports.Console({
-      stderrLevels: ['error']
-    })
-  ]
+      stderrLevels: ['error'],
+    }),
+  ],
 });
 
 module.exports = logger;

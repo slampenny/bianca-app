@@ -37,8 +37,6 @@ const router = express.Router();
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  */
-router
-  .route('/')
-  .post(auth('manageReports'), reportController.generateReport);
+router.route('/').post(auth('manageReports'), reportController.generateReport);
 
 module.exports = router;

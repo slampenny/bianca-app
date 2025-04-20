@@ -1,8 +1,9 @@
 const express = require('express');
+const multer = require('multer');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const config = require('../../config/config');
-const multer = require('multer');
+
 const upload = multer({ dest: config.multer.dest });
 const caregiverValidation = require('../../validations/caregiver.validation');
 const caregiverController = require('../../controllers/caregiver.controller');
@@ -15,23 +16,43 @@ router
 
 router
   .route('/:caregiverId')
-  .get(auth('readOwn:caregiver', 'readAny:caregiver'), validate(caregiverValidation.getCaregiver), caregiverController.getCaregiver)
-  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.updateCaregiver), caregiverController.updateCaregiver)
-  .delete(auth('deleteOwn:caregiver', 'deleteAny:caregiver'), validate(caregiverValidation.deleteCaregiver), caregiverController.deleteCaregiver);
+  .get(
+    auth('readOwn:caregiver', 'readAny:caregiver'),
+    validate(caregiverValidation.getCaregiver),
+    caregiverController.getCaregiver
+  )
+  .patch(
+    auth('updateOwn:caregiver', 'updateAny:caregiver'),
+    validate(caregiverValidation.updateCaregiver),
+    caregiverController.updateCaregiver
+  )
+  .delete(
+    auth('deleteOwn:caregiver', 'deleteAny:caregiver'),
+    validate(caregiverValidation.deleteCaregiver),
+    caregiverController.deleteCaregiver
+  );
 
 router
   .route('/:caregiverId/avatar')
-  .post(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.uploadCaregiverAvatar), upload.single('avatar'), caregiverController.uploadCaregiverAvatar)
-  .patch(auth('updateOwn:caregiver', 'updateAny:caregiver'), validate(caregiverValidation.uploadCaregiverAvatar), upload.single('avatar'), caregiverController.uploadCaregiverAvatar);
+  .post(
+    auth('updateOwn:caregiver', 'updateAny:caregiver'),
+    validate(caregiverValidation.uploadCaregiverAvatar),
+    upload.single('avatar'),
+    caregiverController.uploadCaregiverAvatar
+  )
+  .patch(
+    auth('updateOwn:caregiver', 'updateAny:caregiver'),
+    validate(caregiverValidation.uploadCaregiverAvatar),
+    upload.single('avatar'),
+    caregiverController.uploadCaregiverAvatar
+  );
 
 router
   .route('/:caregiverId/patients/:patientId')
   .post(auth('createAny:patient'), caregiverController.addPatient)
   .delete(auth('deleteAny:patient'), caregiverController.removePatient);
 
-router
-  .route('/:caregiverId/patients')
-  .get(auth('readOwn:patient', 'readAny:patient'), caregiverController.getPatients);
+router.route('/:caregiverId/patients').get(auth('readOwn:patient', 'readAny:patient'), caregiverController.getPatients);
 
 module.exports = router;
 
@@ -253,7 +274,7 @@ module.exports = router;
  *         required: true
  *         schema:
  *           type: string
- *         description: Caregiver ID       
+ *         description: Caregiver ID
  *       - in: path
  *         name: patientId
  *         required: true
@@ -295,4 +316,3 @@ module.exports = router;
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  */
-

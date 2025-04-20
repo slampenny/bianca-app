@@ -26,5 +26,5 @@ const addMessageToConversation = {
 module.exports = {
   getConversation,
   addMessageToConversation,
-  createConversationForPatient
+  createConversationForPatient,
 };

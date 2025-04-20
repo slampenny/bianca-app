@@ -6,7 +6,7 @@ const orgOne = {
   patients: [],
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
-  phone: '+16045624263'
+  phone: '+16045624263',
 };
 
 const orgTwo = {
@@ -14,7 +14,7 @@ const orgTwo = {
   patients: [],
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
-  phone: '+16045624263'
+  phone: '+16045624263',
 };
 
 const insertOrgs = async (orgs) => {
@@ -24,5 +24,5 @@ const insertOrgs = async (orgs) => {
 module.exports = {
   orgOne,
   orgTwo,
-  insertOrgs
+  insertOrgs,
 };

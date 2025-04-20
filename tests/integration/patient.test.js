@@ -1,23 +1,20 @@
 const request = require('supertest');
 const faker = require('faker');
 const httpStatus = require('http-status');
-const app = require('../../src/app');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Patient, Token, Caregiver } = require('../../src/models');
-const {
-  patientOne,
-  patientTwo,
-  insertPatients,
-  insertPatientsAndAddToCaregiver,
-} = require('../fixtures/patient.fixture');
+const app = require('../../src/app');
+const { Org, Patient, Token, Caregiver } = require('../../src/models');
+const { insertOrgs } = require('../fixtures/org.fixture');
+const { patientOne, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
 
 const {
   caregiverOne,
   admin,
-  insertCaregiverAndReturnToken,
-  insertCaregiverAndReturnTokenByRole,
+  insertCaregivertoOrgAndReturnToken,
+  insertCaregivertoOrgAndReturnTokenByRole,
   insertCaregivers,
+  insertCaregiversAndAddToOrg,
 } = require('../fixtures/caregiver.fixture');
 
 let mongoServer;
@@ -36,6 +33,7 @@ afterAll(async () => {
 
 describe('Patient routes', () => {
   afterEach(async () => {
+    await Org.deleteMany();
     await Caregiver.deleteMany();
     await Patient.deleteMany();
     await Token.deleteMany();
@@ -43,7 +41,8 @@ describe('Patient routes', () => {
 
   describe('POST /v1/patients', () => {
     test('should create a new patient and return 201', async () => {
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([admin]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       const res = await request(app)
         .post('/v1/patients')
@@ -53,7 +52,7 @@ describe('Patient routes', () => {
 
       expect(res.body).toEqual({
         id: expect.any(String),
-        org: null,
+        org: org.id.toString(),
         name: patientOne.name,
         email: patientOne.email,
         phone: patientOne.phone,
@@ -66,8 +65,9 @@ describe('Patient routes', () => {
 
   describe('GET /v1/patients/:patientId', () => {
     test('should return 200 and a patient if data is ok', async () => {
-      const { caregiver, accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
-      const [ patient ] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
 
       const res = await request(app)
         .get(`/v1/patients/${patient.id}`)
@@ -91,12 +91,13 @@ describe('Patient routes', () => {
 
   describe('PATCH /v1/patients/:patientId', () => {
     test('should update a patient and return 200', async () => {
-      const { caregiver, accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
-      const [ patient ] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
 
       const updateBody = {
         name: 'Updated Name',
-        email: faker.internet.email()
+        email: faker.internet.email(),
       };
 
       const res = await request(app)
@@ -121,8 +122,9 @@ describe('Patient routes', () => {
 
   describe('DELETE /v1/patients/:patientId', () => {
     test('should delete a patient and return 204', async () => {
-      const { caregiver, accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
-      const [ patient ] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
 
       await request(app)
         .delete(`/v1/patients/${patient.id}`)
@@ -135,9 +137,10 @@ describe('Patient routes', () => {
   // Tests for caregiver assignment and removal
   describe('POST /v1/patients/:patientId/caregiver/:caregiverId', () => {
     test('should assign a caregiver to a patient and return 200', async () => {
-      const { caregiver, accessToken } = await insertCaregiverAndReturnToken(admin);
-      const [ caregiver1 ] = await insertCaregivers([caregiverOne]);
-      const [ patient ] = await insertPatientsAndAddToCaregiver(caregiver1, [patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
+      const [caregiver1] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
+      const [patient] = await insertPatientsAndAddToCaregiver(caregiver1, [patientOne]);
 
       const res = await request(app)
         .post(`/v1/patients/${patient.id}/caregivers/${caregiver.id}`)
@@ -147,7 +150,7 @@ describe('Patient routes', () => {
 
       expect(res.body).toEqual({
         id: patient.id,
-        org: patient.org.toString(),
+        org: caregiver.org.toHexString(),
         name: patient.name,
         email: patient.email,
         phone: patient.phone,
@@ -160,9 +163,10 @@ describe('Patient routes', () => {
 
   describe('DELETE /v1/patients/:patientId/caregiver/:caregiverId', () => {
     test('should remove a caregiver from a patient and return 200', async () => {
-      const { caregiver, accessToken } = await insertCaregiverAndReturnToken(admin);
-      const [ caregiver1 ] = await insertCaregivers([caregiverOne]);
-      const [ patient ] = await insertPatientsAndAddToCaregiver(caregiver1, [patientOne]);
+      const [org] = await insertOrgs([admin]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
+      const [caregiver1] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
+      const [patient] = await insertPatientsAndAddToCaregiver(caregiver1, [patientOne]);
 
       const res = await request(app)
         .delete(`/v1/patients/${patient.id}/caregivers/${caregiver1.id}`)
@@ -172,7 +176,7 @@ describe('Patient routes', () => {
 
       expect(res.body).toEqual({
         id: patient.id,
-        org: patient.org.toString(),
+        org: caregiver.org.toString(),
         name: patient.name,
         email: patient.email,
         phone: patient.phone,

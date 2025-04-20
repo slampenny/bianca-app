@@ -21,9 +21,9 @@ const { tokenTypes } = require('../config/tokens');
  * @returns {string}
  */
 const generateToken = (
-  caregiverId, 
-  expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes'), 
-  type = tokenTypes.ACCESS, 
+  caregiverId,
+  expires = moment().add(config.jwt.accessExpirationMinutes, 'minutes'),
+  type = tokenTypes.ACCESS,
   secret = config.jwt.secret
 ) => {
   const payload = {
@@ -104,9 +104,9 @@ const generateAuthTokens = async (caregiver) => {
 
 const generateInviteToken = async (caregiver) => {
   const token = generateToken(
-    caregiver.id, 
-    expires = moment().add(config.jwt.inviteExpirationMinutes, 'minutes'), 
-    type = tokenTypes.INVITE,
+    caregiver.id,
+    (expires = moment().add(config.jwt.inviteExpirationMinutes, 'minutes')),
+    (type = tokenTypes.INVITE)
   );
   await saveToken(token, caregiver.id, expires, tokenTypes.INVITE);
   return token;

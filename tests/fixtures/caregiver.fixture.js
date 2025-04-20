@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const faker = require('faker');
-const config = require('../../src/config/config');
 const moment = require('moment');
+const { ApiError } = require('@google-cloud/storage');
+const httpStatus = require('http-status');
+const config = require('../../src/config/config');
 const { Caregiver } = require('../../src/models');
 const tokenService = require('../../src/services/token.service');
 const { tokenTypes } = require('../../src/config/tokens');
-const { ApiError } = require('@google-cloud/storage');
-const httpStatus = require('http-status');
 
 const password = 'password1';
 const salt = bcrypt.genSaltSync(8);
@@ -17,10 +17,10 @@ const fakeId = new mongoose.Types.ObjectId();
 
 const caregiverOne = {
   name: faker.name.findName(),
-  email: "fake@example.org",
+  email: 'fake@example.org',
   phone: '+16045624263',
   role: 'staff',
-  patients: []
+  patients: [],
 };
 
 const caregiverOneWithPassword = {
@@ -33,7 +33,7 @@ const caregiverTwo = {
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
   role: 'staff',
-  patients: []
+  patients: [],
 };
 
 const admin = {
@@ -41,7 +41,7 @@ const admin = {
   email: 'admin@example.org',
   phone: '+16045624263',
   role: 'orgAdmin',
-  patiends: []
+  patiends: [],
 };
 
 const superAdmin = {
@@ -49,7 +49,7 @@ const superAdmin = {
   email: 'superAdmin@example.org',
   phone: '+16045624263',
   role: 'superAdmin',
-  patiends: []
+  patiends: [],
 };
 
 const insertCaregivers = async (caregivers) => {
@@ -57,9 +57,11 @@ const insertCaregivers = async (caregivers) => {
 };
 
 const insertCaregiversAndAddToOrg = async (org, caregivers) => {
-  const insertedCaregivers = await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, org: org.id, password: hashedPassword })));
+  const insertedCaregivers = await Caregiver.insertMany(
+    caregivers.map((caregiver) => ({ ...caregiver, org: org.id, password: hashedPassword }))
+  );
   // Add the inserted caregivers to the org.caregivers array
-  org.caregivers.push(...insertedCaregivers.map(caregiver => caregiver._id));
+  org.caregivers.push(...insertedCaregivers.map((caregiver) => caregiver._id));
   await org.save();
 
   return insertedCaregivers;
@@ -72,17 +74,17 @@ const insertCaregivertoOrgAndReturnToken = async (org, caregiverChoice) => {
   return { caregiver, accessToken: authTokens.access.token };
 };
 
-const insertCaregivertoOrgAndReturnTokenByRole = async (org, role = "staff") => {
+const insertCaregivertoOrgAndReturnTokenByRole = async (org, role = 'staff') => {
   let caregiverChoice;
 
   switch (role) {
-    case "staff":
+    case 'staff':
       caregiverChoice = caregiverOne;
       break;
-    case "orgAdmin":
+    case 'orgAdmin':
       caregiverChoice = admin;
       break;
-    case "superAdmin":
+    case 'superAdmin':
       caregiverChoice = superAdmin;
       break;
     default:
@@ -104,5 +106,5 @@ module.exports = {
   insertCaregivers,
   insertCaregiversAndAddToOrg,
   insertCaregivertoOrgAndReturnToken,
-  insertCaregivertoOrgAndReturnTokenByRole
+  insertCaregivertoOrgAndReturnTokenByRole,
 };

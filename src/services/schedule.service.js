@@ -4,11 +4,11 @@ const ApiError = require('../utils/ApiError');
 
 const createSchedule = async (patientId, scheduleData) => {
   // Create the schedule
-  const schedule = await Schedule.create({...scheduleData, patient: patientId});
+  const schedule = await Schedule.create({ ...scheduleData, patient: patientId });
 
   // Add the new schedule's ID to the patient's schedules field
   const patient = await Patient.findById(patientId);
-  
+
   // Check if the patient exists
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');

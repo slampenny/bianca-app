@@ -29,7 +29,11 @@ describe('conversationService', () => {
     const patientId = mongoose.Types.ObjectId();
     const conversation = await conversationService.createConversationForPatient(patientId);
     const messageContent = 'Hello, world!';
-    const updatedConversation = await conversationService.addMessageToConversation(conversation._id, 'patient', messageContent);
+    const updatedConversation = await conversationService.addMessageToConversation(
+      conversation._id,
+      'patient',
+      messageContent
+    );
     expect(updatedConversation.messages).toHaveLength(1);
     const message = await Message.findById(updatedConversation.messages[0]);
     expect(message).toHaveProperty('content', messageContent);

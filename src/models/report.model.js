@@ -7,7 +7,7 @@ const reportSchema = mongoose.Schema(
     patientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient'
+      ref: 'Patient',
     },
     content: {
       type: String,
@@ -17,8 +17,8 @@ const reportSchema = mongoose.Schema(
     // Additional details for reports
     analysisDetails: {
       type: mongoose.Schema.Types.Mixed,
-      default: {}
-    }
+      default: {},
+    },
   },
   {
     timestamps: true,

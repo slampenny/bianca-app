@@ -36,7 +36,7 @@ const caregiverSchema = mongoose.Schema(
       required: true,
       trim: true,
       validate(value) {
-        if (!validator.isMobilePhone (value)) {
+        if (!validator.isMobilePhone(value)) {
           throw new Error('Invalid phone number');
         }
       },
@@ -81,13 +81,13 @@ const caregiverSchema = mongoose.Schema(
 // Plugin to convert mongoose to JSON, and paginate results
 caregiverSchema.plugin(toJSON);
 caregiverSchema.plugin(paginate);
-caregiverSchema.plugin(mongooseDelete, { deletedAt : true });
+caregiverSchema.plugin(mongooseDelete, { deletedAt: true });
 
-caregiverSchema.pre('find', function() {
+caregiverSchema.pre('find', function () {
   this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 
-caregiverSchema.pre('findOne', function() {
+caregiverSchema.pre('findOne', function () {
   this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 

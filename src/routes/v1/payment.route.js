@@ -87,16 +87,16 @@ router
   .route('/patients/:patientId/invoices')
   .post(
     (req, res, next) => {
-        console.log('Received POST to /patients/:patientId/invoices');
-        next();
-      },
+      console.log('Received POST to /patients/:patientId/invoices');
+      next();
+    },
     auth('createAny:invoice'),
-    //validate(paymentValidation.createInvoiceFromConversations),
+    // validate(paymentValidation.createInvoiceFromConversations),
     paymentController.createInvoiceFromConversations
   )
   .get(
     auth('readAny:invoice'),
-    //validate(paymentValidation.listInvoicesByPatient),
+    // validate(paymentValidation.listInvoicesByPatient),
     paymentController.listInvoicesByPatient
   );
 
@@ -145,10 +145,6 @@ router
  */
 router
   .route('/orgs/:orgId/invoices')
-  .get(
-    auth('readAny:invoice'),
-    validate(paymentValidation.listInvoicesByOrg),
-    paymentController.listInvoicesByOrg
-  );
+  .get(auth('readAny:invoice'), validate(paymentValidation.listInvoicesByOrg), paymentController.listInvoicesByOrg);
 
 module.exports = router;

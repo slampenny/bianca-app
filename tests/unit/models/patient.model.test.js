@@ -4,7 +4,6 @@ const faker = require('faker');
 const { Patient } = require('../../../src/models');
 
 describe('Patient model', () => {
-
   let mongoServer;
 
   beforeAll(async () => {

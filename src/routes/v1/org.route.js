@@ -47,9 +47,7 @@ router
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  */
-router
-  .route('/:orgId/caregiver/:caregiverId')
-  .post(auth('updateAny:caregiver'), orgController.addCaregiver);
+router.route('/:orgId/caregiver/:caregiverId').post(auth('updateAny:caregiver'), orgController.addCaregiver);
 
 // New route for removing a org from caregiver
 /**
@@ -82,11 +80,9 @@ router
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  */
-router
-  .route('/:orgId/caregiver/:caregiverId')
-  .delete(auth('updateAny:caregiver'), orgController.removeCaregiver);
+router.route('/:orgId/caregiver/:caregiverId').delete(auth('updateAny:caregiver'), orgController.removeCaregiver);
 
-  /**
+/**
  * @swagger
  * /orgs/{orgId}/caregiver/{caregiverId}/role:
  *   patch:
@@ -129,18 +125,11 @@ router
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  */
-router
-.route('/:orgId/caregiver/:caregiverId/role')
-.patch(auth('updateAny:caregiver'), orgController.setRole);
+router.route('/:orgId/caregiver/:caregiverId/role').patch(auth('updateAny:caregiver'), orgController.setRole);
 
+router.route('/:orgId/invite').patch(/* auth('updateOwn:org'), */ orgController.sendInvite);
 
-router
-.route('/:orgId/invite')
-.patch(/*auth('updateOwn:org'),*/ orgController.sendInvite);
-
-router
-.route('/:orgId/verify-invite/{:token}')
-.patch(auth('updateOwn:caregiver'), orgController.verifyInvite);
+router.route('/:orgId/verify-invite/{:token}').patch(auth('updateOwn:caregiver'), orgController.verifyInvite);
 
 module.exports = router;
 

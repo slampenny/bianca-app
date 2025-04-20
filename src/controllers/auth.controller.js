@@ -34,7 +34,7 @@ const registerWithInvite = catchAsync(async (req, res) => {
 const login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
   const { caregiver, patients } = await authService.loginCaregiverWithEmailAndPassword(email, password);
-  
+
   const alerts = await alertService.getAlerts(caregiver.id);
   const alertDTOs = alerts.map((alert) => AlertDTO(alert));
   const patientDTOs = patients.map((patient) => PatientDTO(patient));

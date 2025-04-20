@@ -11,45 +11,47 @@ const conversationSchema = mongoose.Schema(
   {
     callSid: {
       type: String,
-      index: true
+      index: true,
     },
     patientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient'
+      ref: 'Patient',
     },
     lineItemId: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'LineItem',
-      default: null // Indicates that the conversation has not been billed yet
+      default: null, // Indicates that the conversation has not been billed yet
     },
-    messages: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Message',
-    }],
+    messages: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Message',
+      },
+    ],
     history: {
       type: String,
     },
     analyzedData: {
       type: mongoose.Schema.Types.Mixed,
-      default: {}
+      default: {},
     },
     // Metadata such as speaker distinction
     metadata: {
       type: mongoose.Schema.Types.Mixed,
-      default: {}
+      default: {},
     },
     startTime: {
       type: Date,
-      default: Date.now // Defaults to the current time
+      default: Date.now, // Defaults to the current time
     },
     endTime: {
       type: Date,
     },
     duration: {
       type: Number,
-      default: 0
-    }
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -63,29 +65,29 @@ conversationSchema.pre('save', function (next) {
   next();
 });
 
-conversationSchema.statics.aggregateUnchargedConversations = async function(patientId) {
+conversationSchema.statics.aggregateUnchargedConversations = async function (patientId) {
   return await this.aggregate([
-    { 
-      $match: { 
+    {
+      $match: {
         patientId: mongoose.Types.ObjectId(patientId),
-        lineItemId: null 
-      } 
+        lineItemId: null,
+      },
     },
-    { 
+    {
       $group: {
-        _id: "$patientId",
-        totalDuration: { $sum: "$duration" },
-        conversationIds: { $push: "$_id" }
-      }
+        _id: '$patientId',
+        totalDuration: { $sum: '$duration' },
+        conversationIds: { $push: '$_id' },
+      },
     },
-    { 
+    {
       $project: {
-        patientId: "$_id",
+        patientId: '$_id',
         totalDuration: 1,
         conversationIds: 1,
-        _id: 0
-      }
-    }
+        _id: 0,
+      },
+    },
   ]);
 };
 

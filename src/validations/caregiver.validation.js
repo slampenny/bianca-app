@@ -53,7 +53,7 @@ const updateCaregiver = {
 const uploadCaregiverAvatar = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
-  })
+  }),
 };
 
 const deleteCaregiver = {

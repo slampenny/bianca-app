@@ -6,36 +6,36 @@ const lineItemSchema = mongoose.Schema(
     patientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient'
+      ref: 'Patient',
     },
     invoiceId: {
       type: mongoose.SchemaTypes.ObjectId,
-      ref: 'Invoice'
+      ref: 'Invoice',
     },
     amount: {
       type: Number,
-      required: true
+      required: true,
     },
     description: {
       type: String,
-      required: true
+      required: true,
     },
     periodStart: {
-      type: Date
+      type: Date,
     },
     periodEnd: {
-      type: Date
+      type: Date,
     },
     quantity: {
       type: Number,
-      default: 1
+      default: 1,
     },
     unitPrice: {
-      type: Number
-    }
+      type: Number,
+    },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 
@@ -44,48 +44,48 @@ const invoiceSchema = mongoose.Schema(
     org: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Org'
+      ref: 'Org',
     },
     invoiceNumber: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
     },
     issueDate: {
       type: Date,
       required: true,
-      default: Date.now
+      default: Date.now,
     },
     dueDate: {
       type: Date,
-      required: true
+      required: true,
     },
     status: {
       type: String,
       required: true,
       enum: ['draft', 'pending', 'paid', 'void', 'overdue'],
-      default: 'draft'
+      default: 'draft',
     },
     totalAmount: {
       type: Number,
-      required: true
+      required: true,
     },
     paymentMethod: {
       type: mongoose.SchemaTypes.ObjectId,
-      ref: 'PaymentMethod'
+      ref: 'PaymentMethod',
     },
     stripePaymentIntentId: {
-      type: String
+      type: String,
     },
     stripeInvoiceId: {
-      type: String
+      type: String,
     },
     paidAt: {
-      type: Date
+      type: Date,
     },
     notes: {
-      type: String
-    }
+      type: String,
+    },
   },
   {
     timestamps: true,
@@ -96,11 +96,11 @@ const invoiceSchema = mongoose.Schema(
 invoiceSchema.virtual('lineItems', {
   ref: 'LineItem',
   localField: '_id',
-  foreignField: 'invoiceId'
+  foreignField: 'invoiceId',
 });
 
 // Add a method to calculate the total from line items
-invoiceSchema.methods.calculateTotal = async function() {
+invoiceSchema.methods.calculateTotal = async function () {
   const lineItems = await LineItem.find({ invoiceId: this._id });
   this.totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
   return this.totalAmount;
@@ -114,5 +114,5 @@ const LineItem = mongoose.model('LineItem', lineItemSchema);
 
 module.exports = {
   Invoice,
-  LineItem
+  LineItem,
 };

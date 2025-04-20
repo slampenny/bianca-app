@@ -1,6 +1,6 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { scheduleService }  = require('../services');
+const { scheduleService } = require('../services');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const ScheduleDTO = require('../dtos/schedule.dto');
@@ -14,9 +14,9 @@ const createSchedule = catchAsync(async (req, res) => {
 
   // Create or update the schedule
   const schedule = await scheduleService.createSchedule(req.params.patientId, {
-    frequency: req.body.frequency, 
-    intervals: req.body.intervals, 
-    time: req.body.time
+    frequency: req.body.frequency,
+    intervals: req.body.intervals,
+    time: req.body.time,
   });
 
   // Send the created schedule

@@ -9,10 +9,7 @@ const { paymentMethodService } = require('../services');
  */
 const attachPaymentMethod = catchAsync(async (req, res) => {
   // The frontend sends the payment method ID created using Stripe.js
-  const paymentMethod = await paymentMethodService.attachPaymentMethod(
-    req.params.orgId,
-    req.body.paymentMethodId
-  );
+  const paymentMethod = await paymentMethodService.attachPaymentMethod(req.params.orgId, req.body.paymentMethodId);
   res.status(httpStatus.CREATED).send(paymentMethod);
 });
 
@@ -43,10 +40,7 @@ const getPaymentMethod = catchAsync(async (req, res) => {
  * @route PATCH /orgs/:orgId/payment-methods/:paymentMethodId
  */
 const setDefaultPaymentMethod = catchAsync(async (req, res) => {
-  const paymentMethod = await paymentMethodService.setDefaultPaymentMethod(
-    req.params.orgId,
-    req.params.paymentMethodId
-  );
+  const paymentMethod = await paymentMethodService.setDefaultPaymentMethod(req.params.orgId, req.params.paymentMethodId);
   res.send(paymentMethod);
 });
 
@@ -55,10 +49,7 @@ const setDefaultPaymentMethod = catchAsync(async (req, res) => {
  * @route DELETE /orgs/:orgId/payment-methods/:paymentMethodId
  */
 const detachPaymentMethod = catchAsync(async (req, res) => {
-  await paymentMethodService.detachPaymentMethod(
-    req.params.orgId,
-    req.params.paymentMethodId
-  );
+  await paymentMethodService.detachPaymentMethod(req.params.orgId, req.params.paymentMethodId);
   res.status(httpStatus.NO_CONTENT).send();
 });
 

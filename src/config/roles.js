@@ -1,10 +1,7 @@
 const { AccessControl } = require('accesscontrol');
 
 const allRoles = {
-  invited: [
-    'readOwn:caregiver',
-    'updateOwn:caregiver'
-  ],
+  invited: ['readOwn:caregiver', 'updateOwn:caregiver'],
   staff: [
     'readOwn:caregiver',
     'updateOwn:caregiver',
@@ -15,7 +12,7 @@ const allRoles = {
     'readOwn:alert',
     'updateOwn:alert',
     'deleteOwn:alert',
-    'readOwn:invoice'  // Add this for staff to read their invoices
+    'readOwn:invoice', // Add this for staff to read their invoices
   ],
   orgAdmin: [
     // Inherited from staff
@@ -51,16 +48,16 @@ const allRoles = {
     'createAny:invoice',
     'readAny:invoice',
     'updateAny:invoice',
-    'deleteAny:invoice'
+    'deleteAny:invoice',
   ],
-  superAdmin: [] // superAdmin can do everything without explicit permissions
+  superAdmin: [], // superAdmin can do everything without explicit permissions
 };
 
 // Initialize AccessControl
 const ac = new AccessControl();
 
 // Grant permissions from the allRoles object
-Object.keys(allRoles).forEach(role => {
+Object.keys(allRoles).forEach((role) => {
   // For superAdmin, we'll handle differently
   if (role === 'superAdmin') {
     // First extend from orgAdmin to inherit those permissions
@@ -68,7 +65,7 @@ Object.keys(allRoles).forEach(role => {
     // No need to add more permissions as superAdmin is treated specially in the auth middleware
   } else {
     // For all other roles, process permissions from the array
-    allRoles[role].forEach(permission => {
+    allRoles[role].forEach((permission) => {
       const [action, resource] = permission.split(':');
       ac.grant(role)[action](resource);
     });
@@ -80,5 +77,5 @@ const roles = Object.keys(allRoles);
 
 module.exports = {
   roles,
-  ac
+  ac,
 };

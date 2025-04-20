@@ -5,15 +5,8 @@ const httpStatus = require('http-status');
 const app = require('../../../src/app');
 const { Schedule, Patient, Caregiver } = require('../../../src/models');
 const { scheduleService } = require('../../../src/services');
-const {
-  scheduleOne,
-  scheduleTwo,
-  insertSchedules,
-} = require('../../fixtures/schedule.fixture');
-const {
-  patientOne,
-  insertPatients,
-} = require('../../fixtures/patient.fixture');
+const { scheduleOne, scheduleTwo, insertSchedules } = require('../../fixtures/schedule.fixture');
+const { patientOne, insertPatients } = require('../../fixtures/patient.fixture');
 
 let mongoServer;
 
@@ -30,7 +23,6 @@ afterAll(async () => {
 });
 
 describe('Schedule Service', () => {
-
   afterEach(async () => {
     await Caregiver.deleteMany();
     await Patient.deleteMany();
@@ -38,7 +30,7 @@ describe('Schedule Service', () => {
   });
 
   describe('createSchedule', () => {
-    test('should create a new schedule and add it to the patient\'s schedules', async () => {
+    test("should create a new schedule and add it to the patient's schedules", async () => {
       const [patient] = await insertPatients([patientOne]);
 
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
@@ -47,7 +39,7 @@ describe('Schedule Service', () => {
       expect(schedule.patient.toString()).toEqual(patient.id.toString());
 
       const updatedPatient = await Patient.findById(patient.id);
-      expect(updatedPatient.schedules.map(id => id.toString())).toContainEqual(schedule.id.toString());
+      expect(updatedPatient.schedules.map((id) => id.toString())).toContainEqual(schedule.id.toString());
     });
   });
 
@@ -58,18 +50,20 @@ describe('Schedule Service', () => {
 
       const updateBody = {
         frequency: 'monthly',
-        intervals: [{ day: 2, weeks: 2 }]
+        intervals: [{ day: 2, weeks: 2 }],
       };
 
       const updatedSchedule = await scheduleService.updateSchedule(schedule.id, updateBody);
 
       expect(updatedSchedule.frequency).toBe('monthly');
-      expect(Array.from(updatedSchedule.intervals).map(({ day, weeks }) => ({ day, weeks }))).toEqual([{ day: 2, weeks: 2 }]);
+      expect(Array.from(updatedSchedule.intervals).map(({ day, weeks }) => ({ day, weeks }))).toEqual([
+        { day: 2, weeks: 2 },
+      ]);
     });
   });
 
   describe('deleteSchedule', () => {
-    test('should delete a schedule and update the patient\'s schedule list', async () => {
+    test("should delete a schedule and update the patient's schedule list", async () => {
       const [patient] = await insertPatients([patientOne]);
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
@@ -97,9 +91,7 @@ describe('Schedule Service', () => {
     test('should throw an error if schedule is not found', async () => {
       const invalidId = mongoose.Types.ObjectId();
 
-      await expect(scheduleService.getScheduleById(invalidId))
-        .rejects
-        .toThrow('Schedule not found');
+      await expect(scheduleService.getScheduleById(invalidId)).rejects.toThrow('Schedule not found');
     });
   });
 });

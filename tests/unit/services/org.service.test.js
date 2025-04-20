@@ -2,7 +2,12 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const orgService = require('../../../src/services/org.service');
 const { Org, Caregiver } = require('../../../src/models');
-const { caregiverOne, caregiverTwo, caregiverOneWithPassword, insertCaregivers } = require('../../fixtures/caregiver.fixture');
+const {
+  caregiverOne,
+  caregiverTwo,
+  caregiverOneWithPassword,
+  insertCaregivers,
+} = require('../../fixtures/caregiver.fixture');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 
 let mongoServer;
@@ -92,19 +97,21 @@ describe('orgService', () => {
 
   it('should remove a caregiver from an org', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const [cg] = await insertCaregivers([{
-      org: org.id,
-      ...caregiverTwo
-    }]);
-  
+    const [cg] = await insertCaregivers([
+      {
+        org: org.id,
+        ...caregiverTwo,
+      },
+    ]);
+
     // Add the caregiver to the organization
     org.caregivers.push(cg.id);
 
     // Fetch the organization document from the database before saving it
-  const orgFromDb = await Org.findById(org.id);
-  if (!orgFromDb) {
-    throw new Error(`No matching document found for id "${org.id}"`);
-  }
+    const orgFromDb = await Org.findById(org.id);
+    if (!orgFromDb) {
+      throw new Error(`No matching document found for id "${org.id}"`);
+    }
 
     try {
       await org.save();
@@ -112,25 +119,27 @@ describe('orgService', () => {
       console.error(err);
       throw err; // re-throw the error so the test fails
     }
-  
+
     const updatedOrg = await orgService.removeCaregiver(org.id, cg.id);
     expect(updatedOrg.caregivers).not.toContainEqual(cg.id);
   });
 
   it('should set the role of a caregiver in an org', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const [cg] = await insertCaregivers([{
-      orgId: org.id,
-      ...caregiverTwo
-    }]);
-  
+    const [cg] = await insertCaregivers([
+      {
+        orgId: org.id,
+        ...caregiverTwo,
+      },
+    ]);
+
     // Add the caregiver to the organization
     org.caregivers.push(cg.id);
     await org.save();
-  
+
     const newRole = 'orgAdmin';
     await orgService.setRole(org.id, cg.id, newRole);
-  
+
     const updatedCg = await Caregiver.findById(cg.id);
     expect(updatedCg.role).toBe(newRole);
   });

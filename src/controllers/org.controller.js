@@ -6,7 +6,7 @@ const { orgService } = require('../services');
 
 const createOrg = catchAsync(async (req, res) => {
   const orgData = req.body.org;
-  const caregiver = req.body.caregiver;
+  const { caregiver } = req.body;
   const org = await orgService.createOrg(orgData, caregiver);
   res.status(httpStatus.CREATED).send(org);
 });
@@ -80,5 +80,5 @@ module.exports = {
   removeCaregiver,
   setRole,
   sendInvite,
-  verifyInvite
+  verifyInvite,
 };

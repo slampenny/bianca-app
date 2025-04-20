@@ -9,7 +9,7 @@ const cors = require('cors');
 const passport = require('passport');
 const bodyParser = require('body-parser');
 const httpStatus = require('http-status');
-const path = require('path'); 
+const path = require('path');
 const config = require('./config/config');
 const morgan = require('./config/morgan');
 const { jwtStrategy } = require('./config/passport');
@@ -31,9 +31,9 @@ app.set('trust proxy', true);
 // i18n configuration
 i18n.configure({
   locales: ['en', 'es'],
-  directory: __dirname + '/locales',
+  directory: `${__dirname}/locales`,
   objectNotation: true,
-  logWarnFn: function(msg) {
+  logWarnFn(msg) {
     // do nothing
   },
 });
@@ -41,8 +41,8 @@ app.use(i18n.init); // Attach i18n to the request
 
 // Log HTTP requests if not in test mode
 // if (config.env !== 'test') {
-  app.use(morgan.successHandler);
-  app.use(morgan.errorHandler);
+app.use(morgan.successHandler);
+app.use(morgan.errorHandler);
 // }
 
 // Parse application/x-www-form-urlencoded

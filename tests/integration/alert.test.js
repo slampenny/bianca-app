@@ -1,8 +1,8 @@
 const request = require('supertest');
 const httpStatus = require('http-status');
-const app = require('../../src/app');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const app = require('../../src/app');
 const { Alert, Org, Caregiver, Patient } = require('../../src/models');
 const { caregiverOne, insertCaregiversAndAddToOrg, admin } = require('../fixtures/caregiver.fixture');
 const { alertOne, alertTwo, insertAlerts } = require('../fixtures/alert.fixture');
@@ -14,7 +14,7 @@ const { login } = require('../../src/validations/auth.validation');
 let mongoServer;
 
 beforeAll(async () => {
-    mongoServer = new MongoMemoryServer();
+  mongoServer = new MongoMemoryServer();
   await mongoServer.start();
   const mongoUri = await mongoServer.getUri();
   await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -34,7 +34,7 @@ describe('Alert routes', () => {
   beforeEach(async () => {
     [org] = await insertOrgs([orgOne]);
     [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
-    const alerts = await insertAlerts(caregiver, "Caregiver", [alertOne]);
+    const alerts = await insertAlerts(caregiver, 'Caregiver', [alertOne]);
     alertId = alerts[0].id;
     const tokens = await tokenService.generateAuthTokens(caregiver);
     caregiverToken = tokens.access.token;
@@ -48,8 +48,7 @@ describe('Alert routes', () => {
   });
 
   it('should create a new alert', async () => {
-    const res = await 
-    request(app)
+    const res = await request(app)
       .post('/v1/alerts')
       .set('Authorization', `Bearer ${caregiverToken}`)
       .send({
@@ -57,56 +56,47 @@ describe('Alert routes', () => {
         createdBy: caregiver.id,
         createdModel: 'Caregiver',
       });
-  
+
     expect(res.statusCode).toEqual(httpStatus.CREATED);
     expect(res.body).toHaveProperty('message', alertTwo.message);
-  
+
     const alert = await Alert.findById(res.body.id);
     expect(alert).not.toBeNull();
     expect(alert.message).toEqual(alertTwo.message);
   });
 
   it('should get all alerts', async () => {
-    const res = await request(app)
-      .get('/v1/alerts')
-      .set('Authorization', `Bearer ${caregiverToken}`);
-  
+    const res = await request(app).get('/v1/alerts').set('Authorization', `Bearer ${caregiverToken}`);
+
     expect(res.statusCode).toEqual(httpStatus.OK);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeGreaterThan(0);
   });
 
   it('should get a specific alert', async () => {
-    const res = await request(app)
-      .get(`/v1/alerts/${alertId}`)
-      .set('Authorization', `Bearer ${caregiverToken}`);
-  
+    const res = await request(app).get(`/v1/alerts/${alertId}`).set('Authorization', `Bearer ${caregiverToken}`);
+
     expect(res.statusCode).toEqual(httpStatus.OK);
     expect(res.body.id).toEqual(alertId.toString());
   });
 
   it('should update a specific alert', async () => {
-    const res = await request(app)
-      .patch(`/v1/alerts/${alertId}`)
-      .set('Authorization', `Bearer ${caregiverToken}`)
-      .send({
-        message: 'Updated Alert Message'
-      });
-  
+    const res = await request(app).patch(`/v1/alerts/${alertId}`).set('Authorization', `Bearer ${caregiverToken}`).send({
+      message: 'Updated Alert Message',
+    });
+
     expect(res.statusCode).toEqual(httpStatus.OK);
     expect(res.body.message).toEqual('Updated Alert Message');
-  
+
     const updatedAlert = await Alert.findById(alertId);
     expect(updatedAlert.message).toEqual('Updated Alert Message');
   });
 
   it('should delete a specific alert', async () => {
-    const res = await request(app)
-      .delete(`/v1/alerts/${alertId}`)
-      .set('Authorization', `Bearer ${caregiverToken}`);
-  
+    const res = await request(app).delete(`/v1/alerts/${alertId}`).set('Authorization', `Bearer ${caregiverToken}`);
+
     expect(res.statusCode).toEqual(httpStatus.NO_CONTENT);
-  
+
     const alert = await Alert.findById(alertId);
     expect(alert).toBeNull();
   });
@@ -120,7 +110,7 @@ describe('Alert routes', () => {
   //     createdModel: 'Caregiver',
   //     readBy: [caregiver.id] // Mark as read
   //   };
-  
+
   //   const unreadAlert = {
   //     ...alertTwo,
   //     message: 'Unread Alert',
@@ -128,23 +118,23 @@ describe('Alert routes', () => {
   //     createdModel: 'Caregiver',
   //     readBy: [] // Unread
   //   };
-  
+
   //   // Insert both alerts
   //   await request(app)
   //     .post('/v1/alerts')
   //     .set('Authorization', `Bearer ${caregiverToken}`)
   //     .send(readAlert);
-  
+
   //   await request(app)
   //     .post('/v1/alerts')
   //     .set('Authorization', `Bearer ${caregiverToken}`)
   //     .send(unreadAlert);
-  
+
   //   // Now request alerts with the showRead filter enabled
   //   const res = await request(app)
   //     .get('/v1/alerts?showRead=true')
   //     .set('Authorization', `Bearer ${caregiverToken}`);
-  
+
   //   expect(res.statusCode).toEqual(httpStatus.OK);
   //   // Verify that every alert in the response has a non-empty readBy array
   //   res.body.forEach(alert => {
@@ -162,7 +152,7 @@ describe('Alert routes', () => {
   //     createdModel: 'Caregiver',
   //     readBy: [caregiver.id] // Mark as read
   //   };
-  
+
   //   const unreadAlert = {
   //     ...alertTwo,
   //     message: 'Unread Alert',
@@ -170,23 +160,23 @@ describe('Alert routes', () => {
   //     createdModel: 'Caregiver',
   //     readBy: [] // Unread
   //   };
-  
+
   //   // Insert both alerts
   //   await request(app)
   //     .post('/v1/alerts')
   //     .set('Authorization', `Bearer ${caregiverToken}`)
   //     .send(readAlert);
-  
+
   //   await request(app)
   //     .post('/v1/alerts')
   //     .set('Authorization', `Bearer ${caregiverToken}`)
   //     .send(unreadAlert);
-  
+
   //   // Now request alerts with the showRead filter enabled
   //   const res = await request(app)
   //     .get('/v1/alerts?showRead=true')
   //     .set('Authorization', `Bearer ${caregiverToken}`);
-  
+
   //   expect(res.statusCode).toEqual(httpStatus.OK);
   //   // Verify that every alert in the response has a non-empty readBy array
   //   res.body.forEach(alert => {
@@ -201,39 +191,30 @@ describe('Alert routes', () => {
       message: 'Read Alert',
       createdBy: caregiver.id,
       createdModel: 'Caregiver',
-      readBy: [caregiver.id] // Mark as read
+      readBy: [caregiver.id], // Mark as read
     };
-  
+
     const unreadAlert = {
       ...alertTwo,
       message: 'Unread Alert',
       createdBy: caregiver.id,
       createdModel: 'Caregiver',
-      readBy: [] // Unread
+      readBy: [], // Unread
     };
-  
+
     // Insert both alerts
-    await request(app)
-      .post('/v1/alerts')
-      .set('Authorization', `Bearer ${caregiverToken}`)
-      .send(readAlert);
-  
-    await request(app)
-      .post('/v1/alerts')
-      .set('Authorization', `Bearer ${caregiverToken}`)
-      .send(unreadAlert);
-  
+    await request(app).post('/v1/alerts').set('Authorization', `Bearer ${caregiverToken}`).send(readAlert);
+
+    await request(app).post('/v1/alerts').set('Authorization', `Bearer ${caregiverToken}`).send(unreadAlert);
+
     // Request alerts with the showRead filter set to false
-    const res = await request(app)
-      .get('/v1/alerts?showRead=false')
-      .set('Authorization', `Bearer ${caregiverToken}`);
-  
+    const res = await request(app).get('/v1/alerts?showRead=false').set('Authorization', `Bearer ${caregiverToken}`);
+
     expect(res.statusCode).toEqual(httpStatus.OK);
     // Verify that every alert in the response has an empty readBy array (i.e. unread)
-    res.body.forEach(alert => {
+    res.body.forEach((alert) => {
       expect(Array.isArray(alert.readBy)).toBe(true);
       expect(alert.readBy.length).toEqual(0);
     });
   });
-  
 });

@@ -9,7 +9,7 @@ const ApiError = require('../utils/ApiError');
 const { chatService, alertService } = require('.');
 
 const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
-const VoiceResponse = twilio.twiml.VoiceResponse;
+const { VoiceResponse } = twilio.twiml;
 
 const initiateCall = async (patientId) => {
   logger.info(`[Twilio Service] Attempting to initiate call (Realtime) for patient ID: ${patientId}`);
@@ -37,7 +37,7 @@ const initiateCall = async (patientId) => {
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallbackMethod: 'POST',
       record: true,
-      answerOnBridge: true
+      answerOnBridge: true,
     });
     logger.info(`[Twilio Service] Call initiated with SID: ${call.sid} for patient ID: ${patientId}`);
 
@@ -51,12 +51,15 @@ const initiateCall = async (patientId) => {
     logger.info(`[Twilio Service] Conversation record created in DB for call SID: ${call.sid}`);
 
     return call.sid;
-
   } catch (error) {
     logger.error(`[Twilio Service] Error initiating call for patient ID ${patientId}:`, error);
     if (conversation && conversation._id) {
-      logger.warn(`[Twilio Service] Attempting to clean up conversation record ${conversation._id} due to call initiation error.`);
-      await Conversation.findByIdAndDelete(conversation._id).catch(delErr => logger.error(`[Twilio Service] Failed to clean up conversation record ${conversation._id}:`, delErr));
+      logger.warn(
+        `[Twilio Service] Attempting to clean up conversation record ${conversation._id} due to call initiation error.`
+      );
+      await Conversation.findByIdAndDelete(conversation._id).catch((delErr) =>
+        logger.error(`[Twilio Service] Failed to clean up conversation record ${conversation._id}:`, delErr)
+      );
     }
     if (error instanceof ApiError) throw error;
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to initiate call: ${error.message}`);
@@ -79,14 +82,13 @@ const generateStreamTwiML = (req) => {
       track: 'inbound',
     });
 
-    //twiml.pause({ length: 60 });
+    // twiml.pause({ length: 60 });
 
     logger.info(`[Twilio Service] Generated <Connect><Stream> TwiML for ${CallSid}.`);
-    
+
     const twimlString = twiml.toString();
     logger.info(`[Twilio Service] TwiML being sent to Twilio: ${twimlString}`);
     return twimlString;
-
   } catch (error) {
     logger.error(`[Twilio Service] Error generating <Connect><Stream> TwiML for ${CallSid}:`, error);
     const errorTwiml = new VoiceResponse();
@@ -99,7 +101,7 @@ const generateStreamTwiML = (req) => {
 const endCall = async (req) => {
   const { CallSid, CallStatus, CallDuration } = req.body;
   logger.info(`[Twilio Service] In endCall for CallSid: ${CallSid} with Status: ${CallStatus}, Duration: ${CallDuration}s`);
- 
+
   // Only process completed or failed calls
   if (!['completed', 'failed', 'busy', 'no-answer'].includes(CallStatus)) {
     logger.info(`[Twilio Service] Call ${CallSid} status update: ${CallStatus} (not terminal state, skipping processing)`);
@@ -130,7 +132,7 @@ const endCall = async (req) => {
           logger.info(`[Twilio Service] Summarization successful for CallSid: ${CallSid}`);
         } catch (summaryError) {
           logger.error(`[Twilio Service] Failed to summarize conversation for CallSid: ${CallSid}:`, summaryError);
-          conversation.history = "Error during summarization.";
+          conversation.history = 'Error during summarization.';
         }
         break;
 
@@ -154,17 +156,8 @@ const endCall = async (req) => {
 
     await conversation.save();
     logger.info(`[Twilio Service] Final conversation state saved for CallSid: ${CallSid}`);
-
   } catch (error) {
     logger.error(`[Twilio Service] Error in endCall handler for CallSid: ${CallSid}:`, error);
-  } finally {
-    try {
-      logger.info(`[Twilio Service] Attempting cleanup for CallSid: ${CallSid}`);
-      await chatService.cleanup(CallSid);
-      logger.info(`[Twilio Service] Cleanup successful for CallSid: ${CallSid}`);
-    } catch (cleanupError) {
-      logger.error(`[Twilio Service] Error during cleanup for CallSid: ${CallSid}:`, cleanupError);
-    }
   }
 };
 

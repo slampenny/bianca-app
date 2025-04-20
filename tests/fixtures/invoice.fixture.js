@@ -8,7 +8,7 @@ const invoiceOne = {
   status: 'draft',
   dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
   totalAmount: faker.datatype.number({ min: 1000, max: 50000 }),
-  notes: 'Regular checkup and consultation'
+  notes: 'Regular checkup and consultation',
 };
 
 const invoiceTwo = {
@@ -17,7 +17,7 @@ const invoiceTwo = {
   status: 'pending',
   dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
   totalAmount: faker.datatype.number({ min: 1000, max: 50000 }),
-  notes: 'Follow-up appointments and therapy sessions'
+  notes: 'Follow-up appointments and therapy sessions',
 };
 
 const lineItemOne = {
@@ -26,7 +26,7 @@ const lineItemOne = {
   periodStart: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
   periodEnd: new Date(),
   quantity: 1,
-  unitPrice: faker.datatype.number({ min: 500, max: 2000 })
+  unitPrice: faker.datatype.number({ min: 500, max: 2000 }),
 };
 
 const lineItemTwo = {
@@ -35,7 +35,7 @@ const lineItemTwo = {
   periodStart: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
   periodEnd: new Date(),
   quantity: 2,
-  unitPrice: faker.datatype.number({ min: 500, max: 1500 })
+  unitPrice: faker.datatype.number({ min: 500, max: 1500 }),
 };
 
 /**
@@ -52,19 +52,19 @@ const insertInvoices = async (patient, invoicesArray) => {
         org: patient.org,
       });
       await newInvoice.save();
-      
+
       // Create line items for this invoice
       const lineItems = [
         { ...lineItemOne, patientId: patient._id, invoiceId: newInvoice._id },
-        { ...lineItemTwo, patientId: patient._id, invoiceId: newInvoice._id }
+        { ...lineItemTwo, patientId: patient._id, invoiceId: newInvoice._id },
       ];
-      
+
       await LineItem.insertMany(lineItems);
-      
+
       return newInvoice;
     })
   );
-  
+
   return invoices;
 };
 

@@ -2,19 +2,13 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const config = require('../../../src/config/config');
 const { emailService, orgService } = require('../../../src/services');
-const {
-  orgOne,
-  insertOrgs,
-} = require('../../fixtures/org.fixture');
-const {
-  caregiverOne,
-  password
-} = require('../../fixtures/caregiver.fixture');
+const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
+const { caregiverOne, password } = require('../../fixtures/caregiver.fixture');
 const { Caregiver, Org, Token } = require('../../../src/models');
 
 // Mock i18n
 jest.mock('i18n', () => ({
-  __: jest.fn((key, value) => key === 'inviteEmail.text' ? `Invite link: ${value}` : key),
+  __: jest.fn((key, value) => (key === 'inviteEmail.text' ? `Invite link: ${value}` : key)),
 }));
 
 let mongoServer;
@@ -31,7 +25,7 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
-describe ('inviteService', () => {
+describe('inviteService', () => {
   describe('generateInviteToken', () => {
     afterEach(() => {
       Org.deleteMany();
@@ -44,7 +38,7 @@ describe ('inviteService', () => {
 
       jest.spyOn(emailService, 'sendInviteEmail').mockImplementation(() => {});
 
-      const {inviteToken} = await orgService.sendInvite(org.id, caregiverOne.name, caregiverOne.email, caregiverOne.phone);
+      const { inviteToken } = await orgService.sendInvite(org.id, caregiverOne.name, caregiverOne.email, caregiverOne.phone);
 
       const caregiver = await Caregiver.findOne({ email: caregiverOne.email });
 
@@ -54,7 +48,7 @@ describe ('inviteService', () => {
       expect(caregiver.email).toEqual(caregiverOne.email);
       expect(caregiver.phone).toEqual(caregiverOne.phone);
       expect(caregiver.role).toEqual('invited');
-      
+
       const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
       expect(emailService.sendInviteEmail).toHaveBeenCalledWith(caregiverOne.email, inviteLink);
     });

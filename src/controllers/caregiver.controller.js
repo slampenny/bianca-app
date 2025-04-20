@@ -1,10 +1,10 @@
 const httpStatus = require('http-status');
+const path = require('path');
 const pick = require('../utils/pick');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { caregiverService } = require('../services');
 const config = require('../config/config');
-const path = require('path');
 const { CaregiverDTO } = require('../dtos');
 
 const getCaregivers = catchAsync(async (req, res) => {
@@ -13,7 +13,7 @@ const getCaregivers = catchAsync(async (req, res) => {
     return res.status(httpStatus.OK).send(req.caregiver);
   }
   // Start with query filters for name and role from req.query
-  let filter = pick(req.query, ['name', 'role']);
+  const filter = pick(req.query, ['name', 'role']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
 
   // If the requesting caregiver's role is 'invited' or 'staff',
@@ -27,23 +27,22 @@ const getCaregivers = catchAsync(async (req, res) => {
   }
 
   const result = await caregiverService.queryCaregivers(filter, options);
-  
+
   res.send(result);
 });
-
 
 const getCaregiver = catchAsync(async (req, res) => {
   if (req.params.caregiverId == req.caregiver.id) {
     return res.status(httpStatus.OK).send(req.caregiver);
-  } else if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
-    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
-  } else {
-    const caregiver = await caregiverService.getCaregiverById(req.params.caregiverId);
-    if (!caregiver) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
-    }
-    res.send(caregiver);
   }
+  if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
+    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
+  }
+  const caregiver = await caregiverService.getCaregiverById(req.params.caregiverId);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+  res.send(caregiver);
 });
 
 const createCaregiver = catchAsync(async (req, res) => {
@@ -69,9 +68,9 @@ const updateCaregiver = catchAsync(async (req, res) => {
 });
 
 const uploadCaregiverAvatar = catchAsync(async (req, res) => {
-  const file = req.file;
+  const { file } = req;
   if (!file) {
-    throw new Error("No file uploaded");
+    throw new Error('No file uploaded');
   }
 
   const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
@@ -88,11 +87,8 @@ const uploadCaregiverAvatar = catchAsync(async (req, res) => {
   const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
 
   // Update the caregiver with this URL
-  const caregiver = await caregiverService.updateCaregiverById(
-    req.params.caregiverId, 
-    { avatar: avatarUrl }
-  );
-  
+  const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, { avatar: avatarUrl });
+
   res.send(CaregiverDTO(caregiver));
 });
 
@@ -157,5 +153,5 @@ module.exports = {
   updatePatient,
   deletePatient,
   getPatient,
-  getPatients
+  getPatients,
 };

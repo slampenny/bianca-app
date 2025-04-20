@@ -34,7 +34,7 @@ const patientSchema = mongoose.Schema(
       trim: true,
       lowercase: true,
       validate(value) {
-        if (!validator.isMobilePhone (value)) {
+        if (!validator.isMobilePhone(value)) {
           throw new Error('Invalid phone number');
         }
       },
@@ -76,7 +76,7 @@ const patientSchema = mongoose.Schema(
 // Plugin to convert mongoose to JSON, and paginate results
 patientSchema.plugin(toJSON);
 patientSchema.plugin(paginate);
-patientSchema.plugin(mongooseDelete, { deletedAt : true });
+patientSchema.plugin(mongooseDelete, { deletedAt: true });
 
 // Static method to check if email is taken
 patientSchema.statics.isEmailTaken = async function (email, excludePatientId) {
@@ -84,11 +84,11 @@ patientSchema.statics.isEmailTaken = async function (email, excludePatientId) {
   return !!patient;
 };
 
-patientSchema.pre('find', function() {
+patientSchema.pre('find', function () {
   this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 
-patientSchema.pre('findOne', function() {
+patientSchema.pre('findOne', function () {
   this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });
 });
 

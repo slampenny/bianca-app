@@ -29,11 +29,13 @@ const updateAlert = {
   params: Joi.object().keys({
     alertId: Joi.required().custom(objectId),
   }),
-  body: Joi.object().keys({
-    message: Joi.string().optional(),
-    importance: Joi.string().valid('low', 'medium', 'high', 'urgent').optional(),
-    relevanceUntil: Joi.date().optional(),
-  }).min(1),
+  body: Joi.object()
+    .keys({
+      message: Joi.string().optional(),
+      importance: Joi.string().valid('low', 'medium', 'high', 'urgent').optional(),
+      relevanceUntil: Joi.date().optional(),
+    })
+    .min(1),
 };
 
 const markAlertAsRead = {

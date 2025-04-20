@@ -25,7 +25,6 @@ router
   .route('/markAsRead')
   .post(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.markAllAsRead), alertController.markAllAsRead);
 
-
 module.exports = router;
 
 /**

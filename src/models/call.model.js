@@ -7,7 +7,7 @@ const callSchema = mongoose.Schema(
     patientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient'
+      ref: 'Patient',
     },
     dateTime: {
       type: Date,
@@ -16,13 +16,13 @@ const callSchema = mongoose.Schema(
     status: {
       type: String,
       enum: ['scheduled', 'completed', 'cancelled'],
-      default: 'scheduled'
+      default: 'scheduled',
     },
     // Field to store call details or metadata
     callDetails: {
       type: mongoose.Schema.Types.Mixed,
-      default: {}
-    }
+      default: {},
+    },
   },
   {
     timestamps: true,

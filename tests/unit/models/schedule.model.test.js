@@ -3,7 +3,6 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const { Schedule } = require('../../../src/models');
 
 describe('Schedule model', () => {
-
   let mongoServer;
 
   beforeAll(async () => {
@@ -56,7 +55,7 @@ describe('Schedule model', () => {
           return baseDate;
         }
       };
-  
+
       const newSchedule = {
         patientId: new mongoose.Types.ObjectId(),
         frequency: 'daily',
@@ -67,10 +66,10 @@ describe('Schedule model', () => {
       };
       const schedule = new Schedule(newSchedule);
       schedule.calculateNextCallDate();
-  
+
       const expectedNextCallDate = new Date(Date.UTC(2024, 0, 2, 12, 0, 0)); // January 2, 2024, 12:00 UTC
       expect(schedule.nextCallDate.toISOString()).toEqual(expectedNextCallDate.toISOString());
-  
+
       global.Date = OriginalDate;
     });
 
@@ -83,7 +82,7 @@ describe('Schedule model', () => {
           return baseDate;
         }
       };
-    
+
       const newSchedule = {
         patientId: new mongoose.Types.ObjectId(),
         frequency: 'weekly',
@@ -94,13 +93,13 @@ describe('Schedule model', () => {
       };
       const schedule = new Schedule(newSchedule);
       schedule.calculateNextCallDate();
-    
+
       const expectedNextCallDate = new Date(Date.UTC(2024, 0, 8, 4, 0, 0)); // January 8, 2024, 12:00 UTC
       expect(schedule.nextCallDate.toISOString()).toEqual(expectedNextCallDate.toISOString());
-    
+
       global.Date = OriginalDate;
     });
-    
+
     test('should correctly calculate the next call date for a monthly schedule', () => {
       const baseDate = new Date(Date.UTC(2024, 0, 1, 12, 0, 0)); // January 1, 2024, 12:00 UTC
       const OriginalDate = Date;
@@ -110,7 +109,7 @@ describe('Schedule model', () => {
           return baseDate;
         }
       };
-    
+
       const newSchedule = {
         patientId: new mongoose.Types.ObjectId(),
         frequency: 'monthly',
@@ -121,10 +120,10 @@ describe('Schedule model', () => {
       };
       const schedule = new Schedule(newSchedule);
       schedule.calculateNextCallDate();
-    
+
       const expectedNextCallDate = new Date(Date.UTC(2024, 1, 1, 12, 0, 0)); // February 1, 2024, 12:00 UTC
       expect(schedule.nextCallDate.toISOString()).toEqual(expectedNextCallDate.toISOString());
-    
+
       global.Date = OriginalDate;
     });
 
@@ -137,14 +136,14 @@ describe('Schedule model', () => {
           return baseDate;
         }
       };
-    
+
       const newSchedule = {
         patientId: new mongoose.Types.ObjectId(),
         frequency: 'weekly',
         intervals: [
           { day: 1, weeks: 1 }, // Monday every week
           { day: 3, weeks: 2 }, // Wednesday every two weeks
-          { day: 5, weeks: 1 }  // Friday every week
+          { day: 5, weeks: 1 }, // Friday every week
         ],
         isActive: true,
         time: '12:00',
@@ -152,10 +151,10 @@ describe('Schedule model', () => {
       };
       const schedule = new Schedule(newSchedule);
       schedule.calculateNextCallDate();
-    
+
       const expectedNextCallDate = new Date(Date.UTC(2024, 0, 3, 12, 0, 0)); // January 3, 2024, 12:00 UTC
       expect(schedule.nextCallDate.toISOString()).toEqual(expectedNextCallDate.toISOString());
-    
+
       global.Date = OriginalDate;
     });
 
@@ -168,14 +167,14 @@ describe('Schedule model', () => {
           return baseDate;
         }
       };
-    
+
       const newSchedule = {
         patientId: new mongoose.Types.ObjectId(),
         frequency: 'weekly',
         intervals: [
           { day: 1, weeks: 2 }, // Monday every two weeks
           { day: 3, weeks: 1 }, // Wednesday every week
-          { day: 5, weeks: 1 }  // Friday every week
+          { day: 5, weeks: 1 }, // Friday every week
         ],
         isActive: true,
         time: '12:00',
@@ -183,12 +182,11 @@ describe('Schedule model', () => {
       };
       const schedule = new Schedule(newSchedule);
       schedule.calculateNextCallDate();
-    
+
       const expectedNextCallDate = new Date(Date.UTC(2024, 0, 2, 12, 0, 0)); // January 2, 2024, 12:00 UTC
       expect(schedule.nextCallDate.toISOString()).toEqual(expectedNextCallDate.toISOString());
-    
+
       global.Date = OriginalDate;
     });
   });
-  
 });

@@ -1,22 +1,22 @@
 // agenda.js
 const Agenda = require('agenda');
+const moment = require('moment');
 const config = require('./config');
 const logger = require('./logger');
 const Schedule = require('../models/schedule.model');
 const { patientService, twilioCallService, alertService } = require('../services');
-const moment = require('moment');
 
 const agenda = new Agenda({
   db: {
     address: config.mongoose.url,
     collection: 'agendaJobs', // explicitly set a collection name
-  }
+  },
 });
 
 // Listen for the 'ready' event to ensure the connection is established
 agenda.on('ready', () => {
   logger.info('Agenda is connected and ready!');
-  
+
   // Schedule your centralized job to run every hour
   agenda.every('1 hour', 'runSchedules');
 
@@ -39,33 +39,33 @@ async function runSchedules() {
   const now = new Date();
   const schedules = await Schedule.find({
     isActive: true,
-    nextCallDate: { $lte: now }
+    nextCallDate: { $lte: now },
   });
 
   for (const schedule of schedules) {
-    const interval = schedule.intervals.find(i =>
-      i.day === (schedule.frequency === 'weekly' ? now.getDay() : now.getDate())
+    const interval = schedule.intervals.find(
+      (i) => i.day === (schedule.frequency === 'weekly' ? now.getDay() : now.getDate())
     );
     if (!interval) continue;
 
     logger.info(`Running schedule ${schedule.id}`);
-    
+
     // Check that the schedule has a valid patient id
     if (!schedule.patient) {
       logger.error(`Schedule ${schedule.id} has no patient assigned.`);
       continue;
     }
-    
+
     const patient = await patientService.getPatientById(schedule.patient);
     if (!patient) {
       logger.error(`Patient with ID ${schedule.patient} not found for schedule ${schedule.id}`);
       continue;
     }
-    
+
     try {
       logger.info(`Initiating call for patient with ID: ${schedule.patient}`);
       await twilioCallService.initiateCall(schedule.patient);
-      
+
       await alertService.createAlert({
         message: `Called ${patient.name} for their scheduled check-in at ${now.toISOString()}`,
         importance: 'low',
@@ -91,8 +91,7 @@ async function runSchedules() {
   }
 }
 
-
 module.exports = {
   agenda,
-  runSchedules
+  runSchedules,
 };

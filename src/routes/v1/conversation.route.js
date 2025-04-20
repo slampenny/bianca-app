@@ -37,7 +37,11 @@ const router = express.Router();
  */
 router
   .route('/patient/:patientId')
-  .post(auth('updateAny:conversation'), validate(conversationValidation.createConversationForPatient), conversationController.createConversationForPatient);
+  .post(
+    auth('updateAny:conversation'),
+    validate(conversationValidation.createConversationForPatient),
+    conversationController.createConversationForPatient
+  );
 
 /**
  * @swagger
@@ -79,9 +83,13 @@ router
  */
 router
   .route('/:conversationId')
-  .post(auth('updateAny:conversation'), validate(conversationValidation.addMessageToConversation), conversationController.addMessageToConversation);
+  .post(
+    auth('updateAny:conversation'),
+    validate(conversationValidation.addMessageToConversation),
+    conversationController.addMessageToConversation
+  );
 
-  /**
+/**
  * @swagger
  * /conversations/{id}:
  *   get:
@@ -112,7 +120,11 @@ router
  *         $ref: '#/components/responses/NotFound'
  */
 router
-.route('/')
-.get(auth('readAny:conversation'), validate(conversationValidation.getConversation), conversationController.getConversation);
+  .route('/')
+  .get(
+    auth('readAny:conversation'),
+    validate(conversationValidation.getConversation),
+    conversationController.getConversation
+  );
 
 module.exports = router;

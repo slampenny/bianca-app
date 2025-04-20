@@ -7,12 +7,14 @@ const createOrg = {
     org: Joi.object().keys({
       email: Joi.string().required().email(),
       name: Joi.string().required(),
-      phone: Joi.string().required().custom((value, helpers) => {
-        if (!validator.isMobilePhone(value)) {
-          return helpers.message('Invalid phone number');
-        }
-        return value;
-      }),
+      phone: Joi.string()
+        .required()
+        .custom((value, helpers) => {
+          if (!validator.isMobilePhone(value)) {
+            return helpers.message('Invalid phone number');
+          }
+          return value;
+        }),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     }),
@@ -51,12 +53,14 @@ const updateOrg = {
     .keys({
       email: Joi.string().email().optional(),
       name: Joi.string().optional(),
-      phone: Joi.string().optional().custom((value, helpers) => {
-        if (value && !validator.isMobilePhone(value)) {
-          return helpers.message('Invalid phone number');
-        }
-        return value;
-      }),
+      phone: Joi.string()
+        .optional()
+        .custom((value, helpers) => {
+          if (value && !validator.isMobilePhone(value)) {
+            return helpers.message('Invalid phone number');
+          }
+          return value;
+        }),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

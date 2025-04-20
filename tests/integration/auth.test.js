@@ -3,9 +3,9 @@ const httpStatus = require('http-status');
 const httpMocks = require('node-mocks-http');
 const moment = require('moment');
 const bcrypt = require('bcryptjs');
-const app = require('../../src/app');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const app = require('../../src/app');
 const config = require('../../src/config/config');
 const auth = require('../../src/middlewares/auth');
 const { tokenService, emailService } = require('../../src/services');
@@ -13,7 +13,17 @@ const ApiError = require('../../src/utils/ApiError');
 const { Org, Caregiver, Token } = require('../../src/models');
 const { roleRights } = require('../../src/config/roles');
 const { tokenTypes } = require('../../src/config/tokens');
-const { caregiverOne, caregiverOneWithPassword, password, fakeId, admin, insertCaregivers, caregiverTwo, insertCaregiverAndReturnToken, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
+const {
+  caregiverOne,
+  caregiverOneWithPassword,
+  password,
+  fakeId,
+  admin,
+  insertCaregivers,
+  caregiverTwo,
+  insertCaregivertoOrgAndReturnToken,
+  insertCaregiversAndAddToOrg,
+} = require('../fixtures/caregiver.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 
 let mongoServer;
@@ -41,13 +51,16 @@ describe('Auth routes', () => {
 
   describe('POST /v1/auth/register', () => {
     test('should return 201 and successfully register caregiver if request data is ok', async () => {
-      const res = await request(app).post('/v1/auth/register').send({
-        name: caregiverOne.name,
-        email: caregiverOne.email,
-        phone: caregiverOne.phone,
-        password: password,
-      }).expect(httpStatus.CREATED);
-      
+      const res = await request(app)
+        .post('/v1/auth/register')
+        .send({
+          name: caregiverOne.name,
+          email: caregiverOne.email,
+          phone: caregiverOne.phone,
+          password,
+        })
+        .expect(httpStatus.CREATED);
+
       const caregiver = res.body.org.caregivers[0];
 
       expect(caregiver).not.toHaveProperty('password');
@@ -64,7 +77,12 @@ describe('Auth routes', () => {
 
       const dbCaregiver = await Caregiver.findById(caregiver.id);
       expect(dbCaregiver).toBeDefined();
-      expect(dbCaregiver).toMatchObject({ name: caregiverOne.name, email: caregiverOne.email, role: 'orgAdmin', isEmailVerified: false });
+      expect(dbCaregiver).toMatchObject({
+        name: caregiverOne.name,
+        email: caregiverOne.email,
+        role: 'orgAdmin',
+        isEmailVerified: false,
+      });
 
       expect(res.body.tokens).toEqual({
         access: { token: expect.anything(), expires: expect.anything() },
@@ -73,58 +91,73 @@ describe('Auth routes', () => {
     });
 
     test('should return 400 error if email is invalid', async () => {
-      await request(app).post('/v1/auth/register').send({
-        name: caregiverOne.name,
-        email: 'invalidEmail',
-        phone: caregiverOne.phone,
-        password: password,
-      }).expect(httpStatus.BAD_REQUEST);
+      await request(app)
+        .post('/v1/auth/register')
+        .send({
+          name: caregiverOne.name,
+          email: 'invalidEmail',
+          phone: caregiverOne.phone,
+          password,
+        })
+        .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 error if email is already used', async () => {
       await insertCaregivers([caregiverOne]);
 
-      await request(app).post('/v1/auth/register').send({
-        name: caregiverTwo.name,
-        email: caregiverOne.email,
-        phone: caregiverTwo.phone,
-        password: password,
-      }).expect(httpStatus.BAD_REQUEST);
+      await request(app)
+        .post('/v1/auth/register')
+        .send({
+          name: caregiverTwo.name,
+          email: caregiverOne.email,
+          phone: caregiverTwo.phone,
+          password,
+        })
+        .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 error if password length is less than 8 characters', async () => {
-      await request(app).post('/v1/auth/register').send({
-        name: caregiverOne.name,
-        email: caregiverOne.email,
-        phone: caregiverOne.phone,
-        password: 'passwo1',
-      }).expect(httpStatus.BAD_REQUEST);
+      await request(app)
+        .post('/v1/auth/register')
+        .send({
+          name: caregiverOne.name,
+          email: caregiverOne.email,
+          phone: caregiverOne.phone,
+          password: 'passwo1',
+        })
+        .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 400 error if password does not contain both letters and numbers', async () => {
-      await request(app).post('/v1/auth/register').send({
-        name: caregiverOne.name,
-        email: caregiverOne.email,
-        phone: caregiverOne.phone,
-        password: 'password',
-      }).expect(httpStatus.BAD_REQUEST);
+      await request(app)
+        .post('/v1/auth/register')
+        .send({
+          name: caregiverOne.name,
+          email: caregiverOne.email,
+          phone: caregiverOne.phone,
+          password: 'password',
+        })
+        .expect(httpStatus.BAD_REQUEST);
 
-      await request(app).post('/v1/auth/register').send({
-        name: caregiverOne.name,
-        email: caregiverOne.email,
-        phone: caregiverOne.phone,
-        password: '11111111',
-      }).expect(httpStatus.BAD_REQUEST);
+      await request(app)
+        .post('/v1/auth/register')
+        .send({
+          name: caregiverOne.name,
+          email: caregiverOne.email,
+          phone: caregiverOne.phone,
+          password: '11111111',
+        })
+        .expect(httpStatus.BAD_REQUEST);
     });
   });
 
   describe('POST /v1/auth/login', () => {
     test('should return 200 and login caregiver if email and password match', async () => {
       const [org] = await insertOrgs([orgOne]);
-      await insertCaregiversAndAddToOrg (org, [caregiverOneWithPassword]);
+      await insertCaregiversAndAddToOrg(org, [caregiverOneWithPassword]);
       const loginCredentials = {
         email: caregiverOneWithPassword.email,
-        password: password,
+        password,
       };
 
       const res = await request(app).post('/v1/auth/login').send(loginCredentials).expect(httpStatus.OK);
@@ -154,8 +187,8 @@ describe('Auth routes', () => {
 
       const res = await request(app).post('/v1/auth/login').send(loginCredentials).expect(httpStatus.UNAUTHORIZED);
 
-      expect(res.statusCode).toEqual(httpStatus.UNAUTHORIZED)
-      expect(res.body).toEqual({message: 'Incorrect email or password' });
+      expect(res.statusCode).toEqual(httpStatus.UNAUTHORIZED);
+      expect(res.body).toEqual({ message: 'Incorrect email or password' });
     });
 
     test('should return 401 error if password is wrong', async () => {
@@ -167,8 +200,8 @@ describe('Auth routes', () => {
 
       const res = await request(app).post('/v1/auth/login').send(loginCredentials).expect(httpStatus.UNAUTHORIZED);
 
-      expect(res.statusCode).toEqual(httpStatus.UNAUTHORIZED)
-      expect(res.body).toEqual({message: 'Incorrect email or password' });
+      expect(res.statusCode).toEqual(httpStatus.UNAUTHORIZED);
+      expect(res.body).toEqual({ message: 'Incorrect email or password' });
     });
   });
 
@@ -224,7 +257,7 @@ describe('Auth routes', () => {
       const dbRefreshTokenDoc = await Token.findOne({ token: res.body.tokens.refresh.token });
       expect(dbRefreshTokenDoc.caregiver.toHexString()).toBe(dbCaregiver.id);
       expect(dbRefreshTokenDoc).toMatchObject({ type: tokenTypes.REFRESH, blacklisted: false });
-      //expect(dbRefreshTokenDoc).toMatchObject({ type: tokenTypes.REFRESH, caregiver: dbCaregiver.id, blacklisted: false });
+      // expect(dbRefreshTokenDoc).toMatchObject({ type: tokenTypes.REFRESH, caregiver: dbCaregiver.id, blacklisted: false });
 
       const dbRefreshTokenCount = await Token.countDocuments();
       expect(dbRefreshTokenCount).toBe(1);
@@ -325,7 +358,10 @@ describe('Auth routes', () => {
       const isPasswordMatch = await bcrypt.compare('password2', dbNewCaregiver.password);
       expect(isPasswordMatch).toBe(true);
 
-      const dbResetPasswordTokenCount = await Token.countDocuments({ caregiver: dbNewCaregiver.id, type: tokenTypes.RESET_PASSWORD });
+      const dbResetPasswordTokenCount = await Token.countDocuments({
+        caregiver: dbNewCaregiver.id,
+        type: tokenTypes.RESET_PASSWORD,
+      });
       expect(dbResetPasswordTokenCount).toBe(0);
     });
 
@@ -408,13 +444,11 @@ describe('Auth routes', () => {
     });
 
     test('should return 204 and send verification email to the caregiver', async () => {
-      const {caregiver} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const sendVerificationEmailSpy = jest.spyOn(emailService, 'sendVerificationEmail');
 
-      await request(app)
-        .post('/v1/auth/send-verification-email')
-        .send({caregiver})
-        .expect(httpStatus.NO_CONTENT);
+      await request(app).post('/v1/auth/send-verification-email').send({ caregiver }).expect(httpStatus.NO_CONTENT);
 
       expect(sendVerificationEmailSpy).toHaveBeenCalledWith(caregiver.email, expect.any(String));
       const verifyEmailToken = sendVerificationEmailSpy.mock.calls[0][1];
@@ -513,7 +547,7 @@ describe('Auth middleware', () => {
     const [dbCaregiver] = await insertCaregivers([caregiverOne]);
     const expires = moment().add(config.jwt.verifyEmailExpirationMinutes, 'minutes');
     const accessToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.ACCESS);
-    
+
     const req = httpMocks.createRequest({ headers: { Authorization: `Bearer ${accessToken}` } });
     const next = jest.fn();
 
@@ -618,7 +652,12 @@ describe('Auth middleware', () => {
     await auth('deleteAny:caregiver')(req, httpMocks.createResponse(), next);
 
     expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: httpStatus.FORBIDDEN, message: 'Access Denied: You do not have sufficient permissions.' }));
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: httpStatus.FORBIDDEN,
+        message: 'Access Denied: You do not have sufficient permissions.',
+      })
+    );
   });
 
   // test('should call next with no errors if caregiver does not have required rights but caregiverId is in params', async () => {

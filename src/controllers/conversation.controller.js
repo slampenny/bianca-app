@@ -3,9 +3,7 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { conversationService } = require('../services');
 
-const {
-  ConversationDTO
-} = require('../dtos');
+const { ConversationDTO } = require('../dtos');
 
 const createConversationForPatient = catchAsync(async (req, res) => {
   const { patientId } = req.params;
