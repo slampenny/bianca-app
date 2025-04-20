@@ -79,7 +79,7 @@ const generateStreamTwiML = (req) => {
     const connect = twiml.connect();
     connect.stream({
       url: webSocketUrl,
-      track: 'both_tracks',
+      track: 'both',
     });
 
     // twiml.pause({ length: 60 });
