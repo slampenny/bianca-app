@@ -950,8 +950,8 @@ resource "aws_ecs_service" "app_service" {
     type = "ECS" # Use ECS native rolling updates
   }
   # Optional: Fine-tune rolling update behavior
-  deployment_maximum_percent         = 200 # Allow 100% extra tasks during deployment
-  deployment_minimum_healthy_percent = 100 # Require 100% of desired_count to be healthy (adjust lower if some downtime is ok)
+  deployment_maximum_percent         = 100 # Allow 100% extra tasks during deployment
+  deployment_minimum_healthy_percent = 0 # Require 100% of desired_count to be healthy (adjust lower if some downtime is ok)
 
   # Optional: Enable circuit breaker for rollbacks
   # deployment_circuit_breaker {

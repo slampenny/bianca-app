@@ -19,10 +19,6 @@ const swaggerDef = {
   info: {
     title: 'Bianca--The Wellness Check app',
     version,
-    license: {
-      name: 'MIT',
-      url: 'https://github.com/hagopj13/node-express-boilerplate/blob/master/LICENSE',
-    },
   },
   components: {
     schemas: {
@@ -85,7 +81,7 @@ const swaggerDef = {
   },
   servers: [
     {
-      url: `http://localhost:${config.port}/v1`,
+      url: config.apiUrl,
     },
   ],
 };
