@@ -139,7 +139,10 @@ const initializeWebSocketServer = (server) => {
       "You are Bianca, a helpful AI assistant from the patient's care team. Greet the patient warmly and ask how you can help today.";
     logger.info(`[WebSocket Service] Connecting to OpenAI Realtime for ${callSid} with convId: ${conversationId}`);
     try {
-      openAIService.connect(callSid, conversationId, initialPrompt);
+      setTimeout(() => {
+        openAIService.connect(callSid, conversationId, initialPrompt);
+      }, 500);
+      //openAIService.connect(callSid, conversationId, initialPrompt);
       logger.info(`[WebSocket Service] connect() call returned for ${callSid}`);
     } catch (err) {
       logger.error(`[WebSocket Service] ERROR in openAIService.connect for ${callSid}: ${err.stack}`);
