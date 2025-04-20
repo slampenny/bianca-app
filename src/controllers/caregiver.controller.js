@@ -5,6 +5,7 @@ const catchAsync = require('../utils/catchAsync');
 const { caregiverService } = require('../services');
 const config = require('../config/config');
 const path = require('path');
+const { CaregiverDTO } = require('../dtos');
 
 const getCaregivers = catchAsync(async (req, res) => {
   // if you're not an orgAdmin or superAdmin, you can only see yourself
@@ -64,7 +65,7 @@ const updateCaregiver = catchAsync(async (req, res) => {
   }
 
   const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, caregiverData);
-  res.send(caregiver);
+  res.send(CaregiverDTO(caregiver));
 });
 
 const uploadCaregiverAvatar = catchAsync(async (req, res) => {
@@ -92,7 +93,7 @@ const uploadCaregiverAvatar = catchAsync(async (req, res) => {
     { avatar: avatarUrl }
   );
   
-  res.send(caregiver);
+  res.send(CaregiverDTO(caregiver));
 });
 
 const deleteCaregiver = catchAsync(async (req, res) => {
@@ -103,7 +104,7 @@ const deleteCaregiver = catchAsync(async (req, res) => {
   if (hasRestrictedAccess && isAccessingOthersResource) {
     return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
   }
-  
+
   await caregiverService.deleteCaregiverById(req.params.caregiverId);
   res.status(httpStatus.NO_CONTENT).send();
 });

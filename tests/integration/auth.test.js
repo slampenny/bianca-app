@@ -135,6 +135,7 @@ describe('Auth routes', () => {
         email: caregiverOne.email,
         phone: caregiverOne.phone,
         org: org.id,
+        role: 'staff',
         patients: [],
         isEmailVerified: false,
       });

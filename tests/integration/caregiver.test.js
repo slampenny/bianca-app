@@ -448,7 +448,7 @@ describe('Caregiver routes', () => {
         email: updateBody.email,
         phone: caregiver.phone,
         role: 'staff',
-        org: null,
+        org: caregiver.org.toHexString(),
         patients: caregiver.patients.toObject(),
         isEmailVerified: false,
       });

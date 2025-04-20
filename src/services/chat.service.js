@@ -4,10 +4,6 @@ const config = require('../config/config');
 const { openaiAPI } = require("../api/openaiAPI.js");
 const { Conversation } = require("../models/conversation.model");
 const {langChainAPI} = require("../api/langChainAPI.js");
-const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
-const {Storage} = require('@google-cloud/storage');
-const storage = new Storage();
-const bucket = storage.bucket('bianca-app-audio-files');
 const logger = require('../config/logger');
 
 class ChatService {
@@ -50,62 +46,6 @@ class ChatService {
                 conversation.history
             );
         } catch (err) {
-            throw err;
-        }
-    }
-
-    /**
-     * Converts text to speech
-     * @param {String} text - The text to convert
-     * @returns {Promise<String>} - URL to the speech audio
-     */
-    async textToSpeech(callSid, text) {
-        const client = new TextToSpeechClient();
-        const request = {
-            input: { text: text },
-            voice: {
-                languageCode:  config.google.language,
-                name: config.google.name,
-                ssmlGender: config.google.gender,
-            },
-            audioConfig: { audioEncoding: config.google.encoding },
-        };
-
-        try {
-            const [response] = await client.synthesizeSpeech(request);
-            logger.info('Synthesized speech successfully');
-            // Create a new blob in the bucket and upload the file data
-            const timestamp = Date.now();
-            const blob = bucket.file(`${callSid}/audio-${timestamp}.mp3`);
-            logger.info('Created blob successfully');
-
-            const blobStream = blob.createWriteStream();
-
-            return new Promise((resolve, reject) => {
-                blobStream.on('error', (err) => {
-                    logger.error(`Error uploading audio file: ${err}`);
-                    reject(err);
-                });
-
-                blobStream.on('finish', async () => {
-                    // The audio file is now uploaded and can be accessed at the following URL:
-                    const [url] = await blob.getSignedUrl({
-                        action: 'read',
-                        expires: Date.now() + 1000 * 60 * 60, // 1 hour
-                    });
-
-                    logger.info('Generated signed URL successfully');
-
-                    resolve(url);
-                });
-
-                blobStream.end(response.audioContent);
-            });
-            // const [response] = await client.synthesizeSpeech(request);
-            // const audioContentBase64 = response.audioContent.toString('base64');
-            // return audioContentBase64;
-        } catch (err) {
-            logger.error(`Error generating audio file: ${err}`);
             throw err;
         }
     }

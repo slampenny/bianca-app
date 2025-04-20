@@ -787,8 +787,8 @@ resource "aws_ecs_task_definition" "app_task" {
   family                   = var.service_name
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256" # Consider adjusting based on load
-  memory                   = "512" # Consider adjusting based on load
+  cpu                      = "512" # Consider adjusting based on load
+  memory                   = "1024" # Consider adjusting based on load
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
