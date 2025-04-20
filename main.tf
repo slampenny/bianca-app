@@ -35,9 +35,9 @@ variable "codebuild_role_name" {
   default = "CodeBuildServiceRole"
 }
 
-variable "codedeploy_role_name" {
-  default = "CodeDeployServiceRole"
-}
+# variable "codedeploy_role_name" { # Removed - No longer needed
+#  default = "CodeDeployServiceRole"
+# }
 
 variable "ecs_execution_role_name" {
   default = "ecsTaskExecutionRole"
@@ -65,13 +65,17 @@ variable "secrets_manager_secret" {
   default = "MySecretsManagerSecret"
 }
 
-variable "application_name" {
-  default = "BiancaApp"
+data "aws_secretsmanager_secret" "app_secret" {
+  name = var.secrets_manager_secret
 }
 
-variable "deployment_group_name" {
-  default = "BiancaDeploymentGroup"
-}
+# variable "application_name" { # Removed - No longer needed for CodeDeploy
+#  default = "BiancaApp"
+# }
+
+# variable "deployment_group_name" { # Removed - No longer needed for CodeDeploy
+#  default = "BiancaDeploymentGroup"
+# }
 
 variable "cluster_name" {
   default = "bianca-cluster"
@@ -111,11 +115,11 @@ resource "aws_security_group" "bianca_app_sg" {
   vpc_id = var.vpc_id
 
   ingress {
-    description      = "Allow ALB (alb_sg) traffic on port 3000"
-    from_port        = 3000
-    to_port          = 3000
-    protocol         = "tcp"
-    security_groups  = [aws_security_group.alb_sg.id]
+    description     = "Allow ALB (alb_sg) traffic on port 3000"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   egress {
@@ -162,9 +166,34 @@ resource "aws_security_group" "alb_sg" {
 # Create an EFS file system for MongoDB data
 resource "aws_efs_file_system" "mongodb_data" {
   creation_token = "mongodb-data"
-  
+
   tags = {
     Name = "MongoDB Data"
+  }
+}
+
+resource "aws_efs_access_point" "mongo_ap" {
+  file_system_id = aws_efs_file_system.mongodb_data.id
+
+  # Define the user/group ID for files created via this access point
+  posix_user {
+    uid = 999 # Standard mongodb user ID
+    gid = 999 # Standard mongodb group ID
+  }
+
+  # Define the root directory on EFS for this access point
+  # And automatically create it with the correct ownership/permissions
+  root_directory {
+    path = "/mongodb" # Create a subdirectory on EFS for this app's data
+    creation_info {
+      owner_uid   = 999
+      owner_gid   = 999
+      permissions = "700" # Owner has read/write/execute, nobody else
+    }
+  }
+
+  tags = {
+    Name = "MongoDB Access Point"
   }
 }
 
@@ -225,28 +254,16 @@ resource "aws_efs_file_system_policy" "mongodb_policy" {
 }
 
 ##############################
-# ALB Target Groups
+# ALB Target Group (Single)
 ##############################
 
-resource "aws_lb_target_group" "app_tg_blue" {
-  name        = "bianca-target-group-blue"
-  port        = var.container_port    # e.g. 3000
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
+# resource "aws_lb_target_group" "app_tg_blue" { # Removed - No longer needed for rolling update
+#  ...
+# }
 
-  health_check {
-    path                = "/health"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 3
-    unhealthy_threshold = 2
-  }
-}
-
-resource "aws_lb_target_group" "app_tg_green" {
-  name        = "bianca-target-group-green"
-  port        = var.container_port    # e.g. 3000
+resource "aws_lb_target_group" "app_tg" { # Renamed from app_tg_green
+  name        = "bianca-target-group"     # Renamed for clarity
+  port        = var.container_port        # e.g. 3000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
@@ -276,17 +293,29 @@ resource "aws_cloudwatch_log_group" "mongodb_log_group" {
 
 resource "aws_s3_bucket" "artifact_bucket" {
   bucket = var.bucket_name
+  # Consider adding versioning and lifecycle policies
+  # versioning {
+  #   enabled = true
+  # }
+  # lifecycle_rule {
+  #   ...
+  # }
 }
 
 resource "aws_ecr_repository" "app_repo" {
   name = var.repository_name
+  # Consider image scanning and lifecycle policies
+  # image_scanning_configuration {
+  #  scan_on_push = true
+  # }
+  # image_tag_mutability = "MUTABLE" # Or IMMUTABLE
 }
 
 ##############################
 # IAM Roles and Policies
 ##############################
 
-# CodeBuild Role
+# --- CodeBuild Role and Policies ---
 data "aws_iam_policy_document" "codebuild_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -302,312 +331,218 @@ resource "aws_iam_role" "codebuild_role" {
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume.json
 }
 
+# (Keep CodeBuild ECR, ECS Task Definition, PassRole, Logs, Artifact Access policies as they are)
+# ECR Push Policy
 resource "aws_iam_policy" "codebuild_ecr_policy" {
   name        = "CodeBuildECRPolicy"
   description = "Allow CodeBuild to push Docker images to ECR"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [
       {
-        Sid      = "AllowECRPush",
+        Sid      = "AllowECRPushLogin", # Updated Sid for clarity
         Effect   = "Allow",
         Action   = [
-          "ecr:GetAuthorizationToken",
+          "ecr:GetAuthorizationToken"
+        ],
+        Resource = "*" # Necessary for GetAuthorizationToken
+      },
+      {
+        Sid      = "AllowECRImagePush", # Updated Sid for clarity
+        Effect   = "Allow",
+        Action = [
           "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
+          "ecr:GetDownloadUrlForLayer", # Although pushing, sometimes needed
           "ecr:PutImage",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload"
+          "ecr:CompleteLayerUpload",
+          "ecr:BatchGetImage", # Sometimes needed by Docker client
+          "ecr:GetRepositoryPolicy", # Good practice
+          "ecr:DescribeRepositories" # Good practice
         ],
-        Resource = "*"
+        Resource = aws_ecr_repository.app_repo.arn # More specific resource
       }
     ]
   })
 }
-
 resource "aws_iam_role_policy_attachment" "codebuild_ecr_policy_attach" {
   role       = aws_iam_role.codebuild_role.name
   policy_arn = aws_iam_policy.codebuild_ecr_policy.arn
 }
 
+# ECS Task Definition Policy
 resource "aws_iam_policy" "codebuild_ecs_policy" {
   name        = "CodeBuildECSPolicy"
   description = "Allow CodeBuild to register ECS task definitions"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [
       {
         Effect   = "Allow",
         Action   = "ecs:RegisterTaskDefinition",
-        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/${var.service_name}:*"
+        Resource = "*" # RegisterTaskDefinition doesn't easily support specific ARNs for new definitions
       }
     ]
   })
 }
-
 resource "aws_iam_role_policy_attachment" "codebuild_ecs_policy_attach" {
   role       = aws_iam_role.codebuild_role.name
   policy_arn = aws_iam_policy.codebuild_ecs_policy.arn
 }
 
+# ECS Describe Task Definition Policy (Still useful for build process)
 resource "aws_iam_policy" "codebuild_ecs_describe_policy" {
   name        = "CodeBuildECSDescribePolicy"
   description = "Allow CodeBuild to describe ECS task definitions"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [
       {
         Effect   = "Allow",
         Action   = "ecs:DescribeTaskDefinition",
-        Resource = "*"
+        Resource = "*" # Describe often needs broader access or complex resource matching
       }
     ]
   })
 }
-
 resource "aws_iam_role_policy_attachment" "codebuild_ecs_describe_policy_attach" {
   role       = aws_iam_role.codebuild_role.name
   policy_arn = aws_iam_policy.codebuild_ecs_describe_policy.arn
 }
 
-resource "aws_iam_policy" "codebuild_pass_role_policy" {
-  name        = "CodeBuildPassRolePolicy"
+# Pass Execution Role Policy
+resource "aws_iam_policy" "codebuild_pass_exec_role_policy" { # Renamed for clarity
+  name        = "CodeBuildPassExecRolePolicy"
   description = "Allow CodeBuild to pass the ECS task execution role"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [
       {
         Effect   = "Allow",
         Action   = "iam:PassRole",
-        Resource = "arn:aws:iam::${var.aws_account_id}:role/${var.ecs_execution_role_name}"
+        Resource = aws_iam_role.ecs_execution_role.arn # Use the ARN of the actual execution role
+        # Condition = { # Optional: Restrict which service can use this PassRole
+        #   "StringEquals" : {"iam:PassedToService": "ecs-tasks.amazonaws.com"}
+        # }
       }
     ]
   })
 }
-
-resource "aws_iam_role_policy_attachment" "codebuild_pass_role_policy_attach" {
+resource "aws_iam_role_policy_attachment" "codebuild_pass_exec_role_policy_attach" { # Renamed for clarity
   role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_pass_role_policy.arn
+  policy_arn = aws_iam_policy.codebuild_pass_exec_role_policy.arn
 }
 
-resource "aws_iam_role_policy_attachment" "codebuild_policy" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess"
-}
-
-# CodeDeploy Role
-data "aws_iam_policy_document" "codedeploy_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["codedeploy.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "codedeploy_role" {
-  name               = var.codedeploy_role_name
-  assume_role_policy = data.aws_iam_policy_document.codedeploy_assume.json
-}
-
-resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
-}
-
-resource "aws_iam_policy" "codedeploy_update_service_policy" {
-  name        = "CodeDeployUpdateServicePolicy"
-  description = "Allow CodeDeploy to update the primary task set on ECS services"
-  policy      = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Sid      = "AllowUpdateServicePrimaryTaskSet",
-        Effect   = "Allow",
-        Action   = "ecs:UpdateServicePrimaryTaskSet",
-        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/${var.cluster_name}/${var.service_name}"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "codedeploy_update_service_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_update_service_policy.arn
-}
-
-
-resource "aws_iam_policy" "codedeploy_ecs_policy" {
-  name        = "CodeDeployECSPolicy"
-  description = "Allow CodeDeploy to describe ECS services"
-  policy      = jsonencode({
+# Pass Task Role Policy (May still be needed if task def includes task role)
+resource "aws_iam_policy" "codebuild_pass_task_role_policy" {
+  name   = "CodeBuildPassTaskRolePolicy"
+  # role   = aws_iam_role.codebuild_role.id # Attaching directly to role
+  policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [
       {
-        Sid      = "AllowDescribeServices",
         Effect   = "Allow",
-        Action   = "ecs:DescribeServices",
-        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/${var.cluster_name}/${var.service_name}"
+        Action   = "iam:PassRole",
+        Resource = aws_iam_role.ecs_task_role.arn # Use the ARN of the actual task role
+        # Condition = { # Optional: Restrict which service can use this PassRole
+        #   "StringEquals" : {"iam:PassedToService": "ecs-tasks.amazonaws.com"}
+        # }
       }
     ]
   })
 }
 
-resource "aws_iam_policy" "codedeploy_pass_task_role_policy" {
-  name        = "CodeDeployPassTaskRolePolicy"
-  description = "Allow CodeDeploy to pass the ECS task role"
-  policy      = jsonencode({
-    Version: "2012-10-17",
-    Statement: [
-      {
-        Effect: "Allow",
-        Action: "iam:PassRole",
-        Resource: "arn:aws:iam::${var.aws_account_id}:role/ecsTaskRole"
-      }
-    ]
-  })
-}
-resource "aws_iam_role_policy_attachment" "codedeploy_pass_task_role_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_pass_task_role_policy.arn
+# Attach the CodeBuildPassTaskRolePolicy to the CodeBuild Role
+resource "aws_iam_role_policy_attachment" "codebuild_pass_task_role_policy_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_pass_task_role_policy.arn
 }
 
-
-resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_ecs_policy.arn
-}
-
-resource "aws_iam_policy" "codedeploy_s3_policy" {
-  name        = "CodeDeployS3Policy"
-  description = "Allow CodeDeploy to read deployment artifacts from S3"
-  policy      = jsonencode({
+# Logs Policy
+resource "aws_iam_policy" "codebuild_logs_policy" {
+  name        = "CodeBuildLogsPolicy"
+  description = "Allow CodeBuild to create log groups, log streams, and put log events in CloudWatch Logs"
+  policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [
       {
-        Sid      = "AllowS3Access",
         Effect   = "Allow",
-        Action   = [
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/codebuild/${aws_codebuild_project.bianca_project.name}:*" # More specific resource
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "codebuild_logs_policy_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_logs_policy.arn
+}
+
+# Artifact Access Policy
+resource "aws_iam_policy" "codebuild_artifact_access" {
+  name        = "CodeBuildArtifactAccessPolicy"
+  description = "Allow CodeBuild to read from and write artifacts to the CodePipeline artifact bucket"
+  policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action = [
           "s3:GetObject",
-          "s3:GetObjectVersion",
-          "s3:ListBucket"
+          "s3:GetObjectVersion", # Added for completeness
+          "s3:PutObject",
+          "s3:GetBucketAcl",     # Often needed by CodeBuild S3 actions
+          "s3:GetBucketLocation" # Often needed by CodeBuild S3 actions
         ],
         Resource = [
-          "arn:aws:s3:::${var.bucket_name}",
-          "arn:aws:s3:::${var.bucket_name}/*"
+           aws_s3_bucket.artifact_bucket.arn,
+           "${aws_s3_bucket.artifact_bucket.arn}/*"
         ]
       }
     ]
   })
 }
-
-resource "aws_iam_role_policy_attachment" "codedeploy_s3_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_s3_policy.arn
+resource "aws_iam_role_policy_attachment" "codebuild_artifact_access_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_artifact_access.arn
 }
 
-resource "aws_iam_policy" "codedeploy_elbv2_policy" {
-  name        = "CodeDeployELBV2Policy"
-  description = "Allow CodeDeploy to perform operations on ELBv2"
-  policy      = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [
-      {
-        Sid      = "AllowDescribeELBv2",
-        Effect   = "Allow",
-        Action   = [
-          "elasticloadbalancing:DescribeListeners",
-          "elasticloadbalancing:DescribeRules",
-          "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeTargetHealth"
-        ],
-        Resource = "*"
-      },
-      {
-        Sid      = "AllowModifyELBv2",
-        Effect   = "Allow",
-        Action   = [
-          "elasticloadbalancing:ModifyListener",
-          "elasticloadbalancing:ModifyRule",
-          "elasticloadbalancing:ModifyTargetGroup"
-        ],
-        Resource = "*"
-      }
-    ]
-  })
-}
+# Basic CodeBuild Managed Policy (Consider replacing with more specific policies if desired)
+# resource "aws_iam_role_policy_attachment" "codebuild_policy" {
+#  role       = aws_iam_role.codebuild_role.name
+#  policy_arn = "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess" # This is very permissive
+# }
 
-resource "aws_iam_role_policy_attachment" "codedeploy_elbv2_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_elbv2_policy.arn
-}
 
-resource "aws_iam_policy" "codedeploy_ecs_createtaskset_policy" {
-  name        = "CodeDeployECSCreatetasksetPolicy"
-  description = "Allow CodeDeploy to create ECS task sets for blue/green deployments"
-  policy      = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [
-      {
-        Sid      = "AllowCreateTaskSet",
-        Effect   = "Allow",
-        Action   = "ecs:CreateTaskSet",
-        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-set/${var.cluster_name}/${var.service_name}/*"
-      }
-    ]
-  })
-}
+# --- CodeDeploy Role and Policies --- (REMOVED)
 
-resource "aws_iam_role_policy_attachment" "codedeploy_ecs_createtaskset_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_ecs_createtaskset_policy.arn
-}
+# data "aws_iam_policy_document" "codedeploy_assume" { ... }
+# resource "aws_iam_role" "codedeploy_role" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_policy" { ... }
+# resource "aws_iam_policy" "codedeploy_update_service_policy" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_update_service_policy_attach" { ... }
+# resource "aws_iam_policy" "codedeploy_ecs_policy" { ... }
+# resource "aws_iam_policy" "codedeploy_pass_task_role_policy" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_pass_task_role_policy_attach" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attach" { ... }
+# resource "aws_iam_policy" "codedeploy_s3_policy" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_s3_policy_attach" { ... }
+# resource "aws_iam_policy" "codedeploy_elbv2_policy" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_elbv2_policy_attach" { ... }
+# resource "aws_iam_policy" "codedeploy_ecs_createtaskset_policy" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_ecs_createtaskset_policy_attach" { ... }
+# resource "aws_iam_policy" "codedeploy_ecs_deletetaskset_policy" { ... }
+# resource "aws_iam_role_policy_attachment" "codedeploy_ecs_deletetaskset_policy_attach" { ... }
+# resource "aws_iam_policy" "codedeploy_pass_role_policy" { ... } # Note: Pass role policy might be named similarly to codebuild one, ensure correct deletion
+# resource "aws_iam_role_policy_attachment" "codedeploy_pass_role_policy_attach" { ... }
 
-resource "aws_iam_policy" "codedeploy_ecs_deletetaskset_policy" {
-  name        = "CodeDeployECSDeleteTaskSetPolicy"
-  description = "Allow CodeDeploy to delete ECS task sets during blue/green deployments"
-  policy      = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [
-      {
-        Sid      = "AllowDeleteTaskSet",
-        Effect   = "Allow",
-        Action   = "ecs:DeleteTaskSet",
-        Resource = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-set/${var.cluster_name}/${var.service_name}/*"
-      }
-    ]
-  })
-}
 
-resource "aws_iam_role_policy_attachment" "codedeploy_ecs_deletetaskset_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_ecs_deletetaskset_policy.arn
-}
-
-resource "aws_iam_policy" "codedeploy_pass_role_policy" {
-  name        = "CodeDeployPassRolePolicy"
-  description = "Allow CodeDeploy to pass the ECS task execution role"
-  policy      = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [
-      {
-        Sid      = "AllowPassECSExecutionRole",
-        Effect   = "Allow",
-        Action   = "iam:PassRole",
-        Resource = "arn:aws:iam::${var.aws_account_id}:role/${var.ecs_execution_role_name}"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "codedeploy_pass_role_policy_attach" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_pass_role_policy.arn
-}
-
-# ECS Execution Role
+# --- ECS Execution Role and Policies --- (Keep as is)
 resource "aws_iam_role" "ecs_execution_role" {
   name               = var.ecs_execution_role_name
   assume_role_policy = jsonencode({
@@ -625,7 +560,25 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# ECS Task Role (required for ECS Exec)
+resource "aws_iam_role_policy" "ecs_execution_secrets_policy" {
+  name = "ecs-execution-secrets-policy"
+  role = aws_iam_role.ecs_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "AllowSecretsManagerGetSecretValue"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret}-*" # Use wildcard if suffix is dynamic
+        # Resource = "arn:aws:secretsmanager:us-east-2:730335291008:secret:MySecretsManagerSecret-LyB1aP" # Original specific ARN
+      }
+    ]
+  })
+}
+
+# --- ECS Task Role and Policies --- (Keep as is)
 resource "aws_iam_role" "ecs_task_role" {
   name               = "ecsTaskRole"
   assume_role_policy = jsonencode({
@@ -646,7 +599,7 @@ resource "aws_iam_role_policy" "ecs_task_role_policy" {
     Statement = [
       {
         Effect   = "Allow",
-        Action   = [
+        Action = [
           "ssmmessages:CreateControlChannel",
           "ssmmessages:CreateDataChannel",
           "ssmmessages:OpenControlChannel"
@@ -668,30 +621,15 @@ resource "aws_iam_role_policy" "ecs_task_secrets_policy" {
         Sid      = "AllowSecretsManagerGetSecretValue"
         Effect   = "Allow"
         Action   = "secretsmanager:GetSecretValue"
-        Resource = "arn:aws:secretsmanager:us-east-2:730335291008:secret:MySecretsManagerSecret-LyB1aP"
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret}-*" # Use wildcard if suffix is dynamic
+         # Resource = "arn:aws:secretsmanager:us-east-2:730335291008:secret:MySecretsManagerSecret-LyB1aP" # Original specific ARN
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy" "ecs_execution_secrets_policy" {
-  name = "ecs-execution-secrets-policy"
-  role = aws_iam_role.ecs_execution_role.id
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "AllowSecretsManagerGetSecretValue"
-        Effect   = "Allow"
-        Action   = "secretsmanager:GetSecretValue"
-        Resource = "arn:aws:secretsmanager:us-east-2:730335291008:secret:MySecretsManagerSecret-LyB1aP"
-      }
-    ]
-  })
-}
-
-# CodePipeline Role
+# --- CodePipeline Role and Policies ---
 resource "aws_iam_role" "codepipeline_role" {
   name = var.codepipeline_role_name
   assume_role_policy = jsonencode({
@@ -704,7 +642,7 @@ resource "aws_iam_role" "codepipeline_role" {
   })
 
   inline_policy {
-    name   = "CodePipelineSecretsManagerAccess"
+    name = "CodePipelineSecretsManagerAccess"
     policy = jsonencode({
       Version   = "2012-10-17",
       Statement = [{
@@ -717,35 +655,36 @@ resource "aws_iam_role" "codepipeline_role" {
   }
 
   inline_policy {
-    name   = "CodePipelineS3AccessPolicy"
+    name = "CodePipelineS3AccessPolicy"
     policy = jsonencode({
       Version   = "2012-10-17",
       Statement = [{
         Sid      = "AllowS3Actions",
         Effect   = "Allow",
-        Action   = [
+        Action = [
           "s3:PutObject",
           "s3:GetObject",
           "s3:GetObjectVersion",
           "s3:ListBucket"
         ],
         Resource = [
-          "arn:aws:s3:::${var.bucket_name}",
-          "arn:aws:s3:::${var.bucket_name}/*"
+          aws_s3_bucket.artifact_bucket.arn,
+          "${aws_s3_bucket.artifact_bucket.arn}/*"
         ]
       }]
     })
   }
 
   inline_policy {
-    name   = "CodePipelineCodeBuildAccess"
+    name = "CodePipelineCodeBuildAccess"
     policy = jsonencode({
       Version   = "2012-10-17",
       Statement = [{
         Sid      = "AllowCodeBuildActions",
         Effect   = "Allow",
-        Action   = [
+        Action = [
           "codebuild:StartBuild",
+          "codebuild:StopBuild", # Added for completeness
           "codebuild:BatchGetBuilds"
         ],
         Resource = aws_codebuild_project.bianca_project.arn
@@ -753,105 +692,82 @@ resource "aws_iam_role" "codepipeline_role" {
     })
   }
 
+   # Removed CodeDeploy inline policy
+  # inline_policy {
+  #   name = "CodePipelineCodeDeployAccess"
+  #   ...
+  # }
+
+  # ADDED: Inline policy for ECS Deploy actions
   inline_policy {
-    name   = "CodePipelineCodeDeployAccess"
+    name = "CodePipelineECSDeployAccess"
     policy = jsonencode({
-      Version   = "2012-10-17",
-      Statement = [
-        {
-          Sid    = "AllowCodeDeployActions",
-          Effect = "Allow",
-          Action = [
-            "codedeploy:CreateDeployment",
-            "codedeploy:GetDeploymentConfig",
-            "codedeploy:RegisterApplicationRevision",
-            "codedeploy:GetDeployment",
-            "codedeploy:GetApplicationRevision",
-            "codedeploy:ListDeploymentConfigs",
-            "codedeploy:ListDeploymentGroups"
-          ],
-          Resource = [
-            "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentgroup:${var.application_name}/${var.deployment_group_name}",
-            "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentconfig:CodeDeployDefault.ECSAllAtOnce",
-            "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:application:${var.application_name}"
-          ]
-        }
-      ]
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "ecs:DescribeServices",
+                    "ecs:UpdateService",
+                    "ecs:DescribeTaskDefinition"
+                ],
+                "Resource": "*" # s/b aws_ecs_service.app_service.id # Grant access only to the specific service ARN
+            },
+            { # Needed to pass roles if task definition changes require it
+                "Effect": "Allow",
+                "Action": "iam:PassRole",
+                "Resource": [
+                    aws_iam_role.ecs_execution_role.arn,
+                    aws_iam_role.ecs_task_role.arn
+                ],
+                "Condition": {
+                    "StringEqualsIfExists": {
+                        "iam:PassedToService": "ecs-tasks.amazonaws.com"
+                    }
+                }
+            }
+        ]
     })
   }
 }
 
-resource "aws_iam_role_policy_attachment" "codepipeline_policy" {
-  role       = aws_iam_role.codepipeline_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess"
+# ------------------------------------------------------------
+# TEMPORARY ATTACHMENT FOR DEBUGGING ECS PERMISSIONS
+# REMOVE THIS AFTER TESTING! GRANTS EXCESSIVE PERMISSIONS.
+# ------------------------------------------------------------
+resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
+  role       = aws_iam_role.codepipeline_role.name # Ensure this targets your CodePipeline role
+  policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
 }
+# ------------------------------------------------------------
 
+# Removed FullAccess policy - using more granular inline policies now.
+# resource "aws_iam_role_policy_attachment" "codepipeline_policy" {
+#  role       = aws_iam_role.codepipeline_role.name
+#  policy_arn = "arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess" # This is very permissive
+# }
+
+# Keep CodeStar connection policy
 resource "aws_iam_policy" "codepipeline_connection_policy" {
   name        = "CodePipelineConnectionPolicy"
   description = "Allow CodePipeline to use the GitHub App-based connection"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [
       {
         Effect   = "Allow",
         Action   = "codestar-connections:UseConnection",
-        Resource = "arn:aws:codeconnections:us-east-2:${var.aws_account_id}:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+        Resource = var.github_app_connection_arn # Use variable directly
+        # Resource = "arn:aws:codeconnections:us-east-2:${var.aws_account_id}:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629" # Original specific ARN
       }
     ]
   })
 }
-
 resource "aws_iam_role_policy_attachment" "codepipeline_connection_policy_attach" {
   role       = aws_iam_role.codepipeline_role.name
   policy_arn = aws_iam_policy.codepipeline_connection_policy.arn
 }
 
-resource "aws_iam_policy" "codebuild_logs_policy" {
-  name        = "CodeBuildLogsPolicy"
-  description = "Allow CodeBuild to create log groups, log streams, and put log events in CloudWatch Logs"
-  policy      = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [
-      {
-        Effect   = "Allow",
-        Action   = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "codebuild_logs_policy_attach" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_logs_policy.arn
-}
-
-resource "aws_iam_policy" "codebuild_artifact_access" {
-  name        = "CodeBuildArtifactAccessPolicy"
-  description = "Allow CodeBuild to read from and write artifacts to the CodePipeline artifact bucket"
-  policy      = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [
-      {
-        Effect   = "Allow",
-        Action   = [
-          "s3:GetObject",
-          "s3:PutObject"
-        ],
-        Resource = "arn:aws:s3:::${var.bucket_name}/*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "codebuild_artifact_access_attach" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_artifact_access.arn
-}
 
 ##############################
 # ECS Cluster, Task Definition, and Service
@@ -859,118 +775,228 @@ resource "aws_iam_role_policy_attachment" "codebuild_artifact_access_attach" {
 
 resource "aws_ecs_cluster" "cluster" {
   name = var.cluster_name
+
+  # Optional: Enable Container Insights
+  # setting {
+  #   name  = "containerInsights"
+  #   value = "enabled"
+  # }
 }
 
 resource "aws_ecs_task_definition" "app_task" {
   family                   = var.service_name
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "256" # Consider adjusting based on load
+  memory                   = "512" # Consider adjusting based on load
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   volume {
-    name = "mongodb-data"
+    name = "mongodb-data" # Keep the volume name the same
     efs_volume_configuration {
       file_system_id = aws_efs_file_system.mongodb_data.id
-      root_directory = "/"
+      # Remove root_directory - we use the access point now
+      # root_directory = "/"
+      transit_encryption = "ENABLED" # Keep this
+      # Specify the Access Point ID:
+      authorization_config {
+        access_point_id = aws_efs_access_point.mongo_ap.id
+        }
     }
   }
 
   container_definitions = jsonencode([
     {
-      name         = var.container_name,
-      image        = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest",
-      essential    = true,
+      name      = var.container_name,
+      # Image will be updated by CodePipeline using imagedefinitions.json,
+      # so this initial value is just a placeholder or the initial version.
+      image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest",
+      essential = true,
       portMappings = [{
         containerPort = var.container_port,
-        hostPort      = var.container_port,
-        protocol      = "tcp"
+        hostPort      = var.container_port, # Not strictly needed in awsvpc, but doesn't hurt
+        protocol      = "tcp",
+        # appProtocol = "http" # Optional: For App Mesh / Service Connect
       }],
       environment = [
         {
           name  = "MONGODB_URL",
-          value = "mongodb://localhost:27017/bianca-app"
+          value = "mongodb://localhost:27017/bianca-app" # Assumes Mongo runs in the same task
         },
         {
           name  = "NODE_ENV",
           value = "production"
         },
+        
         {
-          name  = "JWT_SECRET",
-          value = "temp-secret-bianca"
-        }
+            name  = "WBSOCKET_URL",
+            value = "wss://app.myphonefriend.com"
+        },
+        # { # Example using Secrets Manager
+        #  name = "JWT_SECRET"
+        #  valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret}-xxxxxx:JWT_SECRET::" # Adjust ARN and key name
+        # }
       ],
+        secrets = [
+        # --- Secrets injected from AWS Secrets Manager ---
+        {
+            # Env Var name created inside the container:
+            name      = "AWS_ACCESS_KEY",
+            # Value comes from the 'JWT_SECRET' key within the JSON stored in Secrets Manager:
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:AWS_ACCESS_KEY::"
+        },
+        {
+            # Env Var name created inside the container:
+            name      = "AWS_SECRET_KEY",
+            # Value comes from the 'JWT_SECRET' key within the JSON stored in Secrets Manager:
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:AWS_SECRET_KEY::"
+        },
+        {
+            # Env Var name created inside the container:
+            name      = "JWT_SECRET",
+            # Value comes from the 'JWT_SECRET' key within the JSON stored in Secrets Manager:
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::"
+        },
+        {
+            name      = "OPENAI_API_KEY",
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:OPENAI_API_KEY::"
+        },
+        {
+            name      = "TWILIO_PHONENUMBER",
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_ACCOUNTSID::"
+        },
+        {
+            name      = "TWILIO_ACCOUNTSID",
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_ACCOUNTSID::"
+        },
+        {
+            name      = "TWILIO_AUTHTOKEN",
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_AUTHTOKEN::"
+        },
+        {
+            name      = "STRIPE_SECRET_KEY",
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_SECRET_KEY::"
+        },
+        {
+            name      = "STRIPE_PUBLISHABLE_KEY",
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_PUBLISHABLE_KEY::"
+        },
+        
+        ],
+
       logConfiguration = {
         logDriver = "awslogs",
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.app_log_group.name,
           "awslogs-region"        = var.aws_region,
-          "awslogs-stream-prefix" = "ecs"
+          "awslogs-stream-prefix" = "app" # Changed prefix for clarity
         }
       }
+      # dependsOn = [ { "containerName": "mongodb", "condition": "START" } ] # Ensure mongo starts first
     },
     {
-      name         = "mongodb",
-      image        = "mongo:4.2.1-bionic",
-      essential    = true,
+      name      = "mongodb",
+      image     = "mongo:4.4" # Use a specific minor version if possible, e.g., 4.4.18
+      essential = true # Usually true, unless app can function without DB temporarily
       portMappings = [{
         containerPort = 27017,
-        hostPort      = 27017,
         protocol      = "tcp"
       }],
       mountPoints = [{
         sourceVolume  = "mongodb-data",
-        containerPath = "/data/db"
+        containerPath = "/data/db",
+        readOnly      = false
       }],
       logConfiguration = {
         logDriver = "awslogs",
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.mongodb_log_group.name,
           "awslogs-region"        = var.aws_region,
-          "awslogs-stream-prefix" = "ecs"
+          "awslogs-stream-prefix" = "mongo" # Changed prefix for clarity
         }
       }
-      # If you're temporarily not mounting the EFS volume, you can leave out the mountPoints.
+       # healthCheck = { # Optional: Add container health check for Mongo
+       #   command = ["mongo", "--eval", "db.adminCommand('ping')"]
+       #   interval = 30
+       #   timeout = 5
+       #   retries = 3
+       # }
     }
   ])
+
+  # Optional: Enable runtime monitoring
+  # runtime_platform {
+  #   operating_system_family = "LINUX"
+  #   cpu_architecture        = "X86_64" # Or ARM64
+  # }
+
+  # Optional: Configure Ephemeral Storage
+  # ephemeral_storage {
+  #   size_in_gib = 21 # Minimum 21 for Fargate
+  # }
 }
 
 
 resource "aws_ecs_service" "app_service" {
   name            = var.service_name
   cluster         = aws_ecs_cluster.cluster.id
-  task_definition = aws_ecs_task_definition.app_task.arn
+  task_definition = aws_ecs_task_definition.app_task.arn # Will be updated by pipeline
   launch_type     = "FARGATE"
-  desired_count   = 1
+  desired_count   = 1 # Adjust as needed for baseline capacity
 
+  # --- Deployment Configuration ---
   deployment_controller {
-    type = "CODE_DEPLOY"
+    type = "ECS" # Use ECS native rolling updates
   }
+  # Optional: Fine-tune rolling update behavior
+  deployment_maximum_percent         = 200 # Allow 100% extra tasks during deployment
+  deployment_minimum_healthy_percent = 100 # Require 100% of desired_count to be healthy (adjust lower if some downtime is ok)
+
+  # Optional: Enable circuit breaker for rollbacks
+  # deployment_circuit_breaker {
+  #   enable   = true
+  #   rollback = true
+  # }
 
   network_configuration {
-    subnets          = var.subnet_ids
-    security_groups  = [aws_security_group.bianca_app_sg.id]
-    assign_public_ip = true
+    subnets         = var.subnet_ids
+    security_groups = [aws_security_group.bianca_app_sg.id]
+    assign_public_ip = true # Set to false if using private subnets and NAT Gateway/VPC Endpoint
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.app_tg_green.arn
+    target_group_arn = aws_lb_target_group.app_tg.arn # Point to the single target group
     container_name   = var.container_name
     container_port   = var.container_port
   }
 
-  enable_execute_command = true
+  enable_execute_command = true # Keep if you need ECS Exec
 
+  # --- Lifecycle ---
+  # Removed ignore_changes for task_definition and load_balancer
+  # Keep desired_count if you manage scaling outside of this deployment process (e.g., manual or Application Auto Scaling)
   lifecycle {
-    ignore_changes = [ task_definition, desired_count, load_balancer ]
+     ignore_changes = [desired_count]
   }
 
   depends_on = [
     aws_lb_listener.http_listener,
-    aws_lb_listener.https_listener
+    aws_lb_listener.https_listener,
+    aws_iam_role.ecs_task_role,      # Ensure roles exist before service creation
+    aws_iam_role.ecs_execution_role
   ]
+
+  # Optional: Propagate tags from task definition or service to tasks
+  # propagate_tags = "SERVICE" # Or "TASK_DEFINITION"
+
+  # Optional: Configure service discovery
+  # service_registries {
+  #   registry_arn = aws_service_discovery_service.example.arn
+  # }
+
+  # Optional: Wait for service stability on create/update (can increase apply time)
+  # wait_for_steady_state = true
 }
 
 ##############################
@@ -983,6 +1009,12 @@ resource "aws_lb" "app_lb" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = var.subnet_ids
+  # enable_deletion_protection = false # Consider setting to true in production
+  # access_logs { # Recommended for production
+  #   bucket  = aws_s3_bucket.lb_logs.id
+  #   prefix  = "app-lb"
+  #   enabled = true
+  # }
 }
 
 resource "aws_lb_listener" "http_listener" {
@@ -992,8 +1024,17 @@ resource "aws_lb_listener" "http_listener" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg_green.arn
+    target_group_arn = aws_lb_target_group.app_tg.arn # Point to single TG
   }
+  # Optional: Redirect HTTP to HTTPS
+  # default_action {
+  #   type = "redirect"
+  #   redirect {
+  #     port        = "443"
+  #     protocol    = "HTTPS"
+  #     status_code = "HTTP_301"
+  #   }
+  # }
 }
 
 resource "aws_lb_listener" "https_listener" {
@@ -1001,21 +1042,22 @@ resource "aws_lb_listener" "https_listener" {
   port              = 443
   protocol          = "HTTPS"
   certificate_arn   = data.aws_acm_certificate.test_cert.arn
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06" # Use a modern TLS policy
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg_green.arn
+    target_group_arn = aws_lb_target_group.app_tg.arn # Point to single TG
   }
 
-  lifecycle {
-    ignore_changes = [default_action]
-  }
+  # Removed lifecycle ignore_changes for default_action
+  # lifecycle {
+  #  ignore_changes = [default_action]
+  # }
 }
 
 data "aws_acm_certificate" "test_cert" {
-  domain      = "*.myphonefriend.com"
-  statuses    = ["ISSUED"]
+  domain    = "*.myphonefriend.com"
+  statuses  = ["ISSUED"]
   most_recent = true
 }
 
@@ -1025,89 +1067,64 @@ data "aws_acm_certificate" "test_cert" {
 
 resource "aws_codebuild_project" "bianca_project" {
   name         = "bianca"
+  description  = "Builds the Bianca application Docker image and prepares ECS deployment artifacts"
   service_role = aws_iam_role.codebuild_role.arn
 
   artifacts {
     type = "CODEPIPELINE"
+    # Optional: Define secondary artifacts if needed
+    # secondary_artifacts { ... }
   }
 
   environment {
-    compute_type    = "BUILD_GENERAL1_SMALL"
-    image           = "aws/codebuild/standard:4.0"
-    type            = "LINUX_CONTAINER"
-    privileged_mode = true
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0" # Use a recent image
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true # Required for Docker builds
+    image_pull_credentials_type = "CODEBUILD" # Assumes ECR is in the same account
+
+    # Optional: Environment variables for buildspec
+    # environment_variable {
+    #   name  = "EXAMPLE_VAR"
+    #   value = "example_value"
+    # }
   }
 
   source {
-    type      = "CODEPIPELINE"
-    buildspec = "devops/buildspec.yml"
-  }
-}
-
-resource "aws_iam_role_policy" "codebuild_pass_task_role_policy" {
-  name = "CodeBuildPassTaskRolePolicy"
-  role = aws_iam_role.codebuild_role.id
-  policy = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [
-      {
-        Effect   = "Allow",
-        Action   = "iam:PassRole",
-        Resource = "arn:aws:iam::${var.aws_account_id}:role/ecsTaskRole"
-      }
-    ]
-  })
-}
-
-##############################
-# CodeDeploy Application and Deployment Group
-##############################
-
-resource "aws_codedeploy_app" "bianca_app" {
-  name             = var.application_name
-  compute_platform = "ECS"
-}
-
-resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
-  app_name               = aws_codedeploy_app.bianca_app.name
-  deployment_group_name  = var.deployment_group_name
-  service_role_arn       = aws_iam_role.codedeploy_role.arn
-  deployment_config_name = "CodeDeployDefault.ECSAllAtOnce"
-
-  deployment_style {
-    deployment_option = "WITH_TRAFFIC_CONTROL"
-    deployment_type   = "BLUE_GREEN"
+    type            = "CODEPIPELINE"
+    buildspec       = "devops/buildspec.yml" # Ensure this file exists and is updated
+    # git_clone_depth = 1 # Optional: Faster clones for shallow history
   }
 
-  blue_green_deployment_config {
-    terminate_blue_instances_on_deployment_success {
-      action                           = "TERMINATE"
-      termination_wait_time_in_minutes = 5
+  # Optional: Configure logs
+  logs_config {
+    cloudwatch_logs {
+      #group_name  = "/aws/codebuild/${aws_codebuild_project.bianca_project.name}"
+      #stream_name = "build" # Or keep default
+      status      = "ENABLED"
     }
-    deployment_ready_option {
-      action_on_timeout = "CONTINUE_DEPLOYMENT"
-    }
+    # s3_logs { ... } # Optional S3 logging
   }
 
-  load_balancer_info {
-    target_group_pair_info {
-      prod_traffic_route {
-        listener_arns = [aws_lb_listener.https_listener.arn]
-      }
-      target_group {
-        name = aws_lb_target_group.app_tg_green.name
-      }
-      target_group {
-        name = aws_lb_target_group.app_tg_blue.name
-      }
-    }
-  }
+  # Optional: VPC configuration if build needs access to VPC resources
+  # vpc_config {
+  #   vpc_id             = var.vpc_id
+  #   subnets            = var.subnet_ids
+  #   security_group_ids = [aws_security_group.codebuild_sg.id] # Need a dedicated SG for CodeBuild
+  # }
 
-  ecs_service {
-    cluster_name = aws_ecs_cluster.cluster.name
-    service_name = aws_ecs_service.app_service.name
-  }
+  # Optional: Caching for faster builds
+  # cache {
+  #   type  = "LOCAL"
+  #   modes = ["LOCAL_DOCKER_LAYER_CACHE", "LOCAL_SOURCE_CACHE"]
+  # }
 }
+
+# --- CodeDeploy Application and Deployment Group --- (REMOVED)
+
+# resource "aws_codedeploy_app" "bianca_app" { ... }
+# resource "aws_codedeploy_deployment_group" "bianca_deployment_group" { ... }
+
 
 ##############################
 # Route 53
@@ -1115,7 +1132,7 @@ resource "aws_codedeploy_deployment_group" "bianca_deployment_group" {
 
 # 1. Lookup the hosted zone for myphonefriend.com
 data "aws_route53_zone" "myphonefriend" {
-  name         = "myphonefriend.com."
+  name         = "myphonefriend.com." # Ensure trailing dot
   private_zone = false
 }
 
@@ -1126,18 +1143,18 @@ resource "aws_route53_record" "app_subdomain" {
   type    = "A"
 
   alias {
-    name                   = aws_lb.app_lb.dns_name   # Your ALB's DNS name
-    zone_id                = aws_lb.app_lb.zone_id    # The hosted zone ID of your ALB
+    name                   = aws_lb.app_lb.dns_name     # Your ALB's DNS name
+    zone_id                = aws_lb.app_lb.zone_id      # The hosted zone ID of your ALB
     evaluate_target_health = true
   }
 }
 
 resource "aws_route53_record" "wordpress_apex" {
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "myphonefriend.com"  # or "www.myphonefriend.com" if you prefer
+  name    = "myphonefriend.com" # or "www.myphonefriend.com" if you prefer
   type    = "A"
   ttl     = "300"
-  records = ["192.254.225.221"]  # Replace with your HostGator server's IP address
+  records = ["192.254.225.221"] # Replace with your HostGator server's IP address
 }
 
 
@@ -1146,12 +1163,16 @@ resource "aws_route53_record" "wordpress_apex" {
 ##############################
 
 resource "aws_codepipeline" "bianca_pipeline" {
-  name     = "BiancaPipeline"
+  name     = "BiancaPipeline-ECS-Rolling" # Renamed for clarity
   role_arn = aws_iam_role.codepipeline_role.arn
 
   artifact_store {
     type     = "S3"
     location = aws_s3_bucket.artifact_bucket.bucket
+    # encryption_key { # Optional: KMS encryption for artifacts
+    #   id   = "arn:aws:kms:..."
+    #   type = "KMS"
+    # }
   }
 
   stage {
@@ -1161,13 +1182,15 @@ resource "aws_codepipeline" "bianca_pipeline" {
       name             = "SourceAction"
       category         = "Source"
       owner            = "AWS"
-      provider         = "CodeStarSourceConnection"  # Using GitHub App-based connection
+      provider         = "CodeStarSourceConnection" # Using GitHub App-based connection
       version          = "1"
       output_artifacts = ["SourceOutput"]
       configuration = {
         ConnectionArn    = var.github_app_connection_arn
         FullRepositoryId = "${var.github_owner}/${var.github_repo}"
         BranchName       = var.github_branch
+        # DetectChanges = true # Default is true
+        OutputArtifactFormat = "CODE_ZIP" # Default for CodeStarSourceConnection
       }
       run_order = 1
     }
@@ -1183,9 +1206,11 @@ resource "aws_codepipeline" "bianca_pipeline" {
       provider         = "CodeBuild"
       version          = "1"
       input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["BuildOutput"]
+      output_artifacts = ["BuildOutput"] # This will contain imagedefinitions.json
       configuration = {
         ProjectName = aws_codebuild_project.bianca_project.name
+        # Optional: Override buildspec environment variables
+        # EnvironmentVariables = jsonencode([ ... ])
       }
       run_order = 1
     }
@@ -1195,27 +1220,35 @@ resource "aws_codepipeline" "bianca_pipeline" {
     name = "Deploy"
 
     action {
-      name            = "DeployAction"
+      name            = "DeployActionECS" # Renamed action
       category        = "Deploy"
       owner           = "AWS"
-      provider        = "CodeDeploy"
+      provider        = "ECS" # Changed provider
       version         = "1"
-      input_artifacts = ["BuildOutput"]
+      input_artifacts = ["BuildOutput"] # Expects BuildOutput to contain imagedefinitions.json
       configuration = {
-        ApplicationName     = aws_codedeploy_app.bianca_app.name
-        DeploymentGroupName = aws_codedeploy_deployment_group.bianca_deployment_group.deployment_group_name
+        ClusterName = aws_ecs_cluster.cluster.name
+        ServiceName = aws_ecs_service.app_service.name
+        # FileName specifies the artifact file containing container image mappings.
+        # Ensure your buildspec produces this file in the root of BuildOutput.
+        FileName    = "imagedefinitions.json"
       }
       run_order = 1
+      # namespace = "DeployVariables" # Optional: Set namespace for variables
     }
   }
+  # Optional: Add triggers (e.g., CloudWatch Events)
+  # trigger { ... }
 }
 
-# Create a domain identity for SES
+##############################
+# SES and Domain Verification (Keep as is)
+##############################
+
 resource "aws_ses_domain_identity" "ses_identity" {
   domain = "myphonefriend.com"
 }
 
-# Create a TXT record for domain verification in Route 53
 resource "aws_route53_record" "ses_verification" {
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
   name    = "_amazonses.${aws_ses_domain_identity.ses_identity.domain}"
@@ -1224,12 +1257,10 @@ resource "aws_route53_record" "ses_verification" {
   records = [aws_ses_domain_identity.ses_identity.verification_token]
 }
 
-# Enable DKIM for the domain
 resource "aws_ses_domain_dkim" "ses_dkim" {
   domain = aws_ses_domain_identity.ses_identity.domain
 }
 
-# Create CNAME records for DKIM verification (SES generates 3 DKIM tokens)
 resource "aws_route53_record" "ses_dkim_record" {
   count   = 3
   zone_id = data.aws_route53_zone.myphonefriend.zone_id

@@ -1,12 +1,10 @@
 {
-  "name": "create-nodejs-express-app",
-  "version": "1.7.0",
-  "description": "Create a Node.js app for building production-ready RESTful APIs using Express, by running one command",
-  "bin": "bin/createNodejsApp.js",
+  "name": "bianca-app-backend",
+  "version": "0.0.7",
+  "description": "A Tele-Health application that performs wellness checks for the elderly and disabled.",
   "main": "src/index.js",
   "repository": "https://github.com/slampenny/bianca-app-backend.git",
   "author": "Jordan Lapp <negascout@gmail.com>",
-  "license": "MIT",
   "engines": {
     "node": ">=12.0.0"
   },
