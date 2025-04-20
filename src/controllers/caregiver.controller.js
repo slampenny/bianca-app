@@ -7,9 +7,10 @@ const config = require('../config/config');
 const path = require('path');
 
 const getCaregivers = catchAsync(async (req, res) => {
-  console.log("getCaregivers called");
-  console.log("Request caregiver:", req.caregiver);
-
+  // if you're not an orgAdmin or superAdmin, you can only see yourself
+  if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
+    return res.status(httpStatus.OK).send(req.caregiver);
+  }
   // Start with query filters for name and role from req.query
   let filter = pick(req.query, ['name', 'role']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
@@ -19,28 +20,29 @@ const getCaregivers = catchAsync(async (req, res) => {
   if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
     // Use _id instead of id
     filter._id = req.caregiver._id;
-    console.log("Filtering by caregiver _id:", req.caregiver._id);
   } else {
     // Otherwise, return caregivers in the same organization.
     filter.org = req.caregiver.org;
-    console.log("Filtering by organization:", req.caregiver.org);
   }
 
-  console.log("Final filter:", filter);
-
   const result = await caregiverService.queryCaregivers(filter, options);
-  console.log("Query result:", result);
-
+  
   res.send(result);
 });
 
 
 const getCaregiver = catchAsync(async (req, res) => {
-  const caregiver = await caregiverService.getCaregiverById(req.params.caregiverId);
-  if (!caregiver) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  if (req.params.caregiverId == req.caregiver.id) {
+    return res.status(httpStatus.OK).send(req.caregiver);
+  } else if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
+    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
+  } else {
+    const caregiver = await caregiverService.getCaregiverById(req.params.caregiverId);
+    if (!caregiver) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+    }
+    res.send(caregiver);
   }
-  res.send(caregiver);
 });
 
 const createCaregiver = catchAsync(async (req, res) => {
@@ -53,6 +55,14 @@ const createCaregiver = catchAsync(async (req, res) => {
 
 const updateCaregiver = catchAsync(async (req, res) => {
   const { org, patients, ...caregiverData } = req.body;
+  const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
+  // Check if trying to access another caregiver's resource
+  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+
+  if (hasRestrictedAccess && isAccessingOthersResource) {
+    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
+  }
+
   const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, caregiverData);
   res.send(caregiver);
 });
@@ -62,6 +72,15 @@ const uploadCaregiverAvatar = catchAsync(async (req, res) => {
   if (!file) {
     throw new Error("No file uploaded");
   }
+
+  const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
+  // Check if trying to access another caregiver's resource
+  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+
+  if (hasRestrictedAccess && isAccessingOthersResource) {
+    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
+  }
+
   // Extract the filename from the file path
   const filename = path.basename(file.path);
   // Construct an absolute URL for the avatar using the request's protocol and host (which should be your backend's host and port)
@@ -77,6 +96,14 @@ const uploadCaregiverAvatar = catchAsync(async (req, res) => {
 });
 
 const deleteCaregiver = catchAsync(async (req, res) => {
+  const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
+  // Check if trying to access another caregiver's resource
+  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+
+  if (hasRestrictedAccess && isAccessingOthersResource) {
+    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
+  }
+  
   await caregiverService.deleteCaregiverById(req.params.caregiverId);
   res.status(httpStatus.NO_CONTENT).send();
 });

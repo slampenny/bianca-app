@@ -79,6 +79,11 @@ const initializeWebSocketServer = (server) => {
 
   wss.on('connection', async (ws, req) => {
     logger.info('[WebSocket Service] New WS connection attempt: ' + req.url);
+    logger.info(`[WebSocket Service] headers: ${JSON.stringify(req.headers, null, 2)}`);
+    logger.info(`[WebSocket Service] url: ${req.url}`);
+    logger.info(`[WebSocket Service] connection IP: ${req.socket.remoteAddress}`);
+    logger.info(`[WebSocket Service] connection method: ${req.method}`);
+    
     const { pathname } = url.parse(req.url);
     const pathSegments = pathname.split('/');
     const callSid = pathSegments[pathSegments.length - 1];
@@ -97,10 +102,18 @@ const initializeWebSocketServer = (server) => {
     try {
       conversation = await Conversation.findOne({ callSid });
       if (!conversation) {
-        logger.error(`[WebSocket Service] No conversation found in DB for CallSid: ${callSid}. Closing.`);
-        ws.close();
-        cleanupConnection(callSid);
-        return;
+          logger.warn(`[WebSocket Service] No conversation found in DB for CallSid: ${callSid}. Creating temporary placeholder.`);
+          conversation = new Conversation({
+            callSid,
+            // Add default fields as needed
+            messages: [],
+            createdAt: new Date()
+          });
+          await conversation.save(); // This ensures you have an _id for conversationId
+        // logger.error(`[WebSocket Service] No conversation found in DB for CallSid: ${callSid}. Closing.`);
+        // ws.close();
+        // cleanupConnection(callSid);
+        // return;
       }
       conversationId = conversation._id.toString();
       conversationStore.set(callSid, conversationId);

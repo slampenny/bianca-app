@@ -10,8 +10,9 @@ const {
   caregiverTwo,
   admin,
   insertCaregivers,
-  insertCaregiverAndReturnToken,
-  insertCaregiverAndReturnTokenByRole,
+  insertCaregivertoOrgAndReturnToken,
+  insertCaregivertoOrgAndReturnTokenByRole,
+  insertCaregiversAndAddToOrg,
 } = require('../fixtures/caregiver.fixture');
 
 const {
@@ -41,8 +42,9 @@ describe('Caregiver routes', () => {
   });
   describe('GET /v1/caregivers', () => {
     test('should return 200 and apply the default query options', async () => {
-      const [caregiver] = await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
       const res = await request(app)
         .get('/v1/caregivers')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -76,8 +78,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 403 if a non-admin is trying to access all caregivers', async () => {
-      await insertCaregivers([caregiverTwo, admin]);
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('staff');
+      const [org] = await insertOrgs([orgOne]);
+      await insertCaregiversAndAddToOrg(org, [caregiverTwo, admin]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'staff');
       await request(app)
         .get('/v1/caregivers')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -86,8 +89,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should correctly apply filter on name field', async () => {
-      const [caregiver] = await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       const res = await request(app)
         .get('/v1/caregivers')
@@ -108,8 +112,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should correctly apply filter on role field', async () => {
-      const [caregiver1, caregiver2] = await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver1, caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       const res = await request(app)
         .get('/v1/caregivers')
@@ -133,8 +138,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should correctly sort the returned array if descending sort param is specified', async () => {
-      const [caregiver1, caregiver2] = await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { caregiver: admin1, accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver1, caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { caregiver: admin1, accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       const res = await request(app)
         .get('/v1/caregivers')
@@ -157,8 +163,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should correctly sort the returned array if ascending sort param is specified', async () => {
-      const [caregiver1, caregiver2] = await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { caregiver: admin1, accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver1, caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { caregiver: admin1, accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       const res = await request(app)
         .get('/v1/caregivers')
@@ -181,8 +188,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should correctly sort the returned array if multiple sorting criteria are specified', async () => {
-      const [caregiver1, caregiver2] = await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { caregiver: admin1, accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver1, caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { caregiver: admin1, accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       const res = await request(app)
         .get('/v1/caregivers')
@@ -216,8 +224,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should limit returned array if limit param is specified', async () => {
-      const [caregiver1, caregiver2] = await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver1, caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       const res = await request(app)
         .get('/v1/caregivers')
@@ -239,9 +248,10 @@ describe('Caregiver routes', () => {
     });
 
     test('should return the correct page if page and limit params are specified', async () => {
-      await insertCaregivers([caregiverOne, caregiverTwo]);
-      const { caregiver: admin1, accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
-
+      const [org] = await insertOrgs([orgOne]);
+      await insertCaregiversAndAddToOrg(org, [caregiverOne, caregiverTwo]);
+      const { caregiver: admin1, accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
+      
       const res = await request(app)
         .get('/v1/caregivers')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -263,7 +273,8 @@ describe('Caregiver routes', () => {
 
   describe('GET /v1/caregivers/:caregiverId', () => {
     test('should return 200 and the caregiver object if data is ok', async () => {
-      const { caregiver, accessToken } = await insertCaregiverAndReturnTokenByRole('staff');
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'staff');
       const res = await request(app)
         .get(`/v1/caregivers/${caregiver.id}`)
         .set('Authorization', `Bearer ${accessToken}`)
@@ -277,7 +288,7 @@ describe('Caregiver routes', () => {
         name: caregiver.name,
         phone: caregiver.phone,
         role: caregiver.role,
-        org: null,
+        org: caregiver.org.toHexString(),
         patients: expect.any(Array),
         isEmailVerified: false,
       });
@@ -290,8 +301,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 403 error if caregiver is trying to get another caregiver', async () => {
-      const [caregiver2] = await insertCaregivers([caregiverTwo]);
-      const { accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverTwo]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
 
       await request(app)
         .get(`/v1/caregivers/${caregiver2.id}`)
@@ -301,8 +313,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 200 and the caregiver object if admin is trying to get another caregiver', async () => {
-      const [caregiver1] = await insertCaregivers([caregiverOne]);
-      const { accessToken } = await insertCaregiverAndReturnTokenByRole('orgAdmin');
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver1] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
 
       await request(app)
         .get(`/v1/caregivers/${caregiver1.id}`)
@@ -312,7 +325,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 400 error if caregiverId is not a valid mongo id', async () => {
-      const { accessToken } = await insertCaregiverAndReturnToken(admin);
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
 
       await request(app)
         .get('/v1/caregivers/invalidId')
@@ -322,7 +336,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 404 error if caregiver is not found', async () => {
-      const { accessToken } = await insertCaregiverAndReturnToken(admin);
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
 
       await request(app)
         .get(`/v1/caregivers/${mongoose.Types.ObjectId()}`)
@@ -335,9 +350,8 @@ describe('Caregiver routes', () => {
   describe('DELETE /v1/caregivers/:caregiverId', () => {
     test('should return 204 if data is ok', async () => {
       const [org] = await insertOrgs([orgOne]);
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
 
-      caregiver.org = org.id;
       caregiver.patients = [];
       await caregiver.save();
 
@@ -361,8 +375,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 403 error if caregiver is trying to delete another caregiver', async () => {
-      const [caregiver2] = await insertCaregivers([caregiverTwo]);
-      const { accessToken } = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverTwo]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       await request(app)
         .delete(`/v1/caregivers/${caregiver2.id}`)
         .set('Authorization', `Bearer ${accessToken}`)
@@ -372,9 +387,8 @@ describe('Caregiver routes', () => {
 
     test('should return 204 if admin is trying to delete another caregiver', async () => {
       const [org] = await insertOrgs([orgOne]);
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(admin);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, admin);
 
-      caregiver.org = org.id;
       caregiver.patients = [];
       await caregiver.save();
 
@@ -389,7 +403,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 400 error if caregiverId is not a valid mongo id', async () => {
-      const {accessToken} = await insertCaregiverAndReturnToken(admin);
+      const [org] = await insertOrgs([orgOne]);
+      const {accessToken} = await insertCaregivertoOrgAndReturnToken(org, admin);
 
       await request(app)
         .delete('/v1/caregivers/invalidId')
@@ -399,7 +414,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 404 error if caregiver already is not found', async () => {
-      const {accessToken} = await insertCaregiverAndReturnToken(admin);
+      const [org] = await insertOrgs([orgOne]);
+      const {accessToken} = await insertCaregivertoOrgAndReturnToken(org, admin);
 
       await request(app)
         .delete(`/v1/caregivers/${mongoose.Types.ObjectId()}`)
@@ -411,7 +427,8 @@ describe('Caregiver routes', () => {
 
   describe('PATCH /v1/caregivers/:caregiverId', () => {
     test('should return 200 and successfully update caregiver if data is ok', async () => {
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const updateBody = {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
@@ -450,8 +467,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 403 if caregiver is updating another caregiver', async () => {
-      const [caregiver2] = await insertCaregivers([caregiverTwo]);
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver2] = await insertCaregiversAndAddToOrg(org, [caregiverTwo]);
+      const {accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
@@ -462,8 +480,9 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 200 and successfully update caregiver if admin is updating another caregiver', async () => {
-      const [caregiver1] = await insertCaregivers([caregiverOne]);
-      const {accessToken} = await insertCaregiverAndReturnToken(admin);
+      const [org] = await insertOrgs([orgOne]);
+      const [caregiver1] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
+      const {accessToken} = await insertCaregivertoOrgAndReturnToken(org, admin);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
@@ -474,7 +493,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 404 if admin is updating another caregiver that is not found', async () => {
-      const {accessToken} = await insertCaregiverAndReturnToken(admin);
+      const [org] = await insertOrgs([orgOne]);
+      const {accessToken} = await insertCaregivertoOrgAndReturnToken(org, admin);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
@@ -485,7 +505,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 400 error if caregiverId is not a valid mongo id', async () => {
-      const {accessToken} = await insertCaregiverAndReturnToken(admin);
+      const [org] = await insertOrgs([orgOne]);
+      const {accessToken} = await insertCaregivertoOrgAndReturnToken(org, admin);
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
@@ -496,7 +517,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 400 if email is invalid', async () => {
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const updateBody = { email: 'invalidEmail' };
 
       await request(app)
@@ -507,7 +529,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 400 if email is already taken', async () => {
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const [caregiver2] = await insertCaregivers([caregiverTwo]);
       const updateBody = { email: caregiver2.email };
 
@@ -519,7 +542,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should not return 400 if email is my email', async () => {
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const updateBody = { email: caregiver.email };
 
       await request(app)
@@ -530,7 +554,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 400 if password length is less than 8 characters', async () => {
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const updateBody = { password: 'passwo1' };
 
       await request(app)
@@ -541,7 +566,8 @@ describe('Caregiver routes', () => {
     });
 
     test('should return 400 if password does not contain both letters and numbers', async () => {
-      const {caregiver, accessToken} = await insertCaregiverAndReturnToken(caregiverOne);
+      const [org] = await insertOrgs([orgOne]);
+      const {caregiver, accessToken} = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const updateBody = { password: 'password' };
 
       await request(app)

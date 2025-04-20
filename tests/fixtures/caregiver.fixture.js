@@ -16,7 +16,6 @@ const hashedPassword = bcrypt.hashSync(password, salt);
 const fakeId = new mongoose.Types.ObjectId();
 
 const caregiverOne = {
-  org: new mongoose.Types.ObjectId(),
   name: faker.name.findName(),
   email: "fake@example.org",
   phone: '+16045624263',
@@ -30,7 +29,6 @@ const caregiverOneWithPassword = {
 };
 
 const caregiverTwo = {
-  org: new mongoose.Types.ObjectId(),
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
@@ -39,7 +37,6 @@ const caregiverTwo = {
 };
 
 const admin = {
-  org: new mongoose.Types.ObjectId(),
   name: faker.name.findName(),
   email: 'admin@example.org',
   phone: '+16045624263',
@@ -48,7 +45,6 @@ const admin = {
 };
 
 const superAdmin = {
-  org: new mongoose.Types.ObjectId(),
   name: faker.name.findName(),
   email: 'superAdmin@example.org',
   phone: '+16045624263',
@@ -69,14 +65,14 @@ const insertCaregiversAndAddToOrg = async (org, caregivers) => {
   return insertedCaregivers;
 };
 
-const insertCaregiverAndReturnToken = async (caregiverChoice) => {
-  const [caregiver] = await insertCaregivers([caregiverChoice]);
+const insertCaregivertoOrgAndReturnToken = async (org, caregiverChoice) => {
+  const [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverChoice]);
   const authTokens = await tokenService.generateAuthTokens(caregiver);
 
   return { caregiver, accessToken: authTokens.access.token };
 };
 
-const insertCaregiverAndReturnTokenByRole = async (role = "staff") => {
+const insertCaregivertoOrgAndReturnTokenByRole = async (org, role = "staff") => {
   let caregiverChoice;
 
   switch (role) {
@@ -93,7 +89,7 @@ const insertCaregiverAndReturnTokenByRole = async (role = "staff") => {
       throw new ApiError(httpStatus.BAD_REQUEST, `Role ${role} not found`);
   }
 
-  return await insertCaregiverAndReturnToken(caregiverChoice);
+  return await insertCaregivertoOrgAndReturnToken(org, caregiverChoice);
 };
 
 module.exports = {
@@ -107,6 +103,6 @@ module.exports = {
   superAdmin,
   insertCaregivers,
   insertCaregiversAndAddToOrg,
-  insertCaregiverAndReturnToken,
-  insertCaregiverAndReturnTokenByRole
+  insertCaregivertoOrgAndReturnToken,
+  insertCaregivertoOrgAndReturnTokenByRole
 };
