@@ -1,28 +1,28 @@
-import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
-import { 
-  HomeScreen, 
-  PatientScreen, 
-  SchedulesScreen, 
-  ConversationsScreen, 
-  CaregiverScreen, 
+import React from "react"
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
+import { createStackNavigator } from "@react-navigation/stack"
+import { Ionicons } from "@expo/vector-icons"
+import {
+  HomeScreen,
+  PatientScreen,
+  SchedulesScreen,
+  ConversationsScreen,
+  CaregiverScreen,
   CaregiversScreen,
-  AlertScreen, 
-  OrgScreen, 
-  PaymentInfoScreen, 
+  AlertScreen,
+  OrgScreen,
+  PaymentInfoScreen,
   ProfileScreen,
-  LogoutScreen 
-} from 'app/screens';
-import { DrawerParamList } from './navigationTypes';
-import ProfileButton from 'app/components/ProfileButton';
-import { useSelector } from 'react-redux';
-import { getCurrentUser } from 'app/store/authSlice';
-import { selectUnreadAlertCount } from 'app/store/alertSlice';
+  LogoutScreen,
+} from "app/screens"
+import { DrawerParamList } from "./navigationTypes"
+import ProfileButton from "app/components/ProfileButton"
+import { useSelector } from "react-redux"
+import { getCurrentUser } from "app/store/authSlice"
+import { selectUnreadAlertCount } from "app/store/alertSlice"
 
-const Stack = createStackNavigator();
-const Tab = createBottomTabNavigator<DrawerParamList>();
+const Stack = createStackNavigator()
+const Tab = createBottomTabNavigator<DrawerParamList>()
 
 function HomeStack() {
   return (
@@ -33,7 +33,7 @@ function HomeStack() {
         // No left button since we're not using a drawer/hamburger
         headerRight: () => <ProfileButton />,
       })}
-      >
+    >
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Patient" component={PatientScreen} />
       <Stack.Screen name="Schedule" component={SchedulesScreen} />
@@ -41,11 +41,11 @@ function HomeStack() {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Logout" component={LogoutScreen} />
     </Stack.Navigator>
-  );
+  )
 }
 
 function ProfileStack() {
-  const currentUser = useSelector(getCurrentUser);
+  const currentUser = useSelector(getCurrentUser)
   return (
     <Stack.Navigator
       screenOptions={{
@@ -60,7 +60,7 @@ function ProfileStack() {
     >
       <Stack.Screen name="Profile" component={CaregiverScreen} />
     </Stack.Navigator>
-  );
+  )
 }
 
 function AlertStack() {
@@ -68,7 +68,7 @@ function AlertStack() {
     <Stack.Navigator>
       <Stack.Screen name="Alert" component={AlertScreen} />
     </Stack.Navigator>
-  );
+  )
 }
 
 function OrgStack() {
@@ -78,7 +78,7 @@ function OrgStack() {
       <Stack.Screen name="Caregivers" component={CaregiversScreen} />
       <Stack.Screen name="Caregiver" component={CaregiverScreen} />
     </Stack.Navigator>
-  );
+  )
 }
 
 function PaymentStack() {
@@ -86,7 +86,7 @@ function PaymentStack() {
     <Stack.Navigator>
       <Stack.Screen name="Payment" component={PaymentInfoScreen} />
     </Stack.Navigator>
-  );
+  )
 }
 
 function LogoutStack() {
@@ -94,34 +94,34 @@ function LogoutStack() {
     <Stack.Navigator>
       <Stack.Screen name="Logout" component={LogoutScreen} />
     </Stack.Navigator>
-  );
+  )
 }
 
 export default function MainTabNavigator() {
-  const unreadAlertCount = useSelector(selectUnreadAlertCount); // Get unread alert count
+  const unreadAlertCount = useSelector(selectUnreadAlertCount) // Get unread alert count
 
   return (
-    <Tab.Navigator 
+    <Tab.Navigator
       initialRouteName="Home"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#3498db',
-        tabBarInactiveTintColor: '#7f8c8d',
+        tabBarActiveTintColor: "#3498db",
+        tabBarInactiveTintColor: "#7f8c8d",
         tabBarShowLabel: false, // Hide default labels
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+          let iconName
 
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Org') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Payment') {
-            iconName = focused ? 'card' : 'card-outline';
-          } else if (route.name === 'Alert') {
-            iconName = focused ? 'alert-circle' : 'alert-circle-outline';
+          if (route.name === "Home") {
+            iconName = focused ? "home" : "home-outline"
+          } else if (route.name === "Org") {
+            iconName = focused ? "people" : "people-outline"
+          } else if (route.name === "Payment") {
+            iconName = focused ? "card" : "card-outline"
+          } else if (route.name === "Alert") {
+            iconName = focused ? "alert-circle" : "alert-circle-outline"
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={size} color={color} />
         },
       })}
     >
@@ -132,10 +132,10 @@ export default function MainTabNavigator() {
         name="Alert"
         component={AlertStack}
         options={{
-          tabBarLabel: 'Alert', // Custom label
+          tabBarLabel: "Alert", // Custom label
           tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : null, // Show badge if unread count > 0
         }}
       />
     </Tab.Navigator>
-  );
+  )
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react"
 import {
   View,
   StyleSheet,
@@ -7,34 +7,33 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
-} from 'react-native';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { useSelector } from 'react-redux';
+} from "react-native"
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs"
+import { useSelector } from "react-redux"
 // Import getCurrentUser selector here
-import { getCurrentUser, getAuthTokens } from '../store/authSlice';
-import { getOrg } from '../store/orgSlice';
-import { useGetInvoicesByOrgQuery } from '../services/api/paymentApi';
-import { WebView } from 'react-native-webview';
-import Config from '../config';
+import { getCurrentUser, getAuthTokens } from "../store/authSlice"
+import { getOrg } from "../store/orgSlice"
+import { useGetInvoicesByOrgQuery } from "../services/api/paymentApi"
+import { WebView } from "react-native-webview"
+import Config from "../config"
 
 // --- Define the required roles ---
-const AUTHORIZED_ROLES = ['orgAdmin', 'superAdmin'];
-
+const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
 
 // ================================================
 //         PaymentMethodsScreen (No changes needed here)
 // ================================================
 function PaymentMethodsScreen() {
-  const org = useSelector(getOrg);
-  const tokens = useSelector(getAuthTokens);
-  const jwt = tokens?.access?.token;
+  const org = useSelector(getOrg)
+  const tokens = useSelector(getAuthTokens)
+  const jwt = tokens?.access?.token
 
   if (!org || !org.id) {
     return (
       <View style={styles.screenContainer}>
         <Text style={styles.emptyText}>No organization data available.</Text>
       </View>
-    );
+    )
   }
 
   if (!jwt) {
@@ -42,21 +41,17 @@ function PaymentMethodsScreen() {
       <View style={styles.screenContainer}>
         <Text style={styles.emptyText}>Authorization token not available.</Text>
       </View>
-    );
+    )
   }
 
-  const orgId = org.id.toString();
+  const orgId = org.id.toString()
   // console.log('React Native JWT:', jwt); // Consider removing in production
-  const paymentPageUrl = `${Config.paymentMethodGatewayUrl}/${orgId}/${jwt}`;
+  const paymentPageUrl = `${Config.paymentMethodGatewayUrl}/${orgId}/${jwt}`
 
   return (
     <View style={styles.screenContainer}>
-      {Platform.OS === 'web' ? (
-        <iframe
-          src={paymentPageUrl}
-          style={styles.iframe}
-          title="Payment Method"
-        />
+      {Platform.OS === "web" ? (
+        <iframe src={paymentPageUrl} style={styles.iframe} title="Payment Method" />
       ) : (
         <WebView
           source={{ uri: paymentPageUrl }}
@@ -69,35 +64,31 @@ function PaymentMethodsScreen() {
         />
       )}
     </View>
-  );
+  )
 }
-
 
 // ================================================
 //         ExpandableInvoice (No changes needed here)
 // ================================================
 function ExpandableInvoice({ invoice }: { invoice: any }) {
-  const [expanded, setExpanded] = useState(false);
-  const formattedDate = new Date(invoice.issueDate).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const formattedAmount = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(invoice.totalAmount);
+  const [expanded, setExpanded] = useState(false)
+  const formattedDate = new Date(invoice.issueDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+  const formattedAmount = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(invoice.totalAmount)
 
   return (
     <View style={styles.invoiceContainer}>
-      <Pressable
-        onPress={() => setExpanded(prev => !prev)}
-        style={styles.invoiceHeader}
-      >
+      <Pressable onPress={() => setExpanded((prev) => !prev)} style={styles.invoiceHeader}>
         <Text style={styles.invoiceHeaderText}>
           {formattedDate} - {formattedAmount}
         </Text>
-        <Text style={styles.expandIcon}>{expanded ? '▲' : '▼'}</Text>
+        <Text style={styles.expandIcon}>{expanded ? "▲" : "▼"}</Text>
       </Pressable>
       {expanded && (
         <View style={styles.invoiceDetails}>
@@ -109,13 +100,11 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
           <Text style={styles.detailText}>
             Due Date: {new Date(invoice.dueDate).toLocaleString()}
           </Text>
-          {invoice.notes && (
-            <Text style={styles.detailText}>Notes: {invoice.notes}</Text>
-          )}
+          {invoice.notes && <Text style={styles.detailText}>Notes: {invoice.notes}</Text>}
         </View>
       )}
     </View>
-  );
+  )
 }
 
 // ================================================
@@ -123,8 +112,8 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
 // ================================================
 function BillingInfoScreen() {
   // Keep this check as a safety measure in case this screen is somehow accessed directly
-  const currentUser = useSelector(getCurrentUser);
-  const org = useSelector(getOrg);
+  const currentUser = useSelector(getCurrentUser)
+  const org = useSelector(getOrg)
 
   // Although the parent checks authorization, keep these basic checks
   if (!currentUser) {
@@ -132,47 +121,48 @@ function BillingInfoScreen() {
       <View style={styles.screenContainer}>
         <Text style={styles.emptyText}>No user data available.</Text>
       </View>
-    );
+    )
   }
   if (!org || !org.id) {
     return (
       <View style={styles.screenContainer}>
         <Text style={styles.emptyText}>No organization data available.</Text>
       </View>
-    );
+    )
   }
 
-  const queryParam = { orgId: org.id.toString() };
+  const queryParam = { orgId: org.id.toString() }
   const {
     data: invoices,
     error: invoicesError,
     isLoading: invoicesLoading,
-  } = useGetInvoicesByOrgQuery(queryParam, { skip: !org });
+  } = useGetInvoicesByOrgQuery(queryParam, { skip: !org })
 
   // Hardcoded data - consider fetching this from org or user data if available
-  const currentPlan = org.planName || 'Unknown Plan'; // Example: Get plan from org
-  const nextBillingDate = org.nextBillingDate || 'N/A'; // Example: Get next billing date
+  const currentPlan = org.planName || "Unknown Plan" // Example: Get plan from org
+  const nextBillingDate = org.nextBillingDate || "N/A" // Example: Get next billing date
 
   useEffect(() => {
     if (invoicesError) {
-      console.error('Error loading invoices', invoicesError);
+      console.error("Error loading invoices", invoicesError)
     }
-  }, [invoicesError]);
+  }, [invoicesError])
 
   if (invoicesLoading) {
     return (
       <View style={[styles.screenContainer, styles.centered]}>
         <ActivityIndicator size="large" color="#3498db" />
       </View>
-    );
+    )
   }
 
-  if (invoicesError) { // Check specific error before assuming !invoices means error
+  if (invoicesError) {
+    // Check specific error before assuming !invoices means error
     return (
       <View style={styles.screenContainer}>
         <Text style={styles.emptyText}>Error loading invoices.</Text>
       </View>
-    );
+    )
   }
 
   return (
@@ -182,26 +172,25 @@ function BillingInfoScreen() {
       <Text style={styles.sectionTitle}>Past Invoices:</Text>
       <FlatList
         data={invoices}
-        keyExtractor={invoice => invoice.id.toString()}
+        keyExtractor={(invoice) => invoice.id.toString()}
         renderItem={({ item }) => <ExpandableInvoice invoice={item} />}
         contentContainerStyle={{ paddingBottom: 20 }}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No invoices available.</Text>
-        }
+        ListEmptyComponent={<Text style={styles.emptyText}>No invoices available.</Text>}
       />
     </View>
-  );
+  )
 }
 
 // ================================================
 //         Main PaymentInfoScreen (with Role Check)
 // ================================================
-const Tab = createMaterialTopTabNavigator();
+const Tab = createMaterialTopTabNavigator()
 
-export function PaymentInfoScreen() { // Ensure this is the component used in your navigation stack
+export function PaymentInfoScreen() {
+  // Ensure this is the component used in your navigation stack
 
   // *** 1. Get the current user in the main component ***
-  const currentUser = useSelector(getCurrentUser);
+  const currentUser = useSelector(getCurrentUser)
 
   // *** 2. Handle loading state for user ***
   if (!currentUser) {
@@ -211,152 +200,155 @@ export function PaymentInfoScreen() { // Ensure this is the component used in yo
         <ActivityIndicator size="large" color="#3498db" />
         <Text style={styles.emptyText}>Loading user information...</Text>
       </View>
-    );
+    )
   }
 
   // *** 3. Check user role ***
-  const userRole = currentUser.role; // Assuming role is a property on the user object
-  const isAuthorized = AUTHORIZED_ROLES.includes(userRole);
+  const userRole = currentUser.role // Assuming role is a property on the user object
+  const isAuthorized = AUTHORIZED_ROLES.includes(userRole)
 
   // *** 4. Conditional Rendering based on Role ***
   if (!isAuthorized) {
     // User is NOT authorized - Show the message
     return (
-        <View style={styles.messageContainer}>
-            <Text style={styles.messageTitle}>Access Restricted</Text>
-            <Text style={styles.messageText}>
-                You do not have the necessary permissions to view or manage payment information.
-            </Text>
-            <Text style={styles.messageText}>
-                Please contact your organization administrator for assistance.
-            </Text>
-        </View>
-    );
+      <View style={styles.messageContainer}>
+        <Text style={styles.messageTitle}>Access Restricted</Text>
+        <Text style={styles.messageText}>
+          You do not have the necessary permissions to view or manage payment information.
+        </Text>
+        <Text style={styles.messageText}>
+          Please contact your organization administrator for assistance.
+        </Text>
+      </View>
+    )
   }
 
   // *** 5. User IS authorized - Render the Tab Navigator ***
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#3498db',
-        tabBarInactiveTintColor: '#7f8c8d',
-        tabBarLabelStyle: { fontSize: 16, fontWeight: '600' },
-        tabBarStyle: { backgroundColor: '#fff' },
-        tabBarIndicatorStyle: { backgroundColor: '#3498db' },
+        tabBarActiveTintColor: "#3498db",
+        tabBarInactiveTintColor: "#7f8c8d",
+        tabBarLabelStyle: { fontSize: 16, fontWeight: "600" },
+        tabBarStyle: { backgroundColor: "#fff" },
+        tabBarIndicatorStyle: { backgroundColor: "#3498db" },
       }}
     >
       <Tab.Screen name="Payment Methods" component={PaymentMethodsScreen} />
       <Tab.Screen name="Billing Info" component={BillingInfoScreen} />
     </Tab.Navigator>
-  );
+  )
 }
 
 // --- Styles (Combined and added message styles) ---
 const styles = StyleSheet.create({
-  screenContainer: { // Used by sub-screens
+  billingHeader: {
+    color: "#2c3e50",
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 10,
+  },
+  centered: {
+    // Utility style for centering content
     flex: 1,
-    padding: 15, // Slightly reduced padding
-    backgroundColor: '#f4f6f8', // Lighter background grey
+    justifyContent: "center",
+    alignItems: "center",
   },
-  centered: { // Utility style for centering content
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-  },
-  messageContainer: { // Used for the access restricted message
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 30,
-      backgroundColor: '#f0f0f0',
-  },
-  messageTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: '#e74c3c',
-      marginBottom: 15,
-      textAlign: 'center',
-  },
-  messageText: {
-      fontSize: 16,
-      color: '#34495e',
-      textAlign: 'center',
-      marginBottom: 10,
-      lineHeight: 22,
-  },
-  webview: {
-    flex: 1,
-    borderWidth: 1, // Add border to see boundaries if needed
-    borderColor: '#ccc',
-  },
-  iframe: {
-    width: '100%',
-    height: '100%',
-    border: 'none',
+  detailText: {
+    color: "#2c3e50",
+    fontSize: 14,
+    marginVertical: 3, // Increased vertical margin
   },
   emptyText: {
-    textAlign: 'center',
-    color: '#7f8c8d',
-    marginTop: 20,
+    color: "#7f8c8d",
     fontSize: 15,
-  },
-  billingHeader: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 17, // Slightly larger
-    fontWeight: '600',
-    color: '#34495e', // Darker grey
     marginTop: 20,
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingBottom: 5,
+    textAlign: "center",
+  },
+  expandIcon: {
+    color: "#3498db",
+    fontSize: 16,
+  },
+  iframe: {
+    border: "none",
+    height: "100%",
+    width: "100%",
   },
   invoiceContainer: {
-    marginBottom: 10,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
+    borderColor: "#e0e0e0",
     borderRadius: 8,
-    overflow: 'hidden',
+    borderWidth: 1,
     elevation: 2,
-    shadowColor: '#000',
+    marginBottom: 10,
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+  },
+  invoiceDetails: {
+    borderTopColor: "#ecf0f1",
+    borderTopWidth: 1,
+    padding: 12,
   },
   invoiceHeader: {
     paddingVertical: 14, // Increased padding
     paddingHorizontal: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9', // Lighter header bg
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f9f9f9", // Lighter header bg
   },
   invoiceHeaderText: {
+    color: "#2c3e50",
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
+    fontWeight: "600",
   },
-  expandIcon: {
+  messageContainer: {
+    // Used for the access restricted message
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 30,
+    backgroundColor: "#f0f0f0",
+  },
+  messageText: {
+    color: "#34495e",
     fontSize: 16,
-    color: '#3498db',
+    lineHeight: 22,
+    marginBottom: 10,
+    textAlign: "center",
   },
-  invoiceDetails: {
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#ecf0f1',
+  messageTitle: {
+    color: "#e74c3c",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
   },
-  detailText: {
-    fontSize: 14,
-    color: '#2c3e50',
-    marginVertical: 3, // Increased vertical margin
+  screenContainer: {
+    // Used by sub-screens
+    flex: 1,
+    padding: 15, // Slightly reduced padding
+    backgroundColor: "#f4f6f8", // Lighter background grey
   },
-});
+  sectionTitle: {
+    fontSize: 17, // Slightly larger
+    fontWeight: "600",
+    color: "#34495e", // Darker grey
+    marginTop: 20,
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    paddingBottom: 5,
+  },
+  webview: {
+    flex: 1,
+    borderWidth: 1, // Add border to see boundaries if needed
+    borderColor: "#ccc",
+  },
+})
 
 // Optional: If PaymentInfoScreen is the default export of the file
 // export default PaymentInfoScreen;

@@ -1,72 +1,66 @@
-import React, { useState, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { FlatList } from 'react-native';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
-import { Toggle, Button, EmptyState, ListItem } from "../components";
+import React, { useState, useEffect } from "react"
+import { useSelector, useDispatch } from "react-redux"
+import { FlatList, View, Text, StyleSheet, ActivityIndicator } from "react-native"
+import { Toggle, Button, EmptyState, ListItem } from "../components"
 import {
   useMarkAllAsReadMutation,
   useMarkAlertAsReadMutation,
   useGetAllAlertsQuery,
-} from "../services/api";
-import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSlice";
-import { Alert } from "../services/api/api.types";
-import { getCurrentUser } from "app/store/authSlice";
+} from "../services/api"
+import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSlice"
+import { Alert } from "../services/api/api.types"
+import { getCurrentUser } from "app/store/authSlice"
 
 export function AlertScreen() {
-  const dispatch = useDispatch();
-  const alerts = useSelector(getAlerts);
-  const unreadAlertCount = useSelector(selectUnreadAlertCount);
-  const currentUser = useSelector(getCurrentUser);
-  const [showUnread, setShowUnread] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const dispatch = useDispatch()
+  const alerts = useSelector(getAlerts)
+  const unreadAlertCount = useSelector(selectUnreadAlertCount)
+  const currentUser = useSelector(getCurrentUser)
+  const [showUnread, setShowUnread] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   const {
     data: fetchAllAlerts,
     isLoading: isFetching,
     error: fetchError,
     refetch,
-  } = useGetAllAlertsQuery();
+  } = useGetAllAlertsQuery()
 
-  const [markAllAsRead] = useMarkAllAsReadMutation();
-  const [markAlertAsRead] = useMarkAlertAsReadMutation();
+  const [markAllAsRead] = useMarkAllAsReadMutation()
+  const [markAlertAsRead] = useMarkAlertAsReadMutation()
 
   useEffect(() => {
     if (fetchAllAlerts) {
-      console.log('Fetched alerts:', fetchAllAlerts);
-      dispatch(setAlerts(fetchAllAlerts));
+      console.log("Fetched alerts:", fetchAllAlerts)
+      dispatch(setAlerts(fetchAllAlerts))
     }
-  }, [fetchAllAlerts, dispatch]);
+  }, [fetchAllAlerts, dispatch])
 
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
+    setRefreshing(true)
+    await refetch()
+    setRefreshing(false)
+  }
 
   const handleMarkAllAsRead = async () => {
     const filteredAlerts = showUnread
       ? alerts.filter((alert) => !alert.readBy?.includes(currentUser?.id))
-      : alerts;
+      : alerts
 
-    await markAllAsRead({ alerts: filteredAlerts });
-    await refetch();
-  };
+    await markAllAsRead({ alerts: filteredAlerts })
+    await refetch()
+  }
 
   const handleAlertPress = async (alert: Alert) => {
     if (alert.id) {
       try {
-        await markAlertAsRead({ alertId: alert.id }).unwrap();
-        refetch();
+        await markAlertAsRead({ alertId: alert.id }).unwrap()
+        refetch()
       } catch (error) {
-        console.error("Failed to mark alert as read:", error);
+        console.error("Failed to mark alert as read:", error)
       }
     }
-  };
+  }
 
   const renderItem = ({ item }: { item: Alert }) => (
     <ListItem onPress={() => handleAlertPress(item)} style={styles.listItem}>
@@ -82,9 +76,7 @@ export function AlertScreen() {
             {item.message}
           </Text>
         </View>
-        <Text style={styles.alertDetails}>
-          Importance: {item.importance}
-        </Text>
+        <Text style={styles.alertDetails}>Importance: {item.importance}</Text>
         {item.relevanceUntil && (
           <Text style={styles.alertDetails}>
             Expires: {new Date(item.relevanceUntil).toLocaleString()}
@@ -92,24 +84,24 @@ export function AlertScreen() {
         )}
       </View>
     </ListItem>
-  );
+  )
 
   const filteredAlerts = showUnread
     ? alerts.filter((alert) => !alert.readBy?.includes(currentUser?.id))
-    : alerts;
+    : alerts
 
   if (isFetching) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#3498db" />
       </View>
-    );
+    )
   }
 
   const handleShowUnreadChange = (newValue: boolean) => {
-    setShowUnread(newValue);
-    refetch(); // Refetch data after changing showUnread
-  };
+    setShowUnread(newValue)
+    refetch() // Refetch data after changing showUnread
+  }
 
   return (
     <View style={styles.container}>
@@ -142,11 +134,7 @@ export function AlertScreen() {
         )}
 
         {filteredAlerts.length === 0 ? (
-          <EmptyState
-            style={styles.emptyState}
-            content="No alerts"
-            heading="So empty... so sad"
-          />
+          <EmptyState style={styles.emptyState} content="No alerts" heading="So empty... so sad" />
         ) : (
           <FlatList
             data={filteredAlerts}
@@ -163,100 +151,100 @@ export function AlertScreen() {
         />
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ecf0f1",
+  activeTab: {
+    backgroundColor: "#3498db",
   },
-  loaderContainer: {
+  activeTabText: {
+    color: "#fff",
+  },
+  alertContent: {
     flex: 1,
-    justifyContent: "center",
+  },
+  alertDetails: {
+    color: "#7f8c8d",
+    fontSize: 14,
+  },
+  alertHeader: {
     alignItems: "center",
+    flexDirection: "row",
+    marginBottom: 4,
+  },
+  alertMessage: {
+    color: "#2c3e50",
+    flexShrink: 1,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  alertToggle: {
+    marginRight: 8,
+  },
+  container: {
     backgroundColor: "#ecf0f1",
+    flex: 1,
   },
   contentContainer: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  tabRow: {
-    flexDirection: "row",
-    marginBottom: 16,
-    justifyContent: "space-between",
-  },
-  tabButton: {
-    flex: 1,
-    marginHorizontal: 5,
-    paddingVertical: 12,
-    borderRadius: 5,
-  },
-  activeTab: {
-    backgroundColor: "#3498db",
+  emptyState: {
+    marginTop: 40,
   },
   inactiveTab: {
     backgroundColor: "#ccc",
   },
-  activeTabText: {
-    color: "#fff",
-  },
   inactiveTabText: {
     color: "#2c3e50",
-  },
-  markAllContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  markAllToggle: {
-    marginRight: 8,
-  },
-  markAllText: {
-    fontSize: 16,
-    color: "#2c3e50",
-  },
-  emptyState: {
-    marginTop: 40,
-  },
-  listView: {
-    marginBottom: 16,
   },
   listItem: {
     backgroundColor: "#fff",
     borderRadius: 6,
-    padding: 12,
+    elevation: 2,
     marginVertical: 6,
+    padding: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
   },
-  alertContent: {
-    flex: 1,
+  listView: {
+    marginBottom: 16,
   },
-  alertHeader: {
-    flexDirection: "row",
+  loaderContainer: {
     alignItems: "center",
-    marginBottom: 4,
+    backgroundColor: "#ecf0f1",
+    flex: 1,
+    justifyContent: "center",
   },
-  alertToggle: {
-    marginRight: 8,
+  markAllContainer: {
+    alignItems: "center",
+    flexDirection: "row",
+    marginBottom: 16,
   },
-  alertMessage: {
-    fontSize: 16,
-    fontWeight: "bold",
-    flexShrink: 1,
+  markAllText: {
     color: "#2c3e50",
+    fontSize: 16,
   },
-  alertDetails: {
-    fontSize: 14,
-    color: "#7f8c8d",
+  markAllToggle: {
+    marginRight: 8,
   },
   refreshButton: {
     backgroundColor: "#3498db",
     marginBottom: 20,
   },
-});
+  tabButton: {
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+    paddingVertical: 12,
+  },
+  tabRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+})

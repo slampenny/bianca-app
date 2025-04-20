@@ -1,24 +1,23 @@
-import React, { useState, useEffect } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
-import { Text, TextInput, ScrollView, Pressable, StyleSheet, View } from 'react-native'
-import { getOrg } from '../store/orgSlice'
-import { useUpdateOrgMutation } from '../services/api/orgApi'
-import { LoadingScreen } from './LoadingScreen'
-import { goBack } from 'app/navigators'
-import { useNavigation, NavigationProp } from '@react-navigation/native'
-import { OrgStackParamList } from 'app/navigators/navigationTypes'
+import React, { useState, useEffect } from "react"
+import { useSelector, useDispatch } from "react-redux"
+import { Text, TextInput, ScrollView, Pressable, StyleSheet, View } from "react-native"
+import { getOrg } from "../store/orgSlice"
+import { useUpdateOrgMutation } from "../services/api/orgApi"
+import { LoadingScreen } from "./LoadingScreen"
+import { goBack } from "app/navigators"
+import { useNavigation, NavigationProp } from "@react-navigation/native"
+import { OrgStackParamList } from "app/navigators/navigationTypes"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
   const currentOrg = useSelector(getOrg)
   const [updateOrg, { isError, error }] = useUpdateOrgMutation()
   const [isLoading, setIsLoading] = useState(true)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
-  
 
   useEffect(() => {
     if (currentOrg) {
@@ -59,11 +58,11 @@ export function OrgScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {isError && (
         <Text style={styles.errorText}>
-          {'status' in error && 'data' in error
+          {"status" in error && "data" in error
             ? `Status: ${error.status}, Data: ${JSON.stringify(error.data)}`
-            : 'error' in error
+            : "error" in error
             ? error.error
-            : 'Unknown error'}
+            : "Unknown error"}
         </Text>
       )}
       <View style={styles.formCard}>
@@ -101,24 +100,11 @@ export function OrgScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: "#ecf0f1",
+    flex: 1,
   },
   contentContainer: {
     padding: 20,
-  },
-  header: {
-    backgroundColor: "#fff",
-    paddingVertical: 16,
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderColor: "#ddd",
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "#2c3e50",
   },
   errorText: {
     color: "red",
@@ -127,30 +113,43 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: "#fff",
-    padding: 20,
     borderRadius: 6,
+    elevation: 2,
     marginBottom: 20,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    elevation: 2,
+  },
+  header: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+    marginBottom: 20,
+    paddingVertical: 16,
+  },
+  headerTitle: {
+    color: "#2c3e50",
+    fontSize: 24,
+    fontWeight: "600",
   },
   input: {
-    height: 45,
     borderColor: "#bdc3c7",
-    borderWidth: 1,
     borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 15,
-    fontSize: 16,
+    borderWidth: 1,
     color: "#2c3e50",
+    fontSize: 16,
+    height: 45,
+    marginBottom: 15,
+    paddingHorizontal: 10,
   },
   saveButton: {
-    backgroundColor: "#3498db",
-    paddingVertical: 15,
-    borderRadius: 5,
     alignItems: "center",
+    backgroundColor: "#3498db",
+    borderRadius: 5,
+    paddingVertical: 15,
   },
   saveButtonText: {
     color: "#fff",
@@ -158,11 +157,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   viewCaregiversButton: {
-    backgroundColor: "#2ecc71",
-    paddingVertical: 15,
-    borderRadius: 5,
     alignItems: "center",
+    backgroundColor: "#2ecc71",
+    borderRadius: 5,
     marginTop: 10,
+    paddingVertical: 15,
   },
   viewCaregiversButtonText: {
     color: "#fff",

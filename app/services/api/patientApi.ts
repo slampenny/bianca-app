@@ -1,99 +1,102 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { DEFAULT_API_CONFIG } from './api';
-import { RootState } from '../../store/store';
-import { Patient, PatientPages, Caregiver, Conversation } from './api.types';
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
+import { DEFAULT_API_CONFIG } from "./api"
+import { RootState } from "../../store/store"
+import { Patient, PatientPages, Caregiver, Conversation } from "./api.types"
 
 export const patientApi = createApi({
-  reducerPath: 'patientApi',
-  baseQuery: fetchBaseQuery({ 
+  reducerPath: "patientApi",
+  baseQuery: fetchBaseQuery({
     baseUrl: DEFAULT_API_CONFIG.url,
     prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.tokens?.access?.token;
+      const token = (getState() as RootState).auth.tokens?.access?.token
       if (token) {
-        headers.set('authorization', `Bearer ${token}`);
+        headers.set("authorization", `Bearer ${token}`)
       }
-      return headers;
+      return headers
     },
   }),
   endpoints: (builder) => ({
     createPatient: builder.mutation<Patient, { patient: Partial<Patient> }>({
-      query: ({patient}) => {
+      query: ({ patient }) => {
         return {
           url: `/patients`,
-          method: 'POST',
+          method: "POST",
           body: patient,
-        };
-      }
+        }
+      },
     }),
-    getAllPatients: builder.query<PatientPages, { name?: string, role?: string, sortBy?: string, limit?: number, page?: number }>({
+    getAllPatients: builder.query<
+      PatientPages,
+      { name?: string; role?: string; sortBy?: string; limit?: number; page?: number }
+    >({
       query: (params) => ({
-        url: '/patients',
-        method: 'GET',
+        url: "/patients",
+        method: "GET",
         params,
       }),
     }),
     getPatient: builder.query<Patient, { id: string }>({
       query: ({ id }) => `/patients/${id}`,
     }),
-    updatePatient: builder.mutation<Patient, { id: string, patient: Partial<Patient> }>({
+    updatePatient: builder.mutation<Patient, { id: string; patient: Partial<Patient> }>({
       query: ({ id, patient }) => {
-        const { schedules, ...filteredPatient } = patient;
+        const { schedules, ...filteredPatient } = patient
 
         return {
           url: `/patients/${id}`,
-          method: 'PATCH',
+          method: "PATCH",
           body: filteredPatient,
-        };
-      }
+        }
+      },
     }),
-    uploadPatientAvatar: builder.mutation<Caregiver, { id: string, avatar: Blob | File }>({
+    uploadPatientAvatar: builder.mutation<Caregiver, { id: string; avatar: Blob | File }>({
       query: ({ id, avatar }) => {
-        const formData = new FormData();
-        
+        const formData = new FormData()
+
         // Properly append the avatar as a file/blob
-        formData.append('avatar', avatar, 'avatar.jpg');
-        
+        formData.append("avatar", avatar, "avatar.jpg")
+
         return {
           url: `/patients/${id}/avatar`,
-          method: 'POST',
+          method: "POST",
           body: formData,
           // Don't set content-type header, browser will set it with proper boundary
           formData: true,
-        };
+        }
       },
     }),
     deletePatient: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
         url: `/patients/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
     }),
-    assignCaregiver: builder.mutation<Patient, { patientId: string, caregiverId: string }>({
+    assignCaregiver: builder.mutation<Patient, { patientId: string; caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/patients/${patientId}/caregivers/${caregiverId}`,
-        method: 'POST',
+        method: "POST",
       }),
     }),
-    unassignCaregiver: builder.mutation<Patient, { patientId: string, caregiverId: string }>({
+    unassignCaregiver: builder.mutation<Patient, { patientId: string; caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/patients/${patientId}/caregivers/${caregiverId}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
     }),
     getConversationsByPatient: builder.query<Conversation[], { patientId: string }>({
       query: ({ patientId }) => ({
         url: `/patients/${patientId}/conversations`,
-        method: 'GET',
+        method: "GET",
       }),
     }),
     getCaregivers: builder.query<Caregiver[], { patientId: string }>({
       query: ({ patientId }) => ({
         url: `/patients/${patientId}/caregivers`,
-        method: 'GET',
+        method: "GET",
       }),
     }),
   }),
-});
+})
 
 export const {
   useCreatePatientMutation,
@@ -104,6 +107,6 @@ export const {
   useDeletePatientMutation,
   useAssignCaregiverMutation,
   useUnassignCaregiverMutation,
-  //useGetConversationsByPatientQuery,
+  // useGetConversationsByPatientQuery,
   useGetCaregiversQuery,
-} = patientApi;
+} = patientApi

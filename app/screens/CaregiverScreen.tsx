@@ -31,9 +31,11 @@ function CaregiverScreen() {
   const currentOrg = useSelector(getCurrentOrg)
 
   // Mutations for editing/deleting
-  const [updateCaregiver, { isLoading: isUpdating, error: updateError }] = useUpdateCaregiverMutation()
+  const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
+    useUpdateCaregiverMutation()
   const [uploadAvatar] = useUploadAvatarMutation()
-  const [deleteCaregiver, { isLoading: isDeleting, error: deleteError }] = useDeleteCaregiverMutation()
+  const [deleteCaregiver, { isLoading: isDeleting, error: deleteError }] =
+    useDeleteCaregiverMutation()
 
   // Mutation for inviting a new caregiver
   const [sendInvite, { isLoading: isInviting, error: inviteError }] = useSendInviteMutation()
@@ -174,17 +176,15 @@ function CaregiverScreen() {
           </Text>
         )}
 
-        {successMessage ? (
-          <Text style={styles.success}>{successMessage}</Text>
-        ) : null}
+        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
         <View style={styles.formCard}>
-          <AvatarPicker 
+          <AvatarPicker
             initialAvatar={avatar || defaultAvatarUrl}
             onAvatarChanged={({ uri, blob }) => {
               setAvatar(uri)
               if (blob) setAvatarBlob(blob)
-            }} 
+            }}
           />
 
           <TextInput
@@ -219,9 +219,7 @@ function CaregiverScreen() {
             onPress={handleSave}
             disabled={!email || !phone || !!emailError || !!phoneError}
           >
-            <Text style={styles.buttonText}>
-              {caregiver && caregiver.id ? "SAVE" : "INVITE"}
-            </Text>
+            <Text style={styles.buttonText}>{caregiver && caregiver.id ? "SAVE" : "INVITE"}</Text>
           </Pressable>
 
           {caregiver && caregiver.id && (
@@ -234,9 +232,7 @@ function CaregiverScreen() {
               onPress={handleDelete}
               disabled={!caregiver || !caregiver.id}
             >
-              <Text style={styles.buttonText}>
-                {confirmDelete ? "CONFIRM DELETE" : "DELETE"}
-              </Text>
+              <Text style={styles.buttonText}>{confirmDelete ? "CONFIRM DELETE" : "DELETE"}</Text>
             </Pressable>
           )}
         </View>
@@ -246,42 +242,42 @@ function CaregiverScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#ecf0f1" },
+  button: {
+    alignItems: "center",
+    backgroundColor: "#3498db",
+    borderRadius: 5,
+    marginBottom: 15,
+    paddingVertical: 15,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: "#fff", fontSize: 18, fontWeight: "600" },
+  container: { backgroundColor: "#ecf0f1", flex: 1 },
   contentContainer: { padding: 20 },
-  error: { color: "red", textAlign: "center", marginBottom: 10 },
-  success: { color: "green", textAlign: "center", marginBottom: 10, fontSize: 16 },
+  deleteButton: { backgroundColor: "#e74c3c" },
+  error: { color: "red", marginBottom: 10, textAlign: "center" },
+  fieldError: { color: "red", fontSize: 14, marginBottom: 10 },
   formCard: {
     backgroundColor: "#fff",
-    padding: 20,
     borderRadius: 6,
+    elevation: 2,
     marginBottom: 20,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    elevation: 2,
   },
   input: {
-    height: 45,
     borderColor: "#bdc3c7",
+    borderRadius: 5,
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 15,
-    fontSize: 16,
     color: "#2c3e50",
-  },
-  fieldError: { color: "red", fontSize: 14, marginBottom: 10 },
-  button: {
-    backgroundColor: "#3498db",
-    paddingVertical: 15,
-    borderRadius: 5,
-    alignItems: "center",
+    fontSize: 16,
+    height: 45,
     marginBottom: 15,
+    paddingHorizontal: 10,
   },
-  deleteButton: { backgroundColor: "#e74c3c" },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "600" },
+  success: { color: "green", fontSize: 16, marginBottom: 10, textAlign: "center" },
 })
 
 export { CaregiverScreen }

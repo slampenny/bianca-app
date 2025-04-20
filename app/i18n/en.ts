@@ -1,4 +1,3 @@
-
 const en = {
   alertScreen: {
     markAllAsRead: "Mark all as read",
@@ -43,7 +42,7 @@ const en = {
     emailFieldLabel: "Email",
     phoneFieldLabel: "Phone",
     passwordFieldLabel: "Password",
-    goBack : "Go Back",
+    goBack: "Go Back",
     confirmPasswordFieldLabel: "Confirm Password",
     organizationNameFieldLabel: "Orginization Name",
     nameFieldPlaceholder: "Enter your name",
@@ -53,7 +52,7 @@ const en = {
     phoneFieldPlaceholder: "(xxx)xxx-xxxx",
     organizationNameFieldPlaceholder: "Enter your Orginization's Name",
     organizationButton: "Organization",
-    individualButton: "Individual"
+    individualButton: "Individual",
   },
   requestResetScreen: {
     title: "Request Password Reset",

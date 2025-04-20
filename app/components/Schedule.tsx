@@ -28,7 +28,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
     setIsActive(initialSchedule.isActive)
     setTime(initialSchedule.time)
   }, [initialSchedule])
-  
+
   useEffect(() => {
     const newSchedule: Schedule = { id, patient, frequency, intervals, isActive, time }
     onScheduleChange(newSchedule)
@@ -67,8 +67,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   const times: string[] = []
   for (let i = 0; i < 24; i++) {
     for (let j = 0; j < 60; j += 15) {
-      const formattedTime =
-        (i < 10 ? "0" + i : i) + ":" + (j < 10 ? "0" + j : j)
+      const formattedTime = (i < 10 ? "0" + i : i) + ":" + (j < 10 ? "0" + j : j)
       times.push(formattedTime)
     }
   }
@@ -123,14 +122,16 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
                   />
                 </View>
               )
-            }
+            },
           )}
         </View>
       )}
 
       <View style={styles.detailsCard}>
         <Text style={styles.detailsTitle}>Schedule Details</Text>
-        <Text style={styles.detailsText}>Schedule: {formatSchedule({ id, patient, frequency, intervals, isActive, time })}</Text>
+        <Text style={styles.detailsText}>
+          Schedule: {formatSchedule({ id, patient, frequency, intervals, isActive, time })}
+        </Text>
         <Text style={styles.detailsText}>Frequency: {frequency}</Text>
       </View>
 
@@ -150,31 +151,51 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: "#ecf0f1",
     flex: 1,
     padding: 20,
-    backgroundColor: "#ecf0f1",
   },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
+  dayLabel: {
     color: "#2c3e50",
-    textAlign: "center",
+    fontSize: 16,
+  },
+  dayRow: {
+    alignItems: "center",
+    borderBottomColor: "#ecf0f1",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  detailsCard: {
+    backgroundColor: "#fff",
+    borderRadius: 5,
+    elevation: 2,
     marginBottom: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  detailsText: {
+    color: "#7f8c8d",
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  detailsTitle: {
+    color: "#2c3e50",
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
   formGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 18,
     color: "#7f8c8d",
+    fontSize: 18,
     marginBottom: 8,
-  },
-  pickerWrapper: {
-    backgroundColor: "#fff",
-    borderColor: "#bdc3c7",
-    borderWidth: 1,
-    borderRadius: 5,
-    overflow: "hidden",
   },
   picker: {
     height: 50,
@@ -183,61 +204,41 @@ const styles = StyleSheet.create({
   pickerItem: {
     height: 50,
   },
+  pickerWrapper: {
+    backgroundColor: "#fff",
+    borderColor: "#bdc3c7",
+    borderRadius: 5,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  switchContainer: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "#bdc3c7",
+    borderRadius: 5,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 15,
+  },
+  switchLabel: {
+    color: "#2c3e50",
+    fontSize: 18,
+  },
+  title: {
+    color: "#2c3e50",
+    fontSize: 26,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+  },
   weeklyContainer: {
     backgroundColor: "#fff",
     borderColor: "#bdc3c7",
-    borderWidth: 1,
     borderRadius: 5,
+    borderWidth: 1,
+    marginBottom: 20,
     padding: 10,
-    marginBottom: 20,
-  },
-  dayRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomColor: "#ecf0f1",
-    borderBottomWidth: 1,
-  },
-  dayLabel: {
-    fontSize: 16,
-    color: "#2c3e50",
-  },
-  detailsCard: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 5,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  detailsTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginBottom: 10,
-  },
-  detailsText: {
-    fontSize: 16,
-    color: "#7f8c8d",
-    marginBottom: 5,
-  },
-  switchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 5,
-    borderColor: "#bdc3c7",
-    borderWidth: 1,
-  },
-  switchLabel: {
-    fontSize: 18,
-    color: "#2c3e50",
   },
 })
 

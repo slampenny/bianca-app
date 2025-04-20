@@ -79,6 +79,8 @@ export interface ButtonProps extends PressableProps {
    * An optional style override for the disabled state
    */
   disabledStyle?: StyleProp<ViewStyle>
+
+  testID?: string
 }
 
 /**
@@ -110,6 +112,7 @@ export function Button(props: ButtonProps) {
     LeftAccessory,
     disabled,
     disabledStyle: $disabledViewStyleOverride,
+    testID,
     ...rest
   } = props
 
@@ -148,6 +151,7 @@ export function Button(props: ButtonProps) {
       accessibilityState={{ disabled: !!disabled }}
       {...rest}
       disabled={disabled}
+      testID={testID}
     >
       {(state) => (
         <>

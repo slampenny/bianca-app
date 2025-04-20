@@ -75,6 +75,8 @@ bin/Exponent.app
 /android
 /ios
 
+/test-results
+
 ## Secrets
 npm-debug.*
 *.jks

@@ -37,6 +37,7 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
   inputWrapperStyle?: StyleProp<ViewStyle>
   RightAccessory?: ComponentType<TextFieldAccessoryProps>
   LeftAccessory?: ComponentType<TextFieldAccessoryProps>
+  testID?: string
 }
 
 export const TextField = forwardRef(function TextField(props: TextFieldProps, ref: Ref<TextInput>) {
@@ -58,12 +59,15 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     style: $inputStyleOverride,
     containerStyle: $containerStyleOverride,
     inputWrapperStyle: $inputWrapperStyleOverride,
+    testID,
     ...TextInputProps
   } = props
 
   const input = useRef<TextInput>(null)
   const disabled = TextInputProps.editable === false || status === "disabled"
-  const placeholderContent = placeholderTx ? translate(placeholderTx, placeholderTxOptions) : placeholder
+  const placeholderContent = placeholderTx
+    ? translate(placeholderTx, placeholderTxOptions)
+    : placeholder
 
   const $containerStyles: StyleProp<ViewStyle> = [
     $containerStyleOverride,
@@ -130,7 +134,6 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
             multiline={TextInputProps.multiline ?? false}
           />
         )}
-
         <TextInput
           ref={input}
           underlineColorAndroid={colors.transparent}
@@ -140,6 +143,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
           {...TextInputProps}
           editable={!disabled}
           style={$inputStyles}
+          testID={testID}
         />
 
         {!!RightAccessory && (

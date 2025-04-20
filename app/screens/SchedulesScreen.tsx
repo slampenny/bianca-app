@@ -124,50 +124,50 @@ export const SchedulesScreen = () => {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: "#ECF0F1",
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginBottom: 20,
-  },
-  pickerContainer: {
-    borderColor: "#BDC3C7",
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 20,
-    overflow: "hidden",
-    padding: 10,
-  },
-  label: {
-    fontSize: 18,
-    color: "#7F8C8D",
-    marginBottom: 5,
-  },
-  picker: {
-    height: 50,
-    backgroundColor: "#fff",
-  },
-  noSchedulesText: {
-    fontSize: 18,
-    color: "#7F8C8D",
-    marginBottom: 20,
+  button: {
+    padding: 10, // Add padding to increase the size of the buttons
+    width: "45%", // Adjust the width of the buttons
   },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 20,
   },
-  button: {
-    padding: 10, // Add padding to increase the size of the buttons
-    width: "45%", // Adjust the width of the buttons
-  },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-  }
+  },
+  container: {
+    backgroundColor: "#ECF0F1",
+    flex: 1,
+    padding: 20,
+  },
+  header: {
+    color: "#2C3E50",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+  },
+  label: {
+    color: "#7F8C8D",
+    fontSize: 18,
+    marginBottom: 5,
+  },
+  noSchedulesText: {
+    color: "#7F8C8D",
+    fontSize: 18,
+    marginBottom: 20,
+  },
+  picker: {
+    backgroundColor: "#fff",
+    height: 50,
+  },
+  pickerContainer: {
+    borderColor: "#BDC3C7",
+    borderRadius: 5,
+    borderWidth: 1,
+    marginBottom: 20,
+    overflow: "hidden",
+    padding: 10,
+  },
 })

@@ -20,7 +20,7 @@ import "./i18n"
 import "./utils/ignoreWarnings"
 import { useFonts } from "expo-font"
 import React from "react"
-import { Provider } from "react-redux";
+import { Provider } from "react-redux"
 import { persistor, store } from "./store/store"
 import { PersistGate } from "redux-persist/integration/react"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
@@ -52,8 +52,8 @@ interface AppProps {
 }
 
 function InnerApp() {
-  useRefreshToken();
-  return null;
+  useRefreshToken()
+  return null
 }
 
 /**

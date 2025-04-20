@@ -3,8 +3,8 @@ import { InvoiceStatus } from '../../app/services/api/api.types';
 
 export function newInvoice(
   status: InvoiceStatus = 'draft',
-  totalAmount: number = 100,
-  notes: string = 'Test invoice'
+  totalAmount = 100,
+  notes = 'Test invoice'
 ): {
   invoiceNumber: string;
   issueDate: string;

@@ -1,100 +1,110 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { DEFAULT_API_CONFIG } from './api';
-import { RootState } from '../../store/store';
-import { Caregiver, CaregiverPages, Patient } from './api.types';
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
+import { DEFAULT_API_CONFIG } from "./api"
+import { RootState } from "../../store/store"
+import { Caregiver, CaregiverPages, Patient } from "./api.types"
 
 export const caregiverApi = createApi({
-  reducerPath: 'caregiverApi',
+  reducerPath: "caregiverApi",
   baseQuery: fetchBaseQuery({
     baseUrl: DEFAULT_API_CONFIG.url,
     prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.tokens?.access?.token;
+      const token = (getState() as RootState).auth.tokens?.access?.token
       if (token) {
-        headers.set('authorization', `Bearer ${token}`);
+        headers.set("authorization", `Bearer ${token}`)
       }
-      return headers;
+      return headers
     },
   }),
   endpoints: (builder) => ({
-    getAllCaregivers: builder.query<CaregiverPages, { org?: string | null, name?: string, role?: string, sortBy?: string, limit?: number, page?: number }>({
+    getAllCaregivers: builder.query<
+      CaregiverPages,
+      {
+        org?: string | null
+        name?: string
+        role?: string
+        sortBy?: string
+        limit?: number
+        page?: number
+      }
+    >({
       query: (params) => ({
-        url: '/caregivers',
-        method: 'GET',
+        url: "/caregivers",
+        method: "GET",
         params,
       }),
     }),
     getCaregiver: builder.query<Caregiver, { id: string }>({
       query: ({ id }) => `/caregivers/${id}`,
     }),
-    updateCaregiver: builder.mutation<Caregiver, { id: string, caregiver: Partial<Caregiver> }>({
+    updateCaregiver: builder.mutation<Caregiver, { id: string; caregiver: Partial<Caregiver> }>({
       query: ({ id, caregiver }) => {
-        const filteredData: Partial<Caregiver> = {};
-    
+        const filteredData: Partial<Caregiver> = {}
+
         // Explicitly handle each field with proper typing
-        if ('name' in caregiver && caregiver.name !== undefined) {
-          filteredData.name = caregiver.name;
+        if ("name" in caregiver && caregiver.name !== undefined) {
+          filteredData.name = caregiver.name
         }
-        
-        if ('email' in caregiver && caregiver.email !== undefined) {
-          filteredData.email = caregiver.email;
+
+        if ("email" in caregiver && caregiver.email !== undefined) {
+          filteredData.email = caregiver.email
         }
-        
-        if ('phone' in caregiver && caregiver.phone !== undefined) {
-          filteredData.phone = caregiver.phone;
+
+        if ("phone" in caregiver && caregiver.phone !== undefined) {
+          filteredData.phone = caregiver.phone
         }
-        
-        if ('avatar' in caregiver && caregiver.avatar !== undefined) {
-          filteredData.avatar = caregiver.avatar;
+
+        if ("avatar" in caregiver && caregiver.avatar !== undefined) {
+          filteredData.avatar = caregiver.avatar
         }
 
         return {
           url: `/caregivers/${id}`,
-          method: 'PATCH',
+          method: "PATCH",
           body: filteredData,
-        };
+        }
       },
     }),
-    uploadAvatar: builder.mutation<Caregiver, { id: string, avatar: Blob | File }>({
+    uploadAvatar: builder.mutation<Caregiver, { id: string; avatar: Blob | File }>({
       query: ({ id, avatar }) => {
-        const formData = new FormData();
-        
+        const formData = new FormData()
+
         // Properly append the avatar as a file/blob
-        formData.append('avatar', avatar, 'avatar.jpg');
-        
+        formData.append("avatar", avatar, "avatar.jpg")
+
         return {
           url: `/caregivers/${id}/avatar`,
-          method: 'POST',
+          method: "POST",
           body: formData,
           // Don't set content-type header, browser will set it with proper boundary
           formData: true,
-        };
+        }
       },
     }),
     deleteCaregiver: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
         url: `/caregivers/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
     }),
-    getPatientForCaregiver: builder.query<Patient, { patientId: string, caregiverId: string }>({
+    getPatientForCaregiver: builder.query<Patient, { patientId: string; caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
         url: `/caregivers/${caregiverId}/patients/${patientId}`,
-        method: 'GET',
+        method: "GET",
       }),
     }),
     getPatientsForCaregiver: builder.query<Patient[], string | null>({
       query: (caregiverId) => {
         if (caregiverId === null) {
-          throw new Error("No caregiver provided");
+          throw new Error("No caregiver provided")
         }
         return {
           url: `/caregivers/${caregiverId}/patients`,
-          method: 'GET',
-        };
+          method: "GET",
+        }
       },
     }),
   }),
-});
+})
 
 export const {
   useGetAllCaregiversQuery,
@@ -104,4 +114,4 @@ export const {
   useDeleteCaregiverMutation,
   useGetPatientForCaregiverQuery,
   useGetPatientsForCaregiverQuery,
-} = caregiverApi;
+} = caregiverApi

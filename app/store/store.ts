@@ -1,23 +1,42 @@
-import { combineReducers, configureStore } from '@reduxjs/toolkit';
-import alertReducer from './alertSlice';
-import authReducer from './authSlice';
-import orgReducer from './orgSlice';
-import caregiverReducer from './caregiverSlice';
-import patientReducer from './patientSlice';
-import paymentReducer from './paymentSlice';
-import paymentMethodReducer from './paymentMethodSlice';
-import scheduleReducer from './scheduleSlice';
-import conversationReducer from './conversationSlice';
-import { alertApi, authApi, orgApi, caregiverApi, scheduleApi, patientApi, paymentApi, paymentMethodApi, conversationApi } from '../services/api/';
-import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
-import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { combineReducers, configureStore } from "@reduxjs/toolkit"
+import alertReducer from "./alertSlice"
+import authReducer from "./authSlice"
+import orgReducer from "./orgSlice"
+import caregiverReducer from "./caregiverSlice"
+import patientReducer from "./patientSlice"
+import paymentReducer from "./paymentSlice"
+import paymentMethodReducer from "./paymentMethodSlice"
+import scheduleReducer from "./scheduleSlice"
+import conversationReducer from "./conversationSlice"
+import {
+  alertApi,
+  authApi,
+  orgApi,
+  caregiverApi,
+  scheduleApi,
+  patientApi,
+  paymentApi,
+  paymentMethodApi,
+  conversationApi,
+} from "../services/api/"
+import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
+import {
+  persistStore,
+  persistReducer,
+  FLUSH,
+  REHYDRATE,
+  PAUSE,
+  PERSIST,
+  PURGE,
+  REGISTER,
+} from "redux-persist"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 
 const persistConfig = {
-  key: 'root',
+  key: "root",
   version: 1,
   storage: AsyncStorage,
-};
+}
 
 const rootReducer = combineReducers({
   org: orgReducer,
@@ -38,9 +57,9 @@ const rootReducer = combineReducers({
   [paymentApi.reducerPath]: paymentApi.reducer,
   [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
   [scheduleApi.reducerPath]: scheduleApi.reducer,
-});
+})
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+const persistedReducer = persistReducer(persistConfig, rootReducer)
 
 export const store = configureStore({
   reducer: persistedReducer,
@@ -49,30 +68,29 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    })
-    .concat(
-      alertApi.middleware, 
-      authApi.middleware, 
-      orgApi.middleware, 
-      caregiverApi.middleware, 
-      patientApi.middleware, 
+    }).concat(
+      alertApi.middleware,
+      authApi.middleware,
+      orgApi.middleware,
+      caregiverApi.middleware,
+      patientApi.middleware,
       paymentApi.middleware,
       paymentMethodApi.middleware,
       scheduleApi.middleware,
       conversationApi.middleware,
     ),
-});
+})
 
-export const persistor = persistStore(store);
+export const persistor = persistStore(store)
 
 // Clear store in development mode
-if (process.env.NODE_ENV === 'development') {
-  persistor.purge();
+if (process.env.NODE_ENV === "development") {
+  persistor.purge()
 }
 
-export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch;
+export type RootState = ReturnType<typeof store.getState>
+export type AppDispatch = typeof store.dispatch
 
-type DispatchFunc = () => AppDispatch;
-export const useAppDispatch: DispatchFunc = useDispatch;
-export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+type DispatchFunc = () => AppDispatch
+export const useAppDispatch: DispatchFunc = useDispatch
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
