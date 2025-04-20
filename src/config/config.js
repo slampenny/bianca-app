@@ -36,7 +36,7 @@ const envVarsSchema = Joi.object({
   STRIPE_PUBLISHABLE_KEY: Joi.string(),
   // **NEW:** Realtime API specific variables
   OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
-  WEBSOCKET_URL: Joi.string().required(), // URL your WebSocket server listens on
+  WEBSOCKET_URL: Joi.string().default('wss://app.myphonefriend.com'), // URL your WebSocket server listens on
 }).unknown();
 
 // Validate environment variables
@@ -196,11 +196,11 @@ baselineConfig.loadSecrets = async () => {
     }
     if (secrets.STRIPE_PUBLISHABLE_KEY) baselineConfig.stripe.publishableKey = secrets.STRIPE_PUBLISHABLE_KEY;
     // Mongoose URL
-    if (secrets.MONGODB_URL) {
-        baselineConfig.mongoose.url = secrets.MONGODB_URL + (baselineConfig.env === 'test' ? '-test' : '');
-    }
-    // Port
-    if (secrets.PORT) baselineConfig.port = secrets.PORT;
+    // if (secrets.MONGODB_URL) {
+    //     baselineConfig.mongoose.url = secrets.MONGODB_URL + (baselineConfig.env === 'test' ? '-test' : '');
+    // }
+    // // Port
+    // if (secrets.PORT) baselineConfig.port = secrets.PORT;
 
 
     // Add other mappings as needed...

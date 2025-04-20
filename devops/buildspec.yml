@@ -5,7 +5,6 @@ env:
     AWS_DEFAULT_REGION: us-east-2
     AWS_ACCOUNT_ID: 730335291008
     REPOSITORY_NAME: bianca-app-backend
-    TASK_DEFINITION_FAMILY: bianca-service
 
 phases:
   pre_build:
@@ -14,33 +13,21 @@ phases:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
   build:
     commands:
       - echo Build started on $(date)
-      - echo Building the Docker image...
       - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
       - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
+
   post_build:
     commands:
-      - echo Build completed on $(date)
       - echo Pushing the Docker image...
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - docker push $REPOSITORY_URI:latest
-      - echo Writing image definitions file...
+      - echo Writing imagedefinitions.json...
       - printf '[{"name":"bianca-app-backend","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
-      - echo Getting current task definition...
-      - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $TASK_DEFINITION_FAMILY --query taskDefinition --output json)
-      - echo Updating task definition with new image...
-      - echo $TASK_DEFINITION > task-def-original.json
-      - cat task-def-original.json | jq '.containerDefinitions[0].image="'$REPOSITORY_URI:$IMAGE_TAG'"' > task-def-with-image.json
-      - cat task-def-with-image.json | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-def.json
-      - NEW_TASK_DEFINITION=$(aws ecs register-task-definition --cli-input-json file://task-def.json --query taskDefinition.taskDefinitionArn --output text)
-      - cp devops/appspec.json appspec.json
-      - sed -i "s|<TASK_DEFINITION>|$NEW_TASK_DEFINITION|g" appspec.json
-      - echo "Contents of appspec.json after modification:"
-      - cat appspec.json  
+
 artifacts:
   files:
-    - appspec.json
     - imagedefinitions.json
-    - task-def.json
