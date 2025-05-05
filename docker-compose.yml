@@ -1,4 +1,3 @@
-version: '3'
 
 services:
   bianca-app:
@@ -6,15 +5,22 @@ services:
     image: bianca-app
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/bianca-app
+      - NODE_ENV=development
+      - ASTERISK_URL=http://asterisk:8088
+      - ASTERISK_USERNAME=myphonefriend
+      - ASTERISK_PASSWORD=${ARI_PASSWORD}  # Use the same ARI_PASSWORD here
+      - ASTERISK_ENABLED=true
     ports:
       - '3000:3000'
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_started
+      asterisk:
+        condition: service_healthy
     volumes:
       - .:/usr/src/bianca-app
     networks:
       - node-network
-
   mongodb:
     image: mongo:4.2.1-bionic
     ports:
@@ -23,10 +29,32 @@ services:
       - dbdata:/data/db
     networks:
       - node-network
-
+  asterisk:
+    build: ./devops/asterisk
+    container_name: asterisk
+    restart: always
+    environment:
+      - ARI_PASSWORD=${ARI_PASSWORD}  # Used in ari.conf
+      - BIANCA_PASSWORD=${BIANCA_PASSWORD}  # Used in pjsip.conf
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
+      - EXTERNAL_PORT=${EXTERNAL_PORT}
+    ports:
+      - '5060:5060/udp'
+      - '5060:5060/tcp'
+      - '10000-10100:10000-10100/udp'
+      - '8088:8088/tcp'  # Exposing ARI port for easier debugging
+    volumes:
+      - ./devops/asterisk/logs:/var/log/asterisk
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show uptime' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - node-network
 volumes:
   dbdata:
-
 networks:
   node-network:
     driver: bridge

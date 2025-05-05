@@ -15,6 +15,12 @@ const envVarsSchema = Joi.object({
   NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
   JWT_SECRET: Joi.string(),
   MONGODB_URL: Joi.string(),
+
+  ARI_PASSWORD: Joi.string(),
+  BIANCA_PASSWORD: Joi.string(),
+  EXTERNAL_ADDRESS: Joi.string(),
+  EXTERNAL_PORT: Joi.number(),
+
   SMTP_USERNAME: Joi.string(),
   SMTP_PASSWORD: Joi.string(),
   SMTP_HOST: Joi.string(), // Added for consistency
@@ -27,6 +33,7 @@ const envVarsSchema = Joi.object({
   TWILIO_AUTHTOKEN: Joi.string().required(),
   TWILIO_VOICEURL: Joi.string(), // Keep if used elsewhere
   PUBLIC_TUNNEL_URL: Joi.string(), // Used for twilio.apiUrl in dev/testing
+  WEBSOCKET_URL: Joi.string(), // WebSocket URL for Twilio Media Streams
   API_BASE_URL: Joi.string(), // Alternative base URL for APIs/webhooks
   AWS_SECRET_ID: Joi.string(), // Added for consistency
   AWS_REGION: Joi.string(), // Added for consistency
@@ -81,6 +88,12 @@ const baselineConfig = {
       }
     },
     from: envVars.SMTP_FROM || 'support@myphonefriend.com' // Use env var or default
+  },
+  asterisk: {
+    enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
+    url: envVars.ASTERISK_URL || 'http://asterisk:8088', // Example URL, replace with actual
+    username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual
+    password: envVars.ASTERISK_PASSWORD || 'changeme', // Example password, replace with actual
   },
   google: { // Assuming this was for Google TTS, keep if used elsewhere
     language: 'en-US',

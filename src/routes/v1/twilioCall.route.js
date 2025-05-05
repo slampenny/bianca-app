@@ -1,34 +1,10 @@
 const express = require('express');
-const twilio = require('twilio');
 const twilioCallController = require('../../controllers/twilioCall.controller');
-const config = require('../../config/config');
-const logger = require('../../config/logger');
+const bypassTwilioAuthMiddleware = require('../../middlewares/bypassTwilioValidation');
 const validate = require('../../middlewares/validate');
 const twilioCallValidation = require('../../validations/twilioCall.validation');
 
 const router = express.Router();
-
-const twilioAuthMiddleware = (req, res, next) => {
-  try {
-    const signature = req.header('X-Twilio-Signature');
-    const url = config.twilio.apiUrl + req.originalUrl;
-    const params = req.body;
-
-    logger.debug(`[Twilio Route] Validating Request: URL=${url}, Params=${JSON.stringify(params)}, Sig=${signature}`);
-
-    const isValid = twilio.validateRequest(config.twilio.authToken, signature, url, params);
-
-    if (isValid) {
-      logger.info('[Twilio Route] Twilio request signature validated successfully.');
-      return next();
-    }
-    logger.error('[Twilio Route] Twilio request signature validation failed.');
-    return res.status(403).type('text/plain').send('Twilio request validation failed.');
-  } catch (error) {
-    logger.error('[Twilio Route] Error during Twilio request validation:', error);
-    return res.status(500).type('text/plain').send('Error during request validation.');
-  }
-};
 
 /**
  * @swagger
@@ -63,11 +39,18 @@ router.post('/initiate', validate(twilioCallValidation.initiate), twilioCallCont
 
 /**
  * @swagger
- * /twilio/start-stream:
+ * /twilio/start-call/{patientId}:
  *   post:
- *     summary: Provides TwiML instructions to start a media stream
- *     description: Webhook called by Twilio when the outbound call connects. Responds with TwiML containing <Connect><Stream>.
+ *     summary: Provides TwiML instructions to connect to Asterisk SIP
+ *     description: Webhook called by Twilio when the outbound call connects. Responds with TwiML to connect to Asterisk.
  *     tags: [TwilioCalls]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Patient ID
  *     requestBody:
  *       description: Form-encoded data sent by Twilio (e.g., CallSid).
  *       content:
@@ -76,7 +59,7 @@ router.post('/initiate', validate(twilioCallValidation.initiate), twilioCallCont
  *             type: object
  *     responses:
  *       "200":
- *         description: TwiML instructions with <Connect><Stream> provided successfully.
+ *         description: TwiML instructions with SIP dial provided successfully.
  *         content:
  *           text/xml:
  *             schema:
@@ -85,17 +68,17 @@ router.post('/initiate', validate(twilioCallValidation.initiate), twilioCallCont
  *         description: Twilio validation failed.
  */
 router.post(
-  '/start-stream/:patientId',
+  '/start-call/:patientId',
   express.urlencoded({ extended: false }),
-  twilioAuthMiddleware,
-  twilioCallController.handleStartStream
+  bypassTwilioAuthMiddleware,
+  twilioCallController.handleStartCall
 );
 
 /**
  * @swagger
- * /twilio/end-call:
+ * /twilio/call-status:
  *   post:
- *     summary: Handles final call status updates from Twilio
+ *     summary: Handles call status updates from Twilio
  *     description: Webhook called by Twilio when the call reaches a terminal status (completed, failed, busy, no-answer).
  *     tags: [TwilioCalls]
  *     requestBody:
@@ -113,65 +96,49 @@ router.post(
  *       "403":
  *         description: Twilio validation failed.
  */
-router.post('/end-call', express.urlencoded({ extended: false }), twilioAuthMiddleware, twilioCallController.handleEndCall);
-
-// Obsolete endpoints (commented out)
-/**
- * @swagger
- * /twilio/prepare-call:
- *   post:
- *     summary: (OBSOLETE) Provides TwiML instructions when a call connects or is redirected
- *     description: Webhook called by Twilio when the outbound call connects OR when redirected here via TwiML.
- *     tags: [TwilioCalls]
- *     responses:
- *       "200":
- *         description: TwiML instructions provided successfully.
- *         content:
- *           text/xml:
- *             schema:
- *               type: string
- *       "403":
- *         description: Twilio validation failed.
- */
-/*
 router.post(
-  '/prepare-call',
-  express.urlencoded({ extended: false }),
-  twilioAuthMiddleware,
-  twilioCallController.prepareCall
+  '/call-status', 
+  express.urlencoded({ extended: false }), 
+  bypassTwilioAuthMiddleware, 
+  twilioCallController.handleCallStatus
 );
-*/
 
 /**
  * @swagger
- * /twilio/real-time-interaction:
- *   post:
- *     summary: (OBSOLETE) Processes input gathered during the call (speech/DTMF)
- *     description: Webhook called by Twilio with the results from a <Gather> verb.
+ * /twilio/test-sip:
+ *   get:
+ *     summary: Test the SIP dialing capability
+ *     description: Returns TwiML that calls the Asterisk SIP endpoint directly.
  *     tags: [TwilioCalls]
- *     requestBody:
- *       description: Form-encoded data sent by Twilio (e.g., CallSid, SpeechResult, Digits).
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
  *     responses:
  *       "200":
- *         description: TwiML response for next step in conversation.
- *         content:
- *           text/xml:
- *             schema:
- *               type: string
- *       "403":
- *         description: Twilio validation failed.
+ *         description: TwiML for SIP test
  */
-/*
-router.post(
-  '/real-time-interaction',
-  express.urlencoded({ extended: false }),
-  twilioAuthMiddleware,
-  twilioCallController.handleRealTimeInteraction
-);
-*/
+// In your /test-sip route handler file (e.g., twilioCall.routes.js)
+
+router.get('/test-sip', (req, res) => {
+  const VoiceResponse = require('twilio').twiml.VoiceResponse;
+  const twiml = new VoiceResponse();
+
+  const staticSipHost = '3.136.184.169'; // Your static Ngrok address
+  const staticSipPort = '5060';
+  const testPatientId = 'direct-sip-test-static';
+  const testTwilioSid = 'TEST_STATIC_' + Date.now();
+
+  twiml.say('Testing SIP connection to local Asterisk via static Ngrok TCP address');
+  twiml.dial({
+      callerId: '+19786256514', // Your Twilio number
+      timeout: 15
+  }).sip(`sip:bianca@${staticSipHost}:${staticSipPort}?patientId=${testPatientId}&callSid=${testTwilioSid}`);
+
+  // --- Add these headers to prevent caching ---
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // HTTP 1.1.
+  res.setHeader('Pragma', 'no-cache'); // HTTP 1.0.
+  res.setHeader('Expires', '0'); // Proxies.
+  // --- End of cache prevention headers ---
+
+  res.type('text/xml'); // Set Content-Type AFTER cache headers
+  res.send(twiml.toString()); // Send the TwiML
+});
 
 module.exports = router;

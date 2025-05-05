@@ -70,8 +70,22 @@ if (config.env === 'production') {
   app.use('/v1/auth', authLimiter);
 }
 
+// Log incoming requests
+app.use((req, res, next) => {
+  logger.debug(`Incoming request: ${req.method} ${req.url}`);
+  next();
+});
+
 // Set security HTTP headers
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts
+      connectSrc: ["'self'", "wss:"], // Allow WebSocket connections
+    }
+  }
+}));
 
 // Serve static files from uploads directory
 
@@ -79,12 +93,6 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // v1 API routes
 app.use('/v1', routes);
-
-// Log incoming requests
-app.use((req, res, next) => {
-  logger.debug(`Incoming request: ${req.method} ${req.url}`);
-  next();
-});
 
 // 404 handler for unknown routes
 app.use((req, res, next) => {

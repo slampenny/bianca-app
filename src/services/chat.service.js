@@ -1,4 +1,4 @@
-const { openaiAPI } = require('../api/openaiAPI.js');
+const { openaiAPI } = require('../api/openaiAPI.js.old');
 const { langChainAPI } = require('../api/langChainAPI.js');
 const logger = require('../config/logger');
 

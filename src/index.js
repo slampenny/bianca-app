@@ -1,106 +1,140 @@
 // index.js
-// Updated to correctly initialize WebSocket server alongside Express
-
 const mongoose = require('mongoose');
-const http = require('http'); // Import the 'http' module
+const http = require('http');
 const config = require('./config/config');
 const logger = require('./config/logger');
-const { initializeWebSocketServer } = require('./api/websocket.service'); // Import the WS initializer
+//const { initializeWebSocketServer } = require('./api/websocket.service');
+//const { startAriClient } = require('./api/ari.client');
+const { startAriClient } = require('./api/ari.client');
+const { startAudioSocketServer } = require('./api/audio.socket.service'); // ADD
 
+/**
+ * Starts the application server and initializes all components
+ */
 async function startServer() {
   try {
-    // Load secrets before initializing other components
+    // Load environment variables and secrets
     await config.loadSecrets();
+    logger.info(`Environment: ${config.env}`);
 
-    // Now require modules that depend on config
-    const app = require('./app'); // Your Express app instance
-    const { Conversation } = require('./models'); // If needed here
+    // Import Express app (after config is loaded)
+    const app = require('./app');
 
-    // Attempt to connect to MongoDB but do not block server startup on failure
+    // Connect to MongoDB
     try {
       await mongoose.connect(config.mongoose.url, config.mongoose.options);
       logger.info('Connected to MongoDB');
-      // Conversation.ensureIndexes(); // Ensure indexes if connected - uncomment if needed
     } catch (mongoError) {
-      console.error('MongoDB connection failed. Continuing without database connection:', mongoError);
-      // Consider if the app can truly function without DB. If not, maybe exit here.
+      logger.error('MongoDB connection failed. Continuing without database:', mongoError.message);
+      logger.warn('Application functionality will be limited without database access');
     }
 
-    // Log configuration info
-    logger.info(`Environment: ${config.env}`);
-    if (config.env === 'production') {
-      logger.info('Running in production mode');
-      // Log key URLs for production diagnostics
-      logger.info(`Production API URL: ${config.twilio.apiUrl}`);
-      logger.info(`Production WebSocket URL: ${config.twilio.websocketUrl}`);
-    } else {
-      logger.info(`API URL (Dev/Test): ${config.twilio.apiUrl}`);
-      logger.info(`WebSocket URL (Dev/Test): ${config.twilio.websocketUrl}`);
-    }
-
-    if (config.stripe && config.stripe.mode) {
-      logger.info(`Stripe mode: ${config.stripe.mode}`);
-      if (config.env !== 'production' && config.stripe.mode === 'live') {
-        logger.warn('⚠️ WARNING: Using Stripe live keys in non-production environment!');
-      }
-    }
-
-    // --- MODIFICATION START ---
-    // Create HTTP server explicitly from the Express app
+    // Create HTTP server from Express app
     const server = http.createServer(app);
-    // Add this debugging listener before initializing WebSocket server
+    
+    // Add diagnostic listener for WebSocket upgrade requests
     server.on('upgrade', (request, socket, head) => {
-      logger.info(
-        `[WebSocket Service] Upgrade request received: ${request.url}, headers: ${JSON.stringify(request.headers)}`
-      );
+      logger.info(`[Server] WebSocket upgrade request received: ${request.url}`);
+      logger.info(`[Server] Headers: ${JSON.stringify(request.headers)}`);
+      logger.info(`[Server] Method: ${request.method}`);
     });
 
-    // Initialize and attach the WebSocket server to the HTTP server
-    initializeWebSocketServer(server);
-    logger.info('WebSocket server initialized and attached to HTTP server.');
+    // initializeWebSocketServer(server); // REMOVE
+    logger.info('WebSocket server (Twilio Media Streams) is DISABLED.');
 
-    // Start the HTTP server (which now also handles WebSocket upgrades)
-    server.listen(config.port, '0.0.0.0', () => {
-      logger.info(`Server listening on port ${config.port}`);
-    });
-    // --- MODIFICATION END ---
+    // Initialize AudioSocket Server FIRST (needs to listen before Asterisk connects)
+    startAudioSocketServer(); // ADD
+    logger.info('AudioSocket server starting...');
 
-    // Graceful shutdown handlers (should still work with the 'server' instance)
-    const exitHandler = () => {
-      if (server) {
-        server.close(() => {
-          logger.info('Server closed');
-          // Optionally close mongoose connection here if needed
-          // mongoose.connection.close(false, () => { ... });
-          process.exit(1);
-        });
+    // Initialize Asterisk ARI client (if enabled in config)
+    if (config.asterisk && config.asterisk.enabled) {
+      logger.info('Asterisk integration enabled, starting ARI client');
+      startAriClient().catch(err => {
+        logger.error(`Failed to start Asterisk ARI client: ${err.message}`);
+        logger.warn('Continue without Asterisk integration');
+      });
+    } else {
+      logger.info('Asterisk integration disabled in configuration');
+    }
+
+    // Start HTTP server
+    const port = config.port || 3000;
+    server.listen(port, '0.0.0.0', () => {
+      logger.info(`Server listening on port ${port}`);
+      
+      // Log URLs for debugging
+      if (config.env === 'production') {
+        logger.info(`Production API URL: ${config.twilio.apiUrl}`);
+        logger.info(`Production WebSocket URL: ${config.twilio.websocketUrl}`);
       } else {
-        process.exit(1);
-      }
-    };
-
-    const unexpectedErrorHandler = (error) => {
-      logger.error('Unexpected Error:', error); // Log the full error
-      exitHandler();
-    };
-
-    process.on('uncaughtException', unexpectedErrorHandler);
-    process.on('unhandledRejection', (reason, promise) => {
-      // Log both reason and promise for better debugging
-      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-      // Don't necessarily exit immediately on unhandled rejection, depends on severity
-      // exitHandler(); // Uncomment if you want unhandled rejections to stop the server
-    });
-    process.on('SIGTERM', () => {
-      logger.info('SIGTERM received');
-      if (server) {
-        server.close();
+        logger.info(`Development API URL: ${config.twilio.apiUrl}`);
+        logger.info(`Development WebSocket URL: ${config.twilio.websocketUrl}`);
       }
     });
+
+    // Set up graceful shutdown handlers
+    setupShutdownHandlers(server);
+    
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
+/**
+ * Set up handlers for graceful shutdown
+ * @param {http.Server} server - HTTP server instance
+ */
+function setupShutdownHandlers(server) {
+  // Handler for unexpected errors
+  const unexpectedErrorHandler = (error) => {
+    logger.error('Unexpected Error:', error);
+    gracefulShutdown(server);
+  };
+
+  // Handler for graceful shutdown
+  const gracefulShutdown = (server) => {
+    logger.info('Initiating graceful shutdown...');
+    
+    if (server) {
+      server.close(() => {
+        logger.info('HTTP server closed');
+        
+        // Close database connection
+        mongoose.connection.close(false, () => {
+          logger.info('MongoDB connection closed');
+          process.exit(0);
+        });
+      });
+      
+      // Force exit after timeout
+      setTimeout(() => {
+        logger.warn('Forcing exit after timeout');
+        process.exit(1);
+      }, 10000);
+    } else {
+      process.exit(1);
+    }
+  };
+
+  // Register process event handlers
+  process.on('uncaughtException', unexpectedErrorHandler);
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit on unhandled rejections, just log them
+  });
+  
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received');
+    gracefulShutdown(server);
+  });
+  
+  process.on('SIGINT', () => {
+    logger.info('SIGINT received');
+    gracefulShutdown(server);
+  });
+}
+
+// Start the server
 startServer();

@@ -311,6 +311,124 @@ resource "aws_ecr_repository" "app_repo" {
   # image_tag_mutability = "MUTABLE" # Or IMMUTABLE
 }
 
+resource "aws_ecr_repository" "asterisk_repo" {
+  name = "bianca-app-asterisk"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  image_tag_mutability = "MUTABLE" # or IMMUTABLE if you prefer strict tagging
+}
+
+
+variable "asterisk_service_name" {
+  default = "asterisk-service"
+}
+
+variable "asterisk_container_name" {
+  default = "asterisk"
+}
+
+variable "asterisk_image" {
+  default = "andrius/asterisk:latest"
+}
+
+variable "asterisk_container_port" {
+  default = 5060
+}
+
+resource "aws_security_group" "asterisk_sg" {
+  name   = "asterisk-sg"
+  vpc_id = var.vpc_id
+
+  ingress {
+    from_port   = 5060
+    to_port     = 5060
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 5060
+    to_port     = 5060
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 10000
+    to_port     = 10100
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_ecs_task_definition" "asterisk_task" {
+  family                   = var.asterisk_service_name
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "512"
+  memory                   = "1024"
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = var.asterisk_container_name
+      image     = var.asterisk_image
+      essential = true
+      portMappings = [
+        { containerPort = 5060, protocol = "udp" },
+        { containerPort = 5060, protocol = "tcp" },
+        { containerPort = 10000, protocol = "udp" }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs",
+        options = {
+          "awslogs-group"         = "/ecs/asterisk",
+          "awslogs-region"        = var.aws_region,
+          "awslogs-stream-prefix" = "asterisk"
+        }
+      }
+    }
+  ])
+}
+
+resource "aws_ecs_service" "asterisk_service" {
+  name            = var.asterisk_service_name
+  cluster         = aws_ecs_cluster.cluster.id
+  task_definition = aws_ecs_task_definition.asterisk_task.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = var.subnet_ids
+    security_groups  = [aws_security_group.asterisk_sg.id]
+    assign_public_ip = true
+  }
+}
+
+resource "aws_route53_record" "sip_subdomain" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "sip.myphonefriend.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.app_lb.dns_name # or your NLB if you use one for SIP
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
+
+
 ##############################
 # IAM Roles and Policies
 ##############################
@@ -361,7 +479,10 @@ resource "aws_iam_policy" "codebuild_ecr_policy" {
           "ecr:GetRepositoryPolicy", # Good practice
           "ecr:DescribeRepositories" # Good practice
         ],
-        Resource = aws_ecr_repository.app_repo.arn # More specific resource
+        Resource = [
+          aws_ecr_repository.app_repo.arn, # More specific resource
+          aws_ecr_repository.asterisk_repo.arn
+        ]
       }
     ]
   })
@@ -1268,4 +1389,176 @@ resource "aws_route53_record" "ses_dkim_record" {
   type    = "CNAME"
   ttl     = 600
   records = ["${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
+}
+
+##############################################################
+# FRP Server (frps) Resources for Local Debug Tunneling
+##############################################################
+
+variable "frps_instance_type" {
+  description = "EC2 instance type for frps server"
+  type        = string
+  default     = "t3.micro" # Or t4g.micro for ARM (potentially cheaper)
+}
+
+data "aws_ssm_parameter" "amazon_linux_2" {
+  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+}
+
+variable "frps_bind_port" {
+  description = "TCP port for frpc clients to connect to frps"
+  type        = number
+  default     = 7000
+}
+
+variable "frps_sip_tcp_port" {
+  description = "Public TCP port frps will expose for SIP signaling"
+  type        = number
+  default     = 5060
+}
+
+variable "frps_rtp_udp_start_port" {
+  description = "Start of public UDP port range frps will expose for RTP"
+  type        = number
+  default     = 10000
+}
+
+variable "frps_rtp_udp_end_port" {
+  description = "End of public UDP port range frps will expose for RTP"
+  type        = number
+  default     = 10100 # Keep range small for security if possible
+}
+
+variable "frps_token" {
+  description = "Optional secret token for authenticating frpc to frps"
+  type        = string
+  default     = "RtSHnnUOfSis49XVqgidTGL3P1eggjPd6uKmfm2oiCY="
+  sensitive   = true
+}
+
+variable "my_dev_ip_cidr" {
+  description = "Your local development machine's public IP address in CIDR notation (e.g., 1.2.3.4/32) for SSH and frps access."
+  type        = string
+  default     = "23.16.17.211/32" # WARNING: Replace with your specific IP/32 for security!
+}
+
+variable "twilio_signaling_cidrs" {
+  description = "List of CIDR blocks for Twilio SIP signaling (TCP). Get from Twilio Docs."
+  type        = list(string)
+  default     = ["54.172.60.0/30", "54.244.51.0/30"] # EXAMPLE ONLY - GET CURRENT LIST! Add all relevant NA ranges.
+}
+
+variable "twilio_media_cidrs" {
+  description = "List of CIDR blocks for Twilio RTP media (UDP). Get from Twilio Docs."
+  type        = list(string)
+  default     = ["168.86.128.0/18"] # EXAMPLE ONLY - GET CURRENT LIST! This is often a global range.
+}
+
+variable "frp_version" {
+  description = "Version of FRP to download from GitHub releases for frps"
+  type        = string
+  default     = "0.62.1" # Match your client version if possible
+}
+
+# 1. Static Public IP for the FRP Server
+resource "aws_eip" "frps_eip" {
+  domain = "vpc" # Use 'vpc' for EC2-VPC, remove if using EC2-Classic (unlikely)
+
+  tags = {
+    Name = "frps-eip"
+  }
+}
+
+# 2. Security Group for the FRP Server
+resource "aws_security_group" "frps_sg" {
+  name        = "frps-server-sg"
+  description = "Allow FRPS client, SIP(TCP), RTP(UDP), and SSH"
+  vpc_id      = var.vpc_id # Use the same VPC as your app if possible
+
+  # Allow frpc connection from your dev IP
+  ingress {
+    description = "FRPS Bind Port from Dev IP"
+    from_port   = var.frps_bind_port
+    to_port     = var.frps_bind_port
+    protocol    = "tcp"
+    cidr_blocks = [var.my_dev_ip_cidr] # Restrict to your IP!
+  }
+
+  # Allow Twilio SIP Signaling (TCP)
+  ingress {
+    description = "SIP Signaling (TCP) from Twilio"
+    from_port   = var.frps_sip_tcp_port
+    to_port     = var.frps_sip_tcp_port
+    protocol    = "tcp"
+    cidr_blocks = var.twilio_signaling_cidrs # Use list of Twilio IPs
+  }
+
+  # Allow Twilio RTP Media (UDP Range)
+  ingress {
+    description = "RTP Media (UDP) from Twilio"
+    from_port   = var.frps_rtp_udp_start_port
+    to_port     = var.frps_rtp_udp_end_port
+    protocol    = "udp"
+    cidr_blocks = var.twilio_media_cidrs # Use list of Twilio IPs
+  }
+
+  # Allow SSH from your dev IP (for debugging the instance)
+  ingress {
+    description = "SSH from Dev IP"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.my_dev_ip_cidr] # Restrict to your IP!
+  }
+
+  # Allow all outbound traffic (simplest for debugging)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "frps-sg"
+  }
+}
+
+# 3. EC2 Instance to run frps
+# 3. EC2 Instance to run frps
+resource "aws_instance" "frps_server" {
+  ami           = data.aws_ssm_parameter.amazon_linux_2.value
+  instance_type = var.frps_instance_type
+  key_name      = "bianca-key-pair"
+  vpc_security_group_ids = [aws_security_group.frps_sg.id]
+  subnet_id                   = var.subnet_ids[0]
+  associate_public_ip_address = true # Required to associate EIP later
+
+  # User data script to install and run frps
+  user_data = templatefile("${path.module}/frps_userdata.tftpl", {
+    frps_bind_port = var.frps_bind_port,
+    frps_token = var.frps_token
+    # Add the variable used for download path:
+    frp_version    = var.frp_version,
+    # Add variables needed for allowPorts in the template:
+    frps_sip_tcp_port       = var.frps_sip_tcp_port,
+    frps_rtp_udp_start_port = var.frps_rtp_udp_start_port,
+    frps_rtp_udp_end_port   = var.frps_rtp_udp_end_port
+  })
+
+  tags = {
+    Name = "frps-server"
+  }
+}
+
+# 4. Associate the Elastic IP with the instance
+resource "aws_eip_association" "frps_eip_assoc" {
+  instance_id   = aws_instance.frps_server.id
+  allocation_id = aws_eip.frps_eip.id
+}
+
+# 5. Output the public IP address
+output "frps_server_public_ip" {
+  description = "Public IP address of the FRPS server instance"
+  value       = aws_eip.frps_eip.public_ip
 }

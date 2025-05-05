@@ -1,0 +1,30 @@
+serverAddr = "3.136.184.169"
+serverPort = 7000
+
+# Authentication
+auth.method = "token"
+auth.token = "RtSHnnUOfSis49XVqgidTGL3P1eggjPd6uKmfm2oiCY="
+
+# Logging for troubleshooting
+log.level = "debug"
+log.to = "/dev/stdout"
+
+# UDP packet size configuration
+udpPacketSize = 1500
+
+# TCP proxy for SIP signaling
+[[proxies]]
+name = "sip_tcp"
+type = "tcp"
+localIP = "asterisk"
+localPort = 5060
+remotePort = 5060
+
+{{- range $_, $v := parseNumberRangePair "10000-10100" "10000-10100" }}
+[[proxies]]
+name = "rtp-udp-{{ $v.First }}"
+type = "udp"
+localIP = "asterisk"
+localPort = {{ $v.First }}
+remotePort = {{ $v.Second }}
+{{- end }}

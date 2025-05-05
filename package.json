@@ -27,13 +27,14 @@
     "prepare": "husky install",
     "seed": "cross-env NODE_ENV=development node src/scripts/seedDatabase.js",
     "runschedules": "cross-env NODE_ENV=development node src/scripts/runSchedules.js",
-    "terraform:command": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest",
-    "terraform:destroy": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest destroy --auto-approve",
-    "terraform:taint": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest taint aws_ecs_service.app_service",
-    "terraform:init": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest init",
-    "terraform:plan": "docker run --rm -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest plan  -no-color -input=false",
-    "terraform:apply": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest apply -auto-approve",
+    "terraform:command": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest",
+    "terraform:destroy": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest destroy --auto-approve",
+    "terraform:taint": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest taint",
+    "terraform:init": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest init",
+    "terraform:plan": "docker run --rm -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest plan -no-color -input=false",
+    "terraform:apply": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest apply -auto-approve",
     "terraform:deploy": "yarn terraform:init && yarn terraform:plan && yarn terraform:apply"
+     
   },
   "keywords": [
     "node",
@@ -66,6 +67,7 @@
     "@pothos/plugin-validation": "^3.10.1",
     "accesscontrol": "^2.2.1",
     "agenda": "^5.0.0",
+    "ari-client": "^2.2.0",
     "aws-sdk": "^2.1599.0",
     "axios": "^0.21.1",
     "bcryptjs": "^2.4.3",

@@ -11,19 +11,40 @@ services:
     networks: # <-- Add this network assignment
       - node-network
 
-  # ngrok:
-  #   container_name: ngrok
-  #   image: ngrok/ngrok
-  #   restart: unless-stopped
-  #   command: 'http bianca-app:3000 --log=stdout '
-  #   depends_on:
-  #     - bianca-app
-  #   ports:
-  #     - '4040:4040'
-  #   environment:
-  #     - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} # Make sure this is set in your .env file
-  #   networks: # <-- Ensure this network assignment exists
-  #     - node-network
+  ngrok:
+    container_name: ngrok
+    image: ngrok/ngrok
+    restart: unless-stopped
+    depends_on:
+      - bianca-app
+      - asterisk
+    ports:
+      - '4040:4040'
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} # Make sure this is set in your .env file
+    volumes:
+      # Mount the config file into the container
+      - ./devops/ngrok-configs/ngrok.yml:/etc/ngrok/ngrok.yml # Mount as read-only
+    # Use the config file to start ALL defined tunnels
+    command: start --all --config /etc/ngrok/ngrok.yml
+    networks: # <-- Ensure this network assignment exists
+      - node-network
+
+ # --- Add the frpc service ---
+  frpc:
+    container_name: frpc
+    image: snowdreamtech/frpc # Using a popular frpc image
+    restart: unless-stopped
+    networks:
+      - node-network
+    volumes:
+      # Mount your local frpc.ini into the container
+      - ./devops/frp/configs/frpc.toml:/etc/frp/frpc.toml:ro
+    command: -c /etc/frp/frpc.toml # Command to run frpc with the config
+    depends_on:
+      # Ensure asterisk is running before frpc tries to forward to it
+      asterisk:
+        condition: service_healthy # Wait for Asterisk healthcheck
 
 # Define the network at the top level
 networks: # <-- Add this whole block

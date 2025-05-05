@@ -4,29 +4,43 @@ env:
   variables:
     AWS_DEFAULT_REGION: us-east-2
     AWS_ACCOUNT_ID: 730335291008
-    REPOSITORY_NAME: bianca-app-backend
+    REPOSITORY_NAME_BIANCA: bianca-app-backend
+    REPOSITORY_NAME_ASTERISK: bianca-app-asterisk
 
 phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME
+      - echo Setting repository URIs...
+      - REPOSITORY_URI_BIANCA=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_BIANCA
+      - REPOSITORY_URI_ASTERISK=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_ASTERISK
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
 
   build:
     commands:
       - echo Build started on $(date)
-      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
-      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
+      - echo Building Bianca app image...
+      - docker build -t $REPOSITORY_URI_BIANCA:$IMAGE_TAG .
+      - docker tag $REPOSITORY_URI_BIANCA:$IMAGE_TAG $REPOSITORY_URI_BIANCA:latest
+
+      - echo Pulling Asterisk image...
+      - docker pull andrius/asterisk:latest
+      - docker tag andrius/asterisk:latest $REPOSITORY_URI_ASTERISK:$IMAGE_TAG
+      - docker tag andrius/asterisk:latest $REPOSITORY_URI_ASTERISK:latest
 
   post_build:
     commands:
-      - echo Pushing the Docker image...
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - docker push $REPOSITORY_URI:latest
+      - echo Pushing Bianca app image...
+      - docker push $REPOSITORY_URI_BIANCA:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_BIANCA:latest
+
+      - echo Pushing Asterisk image...
+      - docker push $REPOSITORY_URI_ASTERISK:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_ASTERISK:latest
+
       - echo Writing imagedefinitions.json...
-      - printf '[{"name":"bianca-app-backend","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - printf '[{"name":"bianca-app-backend","imageUri":"%s"},{"name":"asterisk","imageUri":"%s"}]' $REPOSITORY_URI_BIANCA:$IMAGE_TAG $REPOSITORY_URI_ASTERISK:$IMAGE_TAG > imagedefinitions.json
 
 artifacts:
   files:
