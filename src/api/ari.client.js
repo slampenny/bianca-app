@@ -76,139 +76,116 @@ class AsteriskAriClient {
 
       // --- StasisStart: Handles BOTH main calls and our originated Local channels ---
       this.client.on('StasisStart', async (event, channel) => {
-          const channelId = channel.id;
-          const appArgs = event.args || [];
-          const channelName = channel.name || 'Unknown';
+        const channelId = channel.id;
+        const appArgs = event.args || [];
+        const channelName = channel.name || 'Unknown'; // e.g., "PJSIP/...", "Snoop/...", "Local/..."
 
-          logger.info(`[ARI] StasisStart event for channel ${channelId} (${channelName}), Args: ${JSON.stringify(appArgs)}`);
+        logger.info(`[ARI] StasisStart event for channel ${channelId} (${channelName}), Args: ${JSON.stringify(appArgs)}`);
 
-          // --- Case 1: Handle the originated Local channel for AudioSocket ---
-          if (appArgs.includes(this.AUDIO_SOCKET_ARG)) {
-              logger.info(`[ARI] Handling StasisStart for Local AudioSocket channel: ${channelId}`);
+        // --- Case 1: Handle the originated Local channel for AudioSocket ---
+        if (appArgs.includes(this.AUDIO_SOCKET_ARG)) {
+            logger.info(`[ARI] Handling StasisStart for Local AudioSocket channel: ${channelId}`);
+            // ... (Existing logic for Local channel handling - Add to snoop bridge, continueInDialplan)
+            // ... Make sure the findParentChannelIdByUuid fix is applied here if not already done ...
+            const nameMatch = channelName.match(/Local\/([^@]+)@/);
+            const audioSocketUuid = nameMatch ? nameMatch[1] : null;
 
-              // Extract the UUID from the channel name (e.g., Local/uuid@context/n)
-              const nameMatch = channelName.match(/Local\/([^@]+)@/);
-              const audioSocketUuid = nameMatch ? nameMatch[1] : null;
+            if (!audioSocketUuid) {
+                logger.error(`[ARI] Could not extract UUID from Local channel name: ${channelName}. Hanging up.`);
+                await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up Local channel ${channelId}: ${e.message}`));
+                return;
+            }
 
-              if (!audioSocketUuid) {
-                  logger.error(`[ARI] Could not extract UUID from Local channel name: ${channelName}. Hanging up.`);
-                  await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up Local channel ${channelId}: ${e.message}`));
-                  return;
-              }
+            // *** Use corrected method name ***
+            const parentChannelId = this.tracker.findParentChannelIdByUuid(audioSocketUuid);
+            if (!parentChannelId) {
+                logger.error(`[ARI] No parent channel found for AudioSocket UUID: ${audioSocketUuid} (Local channel: ${channelId}). Hanging up.`);
+                logger.debug(`[Tracker UUID Map] ${JSON.stringify(Object.fromEntries(this.tracker.uuidToChannelId))}`);
+                logger.debug(`[Tracker Calls Map] ${JSON.stringify(Object.fromEntries(this.tracker.calls))}`);
+                await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned Local channel ${channelId}: ${e.message}`));
+                return;
+            }
+            const parentCallData = this.tracker.getCall(parentChannelId);
+             if (!parentCallData || !parentCallData.snoopBridge) {
+                logger.error(`[ARI] Parent channel data or snoop bridge missing for ${parentChannelId} (UUID: ${audioSocketUuid}, Local: ${channelId}). Hanging up Local channel.`);
+                await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up Local channel ${channelId} due to missing parent/bridge data: ${e.message}`));
+                return;
+            }
+            logger.info(`[ARI] Found parent channel ${parentChannelId} for Local channel ${channelId} (UUID: ${audioSocketUuid})`);
+            this.tracker.updateCall(parentChannelId, { localChannel: channel, localChannelId: channelId, state: 'local_stasis' });
+            try {
+                logger.info(`[ARI] Adding Local channel ${channelId} to Snoop Bridge ${parentCallData.snoopBridge.id}`);
+                await parentCallData.snoopBridge.addChannel({ channel: channelId });
+                logger.info(`[ARI] Added Local channel ${channelId} to Snoop Bridge.`);
+                logger.info(`[ARI] Continuing Local channel ${channelId} in dialplan (${this.AUDIO_SOCKET_CONTEXT}, ${this.AUDIO_SOCKET_EXTENSION})`);
+                await channel.continueInDialplan({ context: this.AUDIO_SOCKET_CONTEXT, extension: this.AUDIO_SOCKET_EXTENSION, priority: 1 });
+                logger.info(`[ARI] Local channel ${channelId} sent to execute AudioSocket.`);
+                this.tracker.updateCall(parentChannelId, { state: 'audiosocket_running' });
+            } catch (err) {
+                 logger.error(`[ARI] Error handling Local channel ${channelId}: ${err.message}`, err);
+                 await this.cleanupChannel(parentChannelId, `Local channel ${channelId} setup failed`);
+            }
 
-              // Find the original parent call using the UUID
-              const parentChannelId = this.tracker.findParentChannelIdByUuid(audioSocketUuid);
-              if (!parentChannelId) {
-                  logger.error(`[ARI] No parent channel found for AudioSocket UUID: ${audioSocketUuid} (Local channel: ${channelId}). Hanging up.`);
-                  // Log tracker state for debugging
-                  logger.debug(`[Tracker UUID Map] ${JSON.stringify(Object.fromEntries(this.tracker.uuidToChannelId))}`);
-                  logger.debug(`[Tracker Calls Map] ${JSON.stringify(Object.fromEntries(this.tracker.calls))}`);
-                  await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned Local channel ${channelId}: ${e.message}`));
-                  return;
-              }
+        // --- Case 2: Handle the Snoop channel entering Stasis ---
+        } else if (channelName.startsWith('Snoop/')) {
+            logger.info(`[ARI] Handling StasisStart for Snoop channel: ${channelId}`);
+            // We don't want to run the full pipeline for the snoop channel.
+            // Its only purpose here is to be controllable by ARI for bridging.
+            // We might want to Answer it just to be safe, although maybe not necessary.
+            try {
+                // logger.debug(`[ARI] Answering Snoop channel ${channelId}...`);
+                // await channel.answer(); // Optional: Answer the snoop channel? Test if needed.
+                logger.info(`[ARI] Snoop channel ${channelId} entered Stasis. No pipeline action needed.`);
+                // Optionally, find parent and update tracker state or store channel object if needed
+                // const snoopedChannelId = channelName.substring(6).split('-')[0]; // Attempt to parse parent ID
+                // if(snoopedChannelId) {
+                //    this.tracker.updateCall(snoopedChannelId, { snoopChannelStasis: true });
+                // }
+            } catch (err) {
+                 logger.error(`[ARI] Error handling Snoop channel ${channelId} in Stasis: ${err.message}`);
+                 // Should we hang it up? Maybe let Asterisk handle it.
+            }
 
-              // Get the parent call data, including the snoop bridge
-              const parentCallData = this.tracker.getCall(parentChannelId);
-               if (!parentCallData || !parentCallData.snoopBridge) {
-                  logger.error(`[ARI] Parent channel data or snoop bridge missing for ${parentChannelId} (UUID: ${audioSocketUuid}, Local: ${channelId}). Hanging up Local channel.`);
-                  await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up Local channel ${channelId} due to missing parent/bridge data: ${e.message}`));
-                  return;
-              }
-
-              logger.info(`[ARI] Found parent channel ${parentChannelId} for Local channel ${channelId} (UUID: ${audioSocketUuid})`);
-
-              // Update tracker: Store the Local channel object and ID
-              this.tracker.updateCall(parentChannelId, {
-                  localChannel: channel,
-                  localChannelId: channelId,
-                  state: 'local_stasis' // New state
-              });
-
-              try {
-                  // Add the Local channel to the Snoop Bridge
-                  logger.info(`[ARI] Adding Local channel ${channelId} to Snoop Bridge ${parentCallData.snoopBridge.id}`);
-                  await parentCallData.snoopBridge.addChannel({ channel: channelId });
-                  logger.info(`[ARI] Added Local channel ${channelId} to Snoop Bridge.`);
-
-                  // Continue the Local channel in the dialplan to execute AudioSocket()
-                  logger.info(`[ARI] Continuing Local channel ${channelId} in dialplan (${this.AUDIO_SOCKET_CONTEXT}, ${this.AUDIO_SOCKET_EXTENSION})`);
-                  await channel.continueInDialplan({
-                      context: this.AUDIO_SOCKET_CONTEXT,
-                      extension: this.AUDIO_SOCKET_EXTENSION,
-                      priority: 1 // Start at priority 1 of the target extension
-                  });
-                  logger.info(`[ARI] Local channel ${channelId} sent to execute AudioSocket.`);
-                  this.tracker.updateCall(parentChannelId, { state: 'audiosocket_running' });
-
-              } catch (err) {
-                   logger.error(`[ARI] Error handling Local channel ${channelId}: ${err.message}`, err);
-                   // Attempt cleanup of the parent call if local channel setup fails
-                   await this.cleanupChannel(parentChannelId, `Local channel ${channelId} setup failed`);
-              }
-
-          // --- Case 2: Handle a regular incoming call ---
-          } else {
-              logger.info(`[ARI] Handling StasisStart for Main incoming channel: ${channelId}`);
-              let callSid = null; // Use Twilio SID if available
-              let patientId = null;
-
-              // Extract patientId/callSid from URIOPTS (same logic as V1)
-               try {
-                  const channelVars = await channel.getChannelVar({ variable: 'URIOPTS' });
-                  if (channelVars.value) {
-                      logger.info(`[ARI] URI options for ${channelId}: ${channelVars.value}`);
-                      const uriOpts = channelVars.value.split('&').reduce((opts, pair) => {
-                          const [key, value] = pair.split('=');
-                          if (key && value) opts[key] = decodeURIComponent(value);
-                          return opts;
-                      }, {});
-                      patientId = uriOpts.patientId || patientId; // Allow override
-                      callSid = uriOpts.callSid ? uriOpts.callSid.trim() : callSid;
-                      logger.info(`[ARI] Extracted from URI: patientId=${patientId}, callSid=${callSid}`);
-                  }
-               } catch (err) {
-                  // Log if URIOPTS not found, but don't fail the call
-                  logger.warn(`[ARI] URIOPTS variable not found or failed to parse for ${channelId}: ${err.message}`);
-               }
-
-               // Add to tracker
-               this.tracker.addCall(channelId, {
-                   channel: channel,
-                   twilioSid: callSid,
-                   patientId: patientId,
-                   state: 'stasis_start'
-               });
-
-               // Handle the main call flow
-               try {
-                  logger.info(`[ARI] Answering main channel: ${channelId}`);
-                  await channel.answer();
-                  this.tracker.updateCall(channelId, { state: 'answered' });
-                  logger.info(`[ARI] Answered main channel: ${channelId}`);
-
-                  // --- Simple Playback Test (Beep) ---
-                  // Keep this to ensure basic channel control works
-                  try {
-                      logger.info(`[ARI DEBUG] Attempting beep playback on ${channelId}...`);
-                      const playback = await channel.play({ media: 'sound:beep' });
-                      logger.info(`[ARI DEBUG] Beep playback command sent (ID: ${playback.id})`);
-                      playback.once('PlaybackFailed', (_, inst) => logger.error(`[ARI DEBUG] Beep Playback ${inst.id} failed!`));
-                      playback.once('PlaybackFinished', (_, inst) => logger.info(`[ARI DEBUG] Beep Playback ${inst.id} finished.`));
-                  } catch (playErr) {
-                      logger.error(`[ARI DEBUG] Failed to initiate beep playback: ${playErr.message}`);
-                  }
-                  // --- End Beep Test ---
-
-                  // Setup the main bridge, recording, OpenAI, and initiate snooping
-                  await this.setupMediaPipeline(channel, callSid, patientId);
-                  // State might be updated further within setupMediaPipeline
-
-               } catch (err) {
-                  logger.error(`[ARI] Error handling main channel ${channelId} setup: ${err.message}`, err);
-                  await this.cleanupChannel(channelId, `Main channel setup failed`);
-               }
-          }
-      });
+        // --- Case 3: Handle a regular Main incoming call ---
+        } else {
+            logger.info(`[ARI] Handling StasisStart for Main incoming channel: ${channelId}`);
+            // ... (Existing logic for Main channel: extract vars, addCall, answer, beep, setupMediaPipeline) ...
+             let callSid = null;
+             let patientId = null;
+             try {
+                const channelVars = await channel.getChannelVar({ variable: 'URIOPTS' });
+                if (channelVars.value) {
+                    logger.info(`[ARI] URI options for ${channelId}: ${channelVars.value}`);
+                    const uriOpts = channelVars.value.split('&').reduce((opts, pair) => { /* ... */ }, {});
+                    patientId = uriOpts.patientId || patientId;
+                    callSid = uriOpts.callSid ? uriOpts.callSid.trim() : callSid;
+                    logger.info(`[ARI] Extracted from URI: patientId=${patientId}, callSid=${callSid}`);
+                }
+             } catch (err) {
+                 logger.warn(`[ARI] URIOPTS variable not found or failed to parse for ${channelId}: ${err.message}`);
+             }
+             this.tracker.addCall(channelId, { channel: channel, twilioSid: callSid, patientId: patientId, state: 'stasis_start' });
+             try {
+                logger.info(`[ARI] Answering main channel: ${channelId}`);
+                await channel.answer();
+                this.tracker.updateCall(channelId, { state: 'answered' });
+                logger.info(`[ARI] Answered main channel: ${channelId}`);
+                try {
+                    logger.info(`[ARI DEBUG] Attempting beep playback on ${channelId}...`);
+                    const playback = await channel.play({ media: 'sound:beep' });
+                    logger.info(`[ARI DEBUG] Beep playback command sent (ID: ${playback.id})`);
+                    playback.once('PlaybackFailed', (_, inst) => logger.error(`[ARI DEBUG] Beep Playback ${inst.id} failed!`));
+                    playback.once('PlaybackFinished', (_, inst) => logger.info(`[ARI DEBUG] Beep Playback ${inst.id} finished.`));
+                } catch (playErr) {
+                    logger.error(`[ARI DEBUG] Failed to initiate beep playback: ${playErr.message}`);
+                }
+                await this.setupMediaPipeline(channel, callSid, patientId);
+             } catch (err) {
+                 logger.error(`[ARI] Error handling main channel ${channelId} setup: ${err.message}`, err);
+                 await this.cleanupChannel(channelId, `Main channel setup failed`);
+             }
+        }
+    });
 
       // --- StasisEnd: Channel leaving the Stasis app ---
       this.client.on('StasisEnd', async (event, channel) => {

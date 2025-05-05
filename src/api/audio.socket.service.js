@@ -1,123 +1,242 @@
 // src/services/audio.socket.service.js
 
-// *** Use WebSocket server, not TCP ***
-const WebSocket = require('ws'); // npm install ws
-const url = require('url'); // Node.js built-in module
+const net = require('net'); // Use Node's built-in TCP module
+const { Buffer } = require('buffer'); // Explicitly require Buffer if needed
 
 const logger = require('../config/logger');
 const openAIService = require('./openai.realtime.service');
-// *** Require the shared tracker instance ***
+// Require the shared tracker instance
 const channelTracker = require('./channel.tracker'); // Adjust path if needed
 
 const LISTEN_HOST = '0.0.0.0';
 const LISTEN_PORT = 9099;
 
-let wsServer = null;
+// AudioSocket Protocol Frame Types (based on documentation)
+const FRAME_TYPE_TERMINATE = 0x00;
+const FRAME_TYPE_UUID = 0x01; // Assume Asterisk sends string UUID based on dialplan arg
+const FRAME_TYPE_DTMF = 0x03;
+const FRAME_TYPE_AUDIO_SLIN16 = 0x10; // Signed Linear 16-bit PCM, 8kHz mono LE (common Asterisk format)
+const FRAME_TYPE_ERROR = 0xFF;
+
+// Header length in bytes
+const HEADER_LENGTH = 3; // 1 byte Type + 2 bytes Length
+
+let tcpServer = null;
+
+function formatBinaryUUID(buffer) {
+    if (!buffer || buffer.length !== 16) {
+      logger.error(`[AudioSocket Utils] Invalid buffer length for UUID formatting: ${buffer?.length}`);
+      return null;
+    }
+    try {
+      const hex = buffer.toString('hex');
+      // Add hyphens: 8-4-4-4-12
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    } catch (e) {
+       logger.error(`[AudioSocket Utils] Error formatting binary UUID: ${e.message}`);
+       return null;
+    }
+  }
 
 function startAudioSocketServer() {
-    if (wsServer) {
-        logger.warn('[AudioSocket] WebSocket Server already running.');
+    if (tcpServer) {
+        logger.warn('[AudioSocket TCP] Server already running.');
         return;
     }
 
-    // *** Create WebSocket Server ***
-    wsServer = new WebSocket.Server({ host: LISTEN_HOST, port: LISTEN_PORT });
+    // Create TCP Server
+    tcpServer = net.createServer((socket) => {
+        const connectionId = `tcp-${socket.remoteAddress}:${socket.remotePort}`;
+        logger.info(`[AudioSocket TCP] Asterisk connected. Client ID: ${connectionId}`);
 
-    wsServer.on('listening', () => {
-        logger.info(`[AudioSocket] WebSocket Server listening on ${LISTEN_HOST}:${LISTEN_PORT}`);
-    });
+        let incomingBuffer = Buffer.alloc(0); // Buffer for accumulating data per connection
+        let parentChannelId = null; // Associated Asterisk Channel ID
+        let state = 'AwaitingUUID'; // Initial state for this connection
 
-    wsServer.on('connection', (ws, req) => {
-        // req is the incoming HTTP request object
-        const connectionId = `ws-${Date.now()}`;
-        const remoteAddress = req.socket.remoteAddress;
-        logger.info(`[AudioSocket] Asterisk connected via WebSocket. Client ID: ${connectionId} from ${remoteAddress}`);
+        // Handle incoming data from Asterisk
+        socket.on('data', (data) => {
+            // logger.debug(`[AudioSocket TCP] Received data chunk of length: ${data.length} from ${connectionId}`);
+            incomingBuffer = Buffer.concat([incomingBuffer, data]);
+            // logger.debug(`[AudioSocket TCP] Buffer size now: ${incomingBuffer.length}`);
 
-        // ** Parse UUID from the connection URL query parameters **
-        // Assumes dialplan uses: AudioSocket(ws://.../path?uuid=THE_UUID)
-        const parsedUrl = url.parse(req.url, true); // true parses query string
-        const audioSocketUuid = parsedUrl.query.uuid;
-
-        if (!audioSocketUuid) {
-            logger.error(`[AudioSocket] No 'uuid' query parameter found in connection URL: ${req.url}. Closing connection ${connectionId}.`);
-            ws.terminate(); // Close the WebSocket connection
-            return;
-        }
-
-        logger.info(`[AudioSocket] Extracted UUID "${audioSocketUuid}" from connection URL for ${connectionId}`);
-
-        // ** Find the parent channel using the tracker **
-        const parentChannelId = channelTracker.findParentChannelIdByUuid(audioSocketUuid);
-
-        if (!parentChannelId) {
-            logger.error(`[AudioSocket] No tracked channel found for UUID: "${audioSocketUuid}". Closing connection ${connectionId}.`);
-            channelTracker.logState(); // Log tracker state for debugging
-            ws.terminate();
-            return;
-        }
-
-        logger.info(`[AudioSocket] Associated UUID ${audioSocketUuid} with Asterisk Channel ID ${parentChannelId} for connection ${connectionId}`);
-
-        // Store the parent channel ID on the WebSocket object for later use
-        ws.parentChannelId = parentChannelId;
-        ws.connectionId = connectionId; // Store for logging
-
-        // Handle incoming audio messages from Asterisk
-        ws.on('message', (message) => {
-            // message is likely a Buffer containing raw audio data (e.g., SLIN)
-             logger.debug(`[AudioSocket] Received message chunk of length: ${message.length} for ${ws.connectionId} (Channel: ${ws.parentChannelId})`);
-
-            if (ws.parentChannelId && Buffer.isBuffer(message) && message.length > 0) {
-                try {
-                     const audioBase64 = message.toString('base64');
-                     // Assuming openAIService uses the Asterisk Channel ID
-                     // You might need the Twilio SID here depending on openAIService implementation.
-                     // If needed, retrieve it from the tracker:
-                     // const callData = channelTracker.getCall(ws.parentChannelId);
-                     // const sidForOpenAI = callData?.twilioSid || ws.parentChannelId;
-                     openAIService.sendAudioChunk(ws.parentChannelId, audioBase64);
-                } catch (err) {
-                     logger.error(`[AudioSocket] Error encoding/sending audio for ${ws.parentChannelId}: ${err.message}`);
+            // Process as many full frames as possible from the buffer
+            while (true) {
+                if (incomingBuffer.length < HEADER_LENGTH) {
+                    // Not enough data for a header, wait for more
+                    // logger.debug(`[AudioSocket TCP] Buffer too small for header (${incomingBuffer.length}), waiting.`);
+                    break;
                 }
-            } else if (!Buffer.isBuffer(message)) {
-                 logger.warn(`[AudioSocket] Received non-buffer message on WebSocket for ${ws.connectionId}: ${message}`);
-            }
+
+                // Read header
+                const frameType = incomingBuffer.readUInt8(0);
+                const payloadLength = incomingBuffer.readUInt16BE(1); // Length is Big Endian
+                const totalFrameLength = HEADER_LENGTH + payloadLength;
+
+                // logger.debug(`[AudioSocket TCP] Parsed header: Type=0x${frameType.toString(16)}, Length=${payloadLength}, TotalFrame=${totalFrameLength}`);
+
+
+                if (incomingBuffer.length < totalFrameLength) {
+                    // Not enough data for the full payload yet, wait for more
+                    // logger.debug(`[AudioSocket TCP] Buffer too small for full frame (${incomingBuffer.length}/${totalFrameLength}), waiting.`);
+                    break;
+                }
+
+                // We have a full frame, extract payload
+                const payload = incomingBuffer.slice(HEADER_LENGTH, totalFrameLength);
+                // logger.debug(`[AudioSocket TCP] Processing frame Type 0x${frameType.toString(16)} with payload length ${payload.length}`);
+
+
+                // --- Process Frame based on Type and State ---
+                switch (frameType) {
+                    case FRAME_TYPE_UUID: // UUID Frame (Type 0x01)
+                        if (state === 'AwaitingUUID') {
+                            // Assuming Asterisk sends the 36-char UUID string here based on dialplan arg
+                            let receivedUuidString = null;
+                            if (payload.length === 16) {
+                                // *** FIX: Convert 16-byte binary payload to string format ***
+                                receivedUuidString = formatBinaryUUID(payload);
+                                logger.info(`[AudioSocket TCP] Received 16-byte UUID frame from ${connectionId}, formatted as: "${receivedUuidString}"`);
+                            } else {
+                                // Fallback/Warning if unexpected length (e.g., 36 bytes string)
+                                const receivedText = payload.toString('ascii').trim();
+                                logger.warn(`[AudioSocket TCP] Received UUID payload with unexpected length ${payload.length} from ${connectionId}. Attempting ASCII conversion: "${receivedText}"`);
+                                receivedUuidString = receivedText; // Try using text if not 16 bytes
+                            }
+
+                            if (!receivedUuidString) {
+                                logger.error(`[AudioSocket TCP] Failed to format or invalid UUID received from ${connectionId}. Closing socket.`);
+                                socket.destroy();
+                                incomingBuffer = Buffer.alloc(0);
+                                return;
+                            }
+
+                            logger.info(`[AudioSocket TCP] Received UUID frame from ${connectionId}: "${receivedUuidString}" (payload length: ${payload.length})`);
+
+                            parentChannelId = channelTracker.findParentChannelIdByUuid(receivedUuidString);
+                            if (parentChannelId) {
+                                logger.info(`[AudioSocket TCP] Associated ${connectionId} with Asterisk Channel ID: ${parentChannelId}`);
+                                socket.parentChannelId = parentChannelId; // Store on socket object
+                                state = 'StreamingAudio'; // Transition state
+                            } else {
+                                logger.error(`[AudioSocket TCP] No tracked channel found for UUID "${receivedUuidString}" from ${connectionId}. Closing socket.`);
+                                channelTracker.logState();
+                                socket.destroy(); // Close the socket immediately
+                                // Need to break the loop AND potentially return if socket is destroyed
+                                incomingBuffer = Buffer.alloc(0); // Clear buffer on error
+                                return; // Exit the 'data' handler for this destroyed socket
+                            }
+                        } else {
+                             logger.warn(`[AudioSocket TCP] Received unexpected UUID frame from ${connectionId} in state ${state}. Ignoring.`);
+                        }
+                        break;
+
+                    case FRAME_TYPE_AUDIO_SLIN16: // Audio Frame (Type 0x10)
+                        if (state === 'StreamingAudio' && socket.parentChannelId) {
+                            if (payload.length > 0) {
+                                logger.debug(`[AudioSocket TCP] Received ${payload.length} bytes audio for ${socket.parentChannelId}`);
+                                try {
+                                    const audioBase64 = payload.toString('base64');
+                                    // Forward to OpenAI service using the parent channel ID stored on the socket
+                                    openAIService.sendAudioChunk(socket.parentChannelId, audioBase64);
+                                } catch (err) {
+                                    logger.error(`[AudioSocket TCP] Error encoding/sending audio for ${socket.parentChannelId}: ${err.message}`);
+                                }
+                            } else {
+                                 logger.debug(`[AudioSocket TCP] Received empty audio payload for ${socket.parentChannelId}`);
+                            }
+                        } else {
+                             logger.warn(`[AudioSocket TCP] Received audio frame from ${connectionId} but state is ${state} or parentChannelId is missing. Ignoring.`);
+                        }
+                        break;
+
+                    case FRAME_TYPE_DTMF: // DTMF Frame (Type 0x03)
+                         if (state === 'StreamingAudio' && socket.parentChannelId) {
+                            const digit = payload.toString('ascii').charAt(0); // DTMF is usually single ASCII char
+                            logger.info(`[AudioSocket TCP] Received DTMF '${digit}' for ${socket.parentChannelId}`);
+                            // Optionally forward DTMF to OpenAI or handle differently
+                            // openAIService.sendDtmf(socket.parentChannelId, digit);
+                         } else {
+                             logger.warn(`[AudioSocket TCP] Received DTMF frame from ${connectionId} but state is ${state} or parentChannelId is missing. Ignoring.`);
+                         }
+                         break;
+
+                    case FRAME_TYPE_TERMINATE: // Terminate Frame (Type 0x00)
+                         logger.info(`[AudioSocket TCP] Received Terminate frame from ${connectionId} (Channel: ${socket.parentChannelId}). Closing socket.`);
+                         socket.end(); // Graceful close initiated by Asterisk
+                         break;
+
+                    case FRAME_TYPE_ERROR: // Error Frame (Type 0xFF)
+                         const errorCode = payload.length > 0 ? payload.readUInt8(0) : 'N/A';
+                         logger.error(`[AudioSocket TCP] Received Error frame from ${connectionId} (Channel: ${socket.parentChannelId}). Error code: ${errorCode}. Closing socket.`);
+                         socket.destroy(); // Force close on error
+                         break;
+
+                    default:
+                        logger.warn(`[AudioSocket TCP] Received unknown frame type 0x${frameType.toString(16)} from ${connectionId}. Ignoring frame.`);
+                }
+
+                // Remove the processed frame from the buffer
+                incomingBuffer = incomingBuffer.slice(totalFrameLength);
+                // logger.debug(`[AudioSocket TCP] Buffer size after processing: ${incomingBuffer.length}`);
+
+                // Safety check in case socket was destroyed during processing
+                if (socket.destroyed) {
+                     logger.debug(`[AudioSocket TCP] Socket ${connectionId} was destroyed during frame processing loop. Breaking loop.`);
+                     break;
+                }
+
+            } // End while loop processing buffer
+        }); // End socket.on('data')
+
+        socket.on('end', () => {
+            // Fired when Asterisk initiates a graceful close (e.g., sends FIN)
+            logger.info(`[AudioSocket TCP] Client ${connectionId} (Channel: ${socket.parentChannelId}) sent FIN packet.`);
+            state = 'Closed';
+            // Main cleanup is handled by ARI client detecting channel hangup/destroy
         });
 
-        ws.on('close', (code, reason) => {
-            const reasonStr = reason ? reason.toString() : 'No reason given';
-            logger.info(`[AudioSocket] WebSocket client ${ws.connectionId} (Channel: ${ws.parentChannelId}) disconnected. Code: ${code}, Reason: ${reasonStr}`);
-            // No need to explicitly clean up the tracker here; ARI events (StasisEnd/ChannelDestroyed) should handle that.
+        socket.on('close', (hadError) => {
+            // Fired when the socket is fully closed, either gracefully or due to error/destroy
+            logger.info(`[AudioSocket TCP] Socket closed for ${connectionId} (Channel: ${socket.parentChannelId}). Had error: ${hadError}`);
+            state = 'Closed';
+            // Remove any specific state tied to this socket instance if necessary,
+            // but the main call state cleanup should happen via ARI events.
         });
 
-        ws.on('error', (err) => {
-            logger.error(`[AudioSocket] Error on WebSocket client ${ws.connectionId} (Channel: ${ws.parentChannelId}): ${err.message}`);
-            // The 'close' event will usually fire after an error.
+        socket.on('error', (err) => {
+            logger.error(`[AudioSocket TCP] Error on socket ${connectionId} (Channel: ${socket.parentChannelId}): ${err.message}`);
+            state = 'Error';
+            // 'close' will usually fire after 'error'
         });
-    }); // End wsServer.on('connection')
+    }); // End tcpServer = net.createServer
 
-    wsServer.on('error', (err) => {
-        logger.error(`[AudioSocket] WebSocket Server error: ${err.message}`);
-        wsServer = null; // Allow restarting
+    tcpServer.listen(LISTEN_PORT, LISTEN_HOST, () => {
+        logger.info(`[AudioSocket TCP] Server listening on TCP ${LISTEN_HOST}:${LISTEN_PORT}`);
     });
 
-    // Graceful shutdown handlers (keep existing logic)
+    tcpServer.on('error', (err) => {
+        logger.error(`[AudioSocket TCP] Server error: ${err.message}`);
+        if (err.code === 'EADDRINUSE') {
+             logger.error(`[AudioSocket TCP] Port ${LISTEN_PORT} is already in use.`);
+        }
+        tcpServer = null; // Allow restarting
+    });
+
+    // Graceful shutdown handlers
      process.on('SIGTERM', () => {
-        if (wsServer) {
-            logger.info('[AudioSocket] Closing WebSocket server on SIGTERM...');
-            wsServer.close(() => logger.info('[AudioSocket] WebSocket Server closed.'));
+        if (tcpServer) {
+            logger.info('[AudioSocket TCP] Closing TCP server on SIGTERM...');
+            tcpServer.close(() => logger.info('[AudioSocket TCP] TCP Server closed.'));
         }
      });
      process.on('SIGINT', () => {
-         if (wsServer) {
-            logger.info('[AudioSocket] Closing WebSocket server on SIGINT...');
-            wsServer.close(() => logger.info('[AudioSocket] WebSocket Server closed.'));
+         if (tcpServer) {
+            logger.info('[AudioSocket TCP] Closing TCP server on SIGINT...');
+            tcpServer.close(() => logger.info('[AudioSocket TCP] TCP Server closed.'));
          }
      });
 
-    return wsServer;
+    return tcpServer;
 }
-
-// Remove the old findChannelByAudioSocketUuid using getAriClient
 
 module.exports = { startAudioSocketServer };
