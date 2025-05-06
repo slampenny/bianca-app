@@ -34,7 +34,6 @@
     "terraform:plan": "docker run --rm -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest plan -no-color -input=false",
     "terraform:apply": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest apply -auto-approve",
     "terraform:deploy": "yarn terraform:init && yarn terraform:plan && yarn terraform:apply"
-     
   },
   "keywords": [
     "node",
@@ -67,6 +66,7 @@
     "@pothos/plugin-validation": "^3.10.1",
     "accesscontrol": "^2.2.1",
     "agenda": "^5.0.0",
+    "alawmulaw": "^6.0.0",
     "ari-client": "^2.2.0",
     "aws-sdk": "^2.1599.0",
     "axios": "^0.21.1",

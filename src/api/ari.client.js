@@ -117,6 +117,28 @@ class AsteriskAriClient {
                 logger.info(`[ARI] Adding Local channel ${channelId} to Snoop Bridge ${parentCallData.snoopBridge.id}`);
                 await parentCallData.snoopBridge.addChannel({ channel: channelId });
                 logger.info(`[ARI] Added Local channel ${channelId} to Snoop Bridge.`);
+
+// // *** <<< INSERT BEEP TEST FOR LOCAL CHANNEL HERE >>> ***
+// try {
+//   logger.info(`[ARI DEBUG] >>> Attempting beep playback on LOCAL channel ${channelId}...`);
+//   // Use the 'channel' object received in this StasisStart event
+//   const localPlayback = await channel.play({ media: 'sound:beep' });
+//   logger.info(`[ARI DEBUG] >>> LOCAL Beep playback command sent (ID: ${localPlayback.id})`);
+
+//   localPlayback.once('PlaybackFailed', (_, inst) => {
+//       logger.error(`[ARI DEBUG] >>> LOCAL Beep Playback ${inst.id} FAILED! Reason: ${inst.playback?.reason || 'Unknown'}`);
+//   });
+//   localPlayback.once('PlaybackFinished', (_, inst) => {
+//       logger.info(`[ARI DEBUG] >>> LOCAL Beep Playback ${inst.id} finished.`);
+//   });
+//   // Optional short delay to allow beep to potentially start playing
+//   // await new Promise(resolve => setTimeout(resolve, 500)); // Wait 0.5 seconds
+// } catch (localPlayErr) {
+//   logger.error(`[ARI DEBUG] >>> FAILED to initiate LOCAL beep playback: ${localPlayErr.message}`);
+//   if (localPlayErr.stack) logger.error(`[ARI DEBUG] >>> Local Playback Stack: ${localPlayErr.stack}`);
+// }
+// // *** <<< END BEEP TEST FOR LOCAL CHANNEL >>> ***
+
                 logger.info(`[ARI] Continuing Local channel ${channelId} in dialplan (${this.AUDIO_SOCKET_CONTEXT}, ${this.AUDIO_SOCKET_EXTENSION})`);
                 await channel.continueInDialplan({ context: this.AUDIO_SOCKET_CONTEXT, extension: this.AUDIO_SOCKET_EXTENSION, priority: 1 });
                 logger.info(`[ARI] Local channel ${channelId} sent to execute AudioSocket.`);
@@ -156,7 +178,16 @@ class AsteriskAriClient {
                 const channelVars = await channel.getChannelVar({ variable: 'URIOPTS' });
                 if (channelVars.value) {
                     logger.info(`[ARI] URI options for ${channelId}: ${channelVars.value}`);
-                    const uriOpts = channelVars.value.split('&').reduce((opts, pair) => { /* ... */ }, {});
+                    const uriOpts = channelVars.value.split('&').reduce((opts, pair) => {
+                        const [key, value] = pair.split('=');
+                        // Ensure both key and value exist after splitting
+                        if (key && value) {
+                            // Decode URI components and add to the object
+                            opts[decodeURIComponent(key)] = decodeURIComponent(value);
+                        }
+                        // IMPORTANT: Return the accumulated object for the next iteration
+                        return opts;
+                    }, {}); // Start with an empty object
                     patientId = uriOpts.patientId || patientId;
                     callSid = uriOpts.callSid ? uriOpts.callSid.trim() : callSid;
                     logger.info(`[ARI] Extracted from URI: patientId=${patientId}, callSid=${callSid}`);
@@ -185,6 +216,17 @@ class AsteriskAriClient {
                  await this.cleanupChannel(channelId, `Main channel setup failed`);
              }
         }
+
+        this.client.on('ChannelTalkingStarted', (event, channel) => {
+          logger.info(`[ARI VAD] >>> Talking STARTED on channel ${channel.id} (${channel.name})`);
+          // You could add more details from event if needed
+          // logger.debug(JSON.stringify(event));
+      });
+      
+      this.client.on('ChannelTalkingFinished', (event, channel) => {
+          logger.info(`[ARI VAD] <<< Talking FINISHED on channel ${channel.id} (${channel.name}). Duration: ${event.duration}ms`);
+          // logger.debug(JSON.stringify(event));
+      });
     });
 
       // --- StasisEnd: Channel leaving the Stasis app ---
@@ -296,7 +338,7 @@ class AsteriskAriClient {
       try {
           // --- Find or create DB conversation record ---
           // Use Twilio SID if available, otherwise Asterisk Channel ID
-          const conversationSid = callSid || asteriskChannelId;
+          const conversationSid = callSid;
           logger.info(`[ARI] Finding/Creating DB conversation for SID: ${conversationSid}`);
           const conversationData = {
               callSid: conversationSid,
@@ -304,7 +346,7 @@ class AsteriskAriClient {
               startTime: new Date(),
               callType: 'asterisk-call',
               status: 'active',
-              patientId: null // Default to null
+              patientId: patientId // Default to null
           };
 
           if (patientId) {
@@ -379,10 +421,10 @@ class AsteriskAriClient {
           // --- Connect to OpenAI ---
           let initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
           // ... customize prompt based on patientId or other data ...
-          logger.info(`[ARI] Initializing OpenAI for call SID: ${callSid || asteriskChannelId} (ConvID: ${conversationId || 'None'})...`);
+          logger.info(`[ARI] Initializing OpenAI for call SID: ${callSid} on channel ${asteriskChannelId} (ConvID: ${conversationId || 'None'})...`);
           try {
               // Pass Twilio SID if available, otherwise Asterisk ID
-              await openAIService.initialize(callSid || asteriskChannelId, conversationId, initialPrompt);
+              await openAIService.initialize(asteriskChannelId, callSid, conversationId, initialPrompt);
               logger.info(`[ARI] OpenAI initialized.`);
 
               // Set callback for receiving audio FROM OpenAI to play TO Asterisk
@@ -469,6 +511,23 @@ class AsteriskAriClient {
            await snoopBridge.addChannel({ channel: snoopChannel.id });
            logger.info(`[Snoop Setup] Added snoop channel to snoop bridge.`);
 
+           // *** TEST: Record the Snoop Bridge ***
+           const snoopBridgeRecordingName = `snoop-bridge-rec-${asteriskChannelId}`;
+           try {
+               logger.info(`[Snoop Setup DEBUG] Attempting to record snoopBridge ${snoopBridge.id} as ${snoopBridgeRecordingName}.wav`);
+               await snoopBridge.record({
+                   name: snoopBridgeRecordingName,
+                   format: 'wav',
+                   maxDurationSeconds: 60, // Record for up to 60 seconds
+                   ifExists: 'overwrite'
+               });
+               logger.info(`[Snoop Setup DEBUG] Snoop bridge recording started.`);
+                this.tracker.updateCall(asteriskChannelId, { snoopBridgeRecordingName });
+           } catch (recordErr) {
+               logger.error(`[Snoop Setup DEBUG] Failed to start snoop bridge recording: ${recordErr.message}`);
+           }
+           // *** END TEST ***
+
            // 5. Originate Local Channel (this is asynchronous)
            const localEndpoint = `Local/${audioSocketUuid}@${this.AUDIO_SOCKET_CONTEXT}`;
            logger.info(`[Snoop Setup] Originating Local channel -> ${localEndpoint} into Stasis app 'myphonefriend' with arg '${this.AUDIO_SOCKET_ARG}'`);
@@ -533,78 +592,59 @@ class AsteriskAriClient {
   }
 
   /**
-   * Plays audio (base64) to the specified main Asterisk channel.
-   * Uses the temp file + sounds.upload approach from Version 1.
-   */
-  async playAudioToChannel(asteriskChannelId, base64Audio) {
-      const callData = this.tracker.getCall(asteriskChannelId);
-      if (!callData || !callData.mainChannel) {
-          logger.warn(`[ARI Playback] Cannot play audio - main channel not found in tracker for ID: ${asteriskChannelId}`);
-          return;
-      }
-      const mainChannel = callData.mainChannel;
+     * Plays audio (base64 PCM) to the specified main Asterisk channel.
+     * Saves as a raw PCM file (.sln16 assumed) and attempts upload/playback.
+     * @param {string} asteriskChannelId - The call identifier (Asterisk Channel ID)
+     * @param {string} base64PcmAudio - Base64 encoded PCM audio data (EXPECTED format: PCM 16-bit Signed Linear, Little Endian)
+     */
+  async playAudioToChannel(asteriskChannelId, base64UlawAudio) { // Expect uLaw
+    const callData = this.tracker.getCall(asteriskChannelId);
+    if (!callData || !callData.mainChannel) {
+        logger.warn(`[ARI Playback] Cannot play audio - main channel not found for ID: ${asteriskChannelId}`);
+        return;
+    }
+    const mainChannel = callData.mainChannel;
 
-      // Rest of this function is identical to the V1 playback logic provided previously...
-      // (Using temp file, sound upload, fallback, cleanup)
-      // ... see the previous response for the full playback code ...
+    // --- Handle uLaw Audio ---
+    const AUDIO_FORMAT = 'ulaw';
+    const FILE_EXTENSION = 'ulaw';
 
-      // --- Paste the full playAudioToChannel implementation from the previous response here ---
-      // --- Start Paste ---
-       try {
-          const audioBuffer = Buffer.from(base64Audio, 'base64');
-          if (audioBuffer.length === 0) {
-              logger.warn(`[ARI Playback] Empty audio buffer for ${asteriskChannelId}, skipping.`);
-              return;
-          }
-          const soundId = `openai-${uuidv4()}`;
-          const tempPath = path.join(os.tmpdir(), `${soundId}.ulaw`); // Assuming ulaw
+    try {
+        const audioBuffer = Buffer.from(base64UlawAudio, 'base64');
+        if (audioBuffer.length === 0) { /* ... skip */ return; }
 
-          try {
-              fs.writeFileSync(tempPath, audioBuffer);
-              logger.debug(`[ARI Playback] Saved audio to temp file: ${tempPath}`);
-          } catch (writeErr) {
-              logger.error(`[ARI Playback] Failed to write temp audio file ${tempPath}: ${writeErr.message}`);
-              return;
-          }
+        const soundId = `openai-ulaw-${uuidv4()}`;
+        const tempPath = path.join(os.tmpdir(), `${soundId}.${FILE_EXTENSION}`);
 
-          let playbackInitiated = false;
-          try {
-              logger.debug(`[ARI Playback] Uploading sound ${soundId} (ulaw) from ${tempPath}`);
-              await this.client.sounds.upload({ soundId: soundId, format: 'ulaw', sound: tempPath });
-              logger.debug(`[ARI Playback] Uploaded sound ${soundId}. Playing sound:${soundId}`);
+        try {
+            fs.writeFileSync(tempPath, audioBuffer);
+            logger.debug(`[ARI Playback] Saved uLaw audio to temp file: ${tempPath}`);
+        } catch (writeErr) { /* ... log, return */ }
 
-              const playback = await mainChannel.play({ media: `sound:${soundId}`});
-              playbackInitiated = true;
-              logger.info(`[ARI Playback] Playing uploaded sound ${soundId} to ${asteriskChannelId}`);
-
-              playback.once('PlaybackFinished', () => logger.info(`[ARI Playback] Finished uploaded sound ${soundId} on ${asteriskChannelId}.`));
-              playback.once('PlaybackFailed', (_, inst) => logger.error(`[ARI Playback] Failed playing uploaded sound ${soundId} on ${asteriskChannelId}: ${inst.playback.reason}`));
-
-          } catch (uploadErr) {
-              logger.error(`[ARI Playback] Error uploading/playing sound ${soundId}: ${uploadErr.message}. Falling back to file.`);
-              try {
-                  const playback = await mainChannel.play({ media: `sound:${tempPath}`});
-                  playbackInitiated = true;
-                  logger.info(`[ARI Playback] Playing directly from file ${tempPath} to ${asteriskChannelId}`);
-                  playback.once('PlaybackFinished', () => logger.info(`[ARI Playback] Finished file playback ${tempPath} on ${asteriskChannelId}.`));
-                  playback.once('PlaybackFailed', (_, inst) => logger.error(`[ARI Playback] Failed playing file ${tempPath} on ${asteriskChannelId}: ${inst.playback.reason}`));
-              } catch (playFileErr) {
-                  logger.error(`[ARI Playback] Fallback play from file ${tempPath} also failed: ${playFileErr.message}`);
-              }
-          } finally {
-               if (fs.existsSync(tempPath)) {
-                   fs.unlink(tempPath, (unlinkErr) => {
-                      if (unlinkErr) logger.warn(`[ARI Playback] Error deleting temp file ${tempPath}: ${unlinkErr.message}`);
-                      else logger.debug(`[ARI Playback] Deleted temp file: ${tempPath}`);
-                  });
-               }
-          }
-       } catch (err) {
-           logger.error(`[ARI Playback] General error playing audio for ${asteriskChannelId}: ${err.message}`, err);
-       }
-      // --- End Paste ---
-
-  }
+        // Attempt upload/play logic (same as original V1 essentially)
+        try {
+             logger.debug(`[ARI Playback] Uploading sound ${soundId} (Format: ${AUDIO_FORMAT}) from ${tempPath}`);
+             await this.client.sounds.upload({ soundId: soundId, format: AUDIO_FORMAT, sound: tempPath });
+             logger.debug(`[ARI Playback] Uploaded sound ${soundId}. Playing sound:${soundId}`);
+             const playback = await mainChannel.play({ media: `sound:${soundId}`});
+             logger.info(`[ARI Playback] Playing uploaded sound ${soundId} to ${asteriskChannelId}`);
+             // Add event listeners if desired...
+        } catch (uploadErr) {
+             logger.error(`[ARI Playback] Error uploading/playing sound ${soundId}: ${uploadErr.message}. Falling back to file.`);
+             try {
+                 const playback = await mainChannel.play({ media: `sound:${tempPath}`});
+                 logger.info(`[ARI Playback] Playing directly from file ${tempPath} to ${asteriskChannelId}`);
+                 // Add listeners...
+             } catch (playFileErr) {
+                 logger.error(`[ARI Playback] Fallback play from file ${tempPath} also failed: ${playFileErr.message}`);
+             }
+        } finally {
+              if (fs.existsSync(tempPath)) { fs.unlink(tempPath, (err) => {/* log */}); }
+        }
+     } catch (err) {
+         logger.error(`[ARI Playback] General error playing uLaw audio for ${asteriskChannelId}: ${err.message}`, err);
+     }
+}
 
    /**
     * Clean up all resources associated with a call.
@@ -667,7 +707,7 @@ class AsteriskAriClient {
           safeDestroy(resources.mainBridge, 'Main'),
           // Disconnect OpenAI
           (async () => {
-              const sidToDisconnect = resources.twilioSid || resources.asteriskChannelId;
+              const sidToDisconnect = resources.twilioSid;
                if (sidToDisconnect) {
                    try {
                       logger.info(`[Cleanup] Disconnecting OpenAI service for call SID: ${sidToDisconnect}`);

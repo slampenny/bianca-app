@@ -4,7 +4,7 @@ const catchAsync = require('../utils/catchAsync');
 const DebugUtils = require('../utils/debug');
 const logger = require('../config/logger');
 const config = require('../config/config');
-const { getAriClient } = require('../api/ari2.client');
+const { getAriClient } = require('../api/ari.client');
 
 // Get service references - update these imports based on your actual file structure
 const openAIService = require('../api/openai.realtime.service');

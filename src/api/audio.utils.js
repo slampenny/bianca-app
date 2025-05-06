@@ -1,11 +1,4 @@
-/**
- * audio.utils.js
- * Provides utilities for audio processing and conversion
- * Used by the OpenAI Realtime Service for handling audio streams
- */
-
-const stream = require('stream');
-const prism = require('prism-media');
+const alawmulaw = require('alawmulaw'); // Use the new library
 const { Buffer } = require('buffer');
 const logger = require('../config/logger');
 
@@ -15,99 +8,31 @@ const logger = require('../config/logger');
 class AudioUtils {
     /**
      * Convert uLaw audio (Base64) to PCM audio (Base64)
+     * NOTE: Assumes 8kHz sample rate for uLaw
      * @param {string} ulawBase64 - Base64 encoded uLaw audio
-     * @param {number} sampleRate - Sample rate for the audio (default: 8000)
-     * @returns {Promise<string>} - Base64 encoded PCM audio
+     * @returns {Promise<string>} - Base64 encoded 16-bit PCM audio
      */
-    static async convertUlawToPcm(ulawBase64, sampleRate = 8000) {
+    static async convertUlawToPcm(ulawBase64) {
         return new Promise((resolve, reject) => {
             try {
+                if (!ulawBase64) return resolve('');
                 const inputBuffer = Buffer.from(ulawBase64, 'base64');
                 if (inputBuffer.length === 0) {
                     logger.warn("[AudioUtils] convertUlawToPcm received empty buffer.");
                     return resolve('');
                 }
 
-                // Check if buffer is too small to be meaningful audio
-                if (inputBuffer.length < 10) {
-                    logger.warn(`[AudioUtils] Buffer too small (${inputBuffer.length} bytes), skipping conversion`);
-                    return resolve('');
-                }
+                // alawmulaw expects Uint8Array for decode input
+                const ulawInput = new Uint8Array(inputBuffer.buffer, inputBuffer.byteOffset, inputBuffer.length);
 
-                // Create decoder for uLaw to PCM conversion
-                const decoder = new prism.Decoder({ 
-                    type: 'ulaw', 
-                    rate: sampleRate, 
-                    channels: 1 
-                });
-                
-                const output = new stream.PassThrough();
-                const outputChunks = [];
+                // Decode uLaw bytes to Int16 PCM samples
+                const pcmSamples = alawmulaw.mulaw.decode(ulawInput); // Returns Int16Array
 
-                // Track if any errors occurred
-                let hadError = false;
+                // Convert Int16Array back to Node.js Buffer
+                const pcmBuffer = Buffer.from(pcmSamples.buffer);
 
-                // Cleanup function to remove listeners
-                const cleanupListeners = () => {
-                    output.removeAllListeners();
-                    decoder.removeAllListeners();
-                    input.removeAllListeners();
-                };
-
-                // Handle output stream events
-                output.once('error', (err) => {
-                    logger.error(`[AudioUtils] Error in output stream: ${err.message}`);
-                    hadError = true;
-                    cleanupListeners();
-                    reject(err);
-                });
-
-                output.on('data', (chunk) => outputChunks.push(chunk));
-                
-                output.once('end', () => {
-                    if (hadError) return; // Skip if we already had an error
-                    
-                    const pcmBuffer = Buffer.concat(outputChunks);
-                    logger.debug(`[AudioUtils] Decoded to PCM buffer size: ${pcmBuffer.length}`);
-                    cleanupListeners();
-                    resolve(pcmBuffer.toString('base64'));
-                });
-
-                // Create input stream and pipe through the conversion pipeline
-                const input = new stream.PassThrough();
-                
-                input.once('error', (err) => {
-                    logger.error(`[AudioUtils] Error in input stream: ${err.message}`);
-                    hadError = true;
-                    cleanupListeners();
-                    reject(err);
-                });
-                
-                decoder.once('error', (err) => {
-                    logger.error(`[AudioUtils] Error in decoder stream: ${err.message}`);
-                    hadError = true;
-                    cleanupListeners();
-                    reject(err);
-                });
-
-                // Set up the pipeline
-                input.pipe(decoder).pipe(output);
-                
-                // Send data and end the input stream
-                input.end(inputBuffer);
-
-                // Set a safety timeout in case the stream doesn't end properly
-                const safetyTimeout = setTimeout(() => {
-                    if (!hadError) {
-                        logger.warn(`[AudioUtils] Safety timeout triggered during uLaw to PCM conversion`);
-                        const pcmBuffer = Buffer.concat(outputChunks);
-                        cleanupListeners();
-                        resolve(pcmBuffer.toString('base64'));
-                    }
-                }, 1000); // 1 second timeout should be more than enough for audio conversion
-                
-                // Clear the timeout when the stream ends properly
-                output.on('end', () => clearTimeout(safetyTimeout));
+                logger.debug(`[AudioUtils] Decoded ${inputBuffer.length} uLaw bytes to ${pcmBuffer.length} PCM bytes.`);
+                resolve(pcmBuffer.toString('base64'));
 
             } catch (err) {
                 logger.error(`[AudioUtils] Error in convertUlawToPcm: ${err.message}`);
@@ -117,113 +42,37 @@ class AudioUtils {
     }
 
     /**
-     * Convert PCM audio to uLaw audio
-     * @param {Buffer} pcmBuffer - PCM audio buffer
-     * @param {number} sampleRate - Sample rate for the audio (default: 8000)
+     * Convert PCM audio (16-bit LE assumed) to uLaw audio (Base64)
+     * NOTE: Assumes 8kHz sample rate for uLaw output
+     * @param {Buffer} pcmBuffer - 16-bit LE PCM audio buffer
      * @returns {Promise<string>} - Base64 encoded uLaw audio
      */
-    static async convertPcmToUlaw(pcmBuffer, sampleRate = 8000) {
+    static async convertPcmToUlaw(pcmBuffer) {
         return new Promise((resolve, reject) => {
             try {
                 if (!pcmBuffer || pcmBuffer.length === 0) {
                     logger.warn("[AudioUtils] convertPcmToUlaw received empty buffer.");
                     return resolve('');
                 }
+                 // Ensure even length for Int16Array conversion
+                 if (pcmBuffer.length % 2 !== 0) {
+                      logger.error(`[AudioUtils] Received PCM buffer with odd length (${pcmBuffer.length}) for uLaw conversion.`);
+                      // Handle error appropriately - reject or resolve with empty? Reject is safer.
+                      return reject(new Error('Invalid PCM buffer length for 16-bit samples.'));
+                 }
 
-                // Check if buffer is too small to be meaningful audio
-                if (pcmBuffer.length < 20) {
-                    logger.warn(`[AudioUtils] PCM buffer too small (${pcmBuffer.length} bytes), skipping conversion`);
-                    return resolve('');
-                }
 
-                // Create streams for PCM -> uLaw conversion
-                const decoder = new prism.Decoder({ 
-                    type: 'pcm', 
-                    rate: sampleRate, 
-                    channels: 1 
-                });
-                
-                const encoder = new prism.Encoder({ 
-                    type: 'ulaw', 
-                    rate: sampleRate, 
-                    channels: 1 
-                });
-                
-                const pcmStream = new stream.PassThrough();
-                const ulawChunks = [];
+                // Convert Node.js Buffer to Int16Array (assuming Little Endian PCM)
+                const pcmSamples = new Int16Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.length / 2);
 
-                // Track if any errors occurred
-                let hadError = false;
+                // Encode Int16 PCM samples to 8-bit uLaw bytes
+                const ulawOutput = alawmulaw.mulaw.encode(pcmSamples); // Returns Uint8Array
 
-                // Cleanup function to remove listeners
-                const cleanupListeners = () => {
-                    pcmStream.removeAllListeners();
-                    decoder.removeAllListeners();
-                    encoder.removeAllListeners();
-                };
+                // Convert Uint8Array back to Node.js Buffer
+                const ulawBuffer = Buffer.from(ulawOutput.buffer);
 
-                // Set up error handlers for each stream in the pipeline
-                pcmStream.once('error', (err) => {
-                    logger.error(`[AudioUtils] Error in PCM stream: ${err.message}`);
-                    hadError = true;
-                    cleanupListeners();
-                    reject(err);
-                });
-
-                decoder.once('error', (err) => {
-                    logger.error(`[AudioUtils] Error in PCM decoder: ${err.message}`);
-                    hadError = true;
-                    cleanupListeners();
-                    reject(err);
-                });
-
-                encoder.once('error', (err) => {
-                    logger.error(`[AudioUtils] Error in uLaw encoder: ${err.message}`);
-                    hadError = true;
-                    cleanupListeners();
-                    reject(err);
-                });
-
-                // Collect uLaw chunks
-                encoder.on('data', (chunk) => ulawChunks.push(chunk));
-                
-                encoder.once('end', () => {
-                    if (hadError) return; // Skip if we already had an error
-                    
-                    if (ulawChunks.length > 0) {
-                        const ulawBuffer = Buffer.concat(ulawChunks);
-                        logger.debug(`[AudioUtils] Transcoded PCM to uLaw, uLaw size: ${ulawBuffer.length}`);
-                        cleanupListeners();
-                        resolve(ulawBuffer.toString('base64'));
-                    } else {
-                        logger.warn(`[AudioUtils] No uLaw chunks generated after transcoding`);
-                        cleanupListeners();
-                        resolve('');
-                    }
-                });
-
-                // Create the pipeline
-                const conversionPipeline = pcmStream.pipe(decoder).pipe(encoder);
-
-                // Set a safety timeout in case the stream doesn't end properly
-                const safetyTimeout = setTimeout(() => {
-                    if (!hadError && ulawChunks.length > 0) {
-                        logger.warn(`[AudioUtils] Safety timeout triggered during PCM to uLaw conversion`);
-                        const ulawBuffer = Buffer.concat(ulawChunks);
-                        cleanupListeners();
-                        resolve(ulawBuffer.toString('base64'));
-                    } else if (!hadError) {
-                        logger.warn(`[AudioUtils] Safety timeout with no uLaw chunks produced`);
-                        cleanupListeners();
-                        resolve('');
-                    }
-                }, 1000); // 1 second timeout
-                
-                // Clear the timeout when the stream ends properly
-                encoder.on('end', () => clearTimeout(safetyTimeout));
-
-                // Start the process
-                pcmStream.end(pcmBuffer);
+                logger.debug(`[AudioUtils] Encoded ${pcmBuffer.length} PCM bytes to ${ulawBuffer.length} uLaw bytes.`);
+                resolve(ulawBuffer.toString('base64'));
 
             } catch (err) {
                 logger.error(`[AudioUtils] Error in convertPcmToUlaw: ${err.message}`);

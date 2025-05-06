@@ -129,7 +129,7 @@ class TwilioCallService {
       twiml.say({
         voice: 'alice',
         language: 'en-US'
-      }, "Hello, this is your wellness check. Please hold while I connect you with your assistant.");
+      }, "Hello.");
       
     
       const sipHost = '3.136.184.169';

@@ -5,7 +5,7 @@ const { Patient, Conversation } = require('../models');
 const logger = require('../config/logger');
 const DebugUtils = require('../utils/debug');
 const openAIService = require('../api/openai.realtime.service');
-const { getAriClient } = require('../api/ari2.client');
+const { getAriClient } = require('../api/ari.client');
 
 /**
  * Test the chat service
@@ -128,31 +128,10 @@ const testCall = catchAsync(async (req, res) => {
   }, 5000); // allow Twilio 5s to fetch TwiML and connect to stream
 });
 
-/**
- * Test functions for Asterisk
- */
-const testAsteriskCall = catchAsync(async (req, res) => {
-  const { ariClient } = require('../api/ari2.client');
-  
-  if (!ariClient || !ariClient.isConnected) {
-    return res.status(httpStatus.SERVICE_UNAVAILABLE).send({
-      message: 'Asterisk client not connected. Check if Asterisk is enabled and running.'
-    });
-  }
-  
-  // Since we can't directly initiate a call in this simple test,
-  // we just return the Asterisk status
-  res.status(httpStatus.OK).send({
-    asteriskStatus: 'connected',
-    message: 'Asterisk is running. To test incoming calls, call your SIP endpoint.'
-  });
-});
-
 module.exports = {
   testCall,
   testChatWith,
   testSummarize,
   testCleanDB,
-  testAsteriskCall,
   getDebugInfo
 };

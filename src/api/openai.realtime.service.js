@@ -1,13 +1,11 @@
+// src/services/openai.realtime.service.js
+
 const WebSocket = require('ws');
-const stream = require('stream');
-const prism = require('prism-media');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
-const { Message } = require('../models');
-
-// Import the audio utilities module (extracted helper functions)
-const AudioUtils = require('./audio.utils');
+const { Message } = require('../models'); // Assuming Message model is used for saving transcripts
+const AudioUtils = require('./audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
 
 /**
  * Constants for configuration
@@ -16,9 +14,10 @@ const CONSTANTS = {
     MAX_PENDING_CHUNKS: 100, // Maximum number of audio chunks to buffer
     RECONNECT_MAX_ATTEMPTS: 5, // Maximum number of reconnection attempts
     RECONNECT_BASE_DELAY: 1000, // Base delay for exponential backoff (milliseconds)
-    COMMIT_DEBOUNCE_DELAY: 300, // Debounce delay for commit messages (milliseconds)
+    COMMIT_DEBOUNCE_DELAY: 1000, // Using 1 second delay - ADJUST IF NEEDED
     CONNECTION_TIMEOUT: 10000, // WebSocket connection timeout (milliseconds)
-    DEFAULT_SAMPLE_RATE: 8000, // Default sample rate for audio processing
+    DEFAULT_SAMPLE_RATE: 8000, // Rate of audio FROM Asterisk (PCM) & FOR Asterisk (uLaw)
+    OPENAI_PCM_OUTPUT_RATE: 24000, // Expected rate FROM OpenAI for pcm16 output
 };
 
 /**
@@ -27,18 +26,16 @@ const CONSTANTS = {
  */
 class OpenAIRealtimeService {
     constructor() {
-        // Connection tracking maps
-        this.connections = new Map(); // asteriskChannelId -> connection state object
-        this.pendingAudio = new Map(); // asteriskChannelId -> array of base64 uLaw audio chunks
-        this.commitTimers = new Map(); // asteriskChannelId -> debounce timers for input_audio_buffer.commit
-        this.isReconnecting = new Map(); // asteriskChannelId -> boolean 
-        this.reconnectAttempts = new Map(); // asteriskChannelId -> number of reconnect attempts
-        this.connectionTimeouts = new Map(); // asteriskChannelId -> connection timeout
+        // Key is now the primary call identifier (e.g., Twilio CallSid)
+        this.connections = new Map(); // callId -> connection state object
+        this.pendingAudio = new Map(); // callId -> array of base64 PCM audio chunks from Asterisk TCP Server
+        this.commitTimers = new Map(); // callId -> debounce timers
+        this.isReconnecting = new Map(); // callId -> boolean
+        this.reconnectAttempts = new Map(); // callId -> number
+        this.connectionTimeouts = new Map(); // callId -> connection timeout
+        this._healthCheckInterval = null; // Store interval ID
 
-        // Notification callback for external services (like ari.client.js)
         this.notifyCallback = null;
-        
-        // Log at info level for service initialization
         logger.info('[OpenAI Realtime] Service initialized');
     }
 
@@ -48,19 +45,17 @@ class OpenAIRealtimeService {
      * @returns {number} - Delay in milliseconds
      */
     calculateBackoffDelay(attempt) {
-        // Exponential backoff with jitter
         const expBackoff = Math.min(
             CONSTANTS.RECONNECT_BASE_DELAY * Math.pow(2, attempt),
             30000 // Max 30 second delay
         );
-        // Add random jitter (±20%)
         const jitter = expBackoff * 0.2 * (Math.random() * 2 - 1);
         return Math.floor(expBackoff + jitter);
     }
 
     /**
      * Set the callback function for notifying other services about events
-     * @param {Function} callback - Function taking (asteriskChannelId, eventType, data)
+     * Callback expects: (asteriskChannelId, eventType, data)
      */
     setNotificationCallback(callback) {
         this.notifyCallback = callback;
@@ -68,781 +63,584 @@ class OpenAIRealtimeService {
     }
 
     /**
-     * Notify subscribed services about events
-     * @param {string} asteriskChannelId - The call identifier (Asterisk Channel ID)
-     * @param {string} eventType - The type of event ('audio_chunk', 'text_message', 'openai_error', etc.)
+     * Notify subscribed services about events.
+     * Looks up the Asterisk ID associated with the primary callId before calling back.
+     * @param {string} callId - The primary call identifier (e.g. Twilio SID)
+     * @param {string} eventType - The type of event
      * @param {Object} data - Event data payload
      */
-    notify(asteriskChannelId, eventType, data = {}) {
-        if (this.notifyCallback) {
-            try {
-                this.notifyCallback(asteriskChannelId, eventType, data);
-            } catch (err) {
-                logger.error(`[OpenAI Realtime] Error in notification callback for ${asteriskChannelId}/${eventType}: ${err.message}`);
-            }
-        } else {
-            // Only log as debug to avoid filling logs
-            logger.debug(`[OpenAI Realtime] No notification callback set to notify for ${eventType}`);
+    notify(callId, eventType, data = {}) {
+        if (!this.notifyCallback) {
+            logger.debug(`[OpenAI Realtime] No notification callback set for ${eventType} (CallID: ${callId})`);
+            return;
+        }
+        const conn = this.connections.get(callId);
+        // We need the Asterisk Channel ID for the callback to ari.client.js
+        const asteriskChannelId = conn?.asteriskChannelId; // Retrieve stored Asterisk ID
+
+        if (!asteriskChannelId) {
+            logger.warn(`[OpenAI Realtime] Cannot notify for ${callId}, missing associated Asterisk Channel ID.`);
+            return;
+        }
+
+        try {
+            // Call back with Asterisk Channel ID
+            this.notifyCallback(asteriskChannelId, eventType, data);
+        } catch (err) {
+            logger.error(`[OpenAI Realtime] Error in notification callback for CallID ${callId} (AsteriskID ${asteriskChannelId}) / Event ${eventType}: ${err.message}`);
         }
     }
 
     /**
-     * Initialize a connection to OpenAI for a call
-     * @param {string} asteriskChannelId - The call identifier (Using Asterisk Channel ID)
-     * @param {string} callSid - The call identifier for the carrier
-     * @param {string|null} conversationId - Database ID for this conversation (can be null)
+     * Initialize a connection to OpenAI for a call. Uses callSid as the primary key.
+     * @param {string} initialAsteriskChannelId - The initial Asterisk channel ID when the call enters Stasis
+     * @param {string} callSid - The primary call identifier (e.g., Twilio CallSid)
+     * @param {string|null} conversationId - Database ID for this conversation
      * @param {string} initialPrompt - System prompt for the AI
      * @returns {Promise<boolean>} - Success indicator
      */
-    async initialize(asteriskChannelId, callSid, conversationId, initialPrompt) {
-        if (this.connections.has(asteriskChannelId)) {
-            logger.warn(`[OpenAI Realtime] Connection attempt for already existing asteriskChannelId: ${asteriskChannelId}. Current status: ${this.connections.get(asteriskChannelId).status}`);
-            // Return if connection is already in a good state
-            return this.connections.get(asteriskChannelId).status !== 'error' && 
-                   this.connections.get(asteriskChannelId).status !== 'closed';
+    async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt) {
+        // Use Twilio SID as the primary key if available, fallback to Asterisk ID
+        const callId = callSid || initialAsteriskChannelId;
+        if (!callId) {
+            logger.error("[OpenAI Realtime] Initialize: Critical - Missing call identifier (callSid or initialAsteriskChannelId).");
+            return false;
         }
 
-        logger.info(`[OpenAI Realtime] Initializing for asteriskChannelId: ${asteriskChannelId}`);
+        if (this.connections.has(callId)) {
+            const existingConn = this.connections.get(callId);
+            logger.warn(`[OpenAI Realtime] Initialize: Connection already exists for callId: ${callId}. Current status: ${existingConn.status}`);
+            // Avoid re-initializing if already connected/connecting
+            return existingConn.status !== 'error' && existingConn.status !== 'closed';
+        }
 
-        // Create tracking object
-        this.connections.set(asteriskChannelId, {
+        logger.info(`[OpenAI Realtime] Initializing for callId: ${callId} (Initial Asterisk ID: ${initialAsteriskChannelId})`);
+
+        // Use callId as the key, store both IDs and other relevant info
+        this.connections.set(callId, {
             status: 'initializing',
             conversationId,
-            callSid,
+            callSid: callSid, // Explicitly store the Twilio SID
+            asteriskChannelId: initialAsteriskChannelId, // Store the initial Asterisk ID
             webSocket: null,
             sessionReady: false,
             startTime: Date.now(),
             initialPrompt: initialPrompt,
-            lastActivity: Date.now()
+            lastActivity: Date.now(),
+            sessionId: null // Initialize OpenAI session ID
         });
 
-        // Reset reconnection attempt counter
-        this.reconnectAttempts.set(asteriskChannelId, 0);
-        this.isReconnecting.set(asteriskChannelId, false);
+        // Initialize state for this callId
+        this.reconnectAttempts.set(callId, 0);
+        this.isReconnecting.set(callId, false);
+        this.pendingAudio.set(callId, []); // Initialize pending audio buffer
 
-        // Connect to OpenAI
         try {
-            await this.connect(asteriskChannelId, callSid, conversationId, initialPrompt, this.connections.get(asteriskChannelId)?.sessionId);
-
+            await this.connect(callId); // Pass only callId
             return true;
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Initialization failed during connect for ${asteriskChannelId}: ${err.message}`);
-            this.cleanup(asteriskChannelId); // Clean up if connect fails immediately
+            logger.error(`[OpenAI Realtime] Initialization failed during connect for ${callId}: ${err.message}`);
+            this.cleanup(callId); // Ensure cleanup if initial connect fails
             return false;
         }
     }
 
     /**
-     * Attempt to reconnect to OpenAI after a disconnection
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {string} callSid - The call SID
-     * @param {string|null} conversationId - Database ID for conversation
-     * @param {string} initialPrompt - System prompt for the AI
+     * Attempt to reconnect. Uses callId as primary key.
      */
-    async attemptReconnect(asteriskChannelId, callSid, conversationId, initialPrompt) {
-        if (!this.isReconnecting.get(asteriskChannelId)) {
-            logger.info(`[OpenAI Realtime] Skipping reconnect for ${asteriskChannelId} - not in reconnecting state`);
+    async attemptReconnect(callId) {
+        // Only needs callId, retrieves other info from stored connection state
+        if (!this.isReconnecting.get(callId)) {
+            logger.info(`[OpenAI Realtime] Skipping reconnect for ${callId} - not in reconnecting state.`);
             return;
         }
 
-        const attempts = this.reconnectAttempts.get(asteriskChannelId) || 0;
+        const attempts = this.reconnectAttempts.get(callId) || 0;
         if (attempts >= CONSTANTS.RECONNECT_MAX_ATTEMPTS) {
-            logger.error(`[OpenAI Realtime] Max reconnection attempts (${CONSTANTS.RECONNECT_MAX_ATTEMPTS}) reached for ${asteriskChannelId}`);
-            this.isReconnecting.set(asteriskChannelId, false);
-            this.notify(asteriskChannelId, 'openai_max_reconnect_failed', { attempts });
+            logger.error(`[OpenAI Realtime] Max reconnection attempts (${CONSTANTS.RECONNECT_MAX_ATTEMPTS}) reached for ${callId}`);
+            this.isReconnecting.set(callId, false); // Stop trying
+            this.notify(callId, 'openai_max_reconnect_failed', { attempts }); // Notify failure
             return;
         }
 
-        logger.info(`[OpenAI Realtime] Attempting reconnect #${attempts + 1} for ${asteriskChannelId}`);
-        this.reconnectAttempts.set(asteriskChannelId, attempts + 1);
+        logger.info(`[OpenAI Realtime] Attempting reconnect #${attempts + 1} for ${callId}`);
+        this.reconnectAttempts.set(callId, attempts + 1);
 
-        // Update connection state for reconnection
-        if (this.connections.has(asteriskChannelId)) {
-            this.updateConnectionStatus(asteriskChannelId, 'reconnecting');
-        } else {
-            // If connection was completely cleaned up, reinitialize
-            this.connections.set(asteriskChannelId, {
-                status: 'reconnecting',
-                conversationId,
-                callSid,
-                webSocket: null,
-                sessionReady: false,
-                startTime: Date.now(),
-                initialPrompt: initialPrompt,
-                lastActivity: Date.now()
-            });
+        let conn = this.connections.get(callId);
+        if (!conn) {
+             logger.error(`[OpenAI Realtime] Cannot reconnect ${callId}: connection state missing.`);
+             this.isReconnecting.delete(callId); // Clean up flags
+             this.reconnectAttempts.delete(callId);
+             return;
         }
+        // Reset status before attempting connection
+        conn.status = 'initializing';
+        conn.webSocket = null;
+        conn.sessionReady = false;
+        this.updateConnectionStatus(callId, 'reconnecting');
 
         try {
-            await this.connect(asteriskChannelId, callSid, conversationId, initialPrompt);
-            this.isReconnecting.set(asteriskChannelId, false);
-            logger.info(`[OpenAI Realtime] Reconnect #${attempts + 1} successful for ${asteriskChannelId}`);
-            this.notify(asteriskChannelId, 'openai_reconnected', { attempts: attempts + 1 });
+            await this.connect(callId); // Pass callId, connect retrieves details
+            this.isReconnecting.set(callId, false); // Reset on success
+            logger.info(`[OpenAI Realtime] Reconnect #${attempts + 1} successful for ${callId}`);
+            this.notify(callId, 'openai_reconnected', { attempts: attempts + 1 });
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Reconnect #${attempts + 1} failed for ${asteriskChannelId}: ${err.message}`);
-            
-            // Schedule another reconnect attempt with exponential backoff
+            logger.error(`[OpenAI Realtime] Reconnect #${attempts + 1} failed for ${callId}: ${err.message}`);
+            // Schedule the next attempt
             const delay = this.calculateBackoffDelay(attempts + 1);
-            logger.info(`[OpenAI Realtime] Will retry connection for ${asteriskChannelId} in ${delay}ms`);
-            
-            setTimeout(() => {
-                this.attemptReconnect(asteriskChannelId, callSid, conversationId, initialPrompt);
-            }, delay);
+            logger.info(`[OpenAI Realtime] Will retry connection for ${callId} in ${delay}ms`);
+            setTimeout(() => { this.attemptReconnect(callId); }, delay);
         }
     }
 
+
     /**
-     * Create and configure WebSocket connection to OpenAI
-     * @param {string} asteriskChannelId - The Asterisk channel identifier
-     * @param {string} callSid - The call identifier
-     * @param {string|null} conversationId - Database ID for conversation
-     * @param {string} initialPrompt - System prompt for the AI
+     * Create and configure WebSocket connection. Uses callId as primary key.
      */
-    async connect(asteriskChannelId, callSid, conversationId, initialPrompt, resumeSessionId = null) {
-        // Get model and voice from config
+    async connect(callId) {
+        const connectionState = this.connections.get(callId);
+        if (!connectionState) {
+            logger.error(`[OpenAI Realtime] Connect: Connection state missing for ${callId}!`);
+            throw new Error(`Connection state missing for ${callId}`);
+        }
+        // Retrieve details from state
+        const initialPrompt = connectionState.initialPrompt;
+        const resumeSessionId = connectionState.sessionId; // TODO: Implement session resume logic if needed
+
         const model = config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17';
         const voice = config.openai.realtimeVoice || 'alloy';
         const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
 
-        logger.info(`[OpenAI Realtime] Connecting to ${wsUrl} for asteriskChannelId: ${asteriskChannelId}`);
+        logger.info(`[OpenAI Realtime] Connecting to ${wsUrl} for callId: ${callId}`);
 
-        let connectionState = this.connections.get(asteriskChannelId);
-        if (!connectionState) {
-            logger.error(`[OpenAI Realtime] Connection state missing during connect for ${asteriskChannelId}! Cannot proceed.`);
-            throw new Error('Connection state missing');
-        }
-        
         if (connectionState.status === 'connected' || connectionState.status === 'connecting') {
-            logger.warn(`[OpenAI Realtime] Connect called for ${asteriskChannelId} but already connecting/connected. Aborting duplicate.`);
+            logger.warn(`[OpenAI Realtime] Connect called for ${callId} but already ${connectionState.status}.`);
             return;
         }
-        
         connectionState.status = 'connecting';
         connectionState.lastActivity = Date.now();
 
         try {
-            // Set up connection timeout
-            const connectionTimeout = setTimeout(() => {
-                if (this.connections.has(asteriskChannelId)) {
-                    const conn = this.connections.get(asteriskChannelId);
-                    if (conn.status === 'connecting' && conn.webSocket) {
-                        logger.error(`[OpenAI Realtime] Connection timeout for ${asteriskChannelId}`);
-                        conn.webSocket.terminate();
-                        this.updateConnectionStatus(asteriskChannelId, 'error');
-                        this.notify(asteriskChannelId, 'openai_connection_timeout', {});
-                    }
+            // Connection Timeout setup
+            const connectionTimeoutId = setTimeout(() => {
+                const currentConn = this.connections.get(callId);
+                if (currentConn && currentConn.status === 'connecting' && currentConn.webSocket) {
+                    logger.error(`[OpenAI Realtime] Connection timeout for ${callId}`);
+                    currentConn.webSocket.terminate(); // Triggers 'close' event
                 }
-                if (this.connectionTimeouts.has(asteriskChannelId)) {
-                    this.connectionTimeouts.delete(asteriskChannelId);
-                }
+                this.connectionTimeouts.delete(callId); // Remove timeout ID
             }, CONSTANTS.CONNECTION_TIMEOUT);
-            
-            this.connectionTimeouts.set(asteriskChannelId, connectionTimeout);
+            this.connectionTimeouts.set(callId, connectionTimeoutId);
 
+            // Create WebSocket instance
             const ws = new WebSocket(wsUrl, {
-                headers: {
-                    Authorization: `Bearer ${config.openai.apiKey}`,
-                    'OpenAI-Beta': 'realtime=v1',
-                },
+                headers: { Authorization: `Bearer ${config.openai.apiKey}`, 'OpenAI-Beta': 'realtime=v1' },
             });
+            connectionState.webSocket = ws; // Store WebSocket object in state
 
-            connectionState.webSocket = ws;
-
-            // --- WebSocket Event Handlers ---
+            // --- WebSocket Event Handlers (using callId) ---
             ws.on('open', () => {
-                // Clear connection timeout
-                if (this.connectionTimeouts.has(asteriskChannelId)) {
-                    clearTimeout(this.connectionTimeouts.get(asteriskChannelId));
-                    this.connectionTimeouts.delete(asteriskChannelId);
-                }
-                
-                logger.info(`[OpenAI Realtime] WebSocket opened for connection: ${asteriskChannelId}`);
-                this.updateConnectionStatus(asteriskChannelId, 'connected');
-                // Configuration is sent upon receiving 'session.created' message
+                if (this.connectionTimeouts.has(callId)) { clearTimeout(this.connectionTimeouts.get(callId)); this.connectionTimeouts.delete(callId); }
+                logger.info(`[OpenAI Realtime] WebSocket opened for callId: ${callId}`);
+                this.updateConnectionStatus(callId, 'connected');
+                // Session configuration is sent after 'session.created' message from OpenAI
             });
 
-            ws.on('message', async (data) => {
-                // Only log first part of message to avoid huge logs
-                if (logger.isLevelEnabled('debug')) {
-                    logger.debug(`[OpenAI Realtime] Raw message received for ${asteriskChannelId}: ${data.toString().substring(0, 100)}...`);
-                }
-                await this.handleOpenAIMessage(asteriskChannelId, data);
+            ws.on('message', (data) => {
+                this.handleOpenAIMessage(callId, data).catch(err => {
+                    logger.error(`[OpenAI Realtime] Uncaught error in handleOpenAIMessage for ${callId}: ${err.message}`);
+                });
             });
 
             ws.on('error', (error) => {
-                logger.error(`[OpenAI Realtime] WebSocket error for ${asteriskChannelId}: ${error.message}`);
-                this.notify(asteriskChannelId, 'openai_error', { message: error.message || 'WebSocket error' });
-                
-                if (this.connections.has(asteriskChannelId)) {
-                    this.updateConnectionStatus(asteriskChannelId, 'error');
-                }
-                // The 'close' event usually follows 'error', let it handle cleanup/retry
+                logger.error(`[OpenAI Realtime] WebSocket error for ${callId}: ${error.message}`);
+                this.notify(callId, 'openai_error', { message: error.message || 'WebSocket error' });
+                if (this.connections.has(callId)) { this.updateConnectionStatus(callId, 'error'); }
+                // 'close' event usually follows, let it handle potential reconnect
             });
 
-            ws.on('close', async (code, reason) => {
-                // Clear connection timeout if it exists
-                if (this.connectionTimeouts.has(asteriskChannelId)) {
-                    clearTimeout(this.connectionTimeouts.get(asteriskChannelId));
-                    this.connectionTimeouts.delete(asteriskChannelId);
-                }
-                
+            ws.on('close', (code, reason) => { // No async needed here
+                if (this.connectionTimeouts.has(callId)) { clearTimeout(this.connectionTimeouts.get(callId)); this.connectionTimeouts.delete(callId); }
                 const reasonStr = reason ? reason.toString() : 'No reason provided';
-                logger.info(`[OpenAI Realtime] WebSocket closed for ${asteriskChannelId}. Code: ${code}, Reason: ${reasonStr}`);
-                this.notify(asteriskChannelId, 'openai_closed', { code, reason: reasonStr });
-                
-                if (this.connections.has(asteriskChannelId)) {
-                    this.updateConnectionStatus(asteriskChannelId, 'closed');
-                
-                    // Implement reconnection logic for abnormal closures
-                    if (code !== 1000 && !this.isReconnecting.get(asteriskChannelId)) {
-                        const conn = this.connections.get(asteriskChannelId);
-                        // Store vital info before cleaning up
-                        const savedCallSid = conn.callSid;
-                        const savedConvId = conn.conversationId;
-                        const savedPrompt = conn.initialPrompt;
-                        
-                        this.isReconnecting.set(asteriskChannelId, true);
-                        
-                        // Clean up the current connection
-                        this.cleanup(asteriskChannelId, false); // Don't clear reconnect flags
-                        
-                        // Attempt reconnect with backoff
-                        const attempts = this.reconnectAttempts.get(asteriskChannelId) || 0;
+                logger.info(`[OpenAI Realtime] WebSocket closed for ${callId}. Code: ${code}, Reason: ${reasonStr}`);
+                this.notify(callId, 'openai_closed', { code, reason: reasonStr });
+
+                if (this.connections.has(callId)) { // Check if cleanup hasn't already removed it
+                    this.updateConnectionStatus(callId, 'closed'); // Mark as closed first
+                    // Attempt reconnect on abnormal closure if not already doing so
+                    if (code !== 1000 && !this.isReconnecting.get(callId)) {
+                        this.isReconnecting.set(callId, true);
+                        this.cleanup(callId, false); // Clean up WS/timers but keep reconnect flags
+                        const attempts = this.reconnectAttempts.get(callId) || 0; // Get attempt count *before* cleanup might delete it
                         const delay = this.calculateBackoffDelay(attempts);
-                        
-                        logger.info(`[OpenAI Realtime] Will attempt reconnect for ${asteriskChannelId} in ${delay}ms (attempt #${attempts + 1})`);
-                        
-                        setTimeout(() => {
-                            this.attemptReconnect(asteriskChannelId, savedCallSid, savedConvId, savedPrompt);
-                        }, delay);
+                        logger.info(`[OpenAI Realtime] Will attempt reconnect for ${callId} in ${delay}ms (attempt #${attempts + 1})`);
+                        setTimeout(() => { this.attemptReconnect(callId); }, delay); // Pass only callId
                     } else {
-                        // Normal closure or already reconnecting - do regular cleanup
-                        this.cleanup(asteriskChannelId);
+                        this.cleanup(callId); // Normal closure or already handling reconnect
                     }
                 }
             });
             // --- End WebSocket Event Handlers ---
-
-            logger.info(`[OpenAI Realtime] WebSocket client created and handlers attached for ${asteriskChannelId}`);
+            logger.info(`[OpenAI Realtime] WebSocket client instance created for ${callId}`);
 
         } catch (err) {
-            // Clear connection timeout if it exists
-            if (this.connectionTimeouts.has(asteriskChannelId)) {
-                clearTimeout(this.connectionTimeouts.get(asteriskChannelId));
-                this.connectionTimeouts.delete(asteriskChannelId);
+            // Catch errors during WS instantiation or initial setup
+            if (this.connectionTimeouts.has(callId)) { clearTimeout(this.connectionTimeouts.get(callId)); this.connectionTimeouts.delete(callId); }
+            logger.error(`[OpenAI Realtime] Error initiating WebSocket connection for ${callId}: ${err.message}`);
+            if (this.connections.has(callId)) {
+                this.updateConnectionStatus(callId, 'error');
+                this.cleanup(callId); // Full cleanup on connection error
             }
-            
-            logger.error(`[OpenAI Realtime] Error initiating WebSocket connection for ${asteriskChannelId}: ${err.message}`);
-            if (this.connections.has(asteriskChannelId)) {
-                this.updateConnectionStatus(asteriskChannelId, 'error');
-                this.cleanup(asteriskChannelId); // Clean up state on connection initiation error
-            }
-            throw err; // Re-throw error to be caught by initialize
+            throw err; // Re-throw for initialize/reconnect to catch
         }
     }
 
     /**
-     * Update the connection status, ensuring state object exists
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {string} status - New connection status
+     * Update connection status safely. Uses callId.
      */
-    updateConnectionStatus(asteriskChannelId, status) {
-        const conn = this.connections.get(asteriskChannelId);
+    updateConnectionStatus(callId, status) {
+        const conn = this.connections.get(callId);
         if (!conn) {
-            logger.warn(`[OpenAI Realtime] Attempted to update status for non-existent/cleaned connection ${asteriskChannelId} to ${status}`);
+            logger.warn(`[OpenAI Realtime] UpdateStatus: Connection state for ${callId} missing.`);
             return;
         }
-        
         const oldStatus = conn.status;
         if (oldStatus === status) return;
-
         conn.status = status;
         conn.lastActivity = Date.now();
-        logger.info(`[OpenAI Realtime] Connection ${asteriskChannelId} status changed: ${oldStatus} -> ${status}`);
+        logger.info(`[OpenAI Realtime] Connection ${callId} status: ${oldStatus} -> ${status}`);
     }
 
     /**
-     * Process messages received from the OpenAI WebSocket
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {Buffer|string} data - Raw message data
+     * Process messages received from the OpenAI WebSocket. Uses callId.
      */
-    async handleOpenAIMessage(asteriskChannelId, data) {
+    async handleOpenAIMessage(callId, data) {
         let message;
         try {
             message = JSON.parse(data);
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Failed to parse JSON message for ${asteriskChannelId}: ${err.message}. Data: ${data.toString().substring(0, 100)}...`);
+            logger.error(`[OpenAI Realtime] Failed to parse JSON for ${callId}: ${err.message}. Data: ${data.toString().substring(0, 100)}...`);
             return;
         }
 
-        const conn = this.connections.get(asteriskChannelId);
+        const conn = this.connections.get(callId);
         if (!conn) {
-            logger.warn(`[OpenAI Realtime] Received message for unknown/cleaned connection: ${asteriskChannelId}. Type: ${message.type}`);
+            logger.warn(`[OpenAI Realtime] Message for unknown/cleaned connection ${callId}. Type: ${message.type}`);
             return;
         }
-        
-        // Update last activity timestamp
         conn.lastActivity = Date.now();
-        
+
         try {
             switch (message.type) {
                 case 'session.created':
-                    logger.info(`[OpenAI Realtime] Session created for ${asteriskChannelId}`);
-                    
+                    logger.info(`[OpenAI Realtime] Session created for ${callId}, OpenAI Session ID: ${message.session.id}`);
                     conn.sessionId = message.session.id;
-                    // Send session configuration now that session exists
                     const sessionConfig = {
                         type: 'session.update',
                         session: {
                             instructions: conn.initialPrompt || "You are Bianca, a helpful AI assistant.",
                             voice: config.openai.realtimeVoice || 'alloy',
-                            output_audio_format: config.openai.outputAudioFormat || 'pcm16',
-                            // Add other configurable parameters from config
+                            input_audio_format: 'g711_ulaw', // We send uLaw
+                            output_audio_format: 'pcm16',   // We expect PCM back
                             ...(config.openai.realtimeSessionConfig || {})
                         },
                     };
-                    
-                    logger.info(`[OpenAI Realtime] Sending session.update for ${asteriskChannelId}`);
-                    if (logger.isLevelEnabled('debug')) {
-                        logger.debug(`[OpenAI Realtime] Session config: ${JSON.stringify(sessionConfig)}`);
-                    }
-                    
-                    await this.sendJsonMessage(asteriskChannelId, sessionConfig);
+                    logger.info(`[OpenAI Realtime] Sending session.update for ${callId}`);
+                    if (logger.isLevelEnabled('debug')) { logger.debug(`[OpenAI Realtime] Session config for ${callId}: ${JSON.stringify(sessionConfig)}`); }
+                    await this.sendJsonMessage(callId, sessionConfig);
 
-                    // Send initial user message to prompt AI's greeting
-                    logger.info(`[OpenAI Realtime] Sending initial user message to trigger greeting for ${asteriskChannelId}`);
-                    const initialUserMessage = {
-                        type: 'conversation.item.create',
-                        item: { 
-                            type: 'message', 
-                            role: 'user', 
-                            content: [{ type: 'input_text', text: 'Hello, are you there?' }] 
-                        },
-                    };
-                    await this.sendJsonMessage(asteriskChannelId, initialUserMessage);
+                    logger.info(`[OpenAI Realtime] Sending initial user message for ${callId}`);
+                    const initialUserMessage = { type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hello, are you there?' }] } };
+                    await this.sendJsonMessage(callId, initialUserMessage);
 
-                    conn.sessionReady = true; // Mark session ready AFTER sending config/prompt
-                    await this.flushPendingAudio(asteriskChannelId); // Send any buffered audio
-                    this.notify(asteriskChannelId, 'openai_session_ready', {}); // Notify ARI client session is ready
+                    conn.sessionReady = true;
+                    await this.flushPendingAudio(callId);
+                    this.notify(callId, 'openai_session_ready', {});
                     break;
 
                 case 'response.content_part.added':
                     if (message.content_part.content_type === 'audio') {
-                        if (logger.isLevelEnabled('debug')) {
-                            logger.debug(`[OpenAI Realtime] Received audio content part for ${asteriskChannelId}, size: ${message.content_part.data ? message.content_part.data.length : 0}`);
-                        }
-                        await this.processAudioResponse(asteriskChannelId, message.content_part.data); // data is base64 pcm
-                    } else if (message.content_part.content_type === 'text') {
-                        if (logger.isLevelEnabled('debug')) {
-                            logger.debug(`[OpenAI Realtime] Received text content part for ${asteriskChannelId}: ${message.content_part.text?.substring(0, 50) || ''}`);
-                        }
-                        // Text parts often accompany audio or are intermediates, usually handled by conversation.item.created
-                    } else {
-                        logger.debug(`[OpenAI Realtime] Received unhandled content part type: ${message.content_part.content_type} for ${asteriskChannelId}`);
-                    }
-                    break;
+                         if (logger.isLevelEnabled('debug')) { logger.debug(`[OpenAI Realtime] Received audio content part for ${callId}, size: ${message.content_part.data?.length || 0}`); }
+                         await this.processAudioResponse(callId, message.content_part.data);
+                     } else if (message.content_part.content_type === 'text') {
+                         if (logger.isLevelEnabled('debug')) { logger.debug(`[OpenAI Realtime] Received text content part for ${callId}: "${message.content_part.text?.substring(0, 50) || ''}"`); }
+                     }
+                     break;
 
                 case 'conversation.item.created':
-                    logger.debug(`[OpenAI Realtime] Received conversation.item.created for ${asteriskChannelId}`);
-                    await this.handleConversationItem(asteriskChannelId, message.item, conn.conversationId);
-                    break;
+                     logger.debug(`[OpenAI Realtime] Received conversation.item.created for ${callId}`);
+                     await this.handleConversationItem(callId, message.item, conn.conversationId);
+                     break;
 
-                case 'response.done':
-                    logger.info(`[OpenAI Realtime] Assistant response done event for asteriskChannelId: ${asteriskChannelId}`);
-                    this.notify(asteriskChannelId, 'response_done', {});
-                    break;
+                 case 'response.done':
+                     logger.info(`[OpenAI Realtime] Assistant response done event for ${callId}`);
+                     this.notify(callId, 'response_done', {});
+                     break;
 
-                case 'error':
-                    logger.error(`[OpenAI Realtime] Error message from OpenAI API for ${asteriskChannelId}: ${message.error.message}`);
-                    this.notify(asteriskChannelId, 'openai_error', { 
-                        message: message.error.message,
-                        code: message.error.code,
-                        type: message.error.type
-                    });
-                    // Depending on severity, might want to disconnect or just log
-                    break;
+                 case 'error':
+                     logger.error(`[OpenAI Realtime] Error message from OpenAI API for ${callId}: ${message.error?.message || 'Unknown API Error'}`);
+                     this.notify(callId, 'openai_error', { error: message.error });
+                     // Optionally close connection on severe errors
+                     // if (message.error?.code === 'some_fatal_code') { this.disconnect(callId); }
+                     break;
 
-                case 'session.updated':
-                    logger.info(`[OpenAI Realtime] Session updated event for ${asteriskChannelId}`);
-                    if (logger.isLevelEnabled('debug')) {
-                        logger.debug(`[OpenAI Realtime] Session update details: ${JSON.stringify(message.session)}`);
-                    }
-                    break;
+                 case 'session.updated':
+                      logger.info(`[OpenAI Realtime] Session updated event for ${callId}`);
+                      if (logger.isLevelEnabled('debug')) { logger.debug(`[OpenAI Realtime] Session update details: ${JSON.stringify(message.session)}`); }
+                      break;
 
-                case 'session.expired':
-                    logger.warn(`[OpenAI Realtime] Session expired for ${asteriskChannelId}`);
-                    this.notify(asteriskChannelId, 'openai_session_expired', {});
-                    // Consider reconnecting here
-                    break;
+                 case 'session.expired':
+                      logger.warn(`[OpenAI Realtime] Session expired for ${callId}`);
+                      this.notify(callId, 'openai_session_expired', {});
+                      // Optionally trigger reconnect here?
+                      break;
 
                 default:
-                    logger.debug(`[OpenAI Realtime] Unhandled message type received for ${asteriskChannelId}: ${message.type}`);
+                     logger.debug(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId}`);
             }
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Error processing message content for ${asteriskChannelId} (type: ${message?.type}): ${err.message}`);
-            if(err.stack) logger.error(`[OpenAI Realtime] Processing Error Stack: ${err.stack}`);
-            
-            // For critical errors, consider notifying
-            this.notify(asteriskChannelId, 'openai_message_processing_error', { 
-                messageType: message?.type,
-                error: err.message
-            });
+            logger.error(`[OpenAI Realtime] Error processing message type ${message?.type} for ${callId}: ${err.message}`, err);
+            this.notify(callId, 'openai_message_processing_error', { messageType: message?.type, error: err.message });
         }
     }
 
     /**
-     * Process an audio response from OpenAI (PCM16 Base64) and notify ARI (uLaw Base64)
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {string} audioBase64PCM - Base64 encoded PCM audio data
+     * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
      */
-    async processAudioResponse(asteriskChannelId, audioBase64PCM) {
-        logger.info(`[OpenAI Realtime] Received audio from OpenAI for ${asteriskChannelId}, raw base64 length: ${audioBase64PCM.length}`);
+    async processAudioResponse(callId, audioBase64PCM) {
+        // logger.info(`[OpenAI Realtime] Received OpenAI audio for ${callId}, PCM length: ${audioBase64PCM?.length || 0}`);
+        if (!audioBase64PCM) return;
 
-        if (!audioBase64PCM) {
-            logger.warn(`[OpenAI Realtime] processAudioResponse called with empty audio for ${asteriskChannelId}`);
-            return;
-        }
-        
         try {
             const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
-            if (inputBuffer.length === 0) {
-                logger.warn(`[OpenAI Realtime] Decoded PCM buffer is empty for ${asteriskChannelId}`);
-                return;
+            if (inputBuffer.length === 0) return;
+
+            // Resample PCM (e.g., 24k -> 8k)
+            const openaiOutputRate = config.openai.outputExpectedSampleRate || CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // e.g., 24000
+            const asteriskPlaybackRate = CONSTANTS.DEFAULT_SAMPLE_RATE; // 8000 Hz
+            const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
+
+            if (!resampledBuffer || resampledBuffer.length === 0) {
+                 logger.warn(`[OpenAI Realtime] Resampling OpenAI output failed for ${callId}`);
+                 return;
             }
 
-            // Get sample rate from config or default
-            const sampleRate = config.openai.outputSampleRate || CONSTANTS.DEFAULT_SAMPLE_RATE;
-            
-            // Use the extracted utility for audio conversion
-            const ulawBase64 = await AudioUtils.convertPcmToUlaw(inputBuffer, sampleRate);
-            
-            if (ulawBase64 && ulawBase64.length > 0) {
-                logger.debug(`[OpenAI Realtime] Transcoded PCM to uLaw for ${asteriskChannelId}, uLaw size: ${ulawBase64.length}`);
-                this.notify(asteriskChannelId, 'audio_chunk', { audio: ulawBase64 }); // Send uLaw to ARI handler
+            // Convert the 8kHz PCM buffer to uLaw base64 for Asterisk playback
+            const ulawBase64ToNotify = await AudioUtils.convertPcmToUlaw(resampledBuffer); // Uses alawmulaw
+
+            if (ulawBase64ToNotify && ulawBase64ToNotify.length > 0) {
+                // logger.debug(`[OpenAI Realtime] Notifying ARI with uLaw audio chunk for ${callId}`);
+                this.notify(callId, 'audio_chunk', { audio: ulawBase64ToNotify });
             } else {
-                logger.warn(`[OpenAI Realtime] No uLaw data generated after transcoding for ${asteriskChannelId}`);
+                logger.warn(`[OpenAI Realtime] No uLaw data after transcoding OpenAI response for ${callId}`);
             }
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Error processing audio response for ${asteriskChannelId}: ${err.message}`);
-            if(err.stack) logger.error(`[OpenAI Realtime] Processing Error Stack: ${err.stack}`);
+             logger.error(`[OpenAI Realtime] Error processing OpenAI audio response for ${callId}: ${err.message}`, err);
         }
     }
 
     /**
-     * Handle conversation items (messages, function calls) from OpenAI
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {Object} item - Conversation item from OpenAI
-     * @param {string|null} conversationId - Database ID for the conversation (can be null)
+     * Handle conversation items. Uses callId internally.
      */
-    async handleConversationItem(asteriskChannelId, item, conversationId) {
+    async handleConversationItem(callId, item, dbConversationId) {
         if (!item) return;
-
         try {
-            if (item.type === 'message' /*&& (item.role === 'assistant' || item.role === 'user')*/) {
+            if (item.type === 'message') {
                 const contentArray = item.content || [];
-                const contentText = contentArray
-                    .map(part => (part && (part.type === 'input_text' || part.type === 'text') ? part.text : ''))
-                    .join('');
+                const contentText = contentArray.map(part => (part?.type === 'text' ? part.text : '')).join('');
 
-                logger.info(`[OpenAI Realtime] ${item.role} message text for ${asteriskChannelId} (status: ${item.status || 'N/A'}): "${contentText.substring(0, 50)}..."`);
-
-                // Save completed messages to database if possible and text exists
-                if (conversationId && contentText && item.status === 'completed') {
-                    try {
-                        // Use a try-catch block for the database operation
-                        const dbMessage = new Message({ 
-                            role: item.role, 
-                            content: contentText, 
-                            conversationId 
-                        });
-                        await dbMessage.save();
-                        logger.debug(`[OpenAI Realtime] Saved completed message to DB for ${asteriskChannelId}/${conversationId}`);
-                    } catch (dbErr) {
-                        logger.error(`[OpenAI Realtime] Failed to save message to DB for ${asteriskChannelId}/${conversationId}: ${dbErr.message}`);
+                if (contentText) {
+                    logger.info(`[OpenAI Realtime] ${item.role} message text for ${callId} (status: ${item.status || 'N/A'}): "${contentText.substring(0, 70)}..."`);
+                    if (dbConversationId && item.status === 'completed') {
+                        try {
+                            await Message.create({ role: item.role, content: contentText, conversationId: dbConversationId });
+                            logger.debug(`[OpenAI Realtime] Saved completed message for ${callId}/${dbConversationId}`);
+                        } catch (dbErr) {
+                             logger.error(`[OpenAI Realtime] Failed to save message for ${callId}/${dbConversationId}: ${dbErr.message}`);
+                        }
+                    }
+                    if (item.status === 'completed') {
+                        this.notify(callId, 'text_message', { role: item.role, content: contentText });
                     }
                 }
 
+                // Audio can also be part of the 'message' item itself
                 if (item.audio?.data && item.audio.data.length > 0) {
-                    logger.info(`[OpenAI Realtime] Received audio in conversation.item.created for ${asteriskChannelId}, size: ${item.audio.data.length}`);
-                    await this.processAudioResponse(asteriskChannelId, item.audio.data);
-                } else {
-                    logger.debug(`[OpenAI Realtime] Skipping audio playback for ${asteriskChannelId} — no audio data.`);
+                    // logger.info(`[OpenAI Realtime] Audio found in conversation.item.created for ${callId}`);
+                    await this.processAudioResponse(callId, item.audio.data);
+                } else if (!contentText && item.role === 'assistant' && item.status === 'completed') {
+                    logger.debug(`[OpenAI Realtime] Completed assistant item with no text/audio for ${callId}.`);
                 }
-                
-                // Notify about text message content
-                if (contentText && item.status === 'completed') {
-                    this.notify(asteriskChannelId, 'text_message', { 
-                        role: item.role, 
-                        content: contentText 
-                    });
-                }
-
             } else if (item.type === 'function_call') {
-                logger.info(`[OpenAI Realtime] Function call received for ${asteriskChannelId}: ${item.function_call ? item.function_call.name : 'N/A'}`);
-                this.notify(asteriskChannelId, 'function_call', { call: item.function_call });
-                
-                // TODO: Implement function call handling
-                // Need logic here to execute the function and send back a function_call_response
-            } else {
-                logger.debug(`[OpenAI Realtime] Unhandled conversation item type: ${item.type} for ${asteriskChannelId}`);
+                logger.info(`[OpenAI Realtime] Function call for ${callId}: ${item.function_call?.name || 'N/A'}`);
+                this.notify(callId, 'function_call', { call: item.function_call });
+                // Implement function call execution logic here
             }
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Error handling conversation item for ${asteriskChannelId}: ${err.message}`);
-            if(err.stack) logger.error(`[OpenAI Realtime] Conversation Item Error Stack: ${err.stack}`);
+            logger.error(`[OpenAI Realtime] Error in handleConversationItem for ${callId}: ${err.message}`);
         }
     }
 
     /**
-     * Send a JSON message to OpenAI WebSocket
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {Object} messageObj - Message object to send
-     * @returns {Promise<boolean>} - Success indicator
+     * Send JSON message. Uses callId.
      */
-    async sendJsonMessage(asteriskChannelId, messageObj) {
-        const conn = this.connections.get(asteriskChannelId);
-        if (!conn || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-            logger.warn(`[OpenAI Realtime] Cannot send JSON - invalid WS state for ${asteriskChannelId}. Status: ${conn?.status}, ReadyState: ${conn?.webSocket?.readyState}`);
-            return false;
+    async sendJsonMessage(callId, messageObj) {
+        const conn = this.connections.get(callId);
+        if (!conn?.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
+             logger.warn(`[OpenAI Realtime] Cannot send JSON - WS not open for ${callId}.`);
+             return false;
         }
-        
         try {
-            const messageStr = JSON.stringify(messageObj);
-            if (logger.isLevelEnabled('debug')) {
-                // Only log part of the message to avoid huge logs
-                logger.debug(`[OpenAI Realtime] Sending JSON type ${messageObj.type}: ${messageStr.substring(0, 100)}...`);
-            }
-            conn.webSocket.send(messageStr);
-            conn.lastActivity = Date.now(); // Update last activity timestamp
-            return true;
-        } catch (err) {
-            logger.error(`[OpenAI Realtime] Error sending JSON message to ${asteriskChannelId}: ${err.message}`);
-            return false;
-        }
+             const messageStr = JSON.stringify(messageObj);
+             // logger.debug(`[OpenAI Realtime] Sending JSON type ${messageObj.type} for ${callId}`);
+             conn.webSocket.send(messageStr);
+             conn.lastActivity = Date.now();
+             return true;
+        } catch (err) { logger.error(`[OpenAI Realtime] Error sending JSON for ${callId}: ${err.message}`); return false; }
     }
 
-    /**
-     * Flush any pending audio chunks for a call (sent when session is ready)
-     * @param {string} asteriskChannelId - The call identifier
-     */
-    async flushPendingAudio(asteriskChannelId) {
-        const chunks = this.pendingAudio.get(asteriskChannelId);
-        if (!chunks || chunks.length === 0) {
-            logger.debug(`[OpenAI Realtime] No pending audio to flush for ${asteriskChannelId}`);
+     /**
+      * Flush pending audio. Uses callId. Sends data through sendAudioChunk.
+      */
+    async flushPendingAudio(callId) {
+        const conn = this.connections.get(callId);
+        // Double check session is ready before flushing
+        if (!conn || !conn.sessionReady) {
+            logger.debug(`[OpenAI Realtime] Not flushing for ${callId}, session not ready or no connection.`);
             return;
         }
-        
-        logger.info(`[OpenAI Realtime] Flushing ${chunks.length} pending audio chunks for ${asteriskChannelId}`);
-        
-        // Process chunks in batches to avoid overwhelming the connection
+        const chunks = this.pendingAudio.get(callId);
+        if (!chunks || chunks.length === 0) {
+            logger.debug(`[OpenAI Realtime] No pending audio to flush for ${callId}`);
+            return;
+        }
+        logger.info(`[OpenAI Realtime] Flushing ${chunks.length} pending audio chunks for ${callId}`);
+        const chunksToFlush = [...chunks];
+        this.pendingAudio.set(callId, []); // Clear buffer
+
         const BATCH_SIZE = 5;
-        for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-            const batch = chunks.slice(i, i + BATCH_SIZE);
-            const sendPromises = batch.map(chunk => this.sendAudioChunk(asteriskChannelId, chunk));
-            
+        for (let i = 0; i < chunksToFlush.length; i += BATCH_SIZE) {
+            const batch = chunksToFlush.slice(i, i + BATCH_SIZE);
+            // Pass the callId (Twilio SID) to sendAudioChunk
+            const sendPromises = batch.map(chunkPCMBase64 => this.sendAudioChunk(callId, chunkPCMBase64)); // Pass PCM
             try {
                 await Promise.all(sendPromises);
-                logger.debug(`[OpenAI Realtime] Processed batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(chunks.length/BATCH_SIZE)} for ${asteriskChannelId}`);
             } catch (err) {
-                logger.error(`[OpenAI Realtime] Error occurred during batch processing for ${asteriskChannelId}: ${err.message}`);
-                // Continue with next batch despite errors
+                 logger.error(`[OpenAI Realtime] Error during batch audio flush for ${callId}: ${err.message}`);
             }
-            
-            // Small delay between batches to avoid overwhelming the connection
-            if (i + BATCH_SIZE < chunks.length) {
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
+            if (i + BATCH_SIZE < chunksToFlush.length) { await new Promise(resolve => setTimeout(resolve, 50)); }
         }
-        
-        logger.info(`[OpenAI Realtime] Finished flushing all pending audio for ${asteriskChannelId}`);
-        this.pendingAudio.delete(asteriskChannelId);
+        logger.info(`[OpenAI Realtime] Finished flushing pending audio for ${callId}`);
+    }
+
+     /**
+      * Debounce commit. Uses callId.
+      */
+    debounceCommit(callId) {
+         if (this.commitTimers.has(callId)) { clearTimeout(this.commitTimers.get(callId)); }
+         const conn = this.connections.get(callId);
+         if (!conn?.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) return;
+
+         const timer = setTimeout(async () => {
+             this.commitTimers.delete(callId);
+             const currentConn = this.connections.get(callId);
+             if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
+                 logger.debug(`[OpenAI Realtime] Sending debounced commit for ${callId}`);
+                 await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+             } else { logger.warn(`[OpenAI Realtime] Skipped debounced commit, WS/session not ready for ${callId}`); }
+         }, CONSTANTS.COMMIT_DEBOUNCE_DELAY);
+         this.commitTimers.set(callId, timer);
     }
 
     /**
-     * Debounce audio commits to avoid sending too many commit messages
-     * @param {string} asteriskChannelId - The call identifier
+     * Send audio chunk. Converts PCM->uLaw. Expects callId (Twilio SID).
+     * @param {string} callId - Primary call identifier (e.g. Twilio SID)
+     * @param {string} audioChunkBase64PCM - Base64 encoded PCM audio chunk from Asterisk TCP Server (8kHz SLIN)
      */
-    debounceCommit(asteriskChannelId) {
-        if (this.commitTimers.has(asteriskChannelId)) {
-            clearTimeout(this.commitTimers.get(asteriskChannelId));
-        }
-        
-        const conn = this.connections.get(asteriskChannelId);
+    async sendAudioChunk(callId, audioChunkBase64PCM) {
+        if (!audioChunkBase64PCM) { return; }
+
+        const conn = this.connections.get(callId);
+        // This function should primarily be called by flushPendingAudio or directly ONLY when session is ready.
+        // Adding check here for safety.
         if (!conn || !conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-            logger.debug(`[OpenAI Realtime] Skipping debounceCommit, connection/session not ready for ${asteriskChannelId}`);
-            return;
-        }
-        
-        const timer = setTimeout(async () => {
-            // Check connection again *before* sending, in case it closed during timeout
-            const currentConn = this.connections.get(asteriskChannelId);
-            if (currentConn && currentConn.webSocket && currentConn.webSocket.readyState === WebSocket.OPEN) {
-                await this.sendJsonMessage(asteriskChannelId, { type: 'input_audio_buffer.commit' });
-            } else {
-                logger.warn(`[OpenAI Realtime] Skipped sending debounced commit, connection closed or missing for ${asteriskChannelId}`);
+            logger.warn(`[OpenAI Realtime] sendAudioChunk: WS/Session not ready for ${callId}. Buffering attempt.`);
+            if (conn && conn.status !== 'closed' && conn.status !== 'error') { // Avoid buffering if connection permanently failed
+                 if (!this.pendingAudio.has(callId)) { this.pendingAudio.set(callId, []); }
+                 this.pendingAudio.get(callId).push(audioChunkBase64PCM); // Buffer original PCM
             }
-            this.commitTimers.delete(asteriskChannelId);
-        }, CONSTANTS.COMMIT_DEBOUNCE_DELAY);
-        
-        this.commitTimers.set(asteriskChannelId, timer);
-    }
-
-    /**
-     * Send an audio chunk received from Asterisk (uLaw Base64) to OpenAI (as PCM Base64)
-     * @param {string} asteriskChannelId - The call identifier (Asterisk Channel ID)
-     * @param {string} audioChunkBase64 - Base64 encoded audio chunk (uLaw format expected)
-     */
-    async sendAudioChunk(asteriskChannelId, audioChunkBase64) {
-        if (!audioChunkBase64 || typeof audioChunkBase64 !== 'string' || audioChunkBase64.trim() === '') {
-            logger.warn(`[OpenAI Realtime] Skipping empty audio chunk for ${asteriskChannelId}`);
             return;
         }
 
-        const conn = this.connections.get(asteriskChannelId);
-        // Buffer if session isn't ready yet
-        if (!conn || !conn.sessionReady) {
-            logger.debug(`[OpenAI Realtime] Buffering audio chunk for ${asteriskChannelId} (sessionReady: ${conn?.sessionReady})`);
-            
-            // Create buffer if it doesn't exist
-            if (!this.pendingAudio.has(asteriskChannelId)) {
-                this.pendingAudio.set(asteriskChannelId, []);
-            }
-            
-            const pendingChunks = this.pendingAudio.get(asteriskChannelId);
-            
-            // Check buffer size limit
-            if (pendingChunks.length >= CONSTANTS.MAX_PENDING_CHUNKS) {
-                // Remove oldest chunks if buffer is full (FIFO)
-                const overflow = pendingChunks.length - CONSTANTS.MAX_PENDING_CHUNKS + 1;
-                pendingChunks.splice(0, overflow);
-                logger.warn(`[OpenAI Realtime] Dropped ${overflow} oldest audio chunk(s) due to buffer limit for ${asteriskChannelId}`);
-            }
-            
-            // Add new chunk to buffer
-            pendingChunks.push(audioChunkBase64);
-            return;
-        }
+        try {
+             const inputBuffer = Buffer.from(audioChunkBase64PCM, 'base64');
+             if (inputBuffer.length === 0) {
+                 logger.warn(`[OpenAI Realtime] sendAudioChunk: Decoded PCM buffer is empty for ${callId}`);
+                 return;
+             }
 
-        // If connected and ready, process and send
-        if (conn.webSocket && conn.webSocket.readyState === WebSocket.OPEN) {
-            try {
-                // Get input sample rate from config or default
-                const inputSampleRate = config.openai.inputSampleRate || CONSTANTS.DEFAULT_SAMPLE_RATE;
-                
-                // Use the extracted utility for audio conversion
-                const pcmBase64 = await AudioUtils.convertUlawToPcm(audioChunkBase64, inputSampleRate);
+             // Convert 8kHz PCM -> 8kHz uLaw using AudioUtils (which uses alawmulaw)
+             const ulawBase64ToSend = await AudioUtils.convertPcmToUlaw(inputBuffer); // Assumes 8kHz input
 
-                if (pcmBase64 && pcmBase64.length > 0) {
-                    logger.debug(`[OpenAI Realtime] Sending PCM chunk to OpenAI for ${asteriskChannelId}, PCM size: ${pcmBase64.length}`);
-                    
-                    // Update last activity timestamp
-                    conn.lastActivity = Date.now();
-                    
-                    const success = await this.sendJsonMessage(asteriskChannelId, { 
-                        type: 'input_audio_buffer.append', 
-                        audio: pcmBase64 
-                    });
-                    
-                    if (success) {
-                        this.debounceCommit(asteriskChannelId);
-                    }
-                } else {
-                    logger.warn(`[OpenAI Realtime] PCM conversion resulted in empty data for ${asteriskChannelId}, not sending.`);
+             if (ulawBase64ToSend && ulawBase64ToSend.length > 0) {
+                // logger.debug(`[OpenAI Realtime] Sending uLaw chunk to OpenAI for ${callId}, uLaw size: ${ulawBase64ToSend.length}`);
+                conn.lastActivity = Date.now();
+                const success = await this.sendJsonMessage(callId, {
+                    type: 'input_audio_buffer.append',
+                    audio: ulawBase64ToSend // Send the uLaw
+                });
+                if (success) {
+                    this.debounceCommit(callId); // Trigger commit timer after successful send
                 }
-            } catch (err) {
-                logger.error(`[OpenAI Realtime] Error processing/sending audio chunk for ${asteriskChannelId}: ${err.message}`);
-                if (err.stack) logger.error(`[OpenAI Realtime] Audio Chunk Error Stack: ${err.stack}`);
-            }
-        } else {
-            logger.warn(`[OpenAI Realtime] Cannot send audio chunk - WebSocket not open or connection missing for ${asteriskChannelId}. State: ${conn?.webSocket?.readyState}`);
-            
-            // If WebSocket closed but we thought session was ready, buffer the chunk for potential reconnect
-            if (conn && conn.status !== 'closed' && conn.status !== 'error') {
-                if (!this.pendingAudio.has(asteriskChannelId)) {
-                    this.pendingAudio.set(asteriskChannelId, []);
-                }
-                this.pendingAudio.get(asteriskChannelId).push(audioChunkBase64);
-                logger.debug(`[OpenAI Realtime] Re-buffered audio chunk for ${asteriskChannelId} due to WebSocket state`);
-            }
+            } else { logger.warn(`[OpenAI Realtime] uLaw conversion yielded empty data for ${callId}.`); }
+        } catch (err) {
+             logger.error(`[OpenAI Realtime] Error sending audio chunk for ${callId}: ${err.message}`, err);
         }
     }
 
     /**
-     * Send a text message to OpenAI
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {string} text - Text message to send
-     * @param {string} role - 'user' or 'function_call_response'
-     * @param {Object} metadata - e.g., { functionCallId: '...' }
+     * Send a text message to OpenAI. Uses callId.
      */
-    async sendTextMessage(asteriskChannelId, text, role = 'user', metadata = {}) {
+    async sendTextMessage(callId, text, role = 'user', metadata = {}) {
         if (!text || typeof text !== 'string') {
-            logger.warn(`[OpenAI Realtime] Skipping empty text message for ${asteriskChannelId}`);
+            logger.warn(`[OpenAI Realtime] Skipping empty text message for ${callId}`);
             return;
         }
-        
+        logger.info(`[OpenAI Realtime] Sending ${role} text message for ${callId}: "${text.substring(0, 50)}..."`);
         try {
             let item;
             if (role === 'function_call_response') {
-                if (!metadata.functionCallId) {
-                    logger.error(`[OpenAI Realtime] Missing functionCallId in metadata for function_call_response on ${asteriskChannelId}`);
-                    return;
-                }
-                item = { 
-                    type: 'function_call_response', 
-                    function_call_id: metadata.functionCallId, 
-                    content: text 
-                };
-            } else {
-                item = { 
-                    type: 'message', 
-                    role: 'user', 
-                    content: [{ type: 'input_text', text }] 
-                };
+                if (!metadata.functionCallId) { logger.error(`[OpenAI Realtime] Missing functionCallId for role ${role} on ${callId}`); return; }
+                item = { type: 'function_call_response', function_call_id: metadata.functionCallId, content: text };
+            } else { // Default to user role
+                item = { type: 'message', role: 'user', content: [{ type: 'input_text', text }] };
             }
-            
-            const success = await this.sendJsonMessage(asteriskChannelId, { 
-                type: 'conversation.item.create', 
-                item 
-            });
-            
-            if (success) {
-                logger.info(`[OpenAI Realtime] Sent ${role} text message for ${asteriskChannelId}: ${text.substring(0, 50)}...`);
-            }
-        } catch (err) {
-            logger.error(`[OpenAI Realtime] Error sending text message for ${asteriskChannelId}: ${err.message}`);
-        }
+            await this.sendJsonMessage(callId, { type: 'conversation.item.create', item });
+        } catch (err) { logger.error(`[OpenAI Realtime] Error sending text for ${callId}: ${err.message}`); }
     }
 
     /**
-     * Start a periodic connection health check to detect and clean up stale connections
-     * @param {number} interval - Check interval in milliseconds
+     * Start periodic health check.
      */
     startHealthCheck(interval = 60000) {
-        // Clear any existing interval
-        if (this._healthCheckInterval) {
-            clearInterval(this._healthCheckInterval);
-        }
-        
+        logger.info(`[OpenAI Realtime] Starting health check (interval: ${interval}ms)`);
+        if (this._healthCheckInterval) clearInterval(this._healthCheckInterval);
+
         this._healthCheckInterval = setInterval(() => {
             const now = Date.now();
             const idleTimeout = config.openai.idleTimeout || 300000; // 5 minutes default
-            
-            // Check each connection for inactivity
-            for (const [asteriskChannelId, conn] of this.connections.entries()) {
-                if (!conn.lastActivity) continue;
-                
-                const idleTime = now - conn.lastActivity;
-                if (idleTime > idleTimeout) {
-                    logger.warn(`[OpenAI Realtime] Connection ${asteriskChannelId} has been idle for ${Math.floor(idleTime/1000)}s, exceeding threshold of ${Math.floor(idleTimeout/1000)}s. Cleaning up.`);
-                    this.disconnect(asteriskChannelId);
+
+            for (const [callId, conn] of this.connections.entries()) {
+                if (conn.lastActivity && (now - conn.lastActivity > idleTimeout)) {
+                    logger.warn(`[OpenAI Realtime] Connection ${callId} idle timeout (${idleTimeout}ms). Cleaning up.`);
+                    this.disconnect(callId); // Use callId
                 }
             }
         }, interval);
-        
-        logger.info(`[OpenAI Realtime] Started health check with interval ${interval}ms`);
     }
 
     /**
-     * Stop the health check interval
+     * Stop health check.
      */
     stopHealthCheck() {
         if (this._healthCheckInterval) {
@@ -853,121 +651,79 @@ class OpenAIRealtimeService {
     }
 
     /**
-     * Disconnect from OpenAI and clean up resources for a specific call
-     * @param {string} asteriskChannelId - The call identifier (Asterisk Channel ID)
+     * Disconnect. Uses callId (Twilio SID).
      */
-    async disconnect(asteriskChannelId) {
-        const conn = this.connections.get(asteriskChannelId);
+    async disconnect(callId) {
+        const conn = this.connections.get(callId);
         if (!conn) {
-            logger.warn(`[OpenAI Realtime] Disconnect called for non-existent or already cleaned connection: ${asteriskChannelId}`);
-            return;
+            // logger.warn(`[OpenAI Realtime] Disconnect called for non-existent callId: ${callId}`);
+            return; // Already cleaned up or never existed
         }
-        
-        logger.info(`[OpenAI Realtime] Disconnecting asteriskChannelId: ${asteriskChannelId} (Current status: ${conn.status})`);
-        
-        try {
-            if (conn.webSocket) {
-                // Attempt to close gracefully first, but terminate quickly if needed
-                if (conn.webSocket.readyState === WebSocket.OPEN) {
-                    logger.info(`[OpenAI Realtime] Sending close frame to WebSocket for ${asteriskChannelId}`);
-                    conn.webSocket.close(1000, "Client initiated disconnect");
-                    
-                    // Set a timeout to force termination if close doesn't complete
-                    setTimeout(() => {
-                        if (this.connections.has(asteriskChannelId) && 
-                            this.connections.get(asteriskChannelId).webSocket) {
-                            logger.warn(`[OpenAI Realtime] Forcing WebSocket termination for ${asteriskChannelId}`);
-                            this.connections.get(asteriskChannelId).webSocket.terminate();
-                        }
-                    }, 3000);
-                } else if (conn.webSocket.readyState === WebSocket.CONNECTING) {
-                    logger.info(`[OpenAI Realtime] Terminating connecting WebSocket for ${asteriskChannelId}`);
-                    conn.webSocket.terminate();
+        logger.info(`[OpenAI Realtime] Disconnecting callId: ${callId} (Status: ${conn.status})`);
+
+        // Clear timers associated with this specific call FIRST
+        if (this.connectionTimeouts.has(callId)) { clearTimeout(this.connectionTimeouts.get(callId)); this.connectionTimeouts.delete(callId); }
+        if (this.commitTimers.has(callId)) { clearTimeout(this.commitTimers.get(callId)); this.commitTimers.delete(callId); }
+
+        // Handle WebSocket closure
+        if (conn.webSocket) {
+            const ws = conn.webSocket;
+            try {
+                // Remove listeners immediately to prevent events during/after close/terminate
+                ws.removeAllListeners();
+                if (ws.readyState === WebSocket.OPEN) {
+                    logger.info(`[OpenAI Realtime] Sending close frame to WebSocket for ${callId}`);
+                    ws.close(1000, "Client initiated disconnect");
+                } else if (ws.readyState === WebSocket.CONNECTING) {
+                    logger.warn(`[OpenAI Realtime] WebSocket for ${callId} still CONNECTING during disconnect. Terminating.`);
+                    ws.terminate(); // Terminate if still connecting
+                } else {
+                     logger.info(`[OpenAI Realtime] WebSocket for ${callId} already closing or closed (state: ${ws.readyState}).`);
                 }
-                
-                // Clean up listeners immediately after initiating close/terminate
-                conn.webSocket.removeAllListeners();
-            }
-        } catch (err) {
-            logger.error(`[OpenAI Realtime] Error closing/terminating WebSocket for ${asteriskChannelId}: ${err.message}`);
+            } catch (err) { logger.error(`[OpenAI Realtime] Error closing/terminating WS for ${callId}: ${err.message}`); }
+            conn.webSocket = null; // Clear reference
         }
-        
-        // Perform cleanup regardless of WS state, as the 'close' event might not fire
-        this.cleanup(asteriskChannelId);
+        // Perform final cleanup of maps and flags
+        this.cleanup(callId);
     }
 
     /**
-     * Clean up internal state for a call (timers, maps)
-     * @param {string} asteriskChannelId - The call identifier
-     * @param {boolean} clearReconnectFlags - Whether to clear reconnection flags
+     * Cleanup internal state maps. Uses callId (Twilio SID).
      */
-    cleanup(asteriskChannelId, clearReconnectFlags = true) {
-        // Clear connection timeout if it exists
-        if (this.connectionTimeouts.has(asteriskChannelId)) {
-            clearTimeout(this.connectionTimeouts.get(asteriskChannelId));
-            this.connectionTimeouts.delete(asteriskChannelId);
-            logger.debug(`[OpenAI Realtime] Cleared connection timeout during cleanup for ${asteriskChannelId}`);
-        }
-        
-        // Clear commit timer if it exists
-        if (this.commitTimers.has(asteriskChannelId)) {
-            clearTimeout(this.commitTimers.get(asteriskChannelId));
-            this.commitTimers.delete(asteriskChannelId);
-            logger.debug(`[OpenAI Realtime] Cleared commit timer during cleanup for ${asteriskChannelId}`);
-        }
-        
-        // Clear pending audio buffer if it exists
-        if (this.pendingAudio.has(asteriskChannelId)) {
-            this.pendingAudio.delete(asteriskChannelId);
-            logger.debug(`[OpenAI Realtime] Cleared pending audio buffer during cleanup for ${asteriskChannelId}`);
-        }
-        
-        // Remove main connection state
-        const deletedConn = this.connections.delete(asteriskChannelId);
-        if (deletedConn) {
-            logger.info(`[OpenAI Realtime] Cleaned up resources for asteriskChannelId: ${asteriskChannelId}. Connection state removed.`);
-        } else {
-            logger.debug(`[OpenAI Realtime] Cleanup called for ${asteriskChannelId}, but connection state already removed.`);
-        }
-        
-        // Reset reconnect flags if requested
-        if (clearReconnectFlags) {
-            this.isReconnecting.delete(asteriskChannelId);
-            this.reconnectAttempts.delete(asteriskChannelId);
-            logger.debug(`[OpenAI Realtime] Cleared reconnection flags for ${asteriskChannelId}`);
-        }
+    cleanup(callId, clearReconnectFlags = true) {
+         // Ensure timers are cleared (might be redundant if disconnect called first, but safe)
+         if (this.connectionTimeouts.has(callId)) { clearTimeout(this.connectionTimeouts.get(callId)); this.connectionTimeouts.delete(callId); }
+         if (this.commitTimers.has(callId)) { clearTimeout(this.commitTimers.get(callId)); this.commitTimers.delete(callId); }
+         // Clear audio buffer
+         if (this.pendingAudio.has(callId)) { this.pendingAudio.delete(callId); logger.debug(`[OpenAI Realtime] Cleared pending audio for ${callId}`); }
+
+         // Remove main connection state object
+         const deleted = this.connections.delete(callId);
+         if (deleted) { logger.info(`[OpenAI Realtime] Cleaned up connection state for callId: ${callId}.`); }
+
+         // Clear reconnect flags if this is a final cleanup
+         if (clearReconnectFlags) {
+             this.isReconnecting.delete(callId);
+             this.reconnectAttempts.delete(callId);
+             logger.debug(`[OpenAI Realtime] Cleared reconnection flags for ${callId}`);
+         }
     }
 
     /**
-     * Disconnect all active connections and clean up resources
+     * Disconnect all connections.
      */
     async disconnectAll() {
         logger.info(`[OpenAI Realtime] Disconnecting all connections (count: ${this.connections.size})`);
-        
-        // Clone the keys to avoid iterator invalidation during disconnect
         const activeConnections = [...this.connections.keys()];
-        
-        const disconnectPromises = activeConnections.map(asteriskChannelId => {
-            return this.disconnect(asteriskChannelId).catch(err => {
-                logger.error(`[OpenAI Realtime] Error disconnecting ${asteriskChannelId}: ${err.message}`);
-                // Continue with other disconnections despite errors
-                return null;
-            });
-        });
-        
-        await Promise.all(disconnectPromises);
-        
-        // Stop health check
+        // Use Promise.allSettled to ensure all disconnects are attempted
+        await Promise.allSettled(activeConnections.map(callId => this.disconnect(callId)));
         this.stopHealthCheck();
-        
-        logger.info(`[OpenAI Realtime] All connections disconnected`);
+        logger.info(`[OpenAI Realtime] All connections disconnected and health check stopped.`);
     }
-}
+} // End OpenAIRealtimeService Class
 
 // Create and export a singleton instance
 const openAIRealtimeService = new OpenAIRealtimeService();
-
-// Start health check on init
+// Start health check when the service is initialized
 openAIRealtimeService.startHealthCheck();
-
 module.exports = openAIRealtimeService;

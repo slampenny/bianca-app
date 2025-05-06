@@ -2368,6 +2368,11 @@ ajv@^8.0.1:
     json-schema-traverse "^1.0.0"
     require-from-string "^2.0.2"
 
+alawmulaw@^6.0.0:
+  version "6.0.0"
+  resolved "https://registry.yarnpkg.com/alawmulaw/-/alawmulaw-6.0.0.tgz#1b431ffc9cc58f7e73e92b72758f32a1c6bbfbf7"
+  integrity sha512-1aQJZX2Ax5X7Bq9j9Wkv0gczxexnkshlNNxTc0sD5DjAb+NIgfHkI3rpnjSgr6pK1s4V0Z7viBgE9/FHcIwkyw==
+
 amp-message@~0.1.1:
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/amp-message/-/amp-message-0.1.2.tgz#a78f1c98995087ad36192a41298e4db49e3dfc45"

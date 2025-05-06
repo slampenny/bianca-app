@@ -46,6 +46,14 @@ services:
       asterisk:
         condition: service_healthy # Wait for Asterisk healthcheck
 
+  asterisk:
+    # You don't need to redefine build, environment, ports if they are
+    # correctly set in your main docker-compose.yml and you don't want to change them for dev.
+    # We are just adding/merging the volumes section here.
+    volumes:
+      # This will be merged with any volumes defined in the main docker-compose.yml for asterisk
+      - ./devops/asterisk/recordings:/var/spool/asterisk/recording # Mount for recordings
+
 # Define the network at the top level
 networks: # <-- Add this whole block
   node-network:
