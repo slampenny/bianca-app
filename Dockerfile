@@ -8,7 +8,12 @@ RUN apt-get update && apt-get install -y \
   libssl-dev \
   ca-certificates \
   curl \
-  ffmpeg
+  tcpdump \
+  iputils-ping \
+  net-tools \
+  # --- End added tools ---
+  # Clean up apt cache
+  && rm -rf /var/lib/apt/lists/*
 
 # Pre-download MongoDB binary
 RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-debian10-6.0.9.tgz && \

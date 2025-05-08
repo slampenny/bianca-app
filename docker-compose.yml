@@ -12,6 +12,7 @@ services:
       - ASTERISK_ENABLED=true
     ports:
       - '3000:3000'
+      - '16384:16384/udp' # Expose the new UDP port for RTP listener service
     depends_on:
       mongodb:
         condition: service_started

@@ -4,133 +4,211 @@ const logger = require('../config/logger');
 
 class ChannelTracker {
     constructor() {
-        this.calls = new Map(); // Key: asteriskChannelId, Value: call state object
-        this.uuidToChannelId = new Map(); // Key: audioSocketUuid, Value: asteriskChannelId
+        this.calls = new Map(); // Key: asteriskChannelId (main channel), Value: call state object
+        // Map AudioSocket UUID back to main Asterisk Channel ID (if using AudioSocket)
+        this.uuidToChannelId = new Map();
         logger.info('[Tracker] ChannelTracker initialized.');
     }
 
+    /**
+     * Adds a new call (main channel) to the tracker.
+     * @param {string} asteriskChannelId - The main Asterisk Channel ID.
+     * @param {object} initialData - Initial data including channel object, twilioSid, patientId.
+     */
     addCall(asteriskChannelId, initialData) {
         if (this.calls.has(asteriskChannelId)) {
-            logger.warn(`[Tracker] Attempted to add existing channel ID: ${asteriskChannelId}. Overwriting data.`);
+            logger.warn(`[Tracker] Attempted to add existing main channel ID: ${asteriskChannelId}. Overwriting data.`);
         }
         const callData = {
             asteriskChannelId: asteriskChannelId,
             mainChannel: initialData.channel || null,
-            twilioSid: initialData.twilioSid || null,
+            twilioSid: initialData.twilioSid || null, // Primary external identifier
             patientId: initialData.patientId || null,
             startTime: new Date(),
-            state: 'init',
+            state: 'init', // Initial state
             mainBridge: null,
             mainBridgeId: null,
-            conversationId: null,
-            recordingName: null,
+            conversationId: null, // Mongoose DB conversation _id
+            recordingName: null, // Main bridge recording name
+
+            // Snoop & Audio Capture Related Fields
+            snoopMethod: null, // 'audiosocket' or 'externalMedia' or 'ffmpeg'
             snoopChannel: null,
             snoopChannelId: null,
-            snoopBridge: null,
+            snoopBridge: null, // Only used if bridging snoop to Local for AudioSocket
             snoopBridgeId: null,
-            audioSocketUuid: null,
-            localChannel: null,
+            audioSocketUuid: null, // Only used for AudioSocket method
+            localChannel: null,    // Only used for AudioSocket method
             localChannelId: null,
-            ...initialData, // Apply passed initial data
+            rtp_ssrc: null, // Learned SSRC for ExternalMedia stream
+            ffmpegTranscoder: null, // Reference to FFmpeg process if using that method
+
+            ...initialData, // Apply any other passed initial data
         };
         this.calls.set(asteriskChannelId, callData);
-        logger.info(`[Tracker] Added call: ${asteriskChannelId}`);
-        this.logState(); // Log state after adding
+        logger.info(`[Tracker] Added call: ${asteriskChannelId} (TwilioSID: ${callData.twilioSid || 'N/A'})`);
+        this.logState();
         return callData;
     }
 
+    /**
+     * Retrieves call data using the main Asterisk Channel ID.
+     * @param {string} asteriskChannelId
+     * @returns {object | undefined}
+     */
     getCall(asteriskChannelId) {
         return this.calls.get(asteriskChannelId);
     }
 
+    /**
+     * Retrieves call data using the primary identifier (Twilio SID or Asterisk ID).
+     * @param {string} callId - The primary identifier (usually Twilio SID).
+     * @returns {object | null}
+     */
+    getCallByPrimaryId(callId) {
+        if (!callId) return null;
+        // First, check if the callId IS the Asterisk ID (e.g., if Twilio SID was missing)
+        let callData = this.getCall(callId);
+        if (callData) return callData;
+
+        // If not, iterate to find by Twilio SID
+        for (const data of this.calls.values()) {
+            if (data.twilioSid === callId) {
+                return data;
+            }
+        }
+        return null; // Not found
+    }
+
+
+    /**
+     * Updates the state object for a given call.
+     * @param {string} asteriskChannelId - The main Asterisk Channel ID.
+     * @param {object} updates - An object containing fields to update.
+     */
     updateCall(asteriskChannelId, updates) {
         const callData = this.calls.get(asteriskChannelId);
         if (callData) {
             Object.assign(callData, updates);
-            // logger.debug(`[Tracker] Updated call ${asteriskChannelId}: ${JSON.stringify(updates)}`);
+            // Example: Log state change specifically
+            if (updates.state) {
+                 logger.debug(`[Tracker] State change for ${asteriskChannelId}: ${callData.state} -> ${updates.state}`);
+            }
         } else {
-            logger.warn(`[Tracker] Attempted to update non-existent channel ID: ${asteriskChannelId}`);
+            logger.warn(`[Tracker] Update failed: Call ${asteriskChannelId} not found.`);
         }
         return callData;
     }
 
+    /**
+     * Maps an AudioSocket UUID to a main Asterisk Channel ID.
+     * (Used only if implementing the AudioSocket method).
+     * @param {string} asteriskChannelId
+     * @param {string} audioSocketUuid
+     */
     addAudioSocketMapping(asteriskChannelId, audioSocketUuid) {
         const callData = this.getCall(asteriskChannelId);
         if (callData) {
-            if(callData.audioSocketUuid && callData.audioSocketUuid !== audioSocketUuid) {
-                 logger.warn(`[Tracker] Overwriting existing UUID mapping for ${asteriskChannelId}. Old: ${callData.audioSocketUuid}, New: ${audioSocketUuid}`);
-            }
-            if (this.uuidToChannelId.has(audioSocketUuid) && this.uuidToChannelId.get(audioSocketUuid) !== asteriskChannelId) {
-                logger.warn(`[Tracker] UUID ${audioSocketUuid} is already mapped to a different channel (${this.uuidToChannelId.get(audioSocketUuid)}). Overwriting mapping to ${asteriskChannelId}.`);
-            }
+            // Warn if overwriting existing mappings
+            if(callData.audioSocketUuid && callData.audioSocketUuid !== audioSocketUuid) { logger.warn(`[Tracker] Overwriting UUID mapping for ${asteriskChannelId}.`); }
+            if (this.uuidToChannelId.has(audioSocketUuid) && this.uuidToChannelId.get(audioSocketUuid) !== asteriskChannelId) { logger.warn(`[Tracker] UUID ${audioSocketUuid} already mapped to ${this.uuidToChannelId.get(audioSocketUuid)}. Overwriting.`); }
+
             callData.audioSocketUuid = audioSocketUuid;
             this.uuidToChannelId.set(audioSocketUuid, asteriskChannelId);
-            logger.info(`[Tracker] Mapped UUID ${audioSocketUuid} to channel ${asteriskChannelId}`);
-            this.logState(); // Log state after mapping
+            logger.info(`[Tracker] Mapped AudioSocket UUID ${audioSocketUuid} to channel ${asteriskChannelId}`);
+            this.logState();
         } else {
              logger.error(`[Tracker] Cannot add UUID mapping, channel not found: ${asteriskChannelId}`);
         }
     }
 
-    // Renamed for clarity - used by AudioSocket service
+    /**
+     * Finds the main Asterisk Channel ID associated with an AudioSocket UUID.
+     * (Used only if implementing the AudioSocket method).
+     * @param {string} audioSocketUuid
+     * @returns {string | undefined}
+     */
     findParentChannelIdByUuid(audioSocketUuid) {
         const cleanUuid = audioSocketUuid ? audioSocketUuid.trim() : null;
-        if (!cleanUuid) return null;
+        if (!cleanUuid) return undefined;
         return this.uuidToChannelId.get(cleanUuid);
     }
 
+    /**
+     * Removes a call and its associated mappings from the tracker.
+     * @param {string} asteriskChannelId - The main Asterisk Channel ID.
+     * @returns {boolean} - True if the call was found and removed.
+     */
     removeCall(asteriskChannelId) {
         const callData = this.calls.get(asteriskChannelId);
         let uuidToRemove = null;
-        if (callData && callData.audioSocketUuid) {
+        if (callData && callData.audioSocketUuid) { // Check if AudioSocket was used
              uuidToRemove = callData.audioSocketUuid;
         }
+        // Note: We don't have a reverse map for SSRC, cleanup handled by RTP listener calling removeSsrcMapping
 
-        // Remove the main call entry
         const deleted = this.calls.delete(asteriskChannelId);
 
-        // If the main call was found and had a UUID, remove the reverse mapping
+        // Clean up AudioSocket UUID mapping if it exists
         if (uuidToRemove) {
              if(this.uuidToChannelId.get(uuidToRemove) === asteriskChannelId) {
                   this.uuidToChannelId.delete(uuidToRemove);
-                  logger.debug(`[Tracker] Removed UUID mapping for ${uuidToRemove}`);
+                  logger.debug(`[Tracker] Removed AudioSocket UUID mapping for ${uuidToRemove}`);
              } else {
-                 // This case might happen if mappings were overwritten - log it
-                 logger.warn(`[Tracker] UUID ${uuidToRemove} was not mapped to the channel being removed (${asteriskChannelId}) during cleanup.`);
+                 logger.warn(`[Tracker] UUID ${uuidToRemove} was not mapped to removed channel ${asteriskChannelId} during cleanup.`);
              }
         }
 
         if (deleted) {
             logger.info(`[Tracker] Removed call: ${asteriskChannelId}`);
-            this.logState(); // Log state after removal
+            this.logState();
         } else {
              logger.warn(`[Tracker] Attempted to remove non-existent channel ID: ${asteriskChannelId}`);
         }
         return deleted;
     }
 
-    // Helper to get active channel/bridge objects for cleanup
-    // Ensures we return null if callData doesn't exist
+    /**
+     * Helper to get active resources for cleanup.
+     * @param {string} asteriskChannelId
+     * @returns {object | null}
+     */
     getResources(asteriskChannelId) {
         const callData = this.getCall(asteriskChannelId);
+        // Return a copy or specific fields to avoid external modification of tracked state
         return callData ? {
             mainChannel: callData.mainChannel,
             mainBridge: callData.mainBridge,
             snoopChannel: callData.snoopChannel,
-            snoopBridge: callData.snoopBridge,
-            localChannel: callData.localChannel,
+            snoopBridge: callData.snoopBridge, // Will be null in ExternalMedia/FFmpeg modes
+            localChannel: callData.localChannel, // Will be null in ExternalMedia/FFmpeg modes
             conversationId: callData.conversationId,
             twilioSid: callData.twilioSid,
-            asteriskChannelId: callData.asteriskChannelId
+            asteriskChannelId: callData.asteriskChannelId,
+            rtp_ssrc: callData.rtp_ssrc, // Include SSRC for cleanup
+            ffmpegTranscoder: callData.ffmpegTranscoder // Include for cleanup
         } : null;
     }
 
-    // Debugging helper
+    /**
+     * Debugging helper to log current state.
+     */
     logState() {
         try {
-             logger.debug(`[Tracker State] Calls: ${JSON.stringify(Array.from(this.calls.keys()))}, UUIDs Mapped: ${JSON.stringify(Array.from(this.uuidToChannelId.keys()))}`);
+             const callSummary = Array.from(this.calls.entries()).map(([id, data]) => ({
+                 astId: id,
+                 twilioSid: data.twilioSid,
+                 state: data.state,
+                 snoopMethod: data.snoopMethod,
+                 snoopId: data.snoopChannelId,
+                 localId: data.localChannelId,
+                 ssrc: data.rtp_ssrc
+             }));
+             logger.debug(`[Tracker State] Active Calls: ${JSON.stringify(callSummary)}`);
+             logger.debug(`[Tracker State] AudioSocket UUIDs Mapped: ${JSON.stringify(Array.from(this.uuidToChannelId.keys()))}`);
+             // Add SSRC map logging if needed (requires access to rtpListenerService's map)
         } catch (e) {
-             logger.warn(`[Tracker State] Error logging state: ${e.message}`); // Avoid crashing logger
+             logger.warn(`[Tracker State] Error logging state: ${e.message}`);
         }
     }
 }

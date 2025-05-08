@@ -6,7 +6,8 @@ const logger = require('./config/logger');
 //const { initializeWebSocketServer } = require('./api/websocket.service');
 //const { startAriClient } = require('./api/ari.client');
 const { startAriClient } = require('./api/ari.client');
-const { startAudioSocketServer } = require('./api/audio.socket.service'); // ADD
+const { startRtpListenerService } = require('./api/rtp.listener.service');
+//const { startAudioSocketServer } = require('./api/audio.socket.service'); // ADD
 
 /**
  * Starts the application server and initializes all components
@@ -42,10 +43,6 @@ async function startServer() {
     // initializeWebSocketServer(server); // REMOVE
     logger.info('WebSocket server (Twilio Media Streams) is DISABLED.');
 
-    // Initialize AudioSocket Server FIRST (needs to listen before Asterisk connects)
-    startAudioSocketServer(); // ADD
-    logger.info('AudioSocket server starting...');
-
     // Initialize Asterisk ARI client (if enabled in config)
     if (config.asterisk && config.asterisk.enabled) {
       logger.info('Asterisk integration enabled, starting ARI client');
@@ -53,6 +50,9 @@ async function startServer() {
         logger.error(`Failed to start Asterisk ARI client: ${err.message}`);
         logger.warn('Continue without Asterisk integration');
       });
+
+      // Start RTP Listener
+      startRtpListenerService();
     } else {
       logger.info('Asterisk integration disabled in configuration');
     }

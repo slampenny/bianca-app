@@ -7,6 +7,9 @@ services:
     command: yarn dev
     ports:
       - "9229:9229"
+    cap_add:
+    - NET_RAW
+    - NET_ADMIN
     # Add other necessary configurations like build context, volumes, etc.
     networks: # <-- Add this network assignment
       - node-network
