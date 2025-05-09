@@ -52,7 +52,7 @@ variable "github_repo" {
 }
 
 variable "github_branch" {
-  default = "main"
+  default = "asterisk-remote"
 }
 
 variable "github_app_connection_arn" {
@@ -318,9 +318,8 @@ resource "aws_ecr_repository" "asterisk_repo" {
     scan_on_push = true
   }
 
-  image_tag_mutability = "MUTABLE" # or IMMUTABLE if you prefer strict tagging
+  image_tag_mutability = "MUTABLE" # or IMMUTABLE if you prefer
 }
-
 
 variable "asterisk_service_name" {
   default = "asterisk-service"
@@ -330,10 +329,7 @@ variable "asterisk_container_name" {
   default = "asterisk"
 }
 
-variable "asterisk_image" {
-  default = "andrius/asterisk:latest"
-}
-
+# Using the custom image built in CodeBuild instead of andrius/asterisk:latest
 variable "asterisk_container_port" {
   default = 5060
 }
@@ -363,6 +359,13 @@ resource "aws_security_group" "asterisk_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 8088
+    to_port     = 8088
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Consider restricting this to your app subnet only
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -371,63 +374,13 @@ resource "aws_security_group" "asterisk_sg" {
   }
 }
 
-resource "aws_ecs_task_definition" "asterisk_task" {
-  family                   = var.asterisk_service_name
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
-  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
-  task_role_arn            = aws_iam_role.ecs_task_role.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = var.asterisk_container_name
-      image     = var.asterisk_image
-      essential = true
-      portMappings = [
-        { containerPort = 5060, protocol = "udp" },
-        { containerPort = 5060, protocol = "tcp" },
-        { containerPort = 10000, protocol = "udp" }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs",
-        options = {
-          "awslogs-group"         = "/ecs/asterisk",
-          "awslogs-region"        = var.aws_region,
-          "awslogs-stream-prefix" = "asterisk"
-        }
-      }
-    }
-  ])
+resource "aws_cloudwatch_log_group" "asterisk_log_group" {
+  name              = "/ecs/asterisk"
+  retention_in_days = 14
 }
 
-resource "aws_ecs_service" "asterisk_service" {
-  name            = var.asterisk_service_name
-  cluster         = aws_ecs_cluster.cluster.id
-  task_definition = aws_ecs_task_definition.asterisk_task.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = var.subnet_ids
-    security_groups  = [aws_security_group.asterisk_sg.id]
-    assign_public_ip = true
-  }
-}
-
-resource "aws_route53_record" "sip_subdomain" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "sip.myphonefriend.com"
-  type    = "A"
-
-  alias {
-    name                   = aws_lb.app_lb.dns_name # or your NLB if you use one for SIP
-    zone_id                = aws_lb.app_lb.zone_id
-    evaluate_target_health = true
-  }
-}
-
+# Removed stand-alone Asterisk task definition and service
+# Asterisk is now integrated into the main app task definition
 
 ##############################
 # IAM Roles and Policies
@@ -929,133 +882,197 @@ resource "aws_ecs_task_definition" "app_task" {
 
   container_definitions = jsonencode([
     {
-      name      = var.container_name,
+      name      = var.container_name
       # Image will be updated by CodePipeline using imagedefinitions.json,
       # so this initial value is just a placeholder or the initial version.
-      image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest",
-      essential = true,
-      portMappings = [{
-        containerPort = var.container_port,
-        hostPort      = var.container_port, # Not strictly needed in awsvpc, but doesn't hurt
-        protocol      = "tcp",
-        # appProtocol = "http" # Optional: For App Mesh / Service Connect
-      }],
+      image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest"
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.container_port
+          hostPort      = var.container_port
+          protocol      = "tcp"
+        },
+        {
+          containerPort = 16384
+          hostPort      = 16384
+          protocol      = "udp"
+        }
+      ]
       environment = [
         {
-          name  = "MONGODB_URL",
+          name  = "MONGODB_URL"
           value = "mongodb://localhost:27017/bianca-app" # Assumes Mongo runs in the same task
         },
         {
-          name  = "NODE_ENV",
+          name  = "NODE_ENV"
           value = "production"
         },
-        
         {
-            name  = "WBSOCKET_URL",
-            value = "wss://app.myphonefriend.com"
+          name  = "WBSOCKET_URL"
+          value = "wss://app.myphonefriend.com"
         },
-        # { # Example using Secrets Manager
-        #  name = "JWT_SECRET"
-        #  valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret}-xxxxxx:JWT_SECRET::" # Adjust ARN and key name
-        # }
-      ],
-        secrets = [
+        {
+          name  = "ASTERISK_URL"
+          value = "http://localhost:8088"
+        },
+        {
+          name  = "ASTERISK_USERNAME"
+          value = "myphonefriend"
+        },
+        {
+          name  = "ASTERISK_ENABLED"
+          value = "true"
+        }
+      ]
+      secrets = [
         # --- Secrets injected from AWS Secrets Manager ---
         {
-            # Env Var name created inside the container:
-            name      = "AWS_ACCESS_KEY",
-            # Value comes from the 'JWT_SECRET' key within the JSON stored in Secrets Manager:
+            name      = "AWS_ACCESS_KEY"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:AWS_ACCESS_KEY::"
         },
         {
-            # Env Var name created inside the container:
-            name      = "AWS_SECRET_KEY",
-            # Value comes from the 'JWT_SECRET' key within the JSON stored in Secrets Manager:
+            name      = "AWS_SECRET_KEY"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:AWS_SECRET_KEY::"
         },
         {
-            # Env Var name created inside the container:
-            name      = "JWT_SECRET",
-            # Value comes from the 'JWT_SECRET' key within the JSON stored in Secrets Manager:
+            name      = "JWT_SECRET"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::"
         },
         {
-            name      = "OPENAI_API_KEY",
+            name      = "OPENAI_API_KEY"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:OPENAI_API_KEY::"
         },
         {
-            name      = "TWILIO_PHONENUMBER",
+            name      = "TWILIO_PHONENUMBER"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_ACCOUNTSID::"
         },
         {
-            name      = "TWILIO_ACCOUNTSID",
+            name      = "TWILIO_ACCOUNTSID"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_ACCOUNTSID::"
         },
         {
-            name      = "TWILIO_AUTHTOKEN",
+            name      = "TWILIO_AUTHTOKEN"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_AUTHTOKEN::"
         },
         {
-            name      = "STRIPE_SECRET_KEY",
+            name      = "STRIPE_SECRET_KEY"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_SECRET_KEY::"
         },
         {
-            name      = "STRIPE_PUBLISHABLE_KEY",
+            name      = "STRIPE_PUBLISHABLE_KEY"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_PUBLISHABLE_KEY::"
         },
-        
-        ],
+        {
+            name      = "ASTERISK_PASSWORD"
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ARI_PASSWORD::"
+        }
+      ]
 
       logConfiguration = {
-        logDriver = "awslogs",
+        logDriver = "awslogs"
         options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.app_log_group.name,
-          "awslogs-region"        = var.aws_region,
+          "awslogs-group"         = aws_cloudwatch_log_group.app_log_group.name
+          "awslogs-region"        = var.aws_region
           "awslogs-stream-prefix" = "app" # Changed prefix for clarity
         }
       }
       # dependsOn = [ { "containerName": "mongodb", "condition": "START" } ] # Ensure mongo starts first
     },
     {
-      name      = "mongodb",
+      name      = "mongodb"
       image     = "mongo:4.4" # Use a specific minor version if possible, e.g., 4.4.18
       essential = true # Usually true, unless app can function without DB temporarily
-      portMappings = [{
-        containerPort = 27017,
-        protocol      = "tcp"
-      }],
-      mountPoints = [{
-        sourceVolume  = "mongodb-data",
-        containerPath = "/data/db",
-        readOnly      = false
-      }],
+      portMappings = [
+        {
+          containerPort = 27017
+          protocol      = "tcp"
+        }
+      ]
+      mountPoints = [
+        {
+          sourceVolume  = "mongodb-data"
+          containerPath = "/data/db"
+          readOnly      = false
+        }
+      ]
       logConfiguration = {
-        logDriver = "awslogs",
+        logDriver = "awslogs"
         options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.mongodb_log_group.name,
-          "awslogs-region"        = var.aws_region,
+          "awslogs-group"         = aws_cloudwatch_log_group.mongodb_log_group.name
+          "awslogs-region"        = var.aws_region
           "awslogs-stream-prefix" = "mongo" # Changed prefix for clarity
         }
       }
-       # healthCheck = { # Optional: Add container health check for Mongo
-       #   command = ["mongo", "--eval", "db.adminCommand('ping')"]
-       #   interval = 30
-       #   timeout = 5
-       #   retries = 3
-       # }
+    },
+    {
+      name      = var.asterisk_container_name
+      # Image will be updated by CodePipeline using imagedefinitions.json
+      image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/bianca-app-asterisk:latest"
+      essential = true
+      portMappings = concat(
+        [
+          # Main SIP and ARI ports
+          {
+            containerPort = 5060
+            hostPort      = 5060
+            protocol      = "udp"
+          },
+          {
+            containerPort = 5060
+            hostPort      = 5060
+            protocol      = "tcp"
+          },
+          {
+            containerPort = 8088
+            hostPort      = 8088
+            protocol      = "tcp"
+          }
+        ],
+        # Dynamically generate all RTP port mappings from 10000 to 10100
+        [for port in range(10000, 10101) : {
+          containerPort = port
+          hostPort      = port
+          protocol      = "udp"
+        }]
+      )
+      environment = [
+        {
+          name  = "EXTERNAL_ADDRESS"
+          value = aws_lb.app_lb.dns_name  # Using the ALB DNS name as external address
+        },
+        {
+          name  = "EXTERNAL_PORT"
+          value = "5060"
+        }
+      ]
+      secrets = [
+        {
+          name      = "ARI_PASSWORD"
+          valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ARI_PASSWORD::"
+        },
+        {
+          name      = "BIANCA_PASSWORD"
+          valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:BIANCA_PASSWORD::"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.asterisk_log_group.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "asterisk"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "asterisk -rx 'core show uptime' || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60  # Give Asterisk time to start up
+      }
     }
   ])
-
-  # Optional: Enable runtime monitoring
-  # runtime_platform {
-  #   operating_system_family = "LINUX"
-  #   cpu_architecture        = "X86_64" # Or ARM64
-  # }
-
-  # Optional: Configure Ephemeral Storage
-  # ephemeral_storage {
-  #   size_in_gib = 21 # Minimum 21 for Fargate
-  # }
 }
 
 
@@ -1074,15 +1091,9 @@ resource "aws_ecs_service" "app_service" {
   deployment_maximum_percent         = 100 # Allow 100% extra tasks during deployment
   deployment_minimum_healthy_percent = 0 # Require 100% of desired_count to be healthy (adjust lower if some downtime is ok)
 
-  # Optional: Enable circuit breaker for rollbacks
-  # deployment_circuit_breaker {
-  #   enable   = true
-  #   rollback = true
-  # }
-
   network_configuration {
     subnets         = var.subnet_ids
-    security_groups = [aws_security_group.bianca_app_sg.id]
+    security_groups = [aws_security_group.bianca_app_sg.id, aws_security_group.asterisk_sg.id]
     assign_public_ip = true # Set to false if using private subnets and NAT Gateway/VPC Endpoint
   }
 
@@ -1107,17 +1118,6 @@ resource "aws_ecs_service" "app_service" {
     aws_iam_role.ecs_task_role,      # Ensure roles exist before service creation
     aws_iam_role.ecs_execution_role
   ]
-
-  # Optional: Propagate tags from task definition or service to tasks
-  # propagate_tags = "SERVICE" # Or "TASK_DEFINITION"
-
-  # Optional: Configure service discovery
-  # service_registries {
-  #   registry_arn = aws_service_discovery_service.example.arn
-  # }
-
-  # Optional: Wait for service stability on create/update (can increase apply time)
-  # wait_for_steady_state = true
 }
 
 ##############################
@@ -1278,6 +1278,17 @@ resource "aws_route53_record" "wordpress_apex" {
   records = ["192.254.225.221"] # Replace with your HostGator server's IP address
 }
 
+resource "aws_route53_record" "sip_subdomain" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "sip.myphonefriend.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.app_lb.dns_name # or your NLB if you use one for SIP
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
 
 ##############################
 # CodePipeline
@@ -1327,7 +1338,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       provider         = "CodeBuild"
       version          = "1"
       input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["BuildOutput"] # This will contain imagedefinitions.json
+      output_artifacts = ["BuildOutput"] # This will contain imagedefinitions.json with both app and asterisk images
       configuration = {
         ProjectName = aws_codebuild_project.bianca_project.name
         # Optional: Override buildspec environment variables
@@ -1389,176 +1400,4 @@ resource "aws_route53_record" "ses_dkim_record" {
   type    = "CNAME"
   ttl     = 600
   records = ["${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
-}
-
-##############################################################
-# FRP Server (frps) Resources for Local Debug Tunneling
-##############################################################
-
-variable "frps_instance_type" {
-  description = "EC2 instance type for frps server"
-  type        = string
-  default     = "t3.micro" # Or t4g.micro for ARM (potentially cheaper)
-}
-
-data "aws_ssm_parameter" "amazon_linux_2" {
-  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
-}
-
-variable "frps_bind_port" {
-  description = "TCP port for frpc clients to connect to frps"
-  type        = number
-  default     = 7000
-}
-
-variable "frps_sip_tcp_port" {
-  description = "Public TCP port frps will expose for SIP signaling"
-  type        = number
-  default     = 5060
-}
-
-variable "frps_rtp_udp_start_port" {
-  description = "Start of public UDP port range frps will expose for RTP"
-  type        = number
-  default     = 10000
-}
-
-variable "frps_rtp_udp_end_port" {
-  description = "End of public UDP port range frps will expose for RTP"
-  type        = number
-  default     = 10100 # Keep range small for security if possible
-}
-
-variable "frps_token" {
-  description = "Optional secret token for authenticating frpc to frps"
-  type        = string
-  default     = "RtSHnnUOfSis49XVqgidTGL3P1eggjPd6uKmfm2oiCY="
-  sensitive   = true
-}
-
-variable "my_dev_ip_cidr" {
-  description = "Your local development machine's public IP address in CIDR notation (e.g., 1.2.3.4/32) for SSH and frps access."
-  type        = string
-  default     = "23.16.17.211/32" # WARNING: Replace with your specific IP/32 for security!
-}
-
-variable "twilio_signaling_cidrs" {
-  description = "List of CIDR blocks for Twilio SIP signaling (TCP). Get from Twilio Docs."
-  type        = list(string)
-  default     = ["54.172.60.0/30", "54.244.51.0/30"] # EXAMPLE ONLY - GET CURRENT LIST! Add all relevant NA ranges.
-}
-
-variable "twilio_media_cidrs" {
-  description = "List of CIDR blocks for Twilio RTP media (UDP). Get from Twilio Docs."
-  type        = list(string)
-  default     = ["168.86.128.0/18"] # EXAMPLE ONLY - GET CURRENT LIST! This is often a global range.
-}
-
-variable "frp_version" {
-  description = "Version of FRP to download from GitHub releases for frps"
-  type        = string
-  default     = "0.62.1" # Match your client version if possible
-}
-
-# 1. Static Public IP for the FRP Server
-resource "aws_eip" "frps_eip" {
-  domain = "vpc" # Use 'vpc' for EC2-VPC, remove if using EC2-Classic (unlikely)
-
-  tags = {
-    Name = "frps-eip"
-  }
-}
-
-# 2. Security Group for the FRP Server
-resource "aws_security_group" "frps_sg" {
-  name        = "frps-server-sg"
-  description = "Allow FRPS client, SIP(TCP), RTP(UDP), and SSH"
-  vpc_id      = var.vpc_id # Use the same VPC as your app if possible
-
-  # Allow frpc connection from your dev IP
-  ingress {
-    description = "FRPS Bind Port from Dev IP"
-    from_port   = var.frps_bind_port
-    to_port     = var.frps_bind_port
-    protocol    = "tcp"
-    cidr_blocks = [var.my_dev_ip_cidr] # Restrict to your IP!
-  }
-
-  # Allow Twilio SIP Signaling (TCP)
-  ingress {
-    description = "SIP Signaling (TCP) from Twilio"
-    from_port   = var.frps_sip_tcp_port
-    to_port     = var.frps_sip_tcp_port
-    protocol    = "tcp"
-    cidr_blocks = var.twilio_signaling_cidrs # Use list of Twilio IPs
-  }
-
-  # Allow Twilio RTP Media (UDP Range)
-  ingress {
-    description = "RTP Media (UDP) from Twilio"
-    from_port   = var.frps_rtp_udp_start_port
-    to_port     = var.frps_rtp_udp_end_port
-    protocol    = "udp"
-    cidr_blocks = var.twilio_media_cidrs # Use list of Twilio IPs
-  }
-
-  # Allow SSH from your dev IP (for debugging the instance)
-  ingress {
-    description = "SSH from Dev IP"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.my_dev_ip_cidr] # Restrict to your IP!
-  }
-
-  # Allow all outbound traffic (simplest for debugging)
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "frps-sg"
-  }
-}
-
-# 3. EC2 Instance to run frps
-# 3. EC2 Instance to run frps
-resource "aws_instance" "frps_server" {
-  ami           = data.aws_ssm_parameter.amazon_linux_2.value
-  instance_type = var.frps_instance_type
-  key_name      = "bianca-key-pair"
-  vpc_security_group_ids = [aws_security_group.frps_sg.id]
-  subnet_id                   = var.subnet_ids[0]
-  associate_public_ip_address = true # Required to associate EIP later
-
-  # User data script to install and run frps
-  user_data = templatefile("${path.module}/frps_userdata.tftpl", {
-    frps_bind_port = var.frps_bind_port,
-    frps_token = var.frps_token
-    # Add the variable used for download path:
-    frp_version    = var.frp_version,
-    # Add variables needed for allowPorts in the template:
-    frps_sip_tcp_port       = var.frps_sip_tcp_port,
-    frps_rtp_udp_start_port = var.frps_rtp_udp_start_port,
-    frps_rtp_udp_end_port   = var.frps_rtp_udp_end_port
-  })
-
-  tags = {
-    Name = "frps-server"
-  }
-}
-
-# 4. Associate the Elastic IP with the instance
-resource "aws_eip_association" "frps_eip_assoc" {
-  instance_id   = aws_instance.frps_server.id
-  allocation_id = aws_eip.frps_eip.id
-}
-
-# 5. Output the public IP address
-output "frps_server_public_ip" {
-  description = "Public IP address of the FRPS server instance"
-  value       = aws_eip.frps_eip.public_ip
 }

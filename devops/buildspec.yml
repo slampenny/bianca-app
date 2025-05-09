@@ -2,10 +2,14 @@ version: 0.2
 
 env:
   variables:
-    AWS_DEFAULT_REGION: us-east-2
-    AWS_ACCOUNT_ID: 730335291008
-    REPOSITORY_NAME_BIANCA: bianca-app-backend
-    REPOSITORY_NAME_ASTERISK: bianca-app-asterisk
+    # Define variables used throughout the buildspec
+    AWS_DEFAULT_REGION: us-east-2 # Use your target region
+    AWS_ACCOUNT_ID: 730335291008 # Use your AWS Account ID
+    REPOSITORY_NAME_APP: bianca-app-backend
+    REPOSITORY_NAME_ASTERISK: bianca-app-asterisk # ECR repo for custom Asterisk
+    # Define container names as used in the ECS Task Definition
+    APP_CONTAINER_NAME: bianca-app-backend
+    ASTERISK_CONTAINER_NAME: asterisk
 
 phases:
   pre_build:
@@ -13,35 +17,50 @@ phases:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - echo Setting repository URIs...
-      - REPOSITORY_URI_BIANCA=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_BIANCA
+      - REPOSITORY_URI_APP=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_APP
       - REPOSITORY_URI_ASTERISK=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_ASTERISK
-      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - echo Setting image tag...
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)-$(date +%Y%m%d%H%M%S) # Combine commit hash and timestamp for uniqueness
 
   build:
     commands:
       - echo Build started on $(date)
-      - echo Building Bianca app image...
-      - docker build -t $REPOSITORY_URI_BIANCA:$IMAGE_TAG .
-      - docker tag $REPOSITORY_URI_BIANCA:$IMAGE_TAG $REPOSITORY_URI_BIANCA:latest
 
-      - echo Pulling Asterisk image...
-      - docker pull andrius/asterisk:latest
-      - docker tag andrius/asterisk:latest $REPOSITORY_URI_ASTERISK:$IMAGE_TAG
-      - docker tag andrius/asterisk:latest $REPOSITORY_URI_ASTERISK:latest
+      # Build Bianca App image
+      - echo Building Bianca app image...
+      - docker build -t $REPOSITORY_URI_APP:$IMAGE_TAG -f Dockerfile . # Assumes Dockerfile is in root
+      - docker tag $REPOSITORY_URI_APP:$IMAGE_TAG $REPOSITORY_URI_APP:latest
+
+      # Build Custom Asterisk image
+      - echo Building Custom Asterisk image...
+      # Assuming the Asterisk Dockerfile is in ./devops/asterisk relative to the build root
+      - docker build -t $REPOSITORY_URI_ASTERISK:$IMAGE_TAG -f ./devops/asterisk/Dockerfile ./devops/asterisk
+      - docker tag $REPOSITORY_URI_ASTERISK:$IMAGE_TAG $REPOSITORY_URI_ASTERISK:latest
 
   post_build:
     commands:
-      - echo Pushing Bianca app image...
-      - docker push $REPOSITORY_URI_BIANCA:$IMAGE_TAG
-      - docker push $REPOSITORY_URI_BIANCA:latest
+      - echo Build completed on $(date)
 
-      - echo Pushing Asterisk image...
+      # Push Bianca App image
+      - echo Pushing Bianca app image...
+      - docker push $REPOSITORY_URI_APP:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_APP:latest
+
+      # Push Custom Asterisk image
+      - echo Pushing Custom Asterisk image...
       - docker push $REPOSITORY_URI_ASTERISK:$IMAGE_TAG
       - docker push $REPOSITORY_URI_ASTERISK:latest
 
+      # Create imagedefinitions.json for ECS deployment
+      # This file tells the ECS Deploy action which images to use for which containers
       - echo Writing imagedefinitions.json...
-      - printf '[{"name":"bianca-app-backend","imageUri":"%s"},{"name":"asterisk","imageUri":"%s"}]' $REPOSITORY_URI_BIANCA:$IMAGE_TAG $REPOSITORY_URI_ASTERISK:$IMAGE_TAG > imagedefinitions.json
+      - printf '[{"name":"%s","imageUri":"%s"},{"name":"%s","imageUri":"%s"}]' "$APP_CONTAINER_NAME" "$REPOSITORY_URI_APP:$IMAGE_TAG" "$ASTERISK_CONTAINER_NAME" "$REPOSITORY_URI_ASTERISK:$IMAGE_TAG" > imagedefinitions.json
+      - echo Contents of imagedefinitions.json:
+      - cat imagedefinitions.json
 
 artifacts:
   files:
+    # This is the file the ECS Deploy action in CodePipeline will use
     - imagedefinitions.json
+  # Optional: Discard paths if you don't need source/build artifacts downstream
+  # discard-paths: yes
