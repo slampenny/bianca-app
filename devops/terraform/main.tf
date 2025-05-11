@@ -1067,7 +1067,7 @@ resource "aws_ecs_task_definition" "asterisk_task" {
   container_definitions = jsonencode([
     {
       name  = var.asterisk_container_name
-      image = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/bianca-app-asterisk:latest"
+      image = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/bianca-app-asterisk"
       essential = true
 
       portMappings = concat(
