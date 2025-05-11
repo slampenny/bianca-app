@@ -104,7 +104,7 @@ variable "github_repo" {
 }
 
 variable "github_branch" {
-  default = "main"
+  default = "asterisk-remote"
 }
 
 variable "github_app_connection_arn" {
