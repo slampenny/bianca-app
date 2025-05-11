@@ -7,16 +7,64 @@ provider "aws" {
 # Variables
 ##############################
 
-variable "aws_profile" {
-  default = "jordan"
+##############################
+# Separate Asterisk Service for SIP
+##############################
+
+# Create a separate ECS service just for the Asterisk SIP functionality
+resource "aws_ecs_service" "asterisk_service" {
+  name            = "asterisk-sip-service"
+  cluster         = aws_ecs_cluster.cluster.id
+  task_definition = aws_ecs_task_definition.asterisk_task.arn
+  launch_type     = "FARGATE"
+  desired_count   = 1 
+
+  enable_execute_command = true
+  
+  deployment_controller {
+    type = "ECS"
+  }
+  
+  network_configuration {
+    subnets         = var.subnet_ids
+    security_groups = [aws_security_group.bianca_app_sg.id, aws_security_group.asterisk_sg.id]
+    assign_public_ip = true
+  }
+  
+  # SIP UDP
+  load_balancer {
+    target_group_arn = aws_lb_target_group.sip_udp_tg.arn
+    container_name   = var.asterisk_container_name
+    container_port   = 5060
+  }
+  
+  # SIP TCP
+  load_balancer {
+    target_group_arn = aws_lb_target_group.sip_tcp_tg.arn
+    container_name   = var.asterisk_container_name
+    container_port   = 5061
+  }
+  
+  # RTP UDP
+  load_balancer {
+    target_group_arn = aws_lb_target_group.rtp_udp_tg.arn
+    container_name   = var.asterisk_container_name
+    container_port   = 10000
+  }
+}
+
+variable "apply_asterisk_lb" {
+  description = "Whether to apply Asterisk load balancers - Deprecated, using separate service now"
+  type        = bool
+  default     = true  # No longer needed
 }
 
 variable "aws_region" {
   default = "us-east-2"
 }
 
-variable "aws_account_id" {
-  default = "730335291008"
+variable "aws_profile" {
+  default = "jordan"
 }
 
 variable "repository_name" {
@@ -25,6 +73,10 @@ variable "repository_name" {
 
 variable "bucket_name" {
   default = "bianca-codepipeline-artifact-bucket"
+}
+
+variable "aws_account_id" {
+  default = "730335291008"
 }
 
 variable "codepipeline_role_name" {
@@ -52,7 +104,7 @@ variable "github_repo" {
 }
 
 variable "github_branch" {
-  default = "asterisk-remote"
+  default = "main"
 }
 
 variable "github_app_connection_arn" {
@@ -377,6 +429,18 @@ resource "aws_security_group" "asterisk_sg" {
 resource "aws_cloudwatch_log_group" "asterisk_log_group" {
   name              = "/ecs/asterisk"
   retention_in_days = 14
+}
+
+# Output the SIP service static IP address
+output "sip_static_ip" {
+  description = "Static IP address for SIP connections"
+  value       = aws_eip.sip_eip.public_ip
+}
+
+# Output the SIP service DNS name
+output "sip_dns_name" {
+  description = "DNS name for SIP connections"
+  value       = "sip.myphonefriend.com"
 }
 
 # Removed stand-alone Asterisk task definition and service
@@ -892,11 +956,6 @@ resource "aws_ecs_task_definition" "app_task" {
           containerPort = var.container_port
           hostPort      = var.container_port
           protocol      = "tcp"
-        },
-        {
-          containerPort = 16384
-          hostPort      = 16384
-          protocol      = "udp"
         }
       ]
       environment = [
@@ -911,18 +970,6 @@ resource "aws_ecs_task_definition" "app_task" {
         {
           name  = "WBSOCKET_URL"
           value = "wss://app.myphonefriend.com"
-        },
-        {
-          name  = "ASTERISK_URL"
-          value = "http://localhost:8088"
-        },
-        {
-          name  = "ASTERISK_USERNAME"
-          value = "myphonefriend"
-        },
-        {
-          name  = "ASTERISK_ENABLED"
-          value = "true"
         }
       ]
       secrets = [
@@ -1004,23 +1051,35 @@ resource "aws_ecs_task_definition" "app_task" {
           "awslogs-stream-prefix" = "mongo" # Changed prefix for clarity
         }
       }
-    },
+    }
+  ])
+}
+
+resource "aws_ecs_task_definition" "asterisk_task" {
+  family                   = var.asterisk_service_name
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "512"
+  memory                   = "1024"
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  container_definitions = jsonencode([
     {
-      name      = var.asterisk_container_name
-      # Image will be updated by CodePipeline using imagedefinitions.json
-      image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/bianca-app-asterisk:latest"
+      name  = var.asterisk_container_name
+      image = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/bianca-app-asterisk:latest"
       essential = true
+
       portMappings = concat(
         [
-          # Main SIP and ARI ports
           {
             containerPort = 5060
             hostPort      = 5060
             protocol      = "udp"
           },
           {
-            containerPort = 5060
-            hostPort      = 5060
+            containerPort = 5061
+            hostPort      = 5061
             protocol      = "tcp"
           },
           {
@@ -1029,23 +1088,26 @@ resource "aws_ecs_task_definition" "app_task" {
             protocol      = "tcp"
           }
         ],
-        # Dynamically generate all RTP port mappings from 10000 to 10100
-        [for port in range(10000, 10101) : {
-          containerPort = port
-          hostPort      = port
-          protocol      = "udp"
-        }]
+        [
+          for port in range(10000, 10101) : {
+            containerPort = port
+            hostPort      = port
+            protocol      = "udp"
+          }
+        ]
       )
+
       environment = [
         {
           name  = "EXTERNAL_ADDRESS"
-          value = aws_lb.app_lb.dns_name  # Using the ALB DNS name as external address
+          value = aws_eip.sip_eip.public_ip
         },
         {
           name  = "EXTERNAL_PORT"
           value = "5060"
         }
       ]
+
       secrets = [
         {
           name      = "ARI_PASSWORD"
@@ -1056,25 +1118,26 @@ resource "aws_ecs_task_definition" "app_task" {
           valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:BIANCA_PASSWORD::"
         }
       ]
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.asterisk_log_group.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "asterisk"
+          awslogs-group         = aws_cloudwatch_log_group.asterisk_log_group.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "asterisk"
         }
       }
+
       healthCheck = {
         command     = ["CMD-SHELL", "asterisk -rx 'core show uptime' || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
-        startPeriod = 60  # Give Asterisk time to start up
+        startPeriod = 60
       }
     }
   ])
 }
-
 
 resource "aws_ecs_service" "app_service" {
   name            = var.service_name
@@ -1098,7 +1161,7 @@ resource "aws_ecs_service" "app_service" {
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.app_tg.arn # Point to the single target group
+    target_group_arn = aws_lb_target_group.app_tg.arn # Point to single TG for HTTP
     container_name   = var.container_name
     container_port   = var.container_port
   }
@@ -1213,7 +1276,7 @@ resource "aws_codebuild_project" "bianca_project" {
 
   source {
     type            = "CODEPIPELINE"
-    buildspec       = "devops/buildspec.yml" # Ensure this file exists and is updated
+    buildspec       = "devops/buildspec.yml" # Ensure this file exists with proper configuration for both images
     # git_clone_depth = 1 # Optional: Faster clones for shallow history
   }
 
@@ -1284,15 +1347,211 @@ resource "aws_route53_record" "sip_subdomain" {
   type    = "A"
 
   alias {
-    name                   = aws_lb.app_lb.dns_name # or your NLB if you use one for SIP
-    zone_id                = aws_lb.app_lb.zone_id
+    name                   = aws_lb.sip_lb.dns_name
+    zone_id                = aws_lb.sip_lb.zone_id
     evaluate_target_health = true
   }
 }
 
 ##############################
-# CodePipeline
+# SIP Network Load Balancer and Elastic IP
 ##############################
+
+# Elastic IP for the Network Load Balancer to provide a static IP
+resource "aws_eip" "sip_eip" {
+  domain = "vpc"
+  tags = {
+    Name = "bianca-sip-eip"
+  }
+}
+
+# Security Group for SIP traffic
+resource "aws_security_group" "sip_nlb_sg" {
+  name        = "sip-nlb-sg"
+  description = "Security group for SIP Network Load Balancer"
+  vpc_id      = var.vpc_id
+
+  # SIP UDP
+  ingress {
+    from_port   = 5060
+    to_port     = 5060
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "SIP UDP traffic"
+  }
+
+  # SIP TCP
+  ingress {
+    from_port   = 5061
+    to_port     = 5061
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "SIP TCP traffic"
+  }
+
+  # RTP UDP range
+  ingress {
+    from_port   = 10000
+    to_port     = 10100
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "RTP UDP range"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "sip-nlb-sg"
+  }
+}
+
+# Network Load Balancer for SIP traffic
+resource "aws_lb" "sip_lb" {
+  name                             = "bianca-sip-nlb"
+  internal                         = false
+  load_balancer_type               = "network"
+  enable_cross_zone_load_balancing = true
+  
+  # Use subnet_mapping instead of subnets
+  subnet_mapping {
+    subnet_id     = var.subnet_ids[0]
+    allocation_id = aws_eip.sip_eip.id
+  }
+  
+  # Add additional subnet mappings for other AZs without Elastic IPs
+  subnet_mapping {
+    subnet_id = var.subnet_ids[1]
+  }
+  
+  subnet_mapping {
+    subnet_id = var.subnet_ids[2]
+  }
+
+  tags = {
+    Name = "bianca-sip-nlb"
+  }
+}
+
+# Target group for SIP UDP
+resource "aws_lb_target_group" "sip_udp_tg" {
+  name        = "sip-udp-tg"
+  port        = 5060
+  protocol    = "UDP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    protocol            = "TCP" # NLB can't do UDP health checks, so use TCP
+    port                = 5060
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+  }
+
+  tags = {
+    Name = "sip-udp-tg"
+  }
+}
+
+# Target group for SIP TCP - use lifecycle ignore_changes to avoid conflicts
+resource "aws_lb_target_group" "sip_tcp_tg" {
+  name        = "sip-tcp-tg"
+  port        = 5061       # Using port 5060 to match our container hostPort for TCP
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    protocol            = "TCP"
+    port                = 5061  # Updated to match our target port
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+  }
+
+  # Add lifecycle block to prevent trying to modify existing resource
+  lifecycle {
+    # ignore_changes = all
+  }
+
+  tags = {
+    Name = "sip-tcp-tg"
+  }
+}
+
+# Target group for RTP UDP (sample port from the range)
+resource "aws_lb_target_group" "rtp_udp_tg" {
+  name        = "rtp-udp-tg"
+  port        = 10000
+  protocol    = "UDP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    protocol            = "TCP" # NLB can't do UDP health checks, so use TCP
+    port                = 5060  # Use SIP TCP port for health checks
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+  }
+
+  tags = {
+    Name = "rtp-udp-tg"
+  }
+}
+
+# Comment out existing listener resources since they already exist
+# Instead, we should import them using Terraform import commands
+
+# Listener for SIP UDP - already exists, needs to be imported
+# terraform import aws_lb_listener.sip_udp_listener arn:aws:elasticloadbalancing:us-east-2:730335291008:listener/net/bianca-sip-nlb/1da0a3026b85ab88/[LISTENER_ID]
+
+resource "aws_lb_listener" "sip_udp_listener" {
+  load_balancer_arn = aws_lb.sip_lb.arn
+  port              = 5060
+  protocol          = "UDP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.sip_udp_tg.arn
+  }
+}
+
+# Listener for SIP TCP - already exists, needs to be imported
+# terraform import aws_lb_listener.sip_tcp_listener arn:aws:elasticloadbalancing:us-east-2:730335291008:listener/net/bianca-sip-nlb/1da0a3026b85ab88/[LISTENER_ID]
+
+resource "aws_lb_listener" "sip_tcp_listener" {
+  load_balancer_arn = aws_lb.sip_lb.arn
+  port              = 5061  # Still listen on standard SIP port
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.sip_tcp_tg.arn  # This target group uses port 5060
+  }
+}
+
+# Listener for RTP UDP (sample port from the range)
+resource "aws_lb_listener" "rtp_udp_listener" {
+  load_balancer_arn = aws_lb.sip_lb.arn
+  port              = 10000
+  protocol          = "UDP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.rtp_udp_tg.arn
+  }
+}
+
+# Associate the NLB with EIPs - REMOVED incorrect resource
+# Use subnet_mapping in the aws_lb resource instead
 
 resource "aws_codepipeline" "bianca_pipeline" {
   name     = "BiancaPipeline-ECS-Rolling" # Renamed for clarity
