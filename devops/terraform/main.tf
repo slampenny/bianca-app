@@ -1622,7 +1622,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
         ServiceName = aws_ecs_service.app_service.name
         # FileName specifies the artifact file containing container image mappings.
         # Ensure your buildspec produces this file in the root of BuildOutput.
-        FileName    = "imagedefinitions.json"
+        FileName    = "imagedef_app.json"
       }
       run_order = 1
       # namespace = "DeployVariables" # Optional: Set namespace for variables
@@ -1638,7 +1638,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       configuration = {
         ClusterName = aws_ecs_cluster.cluster.name
         ServiceName = aws_ecs_service.asterisk_service.name
-        FileName    = "imagedefinitions.json"
+        FileName    = "imagedef_asterisk.json"
       }
       run_order = 2
     }

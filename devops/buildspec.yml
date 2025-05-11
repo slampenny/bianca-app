@@ -30,8 +30,10 @@ phases:
       - docker push $REPOSITORY_URI_ASTERISK:$IMAGE_TAG
       - docker push $REPOSITORY_URI_ASTERISK:latest
       - echo Creating imagedefinitions.json
-      - echo "[{\"name\":\"$APP_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_APP:$IMAGE_TAG\"},{\"name\":\"$ASTERISK_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_ASTERISK:$IMAGE_TAG\"}]" > imagedefinitions.json
-      - cat imagedefinitions.json
+      - echo "[{\"name\":\"$APP_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_APP:$IMAGE_TAG\"}]" > imagedef_app.json
+      - echo "[{\"name\":\"$ASTERISK_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_ASTERISK:$IMAGE_TAG\"}]" > imagedef_asterisk.json
+
 artifacts:
   files:
-    - imagedefinitions.json
+    - imagedef_app.json
+    - imagedef_asterisk.json
