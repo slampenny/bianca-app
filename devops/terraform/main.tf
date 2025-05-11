@@ -1627,6 +1627,21 @@ resource "aws_codepipeline" "bianca_pipeline" {
       run_order = 1
       # namespace = "DeployVariables" # Optional: Set namespace for variables
     }
+
+    action {
+      name            = "DeployAsterisk"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["BuildOutput"]
+      configuration = {
+        ClusterName = aws_ecs_cluster.cluster.name
+        ServiceName = aws_ecs_service.asterisk_service.name
+        FileName    = "imagedefinitions.json"
+      }
+      run_order = 2
+    }
   }
   # Optional: Add triggers (e.g., CloudWatch Events)
   # trigger { ... }
