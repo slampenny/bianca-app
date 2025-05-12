@@ -2,16 +2,16 @@
 type=transport
 protocol=udp
 bind=0.0.0.0:5060
-external_media_address=3.141.235.83
-external_signaling_address=3.141.235.83
+external_media_address=${EXTERNAL_ADDRESS}
+external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5060
 
 [transport-tcp]
 type=transport
 protocol=tcp
 bind=0.0.0.0:5061 ; Listen on TCP port 5060 too
-external_media_address=3.141.235.83
-external_signaling_address=3.141.235.83
+external_media_address=${EXTERNAL_ADDRESS}
+external_signaling_address=${EXTERNAL_ADDRESS} #3.141.235.83
 external_signaling_port=5061
 
 ; Endpoint for incoming Twilio calls
@@ -49,7 +49,7 @@ match=34.216.110.128/25
 type=auth
 auth_type=userpass
 username=bianca
-password=your_secure_password_here
+password=${BIANCA_PASSWORD}
 
 ; AOR section for bianca
 [bianca-aor]

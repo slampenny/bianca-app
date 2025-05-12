@@ -6,4 +6,4 @@ allowed_origins=*
 [myphonefriend]
 type = user
 read_only = no
-password = changeme
+password = ${ARI_PASSWORD}

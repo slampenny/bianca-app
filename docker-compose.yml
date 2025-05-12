@@ -12,7 +12,6 @@ services:
       - ASTERISK_ENABLED=true
     ports:
       - '3000:3000'
-      - '16384:16384/udp' # Expose the new UDP port for RTP listener service
     depends_on:
       mongodb:
         condition: service_started
@@ -41,7 +40,7 @@ services:
       - EXTERNAL_PORT=${EXTERNAL_PORT}
     ports:
       - '5060:5060/udp'
-      - '5060:5060/tcp'
+      - '5061:5061/tcp'
       - '10000-10100:10000-10100/udp'
       - '8088:8088/tcp'  # Exposing ARI port for easier debugging
     volumes:
