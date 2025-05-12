@@ -10,7 +10,7 @@ RUN apt-get update && \
         wget \
         curl \
         ca-certificates \
-        gettext \ 
+        gettext \
         libedit-dev \
         libjansson-dev \
         libsqlite3-dev \
@@ -49,12 +49,18 @@ RUN groupadd asterisk --gid 999 || true && \
     chown -R asterisk:asterisk /etc/asterisk /var/log/asterisk /var/lib/asterisk /var/run/asterisk /var/spool/asterisk /usr/lib/asterisk && \
     chmod -R 750 /var/log/asterisk /var/lib/asterisk /var/run/asterisk /var/spool/asterisk /usr/lib/asterisk /etc/asterisk
 
-# Copy only template configs
 COPY configs/*.conf.template /etc/asterisk/
-
-# Copy entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && sed -i 's/\r$//' /entrypoint.sh
+
+# Fix permissions BEFORE switching users
+RUN mkdir -p /var/log/asterisk/cdr-csv && \
+    chown -R asterisk:asterisk \
+        /etc/asterisk \
+        /var/lib/asterisk \
+        /var/log/asterisk \
+        /var/spool/asterisk \
+        /usr/lib/asterisk
 
 USER asterisk
 

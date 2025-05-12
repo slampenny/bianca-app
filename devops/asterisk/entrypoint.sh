@@ -20,15 +20,6 @@ for template in "$ASTERISK_CONF_DIR"/*.template; do
   envsubst < "$template" > "$conf_file"
 done
 
-# Ensure proper file permissions
-echo "Fixing permissions..."
-mkdir -p /var/log/asterisk/cdr-csv
-chown -R asterisk:asterisk \
-  "$ASTERISK_CONF_DIR" \
-  /var/lib/asterisk \
-  /var/log/asterisk \
-  /var/spool/asterisk
-
 # Start Asterisk
 echo "Starting Asterisk..."
 exec /usr/sbin/asterisk -vvvvv -f
