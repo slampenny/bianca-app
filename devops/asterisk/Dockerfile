@@ -49,7 +49,8 @@ RUN groupadd asterisk --gid 999 || true && \
     chown -R asterisk:asterisk /etc/asterisk /var/log/asterisk /var/lib/asterisk /var/run/asterisk /var/spool/asterisk /usr/lib/asterisk && \
     chmod -R 750 /var/log/asterisk /var/lib/asterisk /var/run/asterisk /var/spool/asterisk /usr/lib/asterisk /etc/asterisk
 
-COPY configs/*.conf.template /etc/asterisk/
+COPY configs/*.template /etc/asterisk/
+RUN chown asterisk:asterisk /etc/asterisk/*.template
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && sed -i 's/\r$//' /entrypoint.sh
 
