@@ -10,6 +10,7 @@ RUN apt-get update && \
         wget \
         curl \
         ca-certificates \
+        gettext \ 
         libedit-dev \
         libjansson-dev \
         libsqlite3-dev \
