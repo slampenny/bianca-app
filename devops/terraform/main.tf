@@ -398,8 +398,8 @@ resource "aws_security_group" "asterisk_sg" {
   }
 
   ingress {
-    from_port   = 5060
-    to_port     = 5060
+    from_port   = 5061
+    to_port     = 5061
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -1013,6 +1013,10 @@ resource "aws_ecs_task_definition" "app_task" {
         {
             name      = "ASTERISK_PASSWORD"
             valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ARI_PASSWORD::"
+        },
+        {
+            name      = "BIANCA_PASSWORD"
+            valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:BIANCA_PASSWORD::"
         }
       ]
 
@@ -1101,10 +1105,6 @@ resource "aws_ecs_task_definition" "asterisk_task" {
         {
           name  = "EXTERNAL_ADDRESS"
           value = aws_eip.sip_eip.public_ip
-        },
-        {
-          name  = "EXTERNAL_PORT"
-          value = "5060"
         }
       ]
 
