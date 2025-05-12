@@ -131,11 +131,11 @@ class TwilioCallService {
         language: 'en-US'
       }, "Hello.");
       
-    
-      const sipHost = '3.136.184.169';
-      const sipPort = '5060';
-      const sipUser = 'bianca'; // Or maybe derived dynamically
-      const sipUri = `sip:bianca@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};patientId=${encodeURIComponent(patientId)}`;
+      const asteriskUrl = new URL(config.asterisk.url || 'http://sip.myphonefriend.com:8088');
+      const sipHost = asteriskUrl.hostname;
+      const sipPort = config.asterisk.externalPort || 5061;
+      const sipUser = config.asterisk.username; // Or make dynamic if needed
+      const sipUri = `sip:${sipUser}@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};patientId=${encodeURIComponent(patientId)}`;
 
       // Connect to Asterisk SIP endpoint with patientId as a parameter
       // Pass the URI *string* to .sip()

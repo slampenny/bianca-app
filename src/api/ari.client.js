@@ -36,7 +36,7 @@ class AsteriskAriClient {
              logger.info('[ARI] Connecting to Asterisk ARI...');
              const ariUrl = config.asterisk.url || 'http://asterisk:8088';
              const username = config.asterisk.username || 'myphonefriend';
-             const password = config.asterisk.password || 'changeme';
+             const password = config.asterisk.password;
              logger.info(`[ARI] Attempting connection to ${ariUrl} with user: ${username}`);
 
              this.client = await AriClient.connect(ariUrl, username, password);

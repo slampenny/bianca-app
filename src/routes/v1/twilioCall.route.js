@@ -114,31 +114,26 @@ router.post(
  *       "200":
  *         description: TwiML for SIP test
  */
-// In your /test-sip route handler file (e.g., twilioCall.routes.js)
-
 router.get('/test-sip', (req, res) => {
   const VoiceResponse = require('twilio').twiml.VoiceResponse;
   const twiml = new VoiceResponse();
 
-  const staticSipHost = '3.136.184.169'; // Your static Ngrok address
-  const staticSipPort = '5060';
-  const testPatientId = 'direct-sip-test-static';
-  const testTwilioSid = 'TEST_STATIC_' + Date.now();
+  const sipHost = new URL(config.asterisk.url).hostname || 'sip.myphonefriend.com'; // resolves from Asterisk config
+  const sipPort = new URL(config.asterisk.url).port || '5060'; // fallback if port not parsed
+  const testPatientId = 'direct-sip-test';
+  const testTwilioSid = `TEST_SIP_${Date.now()}`;
 
-  twiml.say('Testing SIP connection to local Asterisk via static Ngrok TCP address');
+  twiml.say('Testing SIP connection to Asterisk from Twilio.');
   twiml.dial({
-      callerId: '+19786256514', // Your Twilio number
-      timeout: 15
-  }).sip(`sip:bianca@${staticSipHost}:${staticSipPort}?patientId=${testPatientId}&callSid=${testTwilioSid}`);
+    callerId: config.twilio.phone || '+19786256514',
+    timeout: 15
+  }).sip(`sip:bianca@${sipHost}:${sipPort}?patientId=${testPatientId}&callSid=${testTwilioSid}`);
 
-  // --- Add these headers to prevent caching ---
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // HTTP 1.1.
-  res.setHeader('Pragma', 'no-cache'); // HTTP 1.0.
-  res.setHeader('Expires', '0'); // Proxies.
-  // --- End of cache prevention headers ---
-
-  res.type('text/xml'); // Set Content-Type AFTER cache headers
-  res.send(twiml.toString()); // Send the TwiML
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.type('text/xml');
+  res.send(twiml.toString());
 });
 
 module.exports = router;

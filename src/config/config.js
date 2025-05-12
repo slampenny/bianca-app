@@ -18,6 +18,7 @@ const envVarsSchema = Joi.object({
 
   ARI_PASSWORD: Joi.string(),
   BIANCA_PASSWORD: Joi.string(),
+  ASTERISK_URL: Joi.string(),
   EXTERNAL_ADDRESS: Joi.string(),
   EXTERNAL_PORT: Joi.number(),
 
@@ -92,6 +93,7 @@ const baselineConfig = {
   asterisk: {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
     url: envVars.ASTERISK_URL || 'http://asterisk:8088', // Example URL, replace with actual
+    externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
     username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual
     password: envVars.BIANCA_PASSWORD
   },
@@ -140,6 +142,7 @@ if (envVars.NODE_ENV === 'production') {
   // **NEW/UPDATED:** Add necessary production overrides for WebSocket URL
   // Ensure this uses wss:// and points to your correct production WebSocket endpoint
   baselineConfig.twilio.websocketUrl = 'wss://app.myphonefriend.com'; // Example - **VERIFY THIS URL**
+  baselineConfig.asterisk.url = 'http://sip.myphonefriend.com:8088'; // Example - **VERIFY THIS URL**
 
   // Ensure baseUrl is also correct for production if used elsewhere
 }
