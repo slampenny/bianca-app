@@ -25,7 +25,7 @@ class AsteriskAriClient {
 
         // --- Configuration for ExternalMedia ---
         this.RTP_LISTENER_HOST = 'bianca-app';
-        this.RTP_LISTENER_PORT = 16384; // Use the non-conflicting port
+        this.RTP_LISTENER_PORT = 5061; // Use the non-conflicting port
         this.RTP_SEND_FORMAT = 'slin'; // Asterisk sends 8k SLIN
         // --- End ExternalMedia Config ---
     }

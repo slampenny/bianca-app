@@ -27,3 +27,7 @@ exten => _X.,1,NoOp(Outgoing call from Bianca: ${EXTEN})
  same => n,Dial(PJSIP/${EXTEN}@twilio-trunk)
  same => n,Hangup()
 
+[unauthorized]
+exten => _X.,1,NoOp(🚫 Unauthorized SIP attempt from ${CALLERID(all)})
+ same => n,Hangup()
+

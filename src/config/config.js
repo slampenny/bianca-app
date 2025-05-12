@@ -93,7 +93,7 @@ const baselineConfig = {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
     url: envVars.ASTERISK_URL || 'http://asterisk:8088', // Example URL, replace with actual
     username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual
-    password: envVars.ASTERISK_PASSWORD || 'changeme', // Example password, replace with actual
+    password: envVars.BIANCA_PASSWORD
   },
   google: { // Assuming this was for Google TTS, keep if used elsewhere
     language: 'en-US',

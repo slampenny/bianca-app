@@ -9,55 +9,25 @@ external_signaling_port=5060
 [transport-tcp]
 type=transport
 protocol=tcp
-bind=0.0.0.0:5061 ; Listen on TCP port 5060 too
+bind=0.0.0.0:5061
 external_media_address=${EXTERNAL_ADDRESS}
-external_signaling_address=${EXTERNAL_ADDRESS} #3.141.235.83
+external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5061
 
-; Endpoint for incoming Twilio calls
-[twilio-trunk]
-type=endpoint
-transport=transport-tcp
-context=from-twilio
-disallow=all
-allow=ulaw
-allow=alaw
-direct_media=no
-allow_subscribe=no
-allow_registrations=no
-force_rport=yes     # Helps ensure replies go back to the correct source port
-rtp_symmetric=yes   # Ensures Asterisk sends RTP back to the same IP:Port it received RTP from
-
-[twilio-identify]
-type=identify
-endpoint=twilio-trunk ; Link this block to the twilio-trunk endpoint below
-match=54.172.60.0
-match=54.172.60.1
-match=54.172.60.0/30
-match=54.244.51.0/30
-match=54.171.127.192/30
-match=35.156.191.128/30
-match=54.65.63.192/30
-match=54.169.127.128/30
-match=54.252.254.64/30
-match=177.71.206.192/30
-match=34.203.250.0/23
-match=34.216.110.128/25
-
-; Auth section for bianca
+;----------------------------------------
+; Bianca App SIP Client
+;----------------------------------------
 [bianca-auth]
 type=auth
 auth_type=userpass
-username=bianca
+username=myphonefriend
 password=${BIANCA_PASSWORD}
 
-; AOR section for bianca
 [bianca-aor]
 type=aor
 max_contacts=10
 qualify_frequency=60
 
-; Endpoint for bianca
 [bianca]
 type=endpoint
 context=bianca-app
@@ -68,3 +38,47 @@ auth=bianca-auth
 aors=bianca-aor
 transport=transport-udp
 direct_media=no
+
+;----------------------------------------
+; Twilio SIP Trunk
+;----------------------------------------
+[twilio-trunk]
+type=endpoint
+transport=transport-tcp
+context=from-twilio
+disallow=all
+allow=ulaw
+allow=alaw
+direct_media=no
+allow_subscribe=no
+allow_registrations=no
+force_rport=yes
+rtp_symmetric=yes
+
+[twilio-identify]
+type=identify
+endpoint=twilio-trunk
+match=54.172.60.0/23
+match=34.203.250.0/23
+match=34.216.110.128/25
+match=54.244.51.0/24
+match=54.171.127.192/26
+match=35.156.191.128/26
+match=54.65.63.192/26
+match=54.169.127.128/26
+match=54.252.254.64/26
+match=177.71.206.192/26
+
+;----------------------------------------
+; Catch-all endpoint for scanners
+;----------------------------------------
+[unauth-endpoint]
+type=endpoint
+context=unauthorized
+disallow=all
+transport=transport-udp
+
+[unauth-identify]
+type=identify
+endpoint=unauth-endpoint
+match=0.0.0.0/0
