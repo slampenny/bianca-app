@@ -20,7 +20,7 @@ external_signaling_port=5061
 [bianca-auth]
 type=auth
 auth_type=userpass
-username=myphonefriend
+username=bianca
 password=${BIANCA_PASSWORD}
 
 [bianca-aor]
@@ -51,7 +51,6 @@ allow=ulaw
 allow=alaw
 direct_media=no
 allow_subscribe=no
-allow_registrations=no
 force_rport=yes
 rtp_symmetric=yes
 
@@ -72,11 +71,6 @@ match=177.71.206.192/26
 ;----------------------------------------
 ; Catch-all endpoint for scanners
 ;----------------------------------------
-[unauth-endpoint]
-type=endpoint
-context=unauthorized
-disallow=all
-transport=transport-udp
 
 [unauth-identify]
 type=identify
