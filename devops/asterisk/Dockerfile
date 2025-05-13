@@ -11,7 +11,7 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         gettext \
-        netcat-openbsd \
+        netcat \
         libedit-dev \
         libjansson-dev \
         libsqlite3-dev \

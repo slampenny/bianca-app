@@ -1129,7 +1129,7 @@ resource "aws_ecs_task_definition" "asterisk_task" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "nc -z localhost 5061 || exit 1"]
+        command     = ["CMD-SHELL", "su -c \"asterisk -rx 'core show uptime'\" || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
