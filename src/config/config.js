@@ -94,6 +94,7 @@ const baselineConfig = {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
     url: envVars.ASTERISK_URL || 'http://asterisk:8088', // Example URL, replace with actual
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
+    sipUserName: envVars.SIP_USER_NAME || 'bianca', // Example SIP username, replace with actual
     username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual
     password: envVars.BIANCA_PASSWORD
   },
