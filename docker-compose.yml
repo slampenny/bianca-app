@@ -37,7 +37,6 @@ services:
       - ARI_PASSWORD=${ARI_PASSWORD}  # Used in ari.conf
       - BIANCA_PASSWORD=${BIANCA_PASSWORD}  # Used in pjsip.conf
       - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
-      - EXTERNAL_PORT=${EXTERNAL_PORT}
     ports:
       - '5060:5060/udp'
       - '5061:5061/tcp'

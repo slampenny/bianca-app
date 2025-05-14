@@ -64,6 +64,14 @@ RUN mkdir -p /var/log/asterisk/cdr-csv && \
         /var/spool/asterisk \
         /usr/lib/asterisk
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD [ "asterisk", "-rx", "core show uptime" ]
+
+# Ensure correct permissions after all copies
+RUN mkdir -p /var/log/asterisk && \
+    chown -R asterisk:asterisk /var/log/asterisk && \
+    chmod -R 750 /var/log/asterisk
+
 USER asterisk
 
 ENTRYPOINT ["/entrypoint.sh"]

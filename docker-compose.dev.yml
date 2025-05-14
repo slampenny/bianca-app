@@ -34,20 +34,20 @@ services:
       - node-network
 
  # --- Add the frpc service ---
-  frpc:
-    container_name: frpc
-    image: snowdreamtech/frpc # Using a popular frpc image
-    restart: unless-stopped
-    networks:
-      - node-network
-    volumes:
-      # Mount your local frpc.ini into the container
-      - ./devops/frp/configs/frpc.toml:/etc/frp/frpc.toml:ro
-    command: -c /etc/frp/frpc.toml # Command to run frpc with the config
-    depends_on:
-      # Ensure asterisk is running before frpc tries to forward to it
-      asterisk:
-        condition: service_healthy # Wait for Asterisk healthcheck
+  # frpc:
+  #   container_name: frpc
+  #   image: snowdreamtech/frpc # Using a popular frpc image
+  #   restart: unless-stopped
+  #   networks:
+  #     - node-network
+  #   volumes:
+  #     # Mount your local frpc.ini into the container
+  #     - ./devops/frp/configs/frpc.toml:/etc/frp/frpc.toml:ro
+  #   command: -c /etc/frp/frpc.toml # Command to run frpc with the config
+  #   depends_on:
+  #     # Ensure asterisk is running before frpc tries to forward to it
+  #     asterisk:
+  #       condition: service_healthy # Wait for Asterisk healthcheck
 
   asterisk:
     # You don't need to redefine build, environment, ports if they are
