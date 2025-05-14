@@ -72,6 +72,11 @@ RUN mkdir -p /var/log/asterisk && \
     chown -R asterisk:asterisk /var/log/asterisk && \
     chmod -R 750 /var/log/asterisk
 
+# Set up healthcheck while still root
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
+  CMD su -s /bin/sh -c "asterisk -rx 'core show uptime'" asterisk || exit 1
+
+# Drop privileges to asterisk user for main execution
 USER asterisk
 
 ENTRYPOINT ["/entrypoint.sh"]
