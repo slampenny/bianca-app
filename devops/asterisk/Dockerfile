@@ -43,38 +43,28 @@ RUN make -j$(nproc)
 RUN make install
 RUN make config
 
-WORKDIR /
-RUN groupadd asterisk --gid 999 || true && \
-    useradd -r -g asterisk --uid 999 -d /var/lib/asterisk -s /sbin/nologin asterisk || true && \
-    mkdir -p /var/log/asterisk /var/lib/asterisk /var/run/asterisk /var/spool/asterisk /etc/asterisk /usr/lib/asterisk && \
-    chown -R asterisk:asterisk /etc/asterisk /var/log/asterisk /var/lib/asterisk /var/run/asterisk /var/spool/asterisk /usr/lib/asterisk && \
-    chmod -R 750 /var/log/asterisk /var/lib/asterisk /var/run/asterisk /var/spool/asterisk /usr/lib/asterisk /etc/asterisk
+# Create asterisk user and fix permissions
+RUN groupadd -g 999 asterisk || true && \
+    useradd -u 999 -g asterisk -r -s /sbin/nologin -d /var/lib/asterisk asterisk || true && \
+    mkdir -p /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk /var/run/asterisk /usr/lib/asterisk && \
+    chmod -R 750 /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk /var/run/asterisk /usr/lib/asterisk && \
+    chown -R asterisk:asterisk /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk /var/run/asterisk /usr/lib/asterisk
 
-COPY configs/*.template /etc/asterisk/
-RUN chown asterisk:asterisk /etc/asterisk/*.template
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && sed -i 's/\r$//' /entrypoint.sh
-
-# Fix permissions BEFORE switching users
+# Pre-create log files and subdirs with correct ownership
 RUN mkdir -p /var/log/asterisk/cdr-csv && \
-    chown -R asterisk:asterisk \
-        /etc/asterisk \
-        /var/lib/asterisk \
-        /var/log/asterisk \
-        /var/spool/asterisk \
-        /usr/lib/asterisk
+    touch /var/log/asterisk/queue_log && \
+    chown -R asterisk:asterisk /var/log/asterisk /var/log/asterisk/*
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD [ "asterisk", "-rx", "core show uptime" ]
-
-# Ensure correct permissions after all copies
-RUN mkdir -p /var/log/asterisk && \
-    chown -R asterisk:asterisk /var/log/asterisk && \
-    chmod -R 750 /var/log/asterisk
+# Copy configs and entrypoint
+COPY configs/*.template /etc/asterisk/
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && sed -i 's/\r$//' /entrypoint.sh && \
+    chown asterisk:asterisk /entrypoint.sh /etc/asterisk/*.template
 
 # Set up healthcheck while still root
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
-  CMD su -s /bin/sh -c "asterisk -rx 'core show uptime'" asterisk || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD su -s /bin/sh -c "/usr/sbin/asterisk -rx 'core show uptime' | grep 'System uptime'" asterisk || exit 1
+
 
 # Drop privileges to asterisk user for main execution
 USER asterisk
