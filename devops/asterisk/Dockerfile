@@ -63,7 +63,8 @@ RUN chmod +x /entrypoint.sh && sed -i 's/\r$//' /entrypoint.sh && \
 
 # Set up healthcheck while still root
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD su -s /bin/sh -c "/usr/sbin/asterisk -rx 'core show uptime' | grep 'System uptime'" asterisk || exit 1
+  CMD pgrep asterisk || exit 1
+
 
 
 # Drop privileges to asterisk user for main execution

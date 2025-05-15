@@ -27,4 +27,4 @@ done
 
 # Start Asterisk
 echo "Starting Asterisk..."
-exec /usr/sbin/asterisk -vvvvv -f
+exec /usr/sbin/asterisk -vvvvv -f -U asterisk -G asterisk
