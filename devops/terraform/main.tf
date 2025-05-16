@@ -93,12 +93,12 @@ resource "aws_ecs_service" "asterisk_service" {
     # that resolve to the private IPs of your Asterisk tasks.
   }
   
-  # SIP UDP
-  # load_balancer {
-  #   target_group_arn = aws_lb_target_group.sip_udp_tg.arn
-  #   container_name   = var.asterisk_container_name
-  #   container_port   = 5060
-  # }
+#  SIP UDP
+  load_balancer {
+    target_group_arn = aws_lb_target_group.sip_udp_tg.arn
+    container_name   = var.asterisk_container_name
+    container_port   = 5060
+  }
   
   # SIP TCP
   load_balancer {
@@ -107,12 +107,12 @@ resource "aws_ecs_service" "asterisk_service" {
     container_port   = 5061
   }
   
-  # RTP UDP
-  # load_balancer {
-  #   target_group_arn = aws_lb_target_group.rtp_udp_tg.arn
-  #   container_name   = var.asterisk_container_name
-  #   container_port   = 10000
-  # }
+#  RTP UDP
+  load_balancer {
+    target_group_arn = aws_lb_target_group.rtp_udp_tg.arn
+    container_name   = var.asterisk_container_name
+    container_port   = 10000
+  }
 }
 
 variable "apply_asterisk_lb" {
@@ -1220,6 +1220,19 @@ resource "aws_ecs_task_definition" "asterisk_task" {
   ])
 }
 
+resource "aws_service_discovery_service" "bianca_app_sd_service" {
+     name = "bianca-app" # This will become 'bianca-app.myphonefriend.internal'
+     dns_config {
+       namespace_id = aws_service_discovery_private_dns_namespace.internal.id
+       routing_policy = "MULTIVALUE"
+       dns_records { 
+        ttl = 10 
+        type = "A" 
+       }
+     }
+     # Optional health check
+   }
+
 resource "aws_ecs_service" "app_service" {
   name            = var.service_name
   cluster         = aws_ecs_cluster.cluster.id
@@ -1239,6 +1252,10 @@ resource "aws_ecs_service" "app_service" {
     subnets         = var.subnet_ids
     security_groups = [aws_security_group.bianca_app_sg.id, aws_security_group.asterisk_sg.id]
     assign_public_ip = true # Set to false if using private subnets and NAT Gateway/VPC Endpoint
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.bianca_app_sd_service.arn
   }
 
   load_balancer {

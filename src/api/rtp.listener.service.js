@@ -6,9 +6,10 @@ const logger = require('../config/logger');
 const openAIService = require('./openai.realtime.service'); // Assumes refactored for callId
 const channelTracker = require('./channel.tracker'); // Shared tracker instance
 const AudioUtils = require('./audio.utils'); // For PCM -> uLaw conversion
+const config = require('../config/config'); // Configuration file
 
 const RTP_LISTEN_HOST = '0.0.0.0';
-const RTP_LISTEN_PORT = 16384; // Ensure this matches ari.client.js
+const RTP_LISTEN_PORT = config.asterisk.rtpListenerPort; // Ensure this matches ari.client.js
 
 const RTP_HEADER_MIN_LENGTH = 12;
 

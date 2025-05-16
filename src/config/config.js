@@ -19,6 +19,7 @@ const envVarsSchema = Joi.object({
   ARI_PASSWORD: Joi.string(),
   BIANCA_PASSWORD: Joi.string(),
   ASTERISK_URL: Joi.string(),
+  RTP_LISTENER_URL: Joi.string(),
   EXTERNAL_ADDRESS: Joi.string(),
   EXTERNAL_PORT: Joi.number(),
 
@@ -95,6 +96,8 @@ const baselineConfig = {
   asterisk: {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
     url: envVars.ASTERISK_URL || 'http://asterisk:8088', // Example URL, replace with actual
+    rtpListenerUrl: envVars.RTP_LISTENER_URL || 'http://bianca-app', // Example RTP URL, replace with actual
+    rtpListenerPort: envVars.RTP_LISTENER_PORT || 5060, // Example port, replace with actual
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
     sipUserName: envVars.SIP_USER_NAME || 'bianca', // Example SIP username, replace with actual
     username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual
@@ -186,6 +189,7 @@ baselineConfig.loadSecrets = async () => {
     // JWT
     if (secrets.ASTERISK_ENABLED) baselineConfig.asterisk.enabled = secrets.ASTERISK_ENABLED;
     if (secrets.ASTERISK_URL) baselineConfig.asterisk.url = secrets.ASTERISK_URL;
+    if (secrets.RTP_LISTENER_URL) baselineConfig.asterisk.url = secrets.RTP_LISTENER_URL;
     if (secrets.JWT_SECRET) baselineConfig.jwt.secret = secrets.JWT_SECRET;
     // Email
     if (secrets.SMTP_USERNAME) baselineConfig.email.smtp.auth.user = secrets.SMTP_USERNAME;
