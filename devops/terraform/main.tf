@@ -7,6 +7,32 @@ provider "aws" {
 # Variables
 ##############################
 
+variable "twilio_ip_ranges" {
+  description = "List of Twilio SIP signaling IP CIDR ranges. Update from pjsip.conf or Twilio docs."
+  type        = list(string)
+  default = [
+    # These are the IPs you had in your pjsip.conf identify section.
+    # Double-check with Twilio's current documentation for the most up-to-date list.
+    "54.172.60.0/23",
+    "34.203.250.0/23",
+    "34.216.110.128/25",
+    "54.244.51.0/24",
+    "54.171.127.192/26",
+    "35.156.191.128/26",
+    "54.65.63.192/26",
+    "54.169.127.128/26",
+    "54.252.254.64/26",
+    "177.71.206.192/26"
+    # Add any other new ranges published by Twilio
+  ]
+}
+
+variable "bianca_client_static_ips" {
+  description = "List of static IP addresses or CIDR ranges for your Bianca client(s) or server(s) that need to access Asterisk SIP/RTP/ARI."
+  type        = list(string)
+  default     = ["3.141.235.83/32"]
+}
+
 ##############################
 # Separate Asterisk Service for SIP
 ##############################
@@ -32,11 +58,11 @@ resource "aws_ecs_service" "asterisk_service" {
   }
   
   # SIP UDP
-  load_balancer {
-    target_group_arn = aws_lb_target_group.sip_udp_tg.arn
-    container_name   = var.asterisk_container_name
-    container_port   = 5060
-  }
+  # load_balancer {
+  #   target_group_arn = aws_lb_target_group.sip_udp_tg.arn
+  #   container_name   = var.asterisk_container_name
+  #   container_port   = 5060
+  # }
   
   # SIP TCP
   load_balancer {
@@ -46,11 +72,11 @@ resource "aws_ecs_service" "asterisk_service" {
   }
   
   # RTP UDP
-  load_balancer {
-    target_group_arn = aws_lb_target_group.rtp_udp_tg.arn
-    container_name   = var.asterisk_container_name
-    container_port   = 10000
-  }
+  # load_balancer {
+  #   target_group_arn = aws_lb_target_group.rtp_udp_tg.arn
+  #   container_name   = var.asterisk_container_name
+  #   container_port   = 10000
+  # }
 }
 
 variable "apply_asterisk_lb" {
@@ -394,28 +420,32 @@ resource "aws_security_group" "asterisk_sg" {
     from_port   = 5060
     to_port     = 5060
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
+    description = "SIP UDP from Twilio & Bianca Client"
   }
 
   ingress {
     from_port   = 5061
     to_port     = 5061
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
+    description = "SIP UDP from Twilio & Bianca Client"
   }
 
   ingress {
     from_port   = 10000
     to_port     = 10100
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
+    description = "SIP UDP from Twilio & Bianca Client"
   }
 
   ingress {
     from_port   = 8088
     to_port     = 8088
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Consider restricting this to your app subnet only
+    security_groups = [aws_security_group.bianca_app_sg.id] # Allows from your app's SG
+    description     = "ARI access from Bianca App Backend"
   }
 
   egress {
@@ -1376,8 +1406,8 @@ resource "aws_security_group" "sip_nlb_sg" {
     from_port   = 5060
     to_port     = 5060
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "SIP UDP traffic"
+    cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
+    description = "SIP UDP from Twilio & Bianca Client to NLB"
   }
 
   # SIP TCP
@@ -1385,8 +1415,8 @@ resource "aws_security_group" "sip_nlb_sg" {
     from_port   = 5061
     to_port     = 5061
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "SIP TCP traffic"
+    cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
+    description = "SIP TCP from Twilio & Bianca Client to NLB"
   }
 
   # RTP UDP range
@@ -1394,8 +1424,8 @@ resource "aws_security_group" "sip_nlb_sg" {
     from_port   = 10000
     to_port     = 10100
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "RTP UDP range"
+    cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
+    description = "RTP UDP from Twilio & Bianca Client to NLB"
   }
 
   egress {
@@ -1445,15 +1475,6 @@ resource "aws_lb_target_group" "sip_udp_tg" {
   vpc_id      = var.vpc_id
   target_type = "ip"
 
-  health_check {
-    enabled             = true
-    protocol            = "TCP" # NLB can't do UDP health checks, so use TCP
-    port                = 5060
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    interval            = 30
-  }
-
   tags = {
     Name = "sip-udp-tg"
   }
@@ -1492,15 +1513,6 @@ resource "aws_lb_target_group" "rtp_udp_tg" {
   protocol    = "UDP"
   vpc_id      = var.vpc_id
   target_type = "ip"
-
-  health_check {
-    enabled             = true
-    protocol            = "TCP" # NLB can't do UDP health checks, so use TCP
-    port                = 5060  # Use SIP TCP port for health checks
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    interval            = 30
-  }
 
   tags = {
     Name = "rtp-udp-tg"

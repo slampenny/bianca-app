@@ -22,12 +22,34 @@ async function startServer() {
     const app = require('./app');
 
     // Connect to MongoDB
-    try {
-      await mongoose.connect(config.mongoose.url, config.mongoose.options);
-      logger.info('Connected to MongoDB');
-    } catch (mongoError) {
-      logger.error('MongoDB connection failed. Continuing without database:', mongoError.message);
-      logger.warn('Application functionality will be limited without database access');
+    // In index.js, modify the MongoDB connection block
+    let mongoConnected = false;
+    const maxRetries = 5;
+    let retries = 0;
+
+    while (!mongoConnected && retries < maxRetries) {
+      try {
+        logger.info(`Attempting to connect to MongoDB (attempt <span class="math-inline">\{retries \+ 1\}/</span>{maxRetries})... URL: ${config.mongoose.url}`);
+        await mongoose.connect(config.mongoose.url, {
+          ...config.mongoose.options,
+          // Ensure a reasonable connectTimeoutMS if not already in options
+          connectTimeoutMS: config.mongoose.options.connectTimeoutMS || 30000,
+        });
+        logger.info('Connected to MongoDB');
+        mongoConnected = true;
+      } catch (mongoError) {
+        retries++;
+        logger.error(`MongoDB connection attempt ${retries} failed: ${mongoError.message}`);
+        if (retries >= maxRetries) {
+          logger.error('Max MongoDB connection retries reached. Continuing without database.');
+          logger.warn('Application functionality will be limited without database access');
+          // Optionally log the full error for the last attempt for more details
+          // logger.error('Last MongoDB connection error object:', mongoError);
+        } else {
+          logger.info(`Waiting ${5 * retries} seconds before next MongoDB connection attempt...`);
+          await new Promise(resolve => setTimeout(resolve, 5000 * retries)); // Exponential backoff
+        }
+      }
     }
 
     // Create HTTP server from Express app

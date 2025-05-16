@@ -66,6 +66,8 @@ const baselineConfig = {
       // useCreateIndex: true, // Deprecated
       // useNewUrlParser: true, // Default in new Mongoose versions
       // useUnifiedTopology: true // Default in new Mongoose versions
+      connectTimeoutMS: 30000, // 30 seconds (adjust as needed)
+      socketTimeoutMS: 45000,  // Optional: for operations after connection
     }
   },
   billing: { ratePerMinute: 0.1 }, // Example billing rate

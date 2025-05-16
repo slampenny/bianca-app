@@ -19,6 +19,7 @@ exten => bianca,1,NoOp(Incoming call to bianca exten)
   same => n,Set(URIOPTS=callSid=${CALLSID_VALUE}&patientId=${PATIENTID_VALUE})
   same => n,NoOp(Final Constructed URIOPTS = ${URIOPTS})
   ; --- Send to Stasis ---
+  same => n,Verbose(1,💥 Incoming Twilio Call: callSid=${CALLSID_VALUE}, patientId=${PATIENTID_VALUE})
   same => n,Stasis(myphonefriend) ; ARI client will read channel variable URIOPTS
   same => n,Hangup()
 
