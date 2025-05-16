@@ -36,6 +36,35 @@ variable "bianca_client_static_ips" {
 ##############################
 # Separate Asterisk Service for SIP
 ##############################
+resource "aws_service_discovery_private_dns_namespace" "internal" {
+  name        = "myphonefriend.internal" # Example namespace
+  description = "Private DNS namespace for myphonefriend services"
+  vpc         = var.vpc_id
+}
+
+resource "aws_service_discovery_service" "asterisk_sd_service" {
+  name = "asterisk" # This is the name that will be used in the DNS record (e.g., asterisk.myphonefriend.internal)
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.internal.id
+    # For Fargate tasks using private IPs, A records are common
+    routing_policy = "MULTIVALUE" # Allows multiple A records if you have multiple tasks
+    dns_records {
+      ttl  = 10 # Short TTL for dynamic IPs
+      type = "A" # Creates A records (IP addresses)
+    }
+  }
+
+  # Optional: You can add a health check configuration for the service discovery service itself,
+  # though ECS service health checks will also manage task health.
+  # health_check_custom_config {
+  #   failure_threshold = 1
+  # }
+
+  tags = {
+    Name = "asterisk-service-discovery"
+  }
+}
 
 # Create a separate ECS service just for the Asterisk SIP functionality
 resource "aws_ecs_service" "asterisk_service" {
@@ -55,6 +84,13 @@ resource "aws_ecs_service" "asterisk_service" {
     subnets         = var.subnet_ids
     security_groups = [aws_security_group.bianca_app_sg.id, aws_security_group.asterisk_sg.id]
     assign_public_ip = true
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.asterisk_sd_service.arn
+    # You can also specify port, container_name, container_port if needed
+    # This will create DNS A records like 'asterisk.myphonefriend.internal'
+    # that resolve to the private IPs of your Asterisk tasks.
   }
   
   # SIP UDP
@@ -409,7 +445,12 @@ variable "asterisk_container_name" {
 
 # Using the custom image built in CodeBuild instead of andrius/asterisk:latest
 variable "asterisk_container_port" {
-  default = 5060
+  default = 5061
+}
+
+data "aws_subnet" "nlb_subnets" {
+  for_each = toset(var.subnet_ids) # Iterate over your list of subnet IDs
+  id       = each.value            # Lookup each subnet by its ID
 }
 
 resource "aws_security_group" "asterisk_sg" {
@@ -430,6 +471,16 @@ resource "aws_security_group" "asterisk_sg" {
     protocol    = "tcp"
     cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
     description = "SIP UDP from Twilio & Bianca Client"
+  }
+
+  ingress {
+    from_port   = 5061 # The port your NLB TCP health check targets
+    to_port     = 5061
+    protocol    = "tcp"
+    # Allow traffic from the subnets where your NLB is deployed.
+    # The NLB health checks will originate from NLB nodes within these subnets.
+    cidr_blocks = [for s in data.aws_subnet.nlb_subnets : s.cidr_block]
+    description = "Allow NLB TCP Health Check for Asterisk (TCP/5061)"
   }
 
   ingress {
@@ -1474,6 +1525,7 @@ resource "aws_lb_target_group" "sip_udp_tg" {
   protocol    = "UDP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+  preserve_client_ip = true
 
   tags = {
     Name = "sip-udp-tg"
@@ -1487,6 +1539,7 @@ resource "aws_lb_target_group" "sip_tcp_tg" {
   protocol    = "TCP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+  preserve_client_ip = true
 
   health_check {
     protocol            = "TCP"
@@ -1513,6 +1566,7 @@ resource "aws_lb_target_group" "rtp_udp_tg" {
   protocol    = "UDP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+  preserve_client_ip = true
 
   tags = {
     Name = "rtp-udp-tg"

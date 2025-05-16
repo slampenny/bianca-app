@@ -184,6 +184,8 @@ baselineConfig.loadSecrets = async () => {
 
     // Update baselineConfig with specific mappings, preferring secrets over initial envVars
     // JWT
+    if (secrets.ASTERISK_ENABLED) baselineConfig.asterisk.enabled = secrets.ASTERISK_ENABLED;
+    if (secrets.ASTERISK_URL) baselineConfig.asterisk.url = secrets.ASTERISK_URL;
     if (secrets.JWT_SECRET) baselineConfig.jwt.secret = secrets.JWT_SECRET;
     // Email
     if (secrets.SMTP_USERNAME) baselineConfig.email.smtp.auth.user = secrets.SMTP_USERNAME;
