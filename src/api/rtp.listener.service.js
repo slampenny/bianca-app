@@ -193,7 +193,7 @@ function removeSsrcMapping(ssrc) {
         ssrcToCallIdMap.delete(ssrc);
         logger.info(`[RTP Listener] Removed SSRC mapping for ${ssrc} (was callId: ${callId})`);
     } else if (ssrc) {
-        // logger.debug(`[RTP Listener] Attempted to remove mapping for SSRC ${ssrc}, but it was not found.`);
+        logger.debug(`[RTP Listener] Attempted to remove mapping for SSRC ${ssrc}, but it was not found.`);
     }
 }
 

@@ -95,8 +95,9 @@ const baselineConfig = {
   },
   asterisk: {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
-    url: envVars.ASTERISK_URL || 'http://asterisk:8088', // Example URL, replace with actual
-    rtpListenerUrl: envVars.RTP_LISTENER_URL || 'http://bianca-app', // Example RTP URL, replace with actual
+    host: envVars.ASTERISK_HOST || 'asterisk', // Example URL, replace with actual
+    url: `http://${envVars.ASTERISK_HOST}:8088`, // Example URL, replace with actual
+    rtpListenerHost: envVars.RTP_LISTENER_HOST || 'bianca-app', // Example RTP URL, replace with actual
     rtpListenerPort: envVars.RTP_LISTENER_PORT || 5060, // Example port, replace with actual
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
     sipUserName: envVars.SIP_USER_NAME || 'bianca', // Example SIP username, replace with actual

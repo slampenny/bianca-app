@@ -465,6 +465,15 @@ resource "aws_security_group" "asterisk_sg" {
     description = "SIP UDP from Twilio & Bianca Client"
   }
 
+  # Assuming the health check for the RTP range targets the start port (10000)
+  ingress {
+    from_port   = 5060 # Port for rtp_udp_tg health check
+    to_port     = 5060
+    protocol    = "udp"
+    cidr_blocks = [for s in data.aws_subnet.nlb_subnets : s.cidr_block]
+    description = "Allow NLB UDP Health Check for Asterisk RTP"
+  }
+
   ingress {
     from_port   = 5061
     to_port     = 5061
@@ -489,6 +498,15 @@ resource "aws_security_group" "asterisk_sg" {
     protocol    = "udp"
     cidr_blocks = concat(var.twilio_ip_ranges, var.bianca_client_static_ips)
     description = "SIP UDP from Twilio & Bianca Client"
+  }
+
+  # Assuming the health check for the RTP range targets the start port (10000)
+  ingress {
+    from_port   = 10000 # Port for rtp_udp_tg health check
+    to_port     = 10000
+    protocol    = "udp"
+    cidr_blocks = [for s in data.aws_subnet.nlb_subnets : s.cidr_block]
+    description = "Allow NLB UDP Health Check for Asterisk RTP"
   }
 
   ingress {
@@ -1547,6 +1565,14 @@ resource "aws_lb_target_group" "sip_udp_tg" {
   tags = {
     Name = "sip-udp-tg"
   }
+
+  health_check {
+    protocol            = "TCP"
+    port                = 5061  # Use your working TCP port for health checks
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+  }
 }
 
 # Target group for SIP TCP - use lifecycle ignore_changes to avoid conflicts
@@ -1587,6 +1613,14 @@ resource "aws_lb_target_group" "rtp_udp_tg" {
 
   tags = {
     Name = "rtp-udp-tg"
+  }
+
+  health_check {
+    protocol            = "TCP"
+    port                = 5061  # Use your working TCP port for health checks
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
   }
 }
 
