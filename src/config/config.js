@@ -4,7 +4,7 @@
 const dotenv = require('dotenv');
 const path = require('path');
 const Joi = require('joi');
-const AWS = require('aws-sdk');
+const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 const logger = require('./logger'); // Assuming logger is available for loadSecrets
 
 // Load .env file (if present)
@@ -180,8 +180,14 @@ baselineConfig.loadSecrets = async () => {
 
   try {
     logger.info(`Attempting to load secrets from AWS Secrets Manager (Region: ${region}, SecretId: ${secretId})`);
-    const client = new AWS.SecretsManager({ region: region });
-    const data = await client.getSecretValue({ SecretId: secretId }).promise();
+    // Create an SDK v3 SecretsManagerClient instance
+    const client = new SecretsManagerClient({ region: region });
+    
+    // Create the command
+    const command = new GetSecretValueCommand({ SecretId: secretId });
+    
+    // Send the command
+    const data = await client.send(command);
 
     if (!data.SecretString) {
         logger.warn(`SecretString is empty for SecretId: ${secretId}`);

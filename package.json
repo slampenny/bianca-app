@@ -58,6 +58,8 @@
     "prettier"
   ],
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.812.0",
+    "@aws-sdk/client-ses": "^3.812.0",
     "@google-cloud/storage": "^7.7.0",
     "@google-cloud/text-to-speech": "^5.0.2",
     "@langchain/openai": "^0.0.13",
@@ -68,7 +70,6 @@
     "agenda": "^5.0.0",
     "alawmulaw": "^6.0.0",
     "ari-client": "^2.2.0",
-    "aws-sdk": "^2.1599.0",
     "axios": "^0.21.1",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
