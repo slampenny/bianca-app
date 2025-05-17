@@ -42,6 +42,7 @@ RUN ./configure --with-ssl --with-srtp
 RUN make -j$(nproc)
 RUN make install
 RUN make config
+RUN make samples
 
 # Create asterisk user and fix permissions
 RUN groupadd -g 999 asterisk || true && \

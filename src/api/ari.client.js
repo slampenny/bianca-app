@@ -72,100 +72,111 @@ class AsteriskAriClient {
 
         this.client.on('StasisStart', async (event, channel) => {
             const channelId = channel.id;
+            const currentChannelName = channel.name || 'Unknown'; // Use channel.name
             const appArgs = event.args || [];
-            const channelName = channel.name || 'Unknown';
-            logger.info(`[ARI] StasisStart event for ${channelId} (${channelName}), Args: ${JSON.stringify(appArgs)}`);
+            logger.info(`[ARI] StasisStart event for ${channelId} (${currentChannelName}), Args: ${JSON.stringify(appArgs)}`);
 
-            let isSnoopChannelForExtMedia = false;
-            let parentCallId = null;
-            for (const [mainCallId, callData] of this.tracker.calls.entries()) {
-                if (callData.snoopChannelId === channelId && callData.snoopMethod === 'externalMedia') {
-                    isSnoopChannelForExtMedia = true;
-                    parentCallId = mainCallId;
-                    break;
-                }
-            }
-
-            if (isSnoopChannelForExtMedia) {
-                logger.info(`[ARI] StasisStart for ExternalMedia snoop channel: ${channelId} (Parent: ${parentCallId})`);
-                try {
-                     await channel.answer();
-                     logger.info(`[ARI] Answered snoop channel ${channelId}. Starting ExternalMedia.`);
-                     const rtpDest = `${this.RTP_LISTENER_HOST}:${this.RTP_LISTENER_PORT}`;
-
-                     // *** FIX: Re-add the 'app' parameter, using our main app name ***
-                     await channel.externalMedia({
-                         app: 'myphonefriend', // Required by ari-client, send internal RTP channel here
-                         external_host: rtpDest,
-                         format: this.RTP_SEND_FORMAT, // 'slin'
-                         direction: 'read',
-                     });
-                     logger.info(`[ARI] ExternalMedia started for snoop ${channelId} -> ${rtpDest}`);
-                     // Update state to indicate waiting for SSRC (RTP listener will update further)
-                     this.tracker.updateCall(parentCallId, { state: 'external_media_active_awaiting_ssrc' });
-
-                } catch (err) {
-                     logger.error(`[ARI] Failed to start ExternalMedia on snoop ${channelId}: ${err.message}`, err);
-                     if (parentCallId) await this.cleanupChannel(parentCallId, `ExternalMedia setup failed for snoop ${channelId}`);
-                     else await channel.hangup().catch(()=>{});
-                }
-            } else if (channelName.startsWith('Local/')) {
-                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
-                 await channel.hangup().catch(()=>{});
-            } else if (channelName.startsWith('UnicastRTP/')) {
-                 logger.info(`[ARI] StasisStart for internal UnicastRTP channel ${channelId} used by ExternalMedia. Ignoring.`);
-                 // We don't need to do anything with this channel in Stasis.
-            }
-            else { // Main incoming channel
+            // Differentiate channel types
+            if (currentChannelName.startsWith('PJSIP/twilio-trunk-')) { // Main incoming call from Twilio via your trunk
                 logger.info(`[ARI] Handling StasisStart for Main incoming channel: ${channelId}`);
-                let twilioCallSid = null; // Declared with let
-                let patientId = null;     // Declared with let
+                let twilioCallSid = null;
+                let patientId = null;
 
-                try { // Parse URIOPTS
+                try {
                     const channelVars = await channel.getChannelVar({ variable: 'URIOPTS' });
-                    if (channelVars?.value) {
+                    if (channelVars && typeof channelVars.value === 'string' && channelVars.value.length > 0) {
+                        logger.info(`[ARI] Raw URIOPTS for ${channelId}: ${channelVars.value}`);
                         const uriOpts = channelVars.value.split('&').reduce((opts, pair) => {
-                             const [key, value] = pair.split('=');
-                             if (key && value) opts[decodeURIComponent(key)] = decodeURIComponent(value);
-                             return opts;
-                         }, {});
-                        if (uriOpts.patientId) patientId = uriOpts.patientId; // Assign to declared variable
-                        if (uriOpts.callSid) twilioCallSid = uriOpts.callSid; // Assign to declared variable
+                            const [key, value] = pair.split('=');
+                            if (key && value) opts[decodeURIComponent(key)] = decodeURIComponent(value);
+                            return opts;
+                        }, {});
+                        if (uriOpts.patientId) patientId = uriOpts.patientId;
+                        if (uriOpts.callSid) twilioCallSid = uriOpts.callSid;
                         logger.info(`[ARI] From URIOPTS for ${channelId}: patientId=${patientId}, twilioCallSid=${twilioCallSid}`);
-                    } else { logger.warn(`[ARI] URIOPTS variable not found or empty for ${channelId}.`); }
-                } catch (err) { logger.warn(`[ARI] Error parsing URIOPTS for ${channelId}: ${err.message}`); }
+                    } else {
+                        logger.warn(`[ARI] URIOPTS variable not found, empty, or not a string for ${channelId}. Raw value: ${JSON.stringify(channelVars)}`);
+                    }
+                } catch (err) {
+                    logger.warn(`[ARI] Error parsing URIOPTS for ${channelId}: ${err.message}. This might indicate the variable wasn't set in dialplan.`);
+                }
 
-                const asteriskChannelId = channelId;
+                // It's CRITICAL that twilioCallSid and patientId are correctly populated here from URIOPTS
+                // If they are null, the DB save and OpenAI init will have issues.
+                if (!twilioCallSid || !patientId) {
+                    logger.error(`[ARI] Critical: twilioCallSid or patientId is missing for main channel ${channelId}. Cannot proceed with media pipeline. TwilioSID: ${twilioCallSid}, PatientID: ${patientId}`);
+                    await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up main channel ${channelId} after missing params: ${e.message}`));
+                    return;
+                }
 
-                // Debugging logs added previously (can be removed later)
-                logger.debug(`[ARI DEBUG] Before addCall for ${asteriskChannelId}: twilioCallSid type = ${typeof twilioCallSid}, value = ${twilioCallSid}`);
-                logger.debug(`[ARI DEBUG] Before addCall for ${asteriskChannelId}: patientId type = ${typeof patientId}, value = ${patientId}`);
-
-                // *** FIX: Ensure correct variable names are used here ***
-                this.tracker.addCall(asteriskChannelId, {
+                this.tracker.addCall(channelId, {
                     channel: channel,
-                    twilioSid: twilioCallSid, // Use the variable holding the SID
-                    patientId: patientId,     // Use the variable holding the patientId
+                    twilioSid: twilioCallSid,
+                    patientId: patientId,
                     state: 'stasis_start'
                 });
 
                 try {
                     await channel.answer();
-                    this.tracker.updateCall(asteriskChannelId, { state: 'answered' });
-                    logger.info(`[ARI] Answered main channel: ${asteriskChannelId}`);
-                    try { // Main beep test
-                        const playback = await channel.play({ media: 'sound:beep' });
-                        playback.once('PlaybackFinished', (_, inst) => logger.info(`[ARI DEBUG] Main Beep ${inst.id} finished.`));
-                        playback.once('PlaybackFailed', (_, inst) => logger.error(`[ARI DEBUG] Main Beep ${inst.id} FAILED! ${inst.playback?.reason || 'Unknown'}`));
-                    } catch (playErr) { logger.error(`[ARI DEBUG] Error playing main beep: ${playErr.message}`); }
+                    this.tracker.updateCall(channelId, { state: 'answered' });
+                    logger.info(`[ARI] Answered main channel: ${channelId}`);
+
+                    // Optional: Play a beep to confirm answer before media setup
+                    // try {
+                    //     const playback = await channel.play({ media: 'sound:beep' });
+                    //     playback.once('PlaybackFinished', (_, inst) => logger.info(`[ARI DEBUG] Main Beep ${inst.id} finished.`));
+                    //     playback.once('PlaybackFailed', (_, inst) => logger.error(`[ARI DEBUG] Main Beep ${inst.id} FAILED! ${inst.playback?.reason || 'Unknown'}`));
+                    // } catch (playErr) { logger.error(`[ARI DEBUG] Error playing main beep: ${playErr.message}`); }
 
                     await this.setupMediaPipeline(channel, twilioCallSid, patientId);
                 } catch (err) {
-                    logger.error(`[ARI] Error in main channel setup for ${asteriskChannelId}: ${err.message}`, err);
-                    await this.cleanupChannel(asteriskChannelId, `Main channel ${asteriskChannelId} setup error`);
+                    logger.error(`[ARI] Error in main channel setup for ${channelId}: ${err.message}`, err);
+                    await this.cleanupChannel(channelId, `Main channel ${channelId} setup error`);
                 }
+
+            } else if (currentChannelName.startsWith('Snoop/')) { // Snoop channel for ExternalMedia
+                let parentCallId = null;
+                for (const [mainCallId, callData] of this.tracker.calls.entries()) {
+                    if (callData.snoopChannelId === channelId && callData.snoopMethod === 'externalMedia') {
+                        parentCallId = mainCallId;
+                        break;
+                    }
+                }
+                if (parentCallId) {
+                    logger.info(`[ARI] StasisStart for ExternalMedia snoop channel: ${channelId} (Parent: ${parentCallId})`);
+                    try {
+                        await channel.answer();
+                        logger.info(`[ARI] Answered snoop channel ${channelId}. Starting ExternalMedia.`);
+                        const rtpDest = `${this.RTP_LISTENER_HOST}:${this.RTP_LISTENER_PORT}`;
+                        await channel.externalMedia({
+                            app: 'myphonefriend', // Stasis app for the internal UnicastRTP channel
+                            external_host: rtpDest,
+                            format: this.RTP_SEND_FORMAT,
+                            direction: 'read',
+                        });
+                        logger.info(`[ARI] ExternalMedia started for snoop ${channelId} -> ${rtpDest}`);
+                        this.tracker.updateCall(parentCallId, { state: 'external_media_active_awaiting_ssrc' });
+                    } catch (err) {
+                        logger.error(`[ARI] Failed to start ExternalMedia on snoop ${channelId}: ${err.message}`, err);
+                        if (parentCallId) await this.cleanupChannel(parentCallId, `ExternalMedia setup failed for snoop ${channelId}`);
+                        else await channel.hangup().catch(()=>{});
+                    }
+                } else {
+                    logger.warn(`[ARI] StasisStart for unknown Snoop channel ${channelId}. Hanging up.`);
+                    await channel.hangup().catch(()=>{});
+                }
+
+            } else if (currentChannelName.startsWith('UnicastRTP/')) {
+                logger.info(`[ARI] StasisStart for internal UnicastRTP channel ${channelId} used by ExternalMedia. Ignoring.`);
+                // This channel is managed by Asterisk for externalMedia, no action needed here.
+            } else if (currentChannelName.startsWith('Local/')) {
+                logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
+                await channel.hangup().catch(()=>{});
+            } else {
+                logger.warn(`[ARI] StasisStart for unhandled channel type: ${channelId} (${currentChannelName}). Hanging up.`);
+                await channel.hangup().catch(()=>{});
             }
-        }); // End StasisStart
+        });
 
         // --- Other Event Handlers ---
         this.client.on('StasisEnd', async (event, channel) => {
@@ -187,7 +198,7 @@ class AsteriskAriClient {
                         break;
                     }
                     // Check if it's the internal UnicastRTP channel (less critical)
-                    if (channelName.startsWith('UnicastRTP/') && cData.asteriskChannelId === parentCallId) { // Heuristic guess for parent
+                    if (channel.name.startsWith('UnicastRTP/') && cData.asteriskChannelId === parentCallId) { // Heuristic guess for parent
                          logger.info(`[ARI] StasisEnd for internal UnicastRTP channel ${channelId}. Ignoring.`);
                          break;
                     }

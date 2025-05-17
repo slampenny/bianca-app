@@ -1,0 +1,15 @@
+[general]
+enabled=yes
+webenabled=yes
+port=5038
+bindaddr=127.0.0.1
+
+[asterisk]
+secret=${ARI_PASSWORD}
+read=all
+write=all
+
+[bianca]
+secret=${BIANCA_PASSWORD}
+read=all
+write=all
