@@ -137,7 +137,7 @@ function startRtpListenerService() {
             const ulawBase64 = await AudioUtils.convertPcmToUlaw(pcm16Slin8Buffer);
 
             if (ulawBase64 && ulawBase64.length > 0) {
-                 // logger.debug(`[RTP Listener] Forwarding ${ulawBase64.length} base64 uLaw bytes for call ${callId} (SSRC: ${ssrc})`);
+                 logger.debug(`[RTP Listener] Forwarding ${ulawBase64.length} base64 uLaw bytes for call ${callId} (SSRC: ${ssrc})`);
                  // Send to OpenAI service using the mapped callId (Twilio SID)
                  openAIService.sendAudioChunk(callId, ulawBase64);
             } else {

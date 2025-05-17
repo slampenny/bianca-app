@@ -23,7 +23,7 @@ class AsteriskAriClient {
         global.ariClient = this;
 
         this.RTP_LISTENER_HOST = config.asterisk.rtpListenerHost || 'bianca-app.myphonefriend.internal';
-        this.RTP_LISTENER_PORT = config.asterisk.rtpListenerPort || 5060;
+        this.RTP_LISTENER_PORT = config.asterisk.rtpListenerPort || 16384;
         this.RTP_SEND_FORMAT = 'slin';
     }
 

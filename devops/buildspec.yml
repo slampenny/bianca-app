@@ -2,11 +2,11 @@ version: 0.2
 env:
   variables:
     AWS_DEFAULT_REGION: us-east-2
-    AWS_ACCOUNT_ID: 730335291008
-    REPOSITORY_NAME_APP: bianca-app-backend
-    REPOSITORY_NAME_ASTERISK: bianca-app-asterisk
-    APP_CONTAINER_NAME: bianca-app-backend
-    ASTERISK_CONTAINER_NAME: asterisk
+    AWS_ACCOUNT_ID: 730335291008 # Should match var.aws_account_id
+    REPOSITORY_NAME_APP: bianca-app-backend # Should match var.repository_name
+    REPOSITORY_NAME_ASTERISK: bianca-app-asterisk # Should match var.asterisk_ecr_repo_name
+    APP_CONTAINER_NAME: bianca-app-backend # Should match var.container_name
+    ASTERISK_CONTAINER_NAME: asterisk # Should match var.asterisk_container_name
 phases:
   pre_build:
     commands:
@@ -18,22 +18,49 @@ phases:
   build:
     commands:
       - echo Build started on $(date)
-      - docker build -t $REPOSITORY_URI_APP:$IMAGE_TAG -f Dockerfile .
+      # Build the main application image
+      - echo Building main application image...
+      - docker build -t $REPOSITORY_URI_APP:$IMAGE_TAG -f Dockerfile . # Assuming app Dockerfile is at the root
       - docker tag $REPOSITORY_URI_APP:$IMAGE_TAG $REPOSITORY_URI_APP:latest
+      
+      # Build the Asterisk image
+      - echo Building Asterisk image...
       - docker build -t $REPOSITORY_URI_ASTERISK:$IMAGE_TAG -f ./devops/asterisk/Dockerfile ./devops/asterisk
       - docker tag $REPOSITORY_URI_ASTERISK:$IMAGE_TAG $REPOSITORY_URI_ASTERISK:latest
   post_build:
     commands:
       - echo Build completed on $(date)
+      # Push main application image
+      - echo Pushing main application image...
       - docker push $REPOSITORY_URI_APP:$IMAGE_TAG
       - docker push $REPOSITORY_URI_APP:latest
+      
+      # Push Asterisk image
+      - echo Pushing Asterisk image...
       - docker push $REPOSITORY_URI_ASTERISK:$IMAGE_TAG
       - docker push $REPOSITORY_URI_ASTERISK:latest
-      - echo Creating imagedefinitions.json
-      - echo "[{\"name\":\"$APP_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_APP:$IMAGE_TAG\"}]" > imagedef_app.json
-      - echo "[{\"name\":\"$ASTERISK_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_ASTERISK:$IMAGE_TAG\"}]" > imagedef_asterisk.json
+      
+      # Create image definition files
+      - echo Creating imagedefinitions_app.json
+      - echo "[{\"name\":\"$APP_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_APP:$IMAGE_TAG\"}]" > imagedefinitions_app.json
+      - echo Creating imagedefinitions_asterisk.json
+      - echo "[{\"name\":\"$ASTERISK_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_ASTERISK:$IMAGE_TAG\"}]" > imagedefinitions_asterisk.json
 
 artifacts:
+  # Primary artifact (can be empty or contain other build outputs if needed)
   files:
-    - imagedef_app.json
-    - imagedef_asterisk.json
+    - imagedefinitions_app.json # This will go into BuildOutputApp if no secondary-artifacts defined for it
+    # Or, make primary artifact empty if all are secondary:
+    # - /dev/null 
+  # Define secondary artifacts to match CodePipeline's expected output artifact names
+  secondary-artifacts:
+    BuildOutputApp: # This name MUST match an outputArtifact name in CodePipeline Build stage
+      files:
+        - imagedefinitions_app.json
+      # Optional: specify base-directory if files are not in root
+      # base-directory: . 
+    BuildOutputAsterisk: # This name MUST match an outputArtifact name in CodePipeline Build stage
+      files:
+        - imagedefinitions_asterisk.json
+      # Optional: specify base-directory
+      # base-directory: .
