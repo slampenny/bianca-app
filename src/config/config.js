@@ -23,19 +23,25 @@ const envVarsSchema = Joi.object({
   EXTERNAL_ADDRESS: Joi.string(),
   EXTERNAL_PORT: Joi.number(),
 
-  SMTP_USERNAME: Joi.string(),
-  SMTP_PASSWORD: Joi.string(),
-  SMTP_HOST: Joi.string(), // Added for consistency
-  SMTP_PORT: Joi.number(), // Added for consistency
-  SMTP_SECURE: Joi.boolean(), // Added for consistency
-  SMTP_REQUIRETLS: Joi.boolean(), // Added for consistency
-  SMTP_FROM: Joi.string(), // Added for consistency
+  // --- Email Variables ---
+  // Primary 'from' address for all emails
+  EMAIL_FROM: Joi.string().email().description('Default "from" email address for all outgoing emails'),
+  // SES specific
+  AWS_SES_REGION: Joi.string().description('AWS Region for SES (e.g., us-east-1)'),
+  // Generic SMTP (can be used for Ethereal if manually configured, or other SMTP services)
+  SMTP_HOST: Joi.string().description('SMTP host'),
+  SMTP_PORT: Joi.number().description('SMTP port'),
+  SMTP_USERNAME: Joi.string().description('SMTP username'),
+  SMTP_PASSWORD: Joi.string().description('SMTP password'),
+  SMTP_SECURE: Joi.boolean().description('Whether to use SMTPS (TLS direct)'),
+  SMTP_REQUIRETLS: Joi.boolean().description('Whether to require STARTTLS'),
+  // Note: SMTP_FROM was present in user's original, but EMAIL_FROM is now the primary 'from' address.
+
   TWILIO_PHONENUMBER: Joi.string(),
   TWILIO_ACCOUNTSID: Joi.string().required(),
   TWILIO_AUTHTOKEN: Joi.string().required(),
   TWILIO_VOICEURL: Joi.string(), // Keep if used elsewhere
   PUBLIC_TUNNEL_URL: Joi.string(), // Used for twilio.apiUrl in dev/testing
-  WEBSOCKET_URL: Joi.string(), // WebSocket URL for Twilio Media Streams
   API_BASE_URL: Joi.string(), // Alternative base URL for APIs/webhooks
   AWS_SECRET_ID: Joi.string(), // Added for consistency
   AWS_REGION: Joi.string(), // Added for consistency
@@ -81,17 +87,20 @@ const baselineConfig = {
     inviteExpirationMinutes: 10080 // 7 days
   },
   email: {
-    smtp: {
-      host: envVars.SMTP_HOST || 'smtp.ethereal.email', // Use env var or default
-      port: envVars.SMTP_PORT || 587, // Use env var or default
-      secure: envVars.SMTP_SECURE === true || false, // Default to false unless explicitly true via env
-      requireTLS: envVars.SMTP_REQUIRETLS === true || true, // Default to true unless explicitly false via env
+    ses: { // Configuration for AWS SES (used in production/test by email.service.js)
+      region: envVars.AWS_SES_REGION || envVars.AWS_REGION || 'us-east-2', // Default to AWS_REGION if AWS_SES_REGION not set
+    },
+    smtp: { // Fallback or alternative SMTP settings (Ethereal in dev is handled by createTestAccount)
+      host: envVars.SMTP_HOST, // Example: 'smtp.ethereal.email' if you want to pin it
+      port: envVars.SMTP_PORT,
+      secure: envVars.SMTP_SECURE === true, // Coerce to boolean, default false if undefined
+      requireTLS: envVars.SMTP_REQUIRETLS === true, // Coerce to boolean, default false if undefined
       auth: {
         user: envVars.SMTP_USERNAME,
-        pass: envVars.SMTP_PASSWORD
-      }
+        pass: envVars.SMTP_PASSWORD,
+      },
     },
-    from: envVars.SMTP_FROM || 'support@myphonefriend.com' // Use env var or default
+    from: envVars.EMAIL_FROM || 'support@myphonefriend.com', // Primary 'from' address
   },
   asterisk: {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
@@ -151,6 +160,11 @@ if (envVars.NODE_ENV === 'production') {
   baselineConfig.twilio.websocketUrl = 'wss://app.myphonefriend.com'; // Example - **VERIFY THIS URL**
 
   // Ensure baseUrl is also correct for production if used elsewhere
+  // Ensure Asterisk ARI URL points to the internal service discovery name in production
+  baselineConfig.asterisk.enabled = envVars.ASTERISK_ENABLED || true; // Default to true if not set
+  baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.myphonefriend.internal`;
+  baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
+  baselineConfig.asterisk.rtpListenerHost = envVars.RTP_LISTENER_HOST || `bianca-app.myphonefriend.internal`;
 }
 
 // Add method to load secrets from AWS Secrets Manager (if used)
@@ -185,11 +199,27 @@ baselineConfig.loadSecrets = async () => {
         }
     }
 
-    // Update baselineConfig with specific mappings, preferring secrets over initial envVars
-    // JWT
-    if (secrets.ASTERISK_ENABLED) baselineConfig.asterisk.enabled = secrets.ASTERISK_ENABLED;
-    if (secrets.ASTERISK_URL) baselineConfig.asterisk.url = secrets.ASTERISK_URL;
-    if (secrets.RTP_LISTENER_URL) baselineConfig.asterisk.url = secrets.RTP_LISTENER_URL;
+    // Email secrets
+    if (secrets.EMAIL_FROM) baselineConfig.email.from = secrets.EMAIL_FROM;
+    if (secrets.AWS_SES_REGION) baselineConfig.email.ses.region = secrets.AWS_SES_REGION;
+    // Load SMTP specific secrets if they exist and are used for other purposes
+    if (secrets.SMTP_HOST) baselineConfig.email.smtp.host = secrets.SMTP_HOST;
+    if (secrets.SMTP_PORT) baselineConfig.email.smtp.port = secrets.SMTP_PORT;
+    if (secrets.SMTP_USERNAME) baselineConfig.email.smtp.auth.user = secrets.SMTP_USERNAME;
+    if (secrets.SMTP_PASSWORD) baselineConfig.email.smtp.auth.pass = secrets.SMTP_PASSWORD;
+    if (typeof secrets.SMTP_SECURE !== 'undefined') baselineConfig.email.smtp.secure = secrets.SMTP_SECURE;
+    if (typeof secrets.SMTP_REQUIRETLS !== 'undefined') baselineConfig.email.smtp.requireTLS = secrets.SMTP_REQUIRETLS;
+
+
+    // Asterisk secrets
+    if (secrets.ASTERISK_ENABLED) baselineConfig.asterisk.enabled = (secrets.ASTERISK_ENABLED === 'true');
+    if (secrets.ASTERISK_ARI_URL) baselineConfig.asterisk.url = secrets.ASTERISK_ARI_URL; // Use a specific ARI URL from secrets
+    else if (secrets.ASTERISK_HOST) baselineConfig.asterisk.url = `http://${secrets.ASTERISK_HOST}:8088`;
+    if (secrets.RTP_LISTENER_HOST) baselineConfig.asterisk.rtpListenerHost = secrets.RTP_LISTENER_HOST;
+    // ... other Asterisk secrets like ARI username/password if stored in secrets
+    if (secrets.ASTERISK_USERNAME) baselineConfig.asterisk.username = secrets.ASTERISK_USERNAME;
+    if (secrets.ARI_PASSWORD) baselineConfig.asterisk.password = secrets.ARI_PASSWORD; // Assuming ARI_PASSWORD is for ARI user
+
     if (secrets.JWT_SECRET) baselineConfig.jwt.secret = secrets.JWT_SECRET;
     // Email
     if (secrets.SMTP_USERNAME) baselineConfig.email.smtp.auth.user = secrets.SMTP_USERNAME;
