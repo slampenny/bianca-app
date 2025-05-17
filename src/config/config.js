@@ -60,6 +60,8 @@ if (error) {
   throw new Error(`Config validation error: ${error.message}`);
 }
 
+const defaultAsteriskHost = envVars.ASTERISK_HOST || 'asterisk';
+
 // Build a baseline configuration object based on environment variables
 const baselineConfig = {
   env: envVars.NODE_ENV,
@@ -104,8 +106,8 @@ const baselineConfig = {
   },
   asterisk: {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
-    host: envVars.ASTERISK_HOST || 'asterisk', // Example URL, replace with actual
-    url: `http://${envVars.ASTERISK_HOST}:8088`, // Example URL, replace with actual
+    host: defaultAsteriskHost, // Example URL, replace with actual
+    url: `http://${defaultAsteriskHost}:8088`, // Example URL, replace with actual
     rtpListenerHost: envVars.RTP_LISTENER_HOST || 'bianca-app', // Example RTP URL, replace with actual
     rtpListenerPort: envVars.RTP_LISTENER_PORT || 5060, // Example port, replace with actual
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual

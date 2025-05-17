@@ -63,7 +63,7 @@ RUN chmod +x /entrypoint.sh && sed -i 's/\r$//' /entrypoint.sh && \
     chown asterisk:asterisk /entrypoint.sh /etc/asterisk/*.template
 
 # Set up healthcheck while still root
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD pgrep asterisk || exit 1
 
 # Drop privileges to asterisk user for main execution

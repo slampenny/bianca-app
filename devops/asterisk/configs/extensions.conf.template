@@ -1,29 +1,42 @@
 [from-twilio]
-exten => _.,1,NoOp(Catch-all extension in from-twilio)
- same => n,Verbose(1, Received call to: ${EXTEN})
- 
- ; Extract the entire SIP URI from the Request-Line instead of To header
- same => n,Set(REQ_LINE=${PJSIP_HEADER(read,Request-Line)})
- same => n,Verbose(1, Request-Line: ${REQ_LINE})
- 
- ; Try to extract callSid parameter using regex
- same => n,Set(CALLSID_MATCH=${REGEX("callSid=([^;& ]+)",${REQ_LINE})})
- same => n,Set(CALLSID_VALUE=${REGEX_REPLACE(${CALLSID_MATCH},"callSid=","")})
- 
- ; Try to extract patientId parameter using regex
- same => n,Set(PATIENTID_MATCH=${REGEX("patientId=([^;& ]+)",${REQ_LINE})})
- same => n,Set(PATIENTID_VALUE=${REGEX_REPLACE(${PATIENTID_MATCH},"patientId=","")})
- 
- same => n,Verbose(1, Extracted CallSid: ${CALLSID_VALUE})
- same => n,Verbose(1, Extracted PatientId: ${PATIENTID_VALUE})
- 
- ; Construct URI options
- same => n,Set(URIOPTS=callSid=${CALLSID_VALUE}&patientId=${PATIENTID_VALUE})
- same => n,Verbose(1, URIOPTS: ${URIOPTS})
- 
- ; Send to Stasis
- same => n,Stasis(myphonefriend)
- same => n,Hangup()
+exten => bianca,1,NoOp(Incoming call to bianca exten)
+  ; Read the To header (which contains the Request-URI with parameters)
+  same => n,Set(TO_HEADER_RAW=${PJSIP_HEADER(read,To)})
+  same => n,NoOp(Raw To Header: ${TO_HEADER_RAW})
+
+  ; Filter to remove angle brackets <>, allowing other necessary characters for SIP URIs and parameters.
+  ; Ensure your FILTER string includes all valid characters present in your SIP URI parameters.
+  same => n,Set(SIP_URI_AND_PARAMS=${FILTER(0-9a-zA-Z@._\-=+&:/\;,${TO_HEADER_RAW})})
+  same => n,NoOp(Filtered SIP URI and Params: ${SIP_URI_AND_PARAMS}) ; For debugging
+
+  ; The SIP URI is expected to be like:
+  ; sip:user@host:port;transport=tcp;callSid=VALUE_A;patientId=VALUE_B
+  ; After filtering, splitting by ';':
+  ; Field 1: sip:user@host:port
+  ; Field 2: transport=tcp
+  ; Field 3: callSid=VALUE_A
+  ; Field 4: patientId=VALUE_B
+
+  same => n,Set(CALLSID_PAIR=${CUT(SIP_URI_AND_PARAMS,\;,3)})  ; Get the 3rd field for callSid
+  same => n,Set(PATIENTID_PAIR=${CUT(SIP_URI_AND_PARAMS,\;,4)}) ; Get the 4th field for patientId
+  same => n,NoOp(Extracted Pair for CallSid: ${CALLSID_PAIR})
+  same => n,NoOp(Extracted Pair for PatientId: ${PATIENTID_PAIR})
+
+  ; Extract VALUE part using '=' delimiter
+  ; Add checks to ensure the PAIR variables are not empty before cutting
+  same => n,Set(CALLSID_VALUE=${IF($["${CALLSID_PAIR}" != ""]?${CUT(CALLSID_PAIR,=,2)}:)})
+  same => n,Set(PATIENTID_VALUE=${IF($["${PATIENTID_PAIR}" != ""]?${CUT(PATIENTID_PAIR,=,2)}:)})
+  same => n,NoOp(Extracted CallSid Value: ${CALLSID_VALUE})
+  same => n,NoOp(Extracted PatientId Value: ${PATIENTID_VALUE})
+
+  ; Construct URIOPTS using VALUES only
+  same => n,Set(URIOPTS=callSid=${CALLSID_VALUE}&patientId=${PATIENTID_VALUE})
+  same => n,NoOp(Final Constructed URIOPTS = ${URIOPTS})
+
+  ; Send to Stasis
+  same => n,Verbose(1,💥 Incoming Twilio Call: callSid=${CALLSID_VALUE}, patientId=${PATIENTID_VALUE})
+  same => n,Stasis(myphonefriend) ; ARI client will read channel variable URIOPTS
+  same => n,Hangup()
 
 [bianca-app]
 exten => _X.,1,NoOp(Outgoing call from Bianca: ${EXTEN})
