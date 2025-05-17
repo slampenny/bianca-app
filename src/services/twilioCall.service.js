@@ -131,7 +131,7 @@ class TwilioCallService {
         language: 'en-US'
       }, "Hello.");
       
-      const asteriskUrl = new URL(config.asterisk.url || 'http://sip.myphonefriend.com:8088');
+      const asteriskUrl = new URL('http://sip.myphonefriend.com:5061');
       const sipHost = asteriskUrl.hostname;
       const sipPort = config.asterisk.externalPort || 5061;
       const sipUser = config.asterisk.sipUserName; // Or make dynamic if needed
