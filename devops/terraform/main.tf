@@ -858,17 +858,16 @@ resource "aws_ecs_task_definition" "app_task" {
         { containerPort = var.app_rtp_listener_port, hostPort = var.app_rtp_listener_port, protocol = "udp" }
       ]
       environment = [
+        { name = "AWS_REGION", value = var.aws_region },
         { name = "MONGODB_URL", value = "mongodb://localhost:${var.mongodb_port}/${var.service_name}" }, # Corrected DB name
         { name = "NODE_ENV", value = "production" },
         { name = "WBSOCKET_URL", value = "wss://app.myphonefriend.com" },
         { name = "RTP_LISTENER_PORT", value = tostring(var.app_rtp_listener_port) },
         { name = "ASTERISK_URL", value = "http://asterisk.${aws_service_discovery_private_dns_namespace.internal.name}:${var.asterisk_ari_http_port}" }, # Corrected namespace ref
-        { name = "RTP_LISTENER_HOST", value = "bianca-app.${aws_service_discovery_private_dns_namespace.internal.name}" } # Corrected namespace ref
+        { name = "RTP_LISTENER_HOST", value = "bianca-app.${aws_service_discovery_private_dns_namespace.internal.name}" },
+        { name = "AWS_SES_REGION", value = var.aws_region }
       ]
       secrets = [
-        { name = "AWS_REGION", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:AWS_REGION::" },
-        { name = "EMAIL_FROM", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:EMAIL_FROM::" },
-        { name = "AWS_SES_REGION", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:AWS_SES_REGION::" },
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
         { name = "OPENAI_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:OPENAI_API_KEY::" },
         { name = "TWILIO_PHONENUMBER", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_PHONENUMBER::" },
@@ -876,7 +875,6 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "TWILIO_AUTHTOKEN", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_AUTHTOKEN::" },
         { name = "STRIPE_SECRET_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_SECRET_KEY::" },
         { name = "STRIPE_PUBLISHABLE_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_PUBLISHABLE_KEY::" },
-        { name = "ASTERISK_USERNAME", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ASTERISK_USERNAME::" },
         { name = "ASTERISK_PASSWORD", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ARI_PASSWORD::" }
       ]
       logConfiguration = {
