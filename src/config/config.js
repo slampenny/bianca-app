@@ -149,7 +149,6 @@ if (envVars.NODE_ENV === 'production') {
   // **NEW/UPDATED:** Add necessary production overrides for WebSocket URL
   // Ensure this uses wss:// and points to your correct production WebSocket endpoint
   baselineConfig.twilio.websocketUrl = 'wss://app.myphonefriend.com'; // Example - **VERIFY THIS URL**
-  baselineConfig.asterisk.url = 'http://sip.myphonefriend.com:8088'; // Example - **VERIFY THIS URL**
 
   // Ensure baseUrl is also correct for production if used elsewhere
 }

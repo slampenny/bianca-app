@@ -65,8 +65,6 @@ RUN chmod +x /entrypoint.sh && sed -i 's/\r$//' /entrypoint.sh && \
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD pgrep asterisk || exit 1
 
-
-
 # Drop privileges to asterisk user for main execution
 USER asterisk
 
