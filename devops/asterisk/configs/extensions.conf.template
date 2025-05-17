@@ -1,33 +1,24 @@
 [from-twilio]
 exten => bianca,1,NoOp(Incoming call to bianca exten)
-  ; Read the To header
+  ; Read the To header (less reliable than Request-URI for parameters)
   same => n,Set(TO_HEADER_RAW=${PJSIP_HEADER(read,To)})
   same => n,NoOp(Raw To Header: ${TO_HEADER_RAW})
-  ; Filter to get the URI part and parameters, removing angle brackets
-  same => n,Set(SIP_URI_AND_PARAMS=${FILTER(0-9a-zA-Z@._\-=+&:/\;,${TO_HEADER_RAW})})
-  same => n,NoOp(Filtered SIP URI and Params: ${SIP_URI_AND_PARAMS})
-
-  ; Attempt to extract key=value pairs using semicolon delimiter
-  ; Field 1: sip:user@host:port
-  ; Field 2: transport=tcp
-  ; Field 3: callSid=CA...
-  ; Field 4: patientId=...
-  same => n,Set(CALLSID_PAIR=${CUT(SIP_URI_AND_PARAMS,\;,3)})  ; Get the 3rd field for callSid
-  same => n,Set(PATIENTID_PAIR=${CUT(SIP_URI_AND_PARAMS,\;,4)}) ; Get the 4th field for patientId
-  same => n,NoOp(Extracted Pair for CallSid: ${CALLSID_PAIR})
-  same => n,NoOp(Extracted Pair for PatientId: ${PATIENTID_PAIR})
-
-  ; Extract VALUE part using '=' delimiter
-  same => n,Set(CALLSID_VALUE=${IF($["${CALLSID_PAIR}" != ""]?${CUT(CALLSID_PAIR,=,2)}:)})    ; Extracts value after '='
-  same => n,Set(PATIENTID_VALUE=${IF($["${PATIENTID_PAIR}" != ""]?${CUT(PATIENTID_PAIR,=,2)}:)}) ; Extracts value after '='
-  same => n,NoOp(Extracted CallSid Value: ${CALLSID_VALUE})
-  same => n,NoOp(Extracted PatientId Value: ${PATIENTID_VALUE})
-
-  ; Construct URIOPTS using VALUES only
+  ; Filter potentially problematic characters (use with caution)
+  same => n,Set(TO_HEADER_FILTERED=${FILTER(0-9a-zA-Z@._\-=+&:/\;,${TO_HEADER_RAW})})
+  ; Attempt to extract key=value pairs using semicolon delimiter (FRAGILE!)
+  same => n,Set(CALLSID_PAIR=${CUT(TO_HEADER_FILTERED,\;,2)}) ; e.g., "callSid=CA..."
+  same => n,Set(PATIENTID_PAIR=${CUT(TO_HEADER_FILTERED,\;,3)}) ; e.g., "patientId=680c..."
+  same => n,NoOp(Extracted Pair 1 (CallSid?): ${CALLSID_PAIR})
+  same => n,NoOp(Extracted Pair 2 (PatientId?): ${PATIENTID_PAIR})
+  ; --- FIX: Extract VALUE part using '=' delimiter ---
+  same => n,Set(CALLSID_VALUE=${CUT(CALLSID_PAIR,=,2)})     ; Extracts value after '='
+  same => n,Set(PATIENTID_VALUE=${CUT(PATIENTID_PAIR,=,2)}) ; Extracts value after '='
+  same => n,NoOp(Extracted Value 1 (CallSid): ${CALLSID_VALUE})
+  same => n,NoOp(Extracted Value 2 (PatientId): ${PATIENTID_VALUE})
+  ; --- FIX: Construct URIOPTS using VALUES only ---
   same => n,Set(URIOPTS=callSid=${CALLSID_VALUE}&patientId=${PATIENTID_VALUE})
   same => n,NoOp(Final Constructed URIOPTS = ${URIOPTS})
-
-  ; Send to Stasis
+  ; --- Send to Stasis ---
   same => n,Verbose(1,💥 Incoming Twilio Call: callSid=${CALLSID_VALUE}, patientId=${PATIENTID_VALUE})
   same => n,Stasis(myphonefriend) ; ARI client will read channel variable URIOPTS
   same => n,Hangup()
@@ -40,3 +31,4 @@ exten => _X.,1,NoOp(Outgoing call from Bianca: ${EXTEN})
 [unauthorized]
 exten => _X.,1,NoOp(🚫 Unauthorized SIP attempt from ${CALLERID(all)})
  same => n,Hangup()
+
