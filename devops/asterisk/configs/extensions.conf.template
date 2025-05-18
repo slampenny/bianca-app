@@ -2,7 +2,7 @@
 exten => bianca,1,NoOp(Incoming call to bianca exten)
   ; The To: header from Twilio will be something like:
   ; <sip:bianca@sip.myphonefriend.com:5061;transport=tcp;callSid=CA...;patientId=ID...>
-  ; OR potentially (if transport isn't a separate param for CUT):
+  ; OR, if transport=tcp is not a separate field for CUT:
   ; <sip:bianca@sip.myphonefriend.com:5061;callSid=CA...;patientId=ID...>
 
   ; Read the main To header
@@ -18,21 +18,21 @@ exten => bianca,1,NoOp(Incoming call to bianca exten)
   same => n,Set(FIELD2=${CUT(SIP_URI_WITH_PARAMS,\;,2)})
   same => n,NoOp(Field 2 is: ${FIELD2})
 
-  ; Initialize indices
-  same => n,Set(CALLSID_IDX=0)
-  same => n,Set(PATIENTID_IDX=0)
+  ; Initialize indices assuming 'transport=tcp' is NOT the second distinct field
+  same => n,Set(CALLSID_IDX=2)
+  same => n,Set(PATIENTID_IDX=3)
 
-  ; Conditionally set indices based on whether 'transport=tcp' is the second parameter
-  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(CALLSID_IDX=3):Set(CALLSID_IDX=2))
-  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(PATIENTID_IDX=4):Set(PATIENTID_IDX=3))
+  ; Conditionally update indices IF 'transport=tcp' IS the second distinct field
+  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(CALLSID_IDX=3))
+  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(PATIENTID_IDX=4))
   same => n,NoOp(Using CallSid Index: ${CALLSID_IDX}, PatientId Index: ${PATIENTID_IDX})
 
   ; Extract callSid pair using the determined index
-  same => n,Set(CALLSID_PAIR=${IF($[${CALLSID_IDX} > 0]?${CUT(SIP_URI_WITH_PARAMS,\;,${CALLSID_IDX})}:)})
+  same => n,Set(CALLSID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,${CALLSID_IDX})})
   same => n,NoOp(Extracted CallSid Pair: ${CALLSID_PAIR})
 
   ; Extract patientId pair using the determined index
-  same => n,Set(PATIENTID_PAIR=${IF($[${PATIENTID_IDX} > 0]?${CUT(SIP_URI_WITH_PARAMS,\;,${PATIENTID_IDX})}:)})
+  same => n,Set(PATIENTID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,${PATIENTID_IDX})})
   same => n,NoOp(Extracted PatientId Pair: ${PATIENTID_PAIR})
 
   ; Extract actual values from the pairs

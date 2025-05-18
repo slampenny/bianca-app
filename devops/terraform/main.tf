@@ -506,7 +506,7 @@ resource "aws_security_group" "sip_nlb_sg" {
 ################################################################################
 
 resource "aws_efs_file_system" "mongodb_data" {
-  creation_token = "mongodb-data-${var.cluster_name}"
+  creation_token = "mongodb-data-${var.cluster_name}-new"
   tags           = { Name = "MongoDB Data for ${var.cluster_name}" }
 }
 
