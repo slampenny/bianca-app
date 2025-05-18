@@ -89,6 +89,8 @@ function startRtpListenerService() {
     });
 
     udpServer.on('message', async (msg, rinfo) => { // Make handler async for AudioUtils
+        logger.info(`[RTP Listener] RAW PACKET RECEIVED from <span class="math-inline">\{rinfo\.address\}\:</span>{rinfo.port}, size: ${msg.length}`); // Crucial log
+        
         const remoteAddr = `${rinfo.address}:${rinfo.port}`;
         const rtpPacket = parseRtpPacket(msg);
 

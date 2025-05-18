@@ -1,4 +1,4 @@
-const { openaiAPI } = require('../api/openaiAPI.js.old');
+//const { openaiAPI } = require('../api/openaiAPI.js.old');
 const { langChainAPI } = require('../api/langChainAPI.js');
 const logger = require('../config/logger');
 
@@ -18,7 +18,7 @@ class ChatService {
       let openaiResponse;
 
       // Generate a response from OpenAI
-      openaiResponse = await openaiAPI.generateResponseFromOpenAI(messages, conversation.patientId.name);
+      //openaiResponse = await openaiAPI.generateResponseFromOpenAI(messages, conversation.patientId.name);
 
       return openaiResponse;
     } catch (err) {

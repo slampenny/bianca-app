@@ -12,7 +12,6 @@ const scheduleRoute = require('./schedule.route');
 const testRoute = require('./test.route');
 const twilioRoute = require('./twilioCall.route');
 const docsRoute = require('./docs.route');
-const healthRoute = require('./health.route');
 
 const router = express.Router();
 
@@ -72,12 +71,6 @@ const devRoutes = [
   {
     path: '/test',
     route: testRoute,
-  },
-  
-  // Add health routes
-  {
-    path: '/health',
-    route: healthRoute,
   },
 ];
 
