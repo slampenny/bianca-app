@@ -5,7 +5,7 @@ const { Patient, Conversation } = require('../models');
 const logger = require('../config/logger');
 const DebugUtils = require('../utils/debug');
 const openAIService = require('../api/openai.realtime.service');
-const { getAriClient } = require('../api/ari.client');
+const { getAriClientInstance } = require('../api/ari.client');
 const seedDatabase = require('../scripts/seedDatabase');
 
 /**
@@ -44,7 +44,7 @@ const getDebugInfo = async (req, res) => {
     const services = {
       openAIService,
       twilioConnections: global.twilioConnections || new Map(),
-      ariClient: getAriClient()
+      ariClient: getAriClientInstance()
     };
     
     // Log connection state

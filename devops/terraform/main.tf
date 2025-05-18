@@ -506,7 +506,7 @@ resource "aws_security_group" "sip_nlb_sg" {
 ################################################################################
 
 resource "aws_efs_file_system" "mongodb_data" {
-  creation_token = "mongodb-data-${var.cluster_name}-new"
+  creation_token = "mongodb-data-${var.cluster_name}"
   tags           = { Name = "MongoDB Data for ${var.cluster_name}" }
 }
 
@@ -578,7 +578,7 @@ resource "aws_lb_target_group" "app_tg" {
 
   health_check {
     path                = "/health"
-    interval            = 30
+    interval            = 10
     timeout             = 5
     healthy_threshold   = 3
     unhealthy_threshold = 2
