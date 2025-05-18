@@ -88,11 +88,19 @@ async function seedDatabase() {
     console.log('Seeded Invoice:', invoiceRecord);
 
     console.log('Database seeded!');
-    process.exit(0);
+    return { org1, caregiver, patients: [patient1, patient2], invoiceRecord, paymentMethods };
   } catch (error) {
     console.error('Error seeding database:', error);
-    process.exit(1);
+    throw error;
   }
 }
 
-seedDatabase();
+// Only run the function if this file is being executed directly
+if (require.main === module) {
+  seedDatabase()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
+}
+
+// Export the function so it can be imported elsewhere
+module.exports = seedDatabase;

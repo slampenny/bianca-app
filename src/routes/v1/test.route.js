@@ -59,6 +59,21 @@ router.post('/clean', testController.testCleanDB);
 
 /**
  * @swagger
+ * /test/seed:
+ *   post:
+ *     summary: Test the seeding function
+ *     description: This is for testing purposes only.
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: Seed response
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.post('/seed', testController.testSeed);
+
+/**
+ * @swagger
  * /test/call:
  *   post:
  *     summary: Test the call with twilio feature

@@ -6,14 +6,7 @@ const logger = require('../config/logger');
 const DebugUtils = require('../utils/debug');
 const openAIService = require('../api/openai.realtime.service');
 const { getAriClient } = require('../api/ari.client');
-
-/**
- * Test the chat service
- */
-const testChatWith = catchAsync(async (req, res) => {
-  const response = await chatService.chatWith(req.body);
-  res.send(response);
-});
+const seedDatabase = require('../scripts/seedDatabase');
 
 /**
  * Test the summarization feature
@@ -30,6 +23,14 @@ const testSummarize = catchAsync(async (req, res) => {
 const testCleanDB = catchAsync(async (req, res) => {
   await testService.cleanDB();
   res.status(httpStatus.OK).send({ message: 'Database cleaned' });
+});
+
+/**
+ * Clean the database (for testing)
+ */
+const testSeed = catchAsync(async (req, res) => {
+  const result = await seedDatabase();
+  res.status(httpStatus.OK).send({ message: 'Database Seeded', result });
 });
 
 /**
@@ -130,7 +131,7 @@ const testCall = catchAsync(async (req, res) => {
 
 module.exports = {
   testCall,
-  testChatWith,
+  testSeed,
   testSummarize,
   testCleanDB,
   getDebugInfo
