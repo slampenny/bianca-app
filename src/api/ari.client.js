@@ -2,7 +2,7 @@
 
 const AriClient = require('ari-client');
 const { v4: uuidv4 } = require('uuid');
-const fs =require('fs');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const config = require('../config/config'); // Your application's config file
@@ -20,6 +20,7 @@ class AsteriskAriClient {
         this.retryCount = 0;
         this.MAX_RETRIES = 10; // Max number of connection retries
         this.RETRY_DELAY = 3000; // Initial delay in ms, will increase with backoff
+        this.keepAliveInterval = null; // For sending regular WebSocket pings
         global.ariClient = this; // Make instance globally accessible if needed by other modules
 
         // Configuration for ExternalMedia, sourced from your main config file
@@ -41,11 +42,24 @@ class AsteriskAriClient {
             }
             logger.info(`[ARI] Attempting connection to ${ariUrl} with user: ${username}`);
 
-            this.client = await AriClient.connect(ariUrl, username, password);
+            // Enhanced connection with WebSocket options
+            this.client = await AriClient.connect(ariUrl, username, password, {
+                webSocketHeaders: {
+                    'User-Agent': 'Bianca-App/1.0',
+                    'Connection': 'keep-alive',
+                    'Keep-Alive': 'timeout=120'
+                },
+                reconnect: false // We'll handle reconnection manually
+            });
+            
             this.isConnected = true;
             this.retryCount = 0; // Reset retry count on successful connection
             logger.info('[ARI] Successfully connected to Asterisk ARI');
 
+            // Set up WebSocket-specific event handlers
+            this.setupWebSocketHandlers();
+            
+            // Setup application event handlers for Asterisk
             this.setupEventHandlers();
 
             // Register this Stasis application with Asterisk.
@@ -53,23 +67,126 @@ class AsteriskAriClient {
             await this.client.start('myphonefriend');
             logger.info('[ARI] Subscribed to Stasis application: myphonefriend');
 
+            // Start the keep-alive ping mechanism
+            this.startKeepAlive();
+
         } catch (err) {
             logger.error(`[ARI] Connection error: ${err.message}`);
             this.isConnected = false;
-            if (this.retryCount < this.MAX_RETRIES) {
-                this.retryCount++;
-                // Exponential backoff with a cap
-                const delay = Math.min(this.RETRY_DELAY * Math.pow(1.5, this.retryCount - 1), 30000); // Max 30s delay
-                logger.info(`[ARI] Retrying connection in ${delay}ms (attempt ${this.retryCount}/${this.MAX_RETRIES})`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                return this.start(); // Recursive call to retry
-            } else {
-                const finalErrorMsg = `[ARI] Failed to connect after ${this.MAX_RETRIES} attempts. Last error: ${err.message}. Giving up.`;
-                logger.error(finalErrorMsg);
-                // Depending on your app's needs, you might exit or just operate without ARI
-                throw new Error(finalErrorMsg);
+            await this.reconnect();
+        }
+    }
+
+    setupWebSocketHandlers() {
+        if (!this.client || !this.client.ws) {
+            logger.error('[ARI] Client WebSocket not available for event binding');
+            return;
+        }
+
+        // Enhanced WebSocket error handling
+        this.client.ws.on('error', (err) => {
+            logger.error(`[ARI] WebSocket error: ${err.message}`);
+            this.handleDisconnection('WebSocket error');
+        });
+
+        this.client.ws.on('close', (code, reason) => {
+            const reasonStr = reason ? reason.toString() : 'No reason provided';
+            logger.warn(`[ARI] WebSocket closed with code ${code}: ${reasonStr}`);
+            this.handleDisconnection(`WebSocket closed: ${code} ${reasonStr}`);
+        });
+
+        this.client.ws.on('unexpected-response', (req, res) => {
+            logger.error(`[ARI] WebSocket received unexpected response: ${res.statusCode}`);
+            this.handleDisconnection('Unexpected WebSocket response');
+        });
+
+        this.client.ws.on('pong', () => {
+            logger.debug('[ARI] Received WebSocket pong from Asterisk');
+        });
+
+        logger.info('[ARI] WebSocket event handlers set up');
+    }
+
+    startKeepAlive() {
+        // Clear any existing interval first
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+        }
+
+        // Setup ping interval to keep connection alive
+        this.keepAliveInterval = setInterval(() => {
+            if (this.client && this.client.ws && this.client.ws.readyState === 1) { // 1 = OPEN
+                logger.debug('[ARI] Sending WebSocket ping to keep connection alive');
+                this.client.ws.ping('keepalive');
+            } else if (this.isConnected) {
+                // WebSocket not open, but we think we're connected - handle inconsistency
+                logger.warn('[ARI] WebSocket not in OPEN state but client marked as connected. Fixing state...');
+                this.handleDisconnection('WebSocket not in OPEN state');
+            }
+        }, 30000); // 30 seconds interval
+
+        logger.info('[ARI] Started WebSocket keep-alive mechanism');
+    }
+
+    handleDisconnection(reason) {
+        if (!this.isConnected) {
+            // Already handled or handling disconnection
+            return;
+        }
+
+        logger.warn(`[ARI] Handling disconnection: ${reason}`);
+        this.isConnected = false;
+        
+        // Stop the keep-alive interval
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+
+        // Attempt to close client gracefully if it exists
+        if (this.client) {
+            try {
+                if (this.client.ws) {
+                    this.client.ws.terminate();
+                    logger.info('[ARI] WebSocket terminated');
+                }
+                this.client = null;
+            } catch (err) {
+                logger.error(`[ARI] Error during client cleanup: ${err.message}`);
             }
         }
+
+        // Attempt to reconnect
+        this.reconnect();
+    }
+
+    async reconnect() {
+        if (this.retryCount >= this.MAX_RETRIES) {
+            logger.error(`[ARI] Failed to reconnect after ${this.MAX_RETRIES} attempts. Giving up.`);
+            return false;
+        }
+
+        this.retryCount++;
+        
+        // Exponential backoff with jitter and capped maximum
+        const baseDelay = this.RETRY_DELAY * Math.pow(1.5, this.retryCount - 1);
+        const jitter = Math.floor(Math.random() * 1000); // Add up to 1 second of jitter
+        const delay = Math.min(baseDelay + jitter, 30000); // Cap at 30 seconds max
+        
+        logger.info(`[ARI] Attempting reconnection in ${delay}ms (attempt ${this.retryCount}/${this.MAX_RETRIES})`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        if (!this.isConnected) { // Double-check we haven't reconnected through another path
+            try {
+                await this.start();
+                return true;
+            } catch (err) {
+                logger.error(`[ARI] Reconnection attempt ${this.retryCount} failed: ${err.message}`);
+                return false;
+            }
+        }
+        return true;
     }
 
     setupEventHandlers() {
@@ -266,16 +383,8 @@ class AsteriskAriClient {
 
 
         this.client.on('error', (err) => {
-            logger.error(`[ARI] Client WebSocket Error: ${err.message}`, err);
-            this.isConnected = false;
-            logger.info('[ARI] Attempting to reconnect after WebSocket error...');
-            setTimeout(() => {
-                if (!this.isConnected && this.retryCount < this.MAX_RETRIES) {
-                     this.start().catch(e => logger.error(`[ARI] Reconnect attempt failed: ${e.message}`));
-                } else if (!this.isConnected) {
-                    logger.error('[ARI] Max retries reached or already attempting reconnect. Not retrying from "error" event.');
-                }
-            }, this.RETRY_DELAY);
+            logger.error(`[ARI] Client error: ${err.message}`, err);
+            // Don't trigger disconnect here, as the WebSocket handlers will handle it
         });
 
         logger.info('[ARI] Event handlers set up successfully.');
@@ -578,6 +687,52 @@ class AsteriskAriClient {
         }
         logger.info(`[Cleanup] Completed cleanup operations for Asterisk ID: ${asteriskChannelIdToClean}`);
     }
+
+    // Add a shutdown method for graceful termination
+    async shutdown() {
+        logger.info('[ARI] Shutting down ARI client...');
+        
+        // Stop the keep-alive interval
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+        
+        // Clean up any active calls
+        const activeCalls = [...this.tracker.calls.keys()];
+        logger.info(`[ARI] Cleaning up ${activeCalls.length} active calls during shutdown...`);
+        
+        for (const callId of activeCalls) {
+            try {
+                await this.cleanupChannel(callId, 'System shutdown');
+            } catch (err) {
+                logger.error(`[ARI] Error cleaning up call ${callId} during shutdown: ${err.message}`);
+            }
+        }
+        
+        // Close the WebSocket connection
+        if (this.client && this.client.ws) {
+            try {
+                logger.info('[ARI] Closing WebSocket connection...');
+                // Try a clean close first
+                this.client.ws.close(1000, 'Controlled shutdown');
+                
+                // Set a timeout to force terminate if clean close doesn't work
+                setTimeout(() => {
+                    if (this.client && this.client.ws) {
+                        this.client.ws.terminate();
+                        logger.info('[ARI] WebSocket forcefully terminated after timeout');
+                    }
+                }, 2000);
+            } catch (err) {
+                logger.error(`[ARI] Error closing WebSocket: ${err.message}`);
+            }
+        }
+        
+        this.isConnected = false;
+        this.client = null;
+        logger.info('[ARI] Shutdown complete');
+    }
 }
 
 const ariClientInstance = new AsteriskAriClient();
@@ -593,5 +748,14 @@ module.exports = {
         }
         return ariClientInstance;
     },
-    getAriClientInstance: () => ariClientInstance
+    getAriClientInstance: () => ariClientInstance,
+    
+    // Add shutdown handler for graceful application termination
+    shutdownAriClient: async () => {
+        if (ariClientInstance.isConnected) {
+            await ariClientInstance.shutdown();
+            return true;
+        }
+        return false;
+    }
 };

@@ -1,9 +1,9 @@
 [from-twilio]
 exten => bianca,1,NoOp(Incoming call to bianca exten)
   ; The To: header from Twilio will be something like:
-  ; <sip:bianca@sip.myphonefriend.com;callSid=CA...;patientId=ID...>
-  ; Asterisk logs show that after stripping <>, SIP_URI_WITH_PARAMS is:
-  ; sip:user@host:port;callSid=CA...;patientId=ID...
+  ; <sip:bianca@sip.myphonefriend.com:5061;transport=tcp;callSid=CA...;patientId=ID...>
+  ; OR potentially (if transport isn't a separate param for CUT):
+  ; <sip:bianca@sip.myphonefriend.com:5061;callSid=CA...;patientId=ID...>
 
   ; Read the main To header
   same => n,Set(TO_HEADER_RAW=${PJSIP_HEADER(read,To)})
@@ -14,19 +14,25 @@ exten => bianca,1,NoOp(Incoming call to bianca exten)
   same => n,Set(SIP_URI_WITH_PARAMS=${CUT(TEMP_URI_PART,>,1)})
   same => n,NoOp(Extracted SIP URI with Params: ${SIP_URI_WITH_PARAMS})
 
-  ; Based on logs, SIP_URI_WITH_PARAMS is effectively:
-  ; sip:user@host:port;callSid=CA...;patientId=ID...
-  ; Splitting by ';':
-  ; Field 1: sip:bianca@sip.myphonefriend.com:5061 (transport=tcp might be part of this or absent for CUT)
-  ; Field 2: callSid=CA...
-  ; Field 3: patientId=ID...
+  ; Check if the second parameter is 'transport=tcp'
+  same => n,Set(FIELD2=${CUT(SIP_URI_WITH_PARAMS,\;,2)})
+  same => n,NoOp(Field 2 is: ${FIELD2})
 
-  ; Extract callSid pair
-  same => n,Set(CALLSID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,2)})  ; Use 2nd field
+  ; Initialize indices assuming 'transport=tcp' is NOT the second distinct field
+  same => n,Set(CALLSID_IDX=2)
+  same => n,Set(PATIENTID_IDX=3)
+
+  ; Conditionally update indices IF 'transport=tcp' IS the second distinct field
+  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(CALLSID_IDX=3))
+  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(PATIENTID_IDX=4))
+  same => n,NoOp(Using CallSid Index: ${CALLSID_IDX}, PatientId Index: ${PATIENTID_IDX})
+
+  ; Extract callSid pair using the determined index
+  same => n,Set(CALLSID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,${CALLSID_IDX})})
   same => n,NoOp(Extracted CallSid Pair: ${CALLSID_PAIR})
 
-  ; Extract patientId pair
-  same => n,Set(PATIENTID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,3)}) ; Use 3rd field
+  ; Extract patientId pair using the determined index
+  same => n,Set(PATIENTID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,${PATIENTID_IDX})})
   same => n,NoOp(Extracted PatientId Pair: ${PATIENTID_PAIR})
 
   ; Extract actual values from the pairs

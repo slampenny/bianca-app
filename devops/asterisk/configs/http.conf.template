@@ -1,5 +1,21 @@
+
 [general]
 enabled=yes
 bindaddr=0.0.0.0
 bindport=8088
 tlsenable=no
+
+; Increase websocket timeouts
+session_inactivity=60
+session_keep_alive=15
+
+; Increase max connections
+session_limit=1000
+
+; Adjust buffer sizes
+request_body_read_timeout=30
+request_body_buffer_maximum=104857600 ; 100MB
+
+; Add CORS support
+cors_enabled=yes
+cors_allow_origin=*
