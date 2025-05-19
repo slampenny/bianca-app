@@ -22,6 +22,9 @@ class AsteriskAriClient {
         this.RETRY_DELAY = 3000; // Initial delay in ms, will increase with backoff
         this.keepAliveInterval = null; // For sending regular WebSocket pings
         global.ariClient = this; // Make instance globally accessible if needed by other modules
+        this.lastPongTime = Date.now();
+        this.PING_INTERVAL = 15000; // 15 seconds
+        this.PONG_TIMEOUT = 45000;  // 45 seconds
 
         // Configuration for ExternalMedia, sourced from your main config file
         this.RTP_LISTENER_HOST = config.asterisk.rtpListenerHost;
@@ -101,6 +104,7 @@ class AsteriskAriClient {
         });
 
         this.client.ws.on('pong', () => {
+            this.lastPongTime = Date.now();
             logger.debug('[ARI] Received WebSocket pong from Asterisk');
         });
 
@@ -113,17 +117,30 @@ class AsteriskAriClient {
             clearInterval(this.keepAliveInterval);
         }
 
+        this.lastPongTime = Date.now();
+
         // Setup ping interval to keep connection alive
         this.keepAliveInterval = setInterval(() => {
-            if (this.client && this.client.ws && this.client.ws.readyState === 1) { // 1 = OPEN
-                logger.debug('[ARI] Sending WebSocket ping to keep connection alive');
-                this.client.ws.ping('keepalive');
-            } else if (this.isConnected) {
-                // WebSocket not open, but we think we're connected - handle inconsistency
-                logger.warn('[ARI] WebSocket not in OPEN state but client marked as connected. Fixing state...');
-                this.handleDisconnection('WebSocket not in OPEN state');
+            try{
+                if (Date.now() - this.lastPongTime > this.PONG_TIMEOUT) {
+                    logger.warn(`[ARI] No pong received in ${this.PONG_TIMEOUT}ms, connection may be stale`);
+                    this.handleDisconnection('Pong timeout');
+                    return;
+                }
+
+                if (this.client && this.client.ws && this.client.ws.readyState === 1) { // 1 = OPEN
+                    logger.debug('[ARI] Sending WebSocket ping to keep connection alive');
+                    this.client.ws.ping('keepalive');
+                } else if (this.isConnected) {
+                    // WebSocket not open, but we think we're connected - handle inconsistency
+                    logger.warn('[ARI] WebSocket not in OPEN state but client marked as connected. Fixing state...');
+                    this.handleDisconnection('WebSocket not in OPEN state');
+                }
+            } catch (err) {
+                logger.error(`[ARI] Error during WebSocket ping: ${err.message}`);
+                this.handleDisconnection('Ping error');
             }
-        }, 30000); // 30 seconds interval
+        }, 15000); // 30 seconds interval
 
         logger.info('[ARI] Started WebSocket keep-alive mechanism');
     }
