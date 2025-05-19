@@ -243,22 +243,34 @@ class AsteriskAriClient {
                 let patientId = null;
 
                 try {
-                    const channelVars = await channel.getChannelVar({ variable: 'URIOPTS' });
-                    if (channelVars && typeof channelVars.value === 'string' && channelVars.value.length > 0) {
-                        logger.info(`[ARI] Raw URIOPTS for ${channelId}: ${channelVars.value}`);
-                        const uriOpts = channelVars.value.split('&').reduce((opts, pair) => {
-                            const [key, value] = pair.split('=');
-                            if (key && value) opts[decodeURIComponent(key)] = decodeURIComponent(value);
-                            return opts;
-                        }, {});
-                        if (uriOpts.patientId) patientId = uriOpts.patientId;
-                        if (uriOpts.callSid) twilioCallSid = uriOpts.callSid;
-                        logger.info(`[ARI] Parsed from URIOPTS for ${channelId}: patientId=${patientId} (type: ${typeof patientId}), twilioCallSid=${twilioCallSid} (type: ${typeof twilioCallSid})`);
+                    // Fetch the RAW_SIP_URI_FOR_ARI variable set by the dialplan
+                    const channelVarResult = await channel.getChannelVar({ variable: 'RAW_SIP_URI_FOR_ARI' });
+                    if (channelVarResult && typeof channelVarResult.value === 'string' && channelVarResult.value.length > 0) {
+                        const rawSipUri = channelVarResult.value;
+                        logger.info(`[ARI] Raw SIP URI for ${channelId} from channel var: ${rawSipUri}`);
+                        
+                        // Parse parameters from the raw SIP URI string
+                        // Expected format: sip:user@host;param1=value1;param2=value2...
+                        // Or: sip:user@host:port;param1=value1;param2=value2...
+                        const uriParts = rawSipUri.split(';');
+                        const params = {};
+                        // Start from index 1 to skip the main sip:user@host or sip:user@host:port part
+                        for (let i = 1; i < uriParts.length; i++) {
+                            const [key, value] = uriParts[i].split('=');
+                            if (key && value !== undefined) { // Check for value !== undefined in case of valueless params (though not expected here)
+                                params[decodeURIComponent(key.trim())] = decodeURIComponent(value.trim());
+                            }
+                        }
+
+                        if (params.patientId) patientId = params.patientId;
+                        if (params.callSid) twilioCallSid = params.callSid;
+                        
+                        logger.info(`[ARI] Parsed from RAW_SIP_URI for ${channelId}: patientId=${patientId} (type: ${typeof patientId}), twilioCallSid=${twilioCallSid} (type: ${typeof twilioCallSid})`);
                     } else {
-                        logger.warn(`[ARI] URIOPTS variable not found, empty, or not a string for ${channelId}. Raw value: ${JSON.stringify(channelVars)}`);
+                        logger.warn(`[ARI] RAW_SIP_URI_FOR_ARI variable not found or empty for ${channelId}. Raw value: ${JSON.stringify(channelVarResult)}`);
                     }
                 } catch (err) {
-                    logger.warn(`[ARI] Error getting/parsing URIOPTS for ${channelId}: ${err.message}. This might indicate the variable wasn't set in dialplan or channel was hung up.`);
+                    logger.warn(`[ARI] Error getting/parsing RAW_SIP_URI_FOR_ARI for ${channelId}: ${err.message}.`);
                 }
 
                 logger.info(`[ARI PRE-CHECK] For channel ${channelId}: twilioCallSid = "${twilioCallSid}" (type: ${typeof twilioCallSid}), patientId = "${patientId}" (type: ${typeof patientId})`);
@@ -304,7 +316,7 @@ class AsteriskAriClient {
             const currentChannelName = channel.name || 'Unknown'; // Use channel.name
             logger.info(`[ARI] StasisEnd for channel ${channelId} (${currentChannelName})`);
 
-            if (this.tracker.isTracking(channelId)) { // Check if it's a main channel we are tracking
+            if (this.tracker.getCall(channelId)) { // Check if it's a main channel we are tracking
                 logger.info(`[ARI] StasisEnd for tracked main channel ${channelId}. Initiating cleanup.`);
                 this.cleanupChannel(channelId, "StasisEnd (Main Channel)").catch(err => {
                     logger.error(`[ARI] Error during cleanup from StasisEnd for ${channelId}: ${err.message}`);
@@ -333,7 +345,7 @@ class AsteriskAriClient {
             const channelId = channel.id;
             const currentChannelName = channel.name || 'Unknown'; // Use channel.name
             logger.info(`[ARI] ChannelDestroyed event for: ${channelId} (${currentChannelName})`);
-            if (this.tracker.isTracking(channelId)) { // If it's a tracked main channel
+            if (this.tracker.getCall(channelId)) { // If it's a tracked main channel
                 logger.info(`[ARI] ChannelDestroyed for tracked main channel ${channelId}. Initiating cleanup.`);
                 this.cleanupChannel(channelId, "ChannelDestroyed (Main Channel)").catch(err => {
                     logger.error(`[ARI] Error during cleanup from ChannelDestroyed for ${channelId}: ${err.message}`);
@@ -354,7 +366,7 @@ class AsteriskAriClient {
             const channelId = channel.id;
             const currentChannelName = channel.name || 'Unknown'; // Use channel.name
             logger.info(`[ARI] ChannelHangupRequest for: ${channelId} (${currentChannelName}), Cause: ${event.cause_txt || event.cause}`);
-            if (this.tracker.isTracking(channelId)) { // If it's a tracked main channel
+            if (this.tracker.getCall(channelId)) { // If it's a tracked main channel
                 logger.info(`[ARI] HangupRequest for tracked main channel ${channelId}. Initiating cleanup.`);
                 this.cleanupChannel(channelId, `HangupRequest (Main Channel)`).catch(err => {
                     logger.error(`[ARI] Error during cleanup from ChannelHangupRequest for ${channelId}: ${err.message}`);

@@ -1,53 +1,17 @@
 [from-twilio]
-exten => bianca,1,NoOp(Incoming call to bianca exten)
-  ; The To: header from Twilio will be something like:
-  ; <sip:bianca@sip.myphonefriend.com:5061;transport=tcp;callSid=CA...;patientId=ID...>
-  ; OR potentially (if transport isn't a separate param for CUT):
-  ; <sip:bianca@sip.myphonefriend.com:5061;callSid=CA...;patientId=ID...>
-
-  ; Read the main To header
+exten => bianca,1,NoOp(Incoming call to bianca exten from ${CALLERID(all)})
+  ; Read the To header
   same => n,Set(TO_HEADER_RAW=${PJSIP_HEADER(read,To)})
   same => n,NoOp(Raw To Header: ${TO_HEADER_RAW})
 
   ; Extract the content within the angle brackets <>
+  ; This should be like: sip:user@host;transport=tcp;callSid=XXX;patientId=YYY
   same => n,Set(TEMP_URI_PART=${CUT(TO_HEADER_RAW,<,2)})
-  same => n,Set(SIP_URI_WITH_PARAMS=${CUT(TEMP_URI_PART,>,1)})
-  same => n,NoOp(Extracted SIP URI with Params: ${SIP_URI_WITH_PARAMS})
+  same => n,Set(RAW_SIP_URI_FOR_ARI=${CUT(TEMP_URI_PART,>,1)})
+  same => n,NoOp(Raw SIP URI for ARI: ${RAW_SIP_URI_FOR_ARI})
 
-  ; Check if the second parameter is 'transport=tcp'
-  same => n,Set(FIELD2=${CUT(SIP_URI_WITH_PARAMS,\;,2)})
-  same => n,NoOp(Field 2 is: ${FIELD2})
-
-  ; Initialize indices assuming 'transport=tcp' is NOT the second distinct field
-  same => n,Set(CALLSID_IDX=2)
-  same => n,Set(PATIENTID_IDX=3)
-
-  ; Conditionally update indices IF 'transport=tcp' IS the second distinct field
-  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(CALLSID_IDX=3))
-  same => n,ExecIf($["${FIELD2}" = "transport=tcp"]?Set(PATIENTID_IDX=4))
-  same => n,NoOp(Using CallSid Index: ${CALLSID_IDX}, PatientId Index: ${PATIENTID_IDX})
-
-  ; Extract callSid pair using the determined index
-  same => n,Set(CALLSID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,${CALLSID_IDX})})
-  same => n,NoOp(Extracted CallSid Pair: ${CALLSID_PAIR})
-
-  ; Extract patientId pair using the determined index
-  same => n,Set(PATIENTID_PAIR=${CUT(SIP_URI_WITH_PARAMS,\;,${PATIENTID_IDX})})
-  same => n,NoOp(Extracted PatientId Pair: ${PATIENTID_PAIR})
-
-  ; Extract actual values from the pairs
-  same => n,Set(CALLSID_VALUE=${IF($["${CALLSID_PAIR}" != ""]?${CUT(CALLSID_PAIR,=,2)}:)})
-  same => n,Set(PATIENTID_VALUE=${IF($["${PATIENTID_PAIR}" != ""]?${CUT(PATIENTID_PAIR,=,2)}:)})
-  same => n,NoOp(Extracted CallSid Value: ${CALLSID_VALUE})
-  same => n,NoOp(Extracted PatientId Value: ${PATIENTID_VALUE})
-
-  ; Construct URIOPTS using VALUES only
-  same => n,Set(URIOPTS=callSid=${CALLSID_VALUE}&patientId=${PATIENTID_VALUE})
-  same => n,NoOp(Final Constructed URIOPTS = ${URIOPTS})
-
-  ; Send to Stasis
-  same => n,Verbose(1,💥 Incoming Twilio Call: callSid=${CALLSID_VALUE}, patientId=${PATIENTID_VALUE})
-  same => n,Stasis(myphonefriend) ; ARI client will read channel variable URIOPTS
+  ; Send to Stasis. The ARI client will parse RAW_SIP_URI_FOR_ARI.
+  same => n,Stasis(myphonefriend)
   same => n,Hangup()
 
 [bianca-app]
