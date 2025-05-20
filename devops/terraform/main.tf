@@ -517,7 +517,7 @@ resource "aws_efs_access_point" "mongo_ap" {
     gid = 999
   }
   root_directory {
-    path = "/mongodb/data"
+    path = "/mongodb"
     creation_info {
       owner_uid   = 999
       owner_gid   = 999
@@ -924,7 +924,7 @@ resource "aws_ecs_service" "app_service" {
   launch_type                        = "FARGATE"
   desired_count                      = 1
   deployment_controller              { type = "ECS" }
-  deployment_maximum_percent         = 200
+  deployment_maximum_percent         = 100
   deployment_minimum_healthy_percent = 50
   enable_execute_command             = true
   health_check_grace_period_seconds  = 120
