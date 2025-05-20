@@ -932,7 +932,7 @@ resource "aws_ecs_service" "app_service" {
   desired_count                      = 1
   deployment_controller              { type = "ECS" }
   deployment_maximum_percent         = 100
-  deployment_minimum_healthy_percent = 50
+  deployment_minimum_healthy_percent = 0
   enable_execute_command             = true
   health_check_grace_period_seconds  = 120
 
