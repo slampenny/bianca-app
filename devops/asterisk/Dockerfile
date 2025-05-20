@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM public.ecr.aws/debian/debian:bullseye-slim
 
 ARG ASTERISK_VERSION=21.2.0
 ENV ASTERISK_VERSION=${ASTERISK_VERSION}
