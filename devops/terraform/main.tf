@@ -894,9 +894,9 @@ resource "aws_ecs_task_definition" "app_task" {
       portMappings = [
         { containerPort = var.mongodb_port, protocol = "tcp" }
       ]
-      # mountPoints = [
-      #   { sourceVolume = "mongodb-data", containerPath = "/data/db", readOnly = false }
-      # ]
+      mountPoints = [
+        { sourceVolume = "mongodb-data", containerPath = "/data/db", readOnly = false }
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {

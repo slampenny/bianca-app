@@ -35,9 +35,9 @@ class AsteriskAriClient {
     async start() {
         try {
             logger.info('[ARI] Connecting to Asterisk ARI...');
-            const ariUrl = config.asterisk.url; // e.g., http://asterisk.myphonefriend.internal:8088
-            const username = config.asterisk.username; // ARI username
-            const password = config.asterisk.password; // ARI password
+            const ariUrl = config.asterisk.url; 
+            const username = config.asterisk.username;
+            const password = config.asterisk.password;
 
             if (!ariUrl || !username || !password) {
                 logger.error('[ARI] Missing ARI connection details (URL, username, or password) in configuration.');
@@ -45,19 +45,69 @@ class AsteriskAriClient {
             }
             logger.info(`[ARI] Attempting connection to ${ariUrl} with user: ${username}`);
 
-            // Enhanced connection with WebSocket options
-            this.client = await AriClient.connect(ariUrl, username, password, {
-                webSocketHeaders: {
-                    'User-Agent': 'Bianca-App/1.0',
-                    'Connection': 'keep-alive',
-                    'Keep-Alive': 'timeout=120'
-                },
-                reconnect: false // We'll handle reconnection manually
-            });
-            
-            this.isConnected = true;
-            this.retryCount = 0; // Reset retry count on successful connection
-            logger.info('[ARI] Successfully connected to Asterisk ARI');
+            // Add pre-connection diagnostic
+            try {
+                const testUrl = `${ariUrl}/applications`;
+                logger.info(`[ARI] Testing ARI endpoint with HTTP request to: ${testUrl}`);
+                
+                // Using native fetch or another HTTP client you have available
+                const response = await fetch(testUrl, {
+                    headers: {
+                        'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.text();
+                    logger.info(`[ARI] HTTP test successful - received ${data.length} bytes response`);
+                } else {
+                    logger.error(`[ARI] HTTP test failed with status ${response.status}: ${response.statusText}`);
+                    logger.error(`[ARI] Response body: ${await response.text()}`);
+                    throw new Error(`ARI endpoint test failed with status ${response.status}`);
+                }
+            } catch (testErr) {
+                logger.error(`[ARI] Pre-connection test failed: ${testErr.message}`);
+                if (testErr.code) {
+                    logger.error(`[ARI] Error code: ${testErr.code}`);
+                }
+                // Log but continue - don't throw here to allow the actual connection attempt
+            }
+
+            // Main connection attempt with detailed error capture
+            try {
+                this.client = await AriClient.connect(ariUrl, username, password, {
+                    webSocketHeaders: {
+                        'User-Agent': 'Bianca-App/1.0',
+                        'Connection': 'keep-alive',
+                        'Keep-Alive': 'timeout=120'
+                    },
+                    reconnect: false
+                });
+                
+                this.isConnected = true;
+                this.retryCount = 0;
+                logger.info('[ARI] Successfully connected to Asterisk ARI');
+                
+            } catch (connErr) {
+                logger.error(`[ARI] Connection error details: ${connErr.message}`);
+                logger.error(`[ARI] Error name: ${connErr.name}, code: ${connErr.code || 'N/A'}`);
+                
+                if (connErr.response) {
+                    logger.error(`[ARI] Response status: ${connErr.response.status}`);
+                    logger.error(`[ARI] Response body: ${JSON.stringify(connErr.response.data || {})}`);
+                }
+                
+                // Check for specific error types
+                if (connErr.message.includes('401')) {
+                    logger.error('[ARI] Authentication failure - check username and password in config');
+                } else if (connErr.code === 'ECONNREFUSED') {
+                    logger.error('[ARI] Connection refused - Asterisk server may not be running or HTTP server not enabled');
+                } else if (connErr.code === 'ENOTFOUND') {
+                    logger.error('[ARI] Host not found - check hostname/DNS resolution for Asterisk server');
+                }
+                
+                throw connErr; // Re-throw for the outer catch
+            }
 
             // Set up WebSocket-specific event handlers
             this.setupWebSocketHandlers();
