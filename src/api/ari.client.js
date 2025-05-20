@@ -35,7 +35,7 @@ class AsteriskAriClient {
     async start() {
         try {
             logger.info('[ARI] Connecting to Asterisk ARI...');
-            const ariUrl = config.asterisk.url; 
+            const ariUrl = `${config.asterisk.url}/ari`; 
             const username = config.asterisk.username;
             const password = config.asterisk.password;
 
