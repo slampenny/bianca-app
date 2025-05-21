@@ -35,9 +35,11 @@ class AsteriskAriClient {
     async start() {
         try {
             logger.info('[ARI] Connecting to Asterisk ARI...');
-            const ariUrl = `${config.asterisk.url}/ari`; 
+            const ariUrl = `${config.asterisk.url}`; 
             const username = config.asterisk.username;
             const password = config.asterisk.password;
+
+            logger.info(`[ARI] Config URL: ${config.asterisk.url}, Final URL: ${ariUrl}`);
 
             if (!ariUrl || !username || !password) {
                 logger.error('[ARI] Missing ARI connection details (URL, username, or password) in configuration.');
@@ -47,7 +49,7 @@ class AsteriskAriClient {
 
             // Add pre-connection diagnostic
             try {
-                const testUrl = `${ariUrl}/applications`;
+                const testUrl = `${ariUrl}`;
                 logger.info(`[ARI] Testing ARI endpoint with HTTP request to: ${testUrl}`);
                 
                 // Using native fetch or another HTTP client you have available

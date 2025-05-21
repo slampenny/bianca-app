@@ -517,7 +517,7 @@ resource "aws_efs_access_point" "mongo_ap" {
     gid = 999
   }
   root_directory {
-    path = "/mongodb"
+    path = "/mongodb_new"
     creation_info {
       owner_uid   = 999
       owner_gid   = 999
