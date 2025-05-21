@@ -164,37 +164,34 @@ class AsteriskAriClient {
     }
 
     startKeepAlive() {
-        // Clear any existing interval first
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
         }
 
         this.lastPongTime = Date.now();
 
-        // Setup ping interval to keep connection alive
         this.keepAliveInterval = setInterval(() => {
-            try{
-                if (Date.now() - this.lastPongTime > this.PONG_TIMEOUT) {
-                    logger.warn(`[ARI] No pong received in ${this.PONG_TIMEOUT}ms, connection may be stale`);
-                    this.handleDisconnection('Pong timeout');
-                    return;
+            try {
+                const now = Date.now();
+
+                if (now - this.lastPongTime > this.PONG_TIMEOUT) {
+                    logger.warn(`[ARI] ⚠ No pong received in ${this.PONG_TIMEOUT}ms — connection may be stale (but not disconnecting)`);
+                    // Optionally send to metrics: metrics.increment('ari.pong.missed');
                 }
 
-                if (this.client && this.client.ws && this.client.ws.readyState === 1) { // 1 = OPEN
-                    logger.debug('[ARI] Sending WebSocket ping to keep connection alive');
+                if (this.client && this.client.ws && this.client.ws.readyState === 1) {
+                    logger.debug('[ARI] Sending WebSocket ping to ARI');
                     this.client.ws.ping('keepalive');
-                } else if (this.isConnected) {
-                    // WebSocket not open, but we think we're connected - handle inconsistency
-                    logger.warn('[ARI] WebSocket not in OPEN state but client marked as connected. Fixing state...');
-                    this.handleDisconnection('WebSocket not in OPEN state');
+                } else {
+                    logger.warn('[ARI] WebSocket not open — skipping ping (will reconnect only on ws.close/error)');
                 }
             } catch (err) {
-                logger.error(`[ARI] Error during WebSocket ping: ${err.message}`);
-                this.handleDisconnection('Ping error');
+                logger.error(`[ARI] Ping error: ${err.message}`);
+                // Not calling handleDisconnection here — ws.close will handle that if real problem occurs
             }
-        }, 15000); // 30 seconds interval
+        }, this.PING_INTERVAL); // 15 seconds
 
-        logger.info('[ARI] Started WebSocket keep-alive mechanism');
+        logger.info('[ARI] Passive keep-alive started — relying on ws.close/ws.error for disconnect detection');
     }
 
     handleDisconnection(reason) {
