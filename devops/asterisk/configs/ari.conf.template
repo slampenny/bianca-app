@@ -1,9 +1,10 @@
 [general]
 enabled = yes
-pretty = yes
+pretty = yes ; Optional
 allowed_origins=*
 
-[myphonefriend]
+[myphonefriend] ; Your ARI username
 type = user
-read_only = no
-password = ${ARI_PASSWORD}
+read_only = no ; If your app needs to make changes
+password = ${ARI_PASSWORD} ; Ensure this matches what your client uses
+; password_format = plain ; If password is plain text

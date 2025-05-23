@@ -1,2 +1,11 @@
+; /etc/asterisk/modules.conf.template
+
 [modules]
-autoload=yes
+autoload=yes  
+
+; Explicitly load WebSocket support
+load => res_http_websocket.so
+load => res_pjsip_transport_websocket.so
+
+; Don't load deprecated modules
+noload => res_pjsip_transport_management.so

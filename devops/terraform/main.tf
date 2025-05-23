@@ -564,6 +564,7 @@ resource "aws_lb" "app_lb" {
   name               = var.load_balancer_name
   internal           = false
   load_balancer_type = "application"
+  idle_timeout = 120
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = var.subnet_ids
   tags               = { Name = var.load_balancer_name }

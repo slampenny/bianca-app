@@ -1,22 +1,16 @@
-
 [general]
 enabled=yes
 bindaddr=0.0.0.0
 bindport=8088
-tlsenable=no
+prefix=
 
-; Increase websocket timeouts
-session_inactivity=60000
-session_keep_alive=30000
-websocket_write_timeout=100
+; Enable TLS/HTTPS if needed
+;tlsenable=yes
+;tlsbindaddr=0.0.0.0:8089
+;tlscertfile=/etc/asterisk/keys/asterisk.pem
+;tlsprivatekey=/etc/asterisk/keys/asterisk.pem
 
-; Increase max connections
-session_limit=1000
-
-; Adjust buffer sizes
-request_body_read_timeout=30
-request_body_buffer_maximum=104857600 ; 100MB
-
-; Add CORS support
-cors_enabled=yes
-cors_allow_origin=*
+; Session handling
+sessionlimit=100
+session_inactivity=30000
+session_keep_alive=60000

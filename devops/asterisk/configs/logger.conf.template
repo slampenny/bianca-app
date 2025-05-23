@@ -1,28 +1,7 @@
-[general]
-; Enable console colors for better readability
-color = yes
-dateformat = %F %T
-
-; Define custom colors for different log levels
-; Format: level => (colors for level)(colors for text)
-; Colors: black, red, green, yellow, blue, magenta, cyan, white
-;         bright+color for brighter versions
-displayconnects = yes
-
-; Color presets for log levels
-critical_color = bright+red
-error_color = red
-warning_color = yellow
-notice_color = bright+cyan
-verbose_color = bright+green
-debug_color = bright+blue
-security_color = bright+magenta
-
 [logfiles]
-; Console logging with colors applied
-console => warning,error,notice,verbose,debug
+console => notice,warning,error,debug
+messages => notice,warning,error,debug
+full => notice,warning,error,debug,verbose
 
-; Optional file logging 
-; messages => notice,warning,error,verbose,debug
-; verbose => verbose
-; debug => debug
+[general]
+debug => yes
