@@ -193,7 +193,8 @@ class AsteriskAriClient {
                     logger.info(`[ARI] Instructing Asterisk to send ExternalMedia from snoop ${channelId} to: ${rtpDest}`);
                     await channel.externalMedia({
                         app: 'myphonefriend',
-                        external_host: rtpDest,
+                        external_host: this.RTP_LISTENER_HOST,
+                        external_port: this.RTP_LISTENER_PORT,
                         format: this.RTP_SEND_FORMAT,
                         direction: 'read',
                     });
@@ -273,6 +274,16 @@ class AsteriskAriClient {
                 if (!callData) {
                     logger.warn(`[ARI] No parent call found for ${channelId}`);
                     return;
+                }
+
+                try {
+                    const { value: ssrcStr } = await channel.getChannelVar({ variable: 'RTP_REMOTE_SSRC' });
+                    const ssrc = parseInt(ssrcStr, 10);
+                    this.tracker.updateCall(callData.asteriskChannelId, { rtp_ssrc: ssrc });
+                    rtpListenerService.addSsrcMapping(ssrc, callData.asteriskChannelId);
+                    logger.info(`[ARI] Mapped SSRC ${ssrc} → call ${callData.asteriskChannelId}`);
+                } catch (err) {
+                    logger.warn(`[ARI] Couldn’t read RTP_REMOTE_SSRC on ${channelId}: ${err.message}`);
                 }
 
                 logger.info(`[ARI] Adding UnicastRTP channel ${channelId} to bridge ${callData.mainBridgeId}`);
@@ -441,8 +452,6 @@ class AsteriskAriClient {
             mainBridge = await this.client.bridges.create({ type: 'mixing', name: `call-${asteriskChannelId}` });
             this.tracker.updateCall(asteriskChannelId, { mainBridge, mainBridgeId: mainBridge.id });
             logger.info(`[ARI Pipeline] Created main bridge ${mainBridge.id} for ${asteriskChannelId}`);
-
-            
 
             await this.client.bridges.addChannel({
                 bridgeId: mainBridge.id,
