@@ -6,12 +6,7 @@ exten => bianca,1,NoOp(Incoming call to bianca exten from ${CALLERID(all)})
 
   ; Extract the content within the angle brackets <>
   ; This should be like: sip:user@host;transport=tcp;callSid=XXX;patientId=YYY
-  same => n,Set(TEMP_URI_PART=${CUT(TO_HEADER_RAW,<,2)})
-  same => n,Set(RAW_SIP_URI_FOR_ARI=${CUT(TEMP_URI_PART,>,1)})
-  same => n,NoOp(Raw SIP URI for ARI: ${RAW_SIP_URI_FOR_ARI})
-
-  ; Send to Stasis. The ARI client will parse RAW_SIP_URI_FOR_ARI.
-  same  => n,Stasis(myphonefriend,${RAW_SIP_URI_FOR_ARI})
+  same => n,Stasis(myphonefriend,${PJSIP_HEADER(read,To)})
   same => n,Hangup()
 
 [bianca-app]

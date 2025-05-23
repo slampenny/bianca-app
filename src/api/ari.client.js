@@ -206,39 +206,45 @@ class AsteriskAriClient {
 
             } else if (currentChannelName.startsWith('PJSIP/twilio-trunk-')) {
                 logger.info(`[ARI] Handling StasisStart for Main incoming channel: ${channelId}`);
+
                 let twilioCallSid = null;
                 let patientId = null;
 
                 try {
-                    const [rawSipUri] = event.args;   // e.g. "sip:bianca@…:5061;...;patientId=XXX"
-                    if (!rawSipUri) {
-                        logger.error('[ARI] No SIP URI arg in StasisStart, cannot proceed');
-                        return channel.hangup();
-                    }
-                    logger.info(`[ARI] Raw SIP URI for ${channelId} from channel var: ${rawSipUri}`);
-                    
-                    const uriParts = rawSipUri.split(';');
-                    const params = {};
-                    for (let i = 1; i < uriParts.length; i++) {
-                        const [key, value] = uriParts[i].split('=');
-                        if (key && value !== undefined) {
-                            params[decodeURIComponent(key.trim())] = decodeURIComponent(value.trim());
+                    logger.info(`[ARI] StasisStart for ${channel.id}, args: ${JSON.stringify(event.args)}`);
+                    // First try the Stasis argument
+                    let rawUri = event.args[0] || '';
+                    // Fallback to channel variable if missing
+                    if (!rawUri) {
+                        try {
+                            const result = await channel.getChannelVar({ variable: 'RAW_SIP_URI_FOR_ARI' });
+                            rawUri = result.value;
+                        } catch (err) {
+                            logger.warn(`[ARI] Could not get RAW_SIP_URI_FOR_ARI: ${err.message}`);
                         }
                     }
 
-                    if (params.patientId) patientId = params.patientId;
-                    if (params.callSid) twilioCallSid = params.callSid;
-                    
-                    logger.info(`[ARI] Parsed from RAW_SIP_URI for ${channelId}: patientId=${patientId}, twilioCallSid=${twilioCallSid}`);
-                
+                    if (!rawUri) {
+                        logger.error('[ARI] No SIP URI provided in StasisStart, hanging up');
+                        return channel.hangup();
+                    }
+                    // Strip angle brackets
+                    rawUri = rawUri.replace(/^<|>$/g, '');
+                    // Parse parameters after semicolons
+                    const parts = rawUri.split(';');
+                    const paramMap = {};
+                    parts.slice(1).forEach(p => {
+                        const [k, v] = p.split('=');
+                        if (k && v) paramMap[k] = decodeURIComponent(v);
+                    });
+                    twilioCallSid = paramMap.callSid;
+                    patientId = paramMap.patientId;
+                    if (!callSid || !patientId) {
+                        logger.error('[ARI] Missing callSid or patientId, hanging up');
+                        return channel.hangup();
+                    }
                 } catch (err) {
                     logger.warn(`[ARI] Error getting/parsing RAW_SIP_URI_FOR_ARI for ${channelId}: ${err.message}`);
-                }
-
-                if (!twilioCallSid || !patientId) {
-                    logger.error(`[ARI] Critical: twilioCallSid or patientId is missing for main channel ${channelId}`);
-                    await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up main channel ${channelId}: ${e.message}`));
-                    return;
                 }
 
                 this.tracker.addCall(channelId, {
