@@ -428,14 +428,17 @@ class AsteriskAriClient {
 
             const recordingName = `recording-${asteriskChannelId.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
             try {
-                await mainBridge.record({ name: recordingName, format: 'wav', maxDurationSeconds: 3600, beep: false, ifExists: 'overwrite' });
+                mainBridge.record({ name: recordingName, format: 'wav', maxDurationSeconds: 3600, beep: false, ifExists: 'overwrite' });
                 this.tracker.updateCall(asteriskChannelId, { recordingName });
                 logger.info(`[ARI Pipeline] Started recording ${recordingName} on bridge ${mainBridge.id}`);
             } catch (recordErr) {
                 logger.error(`[ARI Pipeline] Main bridge record failed: ${recordErr.message}`);
             }
 
-            await mainBridge.addChannel({ channel: asteriskChannelId });
+            await this.client.bridges.addChannel({
+                bridgeId: mainBridge.id,
+                channel: asteriskChannelId
+            });
             this.tracker.updateCall(asteriskChannelId, { state: 'main_bridged' });
             logger.info(`[ARI Pipeline] Added main channel ${asteriskChannelId} to bridge ${mainBridge.id}`);
 
