@@ -266,7 +266,23 @@ class AsteriskAriClient {
                 }
 
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
-                logger.info(`[ARI] StasisStart for internal UnicastRTP channel ${channelId} created by ExternalMedia. Ignoring.`);
+                // find the parent call record
+                const callData = Array.from(this.tracker.calls.values()).find(c =>
+                    c.mainBridgeId   // assume you've saved mainBridgeId into tracker
+                );
+                if (!callData) {
+                    logger.warn(`[ARI] No parent call found for ${chan.id}`);
+                    return;
+                }
+
+                logger.info(`[ARI] Adding UnicastRTP channel ${chan.id} to bridge ${callData.mainBridgeId}`);
+                await this.client.bridges.addChannel({
+                    bridgeId: callData.mainBridgeId,
+                    channel: chan.id
+                });
+                this.tracker.updateCall(callData.asteriskChannelId, {
+                    state: 'external_media_bridged'
+                });
             } else if (currentChannelName.startsWith('Local/')) {
                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
                 await channel.hangup().catch(()=>{});
