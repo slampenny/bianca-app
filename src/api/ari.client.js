@@ -10,6 +10,16 @@ const { Conversation, Patient } = require('../models');
 const channelTracker = require('./channel.tracker');
 const rtpListenerService = require('./rtp.listener.service');
 
+// Helper to strip protocol and ensure valid host[:port]
+function sanitizeHost(raw) {
+  try {
+    const u = new URL(raw);
+    return u.host;    // includes port if present
+  } catch {
+    return raw;
+  }
+}
+
 class AsteriskAriClient {
     constructor() {
         this.client = null;
@@ -21,7 +31,7 @@ class AsteriskAriClient {
         global.ariClient = this;
 
         // Configuration for ExternalMedia
-        this.RTP_LISTENER_HOST = config.asterisk.rtpListenerHost;
+        this.RTP_LISTENER_HOST = sanitizeHost(config.asterisk.rtpListenerHost);
         this.RTP_LISTENER_PORT = config.asterisk.rtpListenerPort;
         this.RTP_SEND_FORMAT = 'slin';
     }
@@ -36,27 +46,6 @@ class AsteriskAriClient {
             if (!ariUrl || !username || !password) {
                 logger.error('[ARI] Missing ARI connection details in configuration.');
                 throw new Error('ARI configuration incomplete.');
-            }
-
-            logger.info(`[ARI] Attempting connection to ${ariUrl} with user: ${username}`);
-
-            // Pre-connection diagnostic HTTP test
-            try {
-                const testUrl = `${ariUrl}/ari/asterisk/info`;
-                const response = await fetch(testUrl, {
-                    headers: {
-                        'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
-                    }
-                });
-                if (response.ok) {
-                    const data = await response.text();
-                    logger.info(`[ARI] HTTP test successful - received ${data.length} bytes`);
-                } else {
-                    logger.error(`[ARI] HTTP test failed: ${response.status} ${response.statusText}`);
-                    throw new Error(`ARI HTTP test failed`);
-                }
-            } catch (testErr) {
-                logger.error(`[ARI] Pre-connection test failed: ${testErr.message}`);
             }
 
             // Connect with WS-level pings disabled and auto-reconnect
@@ -86,10 +75,15 @@ class AsteriskAriClient {
                 logger.error('[ARI] WS max retries:', err.message || err);
             });
             this.client.on('WebSocketClosed', (code, reason) => {
-                logger.warn(`[ARI] WS closed: ${code} – ${reason || '<no reason>'}`);
-                this.isConnected = false;
-                this.reconnect();
-            });
+      logger.warn(`[ARI] WS closed ${code}: ${reason}`);
+      this.isConnected = false;
+      // Only reconnect on abnormal closures (e.g., network blips)
+      if (code !== 1000 && typeof reason === 'string' && !reason.includes('Success')) {
+        this._scheduleReconnect();
+      } else {
+        logger.info('[ARI] WS closed normally (code 1000 or Success), not reconnecting');
+      }
+    });
 
             // Setup ARI event handlers
             this.setupEventHandlers();
@@ -199,8 +193,7 @@ class AsteriskAriClient {
                     logger.info(`[ARI] Instructing Asterisk to send ExternalMedia from snoop ${channelId} to: ${rtpDest}`);
                     await channel.externalMedia({
                         app: 'myphonefriend',
-                        external_host: this.RTP_LISTENER_HOST,
-                        external_port: this.RTP_LISTENER_PORT,
+                        external_host: rtpDest,
                         format: this.RTP_SEND_FORMAT,
                         direction: 'read',
                     });
