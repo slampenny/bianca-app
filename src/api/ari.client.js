@@ -271,14 +271,14 @@ class AsteriskAriClient {
                     c.mainBridgeId   // assume you've saved mainBridgeId into tracker
                 );
                 if (!callData) {
-                    logger.warn(`[ARI] No parent call found for ${chan.id}`);
+                    logger.warn(`[ARI] No parent call found for ${channelId}`);
                     return;
                 }
 
-                logger.info(`[ARI] Adding UnicastRTP channel ${chan.id} to bridge ${callData.mainBridgeId}`);
+                logger.info(`[ARI] Adding UnicastRTP channel ${channelId} to bridge ${callData.mainBridgeId}`);
                 await this.client.bridges.addChannel({
                     bridgeId: callData.mainBridgeId,
-                    channel: chan.id
+                    channel: channelId
                 });
                 this.tracker.updateCall(callData.asteriskChannelId, {
                     state: 'external_media_bridged'
@@ -442,6 +442,15 @@ class AsteriskAriClient {
             this.tracker.updateCall(asteriskChannelId, { mainBridge, mainBridgeId: mainBridge.id });
             logger.info(`[ARI Pipeline] Created main bridge ${mainBridge.id} for ${asteriskChannelId}`);
 
+            
+
+            await this.client.bridges.addChannel({
+                bridgeId: mainBridge.id,
+                channel: asteriskChannelId
+            });
+            this.tracker.updateCall(asteriskChannelId, { state: 'main_bridged' });
+            logger.info(`[ARI Pipeline] Added main channel ${asteriskChannelId} to bridge ${mainBridge.id}`);
+
             const recordingName = `recording-${asteriskChannelId.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
             try {
                 mainBridge.record({ name: recordingName, format: 'wav', maxDurationSeconds: 3600, beep: false, ifExists: 'overwrite' });
@@ -450,13 +459,6 @@ class AsteriskAriClient {
             } catch (recordErr) {
                 logger.error(`[ARI Pipeline] Main bridge record failed: ${recordErr.message}`);
             }
-
-            await this.client.bridges.addChannel({
-                bridgeId: mainBridge.id,
-                channel: asteriskChannelId
-            });
-            this.tracker.updateCall(asteriskChannelId, { state: 'main_bridged' });
-            logger.info(`[ARI Pipeline] Added main channel ${asteriskChannelId} to bridge ${mainBridge.id}`);
 
             const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
             await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, initialPrompt);
