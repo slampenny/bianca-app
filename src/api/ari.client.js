@@ -210,27 +210,27 @@ class AsteriskAriClient {
                 let patientId = null;
 
                 try {
-                    const channelVarResult = await channel.getChannelVar({ variable: 'RAW_SIP_URI_FOR_ARI' });
-                    if (channelVarResult && typeof channelVarResult.value === 'string' && channelVarResult.value.length > 0) {
-                        const rawSipUri = channelVarResult.value;
-                        logger.info(`[ARI] Raw SIP URI for ${channelId} from channel var: ${rawSipUri}`);
-                        
-                        const uriParts = rawSipUri.split(';');
-                        const params = {};
-                        for (let i = 1; i < uriParts.length; i++) {
-                            const [key, value] = uriParts[i].split('=');
-                            if (key && value !== undefined) {
-                                params[decodeURIComponent(key.trim())] = decodeURIComponent(value.trim());
-                            }
-                        }
-
-                        if (params.patientId) patientId = params.patientId;
-                        if (params.callSid) twilioCallSid = params.callSid;
-                        
-                        logger.info(`[ARI] Parsed from RAW_SIP_URI for ${channelId}: patientId=${patientId}, twilioCallSid=${twilioCallSid}`);
-                    } else {
-                        logger.warn(`[ARI] RAW_SIP_URI_FOR_ARI variable not found or empty for ${channelId}`);
+                    const [rawSipUri] = event.args;   // e.g. "sip:bianca@…:5061;...;patientId=XXX"
+                    if (!rawSipUri) {
+                        logger.error('[ARI] No SIP URI arg in StasisStart, cannot proceed');
+                        return channel.hangup();
                     }
+                    logger.info(`[ARI] Raw SIP URI for ${channelId} from channel var: ${rawSipUri}`);
+                    
+                    const uriParts = rawSipUri.split(';');
+                    const params = {};
+                    for (let i = 1; i < uriParts.length; i++) {
+                        const [key, value] = uriParts[i].split('=');
+                        if (key && value !== undefined) {
+                            params[decodeURIComponent(key.trim())] = decodeURIComponent(value.trim());
+                        }
+                    }
+
+                    if (params.patientId) patientId = params.patientId;
+                    if (params.callSid) twilioCallSid = params.callSid;
+                    
+                    logger.info(`[ARI] Parsed from RAW_SIP_URI for ${channelId}: patientId=${patientId}, twilioCallSid=${twilioCallSid}`);
+                
                 } catch (err) {
                     logger.warn(`[ARI] Error getting/parsing RAW_SIP_URI_FOR_ARI for ${channelId}: ${err.message}`);
                 }

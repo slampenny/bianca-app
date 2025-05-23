@@ -11,7 +11,7 @@ exten => bianca,1,NoOp(Incoming call to bianca exten from ${CALLERID(all)})
   same => n,NoOp(Raw SIP URI for ARI: ${RAW_SIP_URI_FOR_ARI})
 
   ; Send to Stasis. The ARI client will parse RAW_SIP_URI_FOR_ARI.
-  same => n,Stasis(myphonefriend)
+  same  => n,Stasis(myphonefriend,${RAW_SIP_URI_FOR_ARI})
   same => n,Hangup()
 
 [bianca-app]
