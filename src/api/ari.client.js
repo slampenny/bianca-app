@@ -14,7 +14,7 @@ const rtpListenerService = require('./rtp.listener.service');
 function sanitizeHost(raw) {
   try {
     const u = new URL(raw);
-    return u.host;    // includes port if present
+    return u.hostname;    // includes port if present
   } catch {
     return raw;
   }
@@ -79,7 +79,7 @@ class AsteriskAriClient {
       this.isConnected = false;
       // Only reconnect on abnormal closures (e.g., network blips)
       if (code !== 1000 && typeof reason === 'string' && !reason.includes('Success')) {
-        this._scheduleReconnect();
+        this.reconnect();
       } else {
         logger.info('[ARI] WS closed normally (code 1000 or Success), not reconnecting');
       }
@@ -239,8 +239,8 @@ class AsteriskAriClient {
                     });
                     twilioCallSid = paramMap.callSid;
                     patientId = paramMap.patientId;
-                    if (!callSid || !patientId) {
-                        logger.error('[ARI] Missing callSid or patientId, hanging up');
+                    if (!twilioCallSid || !patientId) {
+                        logger.error('[ARI] Missing twilioCallSid or patientId, hanging up');
                         return channel.hangup();
                     }
                 } catch (err) {
