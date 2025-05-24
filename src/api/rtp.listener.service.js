@@ -47,12 +47,26 @@ function findCallAwaitingSsrc() {
         if (callData.state === 'external_media_active_awaiting_ssrc' && !callData.rtp_ssrc) {
             // Return the primary callId (Twilio SID or fallback) and the Asterisk ID
             return {
-                callId: callData.twilioSid || asteriskId,
+                callId: callData.twilioCallSid || asteriskId,
                 asteriskId: asteriskId // Needed to update the tracker state
             };
         }
     }
     return null; // No call found waiting for SSRC
+}
+
+function addSsrcMapping(ssrc, callId) {
+    if (!ssrc || !callId) {
+        logger.warn(`[RTP Listener] Invalid SSRC mapping attempt: ssrc=${ssrc}, callId=${callId}`);
+        return;
+    }
+    
+    if (ssrcToCallIdMap.has(ssrc)) {
+        logger.warn(`[RTP Listener] SSRC ${ssrc} already mapped to ${ssrcToCallIdMap.get(ssrc)}, overwriting with ${callId}`);
+    }
+    
+    ssrcToCallIdMap.set(ssrc, callId);
+    logger.info(`[RTP Listener] Manually mapped SSRC ${ssrc} to callId ${callId}`);
 }
 
 /**
@@ -67,7 +81,7 @@ function getCallDataByPrimaryId(callId) {
 
     // If not found, iterate to find by Twilio SID
     for (const data of channelTracker.calls.values()) {
-        if (data.twilioSid === callId) {
+        if (data.twilioCallSid === callId) {
             return data;
         }
     }
@@ -89,7 +103,7 @@ function startRtpListenerService() {
     });
 
     udpServer.on('message', async (msg, rinfo) => { // Make handler async for AudioUtils
-        logger.info(`[RTP Listener] RAW PACKET RECEIVED from <span class="math-inline">\{rinfo\.address\}\:</span>{rinfo.port}, size: ${msg.length}`); // Crucial log
+       // logger.info(`[RTP Listener] RAW PACKET RECEIVED from <span class="math-inline">\{rinfo\.address\}\:</span>{rinfo.port}, size: ${msg.length}`); // Crucial log
         
         const remoteAddr = `${rinfo.address}:${rinfo.port}`;
         const rtpPacket = parseRtpPacket(msg);
@@ -199,8 +213,20 @@ function removeSsrcMapping(ssrc) {
     }
 }
 
+async function ensureReady() {
+    if (!udpServer) {
+        logger.warn('[RTP Listener] UDP server not running, starting it');
+        startRtpListenerService();
+        // Give it a moment to bind
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return udpServer !== null;
+}
+
 module.exports = {
     startRtpListenerService,
     stopRtpListenerService,
+    ensureReady, // Ensure the service is ready to process packets
+    addSsrcMapping, // Export the function to manually add SSRC mappings
     removeSsrcMapping // Export the cleanup function
 };

@@ -36,6 +36,26 @@ class AsteriskAriClient {
         this.RTP_SEND_FORMAT = 'slin';
     }
 
+    async waitForReady() {
+    if (!this.isConnected) {
+        throw new Error('ARI client not connected');
+    }
+    
+    // Verify the Stasis app is registered by testing an API call
+    try {
+        const apps = await this.client.applications.list();
+        const myApp = apps.find(app => app.name === 'myphonefriend');
+        if (!myApp) {
+            throw new Error('Stasis application myphonefriend not found');
+        }
+        logger.info('[ARI] Stasis application verified and ready');
+        return true;
+    } catch (err) {
+        logger.error('[ARI] Stasis application not ready:', err.message);
+        throw err;
+    }
+}
+
     async start() {
         try {
             logger.info('[ARI] Connecting to Asterisk ARI...');
@@ -75,15 +95,16 @@ class AsteriskAriClient {
                 logger.error('[ARI] WS max retries:', err.message || err);
             });
             this.client.on('WebSocketClosed', (code, reason) => {
-      logger.warn(`[ARI] WS closed ${code}: ${reason}`);
-      this.isConnected = false;
-      // Only reconnect on abnormal closures (e.g., network blips)
-      if (code !== 1000 && typeof reason === 'string' && !reason.includes('Success')) {
-        this.reconnect();
-      } else {
-        logger.info('[ARI] WS closed normally (code 1000 or Success), not reconnecting');
-      }
-    });
+                logger.warn(`[ARI] WS closed ${code}: ${reason}`);
+                this.isConnected = false;
+                
+                // Reconnect on any abnormal closure
+                if (code !== 1000) {
+                    this.reconnect();
+                } else {
+                    logger.info('[ARI] WS closed normally (code 1000), not reconnecting');
+                }
+            });
 
             // Setup ARI event handlers
             this.setupEventHandlers();
@@ -167,52 +188,68 @@ class AsteriskAriClient {
         this.client.on('StasisStart', async (event, channel) => {
             const channelId = channel.id;
             const currentChannelName = channel.name || 'Unknown';
-            const appArgs = event.args || [];
-            logger.info(`[ARI] StasisStart event for ${channelId} (${currentChannelName}), AppArgs: ${JSON.stringify(appArgs)}`);
+            logger.info(`[ARI] StasisStart event for ${channelId} (${currentChannelName})`);
 
-            // Check if this is a snoop channel
-            const parentIdArg = appArgs.find(arg => typeof arg === 'string' && arg.startsWith('snoop_parent_id='));
-            const snoopParentIdFromArg = parentIdArg ? parentIdArg.split('=')[1] : null;
-
-            if (snoopParentIdFromArg) {
-                logger.info(`[ARI] StasisStart for ExternalMedia snoop channel: ${channelId} (Parent ID from arg: ${snoopParentIdFromArg})`);
-                const parentCallData = this.tracker.getCall(snoopParentIdFromArg);
-
-                if (!parentCallData) {
-                    logger.error(`[ARI] Snoop channel ${channelId} entered Stasis, but parent call ${snoopParentIdFromArg} not found in tracker. Hanging up snoop.`);
-                    await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned snoop channel ${channelId}: ${e.message}`));
+            if (currentChannelName.startsWith('Snoop/')) {
+                logger.info(`[ARI] StasisStart for Snoop channel: ${channelId}`);
+    
+                // Extract parent channel ID from the snoop channel name
+                // Format: "Snoop/1748064751.1-00000000"
+                const match = currentChannelName.match(/^Snoop\/([^-]+)-/);
+                const parentChannelId = match ? match[1] : null;
+                
+                if (!parentChannelId) {
+                    logger.error(`[ARI] Cannot extract parent ID from snoop channel name: ${currentChannelName}`);
+                    await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up snoop: ${e.message}`));
                     return;
                 }
 
-                this.tracker.updateCall(snoopParentIdFromArg, { snoopChannel: channel, snoopChannelId: channelId });
+                const parentCallData = this.tracker.getCall(parentChannelId);
+                if (!parentCallData) {
+                    logger.error(`[ARI] Snoop channel ${channelId} entered Stasis, but parent call ${parentChannelId} not found. Hanging up.`);
+                    await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned snoop: ${e.message}`));
+                    return;
+                }
+                
+                // Verify this is our expected snoop channel (optional check)
+                if (parentCallData.pendingSnoopId && parentCallData.pendingSnoopId !== channelId) {
+                    logger.warn(`[ARI] Snoop channel ID mismatch. Expected: ${parentCallData.pendingSnoopId}, Got: ${channelId}`);
+                }
+                
+                this.tracker.updateCall(parentChannelId, { 
+                    snoopChannel: channel, 
+                    snoopChannelId: channelId,
+                    pendingSnoopId: null // Clear pending ID
+                });
 
                 try {
                     await channel.answer();
                     logger.info(`[ARI] Answered snoop channel ${channelId}. Starting ExternalMedia.`);
                     const rtpDest = `${this.RTP_LISTENER_HOST}:${this.RTP_LISTENER_PORT}`;
                     logger.info(`[ARI] Instructing Asterisk to send ExternalMedia from snoop ${channelId} to: ${rtpDest}`);
-                    // Get the RTP session ID from tracker
-                    const parentCallData = this.tracker.getCall(snoopParentIdFromArg);
+                    
                     const rtpSessionId = parentCallData.rtpSessionId;
                     
-                    // Store mapping: snoop channel -> RTP session ID
-                    this.tracker.updateCall(snoopParentIdFromArg, { 
+                    this.tracker.updateCall(parentChannelId, { 
                         snoopToRtpMapping: rtpSessionId 
                     });
-    
+
                     await channel.externalMedia({
                         app: 'myphonefriend',
                         external_host: rtpDest,
                         format: this.RTP_SEND_FORMAT,
                         direction: 'read',
                     });
+                    
                     logger.info(`[ARI] ExternalMedia command sent for snoop ${channelId} -> ${rtpDest}`);
-                    this.tracker.updateCall(snoopParentIdFromArg, { state: 'external_media_active_awaiting_ssrc' });
+                    this.tracker.updateCall(parentChannelId, { 
+                        state: 'external_media_active_awaiting_ssrc',
+                        awaitingSsrcForRtp: true 
+                    });
                 } catch (err) {
                     logger.error(`[ARI] Failed to start ExternalMedia on snoop ${channelId}: ${err.message}`, err);
-                    await this.cleanupChannel(snoopParentIdFromArg, `ExternalMedia setup failed for snoop ${channelId}`);
+                    await this.cleanupChannel(parentChannelId, `ExternalMedia setup failed for snoop ${channelId}`);
                 }
-
             } else if (currentChannelName.startsWith('PJSIP/twilio-trunk-')) {
 
                 await channel.answer();
@@ -493,9 +530,53 @@ class AsteriskAriClient {
 
             const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
             await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, initialPrompt);
-            openAIService.setNotificationCallback((cbAsteriskChannelId, type, data) => {
-                if (cbAsteriskChannelId === asteriskChannelId && type === 'audio_chunk' && data?.audio) {
-                    this.handleOpenAIAudio(asteriskChannelId, data.audio);
+            openAIService.setNotificationCallback((callbackId, type, data) => {
+                if (type === 'audio_chunk' && data?.audio) {
+                    // Check if this is an asterisk channel ID
+                    let targetChannelId = callbackId;
+                    let callData = this.tracker.getCall(callbackId);
+                    
+                    // If not found, try as Twilio SID
+                    if (!callData) {
+                        callData = this.tracker.findCallByTwilioSid(callbackId);
+                        if (callData) {
+                            targetChannelId = callData.asteriskChannelId;
+                        }
+                    }
+                    
+                    if (targetChannelId) {
+                        this.handleOpenAIAudio(targetChannelId, data.audio);
+                    } else {
+                        logger.warn(`[ARI] Received audio for unknown call ID: ${callbackId}`);
+                    }
+                } else if (type === 'openai_session_expired') {
+                    // Find the right channel
+                    let callData = this.tracker.getCall(callbackId);
+                    if (!callData) {
+                        callData = this.tracker.findCallByTwilioCallSid(callbackId);
+                    }
+                    
+                    if (callData) {
+                        logger.warn(`[ARI] OpenAI session expired for ${callData.asteriskChannelId}`);
+                        // Option 1: Try to reinitialize OpenAI
+                        // Option 2: Hang up the call
+                        // Option 3: Play a message to the caller
+                        
+                        // For now, let's just log it and let OpenAI handle reconnection
+                        // If you want to hang up:
+                        // this.cleanupChannel(callData.asteriskChannelId, "OpenAI session expired");
+                    }
+                } else if (type === 'openai_max_reconnect_failed') {
+                    // This definitely should trigger cleanup
+                    let callData = this.tracker.getCall(callbackId);
+                    if (!callData) {
+                        callData = this.tracker.findCallByTwilioCallSid(callbackId);
+                    }
+                    
+                    if (callData) {
+                        logger.error(`[ARI] OpenAI max reconnection attempts failed for ${callData.asteriskChannelId}`);
+                        this.cleanupChannel(callData.asteriskChannelId, "OpenAI connection failed");
+                    }
                 }
             });
             logger.info(`[ARI Pipeline] OpenAI initialized and callback set for Asterisk ID: ${asteriskChannelId}.`);
@@ -518,12 +599,22 @@ class AsteriskAriClient {
         try {
             const rtpSessionId = `rtp-${uuidv4()}`;
             const snoopId = `snoop-extmedia-${uuidv4()}`;
+            
+            // Set up tracking BEFORE creating the snoop
+            this.tracker.updateCall(asteriskChannelId, {
+                rtpSessionId: rtpSessionId,
+                expectingRtpChannel: true,
+                pendingSnoopId: snoopId // Track the expected snoop ID
+            });
+            
             snoopChannel = await this.client.channels.snoopChannel({
                 channelId: asteriskChannelId,
                 snoopId: snoopId,
                 spy: 'in',
                 app: 'myphonefriend'
+                // Remove appArgs - it doesn't work reliably
             });
+            
             logger.info(`[ExternalMedia Setup] Created snoop channel ${snoopChannel.id}`);
             
             this.tracker.updateCall(asteriskChannelId, {
@@ -531,8 +622,7 @@ class AsteriskAriClient {
                 snoopChannelId: snoopChannel.id,
                 snoopMethod: 'externalMedia',
                 state: 'external_media_snoop_created',
-                rtpSessionId: rtpSessionId,
-                expectingRtpChannel: true
+                pendingSnoopId: null // Clear the pending ID
             });
         } catch (err) {
             logger.error(`[ExternalMedia Setup] Failed to create snoop channel for ${asteriskChannelId}: ${err.message}`, err);
@@ -609,100 +699,141 @@ class AsteriskAriClient {
     }
 
     async cleanupChannel(asteriskChannelIdToClean, reason = "Unknown") {
-        logger.info(`[Cleanup] Initiating for Asterisk ID: ${asteriskChannelIdToClean}. Reason: ${reason}`);
-        const resources = this.tracker.getResources(asteriskChannelIdToClean);
-        const primarySidForOpenAI = resources?.twilioCallSid || resources?.asteriskChannelId || asteriskChannelIdToClean;
-        const ssrcToRemove = resources?.rtp_ssrc;
-
-        const removedCallData = this.tracker.removeCall(asteriskChannelIdToClean);
-        
-        const actualResources = resources || removedCallData || {
-            asteriskChannelId: asteriskChannelIdToClean,
-            twilioCallSid: primarySidForOpenAI,
-            mainChannel: null, snoopChannel: null, localChannel: null,
-            mainBridge: null, snoopBridge: null, conversationId: null, rtp_ssrc: null,
-            recordingName: null // Ensure recordingName is part of this structure
-        };
-
-        if (ssrcToRemove) {
-            try {
-                rtpListenerService.removeSsrcMapping(ssrcToRemove);
-            } catch (e) {
-                logger.warn(`[Cleanup] Error calling removeSsrcMapping for SSRC ${ssrcToRemove}: ${e.message}`);
+    logger.info(`[Cleanup] Initiating for Asterisk ID: ${asteriskChannelIdToClean}. Reason: ${reason}`);
+    
+    // Get resources BEFORE removing from tracker
+    const resources = this.tracker.getResources(asteriskChannelIdToClean);
+    if (!resources) {
+        logger.warn(`[Cleanup] No resources found for ${asteriskChannelIdToClean} - may have already been cleaned up`);
+        return;
+    }
+    
+    // Determine the primary identifier for OpenAI service
+    const primarySidForOpenAI = resources.twilioCallSid || resources.asteriskChannelId || asteriskChannelIdToClean;
+    const ssrcToRemove = resources.rtp_ssrc;
+    
+    // NOW remove from tracker (after we've extracted all needed info)
+    const removedSuccessfully = this.tracker.removeCall(asteriskChannelIdToClean);
+    if (!removedSuccessfully) {
+        logger.warn(`[Cleanup] Channel ${asteriskChannelIdToClean} was not in tracker during removal`);
+    }
+    
+    // Remove SSRC mapping if exists
+    if (ssrcToRemove) {
+        try {
+            rtpListenerService.removeSsrcMapping(ssrcToRemove);
+            logger.info(`[Cleanup] Removed SSRC mapping for ${ssrcToRemove}`);
+        } catch (e) {
+            logger.warn(`[Cleanup] Error removing SSRC mapping for ${ssrcToRemove}: ${e.message}`);
+        }
+    }
+    
+    // Stop any active recordings
+    if (resources.mainBridge && resources.recordingName) {
+        try {
+            logger.info(`[Cleanup] Stopping recording ${resources.recordingName} on bridge ${resources.mainBridge.id}`);
+            await resources.mainBridge.stopRecord({ recordingName: resources.recordingName });
+            logger.info(`[Cleanup] Successfully stopped recording ${resources.recordingName}`);
+        } catch (e) {
+            if (e.message && e.message.includes('404')) {
+                logger.info(`[Cleanup] Recording ${resources.recordingName} already stopped or bridge gone (404)`);
+            } else {
+                logger.warn(`[Cleanup] Error stopping recording: ${e.message}`);
             }
+        }
+    }
+    
+    // Helper function to safely hang up channels
+    const safeHangup = async (channel, type) => {
+        if (!channel || typeof channel.hangup !== 'function') {
+            logger.debug(`[Cleanup] No ${type} channel to hang up`);
+            return;
         }
         
-        if (actualResources.mainBridge && actualResources.recordingName) {
-            try {
-                logger.info(`[Cleanup] Attempting to stop recording ${actualResources.recordingName} on bridge ${actualResources.mainBridge.id}`);
-                await actualResources.mainBridge.stopRecord();
-                logger.info(`[Cleanup] Successfully stopped recording ${actualResources.recordingName}`);
-            } catch (e) {
-                if (!e.message || !e.message.includes(' 404 ')) {
-                    logger.warn(`[Cleanup] Error stopping recording on bridge ${actualResources.mainBridge.id || 'unknown'}: ${e.message}`);
-                } else {
-                    logger.info(`[Cleanup] Recording on bridge ${actualResources.mainBridge.id || 'unknown'} likely already stopped or bridge gone (404).`);
-                }
+        try {
+            // Check if channel still exists in Asterisk
+            await channel.get();
+            await channel.hangup();
+            logger.info(`[Cleanup] Hung up ${type} channel ${channel.id}`);
+        } catch (e) {
+            if (e.message && e.message.includes('404')) {
+                logger.info(`[Cleanup] ${type} channel ${channel.id || 'unknown'} already gone (404)`);
+            } else {
+                logger.warn(`[Cleanup] Error hanging up ${type} channel: ${e.message}`);
             }
         }
-
-        const safeHangup = async (channel, type) => {
-            if (channel && typeof channel.hangup === 'function' && !channel.destroyed) {
-                try {
-                    await channel.hangup();
-                    logger.info(`[Cleanup] Hung up ${type} channel ${channel.id}`);
-                } catch (e) {
-                    if (!e.message || !e.message.includes(' 404 ')) {
-                        logger.warn(`[Cleanup] Error hanging up ${type} channel ${channel.id || 'unknown'}: ${e.message}`);
-                    } else {
-                        logger.info(`[Cleanup] ${type} channel ${channel.id || 'unknown'} already gone (404).`);
-                    }
-                }
-            }
-        };
-        const safeDestroy = async (bridge, type) => {
-            if (bridge && typeof bridge.destroy === 'function' && !bridge.destroyed) {
-                try {
-                    await bridge.destroy();
-                    logger.info(`[Cleanup] Destroyed ${type} bridge ${bridge.id}`);
-                } catch (e) {
-                    if (!e.message || !e.message.includes(' 404 ')) {
-                        logger.warn(`[Cleanup] Error destroying ${type} bridge ${bridge.id || 'unknown'}: ${e.message}`);
-                    } else {
-                         logger.info(`[Cleanup] ${type} bridge ${bridge.id || 'unknown'} already gone (404).`);
-                    }
-                }
-            }
-        };
-
-        await safeHangup(actualResources.snoopChannel, 'Snoop');
-        await safeDestroy(actualResources.snoopBridge, 'Snoop'); // snoopBridge is not explicitly created/tracked, usually not needed to destroy separately
-        await safeHangup(actualResources.mainChannel, 'Main');
-        await safeDestroy(actualResources.mainBridge, 'Main');
-        await safeHangup(actualResources.localChannel, 'Local'); // If local channels are used
-
-        if (primarySidForOpenAI) {
-            try {
-                logger.info(`[Cleanup] Disconnecting OpenAI service for primary SID: ${primarySidForOpenAI}`);
-                await openAIService.disconnect(primarySidForOpenAI);
-            } catch(e) {
-                logger.warn(`[Cleanup] Error disconnecting OpenAI for ${primarySidForOpenAI}: ${e.message}`);
+    };
+    
+    // Helper function to safely destroy bridges
+    const safeDestroy = async (bridge, type) => {
+        if (!bridge || typeof bridge.destroy !== 'function') {
+            logger.debug(`[Cleanup] No ${type} bridge to destroy`);
+            return;
+        }
+        
+        try {
+            await bridge.destroy();
+            logger.info(`[Cleanup] Destroyed ${type} bridge ${bridge.id}`);
+        } catch (e) {
+            if (e.message && e.message.includes('404')) {
+                logger.info(`[Cleanup] ${type} bridge ${bridge.id || 'unknown'} already gone (404)`);
+            } else {
+                logger.warn(`[Cleanup] Error destroying ${type} bridge: ${e.message}`);
             }
         }
-
-        if (actualResources.conversationId) {
-            try {
-                logger.info(`[Cleanup] Updating DB conversation ${actualResources.conversationId} status.`);
-                await Conversation.findByIdAndUpdate(actualResources.conversationId, {
+    };
+    
+    // Clean up channels and bridges in correct order
+    await safeHangup(resources.snoopChannel, 'Snoop');
+    await safeHangup(resources.localChannel, 'Local'); // For AudioSocket method
+    await safeDestroy(resources.snoopBridge, 'Snoop'); // For AudioSocket method
+    
+    // Clean up FFmpeg process if exists
+    if (resources.ffmpegTranscoder) {
+        try {
+            if (typeof resources.ffmpegTranscoder.kill === 'function') {
+                resources.ffmpegTranscoder.kill('SIGTERM');
+                logger.info('[Cleanup] Terminated FFmpeg transcoder process');
+            }
+        } catch (e) {
+            logger.warn(`[Cleanup] Error terminating FFmpeg: ${e.message}`);
+        }
+    }
+    
+    // Hang up main channel and destroy main bridge
+    await safeHangup(resources.mainChannel, 'Main');
+    await safeDestroy(resources.mainBridge, 'Main');
+    
+    // Disconnect OpenAI service
+    if (primarySidForOpenAI) {
+        try {
+            logger.info(`[Cleanup] Disconnecting OpenAI service for: ${primarySidForOpenAI}`);
+            await openAIService.disconnect(primarySidForOpenAI);
+        } catch(e) {
+            logger.warn(`[Cleanup] Error disconnecting OpenAI: ${e.message}`);
+        }
+    }
+    
+    // Update database conversation status
+    if (resources.conversationId) {
+        try {
+            logger.info(`[Cleanup] Updating DB conversation ${resources.conversationId} status to completed`);
+            await Conversation.findByIdAndUpdate(
+                resources.conversationId, 
+                {
                     status: 'completed',
                     endTime: new Date(),
-                });
-            } catch (e) {
-                logger.error(`[Cleanup] Error updating DB conversation ${actualResources.conversationId}: ${e.message}`);
-            }
+                    cleanupReason: reason
+                },
+                { new: true }
+            );
+        } catch (e) {
+            logger.error(`[Cleanup] Error updating DB conversation: ${e.message}`);
         }
-        logger.info(`[Cleanup] Completed cleanup operations for Asterisk ID: ${asteriskChannelIdToClean}`);
     }
+    
+    logger.info(`[Cleanup] Completed all cleanup operations for ${asteriskChannelIdToClean}`);
+}
 
     async shutdown() {
         logger.info('[ARI] Shutting down ARI client');

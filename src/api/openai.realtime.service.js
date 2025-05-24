@@ -295,6 +295,20 @@ class OpenAIRealtimeService {
                  case 'session.expired':
                       logger.warn(`[OpenAI Realtime] Session expired for ${callId}`);
                       this.notify(callId, 'openai_session_expired', {});
+                      if (!this.isReconnecting.get(callId)) {
+                        this.isReconnecting.set(callId, true);
+                        
+                        // Close current connection without full cleanup
+                        if (conn.webSocket) {
+                            conn.webSocket.close(1000, "Session expired");
+                        }
+                        
+                        // Trigger reconnection
+                        const attempts = this.reconnectAttempts.get(callId) || 0;
+                        const delay = this.calculateBackoffDelay(attempts);
+                        logger.info(`[OpenAI Realtime] Will attempt reconnect for expired session ${callId} in ${delay}ms`);
+                        setTimeout(() => { this.attemptReconnect(callId); }, delay);
+                    }
                       break;
 
                 default:

@@ -13,7 +13,7 @@ class ChannelTracker {
     /**
      * Adds a new call (main channel) to the tracker.
      * @param {string} asteriskChannelId - The main Asterisk Channel ID.
-     * @param {object} initialData - Initial data including channel object, twilioSid, patientId.
+     * @param {object} initialData - Initial data including channel object, twilioCallSid, patientId.
      */
     addCall(asteriskChannelId, initialData) {
         if (this.calls.has(asteriskChannelId)) {
@@ -22,7 +22,7 @@ class ChannelTracker {
         const callData = {
             asteriskChannelId: asteriskChannelId,
             mainChannel: initialData.channel || null,
-            twilioSid: initialData.twilioSid || null, // Primary external identifier
+            twilioCallSid: initialData.twilioCallSid || null, // Primary external identifier
             patientId: initialData.patientId || null,
             startTime: new Date(),
             state: 'init', // Initial state
@@ -46,7 +46,7 @@ class ChannelTracker {
             ...initialData, // Apply any other passed initial data
         };
         this.calls.set(asteriskChannelId, callData);
-        logger.info(`[Tracker] Added call: ${asteriskChannelId} (TwilioSID: ${callData.twilioSid || 'N/A'})`);
+        logger.info(`[Tracker] Added call: ${asteriskChannelId} (TwilioCallSid: ${callData.twilioCallSid || 'N/A'})`);
         this.logState();
         return callData;
     }
@@ -73,7 +73,7 @@ class ChannelTracker {
 
         // If not, iterate to find by Twilio SID
         for (const data of this.calls.values()) {
-            if (data.twilioSid === callId) {
+            if (data.twilioCallSid === callId) {
                 return data;
             }
         }
@@ -175,19 +175,29 @@ class ChannelTracker {
      */
     getResources(asteriskChannelId) {
         const callData = this.getCall(asteriskChannelId);
-        // Return a copy or specific fields to avoid external modification of tracked state
         return callData ? {
             mainChannel: callData.mainChannel,
             mainBridge: callData.mainBridge,
             snoopChannel: callData.snoopChannel,
-            snoopBridge: callData.snoopBridge, // Will be null in ExternalMedia/FFmpeg modes
-            localChannel: callData.localChannel, // Will be null in ExternalMedia/FFmpeg modes
+            snoopBridge: callData.snoopBridge,
+            localChannel: callData.localChannel,
             conversationId: callData.conversationId,
-            twilioSid: callData.twilioSid,
+            twilioCallSid: callData.twilioCallSid, // Changed from twilioSid
             asteriskChannelId: callData.asteriskChannelId,
-            rtp_ssrc: callData.rtp_ssrc, // Include SSRC for cleanup
-            ffmpegTranscoder: callData.ffmpegTranscoder // Include for cleanup
+            rtp_ssrc: callData.rtp_ssrc,
+            ffmpegTranscoder: callData.ffmpegTranscoder,
+            recordingName: callData.recordingName // Add this!
         } : null;
+    }
+
+    findCallByTwilioCallSid(twilioCallSid) {
+        if (!twilioCallSid) return null;
+        for (const [asteriskId, data] of this.calls.entries()) {
+            if (data.twilioCallSid === twilioCallSid) {
+                return { asteriskChannelId: asteriskId, ...data };
+            }
+        }
+        return null;
     }
 
     /**
@@ -197,7 +207,7 @@ class ChannelTracker {
         try {
              const callSummary = Array.from(this.calls.entries()).map(([id, data]) => ({
                  astId: id,
-                 twilioSid: data.twilioSid,
+                 twilioCallSid: data.twilioCallSid,
                  state: data.state,
                  snoopMethod: data.snoopMethod,
                  snoopId: data.snoopChannelId,
