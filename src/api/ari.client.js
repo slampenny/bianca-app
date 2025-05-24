@@ -471,6 +471,8 @@ class AsteriskAriClient {
         let mainBridge = null;
         let dbConversationId = null;
 
+        await require('./rtp.listener.service').ensureReady();
+
         try {
             if (!patientId) {
                 logger.error(`[ARI Pipeline] Critical: PatientID is missing for main channel ${asteriskChannelId}`);
@@ -524,6 +526,18 @@ class AsteriskAriClient {
                 logger.warn(`[ARI Pipeline] Skipping DB Conversation record for ${conversationRecordKey} due to missing patientId link.`);
             }
 
+            const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
+
+            const initialized = await openAIService.initialize(
+                asteriskChannelId,
+                twilioCallSid,
+                dbConversationId,
+                initialPrompt
+            );
+            if (!initialized) {
+                throw new Error('OpenAI service failed to initialize');
+            }
+
             mainBridge = await this.client.bridges.create({ type: 'mixing', name: `call-${asteriskChannelId}` });
             this.tracker.updateCall(asteriskChannelId, { mainBridge, mainBridgeId: mainBridge.id });
             logger.info(`[ARI Pipeline] Created main bridge ${mainBridge.id} for ${asteriskChannelId}`);
@@ -544,8 +558,6 @@ class AsteriskAriClient {
                 logger.error(`[ARI Pipeline] Main bridge record failed: ${recordErr.message}`);
             }
 
-            const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
-            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, initialPrompt);
             openAIService.setNotificationCallback((callbackId, type, data) => {
                 if (type === 'audio_chunk' && data?.audio) {
                     // Check if this is an asterisk channel ID
