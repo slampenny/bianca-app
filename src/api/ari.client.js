@@ -219,7 +219,7 @@ class AsteriskAriClient {
                 this.tracker.addCall(channelId, {
                     channel: channel,
                     mainChannel: channel,
-                    twilioSid: null,
+                    twilioCallSid: null,
                     patientId: null,
                     state: 'answered'
                 });
@@ -266,7 +266,7 @@ class AsteriskAriClient {
                 }
 
                 try {
-                    this.tracker.updateCall(channelId, { twilioSid, patientId });
+                    this.tracker.updateCall(channelId, { twilioCallSid, patientId });
                     await this.setupMediaPipeline(channel, twilioCallSid, patientId);
                 } catch (err) {
                     logger.error(`[ARI] Error in main channel setup for ${channelId}: ${err.message}`, err);
@@ -430,7 +430,7 @@ class AsteriskAriClient {
             const digit = event.digit;
             const channelId = channel.id;
             const callData = this.tracker.getCall(channelId) || Array.from(this.tracker.calls.values()).find(cd => cd.snoopChannelId === channelId);
-            const primarySid = callData?.twilioSid || callData?.asteriskChannelId || channelId;
+            const primarySid = callData?.twilioCallSid || callData?.asteriskChannelId || channelId;
             logger.info(`[ARI] DTMF '${digit}' on ${channelId} (CallID: ${primarySid})`);
         });
 
@@ -641,14 +641,14 @@ class AsteriskAriClient {
     async cleanupChannel(asteriskChannelIdToClean, reason = "Unknown") {
         logger.info(`[Cleanup] Initiating for Asterisk ID: ${asteriskChannelIdToClean}. Reason: ${reason}`);
         const resources = this.tracker.getResources(asteriskChannelIdToClean);
-        const primarySidForOpenAI = resources?.twilioSid || resources?.asteriskChannelId || asteriskChannelIdToClean;
+        const primarySidForOpenAI = resources?.twilioCallSid || resources?.asteriskChannelId || asteriskChannelIdToClean;
         const ssrcToRemove = resources?.rtp_ssrc;
 
         const removedCallData = this.tracker.removeCall(asteriskChannelIdToClean);
         
         const actualResources = resources || removedCallData || {
             asteriskChannelId: asteriskChannelIdToClean,
-            twilioSid: primarySidForOpenAI,
+            twilioCallSid: primarySidForOpenAI,
             mainChannel: null, snoopChannel: null, localChannel: null,
             mainBridge: null, snoopBridge: null, conversationId: null, rtp_ssrc: null,
             recordingName: null // Ensure recordingName is part of this structure
