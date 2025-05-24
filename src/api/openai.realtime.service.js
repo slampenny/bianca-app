@@ -18,6 +18,7 @@ const CONSTANTS = {
     CONNECTION_TIMEOUT: 10000, // WebSocket connection timeout (milliseconds)
     DEFAULT_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
     OPENAI_PCM_OUTPUT_RATE: 24000, // Expected rate FROM OpenAI for pcm16 output
+    TEST_CONNECTION_TIMEOUT: 20000, // Timeout for the standalone test connection method (milliseconds)
 };
 
 /**
@@ -360,50 +361,36 @@ class OpenAIRealtimeService {
 
         try {
             switch (message.type) {
+                
                 case 'session.created':
-                    logger.info(`[OpenAI Realtime] Session created for ${callId}, OpenAI Session ID: ${message.session.id}`);
-                    conn.sessionId = message.session.id;
-                    const sessionConfig = {
-                        type: 'session.update',
-                        session: {
-                            instructions: conn.initialPrompt || "You are Bianca, a helpful AI assistant.",
-                            voice: config.openai.realtimeVoice || 'alloy',
-                            input_audio_format: 'g711_ulaw', // We send uLaw
-                            output_audio_format: 'pcm16',   // Expect PCM back
-                            ...(config.openai.realtimeSessionConfig || {})
-                        },
-                    };
-                    logger.info(`[OpenAI Realtime] Sending session.update for ${callId} with payload: ${JSON.stringify(sessionConfig.session)}`);
-                    await this.sendJsonMessage(callId, sessionConfig);
-                    
-                    // --- ISOLATED TEXT MESSAGE TEST ---
-                    const testUserMessage = {
-                        type: 'conversation.item.create',
-                        item: {
-                            type: 'message',
-                            role: 'user',
-                            content: [{ type: 'input_text', text: `ISOLATED_TEST_MSG_CALLID_${callId}_SESSIONID_${conn.sessionId}_TIMESTAMP_${Date.now()}` }]
-                        }
-                    };
-                    logger.info(`[OpenAI Realtime] Attempting to send ISOLATED TEST text message for ${callId} (Session: ${conn.sessionId})`);
-                    await this.sendJsonMessage(callId, testUserMessage);
-                    logger.info(`[OpenAI Realtime] ISOLATED TEST text message sent for ${callId}. Now check OpenAI dashboard. Audio flushing is PAUSED for this test.`);
-                    // For this test, we are NOT setting sessionReady or flushing audio yet.
-                    // conn.sessionReady = true;
-                    // await this.flushPendingAudio(callId); 
-                    // this.notify(callId, 'openai_session_ready', {});
-                    break;
-                    // --- END OF ISOLATED TEXT MESSAGE TEST ---
+                    logger.info(`[OpenAI Realtime] Session CREATED for ${callId}, OpenAI Session ID: ${message.session.id}`);
+                    if (conn) { // Ensure conn still exists
+                        conn.sessionId = message.session.id; // Store the session ID
 
-                    /* // Original logic after session.update (commented out for the test)
-                    logger.info(`[OpenAI Realtime] Sending initial user message for ${callId}`);
-                    const initialUserMessage = { type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hello, are you there?' }] } };
-                    await this.sendJsonMessage(callId, initialUserMessage);
-                    conn.sessionReady = true;
-                    await this.flushPendingAudio(callId); // Send buffered uLaw now
-                    this.notify(callId, 'openai_session_ready', {});
+                        const sessionConfig = {
+                            type: 'session.update',
+                            session: {
+                                instructions: conn.initialPrompt || "You are Bianca, a helpful AI assistant.",
+                                voice: config.openai.realtimeVoice || 'alloy',
+                                input_audio_format: 'g711_ulaw',
+                                output_audio_format: 'pcm16',
+                                ...(config.openai.realtimeSessionConfig || {})
+                            },
+                        };
+                        logger.info(`[OpenAI Realtime] Sending session.update for ${callId} (Session: ${conn.sessionId}). Payload: ${JSON.stringify(sessionConfig.session)}`);
+                        try {
+                            await this.sendJsonMessage(callId, sessionConfig);
+                            logger.info(`[OpenAI Realtime] session.update sent for ${callId}. Now WAITING for session.updated from OpenAI before proceeding.`);
+                            // DO NOT set sessionReady or send more data here yet.
+                            // We will do that in the 'session.updated' case.
+                        } catch (sendError) {
+                            logger.error(`[OpenAI Realtime] Failed to send session.update for ${callId}: ${sendError.message}. Cleaning up.`);
+                            this.cleanup(callId);
+                        }
+                    } else {
+                        logger.warn(`[OpenAI Realtime] session.created received for ${callId}, but connection object no longer exists.`);
+                    }
                     break;
-                    */
 
                 case 'response.content_part.added':
                     if (message.content_part.content_type === 'audio') {
@@ -431,15 +418,36 @@ class OpenAIRealtimeService {
                     break;
 
                 case 'session.updated':
-                    logger.info(`[OpenAI Realtime] Session updated event for ${callId}. Details: ${JSON.stringify(message.session)}`);
-                    // If this is the confirmation for our session.update, now we can consider the session fully configured.
-                    // If NOT doing the isolated text test, this is where you might set sessionReady and flush audio.
-                    if (!conn.sessionReady) { // Check if this is the first update after our config
-                        logger.info(`[OpenAI Realtime] OpenAI session confirmed as updated for ${callId}.`);
-                        // If NOT doing the isolated text test:
-                        // conn.sessionReady = true;
-                        // await this.flushPendingAudio(callId);
-                        // this.notify(callId, 'openai_session_ready', {});
+                    logger.info(`[OpenAI Realtime] Session UPDATED for ${callId}. Details: ${JSON.stringify(message.session)}`);
+                    if (conn && conn.sessionId === message.session?.id && !conn.sessionReady) {
+                        // This is the acknowledgment for the session.update we sent after session.created.
+                        // Now the session is truly configured and ready on OpenAI's side.
+                        logger.info(`[OpenAI Realtime] Confirmed session.updated for main call ${callId}. Setting sessionReady and proceeding with initial message & audio flush.`);
+
+                        // Send initial user message
+                        logger.info(`[OpenAI Realtime] Sending initial user message for ${callId} (Session: ${conn.sessionId})`);
+                        const initialUserMessage = {
+                            type: 'conversation.item.create',
+                            item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hello, are you there?' }] }
+                        };
+
+                        try {
+                            await this.sendJsonMessage(callId, initialUserMessage);
+
+                            conn.sessionReady = true;
+                            logger.info(`[OpenAI Realtime] Session for ${callId} (ID: ${conn.sessionId}) is now FULLY READY. Flushing pending audio.`);
+                            await this.flushPendingAudio(callId); // This will send buffered user audio
+                            this.notify(callId, 'openai_session_ready', {});
+
+                        } catch (sendError) {
+                            logger.error(`[OpenAI Realtime] Error sending initial message or flushing audio for ${callId} after session.updated: ${sendError.message}. Cleaning up.`);
+                            this.cleanup(callId);
+                        }
+
+                    } else if (conn && conn.sessionId === message.session?.id && conn.sessionReady) {
+                        logger.info(`[OpenAI Realtime] Received subsequent session.updated for already ready session ${callId}. No action needed.`);
+                    } else {
+                        logger.warn(`[OpenAI Realtime] Received session.updated, but connection/sessionID mismatch or session already ready. CallId: ${callId}, ConnSessionId: ${conn?.sessionId}, MsgSessionId: ${message.session?.id}, SessionReady: ${conn?.sessionReady}`);
                     }
                     break;
 
@@ -551,43 +559,62 @@ class OpenAIRealtimeService {
     /**
      * Send JSON message. Uses callId.
      */
+    /**
+     * Send JSON message. Uses callId or a passed WebSocket for tests.
+     */
     async sendJsonMessage(callId, messageObj) {
-        const conn = this.connections.get(callId);
-        if (!conn?.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-            logger.warn(`[OpenAI Realtime] Cannot send JSON - WS not open for ${callId}. Type: ${messageObj?.type}. WS ReadyState: ${conn?.webSocket?.readyState}`);
-            return false;
+        let wsToSend = null;
+        let identifier = callId;
+        let conn = null; // Keep conn for lastActivity update if it's a regular call
+
+        if (callId) {
+            conn = this.connections.get(callId);
+            if (conn) {
+                wsToSend = conn.webSocket;
+            }
+        } else if (messageObj && messageObj._testWebSocket) { // Check for test WebSocket
+            wsToSend = messageObj._testWebSocket;
+            identifier = messageObj._testId || 'standalone-test'; // Use a test identifier for logging
+            // Create a temporary structure for logging if needed, or just use identifier
+        }
+        
+        // Remove internal props before stringifying, regardless of source
+        if (messageObj && messageObj._testWebSocket) delete messageObj._testWebSocket;
+        if (messageObj && messageObj._testId) delete messageObj._testId;
+
+
+        if (!wsToSend || wsToSend.readyState !== WebSocket.OPEN) {
+            logger.warn(`[OpenAI Realtime] Cannot send JSON - WS not open for ${identifier}. Type: ${messageObj?.type}. WS ReadyState: ${wsToSend?.readyState}`);
+            return Promise.reject(new Error(`WebSocket not open for ${identifier}`));
         }
         try {
             const messageStr = JSON.stringify(messageObj);
 
-            // Conditional logging for audio to avoid overly verbose logs for audio data itself
             if (messageObj.type === 'input_audio_buffer.append') {
-                logger.info(`[OpenAI Realtime] SENDING to OpenAI (${callId}): type=${messageObj.type}, audio_length=${messageObj.audio?.length || 0}`);
+                logger.info(`[OpenAI Realtime] SENDING to OpenAI (${identifier}): type=${messageObj.type}, audio_length=${messageObj.audio?.length || 0}`);
             } else if (messageObj.type === 'input_audio_buffer.commit') {
-                logger.info(`[OpenAI Realtime] SENDING to OpenAI (${callId}): type=${messageObj.type}`);
+                logger.info(`[OpenAI Realtime] SENDING to OpenAI (${identifier}): type=${messageObj.type}`);
             } else {
-                logger.info(`[OpenAI Realtime] SENDING to OpenAI (${callId}): type=${messageObj.type}, details: ${messageStr.substring(0, 250)}...`);
+                logger.info(`[OpenAI Realtime] SENDING to OpenAI (${identifier}): type=${messageObj.type}, details: ${messageStr.substring(0, 250)}...`);
             }
             
             return new Promise((resolve, reject) => {
-                conn.webSocket.send(messageStr, (error) => {
+                wsToSend.send(messageStr, (error) => {
                     if (error) {
-                        logger.error(`[OpenAI Realtime] WebSocket ws.send() ERROR for callId ${callId} (type: ${messageObj.type}): ${error.message}`, error);
-                        conn.lastActivity = Date.now(); // Update activity even on send error
-                        // Consider if this error should trigger a reconnect or specific error state
-                        // this.updateConnectionStatus(callId, 'error_sending'); // Example
-                        reject(error); // Reject the promise
+                        logger.error(`[OpenAI Realtime] WebSocket ws.send() ERROR for ${identifier} (type: ${messageObj.type}): ${error.message}`, error);
+                        if(conn) conn.lastActivity = Date.now(); // Update lastActivity only if it's a regular connection
+                        reject(error); 
                     } else {
-                        logger.debug(`[OpenAI Realtime] WebSocket ws.send() successful for callId ${callId} (type: ${messageObj.type})`);
-                        conn.lastActivity = Date.now();
-                        resolve(true); // Resolve the promise
+                        logger.debug(`[OpenAI Realtime] WebSocket ws.send() successful for ${identifier} (type: ${messageObj.type})`);
+                        if(conn) conn.lastActivity = Date.now(); // Update lastActivity only if it's a regular connection
+                        resolve(true); 
                     }
                 });
             });
 
-        } catch (err) { // Catch error from JSON.stringify
-            logger.error(`[OpenAI Realtime] Error stringifying message for OpenAI (${callId}): ${err.message}`);
-            return false; // Or reject(err) if the caller should handle it as a promise
+        } catch (err) { 
+            logger.error(`[OpenAI Realtime] Error stringifying message for OpenAI (${identifier}): ${err.message}`);
+            return Promise.reject(err);
         }
     }
 
@@ -906,6 +933,168 @@ class OpenAIRealtimeService {
         this.stopHealthCheck(); // Stop health check after attempting to disconnect all
         logger.info(`[OpenAI Realtime] All connections processed for disconnection and health check stopped.`);
     }
+
+    /**
+     * NEW METHOD: Test basic WebSocket connection and session handshake with OpenAI.
+     * This method is standalone and does not use the main `this.connections` map.
+     * @param {string} testId - A unique identifier for this test run, for logging.
+     * @returns {Promise<object>} Resolves with session details on success, rejects on error/timeout.
+     */
+    async testBasicConnectionAndSession(testId = `standalone-test-${Date.now()}`) {
+        return new Promise(async (resolve, reject) => {
+            logger.info(`[OpenAI TestConn] Starting test: ${testId}`);
+            let wsClient = null;
+            let testTimeoutId = null;
+            let sessionCreatedReceived = false;
+            let sessionUpdatedReceived = false;
+            let openAIResponseSessionId = null;
+            let receivedMessages = []; // To track received messages for debugging
+
+            const cleanupAndFinish = (outcome, data) => {
+                if (testTimeoutId) clearTimeout(testTimeoutId);
+                testTimeoutId = null; // Prevent multiple calls
+
+                if (wsClient) {
+                    const tempWs = wsClient; // Avoid race if wsClient is nulled by another path
+                    wsClient = null; // Prevent further operations on this ws
+                    
+                    tempWs.removeAllListeners(); // Important before close/terminate
+                    if (tempWs.readyState === WebSocket.OPEN || tempWs.readyState === WebSocket.CONNECTING) {
+                        logger.info(`[OpenAI TestConn] Closing test WebSocket for ${testId}. Current state: ${tempWs.readyState}`);
+                        tempWs.close(1000, `Test ${testId} finished: ${outcome}`);
+                    } else {
+                         logger.info(`[OpenAI TestConn] Test WebSocket for ${testId} already in state ${tempWs.readyState}. Not closing again.`);
+                    }
+                } else {
+                    logger.info(`[OpenAI TestConn] cleanupAndFinish: wsClient already null for ${testId}.`);
+                }
+
+
+                if (outcome === 'resolve') {
+                    logger.info(`[OpenAI TestConn] Test ${testId} SUCCEEDED. Data: ${JSON.stringify(data)}`);
+                    resolve(data);
+                } else {
+                    data.receivedMessages = receivedMessages; // Add received messages to error object
+                    logger.error(`[OpenAI TestConn] Test ${testId} FAILED. Data: ${JSON.stringify(data)}`);
+                    reject(data);
+                }
+            };
+
+            testTimeoutId = setTimeout(() => {
+                if (wsClient && (wsClient.readyState === WebSocket.OPEN || wsClient.readyState === WebSocket.CONNECTING)) { // Check if cleanupAndFinish hasn't run
+                     cleanupAndFinish('reject', {
+                        status: 'timeout',
+                        message: `Test connection ${testId} timed out after ${CONSTANTS.TEST_CONNECTION_TIMEOUT}ms. SessionCreated: ${sessionCreatedReceived}, SessionUpdated: ${sessionUpdatedReceived}`
+                    });
+                } else {
+                    logger.info(`[OpenAI TestConn] Timeout for ${testId}, but cleanupAndFinish seems to have already run or wsClient is null.`);
+                }
+            }, CONSTANTS.TEST_CONNECTION_TIMEOUT);
+
+            try {
+                const model = config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17';
+                const voice = config.openai.realtimeVoice || 'alloy';
+                const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
+                logger.info(`[OpenAI TestConn] Connecting to ${wsUrl} for test: ${testId}`);
+
+                wsClient = new WebSocket(wsUrl, {
+                    headers: {
+                        Authorization: `Bearer ${config.openai.apiKey}`,
+                        'OpenAI-Beta': 'realtime=v1'
+                    }
+                });
+
+                wsClient.on('open', async () => {
+                    logger.info(`[OpenAI TestConn] WebSocket opened for test: ${testId}`);
+                    // OpenAI should send 'session.created' automatically after 'open'
+                });
+
+                wsClient.on('message', async (data) => {
+                    if (!wsClient) return; // If already cleaned up
+
+                    let message;
+                    try {
+                        message = JSON.parse(data);
+                        receivedMessages.push({ timestamp: new Date().toISOString(), type: message.type, data: message });
+                        logger.info(`[OpenAI TestConn] RECEIVED from OpenAI (${testId}): type=${message.type}, Full: ${JSON.stringify(message)}`);
+                    } catch (err) {
+                        logger.error(`[OpenAI TestConn] Failed JSON parse for ${testId}: ${err.message}. Data: ${data.toString().substring(0,100)}`);
+                        return; 
+                    }
+
+                    if (message.type === 'session.created') {
+                        sessionCreatedReceived = true;
+                        openAIResponseSessionId = message.session?.id;
+                        logger.info(`[OpenAI TestConn] Session CREATED for ${testId}, OpenAI Session ID: ${openAIResponseSessionId}`);
+                        
+                        const sessionConfig = {
+                            type: 'session.update',
+                            session: {
+                                instructions: `Test connection prompt for ${testId}.`,
+                                voice: config.openai.realtimeVoice || 'alloy',
+                                input_audio_format: 'g711_ulaw', // Required, even if not sending audio for this test
+                                output_audio_format: 'pcm16',   // Required
+                            },
+                            _testWebSocket: wsClient, // Pass the ws object for sendJsonMessage
+                            _testId: testId
+                        };
+                        logger.info(`[OpenAI TestConn] Sending session.update for ${testId}`);
+                        try {
+                            // Use the class's sendJsonMessage, but pass null for callId
+                            // and the _testWebSocket and _testId will be picked up by the modified sendJsonMessage
+                            await this.sendJsonMessage(null, sessionConfig);
+                        } catch (sendErr) {
+                            if (wsClient) cleanupAndFinish('reject', { status: 'error_sending_session_update', message: `Failed to send session.update: ${sendErr.message}` });
+                        }
+                    } else if (message.type === 'session.updated') {
+                        sessionUpdatedReceived = true;
+                        logger.info(`[OpenAI TestConn] Session UPDATED for ${testId}. Details: ${JSON.stringify(message.session)}`);
+                        if (sessionCreatedReceived) { // Ensure created was received first
+                            if (wsClient) cleanupAndFinish('resolve', {
+                                status: 'success',
+                                message: 'Session created and updated successfully.',
+                                sessionId: openAIResponseSessionId || message.session?.id, // Prefer the one from session.created
+                                sessionDetails: message.session,
+                                receivedMessages
+                            });
+                        } else {
+                            logger.warn(`[OpenAI TestConn] Received session.updated before session.created for ${testId}. This is unusual.`);
+                        }
+                    } else if (message.type === 'error') {
+                        logger.error(`[OpenAI TestConn] Error message from OpenAI for ${testId}: ${JSON.stringify(message.error)}`);
+                         if (wsClient) cleanupAndFinish('reject', { status: 'openai_error', error: message.error, sessionId: openAIResponseSessionId });
+                    }
+                });
+
+                wsClient.on('error', (error) => {
+                    logger.error(`[OpenAI TestConn] WebSocket error for ${testId}: ${error.message}`);
+                    if (wsClient) cleanupAndFinish('reject', { status: 'ws_error', message: error.message, sessionId: openAIResponseSessionId });
+                });
+
+                wsClient.on('close', (code, reason) => {
+                    const reasonStr = reason ? reason.toString() : 'No reason provided';
+                    logger.info(`[OpenAI TestConn] WebSocket closed for ${testId}. Code: ${code}, Reason: ${reasonStr}`);
+                    // If not already resolved/rejected by timeout or success/error message
+                    // Check if cleanupAndFinish has effectively been called (testTimeoutId would be null or wsClient would be null)
+                    if (testTimeoutId && wsClient) { 
+                         cleanupAndFinish('reject', { 
+                            status: 'ws_closed_unexpectedly', 
+                            code, 
+                            reason: reasonStr, 
+                            sessionId: openAIResponseSessionId,
+                            sessionCreated: sessionCreatedReceived,
+                            sessionUpdated: sessionUpdatedReceived 
+                        });
+                    }
+                });
+
+            } catch (err) { // Synchronous errors from new WebSocket()
+                logger.error(`[OpenAI TestConn] CRITICAL: Error instantiating WebSocket for test ${testId}: ${err.message}`, err);
+                cleanupAndFinish('reject', { status: 'init_error', message: err.message });
+            }
+        });
+    }
+
 } // End OpenAIRealtimeService Class
 
 // Ensure only one instance is created and exported

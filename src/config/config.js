@@ -251,7 +251,7 @@ baselineConfig.loadSecrets = async () => {
     //if (secrets.WEBSOCKET_URL) baselineConfig.twilio.websocketUrl = secrets.WEBSOCKET_URL; // Load WS URL from secrets
     // OpenAI
     if (secrets.OPENAI_API_KEY) baselineConfig.openai.apiKey = secrets.OPENAI_API_KEY;
-    if (secrets.OPENAI_REALTIME_MODEL) baselineConfig.openai.realtimeModel = secrets.OPENAI_REALTIME_MODEL; // Load Realtime model from secrets
+    //if (secrets.OPENAI_REALTIME_MODEL) baselineConfig.openai.realtimeModel = secrets.OPENAI_REALTIME_MODEL; // Load Realtime model from secrets
     // Stripe
     if (secrets.STRIPE_SECRET_KEY) {
       baselineConfig.stripe.secretKey = secrets.STRIPE_SECRET_KEY;

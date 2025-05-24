@@ -119,6 +119,32 @@ router.get('/debug', testController.getDebugInfo);
 
 /**
  * @swagger
+ * /test/websocket:
+ *   get:
+ *     summary: test open ai websocket connection
+ *     description: test open ai websocket connection
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: websocket test successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 details:
+ *                   type: object
+ *                 success:
+ *                   type: object
+ *       "500":
+ *         description: Server error
+ */
+router.get('/websocket', testController.testOpenAIWebSocket);
+
+/**
+ * @swagger
  * /test/create-caregiver:
  *   post:
  *     summary: Test the summarizeConversation function

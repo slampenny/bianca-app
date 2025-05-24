@@ -88,6 +88,31 @@ const getDebugInfo = async (req, res) => {
   }
 };
 
+// New method to test OpenAI WebSocket
+const testOpenAIWebSocket = async (req, res) => {
+  try {
+    logger.info('[DebugController] Initiating OpenAI WebSocket connection test...'); // Use your actual logger
+    const testResult = await openAIService.testBasicConnectionAndSession(`test-route-${Date.now()}`);
+    logger.info('[DebugController] OpenAI WebSocket connection test completed successfully.');
+    res.status(200).json({
+      message: 'OpenAI WebSocket connection test initiated and completed.',
+      success: true,
+      details: testResult
+    });
+  } catch (error) {
+    logger.error('[DebugController] OpenAI WebSocket connection test failed:', error); // Use your actual logger
+    res.status(500).json({
+      message: 'OpenAI WebSocket connection test failed.',
+      success: false,
+      error: {
+        status: error.status || 'error',
+        message: error.message || 'An unexpected error occurred.',
+        details: error.details || error // Include any details from the rejection
+      }
+    });
+  }
+};
+
 /**
  * Initiate a test call to the first patient in the database
  */
@@ -134,5 +159,6 @@ module.exports = {
   testSeed,
   testSummarize,
   testCleanDB,
-  getDebugInfo
+  getDebugInfo,
+  testOpenAIWebSocket
 };
