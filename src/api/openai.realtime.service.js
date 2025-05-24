@@ -423,6 +423,11 @@ class OpenAIRealtimeService {
             if (i + BATCH_SIZE < chunksToFlush.length) { await new Promise(resolve => setTimeout(resolve, 50)); }
         }
         logger.info(`[OpenAI Realtime] Finished flushing pending audio for ${callId}`);
+
+        await this.sendJsonMessage(callId, {
+            type: 'input_audio_buffer.commit'
+        });
+        logger.info(`[OpenAI Realtime] Sent explicit commit for ${callId}`);
     }
 
      /**
