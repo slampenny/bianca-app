@@ -3,11 +3,8 @@ const mongoose = require('mongoose');
 const http = require('http');
 const config = require('./config/config');
 const logger = require('./config/logger');
-//const { initializeWebSocketServer } = require('./api/websocket.service');
-//const { startAriClient } = require('./api/ari.client');
-const { startAriClient } = require('./api/ari.client');
+const { startAriClient, getAriClientInstance } = require('./api/ari.client');
 const { startRtpListenerService } = require('./api/rtp.listener.service');
-//const { startAudioSocketServer } = require('./api/audio.socket.service'); // ADD
 
 /**
  * Starts the application server and initializes all components
@@ -22,17 +19,15 @@ async function startServer() {
     const app = require('./app');
 
     // Connect to MongoDB
-    // In index.js, modify the MongoDB connection block
     let mongoConnected = false;
     const maxRetries = 5;
     let retries = 0;
 
     while (!mongoConnected && retries < maxRetries) {
       try {
-        logger.info(`Attempting to connect to MongoDB (attempt <span class="math-inline">\{retries \+ 1\}/</span>{maxRetries})... URL: ${config.mongoose.url}`);
+        logger.info(`Attempting to connect to MongoDB (attempt ${retries + 1}/${maxRetries})... URL: ${config.mongoose.url}`);
         await mongoose.connect(config.mongoose.url, {
           ...config.mongoose.options,
-          // Ensure a reasonable connectTimeoutMS if not already in options
           connectTimeoutMS: config.mongoose.options.connectTimeoutMS || 30000,
         });
         logger.info('Connected to MongoDB');
@@ -43,13 +38,40 @@ async function startServer() {
         if (retries >= maxRetries) {
           logger.error('Max MongoDB connection retries reached. Continuing without database.');
           logger.warn('Application functionality will be limited without database access');
-          // Optionally log the full error for the last attempt for more details
-          // logger.error('Last MongoDB connection error object:', mongoError);
         } else {
           logger.info(`Waiting ${5 * retries} seconds before next MongoDB connection attempt...`);
-          await new Promise(resolve => setTimeout(resolve, 5000 * retries)); // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 5000 * retries));
         }
       }
+    }
+
+    // Initialize Asterisk ARI client BEFORE starting HTTP server
+    let ariReady = false;
+    if (config.asterisk && config.asterisk.enabled) {
+      logger.info('Asterisk integration enabled, starting ARI client');
+      try {
+        // Start ARI client
+        const ariClient = await startAriClient();
+        
+        // IMPORTANT: Wait for ARI to be fully ready
+        logger.info('Waiting for ARI client to be ready...');
+        await ariClient.waitForReady();
+        ariReady = true;
+        logger.info('ARI client is ready and Stasis app registered');
+        
+        // Start RTP Listener after ARI is ready
+        logger.info('Starting RTP listener service...');
+        startRtpListenerService();
+        logger.info('RTP listener service started');
+        
+      } catch (err) {
+        logger.error(`Failed to start Asterisk ARI client: ${err.message}`);
+        logger.warn('Continuing without Asterisk integration');
+        // Optionally exit if ARI is critical
+        // process.exit(1);
+      }
+    } else {
+      logger.info('Asterisk integration disabled in configuration');
     }
 
     // Create HTTP server from Express app
@@ -62,27 +84,19 @@ async function startServer() {
       logger.info(`[Server] Method: ${request.method}`);
     });
 
-    // initializeWebSocketServer(server); // REMOVE
     logger.info('WebSocket server (Twilio Media Streams) is DISABLED.');
-
-    // Initialize Asterisk ARI client (if enabled in config)
-    if (config.asterisk && config.asterisk.enabled) {
-      logger.info('Asterisk integration enabled, starting ARI client');
-      startAriClient().catch(err => {
-        logger.error(`Failed to start Asterisk ARI client: ${err.message}`);
-        logger.warn('Continue without Asterisk integration');
-      });
-
-      // Start RTP Listener
-      startRtpListenerService();
-    } else {
-      logger.info('Asterisk integration disabled in configuration');
-    }
 
     // Start HTTP server
     const port = config.port || 3000;
     server.listen(port, '0.0.0.0', () => {
       logger.info(`Server listening on port ${port}`);
+      
+      // Log service status
+      logger.info('=== Service Status ===');
+      logger.info(`MongoDB: ${mongoConnected ? 'Connected' : 'Not connected'}`);
+      logger.info(`ARI Client: ${ariReady ? 'Ready' : 'Not ready'}`);
+      logger.info(`RTP Listener: ${config.asterisk?.enabled && ariReady ? 'Running' : 'Not running'}`);
+      logger.info('====================');
       
       // Log URLs for debugging
       if (config.env === 'production') {
@@ -115,8 +129,27 @@ function setupShutdownHandlers(server) {
   };
 
   // Handler for graceful shutdown
-  const gracefulShutdown = (server) => {
+  const gracefulShutdown = async (server) => {
     logger.info('Initiating graceful shutdown...');
+    
+    // Shutdown ARI client first
+    try {
+      const ariClient = getAriClientInstance();
+      if (ariClient && ariClient.isConnected) {
+        logger.info('Shutting down ARI client...');
+        await ariClient.shutdown();
+      }
+    } catch (err) {
+      logger.error('Error shutting down ARI client:', err);
+    }
+    
+    // Stop RTP listener
+    try {
+      const rtpListener = require('./api/rtp.listener.service');
+      rtpListener.stopRtpListenerService();
+    } catch (err) {
+      logger.error('Error stopping RTP listener:', err);
+    }
     
     if (server) {
       server.close(() => {

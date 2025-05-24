@@ -423,57 +423,86 @@ class OpenAIRealtimeService {
             if (i + BATCH_SIZE < chunksToFlush.length) { await new Promise(resolve => setTimeout(resolve, 50)); }
         }
         logger.info(`[OpenAI Realtime] Finished flushing pending audio for ${callId}`);
-
-        await this.sendJsonMessage(callId, {
-            type: 'input_audio_buffer.commit'
-        });
-        logger.info(`[OpenAI Realtime] Sent explicit commit for ${callId}`);
     }
 
      /**
       * Debounce commit. Uses callId.
       */
     debounceCommit(callId) {
-         if (this.commitTimers.has(callId)) { clearTimeout(this.commitTimers.get(callId)); }
-         const conn = this.connections.get(callId);
-         if (!conn?.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) return;
-         const timer = setTimeout(async () => {
-             this.commitTimers.delete(callId);
-             const currentConn = this.connections.get(callId);
-             if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
-                 logger.debug(`[OpenAI Realtime] Sending debounced commit for ${callId}`);
-                 await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-             } else { logger.warn(`[OpenAI Realtime] Skipped debounced commit, WS/session not ready for ${callId}`); }
-         }, CONSTANTS.COMMIT_DEBOUNCE_DELAY);
-         this.commitTimers.set(callId, timer);
+    if (this.commitTimers.has(callId)) { 
+        clearTimeout(this.commitTimers.get(callId)); 
     }
+    const conn = this.connections.get(callId);
+    if (!conn?.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) return;
+    
+    const timer = setTimeout(async () => {
+        this.commitTimers.delete(callId);
+        const currentConn = this.connections.get(callId);
+        if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
+            logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId}`);
+            const success = await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+            if (!success) {
+                logger.error(`[OpenAI Realtime] Failed to send commit for ${callId}`);
+            }
+        } else { 
+            logger.warn(`[OpenAI Realtime] Skipped debounced commit, WS/session not ready for ${callId}`); 
+        }
+    }, CONSTANTS.COMMIT_DEBOUNCE_DELAY);
+    
+    this.commitTimers.set(callId, timer);
+}
 
     /**
      * Send audio chunk. Expects uLaw base64 (from RTP listener). Sends directly to OpenAI.
      */
     async sendAudioChunk(callId, audioChunkBase64ULaw) {
-        if (!audioChunkBase64ULaw) { return; }
-        const conn = this.connections.get(callId);
-        if (!conn || !conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-            logger.warn(`[OpenAI Realtime] sendAudioChunk: WS/Session not ready for ${callId}. Buffering.`);
-            if (conn && conn.status !== 'closed' && conn.status !== 'error') {
-                 if (!this.pendingAudio.has(callId)) { this.pendingAudio.set(callId, []); }
-                 this.pendingAudio.get(callId).push(audioChunkBase64ULaw); // Buffer uLaw
-            }
-            return;
-        }
-        try {
-             const ulawBase64ToSend = audioChunkBase64ULaw;
-             if (ulawBase64ToSend && ulawBase64ToSend.length > 0) {
-                conn.lastActivity = Date.now();
-                const success = await this.sendJsonMessage(callId, {
-                    type: 'input_audio_buffer.append',
-                    audio: ulawBase64ToSend // Send the uLaw
-                });
-                if (success) { this.debounceCommit(callId); }
-            } else { logger.warn(`[OpenAI Realtime] Received empty uLaw chunk for ${callId}.`); }
-        } catch (err) { logger.error(`[OpenAI Realtime] Error sending uLaw audio chunk for ${callId}: ${err.message}`, err); }
+    if (!audioChunkBase64ULaw) { 
+        logger.warn(`[OpenAI Realtime] Empty audio chunk for ${callId}`);
+        return; 
     }
+    
+    const conn = this.connections.get(callId);
+    if (!conn || !conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
+        logger.warn(`[OpenAI Realtime] sendAudioChunk: WS/Session not ready for ${callId}. Buffering.`);
+        if (conn && conn.status !== 'closed' && conn.status !== 'error') {
+            if (!this.pendingAudio.has(callId)) { 
+                this.pendingAudio.set(callId, []); 
+            }
+            const pending = this.pendingAudio.get(callId);
+            if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+                pending.push(audioChunkBase64ULaw);
+            } else {
+                logger.warn(`[OpenAI Realtime] Pending audio buffer full for ${callId}, dropping chunk`);
+            }
+        }
+        return;
+    }
+    
+    try {
+        const ulawBase64ToSend = audioChunkBase64ULaw;
+        if (ulawBase64ToSend && ulawBase64ToSend.length > 0) {
+            conn.lastActivity = Date.now();
+            
+            // Log the size of audio being sent
+            logger.debug(`[OpenAI Realtime] Sending audio chunk for ${callId}, size: ${ulawBase64ToSend.length} chars`);
+            
+            const success = await this.sendJsonMessage(callId, {
+                type: 'input_audio_buffer.append',
+                audio: ulawBase64ToSend
+            });
+            
+            if (success) { 
+                this.debounceCommit(callId); 
+            } else {
+                logger.warn(`[OpenAI Realtime] Failed to send audio chunk for ${callId}`);
+            }
+        } else { 
+            logger.warn(`[OpenAI Realtime] Received empty uLaw chunk for ${callId}.`); 
+        }
+    } catch (err) { 
+        logger.error(`[OpenAI Realtime] Error sending uLaw audio chunk for ${callId}: ${err.message}`, err); 
+    }
+}
 
     /**
      * Send a text message to OpenAI. Uses callId.

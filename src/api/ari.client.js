@@ -758,18 +758,19 @@ class AsteriskAriClient {
     
     // Stop any active recordings
     if (resources.mainBridge && resources.recordingName) {
-        try {
-            logger.info(`[Cleanup] Stopping recording ${resources.recordingName} on bridge ${resources.mainBridge.id}`);
-            await resources.mainBridge.stopRecord({ recordingName: resources.recordingName });
-            logger.info(`[Cleanup] Successfully stopped recording ${resources.recordingName}`);
-        } catch (e) {
-            if (e.message && e.message.includes('404')) {
-                logger.info(`[Cleanup] Recording ${resources.recordingName} already stopped or bridge gone (404)`);
-            } else {
-                logger.warn(`[Cleanup] Error stopping recording: ${e.message}`);
-            }
+    try {
+        logger.info(`[Cleanup] Stopping recording ${resources.recordingName} on bridge ${resources.mainBridge.id}`);
+        // Use the recordings API, not bridge.stopRecord
+        await this.client.recordings.stop({ recordingName: resources.recordingName });
+        logger.info(`[Cleanup] Successfully stopped recording ${resources.recordingName}`);
+    } catch (e) {
+        if (e.message && e.message.includes('404')) {
+            logger.info(`[Cleanup] Recording ${resources.recordingName} already stopped or not found (404)`);
+        } else {
+            logger.warn(`[Cleanup] Error stopping recording: ${e.message}`);
         }
     }
+}
     
     // Helper function to safely hang up channels
     const safeHangup = async (channel, type) => {
