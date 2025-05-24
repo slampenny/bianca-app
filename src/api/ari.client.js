@@ -193,8 +193,7 @@ class AsteriskAriClient {
                     logger.info(`[ARI] Instructing Asterisk to send ExternalMedia from snoop ${channelId} to: ${rtpDest}`);
                     await channel.externalMedia({
                         app: 'myphonefriend',
-                        external_host: this.RTP_LISTENER_HOST,
-                        external_port: this.RTP_LISTENER_PORT,
+                        external_host: rtpDest,
                         format: this.RTP_SEND_FORMAT,
                         direction: 'read',
                     });
