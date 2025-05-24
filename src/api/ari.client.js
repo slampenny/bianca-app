@@ -415,7 +415,7 @@ class AsteriskAriClient {
         this.client.on('ChannelRtpStarted', async (event, channel) => {
             if (!channel.name.startsWith('UnicastRTP/')) return;
 
-            logger.info('[ARI] 🔥 ChannelRtpStarted for', channel.id);
+            logger.info('[ARI] 🔥 ChannelRtpStarted for', channel.id, 'with SSRC', event.ssrc);
 
             // derive the same base as in your UnicastRTP branch
             const [base] = channel.id.split('.');
@@ -427,10 +427,26 @@ class AsteriskAriClient {
                 return;
             }
 
-            // now map the SSRC as before
+            const callData = this.tracker.getCall(parentId);
+            if (!callData) {
+                logger.warn(`[ARI] No call data found for parent ${parentId}`);
+                return;
+            }
+
+            // Get the Twilio SID to use as the primary identifier
+            const twilioSid = callData.twilioCallSid;
+            if (!twilioSid) {
+                logger.error(`[ARI] No Twilio SID found for call ${parentId}, using Asterisk ID as fallback`);
+                // Fallback to Asterisk ID if no Twilio SID
+                rtpListenerService.addSsrcMapping(event.ssrc, parentId);
+            } else {
+                // Use Twilio SID as the primary identifier
+                rtpListenerService.addSsrcMapping(event.ssrc, twilioSid);
+                logger.info(`[ARI] Mapped SSRC ${event.ssrc} → Twilio SID ${twilioSid}`);
+            }
+            
+            // Still update the tracker with the SSRC
             this.tracker.updateCall(parentId, { rtp_ssrc: event.ssrc });
-            rtpListenerService.addSsrcMapping(event.ssrc, parentId);
-            logger.info(`[ARI] Mapped SSRC ${event.ssrc} → call ${parentId}`);
         });
 
         this.client.on('ChannelDtmfReceived', (event, channel) => {

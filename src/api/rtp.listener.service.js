@@ -43,16 +43,14 @@ function parseRtpPacket(rtpPacketBuffer) {
  */
 function findCallAwaitingSsrc() {
     for (const [asteriskId, callData] of channelTracker.calls.entries()) {
-        // Check for the specific state set by ARI client after initiating externalMedia
         if (callData.state === 'external_media_active_awaiting_ssrc' && !callData.rtp_ssrc) {
-            // Return the primary callId (Twilio SID or fallback) and the Asterisk ID
             return {
-                callId: callData.twilioCallSid || asteriskId,
-                asteriskId: asteriskId // Needed to update the tracker state
+                callId: callData.twilioCallSid || asteriskId,  // This is correct - Twilio SID preferred
+                asteriskId: asteriskId  // Still need this to update the tracker
             };
         }
     }
-    return null; // No call found waiting for SSRC
+    return null;
 }
 
 function addSsrcMapping(ssrc, callId) {
