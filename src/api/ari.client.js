@@ -14,7 +14,7 @@ const rtpListenerService = require('./rtp.listener.service');
 function sanitizeHost(raw) {
   try {
     const u = new URL(raw);
-    return u.hostname;    // includes port if present
+    return u.hostname;    // doesn't and shouldn't include port if present
   } catch {
     return raw;
   }
@@ -231,7 +231,9 @@ class AsteriskAriClient {
                     const rtpSessionId = parentCallData.rtpSessionId;
                     
                     this.tracker.updateCall(parentChannelId, { 
-                        snoopToRtpMapping: rtpSessionId 
+                        snoopToRtpMapping: rtpSessionId,
+                        state: 'external_media_active_awaiting_ssrc',
+                        awaitingSsrcForRtp: true 
                     });
 
                     await channel.externalMedia({
@@ -242,10 +244,6 @@ class AsteriskAriClient {
                     });
                     
                     logger.info(`[ARI] ExternalMedia command sent for snoop ${channelId} -> ${rtpDest}`);
-                    this.tracker.updateCall(parentChannelId, { 
-                        state: 'external_media_active_awaiting_ssrc',
-                        awaitingSsrcForRtp: true 
-                    });
                 } catch (err) {
                     logger.error(`[ARI] Failed to start ExternalMedia on snoop ${channelId}: ${err.message}`, err);
                     await this.cleanupChannel(parentChannelId, `ExternalMedia setup failed for snoop ${channelId}`);
@@ -446,7 +444,10 @@ class AsteriskAriClient {
             }
             
             // Still update the tracker with the SSRC
-            this.tracker.updateCall(parentId, { rtp_ssrc: event.ssrc });
+            this.tracker.updateCall(parentId, { 
+                rtp_ssrc: event.ssrc,
+                awaitingSsrcForRtp: false // No longer awaiting SSRC
+             });
         });
 
         this.client.on('ChannelDtmfReceived', (event, channel) => {

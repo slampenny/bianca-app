@@ -43,13 +43,15 @@ function parseRtpPacket(rtpPacketBuffer) {
  */
 function findCallAwaitingSsrc() {
     for (const [asteriskId, callData] of channelTracker.calls.entries()) {
-        if (callData.state === 'external_media_active_awaiting_ssrc' && !callData.rtp_ssrc) {
+        if (callData.awaitingSsrcForRtp === true && !callData.rtp_ssrc) {
+            logger.info(`[RTP Listener] findCallAwaitingSsrc: Found call ${asteriskId} (TwilioSID: ${callData.twilioCallSid}) with awaitingSsrcForRtp=true.`);
             return {
-                callId: callData.twilioCallSid || asteriskId,  // This is correct - Twilio SID preferred
-                asteriskId: asteriskId  // Still need this to update the tracker
+                callId: callData.twilioCallSid || asteriskId, // Prefer Twilio SID for OpenAI
+                asteriskId: asteriskId // Need Asterisk ID to update tracker
             };
         }
     }
+    // logger.warn('[RTP Listener] findCallAwaitingSsrc: No call found with awaitingSsrcForRtp=true and no rtp_ssrc.'); // Reduce noise if it happens often before association
     return null;
 }
 
@@ -125,7 +127,8 @@ function startRtpListenerService() {
                 // Update tracker state and store SSRC
                 channelTracker.updateCall(asteriskId, {
                     state: 'external_media_streaming', // Update state
-                    rtp_ssrc: ssrc // Store the learned SSRC
+                    rtp_ssrc: ssrc, // Store the learned SSRC
+                    awaitingSsrcForRtp: false // Clear awaiting state
                 });
                 logger.info(`[RTP Listener] Mapped SSRC ${ssrc} from ${remoteAddr} to callId: ${callId} (AsteriskID: ${asteriskId})`);
             } else {
