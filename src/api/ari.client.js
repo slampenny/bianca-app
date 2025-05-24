@@ -193,6 +193,7 @@ class AsteriskAriClient {
                     logger.info(`[ARI] Instructing Asterisk to send ExternalMedia from snoop ${channelId} to: ${rtpDest}`);
                     await channel.externalMedia({
                         app: 'myphonefriend',
+                        appArgs:  [`snoop_parent_id=${snoopParentIdFromArg}`],
                         external_host: rtpDest,
                         format: this.RTP_SEND_FORMAT,
                         direction: 'read',
@@ -266,24 +267,27 @@ class AsteriskAriClient {
                 }
 
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
-                // find the parent call record
-                const callData = Array.from(this.tracker.calls.values()).find(c =>
-                    c.mainBridgeId   // assume you've saved mainBridgeId into tracker
-                );
+                const parentArg = event.args.find(a => a.startsWith('snoop_parent_id='));
+                if (!parentArg) {
+                    logger.warn(`[ARI] UnicastRTP ${channelId} came up with no snoop_parent_id — dropping`);
+                    return;
+                }
+                const parentId = parentArg.split('=')[1];
+                const callData = this.tracker.getCall(parentId);
                 if (!callData) {
-                    logger.warn(`[ARI] No parent call found for ${channelId}`);
+                    logger.warn(`[ARI] No call found with Asterisk ID ${parentId} for RTP channel ${channelId}`);
                     return;
                 }
 
-                try {
-                    const { value: ssrcStr } = await channel.getChannelVar({ variable: 'RTP_REMOTE_SSRC' });
-                    const ssrc = parseInt(ssrcStr, 10);
-                    this.tracker.updateCall(callData.asteriskChannelId, { rtp_ssrc: ssrc });
-                    rtpListenerService.addSsrcMapping(ssrc, callData.asteriskChannelId);
-                    logger.info(`[ARI] Mapped SSRC ${ssrc} → call ${callData.asteriskChannelId}`);
-                } catch (err) {
-                    logger.warn(`[ARI] Couldn’t read RTP_REMOTE_SSRC on ${channelId}: ${err.message}`);
-                }
+                // try {
+                //     const { value: ssrcStr } = await channel.getChannelVar({ variable: 'RTP_REMOTE_SSRC' });
+                //     const ssrc = parseInt(ssrcStr, 10);
+                //     this.tracker.updateCall(callData.asteriskChannelId, { rtp_ssrc: ssrc });
+                //     rtpListenerService.addSsrcMapping(ssrc, callData.asteriskChannelId);
+                //     logger.info(`[ARI] Mapped SSRC ${ssrc} → call ${callData.asteriskChannelId}`);
+                // } catch (err) {
+                //     logger.warn(`[ARI] Couldn’t read RTP_REMOTE_SSRC on ${channelId}: ${err.message}`);
+                // }
 
                 logger.info(`[ARI] Adding UnicastRTP channel ${channelId} to bridge ${callData.mainBridgeId}`);
                 await this.client.bridges.addChannel({
@@ -371,6 +375,18 @@ class AsteriskAriClient {
         this.client.on('ChannelTalkingFinished', (event, channel) => {
             const currentChannelName = channel.name || 'Unknown';
             logger.info(`[ARI VAD] <<< Talking FINISHED on channel ${channel.id} (${currentChannelName}). Duration: ${event.duration}ms`);
+        });
+
+        this.client.on('ChannelRtpStarted', (event, channel) => {
+            if (!channel.name.startsWith('UnicastRTP/')) return;
+            const parentArg = event.args.find(a => a.startsWith('snoop_parent_id='));
+            if (!parentArg) return;
+            const parentId = parentArg.split('=')[1];
+            const callData = this.tracker.getCall(parentId);
+            if (!callData) return;
+            this.tracker.updateCall(parentId, { rtp_ssrc: event.ssrc });
+            rtpListenerService.addSsrcMapping(event.ssrc, parentId);
+            logger.info(`[ARI] Mapped SSRC ${event.ssrc} → call ${parentId}`);
         });
 
         this.client.on('ChannelDtmfReceived', (event, channel) => {
