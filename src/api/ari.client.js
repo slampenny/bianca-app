@@ -278,50 +278,22 @@ class AsteriskAriClient {
                 logger.info(`[ARI] Channel ID: ${channelId}`);
                 
                 // Extract the numeric prefix from channel ID - might be like 1748053672.9
-                const match = channelId.match(/^(\d+)/);
-                if (!match) {
-                    logger.warn(`[ARI] Could not extract numeric prefix from UnicastRTP channel ${channelId} - dropping`);
-                    await channel.hangup().catch(() => {});
-                    return;
-                }
-                
-                const numericPrefix = match[1]; // e.g., "1748053672"
-                logger.info(`[ARI] Extracted prefix: ${numericPrefix}`);
-                
-                // Look for calls with matching prefix
-                let parentId = null;
-                for (const [callId, callData] of this.tracker.calls.entries()) {
-                    if (callId.startsWith(numericPrefix) && callData.expectingRtpChannel) {
-                        parentId = callId;
-                        logger.info(`[ARI] FOUND MATCH: ${callId} matches prefix ${numericPrefix}`);
-                        break;
-                    }
-                }
-                
-                if (!parentId) {
-                    logger.warn(`[ARI] No call found with matching prefix ${numericPrefix} for RTP channel ${channelId} - dropping`);
-                    await channel.hangup().catch(() => {});
-                    return;
-                }
-
+                const [parentBase] = channel.id.split('.');
+                // we know the original came in as “1748051349.0”
+                const parentId = `${parentBase}.0`;
                 const callData = this.tracker.getCall(parentId);
-                logger.info(`[ARI] Matched UnicastRTP ${channelId} to call ${parentId} via prefix ${numericPrefix}`);
+                if (!callData) {
+                    logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
+                    return;
+                }
 
-                // Clear the expecting flag and store RTP channel ID
-                this.tracker.updateCall(parentId, { 
-                    expectingRtpChannel: false,
-                    rtpChannelId: channelId
-                });
-
-                logger.info(`[ARI] Adding UnicastRTP channel ${channelId} to bridge ${callData.mainBridgeId}`);
+                logger.info(`[ARI] Adding UnicastRTP channel ${channel.id} to bridge ${callData.mainBridgeId}`);
                 await this.client.bridges.addChannel({
                     bridgeId: callData.mainBridgeId,
-                    channel: channelId
+                    channel: channel.id
                 });
-                this.tracker.updateCall(parentId, {
-                    state: 'external_media_bridged'
-                });
-} else if (currentChannelName.startsWith('Local/')) {
+                this.tracker.updateCall(parentId, { state: 'external_media_bridged' });
+                } else if (currentChannelName.startsWith('Local/')) {
                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
                 await channel.hangup().catch(()=>{});
             } else {
