@@ -191,9 +191,14 @@ class AsteriskAriClient {
                     logger.info(`[ARI] Answered snoop channel ${channelId}. Starting ExternalMedia.`);
                     const rtpDest = `${this.RTP_LISTENER_HOST}:${this.RTP_LISTENER_PORT}`;
                     logger.info(`[ARI] Instructing Asterisk to send ExternalMedia from snoop ${channelId} to: ${rtpDest}`);
+    
+                    await channel.setChannelVar({
+                        variable: 'SNOOP_PARENT_ID',
+                        value: snoopParentIdFromArg
+                    });
+    
                     await channel.externalMedia({
                         app: 'myphonefriend',
-                        appArgs:  [`snoop_parent_id=${snoopParentIdFromArg}`],
                         external_host: rtpDest,
                         format: this.RTP_SEND_FORMAT,
                         direction: 'read',
@@ -267,12 +272,12 @@ class AsteriskAriClient {
                 }
 
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
-                const parentArg = event.args.find(a => a.startsWith('snoop_parent_id='));
-                if (!parentArg) {
+                const { value: parentId } = await channel.getChannelVar({ variable: 'SNOOP_PARENT_ID' });
+                if (!parentId) {
                     logger.warn(`[ARI] UnicastRTP ${channelId} came up with no snoop_parent_id — dropping`);
                     return;
                 }
-                const parentId = parentArg.split('=')[1];
+
                 const callData = this.tracker.getCall(parentId);
                 if (!callData) {
                     logger.warn(`[ARI] No call found with Asterisk ID ${parentId} for RTP channel ${channelId}`);
@@ -377,16 +382,22 @@ class AsteriskAriClient {
             logger.info(`[ARI VAD] <<< Talking FINISHED on channel ${channel.id} (${currentChannelName}). Duration: ${event.duration}ms`);
         });
 
-        this.client.on('ChannelRtpStarted', (event, channel) => {
+        this.client.on('ChannelRtpStarted', async (event, channel) => {
             if (!channel.name.startsWith('UnicastRTP/')) return;
-            const parentArg = event.args.find(a => a.startsWith('snoop_parent_id='));
-            if (!parentArg) return;
-            const parentId = parentArg.split('=')[1];
-            const callData = this.tracker.getCall(parentId);
-            if (!callData) return;
-            this.tracker.updateCall(parentId, { rtp_ssrc: event.ssrc });
-            rtpListenerService.addSsrcMapping(event.ssrc, parentId);
-            logger.info(`[ARI] Mapped SSRC ${event.ssrc} → call ${parentId}`);
+    
+            try {
+                const { value: parentId } = await channel.getChannelVar({ variable: 'SNOOP_PARENT_ID' });
+                if (!parentId) return;
+                
+                const callData = this.tracker.getCall(parentId);
+                if (!callData) return;
+                
+                this.tracker.updateCall(parentId, { rtp_ssrc: event.ssrc });
+                rtpListenerService.addSsrcMapping(event.ssrc, parentId);
+                logger.info(`[ARI] Mapped SSRC ${event.ssrc} → call ${parentId}`);
+            } catch (err) {
+                logger.warn(`[ARI] Couldn't get SNOOP_PARENT_ID on ${channel.id}: ${err.message}`);
+            }
         });
 
         this.client.on('ChannelDtmfReceived', (event, channel) => {
