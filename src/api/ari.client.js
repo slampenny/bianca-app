@@ -274,26 +274,28 @@ class AsteriskAriClient {
                 }
 
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
-                logger.info(`[ARI] UnicastRTP channel name: ${currentChannelName}`);
-                logger.info(`[ARI] Channel ID: ${channelId}`);
-                
-                // Extract the numeric prefix from channel ID - might be like 1748053672.9
-                const [parentBase] = channel.id.split('.');
-                // we know the original came in as “1748051349.0”
-                const parentId = `${parentBase}.0`;
-                const callData = this.tracker.getCall(parentId);
-                if (!callData) {
+                logger.info('[ARI] 🔥 HIT UnicastRTP branch for', channel.id);
+
+                // derive the “base” of the channel (e.g. “1748053672” from “1748053672.9”)
+                const [base] = channel.id.split('.');
+                // find whichever tracked call starts with that same base (whatever suffix it has)
+                const parentId = Array.from(this.tracker.calls.keys())
+                    .find(id => id.startsWith(`${base}.`));
+
+                if (!parentId) {
                     logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
                     return;
                 }
 
-                logger.info(`[ARI] Adding UnicastRTP channel ${channel.id} to bridge ${callData.mainBridgeId}`);
+                const callData = this.tracker.getCall(parentId);
+                logger.info(`[ARI] Bridging RTP ${channel.id} into bridge ${callData.mainBridgeId}`);
+
                 await this.client.bridges.addChannel({
                     bridgeId: callData.mainBridgeId,
                     channel: channel.id
                 });
                 this.tracker.updateCall(parentId, { state: 'external_media_bridged' });
-                } else if (currentChannelName.startsWith('Local/')) {
+            } else if (currentChannelName.startsWith('Local/')) {
                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
                 await channel.hangup().catch(()=>{});
             } else {
@@ -375,27 +377,23 @@ class AsteriskAriClient {
 
         this.client.on('ChannelRtpStarted', async (event, channel) => {
             if (!channel.name.startsWith('UnicastRTP/')) return;
-    
-            try {
-                let parentCallId = null;
-                for (const [callId, callData] of this.tracker.calls.entries()) {
-                    if (callData.rtpChannelId === channel.id) {
-                        parentCallId = callId;
-                        break;
-                    }
-                }
-                
-                if (!parentCallId) {
-                    logger.warn(`[ARI] No call found for RTP channel ${channel.id}`);
-                    return;
-                }
 
-                this.tracker.updateCall(parentCallId, { rtp_ssrc: event.ssrc });
-                rtpListenerService.addSsrcMapping(event.ssrc, parentCallId);
-                logger.info(`[ARI] Mapped SSRC ${event.ssrc} → call ${parentCallId}`);
-            } catch (err) {
-                logger.warn(`[ARI] Couldn't get SNOOP_PARENT_ID on ${channel.id}: ${err.message}`);
+            logger.info('[ARI] 🔥 ChannelRtpStarted for', channel.id);
+
+            // derive the same base as in your UnicastRTP branch
+            const [base] = channel.id.split('.');
+            const parentId = Array.from(this.tracker.calls.keys())
+                .find(id => id.startsWith(`${base}.`));
+
+            if (!parentId) {
+                logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
+                return;
             }
+
+            // now map the SSRC as before
+            this.tracker.updateCall(parentId, { rtp_ssrc: event.ssrc });
+            rtpListenerService.addSsrcMapping(event.ssrc, parentId);
+            logger.info(`[ARI] Mapped SSRC ${event.ssrc} → call ${parentId}`);
         });
 
         this.client.on('ChannelDtmfReceived', (event, channel) => {
