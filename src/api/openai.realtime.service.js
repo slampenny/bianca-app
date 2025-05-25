@@ -747,10 +747,11 @@ class OpenAIRealtimeService {
             }
         }
         
-        logger.info(`[OpenAI Realtime] Finished flushing ${chunksToFlush.length} audio chunks. Triggering immediate commit.`);
+        logger.info(`[OpenAI Realtime] Finished flushing ${chunksToFlush.length} audio chunks for ${callId}`);
         
-        // Force an immediate commit after flushing
-        this.commitAudioBuffer(callId);
+        // Let the normal debounce mechanism handle the commit
+        // It will wait 1 second after the last chunk before committing
+        // This gives OpenAI time to process the audio
     }
 
     /**
