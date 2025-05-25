@@ -706,9 +706,21 @@ class OpenAIRealtimeService {
         try {
             const messageStr = JSON.stringify(messageObj);
             
+            // Reduce logging verbosity for audio append messages
             if (messageObj.type === 'input_audio_buffer.append') {
-                logger.info(`[OpenAI Realtime] SENDING: type=${messageObj.type}, audio_length=${messageObj.audio?.length || 0}`);
+                // Only log every 10th audio append, or use debug level
+                if (!conn || !conn.audioAppendCount) {
+                    if (conn) conn.audioAppendCount = 0;
+                }
+                if (conn) {
+                    conn.audioAppendCount++;
+                    if (conn.audioAppendCount % 10 === 0) {
+                        logger.info(`[OpenAI Realtime] Sent ${conn.audioAppendCount} audio chunks to ${identifier}`);
+                    }
+                }
+                logger.debug(`[OpenAI Realtime] SENDING: type=${messageObj.type}, audio_length=${messageObj.audio?.length || 0}`);
             } else {
+                // Log all other message types normally
                 logger.info(`[OpenAI Realtime] SENDING: type=${messageObj.type}`);
             }
             
@@ -756,11 +768,14 @@ class OpenAIRealtimeService {
 
         // Send all chunks first
         const BATCH_SIZE = 5;
+        let lastChunkSent = false;
+        
         for (let i = 0; i < chunksToFlush.length; i += BATCH_SIZE) {
             const batch = chunksToFlush.slice(i, i + BATCH_SIZE);
             for (const chunkULawBase64 of batch) {
                 try {
                     await this.sendAudioChunk(callId, chunkULawBase64, true);
+                    lastChunkSent = true;
                 } catch (sendErr) {
                     logger.error(`[OpenAI Realtime] Error sending flushed chunk: ${sendErr.message}`);
                     const remainingToRebuffer = chunksToFlush.slice(i);
@@ -776,32 +791,32 @@ class OpenAIRealtimeService {
         
         logger.info(`[OpenAI Realtime] Finished flushing ${chunksToFlush.length} audio chunks for ${callId}`);
         
-        // Let the normal debounce mechanism handle the commit
-        // It will wait 1 second after the last chunk before committing
-        // This gives OpenAI time to process the audio
+        // The last sendAudioChunk should have triggered a debounce commit
+        // Log if no timer was set
+        if (lastChunkSent && !this.commitTimers.has(callId)) {
+            logger.warn(`[OpenAI Realtime] No commit timer set after flushing. Manually triggering debounce.`);
+            this.debounceCommit(callId);
+        }
     }
 
     /**
-     * Force an immediate commit of the audio buffer
+     * Force send a commit for testing
      */
-    async commitAudioBuffer(callId) {
+    async forceCommit(callId) {
+        logger.info(`[OpenAI Realtime] Force commit requested for ${callId}`);
         const conn = this.connections.get(callId);
         if (!conn?.webSocket?.readyState === WebSocket.OPEN || !conn?.sessionReady) {
-            logger.warn(`[OpenAI Realtime] Cannot commit audio buffer - connection not ready for ${callId}`);
-            return;
+            logger.error(`[OpenAI Realtime] Cannot force commit - connection not ready for ${callId}`);
+            return false;
         }
 
-        // Clear any pending debounced commit
-        if (this.commitTimers.has(callId)) {
-            clearTimeout(this.commitTimers.get(callId));
-            this.commitTimers.delete(callId);
-        }
-
-        logger.info(`[OpenAI Realtime] Sending immediate commit for ${callId}`);
         try {
             await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+            logger.info(`[OpenAI Realtime] Force commit sent successfully for ${callId}`);
+            return true;
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Failed to send commit for ${callId}: ${err.message}`);
+            logger.error(`[OpenAI Realtime] Force commit failed for ${callId}: ${err.message}`);
+            return false;
         }
     }
 
@@ -811,13 +826,16 @@ class OpenAIRealtimeService {
     debounceCommit(callId) {
         if (this.commitTimers.has(callId)) {
             clearTimeout(this.commitTimers.get(callId));
+            logger.debug(`[OpenAI Realtime] Cleared existing commit timer for ${callId}`);
         }
+        
         const conn = this.connections.get(callId);
         if (!conn?.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-            logger.debug(`[OpenAI Realtime] DebounceCommit: Not ready for ${callId}`);
+            logger.warn(`[OpenAI Realtime] DebounceCommit: Not ready for ${callId} - sessionReady: ${conn?.sessionReady}, ws state: ${conn?.webSocket?.readyState}`);
             return;
         }
 
+        logger.debug(`[OpenAI Realtime] Setting commit timer (${CONSTANTS.COMMIT_DEBOUNCE_DELAY}ms) for ${callId}`);
         const timer = setTimeout(async () => {
             this.commitTimers.delete(callId);
             const currentConn = this.connections.get(callId);
@@ -828,6 +846,8 @@ class OpenAIRealtimeService {
                 } catch (commitErr) {
                     logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
                 }
+            } else {
+                logger.warn(`[OpenAI Realtime] Commit timer fired but connection no longer ready for ${callId}`);
             }
         }, CONSTANTS.COMMIT_DEBOUNCE_DELAY);
 
@@ -881,6 +901,12 @@ class OpenAIRealtimeService {
 
             if (success) {
                 // Always trigger debounce commit after successfully sending audio
+                // Only log this occasionally to reduce noise
+                if (!conn.debugLogCount) conn.debugLogCount = 0;
+                conn.debugLogCount++;
+                if (conn.debugLogCount % 50 === 1) {
+                    logger.debug(`[OpenAI Realtime] Audio chunks sent, debounce commit active for ${callId}`);
+                }
                 this.debounceCommit(callId);
             } else if (!bypassBuffering) {
                 const pending = this.pendingAudio.get(callId) || [];
