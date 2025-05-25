@@ -482,7 +482,7 @@ class OpenAIRealtimeService {
     }
 
     /**
-     * Handle session.updated - Mark ready and send initial content
+     * Handle session.updated - Mark ready and flush pending audio
      */
     async handleSessionUpdated(callId, message) {
         const conn = this.connections.get(callId);
@@ -495,20 +495,9 @@ class OpenAIRealtimeService {
             this.clearConnectionTimeout(callId);
             
             conn.sessionReady = true;
-            logger.info(`[OpenAI Realtime] Session ready for ${callId}. Sending initial message and flushing audio.`);
+            logger.info(`[OpenAI Realtime] Session ready for ${callId}. Flushing pending audio.`);
 
-            // Send initial message
             try {
-                const initialUserMessage = {
-                    type: 'conversation.item.create',
-                    item: { 
-                        type: 'message', 
-                        role: 'user', 
-                        content: [{ type: 'input_text', text: 'Hello, are you there?' }] 
-                    }
-                };
-                await this.sendJsonMessage(callId, initialUserMessage);
-
                 // Flush any pending audio
                 await this.flushPendingAudio(callId);
                 
@@ -545,7 +534,15 @@ class OpenAIRealtimeService {
      * Handle API errors
      */
     async handleApiError(callId, message) {
-        logger.error(`[OpenAI Realtime] API error for ${callId}: ${message.error?.message || 'Unknown error'}`);
+        const errorMsg = message.error?.message || 'Unknown error';
+        logger.error(`[OpenAI Realtime] API error for ${callId}: ${errorMsg}`);
+        
+        // Don't notify about expected errors during startup
+        if (errorMsg.includes('buffer too small') && errorMsg.includes('0.00ms')) {
+            logger.info(`[OpenAI Realtime] Ignoring empty buffer commit error for ${callId}`);
+            return;
+        }
+        
         this.notify(callId, 'openai_error', { error: message.error });
     }
 
@@ -730,6 +727,7 @@ class OpenAIRealtimeService {
         const chunksToFlush = [...chunks];
         this.pendingAudio.set(callId, []);
 
+        // Send all chunks first
         const BATCH_SIZE = 5;
         for (let i = 0; i < chunksToFlush.length; i += BATCH_SIZE) {
             const batch = chunksToFlush.slice(i, i + BATCH_SIZE);
@@ -749,10 +747,9 @@ class OpenAIRealtimeService {
             }
         }
         
-        if (chunksToFlush.length > 0) {
-            logger.info(`[OpenAI Realtime] Sending commit after flushing audio for ${callId}`);
-            await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-        }
+        // DON'T send commit immediately after flushing
+        // The debounce mechanism will handle commits
+        logger.info(`[OpenAI Realtime] Finished flushing ${chunksToFlush.length} pending audio chunks for ${callId}`);
     }
 
     /**
@@ -800,7 +797,7 @@ class OpenAIRealtimeService {
         }
 
         if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
-            logger.warn(`[OpenAI Realtime] sendAudioChunk: Not ready for ${callId}. Buffering.`);
+            logger.debug(`[OpenAI Realtime] sendAudioChunk: Not ready for ${callId}. Buffering.`);
             if (conn.status !== 'closed' && conn.status !== 'error') {
                 const pending = this.pendingAudio.get(callId) || [];
                 if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
@@ -814,6 +811,13 @@ class OpenAIRealtimeService {
         }
 
         try {
+            // Validate that the audio chunk is properly formatted
+            const audioBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+            if (audioBuffer.length === 0) {
+                logger.error(`[OpenAI Realtime] Decoded audio buffer is empty for ${callId}`);
+                return;
+            }
+
             const success = await this.sendJsonMessage(callId, {
                 type: 'input_audio_buffer.append',
                 audio: audioChunkBase64ULaw
