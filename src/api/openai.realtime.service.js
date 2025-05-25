@@ -747,9 +747,34 @@ class OpenAIRealtimeService {
             }
         }
         
-        // DON'T send commit immediately after flushing
-        // The debounce mechanism will handle commits
-        logger.info(`[OpenAI Realtime] Finished flushing ${chunksToFlush.length} pending audio chunks for ${callId}`);
+        logger.info(`[OpenAI Realtime] Finished flushing ${chunksToFlush.length} audio chunks. Triggering immediate commit.`);
+        
+        // Force an immediate commit after flushing
+        this.commitAudioBuffer(callId);
+    }
+
+    /**
+     * Force an immediate commit of the audio buffer
+     */
+    async commitAudioBuffer(callId) {
+        const conn = this.connections.get(callId);
+        if (!conn?.webSocket?.readyState === WebSocket.OPEN || !conn?.sessionReady) {
+            logger.warn(`[OpenAI Realtime] Cannot commit audio buffer - connection not ready for ${callId}`);
+            return;
+        }
+
+        // Clear any pending debounced commit
+        if (this.commitTimers.has(callId)) {
+            clearTimeout(this.commitTimers.get(callId));
+            this.commitTimers.delete(callId);
+        }
+
+        logger.info(`[OpenAI Realtime] Sending immediate commit for ${callId}`);
+        try {
+            await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+        } catch (err) {
+            logger.error(`[OpenAI Realtime] Failed to send commit for ${callId}: ${err.message}`);
+        }
     }
 
     /**
@@ -803,8 +828,11 @@ class OpenAIRealtimeService {
                 if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
                     pending.push(audioChunkBase64ULaw);
                     this.pendingAudio.set(callId, pending);
+                    if (pending.length % 10 === 0) {
+                        logger.info(`[OpenAI Realtime] Buffered ${pending.length} chunks for ${callId}`);
+                    }
                 } else {
-                    logger.warn(`[OpenAI Realtime] Buffer full for ${callId}. Dropping chunk.`);
+                    logger.warn(`[OpenAI Realtime] Buffer full for ${callId} (${CONSTANTS.MAX_PENDING_CHUNKS} chunks). Dropping chunk.`);
                 }
             }
             return;
@@ -824,6 +852,7 @@ class OpenAIRealtimeService {
             });
 
             if (success) {
+                // Always trigger debounce commit after successfully sending audio
                 this.debounceCommit(callId);
             } else if (!bypassBuffering) {
                 const pending = this.pendingAudio.get(callId) || [];
