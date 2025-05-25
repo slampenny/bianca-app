@@ -408,7 +408,12 @@ class OpenAIRealtimeService {
         }
         conn.lastActivity = Date.now();
 
-        logger.info(`[OpenAI Realtime] RECEIVED from OpenAI (${callId}): type=${message.type}`);
+        // Log all message types for debugging
+        logger.info(`[OpenAI Realtime] RECEIVED from OpenAI (${callId}): type=${message.type}${
+            message.type === 'response.content_part.added' ? `, content_type=${message.content_part?.content_type}` : ''
+        }${
+            message.type === 'conversation.item.created' ? `, item_type=${message.item?.type}, role=${message.item?.role}` : ''
+        }`);
 
         try {
             switch (message.type) {
@@ -431,6 +436,28 @@ class OpenAIRealtimeService {
                 case 'response.done':
                     logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
                     this.notify(callId, 'response_done', {});
+                    break;
+
+                case 'input_audio_buffer.speech_started':
+                    logger.info(`[OpenAI Realtime] Speech started detected for ${callId}`);
+                    this.notify(callId, 'speech_started', {});
+                    break;
+
+                case 'input_audio_buffer.speech_stopped':
+                    logger.info(`[OpenAI Realtime] Speech stopped detected for ${callId}`);
+                    this.notify(callId, 'speech_stopped', {});
+                    break;
+
+                case 'input_audio_buffer.committed':
+                    logger.info(`[OpenAI Realtime] Audio buffer committed successfully for ${callId}`);
+                    break;
+
+                case 'input_audio_buffer.cleared':
+                    logger.info(`[OpenAI Realtime] Audio buffer cleared for ${callId}`);
+                    break;
+
+                case 'response.created':
+                    logger.info(`[OpenAI Realtime] Response created for ${callId}`);
                     break;
 
                 case 'error':
