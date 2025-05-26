@@ -20,7 +20,7 @@ exten => _X.,1,NoOp(🚫 Unauthorized SIP attempt from ${CALLERID(all)})
 
 [playback-context]
 ; Context for Local channels created by ARI for OpenAI audio playback
-; These channels will be handled entirely by ARI via Stasis
 exten => _playback-.,1,NoOp(Playback channel for OpenAI audio: ${EXTEN})
+ same => n,Answer()  ; Answer here in dialplan
  same => n,Stasis(myphonefriend,${EXTEN})
  same => n,Hangup()
