@@ -1014,7 +1014,7 @@ class OpenAIRealtimeService {
     }
 
     /**
-     * Disconnect
+     * Disconnect - Updated version with better error handling
      */
     async disconnect(callId) {
         const conn = this.connections.get(callId);
@@ -1041,10 +1041,21 @@ class OpenAIRealtimeService {
                     ws.close(1000, "Client initiated disconnect");
                 } else if (ws.readyState === WebSocket.CONNECTING) {
                     logger.info(`[OpenAI Realtime] Terminating connecting WebSocket for ${callId}`);
-                    ws.terminate();
+                    // Add a small delay to prevent WebSocket termination race condition
+                    setTimeout(() => {
+                        try {
+                            if (ws.readyState === WebSocket.CONNECTING) {
+                                ws.terminate();
+                            }
+                        } catch (termErr) {
+                            // Ignore termination errors - WebSocket might already be closed
+                            logger.debug(`[OpenAI Realtime] WebSocket terminate ignored for ${callId}: ${termErr.message}`);
+                        }
+                    }, 10);
                 }
             } catch (err) {
-                logger.error(`[OpenAI Realtime] Error during disconnect: ${err.message}`);
+                // Don't throw errors during cleanup - just log them at debug level
+                logger.debug(`[OpenAI Realtime] WebSocket close/terminate ignored for ${callId}: ${err.message}`);
             }
             conn.webSocket = null;
         }

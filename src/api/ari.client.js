@@ -32,8 +32,8 @@ class AsteriskAriClient {
 
         // Configuration for ExternalMedia
         this.RTP_LISTENER_HOST = sanitizeHost(config.asterisk.rtpListenerHost);
-        this.RTP_LISTENER_PORT = config.asterisk.rtpListenerPort;
-        this.RTP_WRITE_PORT = config.asterisk.rtpSenderPort || (config.asterisk.rtpListenerPort + 1); // For sending (App → Asterisk)
+        this.RTP_WRITE_PORT = config.asterisk.rtpListenerPort;
+        this.RTP_READ_PORT = config.asterisk.rtpSenderPort || (config.asterisk.rtpListenerPort + 1); // For sending (App → Asterisk)
         this.RTP_SEND_FORMAT = 'slin';
     }
 
@@ -735,6 +735,9 @@ class AsteriskAriClient {
                 });
                 
                 logger.info(`[ARI] Added playback channel ${channelId} to bridge ${parentCallData.mainBridgeId}`);
+
+                // Wait a bit more before calling externalMedia
+                await new Promise(resolve => setTimeout(resolve, 100));
 
                 await channel.externalMedia({
                     app: 'myphonefriend',
