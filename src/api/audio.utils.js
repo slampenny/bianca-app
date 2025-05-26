@@ -9,9 +9,7 @@ class AudioUtils {
     
     /**
      * Convert 16-bit PCM to uLaw and return as base64
-     * @param {Buffer}
-
-module.exports = AudioUtils; pcmBuffer - Input PCM buffer (16-bit samples)
+     * @param {Buffer} pcmBuffer - Input PCM buffer (16-bit samples)
      * @returns {string} Base64 encoded uLaw audio
      */
     static async convertPcmToUlaw(pcmBuffer) {
@@ -238,3 +236,5 @@ module.exports = AudioUtils; pcmBuffer - Input PCM buffer (16-bit samples)
         }
     }
 }
+
+module.exports = AudioUtils;
