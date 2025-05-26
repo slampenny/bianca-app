@@ -28,8 +28,8 @@ class AudioUtils {
                 }
             }
             
-            // Convert PCM samples to uLaw
-            const ulawSamples = alawmulaw.pcm16tou8(samples);
+            // Convert PCM samples to uLaw using the correct API
+            const ulawSamples = alawmulaw.mulaw.encode(samples);
             const ulawBuffer = Buffer.from(ulawSamples);
             
             return ulawBuffer.toString('base64');
@@ -53,8 +53,8 @@ class AudioUtils {
             // Convert uLaw buffer to array
             const ulawArray = Array.from(ulawBuffer);
             
-            // Convert uLaw to 16-bit PCM samples
-            const pcmSamples = alawmulaw.u8topcm16(ulawArray);
+            // Convert uLaw to 16-bit PCM samples using the correct API
+            const pcmSamples = alawmulaw.mulaw.decode(ulawArray);
             
             // Convert samples array back to buffer
             const pcmBuffer = Buffer.alloc(pcmSamples.length * 2);
