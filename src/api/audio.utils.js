@@ -1,166 +1,240 @@
-/**
- * audio.utils.js
- * Provides utilities for audio processing and conversion using 'alawmulaw'
- */
+// src/services/audio.utils.js - Enhanced with bidirectional uLaw/PCM conversion
 
-const alawmulaw = require('alawmulaw'); // Use the G.711 library
-const { Buffer } = require('buffer');
-const logger = require('../config/logger'); // Assuming logger is configured
-
-// Check if imports worked (Optional but helpful)
-if (typeof alawmulaw?.mulaw?.encode !== 'function' || typeof alawmulaw?.mulaw?.decode !== 'function') {
-     logger.error("[AudioUtils] CRITICAL: alawmulaw library or its mulaw functions not imported correctly!");
-     // Consider throwing an error here to prevent startup if the library is essential
-}
+const alawmulaw = require('alawmulaw');
 
 /**
- * Audio processing utility functions
+ * Audio utility functions for format conversion and resampling
  */
 class AudioUtils {
+    
     /**
-     * Convert uLaw audio (Base64) to PCM audio (Base64)
-     * NOTE: Assumes 8kHz sample rate for uLaw
-     * @param {string} ulawBase64 - Base64 encoded uLaw audio
-     * @returns {Promise<string>} - Base64 encoded 16-bit PCM audio
-     */
-    static async convertUlawToPcm(ulawBase64) {
-        // This function might be needed if OpenAI output format is changed to g711_ulaw
-        return new Promise((resolve, reject) => {
-            try {
-                if (!ulawBase64) return resolve('');
-                const inputBuffer = Buffer.from(ulawBase64, 'base64');
-                if (inputBuffer.length === 0) {
-                    logger.warn("[AudioUtils] convertUlawToPcm received empty buffer.");
-                    return resolve('');
-                }
+     * Convert 16-bit PCM to uLaw and return as base64
+     * @param {Buffer}
 
-                // alawmulaw expects Uint8Array for decode input
-                const ulawInput = new Uint8Array(inputBuffer.buffer, inputBuffer.byteOffset, inputBuffer.length);
-
-                // Decode uLaw bytes to Int16 PCM samples
-                const pcmSamples = alawmulaw.mulaw.decode(ulawInput); // Returns Int16Array
-
-                // Convert Int16Array back to Node.js Buffer
-                const pcmBuffer = Buffer.from(pcmSamples.buffer);
-
-                // logger.debug(`[AudioUtils] Decoded ${inputBuffer.length} uLaw bytes to ${pcmBuffer.length} PCM bytes.`);
-                resolve(pcmBuffer.toString('base64'));
-
-            } catch (err) {
-                logger.error(`[AudioUtils] Error in convertUlawToPcm: ${err.message}`);
-                reject(err);
-            }
-        });
-    }
-
-    /**
-     * Convert PCM audio (16-bit LE assumed) to uLaw audio (Base64)
-     * NOTE: Assumes 8kHz sample rate for input PCM and uLaw output
-     * @param {Buffer} pcmBuffer - 16-bit LE PCM audio buffer (assumed 8kHz)
-     * @returns {Promise<string>} - Base64 encoded uLaw audio
+module.exports = AudioUtils; pcmBuffer - Input PCM buffer (16-bit samples)
+     * @returns {string} Base64 encoded uLaw audio
      */
     static async convertPcmToUlaw(pcmBuffer) {
-        // This function is needed to convert Asterisk PCM -> OpenAI uLaw
-        return new Promise((resolve, reject) => {
-            try {
-                if (!pcmBuffer || pcmBuffer.length === 0) {
-                    logger.warn("[AudioUtils] convertPcmToUlaw received empty buffer.");
-                    return resolve('');
-                }
-                 // Ensure even length for Int16Array conversion
-                 if (pcmBuffer.length % 2 !== 0) {
-                      logger.error(`[AudioUtils] Received PCM buffer with odd length (${pcmBuffer.length}) for uLaw conversion.`);
-                      return reject(new Error('Invalid PCM buffer length for 16-bit samples.'));
-                 }
-
-                // Convert Node.js Buffer to Int16Array (assuming Little Endian PCM)
-                const pcmSamples = new Int16Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.length / 2);
-
-                // Encode Int16 PCM samples to 8-bit uLaw bytes
-                const ulawOutput = alawmulaw.mulaw.encode(pcmSamples); // Returns Uint8Array
-
-                // Convert Uint8Array back to Node.js Buffer
-                const ulawBuffer = Buffer.from(ulawOutput.buffer);
-
-                // logger.debug(`[AudioUtils] Encoded ${pcmBuffer.length} PCM bytes to ${ulawBuffer.length} uLaw bytes.`);
-                resolve(ulawBuffer.toString('base64'));
-
-            } catch (err) {
-                logger.error(`[AudioUtils] Error in convertPcmToUlaw: ${err.message}`);
-                reject(err);
-            }
-        });
-    }
-
-    /**
-     * Resample PCM audio to a different sample rate (simple linear interpolation)
-     * @param {Buffer} pcmBuffer - PCM audio buffer (16-bit LE)
-     * @param {number} originalRate - Original sample rate (e.g., 24000 from OpenAI)
-     * @param {number} targetRate - Target sample rate (e.g., 8000 for Asterisk)
-     * @returns {Buffer} - Resampled PCM buffer
-     */
-    static resamplePcm(pcmBuffer, originalRate, targetRate) {
-        // This function is needed to convert OpenAI 24kHz PCM -> Asterisk 8kHz PCM
+        if (!pcmBuffer || pcmBuffer.length === 0) {
+            return '';
+        }
+        
         try {
-            if (originalRate === targetRate) {
-                return pcmBuffer; // No resampling needed
+            // Convert buffer to 16-bit samples array
+            const samples = [];
+            for (let i = 0; i < pcmBuffer.length; i += 2) {
+                if (i + 1 < pcmBuffer.length) {
+                    // Read little-endian 16-bit signed integer
+                    const sample = pcmBuffer.readInt16LE(i);
+                    samples.push(sample);
+                }
             }
-            if (!pcmBuffer || pcmBuffer.length < 2) {
-                 logger.warn(`[AudioUtils] Resample input buffer too small (${pcmBuffer?.length})`);
-                 return Buffer.alloc(0);
-            }
-             // Ensure even length
-             if (pcmBuffer.length % 2 !== 0) {
-                  logger.error(`[AudioUtils] Resample input buffer has odd length (${pcmBuffer.length})`);
-                  // Handle error: maybe trim last byte or reject? Returning empty for now.
-                  return Buffer.alloc(0);
-             }
-
-            // Convert buffer to 16-bit PCM samples
-            const samples = new Int16Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.length / 2);
-
-            // Calculate new sample count
-            const ratio = targetRate / originalRate;
-            const newSampleCount = Math.floor(samples.length * ratio);
-            if (newSampleCount <= 0) {
-                 logger.warn(`[AudioUtils] Resampling resulted in zero samples (original: ${samples.length}, ratio: ${ratio})`);
-                 return Buffer.alloc(0);
-            }
-            const newSamples = new Int16Array(newSampleCount);
-
-            // Simple linear interpolation
-            for (let i = 0; i < newSampleCount; i++) {
-                const sourceIdx = i / ratio;
-                const idx1 = Math.floor(sourceIdx);
-                const idx2 = Math.min(idx1 + 1, samples.length - 1); // Ensure idx2 is within bounds
-                const frac = sourceIdx - idx1;
-
-                // Linear interpolation between samples
-                newSamples[i] = Math.round((1 - frac) * samples[idx1] + frac * samples[idx2]);
-            }
-
-            // Convert back to Buffer
-            return Buffer.from(newSamples.buffer);
+            
+            // Convert PCM samples to uLaw
+            const ulawSamples = alawmulaw.pcm16tou8(samples);
+            const ulawBuffer = Buffer.from(ulawSamples);
+            
+            return ulawBuffer.toString('base64');
         } catch (err) {
-            logger.error(`[AudioUtils] Error in resamplePcm: ${err.message}`);
-            return pcmBuffer; // Return original on error as fallback
+            console.error('Error converting PCM to uLaw:', err);
+            return '';
         }
     }
 
-    // --- hasVoiceActivity function can remain if needed ---
-    static hasVoiceActivity(audioBuffer, threshold = 0.02) {
-        // ... (implementation from previous version) ...
-         try {
-             if (!audioBuffer || audioBuffer.length < 100) { return false; }
-             let samples = new Int16Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length / 2);
-             let sum = 0;
-             for (let i = 0; i < samples.length; i++) { sum += samples[i] * samples[i]; }
-             const rms = Math.sqrt(sum / samples.length) / 32768;
-             // logger.debug(`[AudioUtils] VAD RMS: ${rms.toFixed(4)}`);
-             return rms > threshold;
-         } catch (err) { logger.error(`[AudioUtils] Error in VAD: ${err.message}`); return false; }
+    /**
+     * Convert uLaw to 16-bit PCM
+     * @param {Buffer} ulawBuffer - Input uLaw buffer
+     * @returns {Buffer} PCM buffer (16-bit samples)
+     */
+    static async convertUlawToPcm(ulawBuffer) {
+        if (!ulawBuffer || ulawBuffer.length === 0) {
+            return Buffer.alloc(0);
+        }
+        
+        try {
+            // Convert uLaw buffer to array
+            const ulawArray = Array.from(ulawBuffer);
+            
+            // Convert uLaw to 16-bit PCM samples
+            const pcmSamples = alawmulaw.u8topcm16(ulawArray);
+            
+            // Convert samples array back to buffer
+            const pcmBuffer = Buffer.alloc(pcmSamples.length * 2);
+            for (let i = 0; i < pcmSamples.length; i++) {
+                pcmBuffer.writeInt16LE(pcmSamples[i], i * 2);
+            }
+            
+            return pcmBuffer;
+        } catch (err) {
+            console.error('Error converting uLaw to PCM:', err);
+            return Buffer.alloc(0);
+        }
     }
 
-}
+    /**
+     * Resample PCM audio from one sample rate to another
+     * @param {Buffer} inputBuffer - Input PCM buffer
+     * @param {number} inputRate - Input sample rate (Hz)
+     * @param {number} outputRate - Output sample rate (Hz)
+     * @returns {Buffer} Resampled PCM buffer
+     */
+    static resamplePcm(inputBuffer, inputRate, outputRate) {
+        if (!inputBuffer || inputBuffer.length === 0) {
+            return Buffer.alloc(0);
+        }
+        
+        if (inputRate === outputRate) {
+            return inputBuffer; // No resampling needed
+        }
+        
+        try {
+            // Simple linear interpolation resampling
+            const inputSamples = [];
+            for (let i = 0; i < inputBuffer.length; i += 2) {
+                if (i + 1 < inputBuffer.length) {
+                    inputSamples.push(inputBuffer.readInt16LE(i));
+                }
+            }
+            
+            const ratio = outputRate / inputRate;
+            const outputLength = Math.floor(inputSamples.length * ratio);
+            const outputSamples = new Array(outputLength);
+            
+            for (let i = 0; i < outputLength; i++) {
+                const sourceIndex = i / ratio;
+                const leftIndex = Math.floor(sourceIndex);
+                const rightIndex = Math.min(leftIndex + 1, inputSamples.length - 1);
+                const fraction = sourceIndex - leftIndex;
+                
+                const leftSample = inputSamples[leftIndex] || 0;
+                const rightSample = inputSamples[rightIndex] || 0;
+                
+                // Linear interpolation
+                outputSamples[i] = Math.round(leftSample + fraction * (rightSample - leftSample));
+            }
+            
+            // Convert back to buffer
+            const outputBuffer = Buffer.alloc(outputSamples.length * 2);
+            for (let i = 0; i < outputSamples.length; i++) {
+                outputBuffer.writeInt16LE(outputSamples[i], i * 2);
+            }
+            
+            return outputBuffer;
+        } catch (err) {
+            console.error('Error resampling PCM:', err);
+            return inputBuffer; // Return original on error
+        }
+    }
 
-module.exports = AudioUtils;
+    /**
+     * Convert base64 uLaw to base64 PCM (convenience method)
+     * @param {string} ulawBase64 - Base64 encoded uLaw
+     * @returns {string} Base64 encoded PCM
+     */
+    static async convertBase64UlawToPcm(ulawBase64) {
+        if (!ulawBase64) return '';
+        
+        try {
+            const ulawBuffer = Buffer.from(ulawBase64, 'base64');
+            const pcmBuffer = await this.convertUlawToPcm(ulawBuffer);
+            return pcmBuffer.toString('base64');
+        } catch (err) {
+            console.error('Error converting base64 uLaw to PCM:', err);
+            return '';
+        }
+    }
+
+    /**
+     * Convert base64 PCM to base64 uLaw (convenience method)
+     * @param {string} pcmBase64 - Base64 encoded PCM
+     * @returns {string} Base64 encoded uLaw
+     */
+    static async convertBase64PcmToUlaw(pcmBase64) {
+        if (!pcmBase64) return '';
+        
+        try {
+            const pcmBuffer = Buffer.from(pcmBase64, 'base64');
+            return await this.convertPcmToUlaw(pcmBuffer);
+        } catch (err) {
+            console.error('Error converting base64 PCM to uLaw:', err);
+            return '';
+        }
+    }
+
+    /**
+     * Validate audio buffer format
+     * @param {Buffer} buffer - Audio buffer to validate
+     * @param {string} expectedFormat - Expected format ('pcm16', 'ulaw', etc.)
+     * @returns {boolean} True if valid
+     */
+    static validateAudioBuffer(buffer, expectedFormat = 'pcm16') {
+        if (!buffer || !Buffer.isBuffer(buffer)) {
+            return false;
+        }
+        
+        if (buffer.length === 0) {
+            return false;
+        }
+        
+        // Basic validation based on format
+        switch (expectedFormat.toLowerCase()) {
+            case 'pcm16':
+                // PCM16 should have even number of bytes (2 bytes per sample)
+                return buffer.length % 2 === 0;
+            case 'ulaw':
+            case 'alaw':
+                // uLaw/aLaw is 1 byte per sample, any length is valid
+                return true;
+            default:
+                return true; // Unknown format, assume valid
+        }
+    }
+
+    /**
+     * Get audio buffer info
+     * @param {Buffer} buffer - Audio buffer
+     * @param {string} format - Audio format
+     * @param {number} sampleRate - Sample rate in Hz
+     * @returns {Object} Audio info
+     */
+    static getAudioInfo(buffer, format = 'pcm16', sampleRate = 8000) {
+        if (!buffer || !Buffer.isBuffer(buffer)) {
+            return { valid: false };
+        }
+        
+        const bytesPerSample = format.toLowerCase() === 'pcm16' ? 2 : 1;
+        const samples = Math.floor(buffer.length / bytesPerSample);
+        const durationMs = samples > 0 ? (samples / sampleRate) * 1000 : 0;
+        
+        return {
+            valid: true,
+            bytes: buffer.length,
+            samples: samples,
+            durationMs: Math.round(durationMs * 100) / 100, // Round to 2 decimal places
+            format: format,
+            sampleRate: sampleRate,
+            bytesPerSample: bytesPerSample
+        };
+    }
+
+    /**
+     * Create silence buffer
+     * @param {number} durationMs - Duration in milliseconds
+     * @param {string} format - Audio format ('pcm16' or 'ulaw')
+     * @param {number} sampleRate - Sample rate in Hz
+     * @returns {Buffer} Silence buffer
+     */
+    static createSilence(durationMs, format = 'pcm16', sampleRate = 8000) {
+        const samples = Math.floor((durationMs / 1000) * sampleRate);
+        const bytesPerSample = format.toLowerCase() === 'pcm16' ? 2 : 1;
+        const bufferSize = samples * bytesPerSample;
+        
+        if (format.toLowerCase() === 'ulaw') {
+            // uLaw silence is 0xFF (not 0x00)
+            return Buffer.alloc(bufferSize, 0xFF);
+        } else {
+            // PCM silence is all zeros
+            return Buffer.alloc(bufferSize, 0x00);
+        }
+    }
+}

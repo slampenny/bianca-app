@@ -110,6 +110,7 @@ const baselineConfig = {
     url: `http://${defaultAsteriskHost}:8088`, // Example URL, replace with actual
     rtpListenerHost: envVars.RTP_LISTENER_HOST || 'bianca-app', // Example RTP URL, replace with actual
     rtpListenerPort: envVars.RTP_LISTENER_PORT || 16384, // Example port, replace with actual
+    rtpSenderPort: parseInt(envVars.RTP_SENDER_PORT) || 16385,
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
     sipUserName: envVars.SIP_USER_NAME || 'bianca', // Example SIP username, replace with actual
     username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual

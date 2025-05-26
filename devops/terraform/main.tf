@@ -68,6 +68,12 @@ variable "app_rtp_listener_port" {
   default     = 16384
 }
 
+variable "app_rtp_sender_port" {
+  description = "UDP port for the application's RTP sender service."
+  type        = number
+  default     = 16385
+}
+
 variable "repository_name" {
   description = "Name of the ECR repository for the main application."
   type        = string
@@ -358,6 +364,14 @@ resource "aws_security_group" "bianca_app_sg" {
     cidr_blocks = [for s in data.aws_subnet.vpc_task_subnets : s.cidr_block]
   }
 
+  ingress {
+    description = "Allow UDP for RTP sender to Asterisk service (WRITE direction)"
+    from_port   = var.app_rtp_sender_port
+    to_port     = var.app_rtp_sender_port
+    protocol    = "udp"
+    cidr_blocks = [for s in data.aws_subnet.vpc_task_subnets : s.cidr_block]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -422,6 +436,14 @@ resource "aws_security_group" "asterisk_sg" {
     protocol    = "udp"
     cidr_blocks = [for s in data.aws_subnet.vpc_task_subnets : s.cidr_block]
     description = "Allow NLB UDP Health Check for Asterisk RTP"
+  }
+
+  ingress {
+    description     = "Allow RTP from Bianca App (WRITE direction - App to Asterisk)"
+    from_port       = var.app_rtp_sender_port
+    to_port         = var.app_rtp_sender_port
+    protocol        = "udp"
+    security_groups = [aws_security_group.bianca_app_sg.id]
   }
 
   ingress {
@@ -856,7 +878,8 @@ resource "aws_ecs_task_definition" "app_task" {
       essential = true
       portMappings = [
         { containerPort = var.container_port, hostPort = var.container_port, protocol = "tcp" },
-        { containerPort = var.app_rtp_listener_port, hostPort = var.app_rtp_listener_port, protocol = "udp" }
+        { containerPort = var.app_rtp_listener_port, hostPort = var.app_rtp_listener_port, protocol = "udp" },
+        { containerPort = var.app_rtp_sender_port, hostPort = var.app_rtp_sender_port, protocol = "udp" }
       ]
       environment = [
         { name = "AWS_REGION", value = var.aws_region },
@@ -864,6 +887,7 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "NODE_ENV", value = "production" },
         { name = "WBSOCKET_URL", value = "wss://app.myphonefriend.com" },
         { name = "RTP_LISTENER_PORT", value = tostring(var.app_rtp_listener_port) },
+        { name = "RTP_SENDER_PORT", value = tostring(var.app_rtp_sender_port) },
         { name = "ASTERISK_URL", value = "http://asterisk.${aws_service_discovery_private_dns_namespace.internal.name}:${var.asterisk_ari_http_port}" }, # Corrected namespace ref
         { name = "RTP_LISTENER_HOST", value = "bianca-app.${aws_service_discovery_private_dns_namespace.internal.name}" },
         { name = "AWS_SES_REGION", value = var.aws_region }
