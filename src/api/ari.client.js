@@ -32,8 +32,8 @@ class AsteriskAriClient {
 
         // Configuration for ExternalMedia
         this.RTP_LISTENER_HOST = sanitizeHost(config.asterisk.rtpListenerHost);
-        this.RTP_WRITE_PORT = config.asterisk.rtpListenerPort;
-        this.RTP_READ_PORT = config.asterisk.rtpSenderPort || (config.asterisk.rtpListenerPort + 1); // For sending (App → Asterisk)
+        this.RTP_READ_PORT = config.asterisk.rtpListenerPort;
+        this.RTP_WRITE_PORT = config.asterisk.rtpSenderPort || (config.asterisk.rtpListenerPort + 1); // For sending (App → Asterisk)
         this.RTP_SEND_FORMAT = 'slin';
     }
 
@@ -698,8 +698,6 @@ class AsteriskAriClient {
         if (currentChannelName.startsWith('Local/playback-')) {
             logger.info(`[ARI] StasisStart for Playback channel: ${channelId}`);
 
-            // Extract parent channel ID from Local channel name
-            // Format: "Local/playback-1748064751.1@playback-context-00000001;1"
             const match = currentChannelName.match(/^Local\/playback-([^@]+)@/);
             const parentChannelId = match ? match[1] : null;
             
@@ -723,8 +721,14 @@ class AsteriskAriClient {
             });
 
             try {
+                // Wait for Local channel to be fully established
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
                 await channel.answer();
                 logger.info(`[ARI] Answered playback channel ${channelId}. Starting WRITE ExternalMedia.`);
+                
+                // Wait after answering
+                await new Promise(resolve => setTimeout(resolve, 150));
                 
                 const rtpWriteSource = `${this.RTP_LISTENER_HOST}:${this.RTP_WRITE_PORT}`;
                 
@@ -736,14 +740,14 @@ class AsteriskAriClient {
                 
                 logger.info(`[ARI] Added playback channel ${channelId} to bridge ${parentCallData.mainBridgeId}`);
 
-                // Wait a bit more before calling externalMedia
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Wait after bridging
+                await new Promise(resolve => setTimeout(resolve, 200));
 
                 await channel.externalMedia({
                     app: 'myphonefriend',
                     external_host: rtpWriteSource,
                     format: this.RTP_SEND_FORMAT,
-                    direction: 'write' // Our app sends TO Asterisk
+                    direction: 'write'
                 });
                 
                 this.tracker.updateCall(parentChannelId, { 
@@ -757,9 +761,46 @@ class AsteriskAriClient {
                 
             } catch (err) {
                 logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
-                await this.cleanupChannel(parentChannelId, `WRITE ExternalMedia setup failed for playback ${channelId}`);
+                
+                // Don't cleanup the entire call, just this playback channel
+                try {
+                    await channel.hangup();
+                    logger.info(`[ARI] Hung up failed playback channel ${channelId}`);
+                } catch (hangupErr) {
+                    logger.warn(`[ARI] Error hanging up failed playback channel: ${hangupErr.message}`);
+                }
+                
+                // Update tracker to remove playback channel references
+                this.tracker.updateCall(parentChannelId, { 
+                    playbackChannel: null, 
+                    playbackChannelId: null,
+                    state: 'external_media_read_only'
+                });
+                
+                logger.warn(`[ARI] Continuing call ${parentChannelId} in READ-only mode (no OpenAI audio playback)`);
             }
         }
+    }
+
+    // 4. Add the missing shutdown method to your ARI client class
+    async shutdown() {
+        logger.info('[ARI] Shutting down ARI client');
+        
+        // Clean up RTP sender service
+        try {
+            const rtpSenderService = require('./rtp.sender.service');
+            rtpSenderService.cleanupAll();
+        } catch (err) {
+            logger.warn(`[ARI] Error cleaning up RTP sender: ${err.message}`);
+        }
+        
+        if (this.client) {
+            this.client.close();
+            logger.info('[ARI] Client closed');
+        }
+        this.isConnected = false;
+        global.ariClient = null;
+        logger.info('[ARI] Shutdown complete');
     }
 
         // Initialize RTP sender for sending audio back to Asterisk
@@ -974,6 +1015,26 @@ class AsteriskAriClient {
         }
         
         logger.info(`[Cleanup] Completed all cleanup operations for ${asteriskChannelIdToClean}`);
+    }
+
+    async shutdown() {
+        logger.info('[ARI] Shutting down ARI client');
+        
+        // Clean up RTP sender service
+        try {
+            const rtpSenderService = require('./rtp.sender.service');
+            rtpSenderService.cleanupAll();
+        } catch (err) {
+            logger.warn(`[ARI] Error cleaning up RTP sender: ${err.message}`);
+        }
+        
+        if (this.client) {
+            this.client.close();
+            logger.info('[ARI] Client closed');
+        }
+        this.isConnected = false;
+        global.ariClient = null;
+        logger.info('[ARI] Shutdown complete');
     }
 }
 
