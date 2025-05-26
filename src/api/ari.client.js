@@ -38,24 +38,38 @@ class AsteriskAriClient {
     }
 
     async waitForReady() {
-    if (!this.isConnected) {
-        throw new Error('ARI client not connected');
-    }
-    
-    // Verify the Stasis app is registered by testing an API call
-    try {
-        const apps = await this.client.applications.list();
-        const myApp = apps.find(app => app.name === 'myphonefriend');
-        if (!myApp) {
-            throw new Error('Stasis application myphonefriend not found');
+        logger.info('[ARI] waitForReady() called');
+        
+        if (!this.isConnected) {
+            logger.error('[ARI] waitForReady() - client not connected!');
+            throw new Error('ARI client not connected');
         }
-        logger.info('[ARI] Stasis application verified and ready');
-        return true;
-    } catch (err) {
-        logger.error('[ARI] Stasis application not ready:', err.message);
-        throw err;
+        
+        if (!this.client) {
+            logger.error('[ARI] waitForReady() - client object is null!');
+            throw new Error('ARI client object is null');
+        }
+        
+        // Verify the Stasis app is registered by testing an API call
+        try {
+            logger.info('[ARI] Checking for registered applications...');
+            const apps = await this.client.applications.list();
+            logger.info(`[ARI] Found ${apps.length} applications: ${apps.map(a => a.name).join(', ')}`);
+            
+            const myApp = apps.find(app => app.name === 'myphonefriend');
+            if (!myApp) {
+                logger.error('[ARI] Stasis application "myphonefriend" not found in registered apps');
+                throw new Error('Stasis application myphonefriend not found');
+            }
+            
+            logger.info('[ARI] Stasis application "myphonefriend" verified and ready');
+            return true;
+        } catch (err) {
+            logger.error('[ARI] Stasis application not ready:', err.message);
+            logger.error('[ARI] Full error:', err);
+            throw err;
+        }
     }
-}
 
     async start() {
         try {
