@@ -98,6 +98,8 @@ class OpenAIRealtimeService {
         }
 
         logger.info(`[OpenAI Realtime] Initializing for callId: ${callId} (Initial Asterisk ID: ${initialAsteriskChannelId})`);
+        logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);
+        
         this.connections.set(callId, {
             status: 'initializing',
             conversationId,
@@ -108,7 +110,8 @@ class OpenAIRealtimeService {
             startTime: Date.now(),
             initialPrompt,
             lastActivity: Date.now(),
-            sessionId: null
+            sessionId: null,
+            audioChunksReceived: 0 // Track how many chunks we receive
         });
         this.reconnectAttempts.set(callId, 0);
         this.isReconnecting.set(callId, false);
@@ -757,8 +760,10 @@ class OpenAIRealtimeService {
         }
 
         const chunks = this.pendingAudio.get(callId);
+        logger.info(`[OpenAI Realtime] Checking pending audio for ${callId}: ${chunks ? chunks.length : 0} chunks found`);
+        
         if (!chunks || chunks.length === 0) {
-            logger.debug(`[OpenAI Realtime] No pending audio to flush for ${callId}`);
+            logger.warn(`[OpenAI Realtime] No pending audio to flush for ${callId} - user may not have spoken yet`);
             return;
         }
 
@@ -796,6 +801,8 @@ class OpenAIRealtimeService {
         if (lastChunkSent && !this.commitTimers.has(callId)) {
             logger.warn(`[OpenAI Realtime] No commit timer set after flushing. Manually triggering debounce.`);
             this.debounceCommit(callId);
+        } else if (lastChunkSent) {
+            logger.info(`[OpenAI Realtime] Commit timer is active for ${callId}`);
         }
     }
 
@@ -869,6 +876,14 @@ class OpenAIRealtimeService {
             return;
         }
 
+        // Track chunks received
+        if (!conn.audioChunksReceived) conn.audioChunksReceived = 0;
+        conn.audioChunksReceived++;
+        
+        if (conn.audioChunksReceived === 1 || conn.audioChunksReceived % 50 === 0) {
+            logger.info(`[OpenAI Realtime] Received ${conn.audioChunksReceived} audio chunks from RTP for ${callId}`);
+        }
+
         if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
             logger.debug(`[OpenAI Realtime] sendAudioChunk: Not ready for ${callId}. Buffering.`);
             if (conn.status !== 'closed' && conn.status !== 'error') {
@@ -876,7 +891,7 @@ class OpenAIRealtimeService {
                 if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
                     pending.push(audioChunkBase64ULaw);
                     this.pendingAudio.set(callId, pending);
-                    if (pending.length % 10 === 0) {
+                    if (pending.length === 1 || pending.length % 10 === 0) {
                         logger.info(`[OpenAI Realtime] Buffered ${pending.length} chunks for ${callId}`);
                     }
                 } else {
