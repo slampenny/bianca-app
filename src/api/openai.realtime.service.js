@@ -413,7 +413,7 @@ class OpenAIRealtimeService {
 
         // Log all message types for debugging
         logger.info(`[OpenAI Realtime] RECEIVED from OpenAI (${callId}): type=${message.type}${
-            message.type === 'response.content_part.added' ? `, content_type=${message.content_part?.content_type}` : ''
+            message.type === 'response.content_part.added' && message.part ? `, part_type=${message.part.type}` : ''
         }${
             message.type === 'conversation.item.created' ? `, item_type=${message.item?.type}, role=${message.item?.role}` : ''
         }`);
@@ -543,11 +543,23 @@ class OpenAIRealtimeService {
      * Handle content part added
      */
     async handleContentPartAdded(callId, message) {
-        if (message.content_part.content_type === 'audio') {
+        // Access message.part instead of message.content_part
+        const part = message.part;
+        if (!part) {
+            logger.warn(`[OpenAI Realtime] No part in content_part.added message for ${callId}`);
+            return;
+        }
+
+        if (part.type === 'audio') {
             logger.info(`[OpenAI Realtime] Received AUDIO content for ${callId}`);
-            await this.processAudioResponse(callId, message.content_part.data);
-        } else if (message.content_part.content_type === 'text') {
-            logger.info(`[OpenAI Realtime] Received TEXT content for ${callId}: "${message.content_part.text}"`);
+            // The audio data is in part.audio, not part.data
+            if (part.audio) {
+                await this.processAudioResponse(callId, part.audio);
+            } else {
+                logger.warn(`[OpenAI Realtime] Audio part missing audio data for ${callId}`);
+            }
+        } else if (part.type === 'text') {
+            logger.info(`[OpenAI Realtime] Received TEXT content for ${callId}: "${part.text}"`);
         }
     }
 
