@@ -272,24 +272,50 @@ class AsteriskAriClient {
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
                 logger.info('[ARI] 🔥 HIT UnicastRTP branch for', channel.id);
 
-                // derive the “base” of the channel (e.g. “1748053672” from “1748053672.9”)
+                // The UnicastRTP channel ID might not match the main channel ID pattern
+                // We need to find the parent by looking at ALL tracked calls
+                let parentId = null;
+                let callData = null;
+                
+                // First try the original method
                 const [base] = channel.id.split('.');
-                // find whichever tracked call starts with that same base (whatever suffix it has)
-                const parentId = Array.from(this.tracker.calls.keys())
+                parentId = Array.from(this.tracker.calls.keys())
                     .find(id => id.startsWith(`${base}.`));
-
+                
+                // If not found, look for the most recent call that's expecting RTP
                 if (!parentId) {
+                    // Find calls that are in a state where they're expecting RTP channels
+                    for (const [callId, data] of this.tracker.calls.entries()) {
+                        if (data.state === 'external_media_channels_created' || 
+                            data.state === 'external_media_read_active' ||
+                            data.expectingRtpChannel) {
+                            parentId = callId;
+                            callData = data;
+                            logger.info(`[ARI] Found parent call ${parentId} expecting RTP channel`);
+                            break;
+                        }
+                    }
+                } else {
+                    callData = this.tracker.getCall(parentId);
+                }
+
+                if (!parentId || !callData) {
                     logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
                     return;
                 }
 
-                const callData = this.tracker.getCall(parentId);
+                if (!callData.mainBridgeId) {
+                    logger.warn(`[ARI] No bridge found for parent ${parentId}`);
+                    return;
+                }
+
                 logger.info(`[ARI] Bridging RTP ${channel.id} into bridge ${callData.mainBridgeId}`);
 
                 await this.client.bridges.addChannel({
                     bridgeId: callData.mainBridgeId,
                     channel: channel.id
                 });
+                
                 this.tracker.updateCall(parentId, { state: 'external_media_bridged' });
             } else if (currentChannelName.startsWith('Local/')) {
                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
