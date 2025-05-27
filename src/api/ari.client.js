@@ -270,31 +270,27 @@ class AsteriskAriClient {
                 }
 
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
-                logger.info(`[ARI] StasisStart for UnicastRTP channel: ${channel.id} (${currentChannelName})`);
-                try {
-                    // CRITICAL: Answer the UnicastRTP channel.
-                    // Asterisk places these channels into Stasis (because of the 'app' parameter
-                    // in externalMedia) and expects the application to manage them.
-                    // Answering is the first step to acknowledge and keep the channel alive.
-                    await channel.answer();
-                    logger.info(`[ARI] Answered UnicastRTP channel ${channel.id}.`);
+                logger.info('[ARI] 🔥 HIT UnicastRTP branch for', channel.id);
 
-                    // This UnicastRTP channel is now active and serves as the endpoint for
-                    // an ExternalMedia resource on either the snoop channel (for READ direction)
-                    // or the playback channel (for WRITE direction).
-                    // It should NOT be added to other bridges here by the application, as that
-                    // would interfere with its intended role or create audio loops.
+                // derive the “base” of the channel (e.g. “1748053672” from “1748053672.9”)
+                const [base] = channel.id.split('.');
+                // find whichever tracked call starts with that same base (whatever suffix it has)
+                const parentId = Array.from(this.tracker.calls.keys())
+                    .find(id => id.startsWith(`${base}.`));
 
-                    // The SSRC mapping for incoming audio (READ stream) is primarily handled
-                    // by rtp.listener.service.js upon receiving the first RTP packet,
-                    // keyed off the 'awaitingSsrcForRtp' flag on the main call data.
-                    // The ChannelRtpStarted event handler in ari.client.js helps update this flag.
-
-                } catch (err) {
-                    logger.error(`[ARI] Error answering UnicastRTP channel ${channel.id}: ${err.message}. Attempting hangup.`);
-                    // If answering fails, try to hangup to prevent it from lingering.
-                    await channel.hangup().catch(e => logger.warn(`[ARI] Failed to hangup problematic UnicastRTP channel ${channel.id} after answer failure: ${e.message}`));
+                if (!parentId) {
+                    logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
+                    return;
                 }
+
+                const callData = this.tracker.getCall(parentId);
+                logger.info(`[ARI] Bridging RTP ${channel.id} into bridge ${callData.mainBridgeId}`);
+
+                await this.client.bridges.addChannel({
+                    bridgeId: callData.mainBridgeId,
+                    channel: channel.id
+                });
+                this.tracker.updateCall(parentId, { state: 'external_media_bridged' });
             } else if (currentChannelName.startsWith('Local/')) {
                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
                 await channel.hangup().catch(()=>{});
