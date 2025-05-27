@@ -463,6 +463,15 @@ class OpenAIRealtimeService {
                     logger.info(`[OpenAI Realtime] Response created for ${callId}`);
                     break;
 
+                case 'response.content_part.added':
+                    // Fix: use message.part, not message.content_part
+                    if (!message.part) {
+                        logger.warn(`[OpenAI Realtime] Missing part in content_part.added for ${callId}`);
+                        break;
+                    }
+                    await this.handleContentPartAdded(callId, message);
+                    break;
+
                 case 'error':
                     await this.handleApiError(callId, message);
                     break;
