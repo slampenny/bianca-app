@@ -935,6 +935,8 @@ class OpenAIRealtimeService {
                 audio: audioChunkBase64ULaw
             });
 
+            logger.debug(`[OpenAI Realtime] sendJsonMessage returned: ${success} for ${callId}`); // ADD THIS
+
             if (success) {
                 // Always trigger debounce commit after successfully sending audio
                 // Only log this occasionally to reduce noise
