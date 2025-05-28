@@ -730,6 +730,8 @@ class OpenAIRealtimeService {
                     conn.audioAppendCount++;
                     if (conn.audioAppendCount % 10 === 0) {
                         logger.info(`[OpenAI Realtime] Sent ${conn.audioAppendCount} audio chunks to ${identifier}`);
+                        this.debounceCommit(callId); 
+                        logger.info(`[OpenAI Realtime] Committing audio chunks to ${identifier}`);
                     }
                 }
                 logger.debug(`[OpenAI Realtime] SENDING: type=${messageObj.type}, audio_length=${messageObj.audio?.length || 0}`);
