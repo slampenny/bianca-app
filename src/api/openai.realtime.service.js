@@ -462,16 +462,6 @@ class OpenAIRealtimeService {
                 case 'response.created':
                     logger.info(`[OpenAI Realtime] Response created for ${callId}`);
                     break;
-
-                case 'response.content_part.added':
-                    // Fix: use message.part, not message.content_part
-                    if (!message.part) {
-                        logger.warn(`[OpenAI Realtime] Missing part in content_part.added for ${callId}`);
-                        break;
-                    }
-                    await this.handleContentPartAdded(callId, message);
-                    break;
-
                 case 'error':
                     await this.handleApiError(callId, message);
                     break;
@@ -937,6 +927,8 @@ class OpenAIRealtimeService {
 
             logger.debug(`[OpenAI Realtime] sendJsonMessage returned: ${success} for ${callId}`); // ADD THIS
 
+            this.debounceCommit(callId);
+
             if (success) {
                 // Always trigger debounce commit after successfully sending audio
                 // Only log this occasionally to reduce noise
@@ -945,7 +937,6 @@ class OpenAIRealtimeService {
                 if (conn.debugLogCount % 50 === 1) {
                     logger.debug(`[OpenAI Realtime] Audio chunks sent, debounce commit active for ${callId}`);
                 }
-                this.debounceCommit(callId);
             } else if (!bypassBuffering) {
                 const pending = this.pendingAudio.get(callId) || [];
                 if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
