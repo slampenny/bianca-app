@@ -14,7 +14,7 @@ const CONSTANTS = {
     MAX_PENDING_CHUNKS: 100, // Maximum number of audio chunks to buffer
     RECONNECT_MAX_ATTEMPTS: 5, // Maximum number of reconnection attempts
     RECONNECT_BASE_DELAY: 1000, // Base delay for exponential backoff (milliseconds)
-    COMMIT_DEBOUNCE_DELAY: 1000, // Using 1 second delay
+    COMMIT_DEBOUNCE_DELAY: 200, // Using 200ms second delay
     CONNECTION_TIMEOUT: 15000, // WebSocket connection + handshake timeout (milliseconds)
     DEFAULT_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
     OPENAI_PCM_OUTPUT_RATE: 24000, // Expected rate FROM OpenAI for pcm16 output
