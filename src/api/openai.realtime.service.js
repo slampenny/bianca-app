@@ -16,7 +16,8 @@ const CONSTANTS = {
     RECONNECT_BASE_DELAY: 1000, // Base delay for exponential backoff (milliseconds)
     COMMIT_DEBOUNCE_DELAY: 500, // Increased to 500ms for better batching
     CONNECTION_TIMEOUT: 15000, // WebSocket connection + handshake timeout (milliseconds)
-    DEFAULT_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
+    DEFAULT_SAMPLE_RATE: 24000, // OpenAI Realtime API uses 24kHz for PCM16
+    ASTERISK_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
     OPENAI_PCM_OUTPUT_RATE: 24000, // Expected rate FROM OpenAI for pcm16 output
     TEST_CONNECTION_TIMEOUT: 20000, // Timeout for the standalone test connection method (milliseconds)
     AUDIO_BATCH_SIZE: 10, // Send audio in batches of 10 chunks
@@ -450,6 +451,14 @@ class OpenAIRealtimeService {
                     this.notify(callId, 'response_done', {});
                     break;
 
+                case 'conversation.item.input_audio_transcription.completed':
+                    logger.info(`[OpenAI Realtime] Audio transcription completed for ${callId}: "${message.transcript}"`);
+                    break;
+
+                case 'response.audio_transcript.delta':
+                    logger.info(`[OpenAI Realtime] Audio transcript delta for ${callId}: "${message.delta}"`);
+                    break;
+
                 case 'input_audio_buffer.speech_started':
                     logger.info(`[OpenAI Realtime] Speech started detected for ${callId}`);
                     this.notify(callId, 'speech_started', {});
@@ -458,6 +467,16 @@ class OpenAIRealtimeService {
                 case 'input_audio_buffer.speech_stopped':
                     logger.info(`[OpenAI Realtime] Speech stopped detected for ${callId}`);
                     this.notify(callId, 'speech_stopped', {});
+                    // Automatically trigger response generation if VAD is disabled
+                    const connForResponse = this.connections.get(callId);
+                    if (connForResponse?.sessionReady) {
+                        logger.info(`[OpenAI Realtime] Triggering response generation for ${callId}`);
+                        try {
+                            await this.sendJsonMessage(callId, { type: 'response.create' });
+                        } catch (err) {
+                            logger.error(`[OpenAI Realtime] Failed to trigger response: ${err.message}`);
+                        }
+                    }
                     break;
 
                 case 'input_audio_buffer.committed':
@@ -514,8 +533,20 @@ class OpenAIRealtimeService {
             session: {
                 instructions: conn.initialPrompt || "You are Bianca, a helpful AI assistant.",
                 voice: config.openai.realtimeVoice || 'alloy',
-                input_audio_format: 'g711_ulaw',
-                output_audio_format: 'pcm16',
+                // USE PCM16 instead of g711_ulaw for better quality and reliability
+                input_audio_format: 'pcm16',  // Much better speech recognition
+                output_audio_format: 'pcm16', // Higher quality output
+                // Add turn detection for automatic response generation
+                turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.5,
+                    prefix_padding_ms: 300,
+                    silence_duration_ms: 1000  // Wait 1 second after speech stops
+                },
+                // Add input transcription to help with debugging
+                input_audio_transcription: {
+                    model: 'whisper-1'
+                },
                 ...(config.openai.realtimeSessionConfig || {})
             }
         };
@@ -642,8 +673,10 @@ class OpenAIRealtimeService {
                 logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
                 return;
             }
-            const openaiOutputRate = config.openai.outputExpectedSampleRate || CONSTANTS.OPENAI_PCM_OUTPUT_RATE;
-            const asteriskPlaybackRate = CONSTANTS.DEFAULT_SAMPLE_RATE;
+            
+            // OpenAI sends PCM16 at 24kHz, need to downsample to 8kHz for Asterisk
+            const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
+            const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
 
             logger.debug(`[OpenAI Realtime] Resampling OpenAI audio for ${callId} from ${openaiOutputRate}Hz to ${asteriskPlaybackRate}Hz`);
             const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
@@ -769,7 +802,7 @@ class OpenAIRealtimeService {
     }
 
     /**
-     * Flush pending audio - FIXED VERSION
+     * Flush pending audio - FIXED VERSION with audio conversion
      */
     async flushPendingAudio(callId) {
         const conn = this.connections.get(callId);
@@ -795,20 +828,46 @@ class OpenAIRealtimeService {
         this.pendingAudio.set(callId, []); // Clear pending buffer
 
         try {
-            // Send all chunks in batches
+            // Convert and send all chunks in batches
             for (let i = 0; i < chunksToFlush.length; i += CONSTANTS.AUDIO_BATCH_SIZE) {
                 const batch = chunksToFlush.slice(i, i + CONSTANTS.AUDIO_BATCH_SIZE);
                 
                 for (const chunkULawBase64 of batch) {
+                    // CONVERT AUDIO: Twilio 8kHz µLaw → OpenAI 24kHz PCM16
+                    
+                    // Step 1: Convert µLaw to PCM16 (8kHz)
+                    const ulawBuffer = Buffer.from(chunkULawBase64, 'base64');
+                    const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+                    
+                    if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
+                        logger.warn(`[OpenAI Realtime] Skipping chunk - µLaw conversion failed for ${callId}`);
+                        continue;
+                    }
+                    
+                    // Step 2: Upsample from 8kHz to 24kHz
+                    const pcm24khzBuffer = AudioUtils.resamplePcm(
+                        pcm8khzBuffer, 
+                        CONSTANTS.ASTERISK_SAMPLE_RATE,  // 8kHz input
+                        CONSTANTS.DEFAULT_SAMPLE_RATE    // 24kHz output
+                    );
+                    
+                    if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
+                        logger.warn(`[OpenAI Realtime] Skipping chunk - resampling failed for ${callId}`);
+                        continue;
+                    }
+                    
+                    // Step 3: Send converted audio
+                    const pcm24khzBase64 = pcm24khzBuffer.toString('base64');
+                    
                     await this.sendJsonMessage(callId, {
                         type: 'input_audio_buffer.append',
-                        audio: chunkULawBase64
+                        audio: pcm24khzBase64
                     });
                     conn.audioChunksSent++;
                 }
                 
                 // Log progress every batch
-                logger.info(`[OpenAI Realtime] Sent ${Math.min(i + CONSTANTS.AUDIO_BATCH_SIZE, chunksToFlush.length)} audio chunks to ${callId}`);
+                logger.info(`[OpenAI Realtime] Converted and sent ${Math.min(i + CONSTANTS.AUDIO_BATCH_SIZE, chunksToFlush.length)} audio chunks to ${callId}`);
                 
                 // Small delay between batches to avoid overwhelming
                 if (i + CONSTANTS.AUDIO_BATCH_SIZE < chunksToFlush.length) {
@@ -816,10 +875,10 @@ class OpenAIRealtimeService {
                 }
             }
             
-            logger.info(`[OpenAI Realtime] Finished flushing ${chunksToFlush.length} audio chunks for ${callId}`);
+            logger.info(`[OpenAI Realtime] Finished flushing and converting ${chunksToFlush.length} audio chunks for ${callId}`);
             
             // Commit the audio buffer after flushing
-            logger.info(`[OpenAI Realtime] Committing audio chunks to ${callId}`);
+            logger.info(`[OpenAI Realtime] Committing converted audio chunks to ${callId}`);
             await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
             conn.pendingCommit = true;
             
@@ -855,7 +914,7 @@ class OpenAIRealtimeService {
     }
 
     /**
-     * IMPROVED: Smarter debounce commit logic
+     * IMPROVED: Smarter debounce commit logic with response trigger
      */
     debounceCommit(callId) {
         const conn = this.connections.get(callId);
@@ -886,6 +945,19 @@ class OpenAIRealtimeService {
                 try {
                     await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
                     currentConn.pendingCommit = true;
+                    
+                    // Optional: Trigger response after a delay if no VAD response comes
+                    setTimeout(async () => {
+                        if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
+                            logger.info(`[OpenAI Realtime] Triggering manual response for ${callId} (fallback)`);
+                            try {
+                                await this.sendJsonMessage(callId, { type: 'response.create' });
+                            } catch (respErr) {
+                                logger.error(`[OpenAI Realtime] Failed to trigger manual response: ${respErr.message}`);
+                            }
+                        }
+                    }, 2000); // Wait 2 seconds for VAD, then trigger manually
+                    
                 } catch (commitErr) {
                     logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
                 }
@@ -898,7 +970,7 @@ class OpenAIRealtimeService {
     }
 
     /**
-     * IMPROVED: Send audio chunk with better batching logic
+     * IMPROVED: Send audio chunk with audio conversion for OpenAI
      */
     async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
         if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
@@ -912,7 +984,7 @@ class OpenAIRealtimeService {
             return;
         }
 
-        // Track chunks received - this just counts incoming RTP chunks
+        // Track chunks received (but reset periodically to avoid infinite growth)
         conn.audioChunksReceived++;
         
         // Log every 50 received chunks
@@ -939,16 +1011,36 @@ class OpenAIRealtimeService {
         }
 
         try {
-            // Validate that the audio chunk is properly formatted
-            const audioBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-            if (audioBuffer.length === 0) {
-                logger.error(`[OpenAI Realtime] Decoded audio buffer is empty for ${callId}`);
+            // CONVERT AUDIO: Twilio 8kHz µLaw → OpenAI 24kHz PCM16
+            
+            // Step 1: Convert µLaw to PCM16 (8kHz)
+            const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+            const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+            
+            if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
+                logger.error(`[OpenAI Realtime] µLaw to PCM conversion failed for ${callId}`);
                 return;
             }
-
+            
+            // Step 2: Upsample from 8kHz to 24kHz
+            const pcm24khzBuffer = AudioUtils.resamplePcm(
+                pcm8khzBuffer, 
+                CONSTANTS.ASTERISK_SAMPLE_RATE,  // 8kHz input
+                CONSTANTS.DEFAULT_SAMPLE_RATE    // 24kHz output
+            );
+            
+            if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
+                logger.error(`[OpenAI Realtime] PCM resampling failed for ${callId}`);
+                return;
+            }
+            
+            // Step 3: Encode as base64 for OpenAI
+            const pcm24khzBase64 = pcm24khzBuffer.toString('base64');
+            
+            // Send the converted audio to OpenAI
             await this.sendJsonMessage(callId, {
                 type: 'input_audio_buffer.append',
-                audio: audioChunkBase64ULaw
+                audio: pcm24khzBase64  // Now 24kHz PCM16
             });
 
             // Track chunks actually sent to OpenAI
@@ -956,12 +1048,12 @@ class OpenAIRealtimeService {
             
             // Only trigger debounce commit every N chunks to batch better
             if (conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
-                logger.info(`[OpenAI Realtime] Sent ${conn.audioChunksSent} chunks, triggering debounce commit for ${callId}`);
+                logger.info(`[OpenAI Realtime] Sent ${conn.audioChunksSent} converted chunks, triggering debounce commit for ${callId}`);
                 this.debounceCommit(callId);
             }
 
         } catch (err) {
-            logger.error(`[OpenAI Realtime] Error sending audio chunk: ${err.message}`);
+            logger.error(`[OpenAI Realtime] Error processing/sending audio chunk: ${err.message}`);
             if (!bypassBuffering) {
                 const pending = this.pendingAudio.get(callId) || [];
                 if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
