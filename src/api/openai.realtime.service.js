@@ -20,7 +20,7 @@ const CONSTANTS = {
     ASTERISK_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
     OPENAI_PCM_OUTPUT_RATE: 24000, // Expected rate FROM OpenAI for pcm16 output
     TEST_CONNECTION_TIMEOUT: 20000, // Timeout for the standalone test connection method (milliseconds)
-    AUDIO_BATCH_SIZE: 10, // Send audio in batches of 10 chunks
+    AUDIO_BATCH_SIZE: 50, // Send audio in batches of 10 chunks
 };
 
 /**
@@ -531,6 +531,7 @@ class OpenAIRealtimeService {
         const sessionConfig = {
             type: 'session.update',
             session: {
+                modalities: ["text", "audio"],
                 instructions: conn.initialPrompt || "You are Bianca, a helpful AI assistant.",
                 voice: config.openai.realtimeVoice || 'alloy',
                 // USE PCM16 instead of g711_ulaw for better quality and reliability
@@ -541,13 +542,13 @@ class OpenAIRealtimeService {
                     type: 'server_vad',
                     threshold: 0.5,
                     prefix_padding_ms: 300,
-                    silence_duration_ms: 1000  // Wait 1 second after speech stops
+                    silence_duration_ms: 500  // Wait 1 second after speech stops
                 },
                 // Add input transcription to help with debugging
                 input_audio_transcription: {
                     model: 'whisper-1'
                 },
-                ...(config.openai.realtimeSessionConfig || {})
+                //...(config.openai.realtimeSessionConfig || {})
             }
         };
 
@@ -939,6 +940,8 @@ class OpenAIRealtimeService {
         const timer = setTimeout(async () => {
             this.commitTimers.delete(callId);
             const currentConn = this.connections.get(callId);
+
+            logger.info(`[OpenAI Realtime] checking commit conditions for ${callId} - ready first: ${currentConn?.webSocket?.readyState === WebSocket.OPEN} ready 2nd: ${currentConn?.sessionReady}, pending: ${currentConn?.pendingCommit}`);            
             
             if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
                 logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId}`);
