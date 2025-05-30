@@ -682,18 +682,25 @@ async handleApiError(callId, message) {
      * Handle session expired
      */
     async handleSessionExpired(callId) {
-        logger.warn(`[OpenAI Realtime] Session expired for ${callId}`);
+        logger.warn(`[OpenAI Realtime] Session expired or reported as invalid for ${callId}. Initiating reconnect sequence if not already in progress.`);
         this.notify(callId, 'openai_session_expired', {});
         
         const conn = this.connections.get(callId);
-        if (!this.isReconnecting.get(callId)) {
-            this.isReconnecting.set(callId, true);
-            if (conn?.webSocket) {
-                conn.webSocket.close(1000, "Session expired, attempting reconnect");
+        if (conn && !this.isReconnecting.get(callId)) { // Check if not already trying to reconnect
+            this.isReconnecting.set(callId, true); // Mark that we are starting a reconnect process
+            if (conn.webSocket) {
+                logger.info(`[OpenAI Realtime] Closing WebSocket for ${callId} due to session expiry to trigger reconnect.`);
+                conn.webSocket.close(1000, "Session expired, client initiating reconnect"); // Normal close to trigger handleClose
             } else {
+                // If WS somehow already gone, directly attempt reconnect
+                logger.info(`[OpenAI Realtime] WebSocket for ${callId} already gone. Directly attempting reconnect after session expiry.`);
                 const delay = this.calculateBackoffDelay(this.reconnectAttempts.get(callId) || 0);
                 setTimeout(() => this.attemptReconnect(callId), delay);
             }
+        } else if (conn && this.isReconnecting.get(callId)) {
+            logger.info(`[OpenAI Realtime] Session expired for ${callId}, but already in reconnecting state. Reconnect process will continue.`);
+        } else if (!conn) {
+            logger.warn(`[OpenAI Realtime] Session expired for ${callId}, but no connection state found.`);
         }
     }
 
