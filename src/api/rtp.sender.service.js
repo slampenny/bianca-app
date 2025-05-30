@@ -131,13 +131,20 @@ class RtpSenderService {
         let framesSentThisBatch = 0;
 
         let currentFrameTimestamp = this.timestamps.get(callId);
+        logger.debug(`[RTP Sender] sendAudioFrames (${callId}): Fetched initial TS from map: ${currentFrameTimestamp} (type: ${typeof currentFrameTimestamp})`);
 
-        if (typeof currentFrameTimestamp !== 'number' || isNaN(currentFrameTimestamp)) {
-            logger.error(`[RTP Sender] sendAudioFrames (${callId}): Timestamp for call is invalid (value: ${currentFrameTimestamp}, type: ${typeof currentFrameTimestamp}) at start of batch. Re-initializing TS for safety.`);
+        // More robust check for validity of the fetched timestamp
+        if (typeof currentFrameTimestamp !== 'number' || 
+            isNaN(currentFrameTimestamp) || 
+            currentFrameTimestamp < 0 || // Explicitly check for negative
+            currentFrameTimestamp > 0xFFFFFFFF) { // Explicitly check for out of unsigned 32-bit range
+
+            logger.error(`[RTP Sender] sendAudioFrames (${callId}): Timestamp from map is invalid (value: ${currentFrameTimestamp}, type: ${typeof currentFrameTimestamp}). Re-initializing TS.`);
             currentFrameTimestamp = Math.floor(Math.random() * 0xFFFFFFFF);
             this.timestamps.set(callId, currentFrameTimestamp); 
             logger.warn(`[RTP Sender] sendAudioFrames (${callId}): Timestamp re-initialized to ${currentFrameTimestamp}.`);
         }
+        
         logger.debug(`[RTP Sender] sendAudioFrames (${callId}): Starting batch with initial TS: ${currentFrameTimestamp}. Audio buffer length: ${audioBuffer.length}, bytesPerFrame: ${bytesPerFrame}`);
 
         while (offset < audioBuffer.length) {
@@ -145,10 +152,12 @@ class RtpSenderService {
             const frameData = audioBuffer.slice(offset, offset + frameSize);
             
             if (frameData.length > 0) {
+                // currentFrameTimestamp at this point should be the correct, positive, wrapped value for this frame
                 const rtpPacket = this.createRtpPacket(callId, frameData, callConfig, currentFrameTimestamp);
                 if (rtpPacket) {
                     promises.push(this.sendRtpPacket(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort));
                     framesSentThisBatch++;
+                    // Increment and wrap timestamp for the *next* frame in this batch
                     currentFrameTimestamp = (currentFrameTimestamp + this.SAMPLES_PER_FRAME) & 0xFFFFFFFF;
                 } else {
                     logger.error(`[RTP Sender] sendAudioFrames (${callId}): Failed to create RTP packet for a frame. Skipping this frame.`);
@@ -158,6 +167,7 @@ class RtpSenderService {
         }
 
         if (framesSentThisBatch > 0) {
+            // Store the timestamp that will be used as the starting point for the *next batch* of audio
             this.timestamps.set(callId, currentFrameTimestamp); 
             logger.debug(`[RTP Sender] sendAudioFrames (${callId}): Finished batch. Next starting TS for call will be ${currentFrameTimestamp}. Sent ${framesSentThisBatch} frames this batch.`);
         }
@@ -177,25 +187,28 @@ class RtpSenderService {
         let sequenceNumber = this.sequenceNumbers.get(callId);
         const ssrc = this.ssrcs.get(callId);
 
+        // Check if essential parameters are valid numbers
         if (typeof sequenceNumber !== 'number' || isNaN(sequenceNumber) ||
-            typeof frameTimestamp !== 'number' || isNaN(frameTimestamp) ||
+            typeof frameTimestamp !== 'number' || isNaN(frameTimestamp) || // frameTimestamp is now directly passed
             typeof ssrc !== 'number' || isNaN(ssrc)) {
             logger.error(`[RTP Sender] createRtpPacket (${callId}): CRITICAL - Undefined or NaN RTP param! Seq: ${sequenceNumber}, TS: ${frameTimestamp}, SSRC: ${ssrc}. Cannot create packet.`);
             return null; 
         }
 
+        // Validate ranges (frameTimestamp should be positive due to & 0xFFFFFFFF in caller)
         if (frameTimestamp < 0 || frameTimestamp > 0xFFFFFFFF) {
-            logger.error(`[RTP Sender] CRITICAL ERROR createRtpPacket (${callId}): Invalid frameTimestamp value before write: ${frameTimestamp}. Forcing to 0 as fallback.`);
+            logger.error(`[RTP Sender] CRITICAL ERROR createRtpPacket (${callId}): Invalid frameTimestamp value before write: ${frameTimestamp}. This should not happen if correctly wrapped. Forcing to 0 as fallback.`);
             frameTimestamp = 0; 
         }
-        if (ssrc < 0 || ssrc > 0xFFFFFFFF) {
+        if (ssrc < 0 || ssrc > 0xFFFFFFFF) { // SSRC is also unsigned 32-bit
              logger.error(`[RTP Sender] CRITICAL ERROR createRtpPacket (${callId}): Invalid SSRC value before write: ${ssrc}. SSRC: ${ssrc}. Cannot create packet.`);
              return null; 
         }
         if (sequenceNumber < 0 || sequenceNumber > 0xFFFF) { // Sequence number is 16-bit
-            logger.error(`[RTP Sender] CRITICAL ERROR createRtpPacket (${callId}): Invalid sequenceNumber value before write: ${sequenceNumber}. Forcing to 0.`);
-            sequenceNumber = 0;
+            logger.error(`[RTP Sender] CRITICAL ERROR createRtpPacket (${callId}): Invalid sequenceNumber value before write: ${sequenceNumber}. Forcing to 0 as fallback.`);
+            sequenceNumber = 0; // Or wrap: sequenceNumber &= 0xFFFF;
         }
+
 
         logger.debug(`[RTP Sender] createRtpPacket (${callId}): Values for RTP Header -> Seq: ${sequenceNumber}, TS: ${frameTimestamp}, SSRC: ${ssrc}, AudioLen: ${audioData.length}, TargetFormat: ${callConfig.format}`);
 
