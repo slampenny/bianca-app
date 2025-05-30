@@ -948,7 +948,7 @@ async handleApiError(callId, message) {
                 totalOutputPCM24Bytes += pcm24khzBuffer.length;
                 
                 
-                await writeAudioToS3(callId, `flush_${chunksToProcess.indexOf(chunkULawBase64)}`, pcm24khzBuffer, true);
+                await this.writeAudioToS3(callId, `flush_${chunksToProcess.indexOf(chunkULawBase64)}`, pcm24khzBuffer, true);
 
                 pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
                 if (!pcm24khzBase64ToSend) {
@@ -1124,7 +1124,7 @@ async handleApiError(callId, message) {
                 return;
             }
 
-            await writeAudioToS3(callId, `live_${conn.audioChunksSent}`, pcm24khzBuffer, false); 
+            await this.writeAudioToS3(callId, `live_${conn.audioChunksSent}`, pcm24khzBuffer, false); 
             
             pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
             if (!pcm24khzBase64ToSend) {
