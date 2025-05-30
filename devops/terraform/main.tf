@@ -1506,3 +1506,29 @@ output "app_alb_dns_name" {
   description = "DNS name for the Application Load Balancer (app.myphonefriend.com)"
   value       = aws_route53_record.app_subdomain.name
 }
+
+
+# In your main.tf or iam.tf where ecs_task_role is defined
+
+resource "aws_iam_policy" "ecs_task_s3_debug_audio_policy" {
+  name        = "ECSTaskS3DebugAudioPolicy"
+  description = "Allows ECS tasks to write debug audio to a specific S3 bucket"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:PutObject"
+        ],
+        # Replace 'myphonefriend-audio-debug' with your actual bucket name
+        Resource = "arn:aws:s3:::myphonefriend-audio-debug/*" 
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_s3_debug_audio_attach" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.ecs_task_s3_debug_audio_policy.arn
+}

@@ -66,6 +66,9 @@ const defaultAsteriskHost = envVars.ASTERISK_HOST || 'asterisk';
 const baselineConfig = {
   env: envVars.NODE_ENV,
   port: envVars.PORT, // Use validated PORT
+  debug: {
+    audioS3Bucket: 'bianca-audio-debug', // Example S3 bucket for debug audio files
+  },
   authEnabled: true, // Assuming auth is generally enabled
   baseUrl: envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`, // Default base URL
   apiUrl: (envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`) + '/v1', // Default API URL

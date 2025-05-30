@@ -23,6 +23,15 @@ const CONSTANTS = {
     AUDIO_BATCH_SIZE: 50, // Send audio in batches of 10 chunks
 };
 
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
+const path = require('path'); // For local saving
+
+// Initialize S3 client (outside the class or in constructor, once)
+// Ensure your ECS task role has S3 write permissions to the target bucket
+const s3Client = new S3Client({ region: config.aws_region || process.env.AWS_REGION || 'us-east-2' }); // Use region from your config
+
+
 /**
  * Manages connections to OpenAI's realtime API
  */
@@ -80,6 +89,43 @@ class OpenAIRealtimeService {
             this.notifyCallback(asteriskChannelId, eventType, data);
         } catch (err) {
             logger.error(`[OpenAI Realtime] Error in notification callback for CallID ${callId} (AsteriskID ${asteriskChannelId}) / Event ${eventType}: ${err.message}`);
+        }
+    }
+
+    async writeAudioToS3(callId, chunkIndex, bufferToSave, isFlushOperation) {
+        if (!config.debug?.audioS3Bucket || !bufferToSave || bufferToSave.length === 0) {
+            if (!config.debug?.audioS3Bucket) {
+                // logger.debug(`[OpenAI Realtime] S3 bucket for debug audio not configured. Skipping S3 upload.`);
+            }
+            return;
+        }
+
+        const operationType = isFlushOperation ? 'flush' : 'live';
+        const key = `debug_audio/${callId}/${operationType}_chunk_${chunkIndex}_${Date.now()}.pcm`;
+
+        try {
+            const putObjectParams = {
+                Bucket: config.debug.audioS3Bucket,
+                Key: key,
+                Body: bufferToSave,
+                ContentType: 'application/octet-stream', // Raw PCM
+            };
+            await s3Client.send(new PutObjectCommand(putObjectParams));
+            logger.debug(`[OpenAI Realtime] Successfully uploaded debug audio to S3: s3://${config.debug.audioS3Bucket}/${key}`);
+        } catch (s3Error) {
+            logger.error(`[OpenAI Realtime] Error uploading debug audio to S3 (s3://${config.debug.audioS3Bucket}/${key}): ${s3Error.message}. Attempting local save.`, s3Error.stack);
+            // Fallback to local file system write if S3 fails (optional)
+            try {
+                const outputDir = path.join(__dirname, '..', '..', 'debug_audio_local', callId); 
+                if (!fs.existsSync(outputDir)){
+                    fs.mkdirSync(outputDir, { recursive: true });
+                }
+                const localFileName = path.join(outputDir, `${operationType}_chunk_${chunkIndex}_${Date.now()}.pcm`);
+                fs.writeFileSync(localFileName, bufferToSave);
+                logger.info(`[OpenAI Realtime] Fallback: Saved debug audio locally to ${localFileName}`);
+            } catch (localWriteErr) {
+                logger.error(`[OpenAI Realtime] Fallback local save failed: ${localWriteErr.message}`);
+            }
         }
     }
 
@@ -901,6 +947,9 @@ async handleApiError(callId, message) {
                 }
                 totalOutputPCM24Bytes += pcm24khzBuffer.length;
                 
+                
+                await writeAudioToS3(callId, `flush_${chunksToProcess.indexOf(chunkULawBase64)}`, pcm24khzBuffer, true);
+
                 pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
                 if (!pcm24khzBase64ToSend) {
                     logger.warn(`[OpenAI Realtime] flushPendingAudio (${callId}): Base64 encoding of 24kHz PCM resulted in an empty string. PCM 24kHz bytes: ${pcm24khzBuffer.length}. Skipping.`);
@@ -1074,6 +1123,8 @@ async handleApiError(callId, message) {
                 logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): resamplePcm empty. PCM8k bytes: ${pcm8khzBuffer.length}. Skipping.`);
                 return;
             }
+
+            await writeAudioToS3(callId, `live_${conn.audioChunksSent}`, pcm24khzBuffer, false); 
             
             pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
             if (!pcm24khzBase64ToSend) {
