@@ -23,14 +23,20 @@ const CONSTANTS = {
     AUDIO_BATCH_SIZE: 50, // Send audio in batches of 10 chunks
 };
 
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
 const path = require('path'); // For local saving
 
-// Initialize S3 client (outside the class or in constructor, once)
-// Ensure your ECS task role has S3 write permissions to the target bucket
-const s3Client = new S3Client({ region: config.aws_region || process.env.AWS_REGION || 'us-east-2' }); // Use region from your config
+const DEBUG_AUDIO_LOCAL_DIR = path.join(__dirname, '..', '..', 'debug_audio_calls'); // Adjust path as needed
 
+// Ensure the main directory exists when the service starts (or before first write)
+try {
+    if (!fs.existsSync(DEBUG_AUDIO_LOCAL_DIR)) {
+        fs.mkdirSync(DEBUG_AUDIO_LOCAL_DIR, { recursive: true });
+        logger.info(`[OpenAI Realtime] Created local debug audio directory: ${DEBUG_AUDIO_LOCAL_DIR}`);
+    }
+} catch (dirError) {
+    logger.error(`[OpenAI Realtime] Could not create local debug audio directory ${DEBUG_AUDIO_LOCAL_DIR}: ${dirError.message}`);
+}
 
 /**
  * Manages connections to OpenAI's realtime API
@@ -92,40 +98,28 @@ class OpenAIRealtimeService {
         }
     }
 
-    async writeAudioToS3(callId, chunkIndex, bufferToSave, isFlushOperation) {
-        if (!config.debug?.audioS3Bucket || !bufferToSave || bufferToSave.length === 0) {
-            if (!config.debug?.audioS3Bucket) {
-                // logger.debug(`[OpenAI Realtime] S3 bucket for debug audio not configured. Skipping S3 upload.`);
-            }
+    async appendAudioToLocalFile(callId, pcmBuffer) {
+        if (!pcmBuffer || pcmBuffer.length === 0) {
             return;
         }
-
-        const operationType = isFlushOperation ? 'flush' : 'live';
-        const key = `debug_audio/${callId}/${operationType}_chunk_${chunkIndex}_${Date.now()}.pcm`;
-
+        // Ensure a directory for this specific callId exists
+        const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
         try {
-            const putObjectParams = {
-                Bucket: config.debug.audioS3Bucket,
-                Key: key,
-                Body: bufferToSave,
-                ContentType: 'application/octet-stream', // Raw PCM
-            };
-            await s3Client.send(new PutObjectCommand(putObjectParams));
-            logger.debug(`[OpenAI Realtime] Successfully uploaded debug audio to S3: s3://${config.debug.audioS3Bucket}/${key}`);
-        } catch (s3Error) {
-            logger.error(`[OpenAI Realtime] Error uploading debug audio to S3 (s3://${config.debug.audioS3Bucket}/${key}): ${s3Error.message}. Attempting local save.`, s3Error.stack);
-            // Fallback to local file system write if S3 fails (optional)
-            try {
-                const outputDir = path.join(__dirname, '..', '..', 'debug_audio_local', callId); 
-                if (!fs.existsSync(outputDir)){
-                    fs.mkdirSync(outputDir, { recursive: true });
-                }
-                const localFileName = path.join(outputDir, `${operationType}_chunk_${chunkIndex}_${Date.now()}.pcm`);
-                fs.writeFileSync(localFileName, bufferToSave);
-                logger.info(`[OpenAI Realtime] Fallback: Saved debug audio locally to ${localFileName}`);
-            } catch (localWriteErr) {
-                logger.error(`[OpenAI Realtime] Fallback local save failed: ${localWriteErr.message}`);
+            if (!fs.existsSync(callAudioDir)) {
+                fs.mkdirSync(callAudioDir, { recursive: true });
             }
+        } catch (dirError) {
+            logger.error(`[OpenAI Realtime] Could not create call-specific debug audio directory ${callAudioDir}: ${dirError.message}`);
+            return; // Don't try to write if directory fails
+        }
+
+        const filePath = path.join(callAudioDir, `output_for_openai.pcm`);
+        try {
+            fs.appendFileSync(filePath, pcmBuffer);
+            // Log less frequently to avoid flooding, e.g., only on first append or periodically
+            // logger.debug(`[OpenAI Realtime] Appended ${pcmBuffer.length} bytes to ${filePath}`);
+        } catch (err) {
+            logger.error(`[OpenAI Realtime] Error appending to local debug audio file ${filePath}: ${err.message}`);
         }
     }
 
@@ -948,7 +942,7 @@ async handleApiError(callId, message) {
                 totalOutputPCM24Bytes += pcm24khzBuffer.length;
                 
                 
-                await this.writeAudioToS3(callId, `flush_${chunksToProcess.indexOf(chunkULawBase64)}`, pcm24khzBuffer, true);
+                await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
 
                 pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
                 if (!pcm24khzBase64ToSend) {
@@ -1124,7 +1118,7 @@ async handleApiError(callId, message) {
                 return;
             }
 
-            await this.writeAudioToS3(callId, `live_${conn.audioChunksSent}`, pcm24khzBuffer, false); 
+            await this.appendAudioToLocalFile(callId, pcm24khzBuffer); 
             
             pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
             if (!pcm24khzBase64ToSend) {

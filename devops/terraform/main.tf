@@ -1510,6 +1510,43 @@ output "app_alb_dns_name" {
 
 # In your main.tf or iam.tf where ecs_task_role is defined
 
+resource "aws_s3_bucket" "debug_audio_bucket" {
+  bucket = "bianca-audio-debug" # Or your chosen unique bucket name
+
+  # Optional: Enable versioning
+  # versioning {
+  #   enabled = true
+  # }
+
+  # Optional: Lifecycle rule to delete old debug files after some days
+  # lifecycle_rule {
+  #   id      = "log"
+  #   enabled = true
+  #   expiration {
+  #     days = 7 # Delete objects older than 7 days
+  #   }
+  # }
+
+  tags = {
+    Name        = "Bianca Debug Audio Bucket"
+    Environment = "Debug" // Or your environment tag
+  }
+}
+
+# You might also want to configure bucket ownership controls and ACLs depending on your needs,
+# but for simple private PutObject access from your ECS task, the default private settings are usually fine.
+# resource "aws_s3_bucket_acl" "debug_audio_bucket_acl" {
+#   bucket = aws_s3_bucket.debug_audio_bucket.id
+#   acl    = "private"
+# }
+
+resource "aws_s3_bucket_ownership_controls" "debug_audio_bucket_ownership" {
+  bucket = aws_s3_bucket.debug_audio_bucket.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 resource "aws_iam_policy" "ecs_task_s3_debug_audio_policy" {
   name        = "ECSTaskS3DebugAudioPolicy"
   description = "Allows ECS tasks to write debug audio to a specific S3 bucket"
@@ -1522,7 +1559,7 @@ resource "aws_iam_policy" "ecs_task_s3_debug_audio_policy" {
           "s3:PutObject"
         ],
         # Replace 'myphonefriend-audio-debug' with your actual bucket name
-        Resource = "arn:aws:s3:::myphonefriend-audio-debug/*" 
+        Resource = "arn:aws:s3:::bianca-audio-debug/*" 
       }
     ]
   })
