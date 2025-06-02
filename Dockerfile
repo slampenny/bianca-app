@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
   tcpdump \
   iputils-ping \
   net-tools \
+  awscli \
   # --- End added tools ---
   # Clean up apt cache
   && rm -rf /var/lib/apt/lists/*

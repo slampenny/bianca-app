@@ -748,38 +748,39 @@ async handleApiError(callId, message) {
      * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
      */
     async processAudioResponse(callId, audioBase64PCM) {
-        if (!audioBase64PCM) {
-            logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
-            return;
-        }
-        try {
-            const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
-            if (inputBuffer.length === 0) {
-                logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
-                return;
-            }
+        return this.processAudioResponseDebug(callId, audioBase64PCM);
+        // if (!audioBase64PCM) {
+        //     logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
+        //     return;
+        // }
+        // try {
+        //     const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
+        //     if (inputBuffer.length === 0) {
+        //         logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
+        //         return;
+        //     }
             
-            // OpenAI sends PCM16 at 24kHz, need to downsample to 8kHz for Asterisk
-            const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
-            const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
+        //     // OpenAI sends PCM16 at 24kHz, need to downsample to 8kHz for Asterisk
+        //     const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
+        //     const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
 
-            logger.debug(`[OpenAI Realtime] Resampling OpenAI audio for ${callId} from ${openaiOutputRate}Hz to ${asteriskPlaybackRate}Hz`);
-            const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
-            if (!resampledBuffer || resampledBuffer.length === 0) {
-                logger.warn(`[OpenAI Realtime] Resampling failed for ${callId}`);
-                return;
-            }
+        //     logger.debug(`[OpenAI Realtime] Resampling OpenAI audio for ${callId} from ${openaiOutputRate}Hz to ${asteriskPlaybackRate}Hz`);
+        //     const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
+        //     if (!resampledBuffer || resampledBuffer.length === 0) {
+        //         logger.warn(`[OpenAI Realtime] Resampling failed for ${callId}`);
+        //         return;
+        //     }
 
-            const ulawBase64ToNotify = await AudioUtils.convertPcmToUlaw(resampledBuffer);
-            if (ulawBase64ToNotify && ulawBase64ToNotify.length > 0) {
-                logger.info(`[OpenAI Realtime] Notifying ARI with processed uLaw audio for ${callId}`);
-                this.notify(callId, 'audio_chunk', { audio: ulawBase64ToNotify });
-            } else {
-                logger.warn(`[OpenAI Realtime] uLaw conversion failed for ${callId}`);
-            }
-        } catch (err) {
-            logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
-        }
+        //     const ulawBase64ToNotify = await AudioUtils.convertPcmToUlaw(resampledBuffer);
+        //     if (ulawBase64ToNotify && ulawBase64ToNotify.length > 0) {
+        //         logger.info(`[OpenAI Realtime] Notifying ARI with processed uLaw audio for ${callId}`);
+        //         this.notify(callId, 'audio_chunk', { audio: ulawBase64ToNotify });
+        //     } else {
+        //         logger.warn(`[OpenAI Realtime] uLaw conversion failed for ${callId}`);
+        //     }
+        // } catch (err) {
+        //     logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
+        // }
     }
 
     /**
@@ -1068,81 +1069,82 @@ async handleApiError(callId, message) {
      * IMPROVED: Send audio chunk with audio conversion for OpenAI
      */
     async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
-        if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
-            logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
-            return;
-        }
+        return this.sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering);
+        // if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
+        //     logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
+        //     return;
+        // }
 
-        const conn = this.connections.get(callId);
-        if (!conn) {
-            logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
-            return;
-        }
+        // const conn = this.connections.get(callId);
+        // if (!conn) {
+        //     logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
+        //     return;
+        // }
 
-        conn.audioChunksReceived++;
-        if (conn.audioChunksReceived % 100 === 0) { // Log less frequently
-            logger.info(`[OpenAI Realtime] Received ${conn.audioChunksReceived} audio chunks from RTP for ${callId}`);
-        }
+        // conn.audioChunksReceived++;
+        // if (conn.audioChunksReceived % 100 === 0) { // Log less frequently
+        //     logger.info(`[OpenAI Realtime] Received ${conn.audioChunksReceived} audio chunks from RTP for ${callId}`);
+        // }
 
-        if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
-            // logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Session not ready or WS not open. Buffering.`);
-            if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
-                const pending = this.pendingAudio.get(callId) || [];
-                if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-                    pending.push(audioChunkBase64ULaw);
-                    this.pendingAudio.set(callId, pending);
-                } else {
-                    logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
-                }
-            }
-            return;
-        }
+        // if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
+        //     // logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Session not ready or WS not open. Buffering.`);
+        //     if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
+        //         const pending = this.pendingAudio.get(callId) || [];
+        //         if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+        //             pending.push(audioChunkBase64ULaw);
+        //             this.pendingAudio.set(callId, pending);
+        //         } else {
+        //             logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
+        //         }
+        //     }
+        //     return;
+        // }
 
-        let ulawBuffer, pcm8khzBuffer, pcm24khzBuffer, pcm24khzBase64ToSend;
-        try {
-            ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-            if (!ulawBuffer || ulawBuffer.length === 0) {
-                logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Decoded uLaw buffer empty. Base64 len: ${audioChunkBase64ULaw.length}. Skipping.`);
-                return;
-            }
+        // let ulawBuffer, pcm8khzBuffer, pcm24khzBuffer, pcm24khzBase64ToSend;
+        // try {
+        //     ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+        //     if (!ulawBuffer || ulawBuffer.length === 0) {
+        //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Decoded uLaw buffer empty. Base64 len: ${audioChunkBase64ULaw.length}. Skipping.`);
+        //         return;
+        //     }
 
-            pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
-            if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
-                logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): convertUlawToPcm empty. uLaw bytes: ${ulawBuffer.length}. Skipping.`);
-                return;
-            }
+        //     pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+        //     if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
+        //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): convertUlawToPcm empty. uLaw bytes: ${ulawBuffer.length}. Skipping.`);
+        //         return;
+        //     }
 
-            pcm24khzBuffer = AudioUtils.resamplePcm(pcm8khzBuffer, CONSTANTS.ASTERISK_SAMPLE_RATE, CONSTANTS.DEFAULT_SAMPLE_RATE);
-            if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
-                logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): resamplePcm empty. PCM8k bytes: ${pcm8khzBuffer.length}. Skipping.`);
-                return;
-            }
+        //     pcm24khzBuffer = AudioUtils.resamplePcm(pcm8khzBuffer, CONSTANTS.ASTERISK_SAMPLE_RATE, CONSTANTS.DEFAULT_SAMPLE_RATE);
+        //     if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
+        //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): resamplePcm empty. PCM8k bytes: ${pcm8khzBuffer.length}. Skipping.`);
+        //         return;
+        //     }
 
-            await this.appendAudioToLocalFile(callId, pcm24khzBuffer); 
+        //     await this.appendAudioToLocalFile(callId, pcm24khzBuffer); 
             
-            pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
-            if (!pcm24khzBase64ToSend) {
-                logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Base64 encoding empty. PCM24k bytes: ${pcm24khzBuffer.length}. Skipping.`);
-                return;
-            }
-            // DETAILED LOG FOR EACH APPEND ATTEMPT
-            logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Appending. uLaw bytes: ${ulawBuffer.length}, PCM8k: ${pcm8khzBuffer.length}, PCM24k: ${pcm24khzBuffer.length}, B64PCM24k len: ${pcm24khzBase64ToSend.length}`);
+        //     pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
+        //     if (!pcm24khzBase64ToSend) {
+        //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Base64 encoding empty. PCM24k bytes: ${pcm24khzBuffer.length}. Skipping.`);
+        //         return;
+        //     }
+        //     // DETAILED LOG FOR EACH APPEND ATTEMPT
+        //     logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Appending. uLaw bytes: ${ulawBuffer.length}, PCM8k: ${pcm8khzBuffer.length}, PCM24k: ${pcm24khzBuffer.length}, B64PCM24k len: ${pcm24khzBase64ToSend.length}`);
 
-            await this.sendJsonMessage(callId, {
-                type: 'input_audio_buffer.append',
-                audio: pcm24khzBase64ToSend
-            });
+        //     await this.sendJsonMessage(callId, {
+        //         type: 'input_audio_buffer.append',
+        //         audio: pcm24khzBase64ToSend
+        //     });
 
-            conn.audioChunksSent++;
-            if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
-                // logger.info(`[OpenAI Realtime] Sent ${conn.audioChunksSent} converted chunks since last commit, triggering debounce commit for ${callId}`);
-                this.debounceCommit(callId);
-            }
+        //     conn.audioChunksSent++;
+        //     if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
+        //         // logger.info(`[OpenAI Realtime] Sent ${conn.audioChunksSent} converted chunks since last commit, triggering debounce commit for ${callId}`);
+        //         this.debounceCommit(callId);
+        //     }
 
-        } catch (audioProcessingError) {
-            logger.error(`[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`, audioProcessingError.stack);
-            return;
-        }
+        // } catch (audioProcessingError) {
+        //     logger.error(`[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`, audioProcessingError.stack);
+        //     return;
+        // }
     }
 
     /**
@@ -1309,6 +1311,257 @@ async handleApiError(callId, message) {
     }
 
     /**
+ * Debug audio data by logging samples
+ */
+debugAudioBuffer(label, buffer, format = 'pcm16') {
+    if (!buffer || buffer.length === 0) {
+        logger.warn(`[AUDIO DEBUG] ${label}: Empty buffer`);
+        return;
+    }
+
+    const info = AudioUtils.getAudioInfo(buffer, format);
+    logger.info(`[AUDIO DEBUG] ${label}: ${info.bytes} bytes, ${info.samples} samples, ${info.durationMs}ms`);
+
+    // Log first few samples
+    if (format === 'pcm16' && buffer.length >= 10) {
+        const samples = [];
+        for (let i = 0; i < Math.min(10, buffer.length / 2); i++) {
+            samples.push(buffer.readInt16LE(i * 2));
+        }
+        logger.info(`[AUDIO DEBUG] ${label} first samples: ${samples.join(', ')}`);
+        
+        // Check if samples are in expected range
+        const maxSample = Math.max(...samples.map(Math.abs));
+        if (maxSample > 32767) {
+            logger.error(`[AUDIO DEBUG] ${label}: Sample overflow detected! Max: ${maxSample}`);
+        } else if (maxSample < 100) {
+            logger.warn(`[AUDIO DEBUG] ${label}: Very quiet audio. Max amplitude: ${maxSample}`);
+        }
+    } else if (format === 'ulaw' && buffer.length >= 10) {
+        const samples = [];
+        for (let i = 0; i < Math.min(10, buffer.length); i++) {
+            samples.push(buffer[i]);
+        }
+        logger.info(`[AUDIO DEBUG] ${label} first ulaw bytes: ${samples.map(b => '0x' + b.toString(16)).join(', ')}`);
+    }
+}
+
+/**
+ * Save audio to file for analysis
+ */
+async saveDebugAudio(callId, label, buffer, format = 'pcm16', sampleRate = null) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${callId}_${label}_${timestamp}.${format === 'pcm16' ? 'raw' : 'ulaw'}`;
+    const filepath = path.join(DEBUG_AUDIO_LOCAL_DIR, callId, filename);
+    
+    try {
+        const dir = path.dirname(filepath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        
+        fs.writeFileSync(filepath, buffer);
+        logger.info(`[AUDIO DEBUG] Saved ${filepath} (${buffer.length} bytes)`);
+        
+        // Also save format info
+        const infoPath = filepath + '.info.json';
+        const defaultSampleRate = format === 'pcm16' ? 24000 : 8000;
+        fs.writeFileSync(infoPath, JSON.stringify({
+            format,
+            sampleRate: sampleRate || defaultSampleRate,
+            channels: 1,
+            bytesPerSample: format === 'pcm16' ? 2 : 1,
+            samples: Math.floor(buffer.length / (format === 'pcm16' ? 2 : 1)),
+            durationMs: Math.floor(buffer.length / (format === 'pcm16' ? 2 : 1) / ((sampleRate || defaultSampleRate) / 1000))
+        }, null, 2));
+    } catch (err) {
+        logger.error(`[AUDIO DEBUG] Failed to save debug audio: ${err.message}`);
+    }
+}
+
+/**
+ * Updated processAudioResponse with debugging
+ */
+async processAudioResponseDebug(callId, audioBase64PCM) {
+    if (!audioBase64PCM) {
+        logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
+        return;
+    }
+    
+    try {
+        // STAGE 1: Decode base64 from OpenAI
+        logger.info(`[AUDIO DEBUG] === PROCESSING AUDIO FROM OPENAI ===`);
+        logger.info(`[AUDIO DEBUG] Base64 length from OpenAI: ${audioBase64PCM.length}`);
+        
+        const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
+        if (inputBuffer.length === 0) {
+            logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
+            return;
+        }
+        
+        // Save RAW input from OpenAI
+        this.debugAudioBuffer(`RAW OpenAI PCM input (24kHz)`, inputBuffer, 'pcm16');
+        await this.saveDebugAudio(callId, '1_raw_openai_24khz', inputBuffer, 'pcm16', 24000);
+        
+        // STAGE 2: Resample from 24kHz to 8kHz
+        const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
+        const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
+
+        logger.info(`[AUDIO DEBUG] Resampling: ${openaiOutputRate}Hz → ${asteriskPlaybackRate}Hz`);
+        const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
+        
+        if (!resampledBuffer || resampledBuffer.length === 0) {
+            logger.error(`[AUDIO DEBUG] Resampling FAILED for ${callId}`);
+            return;
+        }
+        
+        // Save resampled audio
+        this.debugAudioBuffer(`RESAMPLED PCM (8kHz)`, resampledBuffer, 'pcm16');
+        await this.saveDebugAudio(callId, '2_resampled_8khz', resampledBuffer, 'pcm16', 8000);
+
+        // STAGE 3: Convert PCM to uLaw
+        logger.info(`[AUDIO DEBUG] Converting PCM to uLaw`);
+        const ulawBase64 = await AudioUtils.convertPcmToUlaw(resampledBuffer);
+        
+        if (!ulawBase64 || ulawBase64.length === 0) {
+            logger.error(`[AUDIO DEBUG] PCM to uLaw conversion FAILED`);
+            return;
+        }
+        
+        // Save final uLaw
+        const ulawRawBuffer = Buffer.from(ulawBase64, 'base64');
+        this.debugAudioBuffer(`FINAL uLaw output`, ulawRawBuffer, 'ulaw');
+        await this.saveDebugAudio(callId, '3_final_ulaw_to_asterisk', ulawRawBuffer, 'ulaw', 8000);
+        
+        logger.info(`[AUDIO DEBUG] === SENDING TO ASTERISK ===`);
+        this.notify(callId, 'audio_chunk', { audio: ulawBase64 });
+        
+    } catch (err) {
+        logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
+    }
+}
+
+/**
+ * Updated sendAudioChunk with debugging
+ */
+async sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering = false) {
+    if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
+        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
+        return;
+    }
+
+    const conn = this.connections.get(callId);
+    if (!conn) {
+        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
+        return;
+    }
+
+    conn.audioChunksReceived++;
+    
+    // Debug every 10th chunk to avoid too much logging
+    const shouldDebugThisChunk = conn.audioChunksReceived === 1 || conn.audioChunksReceived % 10 === 0;
+    
+    if (shouldDebugThisChunk) {
+        logger.info(`[AUDIO DEBUG] === PROCESSING CHUNK ${conn.audioChunksReceived} FROM ASTERISK ===`);
+    }
+
+    if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
+        if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
+            const pending = this.pendingAudio.get(callId) || [];
+            if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+                pending.push(audioChunkBase64ULaw);
+                this.pendingAudio.set(callId, pending);
+            } else {
+                logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
+            }
+        }
+        return;
+    }
+
+    try {
+        // STAGE 1: Decode base64 uLaw from Asterisk
+        if (shouldDebugThisChunk) {
+            logger.info(`[AUDIO DEBUG] Base64 uLaw length from Asterisk: ${audioChunkBase64ULaw.length}`);
+        }
+        
+        const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+        if (!ulawBuffer || ulawBuffer.length === 0) {
+            logger.warn(`[AUDIO DEBUG] Decoded uLaw buffer empty`);
+            return;
+        }
+
+        // Save RAW uLaw from Asterisk
+        if (shouldDebugThisChunk) {
+            this.debugAudioBuffer(`RAW uLaw from Asterisk (chunk ${conn.audioChunksReceived})`, ulawBuffer, 'ulaw');
+            await this.saveDebugAudio(callId, `A1_raw_asterisk_ulaw_chunk${conn.audioChunksReceived}`, ulawBuffer, 'ulaw', 8000);
+        }
+
+        // STAGE 2: Convert uLaw to PCM 8kHz
+        if (shouldDebugThisChunk) {
+            logger.info(`[AUDIO DEBUG] Converting uLaw to PCM 8kHz`);
+        }
+        
+        const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+        if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
+            logger.error(`[AUDIO DEBUG] uLaw to PCM conversion FAILED`);
+            return;
+        }
+
+        // Save PCM 8kHz
+        if (shouldDebugThisChunk) {
+            this.debugAudioBuffer(`PCM 8kHz from uLaw`, pcm8khzBuffer, 'pcm16');
+            await this.saveDebugAudio(callId, `A2_pcm_8khz_chunk${conn.audioChunksReceived}`, pcm8khzBuffer, 'pcm16', 8000);
+        }
+
+        // STAGE 3: Resample PCM from 8kHz to 24kHz
+        if (shouldDebugThisChunk) {
+            logger.info(`[AUDIO DEBUG] Resampling: 8kHz → 24kHz`);
+        }
+        
+        const pcm24khzBuffer = AudioUtils.resamplePcm(pcm8khzBuffer, CONSTANTS.ASTERISK_SAMPLE_RATE, CONSTANTS.DEFAULT_SAMPLE_RATE);
+        if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
+            logger.error(`[AUDIO DEBUG] Resampling FAILED`);
+            return;
+        }
+
+        // Save PCM 24kHz
+        if (shouldDebugThisChunk) {
+            this.debugAudioBuffer(`PCM 24kHz resampled`, pcm24khzBuffer, 'pcm16');
+            await this.saveDebugAudio(callId, `A3_pcm_24khz_chunk${conn.audioChunksReceived}`, pcm24khzBuffer, 'pcm16', 24000);
+        }
+
+        // Also append to the continuous file
+        await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
+        
+        // STAGE 4: Convert to base64 for OpenAI
+        const pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
+        if (!pcm24khzBase64ToSend) {
+            logger.error(`[AUDIO DEBUG] Base64 encoding FAILED`);
+            return;
+        }
+
+        if (shouldDebugThisChunk) {
+            logger.info(`[AUDIO DEBUG] === SENDING TO OPENAI ===`);
+            logger.info(`[AUDIO DEBUG] Base64 length to OpenAI: ${pcm24khzBase64ToSend.length}`);
+        }
+
+        await this.sendJsonMessage(callId, {
+            type: 'input_audio_buffer.append',
+            audio: pcm24khzBase64ToSend
+        });
+
+        conn.audioChunksSent++;
+        if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
+            this.debounceCommit(callId);
+        }
+
+    } catch (audioProcessingError) {
+        logger.error(`[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`, audioProcessingError.stack);
+        return;
+    }
+}
+
+    /**
      * Test basic WebSocket connection and session handshake with OpenAI
      */
     async testBasicConnectionAndSession(testId = `test-${Date.now()}`) {
@@ -1399,7 +1652,7 @@ async handleApiError(callId, message) {
                             session: {
                                 instructions: `Test connection prompt for ${testId}`,
                                 voice: config.openai.realtimeVoice || 'alloy',
-                                input_audio_format: 'g711_ulaw',
+                                input_audio_format: 'pcm16',
                                 output_audio_format: 'pcm16'
                             },
                             _testWebSocket: wsClient,
@@ -1469,6 +1722,59 @@ async handleApiError(callId, message) {
             }
         });
     }
+
+    /**
+ * Helper to test audio conversion chain independently
+ */
+async testAudioConversionChain() {
+    logger.info(`[AUDIO DEBUG] Testing audio conversion chain...`);
+    
+    try {
+        // Create a test tone (1kHz sine wave at 8kHz sample rate, 100ms duration)
+        const sampleRate = 8000;
+        const duration = 0.1; // 100ms
+        const frequency = 1000; // 1kHz
+        const numSamples = Math.floor(sampleRate * duration);
+        
+        // Create PCM buffer with sine wave
+        const pcmBuffer = Buffer.alloc(numSamples * 2);
+        for (let i = 0; i < numSamples; i++) {
+            const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 16383; // Half amplitude
+            pcmBuffer.writeInt16LE(Math.round(sample), i * 2);
+        }
+        
+        logger.info(`[AUDIO DEBUG] Created test PCM: ${pcmBuffer.length} bytes, ${numSamples} samples`);
+        
+        // Test PCM to uLaw
+        const ulawBase64 = await AudioUtils.convertPcmToUlaw(pcmBuffer);
+        const ulawBuffer = Buffer.from(ulawBase64, 'base64');
+        logger.info(`[AUDIO DEBUG] PCM → uLaw: ${ulawBuffer.length} bytes`);
+        
+        // Test uLaw back to PCM
+        const pcmBackBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+        logger.info(`[AUDIO DEBUG] uLaw → PCM: ${pcmBackBuffer.length} bytes`);
+        
+        // Test resampling up
+        const pcm24khz = AudioUtils.resamplePcm(pcmBuffer, 8000, 24000);
+        logger.info(`[AUDIO DEBUG] Resample 8k→24k: ${pcm24khz.length} bytes`);
+        
+        // Test resampling down
+        const pcm8khzAgain = AudioUtils.resamplePcm(pcm24khz, 24000, 8000);
+        logger.info(`[AUDIO DEBUG] Resample 24k→8k: ${pcm8khzAgain.length} bytes`);
+        
+        // Save test files
+        await this.saveDebugAudio('TEST', 'test_original_pcm_8khz', pcmBuffer, 'pcm16', 8000);
+        await this.saveDebugAudio('TEST', 'test_ulaw', ulawBuffer, 'ulaw', 8000);
+        await this.saveDebugAudio('TEST', 'test_pcm_back_from_ulaw', pcmBackBuffer, 'pcm16', 8000);
+        await this.saveDebugAudio('TEST', 'test_resampled_24khz', pcm24khz, 'pcm16', 24000);
+        await this.saveDebugAudio('TEST', 'test_resampled_back_8khz', pcm8khzAgain, 'pcm16', 8000);
+        
+        logger.info(`[AUDIO DEBUG] Audio conversion chain test complete. Check TEST directory for files.`);
+        
+    } catch (err) {
+        logger.error(`[AUDIO DEBUG] Audio conversion test failed: ${err.message}`, err);
+    }
+}
 
 } // End OpenAIRealtimeService Class
 
