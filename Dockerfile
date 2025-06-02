@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
   iputils-ping \
   net-tools \
   awscli \
+  ffmpeg \
   # --- End added tools ---
   # Clean up apt cache
   && rm -rf /var/lib/apt/lists/*

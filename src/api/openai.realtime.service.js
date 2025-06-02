@@ -1260,6 +1260,10 @@ async handleApiError(callId, message) {
             }
             conn.webSocket = null;
         }
+
+        // Upload debug audio before cleanup
+        await this.handleCallEnd(callId);
+
         this.cleanup(callId);
     }
 
@@ -1389,25 +1393,27 @@ async processAudioResponseDebug(callId, audioBase64PCM) {
     }
     
     try {
-        // STAGE 1: Decode base64 from OpenAI
-        logger.info(`[AUDIO DEBUG] === PROCESSING AUDIO FROM OPENAI ===`);
-        logger.info(`[AUDIO DEBUG] Base64 length from OpenAI: ${audioBase64PCM.length}`);
+        // Initialize files on first audio from OpenAI if needed
+        const conn = this.connections.get(callId);
+        if (conn && !conn._debugFilesInitialized) {
+            this.initializeContinuousDebugFiles(callId);
+            conn._debugFilesInitialized = true;
+        }
         
+        // STAGE 1: Decode base64 from OpenAI
         const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
         if (inputBuffer.length === 0) {
             logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
             return;
         }
         
-        // Save RAW input from OpenAI
-        this.debugAudioBuffer(`RAW OpenAI PCM input (24kHz)`, inputBuffer, 'pcm16');
-        await this.saveDebugAudio(callId, '1_raw_openai_24khz', inputBuffer, 'pcm16', 24000);
+        // Append RAW input from OpenAI
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm24k.raw', inputBuffer);
         
         // STAGE 2: Resample from 24kHz to 8kHz
         const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
         const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
 
-        logger.info(`[AUDIO DEBUG] Resampling: ${openaiOutputRate}Hz → ${asteriskPlaybackRate}Hz`);
         const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
         
         if (!resampledBuffer || resampledBuffer.length === 0) {
@@ -1415,12 +1421,10 @@ async processAudioResponseDebug(callId, audioBase64PCM) {
             return;
         }
         
-        // Save resampled audio
-        this.debugAudioBuffer(`RESAMPLED PCM (8kHz)`, resampledBuffer, 'pcm16');
-        await this.saveDebugAudio(callId, '2_resampled_8khz', resampledBuffer, 'pcm16', 8000);
+        // Append resampled audio
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
 
         // STAGE 3: Convert PCM to uLaw
-        logger.info(`[AUDIO DEBUG] Converting PCM to uLaw`);
         const ulawBase64 = await AudioUtils.convertPcmToUlaw(resampledBuffer);
         
         if (!ulawBase64 || ulawBase64.length === 0) {
@@ -1428,16 +1432,248 @@ async processAudioResponseDebug(callId, audioBase64PCM) {
             return;
         }
         
-        // Save final uLaw
+        // Append final uLaw
         const ulawRawBuffer = Buffer.from(ulawBase64, 'base64');
-        this.debugAudioBuffer(`FINAL uLaw output`, ulawRawBuffer, 'ulaw');
-        await this.saveDebugAudio(callId, '3_final_ulaw_to_asterisk', ulawRawBuffer, 'ulaw', 8000);
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawRawBuffer);
         
-        logger.info(`[AUDIO DEBUG] === SENDING TO ASTERISK ===`);
+        // Log progress every 100 chunks
+        if (!conn._openaiChunkCount) conn._openaiChunkCount = 0;
+        conn._openaiChunkCount++;
+        if (conn._openaiChunkCount % 100 === 0) {
+            logger.info(`[AUDIO DEBUG] Processed ${conn._openaiChunkCount} chunks from OpenAI for ${callId}`);
+        }
+        
         this.notify(callId, 'audio_chunk', { audio: ulawBase64 });
         
     } catch (err) {
         logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
+    }
+}
+
+async appendToContinuousDebugFile(callId, filename, buffer) {
+    if (!buffer || buffer.length === 0) return;
+    
+    const filepath = path.join(DEBUG_AUDIO_LOCAL_DIR, callId, filename);
+    try {
+        fs.appendFileSync(filepath, buffer);
+    } catch (err) {
+        logger.error(`[AUDIO DEBUG] Failed to append to ${filename}: ${err.message}`);
+    }
+}
+
+/**
+ * Initialize continuous debug files for a call
+ */
+initializeContinuousDebugFiles(callId) {
+    const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
+    try {
+        if (!fs.existsSync(callAudioDir)) {
+            fs.mkdirSync(callAudioDir, { recursive: true });
+        }
+        
+        // Create empty files or clear existing ones
+        const files = [
+            'continuous_from_asterisk_ulaw.ulaw',
+            'continuous_from_asterisk_pcm8k.raw',
+            'continuous_from_asterisk_pcm24k.raw',
+            'continuous_from_openai_pcm24k.raw',
+            'continuous_from_openai_pcm8k.raw',
+            'continuous_from_openai_ulaw.ulaw'
+        ];
+        
+        files.forEach(filename => {
+            const filepath = path.join(callAudioDir, filename);
+            fs.writeFileSync(filepath, Buffer.alloc(0)); // Create empty file
+        });
+        
+        logger.info(`[AUDIO DEBUG] Initialized continuous debug files for ${callId}`);
+    } catch (err) {
+        logger.error(`[AUDIO DEBUG] Failed to initialize debug files: ${err.message}`);
+    }
+}
+
+/**
+ * Upload continuous audio files to S3 after call ends
+ */
+async uploadDebugAudioToS3(callId) {
+    const S3Service = require('./s3.service'); // Assuming you have an S3 service
+    
+    try {
+        const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
+        
+        // Define files to upload with their audio formats for conversion
+        const filesToUpload = [
+            {
+                source: 'continuous_from_asterisk_ulaw.ulaw',
+                format: 'mulaw',
+                sampleRate: 8000,
+                s3Key: `debug-audio/${callId}/from_asterisk_to_openai.wav`
+            },
+            {
+                source: 'continuous_from_openai_pcm24k.raw',
+                format: 's16le',
+                sampleRate: 24000,
+                s3Key: `debug-audio/${callId}/from_openai_to_asterisk.wav`
+            }
+        ];
+        
+        const uploadedFiles = [];
+        
+        for (const file of filesToUpload) {
+            const sourceFile = path.join(callAudioDir, file.source);
+            
+            // Check if file exists and has content
+            if (!fs.existsSync(sourceFile)) {
+                logger.warn(`[AUDIO DEBUG] File not found: ${sourceFile}`);
+                continue;
+            }
+            
+            const stats = fs.statSync(sourceFile);
+            if (stats.size === 0) {
+                logger.warn(`[AUDIO DEBUG] File is empty: ${sourceFile}`);
+                continue;
+            }
+            
+            logger.info(`[AUDIO DEBUG] Converting and uploading ${file.source} to S3...`);
+            
+            // Convert to WAV format for easy playback
+            const wavFile = sourceFile.replace(/\.[^.]+$/, '.wav');
+            const ffmpegCommand = `ffmpeg -f ${file.format} -ar ${file.sampleRate} -ac 1 -i "${sourceFile}" -y "${wavFile}"`;
+            
+            try {
+                // Execute ffmpeg conversion
+                const { exec } = require('child_process');
+                await new Promise((resolve, reject) => {
+                    exec(ffmpegCommand, (error, stdout, stderr) => {
+                        if (error) {
+                            logger.error(`[AUDIO DEBUG] FFmpeg error: ${error.message}`);
+                            reject(error);
+                        } else {
+                            logger.info(`[AUDIO DEBUG] Converted ${file.source} to WAV`);
+                            resolve();
+                        }
+                    });
+                });
+                
+                // Upload to S3
+                const fileContent = fs.readFileSync(wavFile);
+                const uploadResult = await S3Service.uploadFile(
+                    fileContent,
+                    file.s3Key,
+                    'audio/wav',
+                    {
+                        callId: callId,
+                        originalFormat: file.format,
+                        sampleRate: file.sampleRate.toString(),
+                        direction: file.source.includes('asterisk') ? 'inbound' : 'outbound'
+                    }
+                );
+                
+                // Get presigned URL for easy download
+                const downloadUrl = await S3Service.getPresignedUrl(file.s3Key, 3600); // 1 hour expiry
+                
+                uploadedFiles.push({
+                    key: file.s3Key,
+                    url: downloadUrl,
+                    description: file.source.includes('asterisk') ? 'Audio from caller to OpenAI' : 'Audio from OpenAI to caller'
+                });
+                
+                logger.info(`[AUDIO DEBUG] Uploaded ${file.s3Key} to S3`);
+                
+                // Clean up local WAV file
+                fs.unlinkSync(wavFile);
+                
+            } catch (err) {
+                logger.error(`[AUDIO DEBUG] Failed to process ${file.source}: ${err.message}`);
+            }
+        }
+        
+        // Log the download URLs
+        if (uploadedFiles.length > 0) {
+            logger.info(`[AUDIO DEBUG] ===== S3 Upload Complete for Call ${callId} =====`);
+            uploadedFiles.forEach(file => {
+                logger.info(`[AUDIO DEBUG] ${file.description}: ${file.url}`);
+            });
+            logger.info(`[AUDIO DEBUG] ==========================================`);
+        }
+        
+        // Optionally clean up local files after successful upload
+        const cleanup = config.debug?.cleanupLocalFiles ?? false;
+        if (cleanup && uploadedFiles.length === filesToUpload.length) {
+            try {
+                fs.rmSync(callAudioDir, { recursive: true, force: true });
+                logger.info(`[AUDIO DEBUG] Cleaned up local debug files for ${callId}`);
+            } catch (err) {
+                logger.error(`[AUDIO DEBUG] Failed to cleanup local files: ${err.message}`);
+            }
+        }
+        
+        return uploadedFiles;
+        
+    } catch (err) {
+        logger.error(`[AUDIO DEBUG] Failed to upload debug audio to S3 for ${callId}: ${err.message}`, err);
+        return [];
+    }
+}
+
+/**
+ * Call this when a call ends to upload debug audio
+ */
+async handleCallEnd(callId) {
+    try {
+        // Upload debug audio if it exists
+        const conn = this.connections.get(callId);
+        if (conn?._debugFilesInitialized) {
+            logger.info(`[AUDIO DEBUG] Call ended, uploading debug audio for ${callId}...`);
+            const uploadedFiles = await this.uploadDebugAudioToS3(callId);
+            
+            // You could also save these URLs to your database
+            if (uploadedFiles.length > 0 && conn.conversationId) {
+                // Example: Update conversation record with debug audio URLs
+                // await Conversation.update(
+                //     { debugAudioUrls: uploadedFiles },
+                //     { where: { id: conn.conversationId } }
+                // );
+            }
+        }
+    } catch (err) {
+        logger.error(`[AUDIO DEBUG] Error handling call end for ${callId}: ${err.message}`);
+    }
+}
+
+// Alternative: Simple version without ffmpeg (uploads raw files)
+async uploadRawDebugAudioToS3(callId) {
+    const S3Service = require('./s3.service');
+    
+    try {
+        const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
+        const uploadedFiles = [];
+        
+        // Just upload the two main continuous files
+        const files = [
+            { name: 'continuous_from_asterisk_ulaw.ulaw', desc: 'Caller to OpenAI (uLaw)' },
+            { name: 'continuous_from_openai_pcm24k.raw', desc: 'OpenAI to Caller (PCM 24kHz)' }
+        ];
+        
+        for (const file of files) {
+            const filepath = path.join(callAudioDir, file.name);
+            if (fs.existsSync(filepath) && fs.statSync(filepath).size > 0) {
+                const fileContent = fs.readFileSync(filepath);
+                const s3Key = `debug-audio/${callId}/${file.name}`;
+                
+                await S3Service.uploadFile(fileContent, s3Key, 'application/octet-stream');
+                const url = await S3Service.getPresignedUrl(s3Key, 3600);
+                
+                uploadedFiles.push({ key: s3Key, url, description: file.desc });
+                logger.info(`[AUDIO DEBUG] Uploaded ${s3Key}`);
+            }
+        }
+        
+        return uploadedFiles;
+        
+    } catch (err) {
+        logger.error(`[AUDIO DEBUG] Failed to upload raw audio to S3: ${err.message}`);
+        return [];
     }
 }
 
@@ -1456,14 +1692,13 @@ async sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering = false)
         return;
     }
 
-    conn.audioChunksReceived++;
-    
-    // Debug every 10th chunk to avoid too much logging
-    const shouldDebugThisChunk = conn.audioChunksReceived === 1 || conn.audioChunksReceived % 10 === 0;
-    
-    if (shouldDebugThisChunk) {
-        logger.info(`[AUDIO DEBUG] === PROCESSING CHUNK ${conn.audioChunksReceived} FROM ASTERISK ===`);
+    // Initialize files on first audio from Asterisk if needed
+    if (!conn._debugFilesInitialized) {
+        this.initializeContinuousDebugFiles(callId);
+        conn._debugFilesInitialized = true;
     }
+
+    conn.audioChunksReceived++;
 
     if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
         if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
@@ -1480,57 +1715,36 @@ async sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering = false)
 
     try {
         // STAGE 1: Decode base64 uLaw from Asterisk
-        if (shouldDebugThisChunk) {
-            logger.info(`[AUDIO DEBUG] Base64 uLaw length from Asterisk: ${audioChunkBase64ULaw.length}`);
-        }
-        
         const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
         if (!ulawBuffer || ulawBuffer.length === 0) {
             logger.warn(`[AUDIO DEBUG] Decoded uLaw buffer empty`);
             return;
         }
 
-        // Save RAW uLaw from Asterisk
-        if (shouldDebugThisChunk) {
-            this.debugAudioBuffer(`RAW uLaw from Asterisk (chunk ${conn.audioChunksReceived})`, ulawBuffer, 'ulaw');
-            await this.saveDebugAudio(callId, `A1_raw_asterisk_ulaw_chunk${conn.audioChunksReceived}`, ulawBuffer, 'ulaw', 8000);
-        }
+        // Append RAW uLaw from Asterisk
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
 
         // STAGE 2: Convert uLaw to PCM 8kHz
-        if (shouldDebugThisChunk) {
-            logger.info(`[AUDIO DEBUG] Converting uLaw to PCM 8kHz`);
-        }
-        
         const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
         if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
             logger.error(`[AUDIO DEBUG] uLaw to PCM conversion FAILED`);
             return;
         }
 
-        // Save PCM 8kHz
-        if (shouldDebugThisChunk) {
-            this.debugAudioBuffer(`PCM 8kHz from uLaw`, pcm8khzBuffer, 'pcm16');
-            await this.saveDebugAudio(callId, `A2_pcm_8khz_chunk${conn.audioChunksReceived}`, pcm8khzBuffer, 'pcm16', 8000);
-        }
+        // Append PCM 8kHz
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm8k.raw', pcm8khzBuffer);
 
         // STAGE 3: Resample PCM from 8kHz to 24kHz
-        if (shouldDebugThisChunk) {
-            logger.info(`[AUDIO DEBUG] Resampling: 8kHz → 24kHz`);
-        }
-        
         const pcm24khzBuffer = AudioUtils.resamplePcm(pcm8khzBuffer, CONSTANTS.ASTERISK_SAMPLE_RATE, CONSTANTS.DEFAULT_SAMPLE_RATE);
         if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
             logger.error(`[AUDIO DEBUG] Resampling FAILED`);
             return;
         }
 
-        // Save PCM 24kHz
-        if (shouldDebugThisChunk) {
-            this.debugAudioBuffer(`PCM 24kHz resampled`, pcm24khzBuffer, 'pcm16');
-            await this.saveDebugAudio(callId, `A3_pcm_24khz_chunk${conn.audioChunksReceived}`, pcm24khzBuffer, 'pcm16', 24000);
-        }
+        // Append PCM 24kHz
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm24k.raw', pcm24khzBuffer);
 
-        // Also append to the continuous file
+        // Also append to the existing output_for_openai.pcm file
         await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
         
         // STAGE 4: Convert to base64 for OpenAI
@@ -1540,9 +1754,9 @@ async sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering = false)
             return;
         }
 
-        if (shouldDebugThisChunk) {
-            logger.info(`[AUDIO DEBUG] === SENDING TO OPENAI ===`);
-            logger.info(`[AUDIO DEBUG] Base64 length to OpenAI: ${pcm24khzBase64ToSend.length}`);
+        // Log progress every 100 chunks
+        if (conn.audioChunksReceived % 100 === 0) {
+            logger.info(`[AUDIO DEBUG] Processed ${conn.audioChunksReceived} chunks from Asterisk for ${callId}`);
         }
 
         await this.sendJsonMessage(callId, {

@@ -5,7 +5,9 @@ const dotenv = require('dotenv');
 const path = require('path');
 const Joi = require('joi');
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+
 const logger = require('./logger'); // Assuming logger is available for loadSecrets
+const { AwsContext } = require('twilio/lib/rest/accounts/v1/credential/aws');
 
 // Load .env file (if present)
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -68,6 +70,14 @@ const baselineConfig = {
   port: envVars.PORT, // Use validated PORT
   debug: {
     audioS3Bucket: 'bianca-audio-debug', // Example S3 bucket for debug audio files
+  },
+  aws: {
+    accessKeyId: env.AWS_SECRET_ID,
+    secretAccessKey: envVars.AWS_SECRET_KEY, // Optional, if using AWS SDK directly
+    region: envVars.AWS_REGION || 'us-east-2', // Default to us-east-2 if not set
+    s3: {
+      bucketName: 'bianca-audio', // Example S3 bucket for audio files
+    },
   },
   authEnabled: true, // Assuming auth is generally enabled
   baseUrl: envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`, // Default base URL
