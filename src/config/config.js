@@ -72,7 +72,7 @@ const baselineConfig = {
     audioS3Bucket: 'bianca-audio-debug', // Example S3 bucket for debug audio files
   },
   aws: {
-    accessKeyId: env.AWS_SECRET_ID,
+    accessKeyId: envVars.AWS_SECRET_ID,
     secretAccessKey: envVars.AWS_SECRET_KEY, // Optional, if using AWS SDK directly
     region: envVars.AWS_REGION || 'us-east-2', // Default to us-east-2 if not set
     s3: {
