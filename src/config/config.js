@@ -68,15 +68,12 @@ const defaultAsteriskHost = envVars.ASTERISK_HOST || 'asterisk';
 const baselineConfig = {
   env: envVars.NODE_ENV,
   port: envVars.PORT, // Use validated PORT
-  debug: {
-    audioS3Bucket: 'bianca-audio-debug', // Example S3 bucket for debug audio files
-  },
   aws: {
     accessKeyId: envVars.AWS_SECRET_ID,
     secretAccessKey: envVars.AWS_SECRET_KEY, // Optional, if using AWS SDK directly
     region: envVars.AWS_REGION || 'us-east-2', // Default to us-east-2 if not set
     s3: {
-      bucketName: 'bianca-audio', // Example S3 bucket for audio files
+      bucketName: 'bianca-audio-debug', // Example S3 bucket for audio files
     },
   },
   authEnabled: true, // Assuming auth is generally enabled
