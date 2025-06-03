@@ -34,7 +34,7 @@ class AsteriskAriClient {
         this.RTP_LISTENER_HOST = sanitizeHost(config.asterisk.rtpListenerHost);
         this.RTP_READ_PORT = config.asterisk.rtpListenerPort;
         this.RTP_WRITE_PORT = config.asterisk.rtpSenderPort || (config.asterisk.rtpListenerPort + 1); // For sending (App → Asterisk)
-        this.RTP_SEND_FORMAT = 'slin';
+        this.RTP_SEND_FORMAT = 'ulaw';
     }
 
     async waitForReady() {

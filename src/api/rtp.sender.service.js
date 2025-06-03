@@ -21,6 +21,7 @@ class RtpSenderService {
         this.RTP_VERSION = 2;
         this.RTP_PAYLOAD_TYPE_ULAW = 0;     // PCMU (uLaw)
         this.RTP_PAYLOAD_TYPE_SLIN16_8K = 11; // L16/8000/1 (for 8kHz 16-bit PCM)
+        this.RTP_SEND_FORMAT = 'ulaw';       // Default format for sending audio to Asterisk
         this.SAMPLE_RATE = 8000;          // 8kHz for telephone quality audio we send to Asterisk
         this.FRAME_SIZE_MS = 20;          // 20ms frames
         this.SAMPLES_PER_FRAME = (this.SAMPLE_RATE * this.FRAME_SIZE_MS) / 1000; // 160 samples for 8kHz 20ms
@@ -41,7 +42,7 @@ class RtpSenderService {
             asteriskChannelId: config.asteriskChannelId,
             rtpHost: config.rtpHost,
             rtpPort: config.rtpPort,
-            format: config.format // Expected: 'ulaw' or 'slin' (for 8kHz PCM16)
+            format: this.RTP_SEND_FORMAT // Expected: 'ulaw' or 'slin' (for 8kHz PCM16)
         });
 
         const ssrc = Math.floor(Math.random() * 0xFFFFFFFF);

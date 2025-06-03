@@ -151,7 +151,8 @@ function startRtpListenerService() {
         try {
             const pcm16Slin8Buffer = payload;
             // *** Convert 8kHz PCM -> 8kHz uLaw using AudioUtils ***
-            const ulawBase64 = await AudioUtils.convertPcmToUlaw(pcm16Slin8Buffer);
+            //const ulawBase64 = await AudioUtils.convertPcmToUlaw(pcm16Slin8Buffer);
+            const ulawBase64 = payload.toString('base64');
 
             if (ulawBase64 && ulawBase64.length > 0) {
                  logger.debug(`[RTP Listener] Forwarding ${ulawBase64.length} base64 uLaw bytes for call ${callId} (SSRC: ${ssrc})`);
