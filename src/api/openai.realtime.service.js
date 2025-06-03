@@ -1495,25 +1495,33 @@ initializeContinuousDebugFiles(callId) {
 /**
  * Upload continuous audio files to S3 after call ends
  */
+/**
+ * Upload continuous audio files to S3 after call ends - FIXED VERSION
+ * Only uploads 2 files: one combined file from Asterisk and one from OpenAI
+ */
 async uploadDebugAudioToS3(callId) {
-    const S3Service = require('./s3.service'); // Assuming you have an S3 service
+    const S3Service = require('./s3.service');
     
     try {
         const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
         
-        // Define files to upload with their audio formats for conversion
+        // Only upload the TWO main continuous files
         const filesToUpload = [
             {
                 source: 'continuous_from_asterisk_ulaw.ulaw',
                 format: 'mulaw',
                 sampleRate: 8000,
-                s3Key: `debug-audio/${callId}/from_asterisk_to_openai.wav`
+                channels: 1,
+                s3Key: `debug-audio/${callId}/caller_to_openai_8khz.wav`,
+                description: 'Complete audio from caller to OpenAI (8kHz)'
             },
             {
                 source: 'continuous_from_openai_pcm24k.raw',
                 format: 's16le',
                 sampleRate: 24000,
-                s3Key: `debug-audio/${callId}/from_openai_to_asterisk.wav`
+                channels: 1,
+                s3Key: `debug-audio/${callId}/openai_to_caller_24khz.wav`,
+                description: 'Complete audio from OpenAI to caller (24kHz)'
             }
         ];
         
@@ -1534,11 +1542,11 @@ async uploadDebugAudioToS3(callId) {
                 continue;
             }
             
-            logger.info(`[AUDIO DEBUG] Converting and uploading ${file.source} to S3...`);
+            logger.info(`[AUDIO DEBUG] Converting and uploading ${file.source} (${stats.size} bytes) to S3...`);
             
             // Convert to WAV format for easy playback
             const wavFile = sourceFile.replace(/\.[^.]+$/, '.wav');
-            const ffmpegCommand = `ffmpeg -f ${file.format} -ar ${file.sampleRate} -ac 1 -i "${sourceFile}" -y "${wavFile}"`;
+            const ffmpegCommand = `ffmpeg -f ${file.format} -ar ${file.sampleRate} -ac ${file.channels} -i "${sourceFile}" -y "${wavFile}"`;
             
             try {
                 // Execute ffmpeg conversion
@@ -1546,10 +1554,11 @@ async uploadDebugAudioToS3(callId) {
                 await new Promise((resolve, reject) => {
                     exec(ffmpegCommand, (error, stdout, stderr) => {
                         if (error) {
-                            logger.error(`[AUDIO DEBUG] FFmpeg error: ${error.message}`);
+                            logger.error(`[AUDIO DEBUG] FFmpeg error for ${file.source}: ${error.message}`);
+                            logger.error(`[AUDIO DEBUG] FFmpeg stderr: ${stderr}`);
                             reject(error);
                         } else {
-                            logger.info(`[AUDIO DEBUG] Converted ${file.source} to WAV`);
+                            logger.info(`[AUDIO DEBUG] Successfully converted ${file.source} to WAV`);
                             resolve();
                         }
                     });
@@ -1565,7 +1574,9 @@ async uploadDebugAudioToS3(callId) {
                         callId: callId,
                         originalFormat: file.format,
                         sampleRate: file.sampleRate.toString(),
-                        direction: file.source.includes('asterisk') ? 'inbound' : 'outbound'
+                        direction: file.source.includes('asterisk') ? 'inbound' : 'outbound',
+                        originalSize: stats.size.toString(),
+                        convertedSize: fileContent.length.toString()
                     }
                 );
                 
@@ -1575,10 +1586,12 @@ async uploadDebugAudioToS3(callId) {
                 uploadedFiles.push({
                     key: file.s3Key,
                     url: downloadUrl,
-                    description: file.source.includes('asterisk') ? 'Audio from caller to OpenAI' : 'Audio from OpenAI to caller'
+                    description: file.description,
+                    originalSize: stats.size,
+                    convertedSize: fileContent.length
                 });
                 
-                logger.info(`[AUDIO DEBUG] Uploaded ${file.s3Key} to S3`);
+                logger.info(`[AUDIO DEBUG] Successfully uploaded ${file.s3Key} to S3`);
                 
                 // Clean up local WAV file
                 fs.unlinkSync(wavFile);
@@ -1588,13 +1601,15 @@ async uploadDebugAudioToS3(callId) {
             }
         }
         
-        // Log the download URLs
+        // Log the download URLs in a clean format
         if (uploadedFiles.length > 0) {
-            logger.info(`[AUDIO DEBUG] ===== S3 Upload Complete for Call ${callId} =====`);
+            logger.info(`[AUDIO DEBUG] ===== DEBUG AUDIO READY FOR CALL ${callId} =====`);
             uploadedFiles.forEach(file => {
-                logger.info(`[AUDIO DEBUG] ${file.description}: ${file.url}`);
+                const sizeMB = (file.originalSize / 1024 / 1024).toFixed(2);
+                logger.info(`[AUDIO DEBUG] ${file.description}`);
+                logger.info(`[AUDIO DEBUG]   Size: ${sizeMB} MB | URL: ${file.url}`);
             });
-            logger.info(`[AUDIO DEBUG] ==========================================`);
+            logger.info(`[AUDIO DEBUG] ===============================================`);
         }
         
         // Optionally clean up local files after successful upload

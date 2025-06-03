@@ -65,7 +65,9 @@ class AsteriskAriClient {
             logger.info('[ARI] Stasis application "myphonefriend" verified and ready');
             return true;
         } catch (err) {
-            logger.error('[ARI] Stasis application not ready:', err.message);
+            if (err.message) {
+                logger.error('[ARI] Stasis application not ready:', err.message);
+            }
             logger.error('[ARI] Full error:', err);
             throw err;
         }
@@ -104,10 +106,19 @@ class AsteriskAriClient {
                 logger.info('[ARI] WS connected');
             });
             this.client.on('WebSocketReconnecting', err => {
-                logger.warn('[ARI] WS reconnecting:', err.message || err);
+                if (err.message) {
+                    logger.warn('[ARI] WS reconnecting:', err.message || err);
+                }
+                else {
+                    logger.warn('[ARI] WS reconnecting with no error message');
+                }
             });
             this.client.on('WebSocketMaxRetries', err => {
-                logger.error('[ARI] WS max retries:', err.message || err);
+                if (err.message) {
+                    logger.error('[ARI] WS max retries:', err.message || err);
+                } else {
+                    logger.error('[ARI] WS max retries with no error message'); 
+                }
             });
             this.client.on('WebSocketClosed', (code, reason) => {
                 logger.warn(`[ARI] WS closed ${code}: ${reason}`);
