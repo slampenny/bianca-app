@@ -407,6 +407,14 @@ resource "aws_security_group" "asterisk_sg" {
   }
 
   ingress {
+    description     = "Allow RTP from Bianca App (any port for ExternalMedia)"
+    from_port       = 1024  # Start of ephemeral ports
+    to_port         = 65535 # End of port range
+    protocol        = "udp"
+    security_groups = [aws_security_group.bianca_app_sg.id]
+  }
+
+  ingress {
     from_port   = var.asterisk_sip_tcp_port
     to_port     = var.asterisk_sip_tcp_port
     protocol    = "tcp"
@@ -436,14 +444,6 @@ resource "aws_security_group" "asterisk_sg" {
     protocol    = "udp"
     cidr_blocks = [for s in data.aws_subnet.vpc_task_subnets : s.cidr_block]
     description = "Allow NLB UDP Health Check for Asterisk RTP"
-  }
-
-  ingress {
-    description     = "Allow RTP from Bianca App (WRITE direction - App to Asterisk)"
-    from_port       = var.app_rtp_sender_port
-    to_port         = var.app_rtp_sender_port
-    protocol        = "udp"
-    security_groups = [aws_security_group.bianca_app_sg.id]
   }
 
   ingress {
