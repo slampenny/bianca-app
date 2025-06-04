@@ -74,6 +74,7 @@ class RtpSenderService {
      * Send audio data (expected as 8kHz uLaw base64 from openai.realtime.service.js) to Asterisk
      */
     async sendAudio(callId, audioBase64Ulaw) {
+    
         if (!audioBase64Ulaw || audioBase64Ulaw.length === 0) {
             logger.debug(`[RTP Sender] sendAudio (${callId}): Empty audioBase64Ulaw received. Skipping.`);
             return;
@@ -84,6 +85,8 @@ class RtpSenderService {
             logger.warn(`[RTP Sender] sendAudio (${callId}): Call not initialized or config missing. Skipping audio send.`);
             return;
         }
+
+        logger.info(`[RTP Sender] sendAudio for ${callId} - Configured to send to ${callConfig.rtpHost}:${callConfig.rtpPort}`);
 
         const socket = this.udpSockets.get(callId);
         if (!socket) {
@@ -237,11 +240,13 @@ class RtpSenderService {
 
     async sendRtpPacket(socket, rtpPacket, host, port) {
         return new Promise((resolve, reject) => {
+            logger.info(`[RTP Sender] SENDING packet to ${host}:${port}, size: ${rtpPacket.length} bytes`);
             socket.send(rtpPacket, 0, rtpPacket.length, port, host, (err, bytes) => {
                 if (err) {
                     logger.error(`[RTP Sender] UDP send error to ${host}:${port} : ${err.message}`, err);
                     reject(err);
                 } else {
+                    logger.debug(`[RTP Sender] SUCCESS: Sent ${bytes} bytes to ${host}:${port}`);
                     resolve();
                 }
             });
