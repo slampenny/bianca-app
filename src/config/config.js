@@ -119,6 +119,7 @@ const baselineConfig = {
     host: defaultAsteriskHost, // Example URL, replace with actual
     url: `http://${defaultAsteriskHost}:8088`, // Example URL, replace with actual
     rtpListenerHost: envVars.RTP_LISTENER_HOST || 'bianca-app', // Example RTP URL, replace with actual
+    rtpSenderHost: envVars.RTP_SENDER_HOST || 'asterisk', // Example RTP sender URL, replace with actual
     rtpListenerPort: envVars.RTP_LISTENER_PORT || 16384, // Example port, replace with actual
     rtpSenderPort: parseInt(envVars.RTP_SENDER_PORT) || 16385,
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
@@ -178,6 +179,7 @@ if (envVars.NODE_ENV === 'production') {
   baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.myphonefriend.internal`;
   baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
   baselineConfig.asterisk.rtpListenerHost = envVars.RTP_LISTENER_HOST || `bianca-app.myphonefriend.internal`;
+  baselineConfig.asterisk.rtpSenderHost = envVars.RTP_SENDER_HOST || `asterisk.myphonefriend.internal`;
 }
 
 // Add method to load secrets from AWS Secrets Manager (if used)

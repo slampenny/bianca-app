@@ -32,6 +32,7 @@ class AsteriskAriClient {
 
         // Configuration for ExternalMedia
         this.RTP_LISTENER_HOST = sanitizeHost(config.asterisk.rtpListenerHost);
+        this.RTP_SENDER_HOST = sanitizeHost(config.asterisk.rtpSenderHost);
         this.RTP_READ_PORT = config.asterisk.rtpListenerPort;
         this.RTP_WRITE_PORT = config.asterisk.rtpSenderPort || (config.asterisk.rtpListenerPort + 1); // For sending (App → Asterisk)
         this.RTP_SEND_FORMAT = 'ulaw';
@@ -916,7 +917,7 @@ class AsteriskAriClient {
                     if (!asteriskRtpEndpoint) {
                         logger.warn(`[ARI] Could not determine Asterisk RTP endpoint dynamically, using configured values`);
                         asteriskRtpEndpoint = {
-                            host: this.RTP_LISTENER_HOST,
+                            host: this.RTP_SENDER_HOST,
                             port: this.RTP_WRITE_PORT
                         };
                     }
@@ -988,7 +989,7 @@ class AsteriskAriClient {
         const rtpSenderService = require('./rtp.sender.service');
         await rtpSenderService.initializeCall(twilioSid, {
             asteriskChannelId,
-            rtpHost: this.RTP_LISTENER_HOST,
+            rtpHost: this.RTP_SENDER_HOST,
             rtpPort: this.RTP_WRITE_PORT,
             format: this.RTP_SEND_FORMAT
         });
