@@ -817,141 +817,147 @@ class AsteriskAriClient {
         }
 
         async handleStasisStartForPlayback(channel, currentChannelName, event) {
-        const channelId = channel.id;
-        
-        if (currentChannelName.startsWith('Local/playback-')) {
-            logger.info(`[ARI] StasisStart for Playback channel: ${channelId} (${currentChannelName})`);
+            const channelId = channel.id;
+            
+            if (currentChannelName.startsWith('Local/playback-')) {
+                logger.info(`[ARI] StasisStart for Playback channel: ${channelId} (${currentChannelName})`);
 
-            const match = currentChannelName.match(/^Local\/playback-([^@]+)@/);
-            const parentChannelId = match ? match[1] : null;
-            
-            // Check which leg this is by looking at the channel name
-            const isLeg1 = currentChannelName.includes(';1');
-            const isLeg2 = currentChannelName.includes(';2');
-            
-            logger.info(`[ARI] Playback channel ${channelId} is ${isLeg1 ? 'Leg 1' : isLeg2 ? 'Leg 2' : 'Unknown leg'}`);
-            
-            if (!parentChannelId) {
-                logger.error(`[ARI] Cannot extract parent ID from playback channel name: ${currentChannelName}`);
-                await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up playback: ${e.message}`));
-                return;
-            }
+                const match = currentChannelName.match(/^Local\/playback-([^@]+)@/);
+                const parentChannelId = match ? match[1] : null;
+                
+                const isLeg2 = currentChannelName.includes(';2');
+                
+                if (!parentChannelId) {
+                    logger.error(`[ARI] Cannot extract parent ID from playback channel name: ${currentChannelName}`);
+                    await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up playback: ${e.message}`));
+                    return;
+                }
 
-            const parentCallData = this.tracker.getCall(parentChannelId);
-            if (!parentCallData) {
-                logger.error(`[ARI] Playback channel ${channelId} entered Stasis, but parent call ${parentChannelId} not found. Hanging up.`);
-                await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned playback: ${e.message}`));
-                return;
-            }
-            
-            // Only process Leg 2 (the one that enters Stasis from dialplan)
-            if (isLeg2) {
-                this.tracker.updateCall(parentChannelId, { 
-                    playbackChannel: channel, 
-                    playbackChannelId: channelId,
-                    pendingPlaybackId: null
-                });
-
-                try {
-                    // Answer the channel
-                    await channel.answer();
-                    logger.info(`[ARI] Answered playback channel ${channelId}`);
-                    
-                    // Wait a moment for answer to complete
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    // Add to bridge
-                    await this.client.bridges.addChannel({
-                        bridgeId: parentCallData.mainBridgeId,
-                        channel: channelId
+                const parentCallData = this.tracker.getCall(parentChannelId);
+                if (!parentCallData) {
+                    logger.error(`[ARI] Playback channel ${channelId} entered Stasis, but parent call ${parentChannelId} not found. Hanging up.`);
+                    await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned playback: ${e.message}`));
+                    return;
+                }
+                
+                if (isLeg2) {
+                    this.tracker.updateCall(parentChannelId, { 
+                        playbackChannel: channel, 
+                        playbackChannelId: channelId,
+                        pendingPlaybackId: null
                     });
-                    
-                    logger.info(`[ARI] Added playback channel ${channelId} to bridge ${parentCallData.mainBridgeId}`);
-                    
-                    // Wait a moment for bridge to be established
-                    await new Promise(resolve => setTimeout(resolve, 100));
 
-                    // Now start external media - BUT THIS TIME WE NEED TO CAPTURE THE RESPONSE!
-                    const rtpWriteSource = `${this.RTP_LISTENER_HOST}:${this.RTP_WRITE_PORT}`;
-                    
-                    // Create the external media channel
-                    const externalMediaResponse = await channel.externalMedia({
-                        app: 'myphonefriend',
-                        external_host: rtpWriteSource,
-                        format: this.RTP_SEND_FORMAT,
-                        direction: 'write'
-                    });
-                    
-                    logger.info(`[ARI] ExternalMedia response:`, externalMediaResponse);
-                    
-                    // Wait for the UnicastRTP channel to be created
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    
-                    // Find the UnicastRTP channel that was just created
-                    let asteriskRtpEndpoint = null;
                     try {
-                        // List all channels and find the UnicastRTP one for this playback
-                        const allChannels = await this.client.channels.list();
-                        const rtpChannel = allChannels.find(ch => 
-                            ch.name.startsWith('UnicastRTP/') && 
-                            ch.name.includes(':') &&
-                            ch.state === 'Up'
-                        );
+                        await channel.answer();
+                        logger.info(`[ARI] Answered playback channel ${channelId}`);
                         
-                        if (rtpChannel) {
-                            // Parse the endpoint from channel name: UnicastRTP/127.0.0.1:5004-0x7f...
-                            const rtpMatch = rtpChannel.name.match(/UnicastRTP\/([^:]+):(\d+)/);
-                            if (rtpMatch) {
-                                asteriskRtpEndpoint = {
-                                    host: rtpMatch[1],
-                                    port: parseInt(rtpMatch[2])
-                                };
-                                logger.info(`[ARI] Found Asterisk RTP endpoint: ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        await this.client.bridges.addChannel({
+                            bridgeId: parentCallData.mainBridgeId,
+                            channel: channelId
+                        });
+                        
+                        logger.info(`[ARI] Added playback channel ${channelId} to bridge ${parentCallData.mainBridgeId}`);
+                        
+                        await new Promise(resolve => setTimeout(resolve, 100));
+
+                        const rtpWriteSource = `${this.RTP_LISTENER_HOST}:${this.RTP_WRITE_PORT}`;
+                        
+                        // Create the external media and store the result
+                        const externalMediaResult = await channel.externalMedia({
+                            app: 'myphonefriend',
+                            external_host: rtpWriteSource,
+                            format: this.RTP_SEND_FORMAT,
+                            direction: 'write'
+                        });
+                        
+                        logger.info(`[ARI] ExternalMedia created, result:`, JSON.stringify(externalMediaResult));
+                        
+                        // The key is to listen for the UnicastRTP channel that will be created
+                        // Set up a promise to wait for it
+                        const rtpChannelPromise = new Promise((resolve, reject) => {
+                            const timeout = setTimeout(() => {
+                                reject(new Error('Timeout waiting for UnicastRTP channel'));
+                            }, 5000);
+                            
+                            const checkForRtpChannel = async (event, rtpChannel) => {
+                                // Check if this is a UnicastRTP channel created for our playback
+                                if (rtpChannel.name && rtpChannel.name.startsWith('UnicastRTP/')) {
+                                    // Parse to check if it's related to our playback channel
+                                    const rtpMatch = rtpChannel.name.match(/UnicastRTP\/([^:]+):(\d+)/);
+                                    if (rtpMatch) {
+                                        clearTimeout(timeout);
+                                        this.client.removeListener('StasisStart', checkForRtpChannel);
+                                        resolve({
+                                            host: rtpMatch[1],
+                                            port: parseInt(rtpMatch[2]),
+                                            channel: rtpChannel
+                                        });
+                                    }
+                                }
+                            };
+                            
+                            this.client.on('StasisStart', checkForRtpChannel);
+                        });
+                        
+                        try {
+                            const rtpInfo = await rtpChannelPromise;
+                            logger.info(`[ARI] Found Asterisk RTP endpoint from UnicastRTP channel: ${rtpInfo.host}:${rtpInfo.port}`);
+                            
+                            const asteriskRtpEndpoint = {
+                                host: rtpInfo.host,
+                                port: rtpInfo.port
+                            };
+                            
+                            this.tracker.updateCall(parentChannelId, { 
+                                state: 'external_media_write_active',
+                                asteriskRtpEndpoint: asteriskRtpEndpoint,
+                                unicastRtpChannel: rtpInfo.channel
+                            });
+                            
+                            logger.info(`[ARI] WRITE ExternalMedia started: ${rtpWriteSource} → Asterisk at ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
+                            
+                            // Initialize the RTP sender with the CORRECT Asterisk endpoint
+                            await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+                            
+                        } catch (rtpErr) {
+                            logger.error(`[ARI] Failed to determine Asterisk RTP endpoint: ${rtpErr.message}`);
+                            
+                            // Last resort: try to parse from the external media result
+                            if (externalMediaResult && externalMediaResult.name) {
+                                const lastResortMatch = externalMediaResult.name.match(/UnicastRTP\/([^:]+):(\d+)/);
+                                if (lastResortMatch) {
+                                    const asteriskRtpEndpoint = {
+                                        host: lastResortMatch[1],
+                                        port: parseInt(lastResortMatch[2])
+                                    };
+                                    logger.info(`[ARI] Parsed endpoint from result: ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
+                                    await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+                                } else {
+                                    throw new Error('Could not determine Asterisk RTP endpoint');
+                                }
+                            } else {
+                                throw rtpErr;
                             }
                         }
+                        
                     } catch (err) {
-                        logger.error(`[ARI] Error finding UnicastRTP channel: ${err.message}`);
+                        logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
+                        
+                        await channel.hangup().catch(() => {});
+                        
+                        this.tracker.updateCall(parentChannelId, { 
+                            playbackChannel: null, 
+                            playbackChannelId: null,
+                            state: 'external_media_read_only'
+                        });
+                        
+                        logger.warn(`[ARI] Continuing call ${parentChannelId} in READ-only mode (no OpenAI audio playback)`);
                     }
-                    
-                    // If we couldn't find it dynamically, fall back to config
-                    if (!asteriskRtpEndpoint) {
-                        logger.warn(`[ARI] Could not determine Asterisk RTP endpoint dynamically, using configured values`);
-                        asteriskRtpEndpoint = {
-                            host: this.RTP_SENDER_HOST,
-                            port: this.RTP_WRITE_PORT
-                        };
-                    }
-                    
-                    this.tracker.updateCall(parentChannelId, { 
-                        state: 'external_media_write_active',
-                        asteriskRtpEndpoint: asteriskRtpEndpoint  // Store this!
-                    });
-                    
-                    logger.info(`[ARI] WRITE ExternalMedia started: ${rtpWriteSource} → Asterisk at ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
-                    
-                    // Initialize the RTP sender with the CORRECT Asterisk endpoint
-                    await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
-                    
-                } catch (err) {
-                    logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
-                    
-                    await channel.hangup().catch(() => {});
-                    
-                    this.tracker.updateCall(parentChannelId, { 
-                        playbackChannel: null, 
-                        playbackChannelId: null,
-                        state: 'external_media_read_only'
-                    });
-                    
-                    logger.warn(`[ARI] Continuing call ${parentChannelId} in READ-only mode (no OpenAI audio playback)`);
                 }
-            } else if (isLeg1) {
-                logger.info(`[ARI] Ignoring Leg 1 of playback Local channel ${channelId}`);
-            } else {
-                logger.warn(`[ARI] Could not determine leg for playback channel ${channelId}`);
             }
         }
-    }
 
     // 4. Add the missing shutdown method to your ARI client class
     async shutdown() {
