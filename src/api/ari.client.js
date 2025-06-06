@@ -854,36 +854,60 @@ class AsteriskAriClient {
 
                     const rtpAsteriskSource = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_SEND_PORT}`;
                     
-                    // Create the external media and get the resulting UnicastRTP channel directly
                     const unicastRtpChannel = await channel.externalMedia({
                         app: 'myphonefriend',
                         external_host: rtpAsteriskSource,
                         format: this.RTP_SEND_FORMAT,
-                        direction: 'write' // Our app WRITES TO Asterisk
+                        direction: 'write'
                     });
                     
                     logger.info(`[ARI] WRITE ExternalMedia created. Resulting UnicastRTP channel: ${unicastRtpChannel.id} (${unicastRtpChannel.name})`);
                     
-                    // Now, parse the host and port from the resulting channel's name
-                    const rtpMatch = unicastRtpChannel.name.match(/UnicastRTP\/([^:]+):(\d+)/);
-                    if (!rtpMatch) {
-                        throw new Error(`Could not parse RTP endpoint from UnicastRTP channel name: ${unicastRtpChannel.name}`);
+                    let asteriskRtpEndpoint = null;
+
+                    // Try to parse host and port from the channel name first
+                    const rtpMatch = unicastRtpChannel.name.match(/UnicastRTP\/([\w.-]+):(\d+)/);
+
+                    if (rtpMatch && rtpMatch[2]) {
+                        asteriskRtpEndpoint = {
+                            host: rtpMatch[1],
+                            port: parseInt(rtpMatch[2])
+                        };
+                        logger.info(`[ARI] Parsed RTP endpoint from channel name: ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
+                    } else {
+                        // If parsing fails, fetch full channel details and inspect channel variables
+                        logger.warn(`[ARI] Could not parse port from channel name "${unicastRtpChannel.name}". Fetching full channel details as a fallback.`);
+                        try {
+                            const fullDetails = await this.client.channels.get({ channelId: unicastRtpChannel.id });
+                            logger.info(`[ARI DEBUG] Full details for ${unicastRtpChannel.id}: ${JSON.stringify(fullDetails, null, 2)}`);
+                            
+                            const vars = fullDetails.channelvars;
+                            if (vars && vars.UNICAST_RTP_LOCAL_PORT) {
+                                 asteriskRtpEndpoint = {
+                                    host: vars.UNICAST_RTP_LOCAL_ADDRESS || this.RTP_ASTERISK_HOST, // Fallback to config host
+                                    port: parseInt(vars.UNICAST_RTP_LOCAL_PORT)
+                                };
+                                logger.info(`[ARI] Found RTP endpoint in channel variables: ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
+                            } else {
+                                logger.error('[ARI] RTP port not found in channel name or common channel variables.');
+                            }
+                        } catch (getErr) {
+                            logger.error(`[ARI] Could not get channel details for ${unicastRtpChannel.id}: ${getErr.message}`);
+                        }
                     }
-                    
-                    const asteriskRtpEndpoint = {
-                        host: rtpMatch[1],
-                        port: parseInt(rtpMatch[2])
-                    };
+
+                    if (!asteriskRtpEndpoint) {
+                        throw new Error(`Failed to determine Asterisk RTP endpoint for channel ${unicastRtpChannel.name}. Check Asterisk logs and RTP configuration.`);
+                    }
                     
                     this.tracker.updateCall(parentChannelId, { 
                         state: 'external_media_write_active',
                         asteriskRtpEndpoint: asteriskRtpEndpoint,
-                        unicastRtpChannel: unicastRtpChannel // Store the channel object
+                        unicastRtpChannel: unicastRtpChannel
                     });
                     
                     logger.info(`[ARI] WRITE ExternalMedia active: ${rtpAsteriskSource} → Asterisk at ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
                     
-                    // Initialize the RTP sender with the CORRECT Asterisk endpoint
                     await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
 
                 } catch (err) {
