@@ -872,7 +872,7 @@
                                 direction: 'write'
                             });
                             
-                            logger.info(`[ARI] ExternalMedia created, result:`, JSON.stringify(externalMediaResult));
+                            logger.info(`[ARI] ExternalMedia created, channel ID: ${externalMediaResult?.id || 'unknown'}`);
                             
                             // The key is to listen for the UnicastRTP channel that will be created
                             // Set up a promise to wait for it
