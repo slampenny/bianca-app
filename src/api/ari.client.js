@@ -281,9 +281,49 @@ class AsteriskAriClient {
                     await this.cleanupChannel(channelId, `Main channel ${channelId} setup error`);
                 }
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
-                // This channel entering Stasis is expected, but we handle its bridging
-                // directly in the playback handler now. We just log it here.
-                logger.info(`[ARI] UnicastRTP channel ${channelId} entered Stasis as expected. No action needed here.`);
+                const creatorId = channel.creator?.id;
+                logger.info(`[ARI] StasisStart for UnicastRTP channel ${channel.id}. Creator: ${creatorId || 'N/A'}`);
+
+                if (!creatorId) {
+                    logger.warn(`[ARI] UnicastRTP channel ${channel.id} has no creator. Cannot determine its purpose.`);
+                    return;
+                }
+
+                // Find the parent call by matching the creator ID with our tracked channels
+                let parentCallId = null;
+                let creatorType = null;
+
+                for (const [id, data] of this.tracker.calls.entries()) {
+                    if (data.snoopChannelId === creatorId) {
+                        parentCallId = id;
+                        creatorType = 'snoop';
+                        break;
+                    }
+                    if (data.playbackChannelId === creatorId) {
+                        parentCallId = id;
+                        creatorType = 'playback';
+                        break;
+                    }
+                }
+
+                if (parentCallId && creatorType === 'snoop') {
+                    // This is the INBOUND RTP stream created by the snoop channel.
+                    // It needs to be answered to allow media to flow TO our application.
+                    // It must NOT be bridged.
+                    logger.info(`[ARI] Identified inbound UnicastRTP channel ${channel.id} (from snoop ${creatorId}). Answering it.`);
+                    try {
+                        await channel.answer();
+                        this.tracker.updateCall(parentCallId, { inboundRtpChannel: channel });
+                    } catch (err) {
+                        logger.error(`[ARI] Failed to answer inbound UnicastRTP channel ${channel.id}: ${err.message}`);
+                    }
+                } else if (parentCallId && creatorType === 'playback') {
+                    // This is the OUTBOUND RTP stream created by the playback channel.
+                    // It is handled (bridged) in the handleStasisStartForPlayback function.
+                    logger.info(`[ARI] Identified outbound UnicastRTP channel ${channel.id} (from playback ${creatorId}). No action needed in this handler.`);
+                } else {
+                    logger.warn(`[ARI] Could not find parent call for UnicastRTP channel ${channel.id} with creator ${creatorId}.`);
+                }
             } else if (currentChannelName.startsWith('Local/')) {
                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
                 await channel.hangup().catch(()=>{});
@@ -1027,6 +1067,7 @@ class AsteriskAriClient {
         // Clean up all channels
         await safeHangup(resources.snoopChannel, 'Snoop');
         await safeHangup(resources.playbackChannel, 'Playback');
+        await safeHangup(resources.inboundRtpChannel, 'InboundRTP');
         await safeHangup(resources.unicastRtpChannel, 'UnicastRTP');
         
         // Clean up main channel and bridge last
