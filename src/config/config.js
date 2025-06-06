@@ -118,10 +118,10 @@ const baselineConfig = {
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
     host: defaultAsteriskHost, // Example URL, replace with actual
     url: `http://${defaultAsteriskHost}:8088`, // Example URL, replace with actual
-    rtpListenerHost: envVars.RTP_LISTENER_HOST || 'bianca-app', // Example RTP URL, replace with actual
-    rtpSenderHost: envVars.RTP_SENDER_HOST || 'asterisk', // Example RTP sender URL, replace with actual
-    rtpListenerPort: envVars.RTP_LISTENER_PORT || 16384, // Example port, replace with actual
-    rtpSenderPort: parseInt(envVars.RTP_SENDER_PORT) || 16385,
+    rtpBiancaHost: envVars.RTP_BIANCA_HOST || 'bianca-app', // Example RTP URL, replace with actual
+    rtpAsteriskHost: envVars.RTP_ASTERISK_HOST || 'asterisk', // Example RTP sender URL, replace with actual
+    rtpBiancaSendPort: envVars.RTP_BIANCA_SEND_PORT || 16384, // Example port, replace with actual
+    rtpBiancaReceivePort: parseInt(envVars.RTP_BIANCA_RECEIVE_PORT) || 16385,
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
     sipUserName: envVars.SIP_USER_NAME || 'bianca', // Example SIP username, replace with actual
     username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual
@@ -178,8 +178,8 @@ if (envVars.NODE_ENV === 'production') {
   baselineConfig.asterisk.enabled = envVars.ASTERISK_ENABLED || true; // Default to true if not set
   baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.myphonefriend.internal`;
   baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
-  baselineConfig.asterisk.rtpListenerHost = envVars.RTP_LISTENER_HOST || `bianca-app.myphonefriend.internal`;
-  baselineConfig.asterisk.rtpSenderHost = envVars.RTP_SENDER_HOST || `asterisk.myphonefriend.internal`;
+  baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || `bianca-app.myphonefriend.internal`;
+  baselineConfig.asterisk.rtpAsteriskHost = envVars.RTP_ASTERISK_HOST || `asterisk.myphonefriend.internal`;
 }
 
 // Add method to load secrets from AWS Secrets Manager (if used)
@@ -236,7 +236,7 @@ baselineConfig.loadSecrets = async () => {
     if (secrets.ASTERISK_ENABLED) baselineConfig.asterisk.enabled = (secrets.ASTERISK_ENABLED === 'true');
     if (secrets.ASTERISK_ARI_URL) baselineConfig.asterisk.url = secrets.ASTERISK_ARI_URL; // Use a specific ARI URL from secrets
     else if (secrets.ASTERISK_HOST) baselineConfig.asterisk.url = `http://${secrets.ASTERISK_HOST}:8088`;
-    if (secrets.RTP_LISTENER_HOST) baselineConfig.asterisk.rtpListenerHost = secrets.RTP_LISTENER_HOST;
+    if (secrets.RTP_BIANCA_HOST) baselineConfig.asterisk.rtpBiancaHost = secrets.RTP_BIANCA_HOST;
     // ... other Asterisk secrets like ARI username/password if stored in secrets
     if (secrets.ASTERISK_USERNAME) baselineConfig.asterisk.username = secrets.ASTERISK_USERNAME;
     if (secrets.ARI_PASSWORD) baselineConfig.asterisk.password = secrets.ARI_PASSWORD; // Assuming ARI_PASSWORD is for ARI user
