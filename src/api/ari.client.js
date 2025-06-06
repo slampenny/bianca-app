@@ -623,122 +623,158 @@
         }
 
         async initiateSnoopForExternalMedia(asteriskChannelId, mainChannelObject) {
-            logger.info(`[ExternalMedia Setup] Starting for main channel: ${asteriskChannelId}`);
-            let snoopChannel = null;
-            let playbackChannel = null;
+    logger.info(`[ExternalMedia Setup] Starting for main channel: ${asteriskChannelId}`);
+    let snoopChannel = null;
+    let playbackChannel = null;
+    
+    try {
+        const rtpSessionId = `rtp-${uuidv4()}`;
+        const snoopId = `snoop-extmedia-${uuidv4()}`;
+        const playbackId = `playback-extmedia-${uuidv4()}`;
+        
+        // Set up tracking BEFORE creating the snoop
+        this.tracker.updateCall(asteriskChannelId, {
+            rtpSessionId: rtpSessionId,
+            expectingRtpChannel: true,
+            pendingSnoopId: snoopId,
+            pendingPlaybackId: playbackId
+        });
+        
+        // Set up a promise to catch the WRITE UnicastRTP channel for this call
+        const writeRtpChannelPromise = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout waiting for write UnicastRTP channel'));
+            }, 10000); // Longer timeout
             
-            try {
-                const rtpSessionId = `rtp-${uuidv4()}`;
-                const snoopId = `snoop-extmedia-${uuidv4()}`;
-                const playbackId = `playback-extmedia-${uuidv4()}`;
+            const checkForWriteRtp = (event, rtpChannel) => {
+                logger.debug(`[ExternalMedia Setup] Checking StasisStart: ${rtpChannel.id} (${rtpChannel.name})`);
                 
-                // Set up tracking BEFORE creating the snoop
-                this.tracker.updateCall(asteriskChannelId, {
-                    rtpSessionId: rtpSessionId,
-                    expectingRtpChannel: true,
-                    pendingSnoopId: snoopId,
-                    pendingPlaybackId: playbackId
-                });
-                
-                // 1. Create snoop channel
-                snoopChannel = await this.client.channels.snoopChannel({
-                    channelId: asteriskChannelId,
-                    snoopId: snoopId,
-                    spy: 'in',
-                    app: 'myphonefriend'
-                });
-                
-                logger.info(`[ExternalMedia Setup] Created snoop channel ${snoopChannel.id}`);
-                
-                // 2. Set up listener for playback channel BEFORE creating it
-                const playbackPromise = new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        reject(new Error('Timeout waiting for playback channel'));
-                    }, 5000);
-                    
-                    // Listen for StasisStart events on the ARI client
-                    const checkStasisStart = (event, channel) => {
-                        // Check if this is a playback channel for our call
-                        if (channel.name && 
-                            channel.name.includes(`playback-${asteriskChannelId}`) && 
-                            channel.name.includes('@playback-context')) {
-                            
-                            // Look for ;2 in the channel name to identify leg 2
-                            if (channel.name.includes(';2')) {
-                                logger.info(`[ExternalMedia Setup] Found playback leg 2: ${channel.id} (${channel.name})`);
-                                clearTimeout(timeout);
-                                this.client.removeListener('StasisStart', checkStasisStart);
-                                resolve(channel);
-                            } else if (channel.name.includes(';1')) {
-                                logger.info(`[ExternalMedia Setup] Saw playback leg 1: ${channel.id} (${channel.name}), waiting for leg 2...`);
-                            }
+                if (rtpChannel.name && rtpChannel.name.startsWith('UnicastRTP/')) {
+                    // Check if this is likely the WRITE channel for our call
+                    const callData = this.tracker.getCall(asteriskChannelId);
+                    if (callData && callData.state === 'external_media_write_pending') {
+                        logger.info(`[ExternalMedia Setup] Found WRITE UnicastRTP channel: ${rtpChannel.name}`);
+                        const rtpMatch = rtpChannel.name.match(/UnicastRTP\/([^:]+):(\d+)/);
+                        if (rtpMatch) {
+                            clearTimeout(timeout);
+                            this.client.removeListener('StasisStart', checkForWriteRtp);
+                            resolve({
+                                host: rtpMatch[1],
+                                port: parseInt(rtpMatch[2]),
+                                channel: rtpChannel
+                            });
                         }
-                    };
-                    
-                    this.client.on('StasisStart', checkStasisStart);
-                });
-                
-                // 3. Create the playback channel
-                const originateResult = await this.client.channels.originate({
-                    endpoint: `Local/playback-${asteriskChannelId}@playback-context`,
-                    app: 'myphonefriend',
-                    appArgs: `playback-for-${asteriskChannelId}`,
-                    callerId: 'OpenAI <openai>'
-                });
-                
-                logger.info(`[ExternalMedia Setup] Originate started, initial channel: ${originateResult.id}`);
-                
-                // 4. Wait for leg 2 to enter Stasis
-                try {
-                    const leg2Channel = await playbackPromise;
-                    logger.info(`[ExternalMedia Setup] Playback channel leg 2 ready: ${leg2Channel.id}`);
-                    
-                    // The leg2Channel from StasisStart is what we'll use for external media
-                    // Update tracking with the correct channel ID (leg 2)
-                    this.tracker.updateCall(asteriskChannelId, {
-                        snoopChannel: snoopChannel,
-                        snoopChannelId: snoopChannel.id,
-                        playbackChannel: leg2Channel, // Use the leg 2 channel
-                        playbackChannelId: leg2Channel.id,
-                        snoopMethod: 'externalMedia',
-                        state: 'external_media_channels_created',
-                        pendingSnoopId: null,
-                        pendingPlaybackId: null
-                    });
-                    
-                } catch (waitErr) {
-                    logger.error(`[ExternalMedia Setup] Error waiting for playback channel: ${waitErr.message}`);
-                    throw waitErr;
+                    }
                 }
-                
-            } catch (err) {
-                logger.error(`[ExternalMedia Setup] Failed to create channels for ${asteriskChannelId}: ${err.message}`, err);
-                
-                // Cleanup on error
-                if (snoopChannel && snoopChannel.id && !snoopChannel.destroyed) {
-                    await snoopChannel.hangup().catch(e => 
-                        logger.warn(`[ExternalMedia Setup] Error hanging up snoop channel: ${e.message}`)
-                    );
+            };
+            
+            this.client.on('StasisStart', checkForWriteRtp);
+        });
+        
+        // Store the promise in the tracker so handleStasisStartForPlayback can use it
+        this.tracker.updateCall(asteriskChannelId, {
+            writeRtpChannelPromise: writeRtpChannelPromise
+        });
+        
+        // 1. Create snoop channel
+        snoopChannel = await this.client.channels.snoopChannel({
+            channelId: asteriskChannelId,
+            snoopId: snoopId,
+            spy: 'in',
+            app: 'myphonefriend'
+        });
+        
+        logger.info(`[ExternalMedia Setup] Created snoop channel ${snoopChannel.id}`);
+        
+        // 2. Set up listener for playback channel BEFORE creating it
+        const playbackPromise = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout waiting for playback channel'));
+            }, 5000);
+            
+            // Listen for StasisStart events on the ARI client
+            const checkStasisStart = (event, channel) => {
+                // Check if this is a playback channel for our call
+                if (channel.name && 
+                    channel.name.includes(`playback-${asteriskChannelId}`) && 
+                    channel.name.includes('@playback-context')) {
+                    
+                    // Look for ;2 in the channel name to identify leg 2
+                    if (channel.name.includes(';2')) {
+                        logger.info(`[ExternalMedia Setup] Found playback leg 2: ${channel.id} (${channel.name})`);
+                        clearTimeout(timeout);
+                        this.client.removeListener('StasisStart', checkStasisStart);
+                        resolve(channel);
+                    } else if (channel.name.includes(';1')) {
+                        logger.info(`[ExternalMedia Setup] Saw playback leg 1: ${channel.id} (${channel.name}), waiting for leg 2...`);
+                    }
                 }
-                
-                if (playbackChannel && playbackChannel.id && !playbackChannel.destroyed) {
-                    await playbackChannel.hangup().catch(e => 
-                        logger.warn(`[ExternalMedia Setup] Error hanging up playback: ${e.message}`)
-                    );
-                }
-                
-                this.tracker.updateCall(asteriskChannelId, {
-                    state: 'snoop_extmedia_failed',
-                    snoopChannel: null,
-                    snoopChannelId: null,
-                    playbackChannel: null,
-                    playbackChannelId: null
-                });
-                
-                throw err;
-            }
+            };
+            
+            this.client.on('StasisStart', checkStasisStart);
+        });
+        
+        // 3. Create the playback channel
+        const originateResult = await this.client.channels.originate({
+            endpoint: `Local/playback-${asteriskChannelId}@playback-context`,
+            app: 'myphonefriend',
+            appArgs: `playback-for-${asteriskChannelId}`,
+            callerId: 'OpenAI <openai>'
+        });
+        
+        logger.info(`[ExternalMedia Setup] Originate started, initial channel: ${originateResult.id}`);
+        
+        // 4. Wait for leg 2 to enter Stasis
+        try {
+            const leg2Channel = await playbackPromise;
+            logger.info(`[ExternalMedia Setup] Playback channel leg 2 ready: ${leg2Channel.id}`);
+            
+            // The leg2Channel from StasisStart is what we'll use for external media
+            // Update tracking with the correct channel ID (leg 2)
+            this.tracker.updateCall(asteriskChannelId, {
+                snoopChannel: snoopChannel,
+                snoopChannelId: snoopChannel.id,
+                playbackChannel: leg2Channel, // Use the leg 2 channel
+                playbackChannelId: leg2Channel.id,
+                snoopMethod: 'externalMedia',
+                state: 'external_media_channels_created',
+                pendingSnoopId: null,
+                pendingPlaybackId: null
+            });
+            
+        } catch (waitErr) {
+            logger.error(`[ExternalMedia Setup] Error waiting for playback channel: ${waitErr.message}`);
+            throw waitErr;
         }
-
+        
+    } catch (err) {
+        logger.error(`[ExternalMedia Setup] Failed to create channels for ${asteriskChannelId}: ${err.message}`, err);
+        
+        // Cleanup on error
+        if (snoopChannel && snoopChannel.id && !snoopChannel.destroyed) {
+            await snoopChannel.hangup().catch(e => 
+                logger.warn(`[ExternalMedia Setup] Error hanging up snoop channel: ${e.message}`)
+            );
+        }
+        
+        if (playbackChannel && playbackChannel.id && !playbackChannel.destroyed) {
+            await playbackChannel.hangup().catch(e => 
+                logger.warn(`[ExternalMedia Setup] Error hanging up playback: ${e.message}`)
+            );
+        }
+        
+        this.tracker.updateCall(asteriskChannelId, {
+            state: 'snoop_extmedia_failed',
+            snoopChannel: null,
+            snoopChannelId: null,
+            playbackChannel: null,
+            playbackChannelId: null,
+            writeRtpChannelPromise: null
+        });
+        
+        throw err;
+    }
+}
         async initializeRtpSenderWithEndpoint(asteriskChannelId, rtpEndpoint) {
             const callData = this.tracker.getCall(asteriskChannelId);
             if (!callData) {
@@ -817,147 +853,132 @@
             }
 
             async handleStasisStartForPlayback(channel, currentChannelName, event) {
-                const channelId = channel.id;
+    const channelId = channel.id;
+    
+    if (currentChannelName.startsWith('Local/playback-')) {
+        logger.info(`[ARI] StasisStart for Playback channel: ${channelId} (${currentChannelName})`);
+
+        const match = currentChannelName.match(/^Local\/playback-([^@]+)@/);
+        const parentChannelId = match ? match[1] : null;
+        
+        const isLeg2 = currentChannelName.includes(';2');
+        
+        if (!parentChannelId) {
+            logger.error(`[ARI] Cannot extract parent ID from playback channel name: ${currentChannelName}`);
+            await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up playback: ${e.message}`));
+            return;
+        }
+
+        const parentCallData = this.tracker.getCall(parentChannelId);
+        if (!parentCallData) {
+            logger.error(`[ARI] Playback channel ${channelId} entered Stasis, but parent call ${parentChannelId} not found. Hanging up.`);
+            await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned playback: ${e.message}`));
+            return;
+        }
+        
+        if (isLeg2) {
+            this.tracker.updateCall(parentChannelId, { 
+                playbackChannel: channel, 
+                playbackChannelId: channelId,
+                pendingPlaybackId: null
+            });
+
+            try {
+                await channel.answer();
+                logger.info(`[ARI] Answered playback channel ${channelId}`);
                 
-                if (currentChannelName.startsWith('Local/playback-')) {
-                    logger.info(`[ARI] StasisStart for Playback channel: ${channelId} (${currentChannelName})`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                await this.client.bridges.addChannel({
+                    bridgeId: parentCallData.mainBridgeId,
+                    channel: channelId
+                });
+                
+                logger.info(`[ARI] Added playback channel ${channelId} to bridge ${parentCallData.mainBridgeId}`);
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
 
-                    const match = currentChannelName.match(/^Local\/playback-([^@]+)@/);
-                    const parentChannelId = match ? match[1] : null;
+                // Mark that we're now expecting the WRITE RTP channel
+                this.tracker.updateCall(parentChannelId, { 
+                    state: 'external_media_write_pending'
+                });
+
+                const rtpAsteriskSource = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_SEND_PORT}`;
+                
+                // Create the external media
+                const externalMediaResult = await channel.externalMedia({
+                    app: 'myphonefriend',
+                    external_host: rtpAsteriskSource,
+                    format: this.RTP_SEND_FORMAT,
+                    direction: 'write'
+                });
+                
+                logger.info(`[ARI] ExternalMedia created, channel ID: ${externalMediaResult?.id}`);
+                
+                // Get the promise that was set up earlier
+                const writeRtpChannelPromise = parentCallData.writeRtpChannelPromise;
+                if (!writeRtpChannelPromise) {
+                    throw new Error('No writeRtpChannelPromise found in call data');
+                }
+                
+                try {
+                    const rtpInfo = await writeRtpChannelPromise;
+                    logger.info(`[ARI] Found Asterisk RTP endpoint from UnicastRTP channel: ${rtpInfo.host}:${rtpInfo.port}`);
                     
-                    const isLeg2 = currentChannelName.includes(';2');
+                    const asteriskRtpEndpoint = {
+                        host: rtpInfo.host,
+                        port: rtpInfo.port
+                    };
                     
-                    if (!parentChannelId) {
-                        logger.error(`[ARI] Cannot extract parent ID from playback channel name: ${currentChannelName}`);
-                        await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up playback: ${e.message}`));
-                        return;
-                    }
-
-                    const parentCallData = this.tracker.getCall(parentChannelId);
-                    if (!parentCallData) {
-                        logger.error(`[ARI] Playback channel ${channelId} entered Stasis, but parent call ${parentChannelId} not found. Hanging up.`);
-                        await channel.hangup().catch(e => logger.warn(`[ARI] Error hanging up orphaned playback: ${e.message}`));
-                        return;
-                    }
+                    this.tracker.updateCall(parentChannelId, { 
+                        state: 'external_media_write_active',
+                        asteriskRtpEndpoint: asteriskRtpEndpoint,
+                        unicastRtpChannel: rtpInfo.channel
+                    });
                     
-                    if (isLeg2) {
-                        this.tracker.updateCall(parentChannelId, { 
-                            playbackChannel: channel, 
-                            playbackChannelId: channelId,
-                            pendingPlaybackId: null
-                        });
-
-                        try {
-                            await channel.answer();
-                            logger.info(`[ARI] Answered playback channel ${channelId}`);
-                            
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                            
-                            await this.client.bridges.addChannel({
-                                bridgeId: parentCallData.mainBridgeId,
-                                channel: channelId
-                            });
-                            
-                            logger.info(`[ARI] Added playback channel ${channelId} to bridge ${parentCallData.mainBridgeId}`);
-                            
-                            await new Promise(resolve => setTimeout(resolve, 100));
-
-                            const rtpAsteriskSource = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_SEND_PORT}`;
-                            
-                            // Create the external media and store the result
-                            const externalMediaResult = await channel.externalMedia({
-                                app: 'myphonefriend',
-                                external_host: rtpAsteriskSource,
-                                format: this.RTP_SEND_FORMAT,
-                                direction: 'write'
-                            });
-                            
-                            logger.info(`[ARI] ExternalMedia created, channel ID: ${externalMediaResult?.id || 'unknown'}`);
-                            
-                            // The key is to listen for the UnicastRTP channel that will be created
-                            // Set up a promise to wait for it
-                            const rtpChannelPromise = new Promise((resolve, reject) => {
-                                const timeout = setTimeout(() => {
-                                    reject(new Error('Timeout waiting for UnicastRTP channel'));
-                                }, 5000);
-                                
-                                const checkForRtpChannel = async (event, rtpChannel) => {
-                                    // Check if this is a UnicastRTP channel created for our playback
-                                    if (rtpChannel.name && rtpChannel.name.startsWith('UnicastRTP/')) {
-                                        // Parse to check if it's related to our playback channel
-                                        const rtpMatch = rtpChannel.name.match(/UnicastRTP\/([^:]+):(\d+)/);
-                                        if (rtpMatch) {
-                                            clearTimeout(timeout);
-                                            this.client.removeListener('StasisStart', checkForRtpChannel);
-                                            resolve({
-                                                host: rtpMatch[1],
-                                                port: parseInt(rtpMatch[2]),
-                                                channel: rtpChannel
-                                            });
-                                        }
-                                    }
-                                };
-                                
-                                this.client.on('StasisStart', checkForRtpChannel);
-                            });
-                            
-                            try {
-                                const rtpInfo = await rtpChannelPromise;
-                                logger.info(`[ARI] Found Asterisk RTP endpoint from UnicastRTP channel: ${rtpInfo.host}:${rtpInfo.port}`);
-                                
-                                const asteriskRtpEndpoint = {
-                                    host: rtpInfo.host,
-                                    port: rtpInfo.port
-                                };
-                                
-                                this.tracker.updateCall(parentChannelId, { 
-                                    state: 'external_media_write_active',
-                                    asteriskRtpEndpoint: asteriskRtpEndpoint,
-                                    unicastRtpChannel: rtpInfo.channel
-                                });
-                                
-                                logger.info(`[ARI] WRITE ExternalMedia started: ${rtpAsteriskSource} → Asterisk at ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
-                                
-                                // Initialize the RTP sender with the CORRECT Asterisk endpoint
-                                await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
-                                
-                            } catch (rtpErr) {
-                                logger.error(`[ARI] Failed to determine Asterisk RTP endpoint: ${rtpErr.message}`);
-                                
-                                // Last resort: try to parse from the external media result
-                                if (externalMediaResult && externalMediaResult.name) {
-                                    const lastResortMatch = externalMediaResult.name.match(/UnicastRTP\/([^:]+):(\d+)/);
-                                    if (lastResortMatch) {
-                                        const asteriskRtpEndpoint = {
-                                            host: lastResortMatch[1],
-                                            port: parseInt(lastResortMatch[2])
-                                        };
-                                        logger.info(`[ARI] Parsed endpoint from result: ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
-                                        await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
-                                    } else {
-                                        throw new Error('Could not determine Asterisk RTP endpoint');
-                                    }
-                                } else {
-                                    throw rtpErr;
-                                }
-                            }
-                            
-                        } catch (err) {
-                            logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
-                            
-                            await channel.hangup().catch(() => {});
-                            
-                            this.tracker.updateCall(parentChannelId, { 
-                                playbackChannel: null, 
-                                playbackChannelId: null,
-                                state: 'external_media_read_only'
-                            });
-                            
-                            logger.warn(`[ARI] Continuing call ${parentChannelId} in READ-only mode (no OpenAI audio playback)`);
+                    logger.info(`[ARI] WRITE ExternalMedia started: ${rtpAsteriskSource} → Asterisk at ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
+                    
+                    // Initialize the RTP sender with the CORRECT Asterisk endpoint
+                    await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+                    
+                } catch (rtpErr) {
+                    logger.error(`[ARI] Failed to determine Asterisk RTP endpoint: ${rtpErr.message}`);
+                    
+                    // Last resort: try to parse from the external media result
+                    if (externalMediaResult && externalMediaResult.name) {
+                        const lastResortMatch = externalMediaResult.name.match(/UnicastRTP\/([^:]+):(\d+)/);
+                        if (lastResortMatch) {
+                            const asteriskRtpEndpoint = {
+                                host: lastResortMatch[1],
+                                port: parseInt(lastResortMatch[2])
+                            };
+                            logger.info(`[ARI] Parsed endpoint from result: ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
+                            await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+                        } else {
+                            throw new Error('Could not determine Asterisk RTP endpoint');
                         }
+                    } else {
+                        throw rtpErr;
                     }
                 }
+                
+            } catch (err) {
+                logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
+                
+                await channel.hangup().catch(() => {});
+                
+                this.tracker.updateCall(parentChannelId, { 
+                    playbackChannel: null, 
+                    playbackChannelId: null,
+                    state: 'external_media_read_only',
+                    writeRtpChannelPromise: null
+                });
+                
+                logger.warn(`[ARI] Continuing call ${parentChannelId} in READ-only mode (no OpenAI audio playback)`);
             }
+        }
+    }
+}
 
         // 4. Add the missing shutdown method to your ARI client class
         async shutdown() {
