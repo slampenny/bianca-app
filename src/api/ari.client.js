@@ -281,48 +281,55 @@ class AsteriskAriClient {
                     await this.cleanupChannel(channelId, `Main channel ${channelId} setup error`);
                 }
             } else if (currentChannelName.startsWith('UnicastRTP/')) {
-                const creatorId = channel.creator?.id;
-                logger.info(`[ARI] StasisStart for UnicastRTP channel ${channel.id}. Creator: ${creatorId || 'N/A'}`);
-
-                if (!creatorId) {
-                    logger.warn(`[ARI] UnicastRTP channel ${channel.id} has no creator. Cannot determine its purpose.`);
+                logger.info(`[ARI] StasisStart for UnicastRTP channel ${channel.id} (${currentChannelName})`);
+                
+                // Find parent call by looking at the channel ID pattern
+                const [base] = channel.id.split('.');
+                let parentId = Array.from(this.tracker.calls.keys())
+                    .find(id => id.startsWith(`${base}.`));
+                
+                if (!parentId) {
+                    // Try to find a call that's expecting RTP channels
+                    for (const [callId, data] of this.tracker.calls.entries()) {
+                        if (data.state === 'external_media_read_active' || 
+                            data.state === 'external_media_write_active' ||
+                            data.expectingRtpChannel) {
+                            parentId = callId;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!parentId) {
+                    logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
                     return;
                 }
-
-                // Find the parent call by matching the creator ID with our tracked channels
-                let parentCallId = null;
-                let creatorType = null;
-
-                for (const [id, data] of this.tracker.calls.entries()) {
-                    if (data.snoopChannelId === creatorId) {
-                        parentCallId = id;
-                        creatorType = 'snoop';
-                        break;
-                    }
-                    if (data.playbackChannelId === creatorId) {
-                        parentCallId = id;
-                        creatorType = 'playback';
-                        break;
-                    }
+                
+                const callData = this.tracker.getCall(parentId);
+                if (!callData) {
+                    logger.warn(`[ARI] No call data found for parent ${parentId}`);
+                    return;
                 }
-
-                if (parentCallId && creatorType === 'snoop') {
-                    // This is the INBOUND RTP stream created by the snoop channel.
-                    // It needs to be answered to allow media to flow TO our application.
-                    // It must NOT be bridged.
-                    logger.info(`[ARI] Identified inbound UnicastRTP channel ${channel.id} (from snoop ${creatorId}). Answering it.`);
+                
+                // Determine if this is inbound or outbound based on state
+                if (callData.state === 'external_media_read_active' && !callData.inboundRtpChannel) {
+                    // This is likely the inbound RTP channel from the snoop
+                    logger.info(`[ARI] Identified as inbound RTP channel ${channel.id} for call ${parentId}. Answering it.`);
                     try {
                         await channel.answer();
-                        this.tracker.updateCall(parentCallId, { inboundRtpChannel: channel });
+                        this.tracker.updateCall(parentId, { 
+                            inboundRtpChannel: channel,
+                            inboundRtpChannelId: channel.id
+                        });
+                        logger.info(`[ARI] Answered inbound RTP channel ${channel.id}`);
                     } catch (err) {
-                        logger.error(`[ARI] Failed to answer inbound UnicastRTP channel ${channel.id}: ${err.message}`);
+                        logger.error(`[ARI] Failed to answer inbound RTP channel ${channel.id}: ${err.message}`);
                     }
-                } else if (parentCallId && creatorType === 'playback') {
-                    // This is the OUTBOUND RTP stream created by the playback channel.
-                    // It is handled (bridged) in the handleStasisStartForPlayback function.
-                    logger.info(`[ARI] Identified outbound UnicastRTP channel ${channel.id} (from playback ${creatorId}). No action needed in this handler.`);
+                } else if (callData.state === 'external_media_write_active' || callData.unicastRtpChannel) {
+                    // This is the outbound RTP channel, already handled in handleStasisStartForPlayback
+                    logger.info(`[ARI] Identified as outbound RTP channel ${channel.id} for call ${parentId}. Already handled.`);
                 } else {
-                    logger.warn(`[ARI] Could not find parent call for UnicastRTP channel ${channel.id} with creator ${creatorId}.`);
+                    logger.warn(`[ARI] Could not determine purpose of RTP channel ${channel.id} for call ${parentId}`);
                 }
             } else if (currentChannelName.startsWith('Local/')) {
                 logger.warn(`[ARI] StasisStart for unexpected Local channel ${channelId}. Hanging up.`);
