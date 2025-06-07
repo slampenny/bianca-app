@@ -29,7 +29,7 @@ const CONFIG = {
 const VALID_STATE_TRANSITIONS = {
     'answered': ['pipeline_setup', 'cleanup'],
     'pipeline_setup': ['main_bridged', 'cleanup'],
-    'main_bridged': ['external_media_channels_created', 'cleanup'],
+    'main_bridged': ['external_media_channels_created', 'external_media_read_active', 'cleanup'], // Allow direct transition
     'external_media_channels_created': ['external_media_read_active', 'cleanup'],
     'external_media_read_active': ['external_media_write_pending', 'cleanup'],
     'external_media_write_pending': ['external_media_write_active', 'cleanup'],
