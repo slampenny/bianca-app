@@ -33,8 +33,8 @@ class AsteriskAriClient {
         // Configuration for ExternalMedia
         this.RTP_BIANCA_HOST = sanitizeHost(config.asterisk.rtpBiancaHost);
         this.RTP_ASTERISK_HOST = sanitizeHost(config.asterisk.rtpAsteriskHost);
-        this.RTP_BIANCA_SEND_PORT = config.asterisk.rtpBiancaSendPort;
-        this.RTP_BIANCA_RECEIVE_PORT = config.asterisk.rtpBiancaReceivePort || (config.asterisk.rtpBiancaSendPort + 1); // For sending (App → Asterisk)
+        this.RTP_BIANCA_RECEIVE_PORT = config.asterisk.rtpBiancaReceivePort;
+        this.RTP_BIANCA_SEND_PORT = config.asterisk.rtpBiancaSendPort || (config.asterisk.rtpBiancaReceivePort + 1);
         this.RTP_SEND_FORMAT = 'ulaw';
     }
 
@@ -863,8 +863,8 @@ class AsteriskAriClient {
                     // Now, get the endpoint where we need to send RTP audio TO
                     let asteriskRtpEndpoint = null;
                     try {
-                        const addressVar = await this.client.channels.getChannelVar({ channelId: unicastRtpChannel.id, variable: 'UNICASTRTP_LOCAL_ADDRESS' });
-                        const portVar = await this.client.channels.getChannelVar({ channelId: unicastRtpChannel.id, variable: 'UNICASTRTP_LOCAL_PORT' });
+                        const addressVar = await unicastRtpChannel.getChannelVar({ channelId: unicastRtpChannel.id, variable: 'UNICASTRTP_LOCAL_ADDRESS' });
+                        const portVar = await unicastRtpChannel.getChannelVar({ channelId: unicastRtpChannel.id, variable: 'UNICASTRTP_LOCAL_PORT' });
                         
                         if (!addressVar || !addressVar.value || !portVar || !portVar.value) {
                             throw new Error('UNICASTRTP_LOCAL_ADDRESS or UNICASTRTP_LOCAL_PORT variables not set on the channel by Asterisk.');
