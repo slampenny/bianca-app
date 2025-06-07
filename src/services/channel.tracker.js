@@ -25,7 +25,7 @@ class ChannelTracker {
             twilioCallSid: initialData.twilioCallSid || null, // Primary external identifier
             patientId: initialData.patientId || null,
             startTime: new Date(),
-            state: 'init', // Initial state
+            state: initialData.state || 'init', // Initial state
             mainBridge: null,
             mainBridgeId: null,
             conversationId: null, // Mongoose DB conversation _id
@@ -40,7 +40,25 @@ class ChannelTracker {
             audioSocketUuid: null, // Only used for AudioSocket method
             localChannel: null,    // Only used for AudioSocket method
             localChannelId: null,
+            
+            // External Media RTP Fields (NEW for refactored ARI client)
+            rtpSessionId: null, // RTP session identifier
+            expectingRtpChannel: false,
+            pendingSnoopId: null,
+            pendingPlaybackId: null,
+            playbackChannel: null,
+            playbackChannelId: null,
+            inboundRtpChannel: null,
+            inboundRtpChannelId: null,
+            outboundRtpChannel: null,
+            outboundRtpChannelId: null,
+            unicastRtpChannel: null,
+            unicastRtpChannelId: null,
+            asteriskRtpEndpoint: null, // { host, port }
             rtp_ssrc: null, // Learned SSRC for ExternalMedia stream
+            awaitingSsrcForRtp: false,
+            snoopToRtpMapping: null,
+            
             ffmpegTranscoder: null, // Reference to FFmpeg process if using that method
 
             ...initialData, // Apply any other passed initial data
@@ -79,7 +97,6 @@ class ChannelTracker {
         }
         return null; // Not found
     }
-
 
     /**
      * Updates the state object for a given call.
@@ -178,18 +195,36 @@ class ChannelTracker {
         return callData ? {
             mainChannel: callData.mainChannel,
             mainBridge: callData.mainBridge,
+            mainBridgeId: callData.mainBridgeId,
             snoopChannel: callData.snoopChannel,
+            snoopChannelId: callData.snoopChannelId,
             snoopBridge: callData.snoopBridge,
+            snoopBridgeId: callData.snoopBridgeId,
             localChannel: callData.localChannel,
+            localChannelId: callData.localChannelId,
+            playbackChannel: callData.playbackChannel,
+            playbackChannelId: callData.playbackChannelId,
+            inboundRtpChannel: callData.inboundRtpChannel,
+            inboundRtpChannelId: callData.inboundRtpChannelId,
+            outboundRtpChannel: callData.outboundRtpChannel,
+            outboundRtpChannelId: callData.outboundRtpChannelId,
+            unicastRtpChannel: callData.unicastRtpChannel,
+            unicastRtpChannelId: callData.unicastRtpChannelId,
             conversationId: callData.conversationId,
-            twilioCallSid: callData.twilioCallSid, // Changed from twilioSid
+            twilioCallSid: callData.twilioCallSid,
             asteriskChannelId: callData.asteriskChannelId,
             rtp_ssrc: callData.rtp_ssrc,
             ffmpegTranscoder: callData.ffmpegTranscoder,
-            recordingName: callData.recordingName // Add this!
+            recordingName: callData.recordingName,
+            asteriskRtpEndpoint: callData.asteriskRtpEndpoint
         } : null;
     }
 
+    /**
+     * Find call data by Twilio Call SID with both ID and data returned
+     * @param {string} twilioCallSid
+     * @returns {object | null} - Returns { asteriskChannelId, ...callData } or null
+     */
     findCallByTwilioCallSid(twilioCallSid) {
         if (!twilioCallSid) return null;
         for (const [asteriskId, data] of this.calls.entries()) {
@@ -212,14 +247,71 @@ class ChannelTracker {
                  snoopMethod: data.snoopMethod,
                  snoopId: data.snoopChannelId,
                  localId: data.localChannelId,
-                 ssrc: data.rtp_ssrc
+                 playbackId: data.playbackChannelId,
+                 ssrc: data.rtp_ssrc,
+                 rtpSession: data.rtpSessionId
              }));
              logger.debug(`[Tracker State] Active Calls: ${JSON.stringify(callSummary)}`);
              logger.debug(`[Tracker State] AudioSocket UUIDs Mapped: ${JSON.stringify(Array.from(this.uuidToChannelId.keys()))}`);
-             // Add SSRC map logging if needed (requires access to rtpListenerService's map)
         } catch (e) {
              logger.warn(`[Tracker State] Error logging state: ${e.message}`);
         }
+    }
+
+    /**
+     * Get statistics about tracked calls
+     * @returns {object} Statistics object
+     */
+    getStats() {
+        const stats = {
+            totalCalls: this.calls.size,
+            callsByState: {},
+            callsBySnoopMethod: {},
+            audioSocketMappings: this.uuidToChannelId.size
+        };
+
+        for (const callData of this.calls.values()) {
+            // Count by state
+            const state = callData.state || 'unknown';
+            stats.callsByState[state] = (stats.callsByState[state] || 0) + 1;
+
+            // Count by snoop method
+            const method = callData.snoopMethod || 'none';
+            stats.callsBySnoopMethod[method] = (stats.callsBySnoopMethod[method] || 0) + 1;
+        }
+
+        return stats;
+    }
+
+    /**
+     * Find calls in specific states
+     * @param {string|string[]} states - State or array of states to search for
+     * @returns {Array} Array of call data objects
+     */
+    findCallsByState(states) {
+        const stateArray = Array.isArray(states) ? states : [states];
+        const results = [];
+
+        for (const [asteriskId, callData] of this.calls.entries()) {
+            if (stateArray.includes(callData.state)) {
+                results.push({ asteriskChannelId: asteriskId, ...callData });
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Check if a call is in a terminal state (cleanup should have happened)
+     * @param {string} asteriskChannelId
+     * @returns {boolean}
+     */
+    isCallInTerminalState(asteriskChannelId) {
+        const callData = this.getCall(asteriskChannelId);
+        if (!callData) return true; // If call doesn't exist, consider it terminal
+
+        const terminalStates = ['cleanup', 'completed', 'failed', 'error'];
+        return terminalStates.includes(callData.state);
     }
 }
 

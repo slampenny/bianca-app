@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const http = require('http');
 const config = require('./config/config');
 const logger = require('./config/logger');
-const { startAriClient, getAriClientInstance } = require('./api/ari.client');
-const { startRtpListenerService } = require('./api/rtp.listener.service');
+const { startAriClient, getAriClientInstance, shutdownAriClient } = require('./services/ari.client'); // Updated path
+const { startRtpListenerService, stopRtpListenerService } = require('./services/rtp.listener.service'); // Updated path
 
 /**
  * Starts the application server and initializes all components
@@ -45,28 +45,60 @@ async function startServer() {
       }
     }
 
-    // Initialize Asterisk ARI client BEFORE starting HTTP server
+    // Initialize services
     let ariReady = false;
+    let rtpListenerReady = false;
+
     if (config.asterisk && config.asterisk.enabled) {
-      logger.info('Asterisk integration enabled, starting ARI client');
+      logger.info('Asterisk integration enabled, starting services...');
+      
       try {
-        // Start ARI client
+        // 1. Start RTP Listener Service first
+        logger.info('Starting RTP listener service...');
+        startRtpListenerService();
+        
+        // Verify RTP listener is ready
+        const rtpListenerService = require('./services/rtp.listener.service');
+        const rtpReady = await rtpListenerService.ensureReady();
+        if (rtpReady) {
+          rtpListenerReady = true;
+          logger.info('RTP listener service started successfully');
+        } else {
+          throw new Error('RTP listener service failed to start');
+        }
+
+        // 2. Start ARI client after RTP listener is ready
+        logger.info('Starting ARI client...');
         const ariClient = await startAriClient();
         
-        // IMPORTANT: Wait for ARI to be fully ready
+        // 3. Wait for ARI to be fully ready
         logger.info('Waiting for ARI client to be ready...');
         await ariClient.waitForReady();
         ariReady = true;
         logger.info('ARI client is ready and Stasis app registered');
+
+        // 4. Verify health of all services
+        const ariHealth = await ariClient.healthCheck();
+        const rtpHealth = rtpListenerService.healthCheck();
         
-        // Start RTP Listener after ARI is ready
-        logger.info('Starting RTP listener service...');
-        startRtpListenerService();
-        logger.info('RTP listener service started');
+        logger.info('=== Service Health Check ===');
+        logger.info(`ARI Client: ${ariHealth.healthy ? 'Healthy' : 'Unhealthy'} - ${ariHealth.status}`);
+        logger.info(`RTP Listener: ${rtpHealth.healthy ? 'Healthy' : 'Unhealthy'} - ${rtpHealth.status}`);
+        logger.info('============================');
         
       } catch (err) {
-        logger.error(`Failed to start Asterisk ARI client: ${err.message}`);
+        logger.error(`Failed to start Asterisk services: ${err.message}`);
         logger.warn('Continuing without Asterisk integration');
+        
+        // Cleanup if partial initialization occurred
+        if (rtpListenerReady) {
+          try {
+            stopRtpListenerService();
+          } catch (cleanupErr) {
+            logger.error(`Error cleaning up RTP listener: ${cleanupErr.message}`);
+          }
+        }
+        
         // Optionally exit if ARI is critical
         // process.exit(1);
       }
@@ -92,11 +124,11 @@ async function startServer() {
       logger.info(`Server listening on port ${port}`);
       
       // Log service status
-      logger.info('=== Service Status ===');
+      logger.info('=== Final Service Status ===');
       logger.info(`MongoDB: ${mongoConnected ? 'Connected' : 'Not connected'}`);
       logger.info(`ARI Client: ${ariReady ? 'Ready' : 'Not ready'}`);
-      logger.info(`RTP Listener: ${config.asterisk?.enabled && ariReady ? 'Running' : 'Not running'}`);
-      logger.info('====================');
+      logger.info(`RTP Listener: ${rtpListenerReady ? 'Running' : 'Not running'}`);
+      logger.info('=============================');
       
       // Log URLs for debugging
       if (config.env === 'production') {
@@ -132,23 +164,36 @@ function setupShutdownHandlers(server) {
   const gracefulShutdown = async (server) => {
     logger.info('Initiating graceful shutdown...');
     
-    // Shutdown ARI client first
     try {
-      const ariClient = getAriClientInstance();
-      if (ariClient && ariClient.isConnected) {
-        logger.info('Shutting down ARI client...');
-        await ariClient.shutdown();
+      // 1. Shutdown ARI client first (this will cleanup all active calls)
+      logger.info('Shutting down ARI client...');
+      const shutdownSuccess = await shutdownAriClient();
+      if (shutdownSuccess) {
+        logger.info('ARI client shutdown completed');
+      } else {
+        logger.warn('ARI client was not running or already shut down');
       }
     } catch (err) {
       logger.error('Error shutting down ARI client:', err);
     }
     
-    // Stop RTP listener
     try {
-      const rtpListener = require('./api/rtp.listener.service');
-      rtpListener.stopRtpListenerService();
+      // 2. Stop RTP listener
+      logger.info('Stopping RTP listener service...');
+      stopRtpListenerService();
+      logger.info('RTP listener service stopped');
     } catch (err) {
       logger.error('Error stopping RTP listener:', err);
+    }
+
+    try {
+      // 3. Stop RTP sender service
+      logger.info('Stopping RTP sender service...');
+      const rtpSenderService = require('./services/rtp.sender.service');
+      rtpSenderService.cleanupAll();
+      logger.info('RTP sender service stopped');
+    } catch (err) {
+      logger.error('Error stopping RTP sender:', err);
     }
     
     if (server) {
@@ -158,15 +203,16 @@ function setupShutdownHandlers(server) {
         // Close database connection
         mongoose.connection.close(false, () => {
           logger.info('MongoDB connection closed');
+          logger.info('Graceful shutdown completed');
           process.exit(0);
         });
       });
       
       // Force exit after timeout
       setTimeout(() => {
-        logger.warn('Forcing exit after timeout');
+        logger.warn('Forcing exit after shutdown timeout');
         process.exit(1);
-      }, 10000);
+      }, 15000); // Increased timeout for proper cleanup
     } else {
       process.exit(1);
     }
@@ -187,6 +233,12 @@ function setupShutdownHandlers(server) {
   
   process.on('SIGINT', () => {
     logger.info('SIGINT received');
+    gracefulShutdown(server);
+  });
+
+  // Add handler for SIGUSR2 (used by nodemon for restarts)
+  process.on('SIGUSR2', () => {
+    logger.info('SIGUSR2 received (nodemon restart)');
     gracefulShutdown(server);
   });
 }

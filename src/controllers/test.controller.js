@@ -4,8 +4,8 @@ const { chatService, testService, twilioCallService } = require('../services');
 const { Patient, Conversation } = require('../models');
 const logger = require('../config/logger');
 const DebugUtils = require('../utils/debug');
-const openAIService = require('../api/openai.realtime.service');
-const { getAriClientInstance } = require('../api/ari.client');
+const openAIService = require('../services/openai.realtime.service');
+const { getAriClientInstance } = require('../services/ari.client');
 const seedDatabase = require('../scripts/seedDatabase');
 
 /**

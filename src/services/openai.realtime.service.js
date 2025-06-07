@@ -5,7 +5,7 @@ const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
 const { Message } = require('../models'); // Assuming Message model is used for saving transcripts
-const AudioUtils = require('./audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
+const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
 
 /**
  * Constants for configuration
@@ -1500,7 +1500,7 @@ initializeContinuousDebugFiles(callId) {
  * Only uploads 2 files: one combined file from Asterisk and one from OpenAI
  */
 async uploadDebugAudioToS3(callId) {
-    const S3Service = require('../services/s3.service');
+    const S3Service = require('./s3.service');
     
     try {
         const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);

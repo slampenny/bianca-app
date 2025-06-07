@@ -115,6 +115,11 @@ const baselineConfig = {
     from: envVars.EMAIL_FROM || 'support@myphonefriend.com', // Primary 'from' address
   },
   asterisk: {
+    maxRetries: process.env.ARI_MAX_RETRIES || 10,
+    retryDelay: process.env.ARI_RETRY_DELAY || 3000,
+    maxRetryDelay: process.env.ARI_MAX_RETRY_DELAY || 30000,
+    operationTimeout: process.env.ARI_OPERATION_TIMEOUT || 30000,
+    
     enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
     host: defaultAsteriskHost, // Example URL, replace with actual
     url: `http://${defaultAsteriskHost}:8088`, // Example URL, replace with actual
