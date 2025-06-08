@@ -4,11 +4,12 @@ const dgram = require('dgram');
 const { Buffer } = require('buffer');
 const logger = require('../config/logger');
 const AudioUtils = require('../api/audio.utils');
+const EventEmitter = require('events');
 
 /**
  * RTP Sender Service - Enhanced version with better error handling and monitoring
  */
-class RtpSenderService {
+class RtpSenderService extends EventEmitter {
     constructor() {
         this.activeCalls = new Map(); // callId -> call config
         this.udpSockets = new Map(); // callId -> UDP socket
