@@ -13,26 +13,26 @@ const rtpListenerService = require('./rtp.listener.service');
 
 // Configuration constants
 const CONFIG = {
-    MAX_RETRIES: config.asterisk?.maxRetries || 10,
-    RETRY_DELAY: config.asterisk?.retryDelay || 3000,
-    MAX_RETRY_DELAY: config.asterisk?.maxRetryDelay || 30000,
-    KEEP_ALIVE_INTERVAL: config.asterisk?.keepAliveInterval || 20000,
-    OPERATION_TIMEOUT: config.asterisk?.operationTimeout || 30000,
-    CHANNEL_SETUP_TIMEOUT: config.asterisk?.channelSetupTimeout || 10000,
-    STASIS_APP_NAME: config.asterisk?.stasisAppName || 'myphonefriend',
-    RTP_SEND_FORMAT: config.asterisk?.rtpSendFormat || 'ulaw',
-    AUDIO_FORMAT: config.asterisk?.audioFormat || 'ulaw',
-    FILE_EXTENSION: config.asterisk?.fileExtension || 'ulaw'
+    MAX_RETRIES: config.ari?.maxRetries || 10,
+    RETRY_DELAY: config.ari?.retryDelay || 3000,
+    MAX_RETRY_DELAY: config.ari?.maxRetryDelay || 30000,
+    KEEP_ALIVE_INTERVAL: config.ari?.keepAliveInterval || 20000,
+    OPERATION_TIMEOUT: config.ari?.operationTimeout || 30000,
+    CHANNEL_SETUP_TIMEOUT: config.ari?.channelSetupTimeout || 10000,
+    STASIS_APP_NAME: config.ari?.stasisAppName || 'myphonefriend',
+    RTP_SEND_FORMAT: config.ari?.rtpSendFormat || 'ulaw',
+    AUDIO_FORMAT: config.ari?.audioFormat || 'ulaw',
+    FILE_EXTENSION: config.ari?.fileExtension || 'ulaw'
 };
 
-// Valid state transitions
+// Valid state transitions - Updated to match your actual flow
 const VALID_STATE_TRANSITIONS = {
     'answered': ['pipeline_setup', 'cleanup'],
     'pipeline_setup': ['main_bridged', 'cleanup'],
-    'main_bridged': ['external_media_channels_created', 'external_media_read_active', 'cleanup'], // Allow direct transition
-    'external_media_channels_created': ['external_media_read_active', 'cleanup'],
-    'external_media_read_active': ['external_media_write_pending', 'pipeline_active_extmedia', 'cleanup'],
-    'external_media_write_pending': ['external_media_write_active', 'cleanup'],
+    'main_bridged': ['external_media_channels_created', 'external_media_read_active', 'cleanup'],
+    'external_media_channels_created': ['external_media_read_active', 'external_media_write_pending', 'external_media_write_active', 'pipeline_active_extmedia', 'cleanup'],
+    'external_media_read_active': ['external_media_write_pending', 'external_media_write_active', 'pipeline_active_extmedia', 'cleanup'],
+    'external_media_write_pending': ['external_media_write_active', 'pipeline_active_extmedia', 'cleanup'],
     'external_media_write_active': ['pipeline_active_extmedia', 'cleanup'],
     'pipeline_active_extmedia': ['cleanup'],
     'cleanup': []
@@ -1080,7 +1080,25 @@ class AsteriskAriClient extends EventEmitter {
             
             const rtpReadDest = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_RECEIVE_PORT}`;
             
-            this.updateCallState(parentChannelId, 'external_media_read_active');
+            // Debug: Try using IP instead of hostname
+            console.log(`[RTP DEBUG] Original RTP dest: ${rtpReadDest}`);
+            console.log(`[RTP DEBUG] RTP_BIANCA_HOST: ${this.RTP_BIANCA_HOST}`);
+            console.log(`[RTP DEBUG] RTP_BIANCA_RECEIVE_PORT: ${this.RTP_BIANCA_RECEIVE_PORT}`);
+            
+            // Try using the container's actual IP if hostname fails
+            // You can get this with: docker inspect <container> | grep IPAddress
+            
+            // Fix: Update state to external_media_read_active properly
+            // First check current state and transition appropriately
+            const currentState = parentCallData.state;
+            if (currentState === 'main_bridged') {
+                // We need to go through external_media_channels_created first
+                this.updateCallState(parentChannelId, 'external_media_channels_created');
+                this.updateCallState(parentChannelId, 'external_media_read_active');
+            } else {
+                this.updateCallState(parentChannelId, 'external_media_read_active');
+            }
+            
             this.tracker.updateCall(parentChannelId, { 
                 snoopToRtpMapping: parentCallData.rtpSessionId,
                 awaitingSsrcForRtp: true 
@@ -1431,14 +1449,22 @@ class AsteriskAriClient extends EventEmitter {
             return;
         }
 
+        // Temporarily disable strict state validation for development
+        // TODO: Re-enable after flow is stabilized
+        const oldState = callData.state;
+        this.tracker.updateCall(channelId, { state: newState });
+        logger.info(`[State] ${channelId}: ${oldState} → ${newState}`);
+        
+        /* COMMENTED OUT FOR DEVELOPMENT
         try {
-            //StateValidator.validateTransition(callData.state, newState);
+            StateValidator.validateTransition(callData.state, newState);
             this.tracker.updateCall(channelId, { state: newState });
             logger.info(`[State] ${channelId}: ${callData.state} → ${newState}`);
         } catch (err) {
             logger.error(`[State] Invalid transition for ${channelId}: ${err.message}`);
             throw err;
         }
+        */
     }
 
     delay(ms) {

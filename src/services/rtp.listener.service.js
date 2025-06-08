@@ -215,6 +215,9 @@ async function handleUdpMessage(msg, rinfo) {
 
     const remoteAddr = `${rinfo.address}:${rinfo.port}`;
     
+    // Additional debugging
+    console.log(`[RTP DEBUG] Processing packet from ${remoteAddr}, size: ${msg.length}`);
+    
     // Validate packet size
     if (msg.length > MAX_PACKET_SIZE) {
         logger.warn(`[RTP Listener] Oversized packet from ${remoteAddr}: ${msg.length} bytes`);
@@ -225,18 +228,25 @@ async function handleUdpMessage(msg, rinfo) {
     const rtpPacket = parseRtpPacket(msg);
 
     if (!rtpPacket) {
+        console.log(`[RTP DEBUG] Invalid RTP packet from ${remoteAddr}`);
         packetStats.invalidPackets++;
         return;
     }
 
+    console.log(`[RTP DEBUG] Valid RTP packet - SSRC: ${rtpPacket.ssrc}, PayloadType: ${rtpPacket.payloadType}, Seq: ${rtpPacket.sequenceNumber}`);
+    
     packetStats.validRtpPackets++;
     const { payloadType, sequenceNumber, timestamp, ssrc, payload } = rtpPacket;
 
     let callId = ssrcToCallIdMap.get(ssrc);
+    console.log(`[RTP DEBUG] SSRC ${ssrc} mapped to callId: ${callId || 'NONE'}`);
 
     // SSRC to CallID Association Logic
     if (!callId) {
+        console.log(`[RTP DEBUG] No mapping for SSRC ${ssrc}, looking for waiting call...`);
         const waitingCall = findCallAwaitingSsrc();
+        console.log(`[RTP DEBUG] Waiting call found:`, waitingCall);
+        
         if (waitingCall) {
             callId = waitingCall.callId;
             const asteriskId = waitingCall.asteriskId;
@@ -256,8 +266,11 @@ async function handleUdpMessage(msg, rinfo) {
             }
         } else {
             packetStats.packetsWithUnknownSsrc++;
-            // Only log this occasionally to avoid spam
-            if (packetStats.packetsWithUnknownSsrc % 100 === 1) {
+            // Log this more frequently during debugging
+            console.log(`[RTP DEBUG] No call waiting for SSRC ${ssrc}. Active calls:`, Array.from(channelTracker.calls.keys()));
+            console.log(`[RTP DEBUG] Calls awaiting SSRC:`, Array.from(channelTracker.calls.values()).filter(c => c.awaitingSsrcForRtp).map(c => ({id: c.asteriskChannelId, twilioSid: c.twilioCallSid})));
+            
+            if (packetStats.packetsWithUnknownSsrc % 10 === 1) { // Log every 10th instead of 100th
                 logger.warn(`[RTP Listener] Received packet from ${remoteAddr} with unknown SSRC ${ssrc}. No call waiting for SSRC. (${packetStats.packetsWithUnknownSsrc} total unknown)`);
             }
             return;
@@ -272,10 +285,14 @@ async function handleUdpMessage(msg, rinfo) {
         return;
     }
 
+    console.log(`[RTP DEBUG] Processing audio for call ${callId}, payload size: ${payload.length}`);
+
     // Process audio payload
     try {
         await processAudioPayload(callId, payload, ssrc);
+        console.log(`[RTP DEBUG] Audio processed successfully for call ${callId}`);
     } catch (err) {
+        console.log(`[RTP DEBUG] Audio processing failed for call ${callId}:`, err.message);
         // Error already logged in processAudioPayload
         return;
     }
@@ -306,6 +323,9 @@ function startRtpListenerService() {
     });
 
     udpServer.on('message', async (msg, rinfo) => {
+        // Add debugging to see if ANY packets arrive
+        console.log(`[RTP DEBUG] Packet received from ${rinfo.address}:${rinfo.port}, size: ${msg.length} bytes`);
+        
         try {
             await handleUdpMessage(msg, rinfo);
         } catch (err) {
