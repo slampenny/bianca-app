@@ -31,7 +31,7 @@ const VALID_STATE_TRANSITIONS = {
     'pipeline_setup': ['main_bridged', 'cleanup'],
     'main_bridged': ['external_media_channels_created', 'external_media_read_active', 'cleanup'], // Allow direct transition
     'external_media_channels_created': ['external_media_read_active', 'cleanup'],
-    'external_media_read_active': ['external_media_write_pending', 'cleanup'],
+    'external_media_read_active': ['external_media_write_pending', 'pipeline_active_extmedia', 'cleanup'],
     'external_media_write_pending': ['external_media_write_active', 'cleanup'],
     'external_media_write_active': ['pipeline_active_extmedia', 'cleanup'],
     'pipeline_active_extmedia': ['cleanup'],
