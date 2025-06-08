@@ -236,6 +236,9 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     async start() {
+    // Wait for Asterisk to be ready before attempting connection
+        await this.waitForAsteriskReady();
+        
         return this.circuitBreaker.execute(async () => {
             try {
                 logger.info('[ARI] Connecting to Asterisk ARI...');
@@ -281,6 +284,41 @@ class AsteriskAriClient extends EventEmitter {
         });
     }
 
+    // Add this new method to wait for Asterisk to be ready
+    async waitForAsteriskReady() {
+        const maxAttempts = 30; // 30 attempts = 60 seconds with 2s delay
+        const delayMs = 2000;
+        const { url: ariUrl, username, password } = config.asterisk;
+        
+        logger.info('[ARI] Waiting for Asterisk to be ready...');
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                // Try to fetch the swagger documentation
+                const response = await fetch(`${ariUrl}/ari/api-docs/resources.json`, {
+                    headers: {
+                        'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
+                    }
+                });
+                
+                if (response.ok) {
+                    logger.info(`[ARI] Asterisk is ready (attempt ${attempt}/${maxAttempts})`);
+                    return true;
+                }
+                
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            } catch (err) {
+                logger.warn(`[ARI] Asterisk not ready yet (attempt ${attempt}/${maxAttempts}): ${err.message}`);
+                
+                if (attempt < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                } else {
+                    throw new Error(`Asterisk not ready after ${maxAttempts} attempts`);
+                }
+            }
+        }
+    }
+    
     setupWebSocketHandlers() {
         this.client.on('WebSocketConnected', () => {
             logger.info('[ARI] WebSocket connected');
