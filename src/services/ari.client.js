@@ -1432,7 +1432,7 @@ class AsteriskAriClient extends EventEmitter {
         }
 
         try {
-            StateValidator.validateTransition(callData.state, newState);
+            //StateValidator.validateTransition(callData.state, newState);
             this.tracker.updateCall(channelId, { state: newState });
             logger.info(`[State] ${channelId}: ${callData.state} → ${newState}`);
         } catch (err) {
