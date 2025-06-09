@@ -11,6 +11,7 @@ const EventEmitter = require('events');
  */
 class RtpSenderService extends EventEmitter {
     constructor() {
+        super();
         this.activeCalls = new Map(); // callId -> call config
         this.udpSockets = new Map(); // callId -> UDP socket
         this.sequenceNumbers = new Map(); // callId -> current sequence number

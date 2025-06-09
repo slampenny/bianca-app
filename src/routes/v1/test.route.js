@@ -2,12 +2,16 @@ const express = require('express');
 const router = express.Router();
 const config = require('../../config/config');
 const logger = require('../../config/logger');
+const testController = require('../../controllers/test.controller');
+const caregiverController = require('../../controllers/caregiver.controller');
+const validate = require('../../middlewares/validate');
+const caregiverValidation = require('../../validations/caregiver.validation');
 const dns = require('dns').promises;
 
 // Import services safely
 let ariClient, rtpListener, rtpSender, openAIService, channelTracker;
 try {
-    ariClient = require('../../services/asterisk.ari.client');
+    ariClient = require('../../services/ari.client');
     rtpListener = require('../../services/rtp.listener.service');
     rtpSender = require('../../services/rtp.sender.service');
     openAIService = require('../../services/openai.realtime.service');
