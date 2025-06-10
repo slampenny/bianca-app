@@ -11,7 +11,7 @@ const dns = require('dns').promises;
 // Import services safely
 let ariClient, rtpListener, rtpSender, openAIService, channelTracker;
 try {
-    ariClient = require('../../services/asterisk.ari.client');
+    ariClient = require('../../services/ari.client');
     rtpListener = require('../../services/rtp.listener.service');
     rtpSender = require('../../services/rtp.sender.service');
     openAIService = require('../../services/openai.realtime.service');
