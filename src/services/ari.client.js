@@ -552,7 +552,7 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     async handleStasisStartForUnicastRTP(channel) {
-        logger.info('[ARI] Processing UnicastRTP channel:', channel.id);
+        logger.info(`[ARI] Processing UnicastRTP channel: ${channel.id}`);
 
         const parentCallData = this.findParentCallForRtpChannel(channel);
         if (!parentCallData) {
@@ -908,6 +908,9 @@ class AsteriskAriClient extends EventEmitter {
                     case 'audio_chunk':
                         this.handleOpenAIAudio(callbackId, data);
                         break;
+                    case 'openai_session_ready':
+                        logger.info(`[ARI] OpenAI session is ready for ${callbackId}`);
+                        break; // Acknowledge and do nothing further
                     case 'openai_session_expired':
                         this.handleOpenAISessionExpired(callbackId);
                         break;
@@ -1115,6 +1118,7 @@ class AsteriskAriClient extends EventEmitter {
 
             await channel.answer();
             logger.info(`[ARI] Answered snoop channel ${channelId}`);
+            this.updateCallState(parentChannelId, 'external_media_read_active');
             
             const rtpReadDest = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_RECEIVE_PORT}`;
             
