@@ -1,17 +1,17 @@
 const express = require('express');
+const validate = require('../../middlewares/validate');
+const caregiverValidation = require('../../validations/caregiver.validation');
+const caregiverController = require('../../controllers/caregiver.controller');
+const testController = require('../../controllers/test.controller');
 const router = express.Router();
 const config = require('../../config/config');
 const logger = require('../../config/logger');
-const testController = require('../../controllers/test.controller');
-const caregiverController = require('../../controllers/caregiver.controller');
-const validate = require('../../middlewares/validate');
-const caregiverValidation = require('../../validations/caregiver.validation');
 const dns = require('dns').promises;
 
 // Import services safely
 let ariClient, rtpListener, rtpSender, openAIService, channelTracker;
 try {
-    ariClient = require('../../services/ari.client');
+    ariClient = require('../../services/asterisk.ari.client');
     rtpListener = require('../../services/rtp.listener.service');
     rtpSender = require('../../services/rtp.sender.service');
     openAIService = require('../../services/openai.realtime.service');
@@ -19,6 +19,10 @@ try {
 } catch (err) {
     logger.error('Error loading services for test routes:', err);
 }
+
+// ============================================
+// YOUR ORIGINAL TEST ROUTES
+// ============================================
 
 /**
  * @swagger
@@ -204,6 +208,9 @@ router.get('/websocket', testController.testOpenAIWebSocket);
  */
 router.post('/create-caregiver', validate(caregiverValidation.createCaregiver), caregiverController.createCaregiver);
 
+// ============================================
+// NEW DEBUGGING TEST ROUTES
+// ============================================
 
 /**
  * @swagger
@@ -562,8 +569,10 @@ router.post('/send-test-rtp', (req, res) => {
         rtpHeader[0] = 0x80; // Version 2, no padding, no extension, no CSRC
         rtpHeader[1] = 0; // Marker = 0, Payload type = 0 (PCMU)
         rtpHeader.writeUInt16BE(1, 2); // Sequence number
-        rtpHeader.writeUInt32BE(Date.now(), 4); // Timestamp
-        rtpHeader.writeUInt32BE(ssrc, 8); // SSRC
+        // Use a valid 32-bit timestamp (wrap around using unsigned 32-bit arithmetic)
+        const timestamp = Math.floor(Date.now() / 1000 * 8000) >>> 0; // Convert to RTP timestamp units and ensure 32-bit
+        rtpHeader.writeUInt32BE(timestamp, 4); // Timestamp
+        rtpHeader.writeUInt32BE(ssrc >>> 0, 8); // SSRC (ensure 32-bit)
         
         // Add some dummy payload
         const payload = Buffer.from('test audio data');
@@ -815,464 +824,5 @@ router.post('/cleanup-all', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /test/rtp-sender-detailed-status:
- *   get:
- *     summary: Get detailed RTP sender status
- *     description: Returns comprehensive status of RTP sender including all active calls
- *     tags: [Test - RTP Sender]
- *     responses:
- *       "200":
- *         description: Detailed RTP sender status
- */
-router.get('/rtp-sender-detailed-status', (req, res) => {
-    try {
-        const status = rtpSender.getStatus();
-        const health = rtpSender.healthCheck();
-        
-        // Add more diagnostic info
-        const diagnostic = {
-            ...health,
-            activeConnections: {
-                count: rtpSender.activeCalls.size,
-                calls: Array.from(rtpSender.activeCalls.entries()).map(([callId, config]) => ({
-                    callId,
-                    config: {
-                        rtpHost: config.rtpHost,
-                        rtpPort: config.rtpPort,
-                        format: config.format,
-                        initialized: config.initialized,
-                        initTime: config.initTime,
-                        ssrc: config.ssrc
-                    }
-                }))
-            },
-            sockets: {
-                count: rtpSender.udpSockets.size,
-                socketIds: Array.from(rtpSender.udpSockets.keys())
-            },
-            sequenceNumbers: Array.from(rtpSender.sequenceNumbers.entries()),
-            timestamps: Array.from(rtpSender.timestamps.entries()),
-            ssrcs: Array.from(rtpSender.ssrcs.entries())
-        };
-        
-        res.json(diagnostic);
-    } catch (err) {
-        res.status(500).json({ error: err.message, stack: err.stack });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-sender-initialize:
- *   post:
- *     summary: Initialize RTP sender for a test call
- *     description: Manually initialize RTP sender with specific parameters
- *     tags: [Test - RTP Sender]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - callId
- *               - rtpHost
- *               - rtpPort
- *             properties:
- *               callId:
- *                 type: string
- *                 default: "test-call-123"
- *               rtpHost:
- *                 type: string
- *                 default: "172.31.1.67"
- *               rtpPort:
- *                 type: number
- *                 default: 10070
- *               format:
- *                 type: string
- *                 enum: [ulaw, slin]
- *                 default: "ulaw"
- *     responses:
- *       "200":
- *         description: RTP sender initialized
- */
-router.post('/rtp-sender-initialize', async (req, res) => {
-    const { callId, rtpHost, rtpPort, format = 'ulaw' } = req.body;
-    
-    if (!callId || !rtpHost || !rtpPort) {
-        return res.status(400).json({ 
-            error: 'Missing required fields: callId, rtpHost, rtpPort' 
-        });
-    }
-    
-    try {
-        await rtpSender.initializeCall(callId, {
-            rtpHost,
-            rtpPort,
-            format,
-            asteriskChannelId: `test-asterisk-${callId}`
-        });
-        
-        const callConfig = rtpSender.activeCalls.get(callId);
-        const stats = rtpSender.stats.get(callId);
-        
-        res.json({
-            success: true,
-            initialized: {
-                callId,
-                config: callConfig,
-                stats,
-                ssrc: rtpSender.ssrcs.get(callId),
-                sequenceNumber: rtpSender.sequenceNumbers.get(callId),
-                timestamp: rtpSender.timestamps.get(callId)
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ 
-            error: err.message,
-            stack: err.stack 
-        });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-sender-send-test-audio:
- *   post:
- *     summary: Send test audio through RTP sender
- *     description: Sends test audio data to verify RTP sender functionality
- *     tags: [Test - RTP Sender]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - callId
- *             properties:
- *               callId:
- *                 type: string
- *                 default: "test-call-123"
- *               audioType:
- *                 type: string
- *                 enum: [silence, tone, pattern]
- *                 default: "pattern"
- *               durationMs:
- *                 type: number
- *                 default: 100
- *     responses:
- *       "200":
- *         description: Test audio sent
- */
-router.post('/rtp-sender-send-test-audio', async (req, res) => {
-    const { callId, audioType = 'pattern', durationMs = 100 } = req.body;
-    
-    if (!callId) {
-        return res.status(400).json({ error: 'callId is required' });
-    }
-    
-    try {
-        // Check if call is initialized
-        const callConfig = rtpSender.activeCalls.get(callId);
-        if (!callConfig) {
-            return res.status(404).json({ 
-                error: `Call ${callId} not initialized in RTP sender` 
-            });
-        }
-        
-        // Generate test audio based on type
-        let audioBuffer;
-        const samples = Math.floor((8000 * durationMs) / 1000); // 8kHz sample rate
-        
-        switch (audioType) {
-            case 'silence':
-                // µ-law silence is 0xFF
-                audioBuffer = Buffer.alloc(samples, 0xFF);
-                break;
-                
-            case 'tone':
-                // Simple 1kHz tone in µ-law
-                audioBuffer = Buffer.alloc(samples);
-                for (let i = 0; i < samples; i++) {
-                    // Generate a simple pattern for µ-law
-                    audioBuffer[i] = i % 2 === 0 ? 0x80 : 0x00;
-                }
-                break;
-                
-            case 'pattern':
-                // Recognizable pattern
-                audioBuffer = Buffer.alloc(samples);
-                for (let i = 0; i < samples; i++) {
-                    audioBuffer[i] = (i % 256);
-                }
-                break;
-        }
-        
-        // Convert to base64
-        const audioBase64 = audioBuffer.toString('base64');
-        
-        // Send through RTP sender
-        await rtpSender.sendAudio(callId, audioBase64);
-        
-        // Get updated stats
-        const stats = rtpSender.stats.get(callId);
-        
-        res.json({
-            success: true,
-            sent: {
-                callId,
-                audioType,
-                durationMs,
-                samples,
-                bytesGenerated: audioBuffer.length,
-                base64Length: audioBase64.length
-            },
-            stats: {
-                packetsSent: stats?.packetsSent || 0,
-                bytesSent: stats?.bytesSent || 0,
-                errors: stats?.errors || 0,
-                lastActivity: stats?.lastActivity
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ 
-            error: err.message,
-            stack: err.stack 
-        });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-sender-verify-sending:
- *   post:
- *     summary: Verify RTP packets are being sent
- *     description: Sends test audio and monitors if packets are actually transmitted
- *     tags: [Test - RTP Sender]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - callId
- *             properties:
- *               callId:
- *                 type: string
- *                 default: "test-call-123"
- *     responses:
- *       "200":
- *         description: Verification results
- */
-router.post('/rtp-sender-verify-sending', async (req, res) => {
-    const { callId } = req.body;
-    
-    if (!callId) {
-        return res.status(400).json({ error: 'callId is required' });
-    }
-    
-    try {
-        // Get initial stats
-        const beforeStats = rtpSender.stats.get(callId);
-        if (!beforeStats) {
-            return res.status(404).json({ error: `No stats found for call ${callId}` });
-        }
-        
-        const packetsBefore = beforeStats.packetsSent || 0;
-        const bytesBefore = beforeStats.bytesSent || 0;
-        
-        // Send a known pattern
-        const testPattern = Buffer.alloc(160); // 20ms of audio at 8kHz
-        for (let i = 0; i < 160; i++) {
-            testPattern[i] = i % 256;
-        }
-        const testAudio = testPattern.toString('base64');
-        
-        // Send the audio
-        await rtpSender.sendAudio(callId, testAudio);
-        
-        // Wait a bit for packets to be sent
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Get updated stats
-        const afterStats = rtpSender.stats.get(callId);
-        const packetsAfter = afterStats.packetsSent || 0;
-        const bytesAfter = afterStats.bytesSent || 0;
-        
-        const packetsSent = packetsAfter - packetsBefore;
-        const bytesSent = bytesAfter - bytesBefore;
-        
-        res.json({
-            success: packetsSent > 0,
-            verification: {
-                packetsSent,
-                bytesSent,
-                expectedPackets: 1, // 20ms = 1 packet
-                callConfig: rtpSender.activeCalls.get(callId),
-                errors: afterStats.errors - (beforeStats.errors || 0)
-            },
-            before: {
-                packets: packetsBefore,
-                bytes: bytesBefore
-            },
-            after: {
-                packets: packetsAfter,
-                bytes: bytesAfter
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ 
-            error: err.message,
-            stack: err.stack 
-        });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-sender-cleanup:
- *   post:
- *     summary: Cleanup specific RTP sender call
- *     description: Cleans up resources for a specific call ID
- *     tags: [Test - RTP Sender]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - callId
- *             properties:
- *               callId:
- *                 type: string
- *                 default: "test-call-123"
- *     responses:
- *       "200":
- *         description: Cleanup completed
- */
-router.post('/rtp-sender-cleanup', (req, res) => {
-    const { callId } = req.body;
-    
-    if (!callId) {
-        return res.status(400).json({ error: 'callId is required' });
-    }
-    
-    try {
-        const hadCall = rtpSender.activeCalls.has(callId);
-        
-        if (!hadCall) {
-            return res.status(404).json({ 
-                error: `Call ${callId} not found in RTP sender` 
-            });
-        }
-        
-        rtpSender.cleanupCall(callId);
-        
-        res.json({
-            success: true,
-            cleaned: {
-                callId,
-                message: `Call ${callId} cleaned up successfully`
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ 
-            error: err.message,
-            stack: err.stack 
-        });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-full-flow-test:
- *   post:
- *     summary: Test full RTP flow
- *     description: Tests the complete flow from OpenAI audio receipt to RTP sending
- *     tags: [Test - Integration]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               asteriskChannelId:
- *                 type: string
- *                 default: "test-channel-123"
- *               twilioCallSid:
- *                 type: string
- *                 default: "CA-test-123"
- *               targetRtpHost:
- *                 type: string
- *                 default: "172.31.1.67"
- *               targetRtpPort:
- *                 type: number
- *                 default: 10070
- *     responses:
- *       "200":
- *         description: Flow test results
- */
-router.post('/rtp-full-flow-test', async (req, res) => {
-    const { 
-        asteriskChannelId = 'test-channel-123',
-        twilioCallSid = 'CA-test-123',
-        targetRtpHost = '172.31.1.67',
-        targetRtpPort = 10070
-    } = req.body;
-    
-    try {
-        const results = {
-            steps: [],
-            success: true
-        };
-        
-        // Step 1: Set up channel tracking
-        channelTracker.addCall(asteriskChannelId, {
-            twilioCallSid,
-            state: 'test',
-            mainChannel: { id: asteriskChannelId }
-        });
-        results.steps.push({ step: 'Channel tracking', success: true });
-        
-        // Step 2: Initialize RTP sender
-        await rtpSender.initializeCall(twilioCallSid, {
-            asteriskChannelId,
-            rtpHost: targetRtpHost,
-            rtpPort: targetRtpPort,
-            format: 'ulaw'
-        });
-        results.steps.push({ step: 'RTP sender initialized', success: true });
-        
-        // Step 3: Send test audio
-        const testAudio = Buffer.alloc(160, 0xFF).toString('base64'); // Silence
-        await rtpSender.sendAudio(twilioCallSid, testAudio);
-        
-        const stats = rtpSender.stats.get(twilioCallSid);
-        results.steps.push({ 
-            step: 'Audio sent', 
-            success: true,
-            packetsSent: stats?.packetsSent || 0,
-            bytesSent: stats?.bytesSent || 0
-        });
-        
-        // Cleanup
-        rtpSender.cleanupCall(twilioCallSid);
-        channelTracker.removeCall(asteriskChannelId);
-        
-        res.json(results);
-    } catch (err) {
-        res.status(500).json({ 
-            error: err.message,
-            stack: err.stack 
-        });
-    }
-});
-
-// Export the enhanced test routes
+// Export the complete test routes
 module.exports = router;

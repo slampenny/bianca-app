@@ -318,7 +318,7 @@ class AsteriskAriClient extends EventEmitter {
             }
         }
     }
-    
+
     setupWebSocketHandlers() {
         this.client.on('WebSocketConnected', () => {
             logger.info('[ARI] WebSocket connected');
@@ -824,7 +824,7 @@ class AsteriskAriClient extends EventEmitter {
 
             // Initialize external media pipeline
             await this.initiateSnoopForExternalMedia(asteriskChannelId, channel);
-            this.updateCallState(asteriskChannelId, 'pipeline_active_extmedia');
+            //this.updateCallState(asteriskChannelId, 'pipeline_active_extmedia');
 
             logger.info(`[ARI Pipeline] Media pipeline setup complete for ${asteriskChannelId}`);
 
@@ -1237,6 +1237,8 @@ class AsteriskAriClient extends EventEmitter {
             logger.info(`[ARI] WRITE ExternalMedia active: ${rtpAsteriskSource} → ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
             
             await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+
+            this.updateCallState(parentChannelId, 'pipeline_active_extmedia');
             
         } catch (err) {
             logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
