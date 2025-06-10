@@ -1128,14 +1128,14 @@ class AsteriskAriClient extends EventEmitter {
             
             // Fix: Update state to external_media_read_active properly
             // First check current state and transition appropriately
-            const currentState = parentCallData.state;
-            if (currentState === 'main_bridged') {
-                // We need to go through external_media_channels_created first
-                this.updateCallState(parentChannelId, 'external_media_channels_created');
-                this.updateCallState(parentChannelId, 'external_media_read_active');
-            } else {
-                this.updateCallState(parentChannelId, 'external_media_read_active');
-            }
+            // const currentState = parentCallData.state;
+            // if (currentState === 'main_bridged') {
+            //     // We need to go through external_media_channels_created first
+            //     this.updateCallState(parentChannelId, 'external_media_channels_created');
+            //     this.updateCallState(parentChannelId, 'external_media_read_active');
+            // } else {
+            //     this.updateCallState(parentChannelId, 'external_media_read_active');
+            // }
             
             this.tracker.updateCall(parentChannelId, { 
                 snoopToRtpMapping: parentCallData.rtpSessionId,
