@@ -753,17 +753,14 @@ class AsteriskAriClient extends EventEmitter {
         const twilioSid = callData.twilioCallSid || parentId;
 
         try {
-            // --- REFACTOR 5: Set readiness flag when RTP starts flowing ---
-            // If this RTP channel is our inbound one, its start signifies the read stream is ready.
-            if (channel.id === callData.inboundRtpChannelId) {
+            // This handler's only job is to map the SSRC. It does not control readiness.
+            if (channel.id === callData.inboundRtpChannelId && callData.awaitingSsrcForRtp) {
                 rtpListenerService.addSsrcMapping(event.ssrc, twilioSid);
                 this.tracker.updateCall(parentId, { 
                     rtp_ssrc: event.ssrc,
                     awaitingSsrcForRtp: false,
-                    isReadStreamReady: true // Set the flag
                 });
-                logger.info(`[ARI Pipeline] READ stream is now ready for ${parentId}. Mapped SSRC ${event.ssrc} → ${twilioSid}`);
-                this.checkMediaPipelineReady(parentId); // Check if the whole pipeline is ready
+                logger.info(`[ARI SSRC] Mapped SSRC ${event.ssrc} → ${twilioSid} for READ stream.`);
             }
         } catch (err) {
             logger.error(`[ARI] Error in ChannelRtpStarted handler: ${err.message}`);
