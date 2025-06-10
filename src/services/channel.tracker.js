@@ -31,6 +31,10 @@ class ChannelTracker {
             conversationId: null, // Mongoose DB conversation _id
             recordingName: null, // Main bridge recording name
 
+            // --- Flag-Based State Properties ---
+            isReadStreamReady: false,  // NEW: Flag for inbound audio path (user->app)
+            isWriteStreamReady: false, // NEW: Flag for outbound audio path (app->user)
+
             // Snoop & Audio Capture Related Fields
             snoopMethod: null, // 'audiosocket' or 'externalMedia' or 'ffmpeg'
             snoopChannel: null,
@@ -41,7 +45,8 @@ class ChannelTracker {
             localChannel: null,    // Only used for AudioSocket method
             localChannelId: null,
             
-            // External Media RTP Fields (NEW for refactored ARI client)
+            // External Media RTP Fields
+            rtpPort: null, // NEW: The unique UDP port for receiving audio for this call
             rtpSessionId: null, // RTP session identifier
             expectingRtpChannel: false,
             pendingSnoopId: null,
@@ -169,10 +174,10 @@ class ChannelTracker {
         // Clean up AudioSocket UUID mapping if it exists
         if (uuidToRemove) {
              if(this.uuidToChannelId.get(uuidToRemove) === asteriskChannelId) {
-                  this.uuidToChannelId.delete(uuidToRemove);
-                  logger.debug(`[Tracker] Removed AudioSocket UUID mapping for ${uuidToRemove}`);
+                   this.uuidToChannelId.delete(uuidToRemove);
+                   logger.debug(`[Tracker] Removed AudioSocket UUID mapping for ${uuidToRemove}`);
              } else {
-                 logger.warn(`[Tracker] UUID ${uuidToRemove} was not mapped to removed channel ${asteriskChannelId} during cleanup.`);
+                  logger.warn(`[Tracker] UUID ${uuidToRemove} was not mapped to removed channel ${asteriskChannelId} during cleanup.`);
              }
         }
 
@@ -216,7 +221,8 @@ class ChannelTracker {
             rtp_ssrc: callData.rtp_ssrc,
             ffmpegTranscoder: callData.ffmpegTranscoder,
             recordingName: callData.recordingName,
-            asteriskRtpEndpoint: callData.asteriskRtpEndpoint
+            asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
+            rtpPort: callData.rtpPort, // NEW: Ensure port is available for cleanup
         } : null;
     }
 
