@@ -605,19 +605,29 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     async handleInboundRtpChannel(channel, parentId, callData) {
-        logger.info(`[ARI] Processing READ UnicastRTP channel ${channel.id} for parent ${parentId}`);
-        
+        // Added extra debugging logs to be certain of the flow
+        logger.info(`[ARI DEBUG] Entering handleInboundRtpChannel for ${channel.id}`);
         try {
             await channel.answer();
+            logger.info(`[ARI DEBUG] Channel ${channel.id} was successfully answered.`);
+            
+            // This is the critical part that sets the flag and checks for readiness
             this.tracker.updateCall(parentId, { 
                 inboundRtpChannel: channel,
-                inboundRtpChannelId: channel.id
+                inboundRtpChannelId: channel.id,
+                awaitingSsrcForRtp: true,
+                isReadStreamReady: true   // Set the flag
             });
-            logger.info(`[ARI] Answered READ RTP channel ${channel.id}`);
-            // Readiness will be confirmed by ChannelRtpStarted
+            logger.info(`[ARI Pipeline] READ stream is now ready for ${parentId}.`);
+
+            // Check if this completes the pipeline.
+            this.checkMediaPipelineReady(parentId);
+            logger.info(`[ARI DEBUG] handleInboundRtpChannel finished for ${channel.id}.`);
+
         } catch (err) {
-            logger.error(`[ARI] Failed to answer READ UnicastRTP channel ${channel.id}: ${err.message}`);
-            throw err;
+            logger.error(`[ARI DEBUG] CRITICAL ERROR inside handleInboundRtpChannel for ${channel.id}: ${err.message}`, { stack: err.stack });
+            this.updateCallState(parentId, 'failed');
+            // Do not re-throw, as this might be happening in an unchained promise.
         }
     }
 
