@@ -25,18 +25,17 @@ const CONFIG = {
     FILE_EXTENSION: config.ari?.fileExtension || 'ulaw'
 };
 
-// Valid state transitions - Updated to match your actual flow
+// --- REFACTOR 1: A simpler, high-level state machine ---
+// These states represent the major milestones of the call, not every single step.
 const VALID_STATE_TRANSITIONS = {
-    'answered': ['pipeline_setup', 'cleanup'],
-    'pipeline_setup': ['main_bridged', 'cleanup'],
-    'main_bridged': ['external_media_channels_created', 'external_media_read_active', 'cleanup'],
-    'external_media_channels_created': ['external_media_read_active', 'external_media_write_pending', 'external_media_write_active', 'pipeline_active_extmedia', 'cleanup'],
-    'external_media_read_active': ['external_media_write_pending', 'external_media_write_active', 'pipeline_active_extmedia', 'cleanup'],
-    'external_media_write_pending': ['external_media_write_active', 'pipeline_active_extmedia', 'cleanup'],
-    'external_media_write_active': ['pipeline_active_extmedia', 'cleanup'],
-    'pipeline_active_extmedia': ['cleanup'],
+    'new': ['answered'],
+    'answered': ['pending_media', 'cleanup'],
+    'pending_media': ['pipeline_active', 'failed', 'cleanup'],
+    'pipeline_active': ['cleanup', 'failed'],
+    'failed': ['cleanup'],
     'cleanup': []
 };
+
 
 // Helper to strip protocol and ensure valid host
 function sanitizeHost(raw) {
@@ -95,22 +94,14 @@ class CircuitBreaker {
 function withTimeout(promise, timeoutMs, operationName = 'Operation') {
     return Promise.race([
         promise,
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
             setTimeout(() => reject(new Error(`${operationName} timed out after ${timeoutMs}ms`)), timeoutMs)
         )
     ]);
 }
 
-// State machine validator
-class StateValidator {
-    static validateTransition(currentState, newState) {
-        const validTransitions = VALID_STATE_TRANSITIONS[currentState];
-        if (!validTransitions || !validTransitions.includes(newState)) {
-            throw new Error(`Invalid state transition from ${currentState} to ${newState}`);
-        }
-        return true;
-    }
-}
+// --- REFACTOR 2: StateValidator class is no longer needed for this simpler model ---
+// class StateValidator { ... } // Removed
 
 // Enhanced resource manager
 class ResourceManager {
@@ -185,6 +176,24 @@ class AsteriskAriClient extends EventEmitter {
         this.setupGracefulShutdown();
     }
 
+    // --- REFACTOR 3: Add the core readiness check logic ---
+    checkMediaPipelineReady(asteriskChannelId) {
+        const callData = this.tracker.getCall(asteriskChannelId);
+        // Only proceed if we are in the pending state
+        if (!callData || callData.state !== 'pending_media') {
+            return;
+        }
+
+        // Check if both read (user->app) and write (app->user) streams are ready
+        if (callData.isReadStreamReady && callData.isWriteStreamReady) {
+            logger.info(`[ARI Pipeline] Bidirectional media pipeline is now active for ${asteriskChannelId}`);
+            this.updateCallState(asteriskChannelId, 'pipeline_active');
+            
+            // TODO: This is the ideal place to trigger the initial greeting from the AI
+            // openAIService.startConversation(callData.twilioCallSid);
+        }
+    }
+    
     setGlobalReference() {
         if (typeof global !== 'undefined') {
             global.ariClient = this;
@@ -284,7 +293,6 @@ class AsteriskAriClient extends EventEmitter {
         });
     }
 
-    // Add this new method to wait for Asterisk to be ready
     async waitForAsteriskReady() {
         const maxAttempts = 30; // 30 attempts = 60 seconds with 2s delay
         const delayMs = 2000;
@@ -492,12 +500,15 @@ class AsteriskAriClient extends EventEmitter {
         try {
             await channel.answer();
             
+            // --- REFACTOR 4: Initialize the call with readiness flags ---
             this.tracker.addCall(channelId, {
                 channel: channel,
                 mainChannel: channel,
                 twilioCallSid: null,
                 patientId: null,
-                state: 'answered'
+                state: 'answered', // Initial high-level state
+                isReadStreamReady: false,
+                isWriteStreamReady: false,
             });
             
             logger.info(`[ARI] Answered main channel: ${channelId}`);
@@ -556,35 +567,37 @@ class AsteriskAriClient extends EventEmitter {
 
         const parentCallData = this.findParentCallForRtpChannel(channel);
         if (!parentCallData) {
-            logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
+            logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}. Hanging up.`);
+            await this.safeHangup(channel, 'Orphaned UnicastRTP');
             return;
         }
 
         const { parentId, callData } = parentCallData;
-
-        if (callData.state === 'external_media_read_active' && !callData.inboundRtpChannel) {
-            await this.handleInboundRtpChannel(channel, parentId, callData);
-        } else if (['external_media_write_pending', 'external_media_write_active'].includes(callData.state)) {
-            await this.handleOutboundRtpChannel(channel, parentId, callData);
+        
+        // This UnicastRTP channel is for the READ stream (user->app)
+        if (!callData.inboundRtpChannelId) {
+             await this.handleInboundRtpChannel(channel, parentId, callData);
+        } 
+        // This UnicastRTP channel is for the WRITE stream (app->user)
+        else if (!callData.outboundRtpChannelId) {
+             await this.handleOutboundRtpChannel(channel, parentId, callData);
         }
     }
 
     findParentCallForRtpChannel(channel) {
-        const [base] = channel.id.split('.');
-        let parentId = Array.from(this.tracker.calls.keys())
-            .find(id => id.startsWith(`${base}.`));
-        
-        if (parentId) {
-            return { parentId, callData: this.tracker.getCall(parentId) };
-        }
+        // The channel name includes the host and port it was created for.
+        // We can use this to determine if it's for the read or write stream.
+        const isReadChannel = channel.name.includes(this.RTP_BIANCA_RECEIVE_PORT.toString());
 
-        // Fallback: look for calls expecting RTP channels
         for (const [callId, data] of this.tracker.calls.entries()) {
-            if (data.state === 'external_media_channels_created' || 
-                data.state === 'external_media_read_active' ||
-                data.state === 'external_media_write_pending' ||
-                data.expectingRtpChannel) {
-                return { parentId: callId, callData: data };
+            // Find the call that is expecting an RTP channel and matches the direction.
+            if (data.expectingRtpChannel) {
+                if (isReadChannel && !data.inboundRtpChannelId) {
+                    return { parentId: callId, callData: data };
+                }
+                if (!isReadChannel && !data.outboundRtpChannelId) {
+                     return { parentId: callId, callData: data };
+                }
             }
         }
 
@@ -592,7 +605,7 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     async handleInboundRtpChannel(channel, parentId, callData) {
-        logger.info(`[ARI] Processing READ UnicastRTP channel ${channel.id}`);
+        logger.info(`[ARI] Processing READ UnicastRTP channel ${channel.id} for parent ${parentId}`);
         
         try {
             await channel.answer();
@@ -601,6 +614,7 @@ class AsteriskAriClient extends EventEmitter {
                 inboundRtpChannelId: channel.id
             });
             logger.info(`[ARI] Answered READ RTP channel ${channel.id}`);
+            // Readiness will be confirmed by ChannelRtpStarted
         } catch (err) {
             logger.error(`[ARI] Failed to answer READ UnicastRTP channel ${channel.id}: ${err.message}`);
             throw err;
@@ -612,7 +626,7 @@ class AsteriskAriClient extends EventEmitter {
             throw new Error(`No bridge found for parent ${parentId}`);
         }
         
-        logger.info(`[ARI] Processing WRITE UnicastRTP channel ${channel.id}`);
+        logger.info(`[ARI] Processing WRITE UnicastRTP channel ${channel.id} for parent ${parentId}`);
         
         await this.client.bridges.addChannel({
             bridgeId: callData.mainBridgeId,
@@ -727,11 +741,11 @@ class AsteriskAriClient extends EventEmitter {
     async handleChannelRtpStarted(event, channel) {
         if (!channel.name.startsWith('UnicastRTP/')) return;
 
-        logger.info('[ARI] ChannelRtpStarted for', channel.id, 'with SSRC', event.ssrc);
+        logger.info(`[ARI] ChannelRtpStarted for ${channel.id} with SSRC ${event.ssrc}`);
 
         const parentCallData = this.findParentCallForRtpChannel(channel);
         if (!parentCallData) {
-            logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}`);
+            logger.warn(`[ARI] No parent call found for RTP channel ${channel.id} during RtpStarted event`);
             return;
         }
 
@@ -739,15 +753,20 @@ class AsteriskAriClient extends EventEmitter {
         const twilioSid = callData.twilioCallSid || parentId;
 
         try {
-            rtpListenerService.addSsrcMapping(event.ssrc, twilioSid);
-            this.tracker.updateCall(parentId, { 
-                rtp_ssrc: event.ssrc,
-                awaitingSsrcForRtp: false
-            });
-            
-            logger.info(`[ARI] Mapped SSRC ${event.ssrc} → ${twilioSid}`);
+            // --- REFACTOR 5: Set readiness flag when RTP starts flowing ---
+            // If this RTP channel is our inbound one, its start signifies the read stream is ready.
+            if (channel.id === callData.inboundRtpChannelId) {
+                rtpListenerService.addSsrcMapping(event.ssrc, twilioSid);
+                this.tracker.updateCall(parentId, { 
+                    rtp_ssrc: event.ssrc,
+                    awaitingSsrcForRtp: false,
+                    isReadStreamReady: true // Set the flag
+                });
+                logger.info(`[ARI Pipeline] READ stream is now ready for ${parentId}. Mapped SSRC ${event.ssrc} → ${twilioSid}`);
+                this.checkMediaPipelineReady(parentId); // Check if the whole pipeline is ready
+            }
         } catch (err) {
-            logger.error(`[ARI] Error mapping SSRC: ${err.message}`);
+            logger.error(`[ARI] Error in ChannelRtpStarted handler: ${err.message}`);
         }
     }
 
@@ -766,75 +785,45 @@ class AsteriskAriClient extends EventEmitter {
         this.emit('client_error', err);
     }
 
+    // --- REFACTOR 6: Simplify the main pipeline setup function ---
     async setupMediaPipeline(channel, twilioCallSid, patientId) {
         const asteriskChannelId = channel.id;
         logger.info(`[ARI Pipeline] Setting up for Asterisk ID: ${asteriskChannelId}, Twilio SID: ${twilioCallSid}, PatientID: ${patientId}`);
         
-        this.updateCallState(asteriskChannelId, 'pipeline_setup');
-        
         let mainBridge = null;
-        let dbConversationId = null;
 
         try {
-            await require('./rtp.listener.service').ensureReady();
+            await rtpListenerService.ensureReady();
+            const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId);
 
-            // Create conversation record
-            dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId);
-
-            // Initialize OpenAI service
             const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
-            const initialized = await openAIService.initialize(
-                asteriskChannelId,
-                twilioCallSid,
-                dbConversationId,
-                initialPrompt
-            );
-            
-            if (!initialized) {
-                throw new Error('OpenAI service failed to initialize');
-            }
+            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, initialPrompt);
 
-            // Create and setup bridge
-            mainBridge = await this.client.bridges.create({ 
-                type: 'mixing', 
-                name: `call-${asteriskChannelId}` 
-            });
-            
-            this.tracker.updateCall(asteriskChannelId, { 
-                mainBridge, 
-                mainBridgeId: mainBridge.id,
-                conversationId: dbConversationId
-            });
-            
+            mainBridge = await this.client.bridges.create({ type: 'mixing', name: `call-${asteriskChannelId}` });
+            this.tracker.updateCall(asteriskChannelId, { mainBridge, mainBridgeId: mainBridge.id, conversationId: dbConversationId });
             logger.info(`[ARI Pipeline] Created main bridge ${mainBridge.id}`);
 
-            await this.client.bridges.addChannel({
-                bridgeId: mainBridge.id,
-                channel: asteriskChannelId
-            });
-            
-            this.updateCallState(asteriskChannelId, 'main_bridged');
+            await this.client.bridges.addChannel({ bridgeId: mainBridge.id, channel: asteriskChannelId });
             logger.info(`[ARI Pipeline] Added main channel to bridge`);
 
-            // Start recording
             await this.startRecording(mainBridge, asteriskChannelId);
-
-            // Setup OpenAI callback
             this.setupOpenAICallback();
 
-            // Initialize external media pipeline
-            await this.initiateSnoopForExternalMedia(asteriskChannelId, channel);
-            //this.updateCallState(asteriskChannelId, 'pipeline_active_extmedia');
+            // Set the high-level state to show we're starting media setup.
+            this.updateCallState(asteriskChannelId, 'pending_media');
 
-            logger.info(`[ARI Pipeline] Media pipeline setup complete for ${asteriskChannelId}`);
+            // Initiate the creation of media channels. This function no longer manages state.
+            // We don't need to await this if we want setup to continue in parallel.
+            // However, awaiting ensures that the commands have at least been sent.
+            await this.initiateSnoopForExternalMedia(asteriskChannelId);
+            logger.info(`[ARI Pipeline] External media channel creation initiated for ${asteriskChannelId}`);
 
         } catch (err) {
             logger.error(`[ARI Pipeline] Error in setupMediaPipeline for ${asteriskChannelId}: ${err.message}`, err);
-            
+            this.updateCallState(asteriskChannelId, 'failed');
             if (mainBridge?.id) {
                 await this.safeDestroy(mainBridge, 'Main bridge cleanup after error');
             }
-            
             throw err;
         }
     }
@@ -897,7 +886,6 @@ class AsteriskAriClient extends EventEmitter {
             logger.info(`[ARI Pipeline] Started recording ${recordingName}`);
         } catch (err) {
             logger.error(`[ARI Pipeline] Recording failed: ${err.message}`);
-            // Don't throw - recording failure shouldn't stop the call
         }
     }
 
@@ -910,7 +898,7 @@ class AsteriskAriClient extends EventEmitter {
                         break;
                     case 'openai_session_ready':
                         logger.info(`[ARI] OpenAI session is ready for ${callbackId}`);
-                        break; // Acknowledge and do nothing further
+                        break;
                     case 'openai_session_expired':
                         this.handleOpenAISessionExpired(callbackId);
                         break;
@@ -954,7 +942,6 @@ class AsteriskAriClient extends EventEmitter {
         const callData = this.findCallData(callbackId);
         if (callData) {
             logger.warn(`[ARI] OpenAI session expired for ${callData.asteriskChannelId}`);
-            // Could implement session renewal here
         }
     }
 
@@ -974,121 +961,44 @@ class AsteriskAriClient extends EventEmitter {
         return callData;
     }
 
-    async initiateSnoopForExternalMedia(asteriskChannelId, mainChannelObject) {
-        logger.info(`[ExternalMedia Setup] Starting for main channel: ${asteriskChannelId}`);
-        
-        const abortController = this.resourceManager.getAbortController(asteriskChannelId);
+    // --- REFACTOR 7: Greatly simplify this function to only create resources ---
+    async initiateSnoopForExternalMedia(asteriskChannelId) {
+        logger.info(`[ExternalMedia Setup] Starting resource creation for main channel: ${asteriskChannelId}`);
         
         try {
-            const rtpSessionId = `rtp-${uuidv4()}`;
             const snoopId = `snoop-extmedia-${uuidv4()}`;
-            const playbackId = `playback-extmedia-${uuidv4()}`;
-            
             this.tracker.updateCall(asteriskChannelId, {
-                rtpSessionId,
                 expectingRtpChannel: true,
                 pendingSnoopId: snoopId,
-                pendingPlaybackId: playbackId
             });
             
-            // Create snoop channel with timeout
-            const snoopChannel = await withTimeout(
-                this.client.channels.snoopChannel({
-                    channelId: asteriskChannelId,
-                    snoopId: snoopId,
-                    spy: 'in',
-                    app: CONFIG.STASIS_APP_NAME
-                }),
-                CONFIG.CHANNEL_SETUP_TIMEOUT,
-                'Snoop channel creation'
-            );
-            
-            logger.info(`[ExternalMedia Setup] Created snoop channel ${snoopChannel.id}`);
-            
-            // Setup playback channel with proper cleanup
-            const playbackChannel = await this.createPlaybackChannelWithCleanup(
-                asteriskChannelId, 
-                abortController.signal
-            );
-            
-            this.tracker.updateCall(asteriskChannelId, {
-                snoopChannel,
-                snoopChannelId: snoopChannel.id,
-                playbackChannel,
-                playbackChannelId: playbackChannel.id,
-                snoopMethod: 'externalMedia',
-                state: 'external_media_channels_created',
-                pendingSnoopId: null,
-                pendingPlaybackId: null
-            });
-            
-            logger.info(`[ExternalMedia Setup] Channels created successfully`);
-            
-        } catch (err) {
-            logger.error(`[ExternalMedia Setup] Failed for ${asteriskChannelId}: ${err.message}`, err);
-            
-            this.tracker.updateCall(asteriskChannelId, {
-                state: 'snoop_extmedia_failed',
-                snoopChannel: null,
-                snoopChannelId: null,
-                playbackChannel: null,
-                playbackChannelId: null
-            });
-            
-            throw err;
-        }
-    }
+            // Fire and forget the creation commands. The event handlers will take over.
+            this.client.channels.snoopChannel({
+                channelId: asteriskChannelId,
+                snoopId: snoopId,
+                spy: 'in',
+                app: CONFIG.STASIS_APP_NAME
+            }).catch(err => logger.error(`[ARI] Snoop channel creation failed to initiate for ${asteriskChannelId}: ${err.message}`));
 
-    async createPlaybackChannelWithCleanup(asteriskChannelId, abortSignal) {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                reject(new Error('Timeout waiting for playback channel'));
-            }, CONFIG.CHANNEL_SETUP_TIMEOUT);
-            
-            let eventListener = null;
-            
-            const cleanup = () => {
-                clearTimeout(timeout);
-                if (eventListener && this.client) {
-                    this.client.removeListener('StasisStart', eventListener);
-                }
-            };
-            
-            // Handle abort signal
-            if (abortSignal) {
-                abortSignal.addEventListener('abort', () => {
-                    cleanup();
-                    reject(new Error('Operation aborted'));
-                });
-            }
-            
-            eventListener = (event, channel) => {
-                if (channel.name && 
-                    channel.name.includes(`playback-${asteriskChannelId}`) && 
-                    channel.name.includes('@playback-context') &&
-                    channel.name.includes(';2')) {
-                    
-                    logger.info(`[ExternalMedia Setup] Found playback leg 2: ${channel.id}`);
-                    cleanup();
-                    resolve(channel);
-                }
-            };
-            
-            this.client.on('StasisStart', eventListener);
-            
-            // Create the playback channel
             this.client.channels.originate({
                 endpoint: `Local/playback-${asteriskChannelId}@playback-context`,
                 app: CONFIG.STASIS_APP_NAME,
                 appArgs: `playback-for-${asteriskChannelId}`,
                 callerId: 'OpenAI <openai>'
-            }).catch(err => {
-                cleanup();
-                reject(err);
-            });
-        });
+            }).catch(err => logger.error(`[ARI] Playback channel creation failed to initiate for ${asteriskChannelId}: ${err.message}`));
+
+        } catch (err) {
+            logger.error(`[ExternalMedia Setup] Failed for ${asteriskChannelId}: ${err.message}`, err);
+            this.updateCallState(asteriskChannelId, 'failed');
+            throw err;
+        }
     }
 
+    // This function is no longer needed as we fire-and-forget originate.
+    // The StasisStart handler for playback will handle the channel object.
+    // async createPlaybackChannelWithCleanup(...) { ... } // Removed
+
+    // --- REFACTOR 8: Simplify snoop handler ---
     async handleStasisStartForSnoop(channel, channelName) {
         const channelId = channel.id;
         logger.info(`[ARI] StasisStart for Snoop channel: ${channelId}`);
@@ -1096,56 +1006,18 @@ class AsteriskAriClient extends EventEmitter {
         const match = channelName.match(/^Snoop\/([^-]+)-/);
         const parentChannelId = match?.[1];
         
-        if (!parentChannelId) {
-            logger.error(`[ARI] Cannot extract parent ID from snoop channel name: ${channelName}`);
-            await this.safeHangup(channel, 'Invalid snoop channel name');
-            return;
-        }
-
-        const parentCallData = this.tracker.getCall(parentChannelId);
-        if (!parentCallData) {
-            logger.error(`[ARI] Parent call ${parentChannelId} not found for snoop ${channelId}`);
-            await this.safeHangup(channel, 'Orphaned snoop channel');
-            return;
+        if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
+            logger.error(`[ARI] Parent call ${parentChannelId} not found for snoop ${channelId}. Hanging up.`);
+            return this.safeHangup(channel, 'Orphaned snoop channel');
         }
         
         try {
-            this.tracker.updateCall(parentChannelId, { 
-                snoopChannel: channel, 
-                snoopChannelId: channelId,
-                pendingSnoopId: null
-            });
-
+            this.tracker.updateCall(parentChannelId, { snoopChannel: channel, snoopChannelId: channelId });
             await channel.answer();
             logger.info(`[ARI] Answered snoop channel ${channelId}`);
-            this.updateCallState(parentChannelId, 'external_media_read_active');
             
             const rtpReadDest = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_RECEIVE_PORT}`;
             
-            // Debug: Try using IP instead of hostname
-            console.log(`[RTP DEBUG] Original RTP dest: ${rtpReadDest}`);
-            console.log(`[RTP DEBUG] RTP_BIANCA_HOST: ${this.RTP_BIANCA_HOST}`);
-            console.log(`[RTP DEBUG] RTP_BIANCA_RECEIVE_PORT: ${this.RTP_BIANCA_RECEIVE_PORT}`);
-            
-            // Try using the container's actual IP if hostname fails
-            // You can get this with: docker inspect <container> | grep IPAddress
-            
-            // Fix: Update state to external_media_read_active properly
-            // First check current state and transition appropriately
-            // const currentState = parentCallData.state;
-            // if (currentState === 'main_bridged') {
-            //     // We need to go through external_media_channels_created first
-            //     this.updateCallState(parentChannelId, 'external_media_channels_created');
-            //     this.updateCallState(parentChannelId, 'external_media_read_active');
-            // } else {
-            //     this.updateCallState(parentChannelId, 'external_media_read_active');
-            // }
-            
-            this.tracker.updateCall(parentChannelId, { 
-                snoopToRtpMapping: parentCallData.rtpSessionId,
-                awaitingSsrcForRtp: true 
-            });
-
             await channel.externalMedia({
                 app: CONFIG.STASIS_APP_NAME,
                 external_host: rtpReadDest,
@@ -1153,64 +1025,41 @@ class AsteriskAriClient extends EventEmitter {
                 direction: 'read'
             });
             
-            logger.info(`[ARI] READ ExternalMedia started: snoop ${channelId} → ${rtpReadDest}`);
-            
+            logger.info(`[ARI] READ ExternalMedia requested: snoop ${channelId} → ${rtpReadDest}`);
         } catch (err) {
             logger.error(`[ARI] Failed to start READ ExternalMedia on snoop ${channelId}: ${err.message}`, err);
             await this.cleanupChannel(parentChannelId, `READ ExternalMedia setup failed: ${err.message}`);
         }
     }
 
+    // --- REFACTOR 9: Simplify playback handler ---
     async handleStasisStartForPlayback(channel, channelName, event) {
         const channelId = channel.id;
-        logger.info(`[ARI] StasisStart for Playback channel: ${channelId} (${channelName})`);
-
-        const match = channelName.match(/^Local\/playback-([^@]+)@/);
-        const parentChannelId = match?.[1];
         const isLeg2 = channelName.includes(';2');
-        
-        if (!parentChannelId) {
-            logger.error(`[ARI] Cannot extract parent ID from playback channel name: ${channelName}`);
-            await this.safeHangup(channel, 'Invalid playback channel name');
-            return;
-        }
 
         if (!isLeg2) {
             logger.info(`[ARI] Ignoring playback leg 1: ${channelId}`);
             return;
         }
 
-        const parentCallData = this.tracker.getCall(parentChannelId);
-        if (!parentCallData) {
-            logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}`);
-            await this.safeHangup(channel, 'Orphaned playback channel');
-            return;
+        logger.info(`[ARI] StasisStart for Playback channel leg 2: ${channelId}`);
+        const match = channelName.match(/^Local\/playback-([^@]+)@/);
+        const parentChannelId = match?.[1];
+        
+        if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
+            logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}. Hanging up.`);
+            return this.safeHangup(channel, 'Orphaned playback channel');
         }
         
-        try {
-            this.tracker.updateCall(parentChannelId, { 
-                playbackChannel: channel, 
-                playbackChannelId: channelId,
-                pendingPlaybackId: null
-            });
+        const parentCallData = this.tracker.getCall(parentChannelId);
 
+        try {
+            this.tracker.updateCall(parentChannelId, { playbackChannel: channel, playbackChannelId: channelId });
             await channel.answer();
             logger.info(`[ARI] Answered playback channel ${channelId}`);
             
-            // Small delay for stability
-            await this.delay(100);
-            
-            await this.client.bridges.addChannel({
-                bridgeId: parentCallData.mainBridgeId,
-                channel: channelId
-            });
-            
-            logger.info(`[ARI] Added playback channel to bridge`);
-            
-            // Another small delay
-            await this.delay(100);
-
-            this.updateCallState(parentChannelId, 'external_media_write_pending');
+            await this.client.bridges.addChannel({ bridgeId: parentCallData.mainBridgeId, channel: channelId });
+            logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
 
             const rtpAsteriskSource = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_SEND_PORT}`;
             
@@ -1221,41 +1070,15 @@ class AsteriskAriClient extends EventEmitter {
                 direction: 'write'
             });
             
-            logger.info(`[ARI] WRITE ExternalMedia created: ${unicastRtpChannel.id}`);
-            
-            await this.client.bridges.addChannel({
-                bridgeId: parentCallData.mainBridgeId,
-                channel: unicastRtpChannel.id
-            });
-            
-            // Get RTP endpoint information
+            logger.info(`[ARI] WRITE ExternalMedia requested, created channel ${unicastRtpChannel.id}`);
             const asteriskRtpEndpoint = await this.getRtpEndpoint(unicastRtpChannel);
             
-            this.updateCallState(parentChannelId, 'external_media_write_active');
-            this.tracker.updateCall(parentChannelId, { 
-                asteriskRtpEndpoint,
-                unicastRtpChannel,
-                unicastRtpChannelId: unicastRtpChannel.id
-            });
-            
-            logger.info(`[ARI] WRITE ExternalMedia active: ${rtpAsteriskSource} → ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
-            
+            this.tracker.updateCall(parentChannelId, { asteriskRtpEndpoint, unicastRtpChannel, unicastRtpChannelId: unicastRtpChannel.id });
             await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
-
-            this.updateCallState(parentChannelId, 'pipeline_active_extmedia');
             
         } catch (err) {
             logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
-            
-            await this.safeHangup(channel, 'WRITE ExternalMedia setup failed');
-            
-            this.tracker.updateCall(parentChannelId, { 
-                playbackChannel: null, 
-                playbackChannelId: null,
-                state: 'external_media_read_only'
-            });
-            
-            logger.warn(`[ARI] Continuing call ${parentChannelId} in READ-only mode`);
+            await this.cleanupChannel(parentChannelId, `WRITE ExternalMedia setup failed: ${err.message}`);
         }
     }
 
@@ -1270,12 +1093,8 @@ class AsteriskAriClient extends EventEmitter {
                 throw new Error('UNICASTRTP_LOCAL_ADDRESS or UNICASTRTP_LOCAL_PORT variables not set');
             }
             
-            const endpoint = {
-                host: addressVar.value,
-                port: parseInt(portVar.value)
-            };
-            
-            logger.info(`[ARI] Got Asterisk RTP endpoint: ${endpoint.host}:${endpoint.port}`);
+            const endpoint = { host: addressVar.value, port: parseInt(portVar.value) };
+            logger.info(`[ARI] Got Asterisk RTP endpoint for sending: ${endpoint.host}:${endpoint.port}`);
             return endpoint;
             
         } catch (err) {
@@ -1283,7 +1102,8 @@ class AsteriskAriClient extends EventEmitter {
             throw err;
         }
     }
-
+    
+    // --- REFACTOR 10: Set readiness flag when RTP sender is ready ---
     async initializeRtpSenderWithEndpoint(asteriskChannelId, rtpEndpoint) {
         const callData = this.tracker.getCall(asteriskChannelId);
         if (!callData) {
@@ -1304,8 +1124,15 @@ class AsteriskAriClient extends EventEmitter {
             });
             
             logger.info(`[RTP Sender] Successfully initialized for ${twilioSid}`);
+            
+            // Set the flag and check for pipeline completion
+            this.tracker.updateCall(asteriskChannelId, { isWriteStreamReady: true });
+            logger.info(`[ARI Pipeline] WRITE stream is now ready for ${asteriskChannelId}.`);
+            this.checkMediaPipelineReady(asteriskChannelId);
+
         } catch (err) {
             logger.error(`[RTP Sender] Failed to initialize: ${err.message}`, err);
+            this.updateCallState(asteriskChannelId, 'failed');
             throw err;
         }
     }
@@ -1335,45 +1162,31 @@ class AsteriskAriClient extends EventEmitter {
     async cleanupChannel(asteriskChannelId, reason = "Unknown") {
         logger.info(`[Cleanup] Starting cleanup for ${asteriskChannelId}. Reason: ${reason}`);
         
-        // Abort any ongoing operations
         this.resourceManager.abortOperations(asteriskChannelId);
         
         const resources = this.tracker.getResources(asteriskChannelId);
         if (!resources) {
-            logger.warn(`[Cleanup] No resources found for ${asteriskChannelId}`);
+            logger.warn(`[Cleanup] No resources found for ${asteriskChannelId}, already cleaned up.`);
             return;
         }
         
         const primarySid = resources.twilioCallSid || resources.asteriskChannelId || asteriskChannelId;
         
-        // Remove from tracker early to prevent new operations
         this.tracker.removeCall(asteriskChannelId);
         
         try {
-            // Clean up external services
             await this.cleanupExternalServices(primarySid, resources);
-            
-            // Stop recordings
             await this.stopRecording(resources);
-            
-            // Clean up channels in proper order
             await this.cleanupChannels(resources);
-            
-            // Clean up bridges
             await this.cleanupBridges(resources);
-            
-            // Update database
             await this.updateConversationRecord(resources.conversationId, reason);
-            
             logger.info(`[Cleanup] Completed cleanup for ${asteriskChannelId}`);
-            
         } catch (err) {
             logger.error(`[Cleanup] Error during cleanup for ${asteriskChannelId}: ${err.message}`, err);
         }
     }
 
     async cleanupExternalServices(primarySid, resources) {
-        // Clean up RTP sender
         try {
             const rtpSenderService = require('./rtp.sender.service');
             rtpSenderService.cleanupCall(primarySid);
@@ -1381,7 +1194,6 @@ class AsteriskAriClient extends EventEmitter {
             logger.warn(`[Cleanup] Error cleaning up RTP sender: ${err.message}`);
         }
         
-        // Remove SSRC mapping
         if (resources.rtp_ssrc) {
             try {
                 rtpListenerService.removeSsrcMapping(resources.rtp_ssrc);
@@ -1391,7 +1203,6 @@ class AsteriskAriClient extends EventEmitter {
             }
         }
         
-        // Disconnect OpenAI
         try {
             await openAIService.disconnect(primarySid);
             logger.info(`[Cleanup] Disconnected OpenAI service`);
@@ -1463,12 +1274,12 @@ class AsteriskAriClient extends EventEmitter {
         if (!channel || typeof channel.hangup !== 'function') return;
         
         try {
-            await channel.get(); // Check if channel still exists
+            await channel.get(); 
             await withTimeout(channel.hangup(), 5000, `${type} channel hangup`);
             logger.info(`[Cleanup] Hung up ${type} channel ${channel.id}`);
         } catch (err) {
             if (!err.message?.includes('404')) {
-                logger.warn(`[Cleanup] Error hanging up ${type} channel: ${err.message}`);
+                logger.warn(`[Cleanup] Error hanging up ${type} channel ${channel.id}: ${err.message}`);
             }
         }
     }
@@ -1489,26 +1300,15 @@ class AsteriskAriClient extends EventEmitter {
     updateCallState(channelId, newState) {
         const callData = this.tracker.getCall(channelId);
         if (!callData) {
-            logger.warn(`[State] No call data found for ${channelId}`);
+            logger.warn(`[State] No call data found for ${channelId} to update state`);
             return;
         }
 
-        // Temporarily disable strict state validation for development
-        // TODO: Re-enable after flow is stabilized
         const oldState = callData.state;
+        // You can re-introduce stricter validation here if needed
+        // if (!VALID_STATE_TRANSITIONS[oldState]?.includes(newState)) { ... }
         this.tracker.updateCall(channelId, { state: newState });
         logger.info(`[State] ${channelId}: ${oldState} → ${newState}`);
-        
-        /* COMMENTED OUT FOR DEVELOPMENT
-        try {
-            StateValidator.validateTransition(callData.state, newState);
-            this.tracker.updateCall(channelId, { state: newState });
-            logger.info(`[State] ${channelId}: ${callData.state} → ${newState}`);
-        } catch (err) {
-            logger.error(`[State] Invalid transition for ${channelId}: ${err.message}`);
-            throw err;
-        }
-        */
     }
 
     delay(ms) {
@@ -1520,7 +1320,6 @@ class AsteriskAriClient extends EventEmitter {
         this.isShuttingDown = true;
         
         try {
-            // Clean up all active calls
             const activeCalls = Array.from(this.tracker.calls.keys());
             logger.info(`[ARI] Cleaning up ${activeCalls.length} active calls`);
             
@@ -1530,7 +1329,6 @@ class AsteriskAriClient extends EventEmitter {
                 )
             );
             
-            // Clean up RTP sender service
             try {
                 const rtpSenderService = require('./rtp.sender.service');
                 rtpSenderService.cleanupAll();
@@ -1538,30 +1336,25 @@ class AsteriskAriClient extends EventEmitter {
                 logger.warn(`[ARI] Error cleaning up RTP sender: ${err.message}`);
             }
             
-            // Stop health check
             if (this.healthCheckInterval) {
                 clearInterval(this.healthCheckInterval);
                 this.healthCheckInterval = null;
             }
             
-            // Cancel reconnection timer
             if (this.reconnectTimer) {
                 clearTimeout(this.reconnectTimer);
                 this.reconnectTimer = null;
             }
             
-            // Close ARI client
             if (this.client) {
                 this.client.close();
                 this.client = null;
                 logger.info('[ARI] Client closed');
             }
             
-            // Clean up resources
             this.cleanup();
             this.isConnected = false;
             
-            // Clear global reference
             if (typeof global !== 'undefined') {
                 global.ariClient = null;
             }
@@ -1574,7 +1367,6 @@ class AsteriskAriClient extends EventEmitter {
         }
     }
 
-    // Health check method
     async healthCheck() {
         if (!this.isConnected || !this.client) {
             return { status: 'disconnected', healthy: false };
@@ -1643,8 +1435,6 @@ module.exports = {
     
     // Export for testing
     AsteriskAriClient,
-    CONFIG,
-    StateValidator,
-    CircuitBreaker,
-    withTimeout
+    CONFIG
+    // Removed other exports that are no longer needed
 };
