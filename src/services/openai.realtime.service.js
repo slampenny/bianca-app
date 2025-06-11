@@ -80,23 +80,19 @@ class OpenAIRealtimeService {
      * Looks up the Asterisk ID associated with the primary callId before calling back.
      */
     notify(callId, eventType, data = {}) {
-        if (!this.notifyCallback) {
-            logger.debug(`[OpenAI Realtime] No notify callback for ${eventType} (CallID: ${callId})`);
-            return;
-        }
-        const conn = this.connections.get(callId);
-        const asteriskChannelId = conn?.asteriskChannelId;
-
-        if (!asteriskChannelId) {
-            logger.warn(`[OpenAI Realtime] Cannot notify for ${callId}, missing associated Asterisk Channel ID.`);
-            return;
-        }
-        try {
-            this.notifyCallback(asteriskChannelId, eventType, data);
-        } catch (err) {
-            logger.error(`[OpenAI Realtime] Error in notification callback for CallID ${callId} (AsteriskID ${asteriskChannelId}) / Event ${eventType}: ${err.message}`);
-        }
+    if (!this.notifyCallback) {
+        logger.debug(`[OpenAI Realtime] No notify callback for ${eventType} (CallID: ${callId})`);
+        return;
     }
+    
+    // The callId is already the primary identifier (Twilio SID)
+    // We need to pass it directly to the callback
+    try {
+        this.notifyCallback(callId, eventType, data);
+    } catch (err) {
+        logger.error(`[OpenAI Realtime] Error in notification callback for CallID ${callId} / Event ${eventType}: ${err.message}`);
+    }
+}
 
     async appendAudioToLocalFile(callId, pcmBuffer) {
         if (!pcmBuffer || pcmBuffer.length === 0) {

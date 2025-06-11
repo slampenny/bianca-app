@@ -55,8 +55,13 @@ function getStats() {
     };
 }
 
+function isPortAvailable(port) {
+    return availablePorts.has(port);
+}
+
 module.exports = {
     acquirePort,
     releasePort,
-    getStats
+    getStats,
+    isPortAvailable,
 };

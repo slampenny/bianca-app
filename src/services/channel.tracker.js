@@ -30,6 +30,8 @@ class ChannelTracker {
             mainBridgeId: null,
             conversationId: null, // Mongoose DB conversation _id
             recordingName: null, // Main bridge recording name
+            rtpPort: initialData.rtpPort || null, // The unique port allocated for this call
+            rtpListener: null, // Reference to the dedicated RTP listener instance
 
             // --- Flag-Based State Properties ---
             isReadStreamReady: false,  // NEW: Flag for inbound audio path (user->app)
@@ -48,7 +50,7 @@ class ChannelTracker {
             // External Media RTP Fields
             rtpPort: null, // NEW: The unique UDP port for receiving audio for this call
             rtpSessionId: null, // RTP session identifier
-            expectingRtpChannel: false,
+            //expectingRtpChannel: false,
             pendingSnoopId: null,
             pendingPlaybackId: null,
             playbackChannel: null,
@@ -60,8 +62,8 @@ class ChannelTracker {
             unicastRtpChannel: null,
             unicastRtpChannelId: null,
             asteriskRtpEndpoint: null, // { host, port }
-            rtp_ssrc: null, // Learned SSRC for ExternalMedia stream
-            awaitingSsrcForRtp: false,
+            //rtp_ssrc: null, // Learned SSRC for ExternalMedia stream
+            //awaitingSsrcForRtp: false,
             snoopToRtpMapping: null,
             
             ffmpegTranscoder: null, // Reference to FFmpeg process if using that method
