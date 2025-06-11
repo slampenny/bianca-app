@@ -1091,7 +1091,10 @@ resource "aws_iam_policy" "codebuild_ecr_policy" {
          "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
          "ecr:BatchGetImage", "ecr:GetRepositoryPolicy", "ecr:DescribeRepositories"
        ],
-       Resource = [aws_ecr_repository.app_repo.arn]
+       Resource = [
+        aws_ecr_repository.app_repo.arn,
+        aws_ecr_repository.asterisk_repo.arn
+]
      }
    ]
  })
