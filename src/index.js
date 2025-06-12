@@ -4,7 +4,7 @@ const http = require('http');
 const config = require('./config/config');
 const logger = require('./config/logger');
 const { startAriClient, getAriClientInstance, shutdownAriClient } = require('./services/ari.client'); // Updated path
-const { startRtpListenerService, stopRtpListenerService } = require('./services/rtp.listener.service'); // Updated path
+const { stopAllListeners  } = require('./services/rtp.listener.service'); // Updated path
 
 /**
  * Starts the application server and initializes all components
@@ -18,18 +18,14 @@ async function startServer() {
     // Import Express app (after config is loaded)
     const app = require('./app');
 
-    // Connect to MongoDB with retry logic (Your existing code - no changes needed)
+    // Connect to MongoDB (Your existing logic is perfect)
     let mongoConnected = false;
     const maxRetries = 5;
     let retries = 0;
-
     while (!mongoConnected && retries < maxRetries) {
       try {
-        logger.info(`Attempting to connect to MongoDB (attempt ${retries + 1}/${maxRetries})... URL: ${config.mongoose.url}`);
-        await mongoose.connect(config.mongoose.url, {
-          ...config.mongoose.options,
-          connectTimeoutMS: config.mongoose.options.connectTimeoutMS || 30000,
-        });
+        logger.info(`Attempting to connect to MongoDB (attempt ${retries + 1}/${maxRetries})...`);
+        await mongoose.connect(config.mongoose.url, config.mongoose.options);
         logger.info('Connected to MongoDB');
         mongoConnected = true;
       } catch (mongoError) {
@@ -37,7 +33,6 @@ async function startServer() {
         logger.error(`MongoDB connection attempt ${retries} failed: ${mongoError.message}`);
         if (retries >= maxRetries) {
           logger.error('Max MongoDB connection retries reached. Continuing without database.');
-          logger.warn('Application functionality will be limited without database access');
         } else {
           logger.info(`Waiting ${5 * retries} seconds before next MongoDB connection attempt...`);
           await new Promise(resolve => setTimeout(resolve, 5000 * retries));
@@ -45,87 +40,45 @@ async function startServer() {
       }
     }
 
-    // --- START: MODIFIED ASTERISK INITIALIZATION ---
+    // Initialize and wait for the ARI Client connection
     let ariReady = false;
-    let rtpListenerReady = false;
-
     if (config.asterisk && config.asterisk.enabled) {
-      logger.info('Asterisk integration enabled, starting services...');
+      logger.info('Asterisk integration enabled, starting ARI client...');
 
       const ariMaxRetries = 12; // Try for up to 6 minutes (12 * 30s)
       const ariRetryDelay = 30000; // 30 seconds is a good delay for waiting on an EC2 instance
 
       for (let attempt = 1; attempt <= ariMaxRetries; attempt++) {
         try {
-          logger.info(`Initializing Asterisk services (Attempt ${attempt}/${ariMaxRetries})...`);
-
-          // 1. Start RTP Listener Service
-          startRtpListenerService();
-          const rtpListenerService = require('./services/rtp.listener.service');
-          const rtpReady = await rtpListenerService.ensureReady();
-          if (!rtpReady) throw new Error('RTP listener service failed to become ready');
-          rtpListenerReady = true;
-          logger.info('RTP listener service started successfully.');
-
-          // 2. Start and wait for ARI client
+          logger.info(`[Startup] Attempting to connect to ARI (Attempt ${attempt}/${ariMaxRetries})...`);
           const ariClient = await startAriClient();
           await ariClient.waitForReady();
-          ariReady = true;
-          logger.info('ARI client is ready and Stasis app registered.');
-
-          // 3. If we get here, all services started successfully. Break the loop.
-          break;
-
-        } catch (err) {
-          logger.error(`[Startup] Asterisk services failed on attempt ${attempt}: ${err.message}`);
           
-          // Cleanup partially started services before retrying
-          if (rtpListenerReady) stopRtpListenerService();
-          rtpListenerReady = false;
-          ariReady = false;
-
+          ariReady = true;
+          logger.info('[Startup] ARI client connected and ready.');
+          break; // Exit loop on success
+        } catch (err) {
+          logger.error(`[Startup] ARI connection failed on attempt ${attempt}: ${err.message}`);
           if (attempt < ariMaxRetries) {
             logger.info(`[Startup] Retrying in ${ariRetryDelay / 1000} seconds...`);
             await new Promise(resolve => setTimeout(resolve, ariRetryDelay));
           } else {
-            logger.error('[Startup] Max retries reached. Could not initialize Asterisk services.');
-            logger.warn('Continuing without Asterisk integration.');
+            logger.error('[Startup] Max retries reached. Could not initialize ARI client.');
           }
         }
       }
-
-      // Optional: Final health check on success
-      if (ariReady) {
-        const ariClient = getAriClientInstance();
-        const rtpListenerService = require('./services/rtp.listener.service');
-        const ariHealth = await ariClient.healthCheck();
-        const rtpHealth = rtpListenerService.healthCheck();
-        logger.info('=== Service Health Check ===');
-        logger.info(`ARI Client: ${ariHealth.healthy ? 'Healthy' : 'Unhealthy'} - ${ariHealth.status}`);
-        logger.info(`RTP Listener: ${rtpHealth.healthy ? 'Healthy' : 'Unhealthy'} - ${rtpHealth.status}`);
-        logger.info('============================');
-      }
-
     } else {
-      logger.info('Asterisk integration disabled in configuration');
+      logger.info('Asterisk integration disabled in configuration.');
     }
-    // --- END: MODIFIED ASTERISK INITIALIZATION ---
 
-    // Create HTTP server from Express app
+    // Create and start the HTTP server
     const server = http.createServer(app);
-
-    server.on('upgrade', (request, socket, head) => {
-      logger.info(`[Server] WebSocket upgrade request received: ${request.url}`);
-    });
-
-    // Start HTTP server
     const port = config.port || 3000;
     server.listen(port, '0.0.0.0', () => {
       logger.info(`Server listening on port ${port}`);
       logger.info('=== Final Service Status ===');
       logger.info(`MongoDB: ${mongoConnected ? 'Connected' : 'Not connected'}`);
       logger.info(`ARI Client: ${ariReady ? 'Ready' : 'Not ready'}`);
-      logger.info(`RTP Listener: ${rtpListenerReady ? 'Running' : 'Not running'}`);
       logger.info('=============================');
     });
 
