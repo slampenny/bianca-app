@@ -18,7 +18,7 @@ async function startServer() {
     // Import Express app (after config is loaded)
     const app = require('./app');
 
-    // Connect to MongoDB
+    // Connect to MongoDB with retry logic (Your existing code - no changes needed)
     let mongoConnected = false;
     const maxRetries = 5;
     let retries = 0;
@@ -45,104 +45,93 @@ async function startServer() {
       }
     }
 
-    // Initialize services
+    // --- START: MODIFIED ASTERISK INITIALIZATION ---
     let ariReady = false;
     let rtpListenerReady = false;
 
     if (config.asterisk && config.asterisk.enabled) {
       logger.info('Asterisk integration enabled, starting services...');
-      
-      try {
-        // 1. Start RTP Listener Service first
-        logger.info('Starting RTP listener service...');
-        startRtpListenerService();
-        
-        // Verify RTP listener is ready
-        const rtpListenerService = require('./services/rtp.listener.service');
-        const rtpReady = await rtpListenerService.ensureReady();
-        if (rtpReady) {
+
+      const ariMaxRetries = 12; // Try for up to 6 minutes (12 * 30s)
+      const ariRetryDelay = 30000; // 30 seconds is a good delay for waiting on an EC2 instance
+
+      for (let attempt = 1; attempt <= ariMaxRetries; attempt++) {
+        try {
+          logger.info(`Initializing Asterisk services (Attempt ${attempt}/${ariMaxRetries})...`);
+
+          // 1. Start RTP Listener Service
+          startRtpListenerService();
+          const rtpListenerService = require('./services/rtp.listener.service');
+          const rtpReady = await rtpListenerService.ensureReady();
+          if (!rtpReady) throw new Error('RTP listener service failed to become ready');
           rtpListenerReady = true;
-          logger.info('RTP listener service started successfully');
-        } else {
-          throw new Error('RTP listener service failed to start');
+          logger.info('RTP listener service started successfully.');
+
+          // 2. Start and wait for ARI client
+          const ariClient = await startAriClient();
+          await ariClient.waitForReady();
+          ariReady = true;
+          logger.info('ARI client is ready and Stasis app registered.');
+
+          // 3. If we get here, all services started successfully. Break the loop.
+          break;
+
+        } catch (err) {
+          logger.error(`[Startup] Asterisk services failed on attempt ${attempt}: ${err.message}`);
+          
+          // Cleanup partially started services before retrying
+          if (rtpListenerReady) stopRtpListenerService();
+          rtpListenerReady = false;
+          ariReady = false;
+
+          if (attempt < ariMaxRetries) {
+            logger.info(`[Startup] Retrying in ${ariRetryDelay / 1000} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, ariRetryDelay));
+          } else {
+            logger.error('[Startup] Max retries reached. Could not initialize Asterisk services.');
+            logger.warn('Continuing without Asterisk integration.');
+          }
         }
+      }
 
-        // 2. Start ARI client after RTP listener is ready
-        logger.info('Starting ARI client...');
-        const ariClient = await startAriClient();
-        
-        // 3. Wait for ARI to be fully ready
-        logger.info('Waiting for ARI client to be ready...');
-        await ariClient.waitForReady();
-        ariReady = true;
-        logger.info('ARI client is ready and Stasis app registered');
-
-        // 4. Verify health of all services
+      // Optional: Final health check on success
+      if (ariReady) {
+        const ariClient = getAriClientInstance();
+        const rtpListenerService = require('./services/rtp.listener.service');
         const ariHealth = await ariClient.healthCheck();
         const rtpHealth = rtpListenerService.healthCheck();
-        
         logger.info('=== Service Health Check ===');
         logger.info(`ARI Client: ${ariHealth.healthy ? 'Healthy' : 'Unhealthy'} - ${ariHealth.status}`);
         logger.info(`RTP Listener: ${rtpHealth.healthy ? 'Healthy' : 'Unhealthy'} - ${rtpHealth.status}`);
         logger.info('============================');
-        
-      } catch (err) {
-        logger.error(`Failed to start Asterisk services: ${err.message}`);
-        logger.warn('Continuing without Asterisk integration');
-        
-        // Cleanup if partial initialization occurred
-        if (rtpListenerReady) {
-          try {
-            stopRtpListenerService();
-          } catch (cleanupErr) {
-            logger.error(`Error cleaning up RTP listener: ${cleanupErr.message}`);
-          }
-        }
-        
-        // Optionally exit if ARI is critical
-        // process.exit(1);
       }
+
     } else {
       logger.info('Asterisk integration disabled in configuration');
     }
+    // --- END: MODIFIED ASTERISK INITIALIZATION ---
 
     // Create HTTP server from Express app
     const server = http.createServer(app);
-    
-    // Add diagnostic listener for WebSocket upgrade requests
+
     server.on('upgrade', (request, socket, head) => {
       logger.info(`[Server] WebSocket upgrade request received: ${request.url}`);
-      logger.info(`[Server] Headers: ${JSON.stringify(request.headers)}`);
-      logger.info(`[Server] Method: ${request.method}`);
     });
-
-    logger.info('WebSocket server (Twilio Media Streams) is DISABLED.');
 
     // Start HTTP server
     const port = config.port || 3000;
     server.listen(port, '0.0.0.0', () => {
       logger.info(`Server listening on port ${port}`);
-      
-      // Log service status
       logger.info('=== Final Service Status ===');
       logger.info(`MongoDB: ${mongoConnected ? 'Connected' : 'Not connected'}`);
       logger.info(`ARI Client: ${ariReady ? 'Ready' : 'Not ready'}`);
       logger.info(`RTP Listener: ${rtpListenerReady ? 'Running' : 'Not running'}`);
       logger.info('=============================');
-      
-      // Log URLs for debugging
-      if (config.env === 'production') {
-        logger.info(`Production API URL: ${config.twilio.apiUrl}`);
-        logger.info(`Production WebSocket URL: ${config.twilio.websocketUrl}`);
-      } else {
-        logger.info(`Development API URL: ${config.twilio.apiUrl}`);
-        logger.info(`Development WebSocket URL: ${config.twilio.websocketUrl}`);
-      }
     });
 
     // Set up graceful shutdown handlers
     setupShutdownHandlers(server);
-    
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
