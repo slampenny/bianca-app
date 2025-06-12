@@ -37,6 +37,41 @@ const VALID_STATE_TRANSITIONS = {
     'cleanup': []
 };
 
+const AWS_ECS_METADATA_URI = process.env.ECS_CONTAINER_METADATA_URI_V4;
+
+let publicIpAddress = null;
+
+async function getFargatePublicIp() {
+    if (publicIpAddress) {
+        return publicIpAddress;
+    }
+    if (!AWS_ECS_METADATA_URI) {
+        logger.warn('[Fargate IP] ECS_CONTAINER_METADATA_URI_V4 not found. Assuming local development.');
+        // Fallback for local dev. Use the internal DNS name or localhost.
+        return config.asterisk.rtpBiancaHost || '127.0.0.1';
+    }
+
+    try {
+        logger.info('[Fargate IP] Fetching container metadata...');
+        const response = await fetch(AWS_ECS_METADATA_URI);
+        const metadata = await response.json();
+        
+        // Find the network interface with a public IP
+        const publicInterface = metadata.Networks.find(net => net.IPv4Addresses && net.IPv4Addresses.length > 0);
+        
+        if (publicInterface) {
+            publicIpAddress = publicInterface.IPv4Addresses[0];
+            logger.info(`[Fargate IP] Detected Public IP: ${publicIpAddress}`);
+            return publicIpAddress;
+        }
+        throw new Error('No public IP found in container metadata');
+    } catch (err) {
+        logger.error(`[Fargate IP] Failed to get public IP: ${err.message}. Falling back to config.`);
+        // Fallback if metadata call fails
+        return config.asterisk.rtpBiancaHost;
+    }
+}
+
 
 // Helper to strip protocol and ensure valid host
 function sanitizeHost(raw) {
@@ -1070,7 +1105,8 @@ class AsteriskAriClient extends EventEmitter {
         await channel.answer();
         
         // Use the call-specific port instead of the shared port
-        const rtpReadDest = `${this.RTP_BIANCA_HOST}:${parentCallData.rtpPort}`;
+        const rtpHost = await getFargatePublicIp(); 
+        const rtpReadDest = `${rtpHost}:${parentCallData.rtpPort}`;
         
         await channel.externalMedia({
             app: CONFIG.STASIS_APP_NAME,
