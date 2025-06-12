@@ -31,9 +31,8 @@ variable "vpc_id" {
   default     = "vpc-05c16725411127dc3"
 }
 
-# This variable is no longer used for the primary services but can be kept for reference
 variable "subnet_ids" {
-  description = "List of original private subnet IDs."
+  description = "List of subnet IDs for placing resources like Fargate tasks and Load Balancers."
   type        = list(string)
   default     = ["subnet-016b6aba534de1845", "subnet-0c7b38f9439f97b3e", "subnet-006892e47fe84433f"]
 }
@@ -97,13 +96,13 @@ variable "asterisk_instance_type" {
 variable "asterisk_ami_id" {
   description = "AMI ID for Asterisk (defaults to Amazon Linux 2)"
   type        = string
-  default     = "" # Will use data source if not specified
+  default     = ""  # Will use data source if not specified
 }
 
 variable "asterisk_key_pair_name" {
   description = "EC2 key pair name for SSH access to Asterisk"
   type        = string
-  default     = "bianca-key-pair" # Create this key pair in AWS first
+  default     = "bianca-key-pair"  # Create this key pair in AWS first
 }
 
 # --- Asterisk Service Variables ---
@@ -134,7 +133,7 @@ variable "asterisk_rtp_start_port" {
 variable "asterisk_rtp_end_port" {
   description = "End of the UDP port range for Asterisk RTP."
   type        = number
-  default     = 20000 # Increased for more concurrent calls
+  default     = 20000  # Increased for more concurrent calls
 }
 
 # --- MongoDB Variables ---
@@ -246,6 +245,11 @@ data "aws_secretsmanager_secret" "app_secret" {
   name = var.secrets_manager_secret_name
 }
 
+data "aws_subnet" "vpc_task_subnets" {
+  for_each = toset(var.subnet_ids)
+  id       = each.value
+}
+
 data "aws_route53_zone" "myphonefriend" {
   name         = "myphonefriend.com."
   private_zone = false
@@ -272,79 +276,6 @@ data "aws_ami" "amazon_linux_2" {
     values = ["hvm"]
   }
 }
-
-################################################################################
-# NETWORKING - PUBLIC SUBNETS
-################################################################################
-
-# Get the list of Availability Zones in your region to ensure high availability
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-# Use a resource block to create/manage the Internet Gateway.
-# On a fresh account, this will be created.
-# On your existing account, you have already imported it.
-resource "aws_internet_gateway" "gw" {
-  vpc_id = var.vpc_id
-
-  tags = {
-    Name = "bianca-app-igw"
-  }
-}
-
-# Create a new Route Table for your public subnets
-resource "aws_route_table" "public" {
-  vpc_id = var.vpc_id
-
-  # This route sends all internet-bound traffic (0.0.0.0/0) to the Internet Gateway
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.gw.id
-  }
-
-  tags = {
-    Name = "bianca-public-rt"
-  }
-}
-
-# Create the first public subnet in the first available Availability Zone
-resource "aws_subnet" "public_a" {
-  vpc_id                  = var.vpc_id
-  # IMPORTANT: Adjust this CIDR block if it conflicts with existing subnets in your VPC
-  cidr_block              = "172.31.100.0/24"
-  availability_zone       = data.aws_availability_zones.available.names[0]
-  map_public_ip_on_launch = true # Automatically assign public IPs to instances launched here
-
-  tags = {
-    Name = "bianca-public-a"
-  }
-}
-
-# Create the second public subnet in the second available Availability Zone
-resource "aws_subnet" "public_b" {
-  vpc_id                  = var.vpc_id
-  # IMPORTANT: Adjust this CIDR block if it conflicts with existing subnets in your VPC
-  cidr_block              = "172.31.101.0/24"
-  availability_zone       = data.aws_availability_zones.available.names[1]
-  map_public_ip_on_launch = true # Automatically assign public IPs to instances launched here
-
-  tags = {
-    Name = "bianca-public-b"
-  }
-}
-
-# Associate the new public route table with our new public subnets
-resource "aws_route_table_association" "public_a" {
-  subnet_id      = aws_subnet.public_a.id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table_association" "public_b" {
-  subnet_id      = aws_subnet.public_b.id
-  route_table_id = aws_route_table.public.id
-}
-
 
 ################################################################################
 # SERVICE DISCOVERY (AWS Cloud Map)
@@ -515,7 +446,7 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Restrict this to your IP
+    cidr_blocks = ["0.0.0.0/0"]  # Restrict this to your IP
     description = "SSH access"
   }
 
@@ -621,7 +552,7 @@ resource "aws_iam_role_policy" "asterisk_secrets" {
       Action = [
         "secretsmanager:GetSecretValue"
       ]
-      Resource = data.aws_secretsmanager_secret.app_secret.arn
+      Resource = "${data.aws_secretsmanager_secret.app_secret.arn}"
     }]
   })
 }
@@ -630,16 +561,15 @@ resource "aws_iam_role_policy" "asterisk_secrets" {
 resource "aws_instance" "asterisk" {
   ami           = var.asterisk_ami_id != "" ? var.asterisk_ami_id : data.aws_ami.amazon_linux_2.id
   instance_type = var.asterisk_instance_type
-  # MODIFIED: Place the Asterisk instance in the new public subnet
-  subnet_id = aws_subnet.public_a.id
-
+  subnet_id     = var.subnet_ids[0]
+  
   vpc_security_group_ids = [aws_security_group.asterisk_ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.asterisk_profile.name
   key_name               = var.asterisk_key_pair_name
-
+  
   # Enable detailed monitoring
   monitoring = true
-
+  
   # User data script to install Docker and run Asterisk
   user_data = base64encode(templatefile("${path.module}/asterisk-userdata.sh", {
     external_ip            = aws_eip.asterisk_eip.public_ip
@@ -696,10 +626,9 @@ resource "aws_efs_access_point" "mongo_ap" {
 }
 
 resource "aws_efs_mount_target" "mongodb_mount" {
-  # MODIFIED: Mount EFS in the new public subnets so Fargate can access it
-  count           = 2 # One for each new public subnet
+  count           = length(var.subnet_ids)
   file_system_id  = aws_efs_file_system.mongodb_data.id
-  subnet_id       = [aws_subnet.public_a.id, aws_subnet.public_b.id][count.index]
+  subnet_id       = var.subnet_ids[count.index]
   security_groups = [aws_security_group.efs_sg.id]
 }
 
@@ -733,9 +662,8 @@ resource "aws_lb" "app_lb" {
   load_balancer_type = "application"
   idle_timeout       = 120
   security_groups    = [aws_security_group.alb_sg.id]
-  # MODIFIED: Place the ALB in the new public subnets
-  subnets = [aws_subnet.public_a.id, aws_subnet.public_b.id]
-  tags    = { Name = var.load_balancer_name }
+  subnets            = var.subnet_ids
+  tags               = { Name = var.load_balancer_name }
 }
 
 resource "aws_lb_target_group" "app_tg" {
@@ -889,19 +817,19 @@ resource "aws_ecs_task_definition" "app_task" {
 }
 
 resource "aws_ecs_service" "app_service" {
-  name = var.service_name
-  cluster = aws_ecs_cluster.cluster.id
-  task_definition = aws_ecs_task_definition.app_task.arn
-  launch_type = "FARGATE"
-  desired_count = 1
+  name                               = var.service_name
+  cluster                            = aws_ecs_cluster.cluster.id
+  task_definition                    = aws_ecs_task_definition.app_task.arn
+  launch_type                        = "FARGATE"
+  desired_count                      = 1
+  deployment_controller              { type = "ECS" }
   deployment_maximum_percent         = 100
   deployment_minimum_healthy_percent = 0
   enable_execute_command             = true
   health_check_grace_period_seconds  = 120
 
   network_configuration {
-    # MODIFIED: Place the Fargate tasks in the new public subnets
-    subnets          = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+    subnets          = var.subnet_ids
     security_groups  = [aws_security_group.bianca_app_sg.id]
     assign_public_ip = true
   }
@@ -923,8 +851,8 @@ resource "aws_ecs_service" "app_service" {
     aws_lb_listener.https_listener,
     aws_service_discovery_service.bianca_app_sd_service,
     aws_security_group.bianca_app_sg
-  ]
-  tags = { Name = var.service_name }
+ ]
+ tags = { Name = var.service_name }
 }
 
 ################################################################################
@@ -932,15 +860,15 @@ resource "aws_ecs_service" "app_service" {
 ################################################################################
 
 resource "aws_s3_bucket" "artifact_bucket" {
-  bucket = var.bucket_name
-  tags   = { Name = var.bucket_name }
+ bucket = var.bucket_name
+ tags   = { Name = var.bucket_name }
 }
 
 resource "aws_ecr_repository" "app_repo" {
-  name                 = var.repository_name
-  image_tag_mutability = "MUTABLE"
-  image_scanning_configuration { scan_on_push = true }
-  tags                 = { Name = var.repository_name }
+ name                 = var.repository_name
+ image_tag_mutability = "MUTABLE"
+ image_scanning_configuration { scan_on_push = true }
+ tags                 = { Name = var.repository_name }
 }
 
 resource "aws_ecr_repository" "asterisk_repo" {
@@ -955,21 +883,21 @@ resource "aws_ecr_repository" "asterisk_repo" {
 ################################################################################
 
 resource "aws_cloudwatch_log_group" "app_log_group" {
-  name              = "/ecs/${var.container_name}"
-  retention_in_days = 14
-  tags              = { Name = "${var.container_name}-logs" }
+ name              = "/ecs/${var.container_name}"
+ retention_in_days = 14
+ tags              = { Name = "${var.container_name}-logs" }
 }
 
 resource "aws_cloudwatch_log_group" "mongodb_log_group" {
-  name              = "/ecs/mongodb"
-  retention_in_days = 14
-  tags              = { Name = "mongodb-logs" }
+ name              = "/ecs/mongodb"
+ retention_in_days = 14
+ tags              = { Name = "mongodb-logs" }
 }
 
 resource "aws_cloudwatch_log_group" "asterisk_log_group" {
-  name              = "/aws/ec2/asterisk"
-  retention_in_days = 14
-  tags              = { Name = "asterisk-ec2-logs" }
+ name              = "/aws/ec2/asterisk"
+ retention_in_days = 14
+ tags              = { Name = "asterisk-ec2-logs" }
 }
 
 resource "aws_iam_role_policy" "asterisk_ecr_pull" {
@@ -998,324 +926,324 @@ resource "aws_iam_role_policy" "asterisk_ecr_pull" {
 ################################################################################
 
 resource "aws_iam_role" "ecs_execution_role" {
-  name               = var.ecs_execution_role_name
-  assume_role_policy = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [{
-      Action    = "sts:AssumeRole",
-      Effect    = "Allow",
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
-  })
-  tags = { Name = var.ecs_execution_role_name }
+ name               = var.ecs_execution_role_name
+ assume_role_policy = jsonencode({
+   Version   = "2012-10-17",
+   Statement = [{
+     Action    = "sts:AssumeRole",
+     Effect    = "Allow",
+     Principal = { Service = "ecs-tasks.amazonaws.com" }
+   }]
+ })
+ tags = { Name = var.ecs_execution_role_name }
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy_attachment" {
-  role       = aws_iam_role.ecs_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+ role       = aws_iam_role.ecs_execution_role.name
+ policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 resource "aws_iam_policy" "ecs_execution_secrets_policy" {
-  name        = "ECSTaskExecutionSecretsManagerPolicy"
-  description = "Allows ECS tasks to get secrets from Secrets Manager for env vars"
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "secretsmanager:GetSecretValue"
-      Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
-    }]
-  })
+ name        = "ECSTaskExecutionSecretsManagerPolicy"
+ description = "Allows ECS tasks to get secrets from Secrets Manager for env vars"
+ policy = jsonencode({
+   Version   = "2012-10-17"
+   Statement = [{
+     Effect   = "Allow"
+     Action   = "secretsmanager:GetSecretValue"
+     Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
+   }]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_execution_secrets_policy_attach" {
-  role       = aws_iam_role.ecs_execution_role.name
-  policy_arn = aws_iam_policy.ecs_execution_secrets_policy.arn
+ role       = aws_iam_role.ecs_execution_role.name
+ policy_arn = aws_iam_policy.ecs_execution_secrets_policy.arn
 }
 
 resource "aws_iam_role" "ecs_task_role" {
-  name               = var.ecs_task_role_name
-  assume_role_policy = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [{
-      Action    = "sts:AssumeRole",
-      Effect    = "Allow",
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
-  })
-  tags = { Name = var.ecs_task_role_name }
+ name               = var.ecs_task_role_name
+ assume_role_policy = jsonencode({
+   Version   = "2012-10-17",
+   Statement = [{
+     Action    = "sts:AssumeRole",
+     Effect    = "Allow",
+     Principal = { Service = "ecs-tasks.amazonaws.com" }
+   }]
+ })
+ tags = { Name = var.ecs_task_role_name }
 }
 
 resource "aws_iam_policy" "ecs_task_exec_policy" {
-  name        = "ECSTaskExecPolicy"
-  description = "Allows ECS Exec functionality"
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "ssmmessages:CreateControlChannel",
-        "ssmmessages:CreateDataChannel",
-        "ssmmessages:OpenControlChannel"
-      ]
-      Resource = "*"
-    }]
-  })
+ name        = "ECSTaskExecPolicy"
+ description = "Allows ECS Exec functionality"
+ policy = jsonencode({
+   Version   = "2012-10-17"
+   Statement = [{
+     Effect   = "Allow"
+     Action = [
+       "ssmmessages:CreateControlChannel",
+       "ssmmessages:CreateDataChannel",
+       "ssmmessages:OpenControlChannel"
+     ]
+     Resource = "*"
+   }]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_exec_policy_attach" {
-  role       = aws_iam_role.ecs_task_role.name
-  policy_arn = aws_iam_policy.ecs_task_exec_policy.arn
+ role       = aws_iam_role.ecs_task_role.name
+ policy_arn = aws_iam_policy.ecs_task_exec_policy.arn
 }
 
 resource "aws_iam_policy" "ecs_task_secrets_policy" {
-  name        = "ECSTaskSecretsManagerPolicyForApp"
-  description = "Allows ECS tasks to get secrets from Secrets Manager (for application use)"
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "secretsmanager:GetSecretValue"
-      Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
-    }]
-  })
+ name        = "ECSTaskSecretsManagerPolicyForApp"
+ description = "Allows ECS tasks to get secrets from Secrets Manager (for application use)"
+ policy = jsonencode({
+   Version   = "2012-10-17"
+   Statement = [{
+     Effect   = "Allow"
+     Action   = "secretsmanager:GetSecretValue"
+     Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
+   }]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_secrets_policy_attach" {
-  role       = aws_iam_role.ecs_task_role.name
-  policy_arn = aws_iam_policy.ecs_task_secrets_policy.arn
+ role       = aws_iam_role.ecs_task_role.name
+ policy_arn = aws_iam_policy.ecs_task_secrets_policy.arn
 }
 
 resource "aws_iam_policy" "ecs_task_ses_policy" {
-  name        = "ECSTaskSESPolicy"
-  description = "Allows ECS tasks to send email via SES"
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "ses:SendEmail",
-        "ses:SendRawEmail"
-      ]
-      Resource = "*"
-    }]
-  })
+ name        = "ECSTaskSESPolicy"
+ description = "Allows ECS tasks to send email via SES"
+ policy = jsonencode({
+   Version   = "2012-10-17"
+   Statement = [{
+     Effect   = "Allow"
+     Action = [
+       "ses:SendEmail",
+       "ses:SendRawEmail"
+     ]
+     Resource = "*"
+   }]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_ses_policy_attach" {
-  role       = aws_iam_role.ecs_task_role.name
-  policy_arn = aws_iam_policy.ecs_task_ses_policy.arn
+ role       = aws_iam_role.ecs_task_role.name
+ policy_arn = aws_iam_policy.ecs_task_ses_policy.arn
 }
 
 # S3 Debug Audio Bucket and Policy
 resource "aws_s3_bucket" "debug_audio_bucket" {
-  bucket = "bianca-audio-debug"
-  tags = {
-    Name        = "Bianca Debug Audio Bucket"
-    Environment = "Debug"
-  }
+ bucket = "bianca-audio-debug"
+ tags = {
+   Name        = "Bianca Debug Audio Bucket"
+   Environment = "Debug"
+ }
 }
 
 resource "aws_s3_bucket_ownership_controls" "debug_audio_bucket_ownership" {
-  bucket = aws_s3_bucket.debug_audio_bucket.id
-  rule {
-    object_ownership = "BucketOwnerEnforced"
-  }
+ bucket = aws_s3_bucket.debug_audio_bucket.id
+ rule {
+   object_ownership = "BucketOwnerEnforced"
+ }
 }
 
 resource "aws_iam_policy" "ecs_task_s3_debug_audio_policy" {
-  name        = "ECSTaskS3DebugAudioPolicy"
-  description = "Allows ECS tasks to write debug audio to a specific S3 bucket"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = ["s3:PutObject"],
-      Resource = "arn:aws:s3:::bianca-audio-debug/*"
-    }]
-  })
+ name        = "ECSTaskS3DebugAudioPolicy"
+ description = "Allows ECS tasks to write debug audio to a specific S3 bucket"
+ policy = jsonencode({
+   Version = "2012-10-17",
+   Statement = [{
+     Effect = "Allow",
+     Action = ["s3:PutObject"],
+     Resource = "arn:aws:s3:::bianca-audio-debug/*"
+   }]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_s3_debug_audio_attach" {
-  role       = aws_iam_role.ecs_task_role.name
-  policy_arn = aws_iam_policy.ecs_task_s3_debug_audio_policy.arn
+ role       = aws_iam_role.ecs_task_role.name
+ policy_arn = aws_iam_policy.ecs_task_s3_debug_audio_policy.arn
 }
 
 # CodeBuild and CodePipeline IAM roles remain the same
 data "aws_iam_policy_document" "codebuild_assume_role_policy" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["codebuild.amazonaws.com"]
-    }
-  }
+ statement {
+   actions = ["sts:AssumeRole"]
+   principals {
+     type        = "Service"
+     identifiers = ["codebuild.amazonaws.com"]
+   }
+ }
 }
 
 resource "aws_iam_role" "codebuild_role" {
-  name               = var.codebuild_role_name
-  assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role_policy.json
-  tags               = { Name = var.codebuild_role_name }
+ name               = var.codebuild_role_name
+ assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role_policy.json
+ tags               = { Name = var.codebuild_role_name }
 }
 
 resource "aws_iam_policy" "codebuild_ecr_policy" {
-  name        = "CodeBuildECRPolicy"
-  description = "Allow CodeBuild to push Docker images to ECR"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      { Sid = "AllowECRAuth", Effect = "Allow", Action = "ecr:GetAuthorizationToken", Resource = "*" },
-      {
-        Sid    = "AllowECRImagePush",
-        Effect = "Allow",
-        Action = [
-          "ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:PutImage",
-          "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
-          "ecr:BatchGetImage", "ecr:GetRepositoryPolicy", "ecr:DescribeRepositories"
-        ],
-        Resource = [
-          aws_ecr_repository.app_repo.arn,
-          aws_ecr_repository.asterisk_repo.arn
-        ]
-      }
-    ]
-  })
+ name        = "CodeBuildECRPolicy"
+ description = "Allow CodeBuild to push Docker images to ECR"
+ policy = jsonencode({
+   Version = "2012-10-17",
+   Statement = [
+     { Sid = "AllowECRAuth", Effect = "Allow", Action = "ecr:GetAuthorizationToken", Resource = "*" },
+     {
+       Sid    = "AllowECRImagePush",
+       Effect = "Allow",
+       Action = [
+         "ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:PutImage",
+         "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
+         "ecr:BatchGetImage", "ecr:GetRepositoryPolicy", "ecr:DescribeRepositories"
+       ],
+       Resource = [
+        aws_ecr_repository.app_repo.arn,
+        aws_ecr_repository.asterisk_repo.arn
+]
+     }
+   ]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "codebuild_ecr_attach" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_ecr_policy.arn
+ role       = aws_iam_role.codebuild_role.name
+ policy_arn = aws_iam_policy.codebuild_ecr_policy.arn
 }
 
 resource "aws_iam_policy" "codebuild_ecs_task_def_policy" {
-  name        = "CodeBuildECSTaskDefPolicy"
-  description = "Allow CodeBuild to register and describe ECS task definitions"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      { Effect = "Allow", Action = "ecs:RegisterTaskDefinition", Resource = "*" },
-      { Effect = "Allow", Action = "ecs:DescribeTaskDefinition", Resource = "*" }
-    ]
-  })
+ name        = "CodeBuildECSTaskDefPolicy"
+ description = "Allow CodeBuild to register and describe ECS task definitions"
+ policy = jsonencode({
+   Version = "2012-10-17",
+   Statement = [
+     { Effect = "Allow", Action = "ecs:RegisterTaskDefinition", Resource = "*" },
+     { Effect = "Allow", Action = "ecs:DescribeTaskDefinition", Resource = "*" }
+   ]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "codebuild_ecs_task_def_attach" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_ecs_task_def_policy.arn
+ role       = aws_iam_role.codebuild_role.name
+ policy_arn = aws_iam_policy.codebuild_ecs_task_def_policy.arn
 }
 
 resource "aws_iam_policy" "codebuild_pass_role_policy" {
-  name        = "CodeBuildPassRolePolicy"
-  description = "Allow CodeBuild to pass ECS task execution and task roles"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      { Effect = "Allow", Action = "iam:PassRole", Resource = aws_iam_role.ecs_execution_role.arn },
-      { Effect = "Allow", Action = "iam:PassRole", Resource = aws_iam_role.ecs_task_role.arn }
-    ]
-  })
+ name        = "CodeBuildPassRolePolicy"
+ description = "Allow CodeBuild to pass ECS task execution and task roles"
+ policy = jsonencode({
+   Version = "2012-10-17",
+   Statement = [
+     { Effect = "Allow", Action = "iam:PassRole", Resource = aws_iam_role.ecs_execution_role.arn },
+     { Effect = "Allow", Action = "iam:PassRole", Resource = aws_iam_role.ecs_task_role.arn }
+   ]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "codebuild_pass_role_attach" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_pass_role_policy.arn
+ role       = aws_iam_role.codebuild_role.name
+ policy_arn = aws_iam_policy.codebuild_pass_role_policy.arn
 }
 
 resource "aws_iam_policy" "codebuild_logs_policy" {
-  name        = "CodeBuildLogsPolicy"
-  description = "Allow CodeBuild to write logs to CloudWatch"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-      Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/codebuild/${aws_codebuild_project.bianca_project.name}:*"
-    }]
-  })
+ name        = "CodeBuildLogsPolicy"
+ description = "Allow CodeBuild to write logs to CloudWatch"
+ policy = jsonencode({
+   Version = "2012-10-17",
+   Statement = [{
+     Effect   = "Allow",
+     Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+     Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/codebuild/${aws_codebuild_project.bianca_project.name}:*"
+   }]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "codebuild_logs_attach" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_logs_policy.arn
+ role       = aws_iam_role.codebuild_role.name
+ policy_arn = aws_iam_policy.codebuild_logs_policy.arn
 }
 
 resource "aws_iam_policy" "codebuild_s3_artifact_policy" {
-  name        = "CodeBuildS3ArtifactPolicy"
-  description = "Allow CodeBuild to access S3 artifact bucket"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:GetBucketAcl", "s3:GetBucketLocation"],
-      Resource = [aws_s3_bucket.artifact_bucket.arn, "${aws_s3_bucket.artifact_bucket.arn}/*"]
-    }]
-  })
+ name        = "CodeBuildS3ArtifactPolicy"
+ description = "Allow CodeBuild to access S3 artifact bucket"
+ policy = jsonencode({
+   Version = "2012-10-17",
+   Statement = [{
+     Effect   = "Allow",
+     Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:GetBucketAcl", "s3:GetBucketLocation"],
+     Resource = [aws_s3_bucket.artifact_bucket.arn, "${aws_s3_bucket.artifact_bucket.arn}/*"]
+   }]
+ })
 }
 
 resource "aws_iam_role_policy_attachment" "codebuild_s3_artifact_attach" {
-  role       = aws_iam_role.codebuild_role.name
-  policy_arn = aws_iam_policy.codebuild_s3_artifact_policy.arn
+ role       = aws_iam_role.codebuild_role.name
+ policy_arn = aws_iam_policy.codebuild_s3_artifact_policy.arn
 }
 
 resource "aws_iam_role" "codepipeline_role" {
-  name               = var.codepipeline_role_name
-  assume_role_policy = jsonencode({
-    Version   = "2012-10-17",
-    Statement = [{
-      Action    = "sts:AssumeRole",
-      Effect    = "Allow",
-      Principal = { Service = "codepipeline.amazonaws.com" }
-    }]
-  })
-  tags = { Name = var.codepipeline_role_name }
+ name               = var.codepipeline_role_name
+ assume_role_policy = jsonencode({
+   Version   = "2012-10-17",
+   Statement = [{
+     Action    = "sts:AssumeRole",
+     Effect    = "Allow",
+     Principal = { Service = "codepipeline.amazonaws.com" }
+   }]
+ })
+ tags = { Name = var.codepipeline_role_name }
 
-  inline_policy {
-    name = "CodePipelineBasePermissions"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:ListBucket"],
-          Resource = [aws_s3_bucket.artifact_bucket.arn, "${aws_s3_bucket.artifact_bucket.arn}/*"]
-        },
-        {
-          Effect   = "Allow",
-          Action   = ["codebuild:StartBuild", "codebuild:StopBuild", "codebuild:BatchGetBuilds"],
-          Resource = aws_codebuild_project.bianca_project.arn
-        },
-        {
-          Effect = "Allow",
-          Action = ["ecs:DescribeServices", "ecs:UpdateService", "ecs:DescribeTaskDefinition"],
-          Resource = [
-            aws_ecs_service.app_service.id,
-            "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/*"
-          ]
-        },
-        {
-          Effect    = "Allow",
-          Action    = "iam:PassRole",
-          Resource  = [aws_iam_role.ecs_execution_role.arn, aws_iam_role.ecs_task_role.arn],
-          Condition = { StringEqualsIfExists = { "iam:PassedToService" = "ecs-tasks.amazonaws.com" } }
-        },
-        {
-          Effect   = "Allow",
-          Action   = "codestar-connections:UseConnection",
-          Resource = var.github_app_connection_arn
-        },
-        {
-          Effect   = "Allow",
-          Action   = "secretsmanager:GetSecretValue",
-          Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
-        }
-      ]
-    })
-  }
+ inline_policy {
+   name = "CodePipelineBasePermissions"
+   policy = jsonencode({
+     Version = "2012-10-17",
+     Statement = [
+       {
+         Effect   = "Allow",
+         Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:ListBucket"],
+         Resource = [aws_s3_bucket.artifact_bucket.arn, "${aws_s3_bucket.artifact_bucket.arn}/*"]
+       },
+       {
+         Effect   = "Allow",
+         Action   = ["codebuild:StartBuild", "codebuild:StopBuild", "codebuild:BatchGetBuilds"],
+         Resource = aws_codebuild_project.bianca_project.arn
+       },
+       {
+         Effect   = "Allow",
+         Action   = ["ecs:DescribeServices", "ecs:UpdateService", "ecs:DescribeTaskDefinition"],
+         Resource = [
+           aws_ecs_service.app_service.id,
+           "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/*"
+         ]
+       },
+       {
+         Effect    = "Allow",
+         Action    = "iam:PassRole",
+         Resource  = [aws_iam_role.ecs_execution_role.arn, aws_iam_role.ecs_task_role.arn],
+         Condition = { StringEqualsIfExists = { "iam:PassedToService" = "ecs-tasks.amazonaws.com" } }
+       },
+       {
+         Effect   = "Allow",
+         Action   = "codestar-connections:UseConnection",
+         Resource = var.github_app_connection_arn
+       },
+       {
+         Effect   = "Allow",
+         Action   = "secretsmanager:GetSecretValue",
+         Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
+       }
+     ]
+   })
+ }
 }
 
 resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
-  role       = aws_iam_role.codepipeline_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
+ role       = aws_iam_role.codepipeline_role.name
+ policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
 }
 
 ################################################################################
@@ -1323,29 +1251,29 @@ resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
 ################################################################################
 
 resource "aws_codebuild_project" "bianca_project" {
-  name         = "bianca-app-build"
-  description  = "Builds Docker images for Bianca application"
-  service_role = aws_iam_role.codebuild_role.arn
+ name         = "bianca-app-build"
+ description  = "Builds Docker images for Bianca application"
+ service_role = aws_iam_role.codebuild_role.arn
 
-  artifacts { type = "CODEPIPELINE" }
+ artifacts { type = "CODEPIPELINE" }
 
-  environment {
-    compute_type                = "BUILD_GENERAL1_SMALL"
-    image                       = "aws/codebuild/standard:7.0"
-    type                        = "LINUX_CONTAINER"
-    privileged_mode             = true
-    image_pull_credentials_type = "CODEBUILD"
-  }
+ environment {
+   compute_type                = "BUILD_GENERAL1_SMALL"
+   image                       = "aws/codebuild/standard:7.0"
+   type                        = "LINUX_CONTAINER"
+   privileged_mode             = true
+   image_pull_credentials_type = "CODEBUILD"
+ }
 
-  source {
-    type      = "CODEPIPELINE"
-    buildspec = "devops/buildspec.yml"
-  }
+ source {
+   type      = "CODEPIPELINE"
+   buildspec = "devops/buildspec.yml"
+ }
 
-  logs_config {
-    cloudwatch_logs { status = "ENABLED" }
-  }
-  tags = { Name = "bianca-app-build" }
+ logs_config {
+   cloudwatch_logs { status = "ENABLED" }
+ }
+ tags = { Name = "bianca-app-build" }
 }
 
 ################################################################################
@@ -1353,68 +1281,68 @@ resource "aws_codebuild_project" "bianca_project" {
 ################################################################################
 
 resource "aws_codepipeline" "bianca_pipeline" {
-  name     = "BiancaApp-ECS-Pipeline"
-  role_arn = aws_iam_role.codepipeline_role.arn
+ name     = "BiancaApp-ECS-Pipeline"
+ role_arn = aws_iam_role.codepipeline_role.arn
 
-  artifact_store {
-    type     = "S3"
-    location = aws_s3_bucket.artifact_bucket.bucket
-  }
+ artifact_store {
+   type     = "S3"
+   location = aws_s3_bucket.artifact_bucket.bucket
+ }
 
-  stage {
-    name = "Source"
-    action {
-      name             = "Source"
-      category         = "Source"
-      owner            = "AWS"
-      provider         = "CodeStarSourceConnection"
-      version          = "1"
-      output_artifacts = ["SourceOutput"]
-      configuration = {
-        ConnectionArn        = var.github_app_connection_arn
-        FullRepositoryId     = "${var.github_owner}/${var.github_repo}"
-        BranchName           = var.github_branch
-        OutputArtifactFormat = "CODE_ZIP"
-      }
-      run_order = 1
-    }
-  }
+ stage {
+   name = "Source"
+   action {
+     name             = "Source"
+     category         = "Source"
+     owner            = "AWS"
+     provider         = "CodeStarSourceConnection"
+     version          = "1"
+     output_artifacts = ["SourceOutput"]
+     configuration = {
+       ConnectionArn        = var.github_app_connection_arn
+       FullRepositoryId     = "${var.github_owner}/${var.github_repo}"
+       BranchName           = var.github_branch
+       OutputArtifactFormat = "CODE_ZIP"
+     }
+     run_order = 1
+   }
+ }
 
-  stage {
-    name = "Build"
-    action {
-      name             = "Build"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["BuildOutput"]
-      configuration = {
-        ProjectName = aws_codebuild_project.bianca_project.name
-      }
-      run_order = 1
-    }
-  }
+ stage {
+   name = "Build"
+   action {
+     name             = "Build"
+     category         = "Build"
+     owner            = "AWS"
+     provider         = "CodeBuild"
+     version          = "1"
+     input_artifacts  = ["SourceOutput"]
+     output_artifacts = ["BuildOutput"]
+     configuration = {
+       ProjectName = aws_codebuild_project.bianca_project.name
+     }
+     run_order = 1
+   }
+ }
 
-  stage {
-    name = "Deploy"
-    action {
-      name            = "DeployAppECS"
-      category        = "Deploy"
-      owner           = "AWS"
-      provider        = "ECS"
-      version         = "1"
-      input_artifacts = ["BuildOutput"]
-      configuration = {
-        ClusterName = aws_ecs_cluster.cluster.name
-        ServiceName = aws_ecs_service.app_service.name
-        FileName    = "imagedefinitions_app.json"
-      }
-      run_order = 1
-    }
-  }
-  tags = { Name = "BiancaApp-ECS-Pipeline" }
+ stage {
+   name = "Deploy"
+   action {
+     name            = "DeployAppECS"
+     category        = "Deploy"
+     owner           = "AWS"
+     provider        = "ECS"
+     version         = "1"
+     input_artifacts = ["BuildOutput"]
+     configuration = {
+       ClusterName = aws_ecs_cluster.cluster.name
+       ServiceName = aws_ecs_service.app_service.name
+       FileName    = "imagedefinitions_app.json"
+     }
+     run_order = 1
+   }
+ }
+ tags = { Name = "BiancaApp-ECS-Pipeline" }
 }
 
 ################################################################################
@@ -1422,30 +1350,30 @@ resource "aws_codepipeline" "bianca_pipeline" {
 ################################################################################
 
 resource "aws_route53_record" "app_subdomain" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "app.myphonefriend.com"
-  type    = "A"
-  alias {
-    name                   = aws_lb.app_lb.dns_name
-    zone_id                = aws_lb.app_lb.zone_id
-    evaluate_target_health = true
-  }
+ zone_id = data.aws_route53_zone.myphonefriend.zone_id
+ name    = "app.myphonefriend.com"
+ type    = "A"
+ alias {
+   name                   = aws_lb.app_lb.dns_name
+   zone_id                = aws_lb.app_lb.zone_id
+   evaluate_target_health = true
+ }
 }
 
 resource "aws_route53_record" "sip_subdomain" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "sip.myphonefriend.com"
-  type    = "A"
-  ttl     = 300
-  records = [aws_eip.asterisk_eip.public_ip]
+ zone_id = data.aws_route53_zone.myphonefriend.zone_id
+ name    = "sip.myphonefriend.com"
+ type    = "A"
+ ttl     = 300
+ records = [aws_eip.asterisk_eip.public_ip]
 }
 
 resource "aws_route53_record" "wordpress_apex" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "myphonefriend.com"
-  type    = "A"
-  ttl     = "300"
-  records = ["192.254.225.221"]
+ zone_id = data.aws_route53_zone.myphonefriend.zone_id
+ name    = "myphonefriend.com"
+ type    = "A"
+ ttl     = "300"
+ records = ["192.254.225.221"]
 }
 
 ################################################################################
@@ -1453,28 +1381,28 @@ resource "aws_route53_record" "wordpress_apex" {
 ################################################################################
 
 resource "aws_ses_domain_identity" "ses_domain" {
-  domain = "myphonefriend.com"
+ domain = "myphonefriend.com"
 }
 
 resource "aws_route53_record" "ses_verification_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "_amazonses.${aws_ses_domain_identity.ses_domain.domain}"
-  type    = "TXT"
-  ttl     = 600
-  records = [aws_ses_domain_identity.ses_domain.verification_token]
+ zone_id = data.aws_route53_zone.myphonefriend.zone_id
+ name    = "_amazonses.${aws_ses_domain_identity.ses_domain.domain}"
+ type    = "TXT"
+ ttl     = 600
+ records = [aws_ses_domain_identity.ses_domain.verification_token]
 }
 
 resource "aws_ses_domain_dkim" "ses_dkim" {
-  domain = aws_ses_domain_identity.ses_domain.domain
+ domain = aws_ses_domain_identity.ses_domain.domain
 }
 
 resource "aws_route53_record" "ses_dkim_records" {
-  count   = 3
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.ses_domain.domain}"
-  type    = "CNAME"
-  ttl     = 600
-  records = ["${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
+ count   = 3
+ zone_id = data.aws_route53_zone.myphonefriend.zone_id
+ name    = "${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.ses_domain.domain}"
+ type    = "CNAME"
+ ttl     = 600
+ records = ["${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
 }
 
 ################################################################################
@@ -1482,26 +1410,26 @@ resource "aws_route53_record" "ses_dkim_records" {
 ################################################################################
 
 output "asterisk_public_ip" {
-  description = "Permanent public IP address for Asterisk EC2 instance"
-  value       = aws_eip.asterisk_eip.public_ip
+ description = "Permanent public IP address for Asterisk EC2 instance"
+ value       = aws_eip.asterisk_eip.public_ip
 }
 
 output "asterisk_private_ip" {
-  description = "Private IP address for Asterisk EC2 instance"
-  value       = aws_instance.asterisk.private_ip
+ description = "Private IP address for Asterisk EC2 instance"
+ value       = aws_instance.asterisk.private_ip
 }
 
 output "sip_dns_name" {
-  description = "DNS name for SIP (sip.myphonefriend.com)"
-  value       = aws_route53_record.sip_subdomain.name
+ description = "DNS name for SIP (sip.myphonefriend.com)"
+ value       = aws_route53_record.sip_subdomain.name
 }
 
 output "app_alb_dns_name" {
-  description = "DNS name for the Application Load Balancer (app.myphonefriend.com)"
-  value       = aws_route53_record.app_subdomain.name
+ description = "DNS name for the Application Load Balancer (app.myphonefriend.com)"
+ value       = aws_route53_record.app_subdomain.name
 }
 
 output "asterisk_instance_id" {
-  description = "EC2 instance ID for Asterisk"
-  value       = aws_instance.asterisk.id
+ description = "EC2 instance ID for Asterisk"
+ value       = aws_instance.asterisk.id
 }

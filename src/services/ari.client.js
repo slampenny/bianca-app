@@ -41,13 +41,15 @@ const AWS_ECS_METADATA_URI = process.env.ECS_CONTAINER_METADATA_URI_V4;
 
 let publicIpAddress = null;
 
+// In ari.client.js
+
 async function getFargatePublicIp() {
     if (publicIpAddress) {
         return publicIpAddress;
     }
+    const AWS_ECS_METADATA_URI = process.env.ECS_CONTAINER_METADATA_URI_V4;
     if (!AWS_ECS_METADATA_URI) {
         logger.warn('[Fargate IP] ECS_CONTAINER_METADATA_URI_V4 not found. Assuming local development.');
-        // Fallback for local dev. Use the internal DNS name or localhost.
         return config.asterisk.rtpBiancaHost || '127.0.0.1';
     }
 
@@ -56,19 +58,39 @@ async function getFargatePublicIp() {
         const response = await fetch(AWS_ECS_METADATA_URI);
         const metadata = await response.json();
         
-        // Find the network interface with a public IP
-        const publicInterface = metadata.Networks.find(net => net.IPv4Addresses && net.IPv4Addresses.length > 0);
-        
-        if (publicInterface) {
-            publicIpAddress = publicInterface.IPv4Addresses[0];
+        const networkInfo = metadata.Networks[0];
+        if (!networkInfo || !networkInfo.IPv4Addresses) {
+            throw new Error('No network info found in metadata');
+        }
+
+        // --- THIS IS THE FIX ---
+        // Find the IP address that is NOT in a private range.
+        const ip = networkInfo.IPv4Addresses.find(addr => 
+            !addr.startsWith('10.') && 
+            !addr.startsWith('172.16.') && 
+            !addr.startsWith('172.17.') && 
+            !addr.startsWith('172.18.') && 
+            !addr.startsWith('172.19.') && 
+            !addr.startsWith('172.2') && // covers 172.20-172.29
+            !addr.startsWith('172.30.') &&
+            !addr.startsWith('172.31.') &&
+            !addr.startsWith('192.168.')
+        );
+
+        if (ip) {
+            publicIpAddress = ip;
             logger.info(`[Fargate IP] Detected Public IP: ${publicIpAddress}`);
             return publicIpAddress;
         }
-        throw new Error('No public IP found in container metadata');
+        
+        // If no public IP is found, fall back to the first one for debugging
+        logger.warn('[Fargate IP] No public IP found, falling back to first IP in list.');
+        publicIpAddress = networkInfo.IPv4Addresses[0];
+        return publicIpAddress;
+
     } catch (err) {
-        logger.error(`[Fargate IP] Failed to get public IP: ${err.message}. Falling back to config.`);
-        // Fallback if metadata call fails
-        return config.asterisk.rtpBiancaHost;
+        logger.error(`[Fargate IP] Failed to get public IP: ${err.message}.`);
+        throw err;
     }
 }
 
