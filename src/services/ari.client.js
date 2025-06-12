@@ -43,57 +43,65 @@ let publicIpAddress = null;
 
 // In ari.client.js
 
+// In ari.client.js
+
 async function getFargatePublicIp() {
+    // This function is now memoized, so it only runs the lookup once.
     if (publicIpAddress) {
         return publicIpAddress;
     }
+
     const AWS_ECS_METADATA_URI = process.env.ECS_CONTAINER_METADATA_URI_V4;
+
     if (!AWS_ECS_METADATA_URI) {
         logger.warn('[Fargate IP] ECS_CONTAINER_METADATA_URI_V4 not found. Assuming local development.');
+        // Fallback for local dev.
         return config.asterisk.rtpBiancaHost || '127.0.0.1';
     }
 
     try {
-        logger.info('[Fargate IP] Fetching container metadata...');
+        logger.info('[Fargate IP] Fetching container metadata from ECS...');
         const response = await fetch(AWS_ECS_METADATA_URI);
+        if (!response.ok) {
+            throw new Error(`Metadata endpoint returned status ${response.status}`);
+        }
         const metadata = await response.json();
-        
-        const networkInfo = metadata.Networks[0];
-        if (!networkInfo || !networkInfo.IPv4Addresses) {
-            throw new Error('No network info found in metadata');
-        }
 
-        // --- THIS IS THE FIX ---
-        // Find the IP address that is NOT in a private range.
-        const ip = networkInfo.IPv4Addresses.find(addr => 
-            !addr.startsWith('10.') && 
-            !addr.startsWith('172.16.') && 
-            !addr.startsWith('172.17.') && 
-            !addr.startsWith('172.18.') && 
-            !addr.startsWith('172.19.') && 
-            !addr.startsWith('172.2') && // covers 172.20-172.29
-            !addr.startsWith('172.30.') &&
-            !addr.startsWith('172.31.') &&
-            !addr.startsWith('192.168.')
-        );
+        // The metadata provides a list of network interfaces. We need to find the one
+        // that has the public IP assigned to it by AWS.
+        for (const network of metadata.Networks) {
+            if (network.IPv4Addresses && network.IPv4Addresses.length > 1) {
+                // A network interface with more than one IPv4 address will typically
+                // have both the private and the public IP. We need to find the one that
+                // is NOT the private one.
+                const privateIp = network.PrivateIPv4Address;
+                const publicIp = network.IPv4Addresses.find(ip => ip !== privateIp);
 
-        if (ip) {
-            publicIpAddress = ip;
-            logger.info(`[Fargate IP] Detected Public IP: ${publicIpAddress}`);
-            return publicIpAddress;
+                if (publicIp) {
+                    logger.info(`[Fargate IP] Detected Public IP: ${publicIp}`);
+                    publicIpAddress = publicIp; // Cache the result
+                    return publicIpAddress;
+                }
+            }
         }
         
-        // If no public IP is found, fall back to the first one for debugging
-        logger.warn('[Fargate IP] No public IP found, falling back to first IP in list.');
-        publicIpAddress = networkInfo.IPv4Addresses[0];
+        // As a fallback, if the above logic fails, we'll try the old method.
+        logger.warn('[Fargate IP] Could not find distinct public IP. Falling back to simple check.');
+        const fallbackIp = metadata.Networks[0]?.IPv4Addresses[0];
+        if (!fallbackIp) {
+            throw new Error('No IP addresses found in any network interface.');
+        }
+
+        publicIpAddress = fallbackIp;
+        logger.info(`[Fargate IP] Using fallback IP: ${publicIpAddress}`);
         return publicIpAddress;
 
     } catch (err) {
-        logger.error(`[Fargate IP] Failed to get public IP: ${err.message}.`);
+        logger.error(`[Fargate IP] Critical error fetching Fargate IP: ${err.message}.`);
+        // If we can't determine the IP, we must throw the error to prevent misconfigured media streams.
         throw err;
     }
 }
-
 
 // Helper to strip protocol and ensure valid host
 function sanitizeHost(raw) {
