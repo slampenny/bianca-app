@@ -46,16 +46,12 @@ let publicIpAddress = null;
 // In ari.client.js
 
 async function getFargatePublicIp() {
-    // This function is now memoized, so it only runs the lookup once.
     if (publicIpAddress) {
         return publicIpAddress;
     }
-
     const AWS_ECS_METADATA_URI = process.env.ECS_CONTAINER_METADATA_URI_V4;
-
     if (!AWS_ECS_METADATA_URI) {
         logger.warn('[Fargate IP] ECS_CONTAINER_METADATA_URI_V4 not found. Assuming local development.');
-        // Fallback for local dev.
         return config.asterisk.rtpBiancaHost || '127.0.0.1';
     }
 
@@ -82,23 +78,21 @@ async function getFargatePublicIp() {
                     publicIpAddress = publicIp; // Cache the result
                     return publicIpAddress;
                 }
+            } else if (network.IPv4Addresses && network.IPv4Addresses.length === 1) {
+                 // If there's only one IP, it might be the public one
+                 const ip = network.IPv4Addresses[0];
+                 if (ip && !ip.startsWith('172.') && !ip.startsWith('10.') && !ip.startsWith('192.168.')) {
+                     logger.info(`[Fargate IP] Detected single Public IP: ${ip}`);
+                     publicIpAddress = ip;
+                     return publicIpAddress;
+                 }
             }
         }
         
-        // As a fallback, if the above logic fails, we'll try the old method.
-        logger.warn('[Fargate IP] Could not find distinct public IP. Falling back to simple check.');
-        const fallbackIp = metadata.Networks[0]?.IPv4Addresses[0];
-        if (!fallbackIp) {
-            throw new Error('No IP addresses found in any network interface.');
-        }
-
-        publicIpAddress = fallbackIp;
-        logger.info(`[Fargate IP] Using fallback IP: ${publicIpAddress}`);
-        return publicIpAddress;
+        throw new Error('No public IP found in any network interface.');
 
     } catch (err) {
         logger.error(`[Fargate IP] Critical error fetching Fargate IP: ${err.message}.`);
-        // If we can't determine the IP, we must throw the error to prevent misconfigured media streams.
         throw err;
     }
 }

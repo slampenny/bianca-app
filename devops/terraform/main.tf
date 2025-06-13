@@ -655,7 +655,8 @@ resource "aws_instance" "asterisk" {
   }
 
   tags = {
-    Name = "asterisk-server"
+    Name = "asterisk-server",
+    Environment = "production",
   }
 }
 
