@@ -153,8 +153,6 @@ router.get('/ecs-metadata', async (req, res) => {
     }
     
     try {
-        const fetch = require('node-fetch');
-        
         // Get container metadata
         const containerResponse = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4);
         const containerData = await containerResponse.json();
@@ -202,7 +200,6 @@ router.get('/rtp-debug', async (req, res) => {
             // This function is defined in ari.client.js but not exported
             // For now, let's get it from the metadata endpoint directly
             if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
-                const fetch = require('node-fetch');
                 const taskResponse = await fetch(`${process.env.ECS_CONTAINER_METADATA_URI_V4}/task`);
                 const taskData = await taskResponse.json();
                 

@@ -15,7 +15,6 @@ async function getFargatePublicIp() {
 
     try {
         // For Fargate with public IP assignment
-        const fetch = require('node-fetch');
         const taskResponse = await fetch(`${process.env.ECS_CONTAINER_METADATA_URI_V4}/task`);
         const taskData = await taskResponse.json();
         
