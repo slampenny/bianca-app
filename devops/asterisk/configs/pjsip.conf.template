@@ -93,6 +93,8 @@ direct_media=no
 allow_subscribe=no
 force_rport=yes
 rtp_symmetric=yes
+external_media_address=${EXTERNAL_ADDRESS}
+external_signaling_address=${EXTERNAL_ADDRESS}
 
 [twilio-identify]
 type=identify
