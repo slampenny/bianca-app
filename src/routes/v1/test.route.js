@@ -138,6 +138,51 @@ router.get('/debug', testController.getDebugInfo);
 
 /**
  * @swagger
+ * /test/ecs-metadata:
+ *   get:
+ *     summary: Debug ECS metadata
+ *     description: Shows ECS container and task metadata for debugging
+ *     tags: [Test - RTP]
+ *     responses:
+ *       "200":
+ *         description: ECS metadata retrieved successfully
+ */
+router.get('/ecs-metadata', async (req, res) => {
+    if (!process.env.ECS_CONTAINER_METADATA_URI_V4) {
+        return res.json({ error: 'Not running in ECS' });
+    }
+    
+    try {
+        const fetch = require('node-fetch');
+        
+        // Get container metadata
+        const containerResponse = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4);
+        const containerData = await containerResponse.json();
+        
+        // Get task metadata
+        const taskResponse = await fetch(`${process.env.ECS_CONTAINER_METADATA_URI_V4}/task`);
+        const taskData = await taskResponse.json();
+        
+        res.json({
+            container: {
+                Networks: containerData.Networks,
+                TaskARN: containerData.TaskARN
+            },
+            task: {
+                Attachments: taskData.Attachments,
+                Containers: taskData.Containers?.map(c => ({
+                    Name: c.Name,
+                    NetworkInterfaces: c.NetworkInterfaces
+                }))
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
  * /test/rtp-debug:
  *   get:
  *     summary: Debug RTP configuration and network
@@ -150,12 +195,29 @@ router.get('/debug', testController.getDebugInfo);
 router.get('/rtp-debug', async (req, res) => {
     try {
         const portManager = require('../../services/port.manager.service');
-        const getFargatePublicIp = require('../../services/ari.client').getFargatePublicIp;
         
-        // Get public IP
+        // Get public IP - fix the import
         let publicIp = 'Not available';
         try {
-            publicIp = await getFargatePublicIp();
+            // This function is defined in ari.client.js but not exported
+            // For now, let's get it from the metadata endpoint directly
+            if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
+                const fetch = require('node-fetch');
+                const taskResponse = await fetch(`${process.env.ECS_CONTAINER_METADATA_URI_V4}/task`);
+                const taskData = await taskResponse.json();
+                
+                // Look for public IP in the task metadata
+                for (const attachment of taskData.Attachments || []) {
+                    if (attachment.Type === 'ElasticNetworkInterface') {
+                        for (const detail of attachment.Details || []) {
+                            if (detail.Name === 'publicIPv4Address' && detail.Value) {
+                                publicIp = detail.Value;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         } catch (err) {
             publicIp = `Error: ${err.message}`;
         }
@@ -175,11 +237,14 @@ router.get('/rtp-debug', async (req, res) => {
                 appRtpPortRange: process.env.APP_RTP_PORT_RANGE || 'Not set',
                 rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set',
                 asteriskUrl: config.asterisk.url,
-                asteriskPublicIp: config.asterisk.publicIp
+                asteriskPublicIp: config.asterisk.publicIp || 'Not set'
             },
             environment: {
                 AWS_REGION: process.env.AWS_REGION,
-                NODE_ENV: process.env.NODE_ENV
+                NODE_ENV: process.env.NODE_ENV,
+                // Add these to debug
+                RTP_PORT_RANGE: process.env.RTP_PORT_RANGE,
+                RTP_LISTENER_PORT: process.env.RTP_LISTENER_PORT
             }
         });
     } catch (err) {

@@ -11,6 +11,7 @@ const { Conversation, Patient } = require('../models');
 const channelTracker = require('./channel.tracker');
 const portManager = require('./port.manager.service');
 const rtpListenerService = require('./rtp.listener.service');
+const { getFargatePublicIp } = require('../utils/network.utils');
 
 // Configuration constants
 const CONFIG = {
@@ -37,66 +38,7 @@ const VALID_STATE_TRANSITIONS = {
     'cleanup': []
 };
 
-const AWS_ECS_METADATA_URI = process.env.ECS_CONTAINER_METADATA_URI_V4;
-
-let publicIpAddress = null;
-
-// In ari.client.js
-
-// In ari.client.js
-
-async function getFargatePublicIp() {
-    if (publicIpAddress) {
-        return publicIpAddress;
-    }
-
-    // In dev/local environment
-    if (!process.env.ECS_CONTAINER_METADATA_URI_V4) {
-        logger.warn('[Fargate IP] Not running in ECS, using configured host');
-        return config.asterisk.rtpBiancaHost || '127.0.0.1';
-    }
-
-    try {
-        // For Fargate with public IP assignment
-        const taskResponse = await fetch(`${process.env.ECS_CONTAINER_METADATA_URI_V4}/task`);
-        const taskData = await taskResponse.json();
-        
-        // Look for the ENI (Elastic Network Interface) with a public IP
-        for (const attachment of taskData.Attachments || []) {
-            if (attachment.Type === 'ElasticNetworkInterface') {
-                for (const detail of attachment.Details || []) {
-                    if (detail.Name === 'publicIPv4Address' && detail.Value) {
-                        logger.info(`[Fargate IP] Found public IP from task metadata: ${detail.Value}`);
-                        publicIpAddress = detail.Value;
-                        return publicIpAddress;
-                    }
-                }
-            }
-        }
-
-        // Fallback: Try the container metadata endpoint
-        const containerResponse = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4);
-        const containerData = await containerResponse.json();
-        
-        // In public subnets, the Networks array should have the public IP
-        for (const network of containerData.Networks || []) {
-            // Look for a non-private IP
-            for (const ip of network.IPv4Addresses || []) {
-                if (ip && !ip.startsWith('172.') && !ip.startsWith('10.') && !ip.startsWith('192.168.')) {
-                    logger.info(`[Fargate IP] Found public IP: ${ip}`);
-                    publicIpAddress = ip;
-                    return publicIpAddress;
-                }
-            }
-        }
-
-        throw new Error('No public IP found in ECS metadata');
-        
-    } catch (err) {
-        logger.error(`[Fargate IP] Failed to get public IP: ${err.message}`);
-        throw err;
-    }
-}
+let publicIpAddress = null; // Cache for public IP address
 
 // Helper to strip protocol and ensure valid host
 function sanitizeHost(raw) {

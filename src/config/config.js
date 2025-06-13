@@ -115,7 +115,7 @@ const baselineConfig = {
     from: envVars.EMAIL_FROM || 'support@myphonefriend.com', // Primary 'from' address
   },
   app: {
-    rtpPortRange: '16384-16484'
+    rtpPortRange: process.env.APP_RTP_PORT_RANGE || '16384-16484'
   },
   asterisk: {
     maxRetries: process.env.ARI_MAX_RETRIES || 10,
