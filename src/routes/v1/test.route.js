@@ -138,6 +138,57 @@ router.get('/debug', testController.getDebugInfo);
 
 /**
  * @swagger
+ * /test/rtp-debug:
+ *   get:
+ *     summary: Debug RTP configuration and network
+ *     description: Shows current RTP configuration, ports, and network details
+ *     tags: [Test - RTP]
+ *     responses:
+ *       "200":
+ *         description: RTP debug information
+ */
+router.get('/rtp-debug', async (req, res) => {
+    try {
+        const portManager = require('../../services/port.manager.service');
+        const getFargatePublicIp = require('../../services/ari.client').getFargatePublicIp;
+        
+        // Get public IP
+        let publicIp = 'Not available';
+        try {
+            publicIp = await getFargatePublicIp();
+        } catch (err) {
+            publicIp = `Error: ${err.message}`;
+        }
+        
+        // Get active listeners
+        const activeListeners = rtpListener.getAllActiveListeners();
+        
+        res.json({
+            network: {
+                publicIp,
+                isRunningInECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
+                ecsMetadataUri: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set'
+            },
+            portManager: portManager.getStats(),
+            activeListeners,
+            config: {
+                appRtpPortRange: process.env.APP_RTP_PORT_RANGE || 'Not set',
+                rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set',
+                asteriskUrl: config.asterisk.url,
+                asteriskPublicIp: config.asterisk.publicIp
+            },
+            environment: {
+                AWS_REGION: process.env.AWS_REGION,
+                NODE_ENV: process.env.NODE_ENV
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+/**
+ * @swagger
  * /test/websocket:
  *   get:
  *     summary: test open ai websocket connection
