@@ -3,7 +3,7 @@ const logger = require('../config/logger');
 const config = require('../config/config');
 
 // Get port range from config, e.g., "10000-20000"
-const [RTP_PORT_START, RTP_PORT_END] = (config.asterisk.rtpPortRange || "10000-20000")
+const [RTP_PORT_START, RTP_PORT_END] = (config.app?.rtpPortRange || "16384-16484")
     .split('-').map(Number);
 
 const availablePorts = new Set();

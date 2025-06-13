@@ -137,6 +137,18 @@ variable "asterisk_rtp_end_port" {
   default     = 20000 # Increased for more concurrent calls
 }
 
+variable "app_rtp_port_start" {
+  description = "RTP port range for the application (format: start-end)"
+  type        = string
+  default     = "16384"  # 100 ports for concurrent calls
+}
+
+variable "app_rtp_port_end" {
+  description = "RTP port range for the application (format: start-end)"
+  type        = string
+  default     = "16484"  # 100 ports for concurrent calls
+}
+
 # --- MongoDB Variables ---
 variable "mongodb_port" {
   description = "TCP port for MongoDB."
@@ -449,24 +461,26 @@ resource "aws_security_group" "bianca_app_sg" {
   tags = { Name = "bianca-app-sg" }
 }
 
-resource "aws_security_group_rule" "bianca_app_from_asterisk" {
+# Allow RTP from Asterisk to App (for the app's RTP listener)
+resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   type                     = "ingress"
-  from_port                = var.app_rtp_listener_port
-  to_port                  = var.app_rtp_listener_port
+  from_port                = var.app_rtp_port_start
+  to_port                  = var.app_rtp_port_end
   protocol                 = "udp"
   security_group_id        = aws_security_group.bianca_app_sg.id
   source_security_group_id = aws_security_group.asterisk_ec2_sg.id
-  description              = "Allow UDP for RTP listener from Asterisk"
+  description              = "RTP from Asterisk to App"
 }
 
-resource "aws_security_group_rule" "allow_rtp_from_asterisk_to_app" {
+# Allow RTP from App to Asterisk (for ExternalMedia)
+resource "aws_security_group_rule" "asterisk_rtp_from_app" {
   type                     = "ingress"
-  description              = "Allow RTP from Asterisk to Bianca App"
   from_port                = var.asterisk_rtp_start_port
   to_port                  = var.asterisk_rtp_end_port
   protocol                 = "udp"
-  security_group_id        = aws_security_group.bianca_app_sg.id
-  source_security_group_id = aws_security_group.asterisk_ec2_sg.id
+  security_group_id        = aws_security_group.asterisk_ec2_sg.id
+  source_security_group_id = aws_security_group.bianca_app_sg.id
+  description              = "RTP from App to Asterisk"
 }
 
 resource "aws_security_group" "asterisk_ec2_sg" {
@@ -830,7 +844,10 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
         { name = "RTP_LISTENER_HOST", value = "bianca-app.${aws_service_discovery_private_dns_namespace.internal.name}" },
-        { name = "AWS_SES_REGION", value = var.aws_region }
+        { name = "AWS_SES_REGION", value = var.aws_region },
+        { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
+        { name = "RTP_LISTENER_HOST", value = "0.0.0.0" },
+        { name = "BIANCA_PUBLIC_IP", value = "AUTO" },
       ]
       secrets = [
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
