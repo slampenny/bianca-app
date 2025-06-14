@@ -911,6 +911,7 @@ resource "aws_ecs_service" "app_service" {
   cluster = aws_ecs_cluster.cluster.id
   task_definition = aws_ecs_task_definition.app_task.arn
   launch_type = "FARGATE"
+  platform_version                   = "LATEST"
   desired_count = 1
   deployment_maximum_percent         = 100
   deployment_minimum_healthy_percent = 0
