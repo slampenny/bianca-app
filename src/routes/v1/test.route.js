@@ -6,6 +6,7 @@ const testController = require('../../controllers/test.controller');
 const router = express.Router();
 const config = require('../../config/config');
 const logger = require('../../config/logger');
+const { getFargateIp } = require('../../utils/network.utils');
 const dns = require('dns').promises;
 
 // Import services safely
@@ -195,29 +196,7 @@ router.get('/rtp-debug', async (req, res) => {
         const portManager = require('../../services/port.manager.service');
         
         // Get public IP - fix the import
-        let publicIp = 'Not available';
-        try {
-            // This function is defined in ari.client.js but not exported
-            // For now, let's get it from the metadata endpoint directly
-            if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
-                const taskResponse = await fetch(`${process.env.ECS_CONTAINER_METADATA_URI_V4}/task`);
-                const taskData = await taskResponse.json();
-                
-                // Look for public IP in the task metadata
-                for (const attachment of taskData.Attachments || []) {
-                    if (attachment.Type === 'ElasticNetworkInterface') {
-                        for (const detail of attachment.Details || []) {
-                            if (detail.Name === 'publicIPv4Address' && detail.Value) {
-                                publicIp = detail.Value;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (err) {
-            publicIp = `Error: ${err.message}`;
-        }
+        let publicIp = getFargateIp();
         
         // Get active listeners
         const activeListeners = rtpListener.getAllActiveListeners();

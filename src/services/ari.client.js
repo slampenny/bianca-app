@@ -11,7 +11,7 @@ const { Conversation, Patient } = require('../models');
 const channelTracker = require('./channel.tracker');
 const portManager = require('./port.manager.service');
 const rtpListenerService = require('./rtp.listener.service');
-const { getFargatePublicIp } = require('../utils/network.utils');
+const { getFargateIp } = require('../utils/network.utils');
 
 // Configuration constants
 const CONFIG = {
@@ -37,8 +37,6 @@ const VALID_STATE_TRANSITIONS = {
     'failed': ['cleanup'],
     'cleanup': []
 };
-
-let publicIpAddress = null; // Cache for public IP address
 
 // Helper to strip protocol and ensure valid host
 function sanitizeHost(raw) {
@@ -1070,7 +1068,7 @@ class AsteriskAriClient extends EventEmitter {
         await channel.answer();
         
         // Use the call-specific port instead of the shared port
-        const rtpHost = await getFargatePublicIp(); 
+        const rtpHost = await getFargateIp(); 
         const rtpReadDest = `${rtpHost}:${parentCallData.rtpPort}`;
         
         await channel.externalMedia({

@@ -2,7 +2,7 @@ const logger = require('../config/logger');
 
 let publicIpAddress = null;
 
-async function getFargatePublicIp() {
+async function getFargateIp() {
     if (publicIpAddress) {
         return publicIpAddress;
     }
@@ -47,7 +47,14 @@ async function getFargatePublicIp() {
             }
         }
 
-        throw new Error('No public IP found in ECS metadata');
+        if (containerData.Networks && containerData.Networks[0] && containerData.Networks[0].IPv4Addresses[0]) {
+            const privateIp = containerData.Networks[0].IPv4Addresses[0];
+            logger.warn(`[Fargate IP] Using private IP as fallback: ${privateIp}`);
+            publicIpAddress = privateIp;
+            return publicIpAddress;
+        }
+
+        throw new Error('No public or private IP found in ECS metadata');
         
     } catch (err) {
         logger.error(`[Network Utils] Failed to get public IP: ${err.message}`);
@@ -56,5 +63,5 @@ async function getFargatePublicIp() {
 }
 
 module.exports = {
-    getFargatePublicIp
+    getFargateIp
 };
