@@ -7,10 +7,10 @@ async function getFargateIp() {
         return publicIpAddress;
     }
 
-    // In dev/local environment
     if (!process.env.ECS_CONTAINER_METADATA_URI_V4) {
-        logger.warn('[Network Utils] Not running in ECS, returning localhost');
-        return '127.0.0.1';
+        logger.warn('[Network Utils] Not running in ECS, using localhost');
+        publicIpAddress = 'localhost';
+        return publicIpAddress;
     }
 
     try {

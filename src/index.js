@@ -122,7 +122,7 @@ function setupShutdownHandlers(server) {
     try {
       // 2. Stop RTP listener
       logger.info('Stopping RTP listener service...');
-      stopRtpListenerService();
+      stopAllListeners();
       logger.info('RTP listener service stopped');
     } catch (err) {
       logger.error('Error stopping RTP listener:', err);

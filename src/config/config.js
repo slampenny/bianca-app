@@ -21,7 +21,6 @@ const envVarsSchema = Joi.object({
   ARI_PASSWORD: Joi.string(),
   BIANCA_PASSWORD: Joi.string(),
   ASTERISK_URL: Joi.string(),
-  RTP_LISTENER_URL: Joi.string(),
   EXTERNAL_ADDRESS: Joi.string(),
   EXTERNAL_PORT: Joi.number(),
 
@@ -128,8 +127,6 @@ const baselineConfig = {
     url: `http://${defaultAsteriskHost}:8088`, // Example URL, replace with actual
     rtpBiancaHost: envVars.RTP_BIANCA_HOST || 'bianca-app', // Example RTP URL, replace with actual
     rtpAsteriskHost: envVars.RTP_ASTERISK_HOST || 'asterisk', // Example RTP sender URL, replace with actual
-    rtpBiancaReceivePort: parseInt(envVars.RTP_BIANCA_RECEIVE_PORT) || 16384,
-    rtpBiancaSendPort: envVars.RTP_BIANCA_SEND_PORT || 16385, // Example port, replace with actual
     externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
     sipUserName: envVars.SIP_USER_NAME || 'bianca', // Example SIP username, replace with actual
     username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual

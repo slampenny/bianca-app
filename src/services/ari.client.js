@@ -586,26 +586,39 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     findParentCallForRtpChannel(channel) {
-        // The channel name includes the host and port it was created for.
-        // We can use this to determine if it's for the read or write stream.
-        const isReadChannel = channel.name.includes(this.RTP_BIANCA_RECEIVE_PORT.toString());
-
+        // Look for calls with allocated RTP ports
         for (const [callId, data] of this.tracker.calls.entries()) {
-            // Find the call that is expecting an RTP channel and matches the direction.
-            if (data.expectingRtpChannel) {
-                if (isReadChannel && !data.inboundRtpChannelId) {
+            if (data.rtpPort) {
+                // Check if this RTP channel belongs to this specific call
+                const channelName = channel.name || '';
+                // Check if channel name contains the call ID or Twilio SID
+                if (channelName.includes(callId) || 
+                    (data.twilioCallSid && channelName.includes(data.twilioCallSid)) ||
+                    this.isChannelForCall(channel, callId, data)) {
                     return { parentId: callId, callData: data };
-                }
-                if (!isReadChannel && !data.outboundRtpChannelId) {
-                     return { parentId: callId, callData: data };
                 }
             }
         }
-
         return null;
     }
 
+    isChannelForCall(channel, callId, callData) {
+        // Determine if an RTP channel belongs to a specific call
+        const channelName = channel.name || '';
+        
+        // Check various ways the channel might be associated
+        if (channelName.includes(callId)) return true;
+        if (callData.twilioCallSid && channelName.includes(callData.twilioCallSid)) return true;
+        if (callData.pendingSnoopId && channelName.includes(callData.pendingSnoopId)) return true;
+        
+        // You can add more sophisticated checks here based on your channel naming conventions
+        return false;
+    }
+
     async handleInboundRtpChannel(channel, parentId, callData) {
+        if (!callData.mainBridgeId) {
+            throw new Error(`No bridge found for parent ${parentId}`);
+        }
         // Added extra debugging logs to be certain of the flow
         logger.info(`[ARI DEBUG] Entering handleInboundRtpChannel for ${channel.id}`);
         try {
@@ -771,122 +784,126 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     async setupMediaPipeline(channel, twilioCallSid, patientId) {
-    const asteriskChannelId = channel.id;
-    logger.info(`[ARI Pipeline] Setting up for Asterisk ID: ${asteriskChannelId}, Twilio SID: ${twilioCallSid}, PatientID: ${patientId}`);
-    
-    let mainBridge = null;
-    let allocatedPort = null;
-    let rtpListener = null;
-
-    try {
-        // Step 1: Allocate a unique port for this call
-        allocatedPort = portManager.acquirePort();
+        const asteriskChannelId = channel.id;
+        logger.info(`[ARI Pipeline] Setting up for Asterisk ID: ${asteriskChannelId}, Twilio SID: ${twilioCallSid}, PatientID: ${patientId}`);
         
-        if (!allocatedPort) {
-            throw new Error('No available RTP ports for media pipeline');
-        }
-        
-        logger.info(`[ARI Pipeline] Allocated port ${allocatedPort} for call ${asteriskChannelId}`);
+        let mainBridge = null;
+        let allocatedPort = null;
+        let rtpListener = null;
 
-        // Step 2: Start the dedicated RTP listener for this call
-        const rtpListenerService = require('./rtp.listener.service');
-        rtpListener = await rtpListenerService.startRtpListenerForCall(
-            allocatedPort,
-            twilioCallSid || asteriskChannelId,
-            asteriskChannelId
-        );
-
-        // Step 3: Update call tracking with port information
-        this.tracker.updateCall(asteriskChannelId, {
-            rtpPort: allocatedPort,
-            rtpListener: rtpListener,
-            state: 'setting_up_media'
-        });
-
-        // Step 4: Create conversation record in database
-        const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId);
-
-        // Step 5: Initialize OpenAI service for this call
-        const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
-        await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, initialPrompt);
-
-        // Step 6: Create the main bridge for mixing audio
-        mainBridge = await this.client.bridges.create({
-            type: 'mixing',
-            name: `call-${asteriskChannelId}`
-        });
-        
-        this.tracker.updateCall(asteriskChannelId, {
-            mainBridge: mainBridge,
-            mainBridgeId: mainBridge.id,
-            conversationId: dbConversationId
-        });
-        
-        logger.info(`[ARI Pipeline] Created main bridge ${mainBridge.id}`);
-
-        // Step 7: Add the main channel to the bridge
-        await this.client.bridges.addChannel({
-            bridgeId: mainBridge.id,
-            channel: asteriskChannelId
-        });
-        
-        logger.info(`[ARI Pipeline] Added main channel to bridge`);
-
-        // Step 8: Start recording on the bridge
-        await this.startRecording(mainBridge, asteriskChannelId);
-
-        // Step 9: Setup OpenAI callback handlers
-        this.setupOpenAICallback();
-
-        // Step 10: Update state to indicate we're ready for media channels
-        this.updateCallState(asteriskChannelId, 'pending_media');
-
-        // Step 11: Initiate the creation of snoop and playback channels
-        await this.initiateSnoopForExternalMedia(asteriskChannelId);
-        
-        logger.info(`[ARI Pipeline] Media pipeline setup completed for ${asteriskChannelId}`);
-        
-        // Return success indicators
-        return {
-            success: true,
-            asteriskChannelId,
-            twilioCallSid,
-            allocatedPort,
-            bridgeId: mainBridge.id
-        };
-
-    } catch (err) {
-        logger.error(`[ARI Pipeline] Error in setupMediaPipeline for ${asteriskChannelId}: ${err.message}`, err);
-        
-        // Update state to failed
-        this.updateCallState(asteriskChannelId, 'failed');
-        
-        // Cleanup on error
-        if (rtpListener) {
-            try {
-                const rtpListenerService = require('./rtp.listener.service');
-                rtpListenerService.stopRtpListenerForCall(twilioCallSid || asteriskChannelId);
-            } catch (cleanupErr) {
-                logger.error(`[ARI Pipeline] Error stopping RTP listener during cleanup: ${cleanupErr.message}`);
+        try {
+            // Step 1: Allocate a unique port for this call
+            allocatedPort = portManager.acquirePort(asteriskChannelId, {
+                asteriskChannelId,
+                twilioCallSid,
+                patientId
+            });
+            
+            if (!allocatedPort) {
+                throw new Error('No available RTP ports for media pipeline');
             }
-        }
-        
-        if (allocatedPort) {
-            try {
-                portManager.releasePort(allocatedPort);
-                logger.info(`[ARI Pipeline] Released port ${allocatedPort} after setup failure`);
-            } catch (cleanupErr) {
-                logger.error(`[ARI Pipeline] Error releasing port during cleanup: ${cleanupErr.message}`);
+            
+            logger.info(`[ARI Pipeline] Allocated port ${allocatedPort} for call ${asteriskChannelId}`);
+
+            // Step 2: Start the dedicated RTP listener for this call
+            const rtpListenerService = require('./rtp.listener.service');
+            rtpListener = await rtpListenerService.startRtpListenerForCall(
+                allocatedPort,
+                twilioCallSid || asteriskChannelId,
+                asteriskChannelId
+            );
+
+            // Step 3: Update call tracking with port information
+            this.tracker.updateCall(asteriskChannelId, {
+                rtpPort: allocatedPort,
+                rtpListener: rtpListener,
+                state: 'setting_up_media'
+            });
+
+            // Step 4: Create conversation record in database
+            const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId);
+
+            // Step 5: Initialize OpenAI service for this call
+            const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
+            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, initialPrompt);
+
+            // Step 6: Create the main bridge for mixing audio
+            mainBridge = await this.client.bridges.create({
+                type: 'mixing',
+                name: `call-${asteriskChannelId}`
+            });
+            
+            this.tracker.updateCall(asteriskChannelId, {
+                mainBridge: mainBridge,
+                mainBridgeId: mainBridge.id,
+                conversationId: dbConversationId
+            });
+            
+            logger.info(`[ARI Pipeline] Created main bridge ${mainBridge.id}`);
+
+            // Step 7: Add the main channel to the bridge
+            await this.client.bridges.addChannel({
+                bridgeId: mainBridge.id,
+                channel: asteriskChannelId
+            });
+            
+            logger.info(`[ARI Pipeline] Added main channel to bridge`);
+
+            // Step 8: Start recording on the bridge
+            await this.startRecording(mainBridge, asteriskChannelId);
+
+            // Step 9: Setup OpenAI callback handlers
+            this.setupOpenAICallback();
+
+            // Step 10: Update state to indicate we're ready for media channels
+            this.updateCallState(asteriskChannelId, 'pending_media');
+
+            // Step 11: Initiate the creation of snoop and playback channels
+            await this.initiateSnoopForExternalMedia(asteriskChannelId);
+            
+            logger.info(`[ARI Pipeline] Media pipeline setup completed for ${asteriskChannelId}`);
+            
+            // Return success indicators
+            return {
+                success: true,
+                asteriskChannelId,
+                twilioCallSid,
+                allocatedPort,
+                bridgeId: mainBridge.id
+            };
+
+        } catch (err) {
+            logger.error(`[ARI Pipeline] Error in setupMediaPipeline for ${asteriskChannelId}: ${err.message}`, err);
+            
+            // Update state to failed
+            this.updateCallState(asteriskChannelId, 'failed');
+            
+            // Cleanup on error
+            if (rtpListener) {
+                try {
+                    const rtpListenerService = require('./rtp.listener.service');
+                    rtpListenerService.stopRtpListenerForCall(twilioCallSid || asteriskChannelId);
+                } catch (cleanupErr) {
+                    logger.error(`[ARI Pipeline] Error stopping RTP listener during cleanup: ${cleanupErr.message}`);
+                }
             }
+            
+            if (allocatedPort) {
+                try {
+                    portManager.releasePort(allocatedPort, asteriskChannelId);
+                    logger.info(`[ARI Pipeline] Released port ${allocatedPort} after setup failure`);
+                } catch (cleanupErr) {
+                    logger.error(`[ARI Pipeline] Error releasing port during cleanup: ${cleanupErr.message}`);
+                }
+            }
+            
+            if (mainBridge?.id) {
+                await this.safeDestroy(mainBridge, 'Main bridge cleanup after error');
+            }
+            
+            throw err;
         }
-        
-        if (mainBridge?.id) {
-            await this.safeDestroy(mainBridge, 'Main bridge cleanup after error');
-        }
-        
-        throw err;
     }
-}
 
     async createConversationRecord(twilioCallSid, asteriskChannelId, patientId) {
         if (!patientId || !twilioCallSid) {
@@ -1027,8 +1044,8 @@ class AsteriskAriClient extends EventEmitter {
         try {
             const snoopId = `snoop-extmedia-${uuidv4()}`;
             this.tracker.updateCall(asteriskChannelId, {
-                expectingRtpChannel: true,
                 pendingSnoopId: snoopId,
+                expectingRtpChannels: true,
             });
             
             // Fire and forget the creation commands. The event handlers will take over.
@@ -1053,37 +1070,38 @@ class AsteriskAriClient extends EventEmitter {
         }
     }
 
+
     async handleStasisStartForSnoop(channel, channelName) {
-    const channelId = channel.id;
-    const match = channelName.match(/^Snoop\/([^-]+)-/);
-    const parentChannelId = match?.[1];
-    
-    const parentCallData = this.tracker.getCall(parentChannelId);
-    if (!parentCallData || !parentCallData.rtpPort) {
-        logger.error(`[ARI] No allocated port for parent call ${parentChannelId}`);
-        return this.safeHangup(channel, 'No allocated port');
+        const channelId = channel.id;
+        const match = channelName.match(/^Snoop\/([^-]+)-/);
+        const parentChannelId = match?.[1];
+        
+        const parentCallData = this.tracker.getCall(parentChannelId);
+        if (!parentCallData || !parentCallData.rtpPort) {
+            logger.error(`[ARI] No allocated port for parent call ${parentChannelId}`);
+            return this.safeHangup(channel, 'No allocated port');
+        }
+        
+        try {
+            await channel.answer();
+            
+            // Use the call-specific port instead of the shared port
+            const rtpHost = await getFargateIp(); 
+            const rtpReadDest = `${rtpHost}:${parentCallData.rtpPort}`;
+            
+            await channel.externalMedia({
+                app: CONFIG.STASIS_APP_NAME,
+                external_host: rtpReadDest,
+                format: CONFIG.RTP_SEND_FORMAT,
+                direction: 'read'
+            });
+            
+            logger.info(`[ARI] READ ExternalMedia configured: snoop ${channelId} → ${rtpReadDest} (dedicated port)`);
+        } catch (err) {
+            logger.error(`[ARI] Failed to start ExternalMedia: ${err.message}`);
+            await this.cleanupChannel(parentChannelId, `ExternalMedia setup failed`);
+        }
     }
-    
-    try {
-        await channel.answer();
-        
-        // Use the call-specific port instead of the shared port
-        const rtpHost = await getFargateIp(); 
-        const rtpReadDest = `${rtpHost}:${parentCallData.rtpPort}`;
-        
-        await channel.externalMedia({
-            app: CONFIG.STASIS_APP_NAME,
-            external_host: rtpReadDest,
-            format: CONFIG.RTP_SEND_FORMAT,
-            direction: 'read'
-        });
-        
-        logger.info(`[ARI] READ ExternalMedia configured: snoop ${channelId} → ${rtpReadDest} (dedicated port)`);
-    } catch (err) {
-        logger.error(`[ARI] Failed to start ExternalMedia: ${err.message}`);
-        await this.cleanupChannel(parentChannelId, `ExternalMedia setup failed`);
-    }
-}
 
     // --- REFACTOR 9: Simplify playback handler ---
     async handleStasisStartForPlayback(channel, channelName, event) {
@@ -1248,7 +1266,7 @@ class AsteriskAriClient extends EventEmitter {
             }
             
             try {
-                portManager.releasePort(resources.rtpPort);
+                portManager.releasePort(resources.rtpPort, asteriskChannelId);
                 logger.info(`[Cleanup] Released port ${resources.rtpPort} for ${asteriskChannelId}`);
             } catch (err) {
                 logger.error(`[Cleanup] Error releasing port: ${err.message}`);
@@ -1532,6 +1550,13 @@ class AsteriskAriClient extends EventEmitter {
                 clearTimeout(this.reconnectTimer);
                 this.reconnectTimer = null;
             }
+            
+            // Ensure channel tracker is properly shut down
+            await this.tracker.shutdown();
+            
+            // Log port manager final stats
+            const portStats = portManager.getStats();
+            logger.info(`[ARI] Port Manager final stats:`, portStats);
             
             if (this.client) {
                 this.client.close();

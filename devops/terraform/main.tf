@@ -138,15 +138,15 @@ variable "asterisk_rtp_end_port" {
 }
 
 variable "app_rtp_port_start" {
-  description = "RTP port range for the application (format: start-end)"
-  type        = string
-  default     = "16384"  # 100 ports for concurrent calls
+  description = "Start of RTP port range for the application"
+  type        = number
+  default     = 16384
 }
 
 variable "app_rtp_port_end" {
-  description = "RTP port range for the application (format: start-end)"
-  type        = string
-  default     = "16484"  # 100 ports for concurrent calls
+  description = "End of RTP port range for the application"
+  type        = number
+  default     = 16484
 }
 
 # --- MongoDB Variables ---
@@ -832,21 +832,19 @@ resource "aws_ecs_task_definition" "app_task" {
       essential = true
       portMappings = [
         { containerPort = var.container_port, hostPort = var.container_port, protocol = "tcp" },
-        { containerPort = var.app_rtp_listener_port, hostPort = var.app_rtp_listener_port, protocol = "udp" }
+        # { containerPort = var.app_rtp_listener_port, hostPort = var.app_rtp_listener_port, protocol = "udp" }
       ]
       environment = [
         { name = "AWS_REGION", value = var.aws_region },
         { name = "MONGODB_URL", value = "mongodb://localhost:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
         { name = "WBSOCKET_URL", value = "wss://app.myphonefriend.com" },
-        { name = "RTP_LISTENER_PORT", value = tostring(var.app_rtp_listener_port) },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
         { name = "RTP_LISTENER_HOST", value = "bianca-app.${aws_service_discovery_private_dns_namespace.internal.name}" },
         { name = "AWS_SES_REGION", value = var.aws_region },
         { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
-        { name = "RTP_LISTENER_HOST", value = "0.0.0.0" },
         { name = "BIANCA_PUBLIC_IP", value = "AUTO" },
       ]
       secrets = [

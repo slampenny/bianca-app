@@ -194,16 +194,27 @@ router.get('/ecs-metadata', async (req, res) => {
 router.get('/rtp-debug', async (req, res) => {
     try {
         const portManager = require('../../services/port.manager.service');
+        const { getFargateIp } = require('../../utils/network.utils');
         
-        // Get public IP - fix the import
-        let publicIp = getFargateIp();
+        // Get public IP with better error handling
+        let publicIp = 'Not available';
+        let ipError = null;
+        
+        try {
+            // Make sure we await the promise
+            publicIp = await getFargateIp();
+        } catch (err) {
+            publicIp = 'Error getting IP';
+            ipError = err.message;
+        }
         
         // Get active listeners
         const activeListeners = rtpListener.getAllActiveListeners();
         
         res.json({
             network: {
-                publicIp,
+                publicIp: publicIp, // This should now be a string
+                ipError: ipError,   // Add error details if any
                 isRunningInECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
                 ecsMetadataUri: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set'
             },
@@ -218,9 +229,7 @@ router.get('/rtp-debug', async (req, res) => {
             environment: {
                 AWS_REGION: process.env.AWS_REGION,
                 NODE_ENV: process.env.NODE_ENV,
-                // Add these to debug
-                RTP_PORT_RANGE: process.env.RTP_PORT_RANGE,
-                RTP_LISTENER_PORT: process.env.RTP_LISTENER_PORT
+                RTP_PORT_RANGE: process.env.RTP_PORT_RANGE
             }
         });
     } catch (err) {
@@ -334,13 +343,11 @@ router.get('/config', (req, res) => {
             host: config.asterisk.host,
             url: config.asterisk.url,
             rtpBiancaHost: config.asterisk.rtpBiancaHost,
-            rtpBiancaReceivePort: config.asterisk.rtpBiancaReceivePort,
-            rtpBiancaSendPort: config.asterisk.rtpBiancaSendPort,
             rtpAsteriskHost: config.asterisk.rtpAsteriskHost,
         },
         rtpPorts: {
-            listenerPort: process.env.RTP_LISTENER_PORT,
-            senderPort: process.env.RTP_SENDER_PORT,
+            appPortRange: process.env.APP_RTP_PORT_RANGE || '16384-16484',
+            // Remove listenerPort and senderPort
         },
         environmentVariables: {
             NODE_ENV: process.env.NODE_ENV,
@@ -506,18 +513,12 @@ router.post('/ari-test-connection', async (req, res) => {
  */
 router.get('/rtp-listener-status', (req, res) => {
     try {
-        const stats = rtpListener.getStats();
-        const health = rtpListener.healthCheck();
-        const ssrcMappings = rtpListener.getAllSsrcMappings();
+        const activeListeners = rtpListener.getAllActiveListeners();
         
         res.json({
-            health,
-            stats,
-            ssrcMappings: Array.from(ssrcMappings.entries()),
-            config: {
-                listenHost: '0.0.0.0',
-                listenPort: config.asterisk.rtpBiancaReceivePort
-            }
+            activeListenerCount: Object.keys(activeListeners).length,
+            listeners: activeListeners,
+            // Remove the config.listenPort reference
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -567,9 +568,11 @@ router.get('/channel-tracker', (req, res) => {
             asteriskChannelId: id,
             twilioCallSid: data.twilioCallSid,
             state: data.state,
-            snoopMethod: data.snoopMethod,
-            awaitingSsrcForRtp: data.awaitingSsrcForRtp,
-            rtp_ssrc: data.rtp_ssrc,
+            allocatedRtpPort: data.rtpPort,  // ADD THIS - shows the allocated port
+            isReadStreamReady: data.isReadStreamReady,
+            isWriteStreamReady: data.isWriteStreamReady,
+            // Remove SSRC-related fields
+            // Remove snoopMethod field (outdated)
             hasMainChannel: !!data.mainChannel,
             hasSnoopChannel: !!data.snoopChannel,
             hasPlaybackChannel: !!data.playbackChannel,
@@ -581,8 +584,7 @@ router.get('/channel-tracker', (req, res) => {
         
         res.json({
             stats,
-            calls,
-            audioSocketMappings: Array.from(channelTracker.uuidToChannelId.entries())
+            calls
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -760,67 +762,16 @@ router.post('/simulate-call-setup', (req, res) => {
  *         description: Connectivity test instructions
  */
 router.post('/test-udp-connectivity', async (req, res) => {
-    const { fromHost = 'asterisk.myphonefriend.internal' } = req.body;
-    
-    // Get the current RTP listener stats before the test
-    const beforeStats = rtpListener.getStats();
-    
     res.json({
-        instructions: `To test UDP connectivity from ${fromHost} to the RTP listener:`,
-        commands: [
-            `1. SSH into ${fromHost}`,
-            `2. Run: echo "test" | nc -u bianca-app.myphonefriend.internal ${config.asterisk.rtpBiancaReceivePort}`,
-            `3. Check /test/rtp-listener-status to see if packet count increased`,
-        ],
-        currentStats: {
-            totalPackets: beforeStats.totalPackets,
-            validRtpPackets: beforeStats.validRtpPackets,
-            invalidPackets: beforeStats.invalidPackets
-        }
+        instructions: `UDP connectivity test:`,
+        note: 'With one-port-per-call architecture, you need an active call first',
+        steps: [
+            '1. Make a test call',
+            '2. Check /test/channel-tracker to see the allocated port',
+            '3. SSH into Asterisk',
+            '4. Run: echo "test" | nc -u [FARGATE_IP] [ALLOCATED_PORT]'
+        ]
     });
-});
-
-/**
- * @swagger
- * /test/force-ssrc-mapping:
- *   post:
- *     summary: Force SSRC mapping
- *     description: Manually maps an SSRC to a call ID for testing
- *     tags: [Test - RTP]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               ssrc:
- *                 type: number
- *                 default: 12345
- *               callId:
- *                 type: string
- *                 default: "CA-test-123"
- *     responses:
- *       "200":
- *         description: SSRC mapping created
- */
-router.post('/force-ssrc-mapping', (req, res) => {
-    const { ssrc = 12345, callId = 'CA-test-123' } = req.body;
-    
-    try {
-        rtpListener.addSsrcMapping(ssrc, callId);
-        
-        res.json({
-            success: true,
-            mapping: {
-                ssrc,
-                callId
-            },
-            allMappings: Array.from(rtpListener.getAllSsrcMappings().entries())
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
 });
 
 /**

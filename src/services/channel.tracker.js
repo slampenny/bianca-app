@@ -1,13 +1,42 @@
 // src/services/channel.tracker.js
 
 const logger = require('../config/logger');
+const portManager = require('./port.manager.service');
 
 class ChannelTracker {
     constructor() {
         this.calls = new Map(); // Key: asteriskChannelId (main channel), Value: call state object
         // Map AudioSocket UUID back to main Asterisk Channel ID (if using AudioSocket)
         this.uuidToChannelId = new Map();
+        
+        // Listen to port manager events
+        this.setupPortManagerListeners();
+        
         logger.info('[Tracker] ChannelTracker initialized.');
+    }
+    
+    /**
+     * Set up listeners for port manager events
+     */
+    setupPortManagerListeners() {
+        portManager.on('stuck-ports-detected', (stuckPorts) => {
+            logger.warn('[Tracker] Detected stuck ports, checking for orphaned calls');
+            for (const stuckPort of stuckPorts) {
+                const callData = this.getCallByPrimaryId(stuckPort.callId);
+                if (!callData) {
+                    logger.error(`[Tracker] Stuck port ${stuckPort.port} for non-existent call ${stuckPort.callId}. Consider force release.`);
+                } else if (this.isCallInTerminalState(callData.asteriskChannelId)) {
+                    logger.error(`[Tracker] Call ${stuckPort.callId} in terminal state but port ${stuckPort.port} not released!`);
+                    // Auto-release the port
+                    portManager.releasePort(stuckPort.port, stuckPort.callId);
+                }
+            }
+        });
+        
+        portManager.on('ports-exhausted', () => {
+            logger.error('[Tracker] Port pool exhausted! Check for leaked ports.');
+            this.performPortAudit();
+        });
     }
 
     /**
@@ -18,7 +47,28 @@ class ChannelTracker {
     addCall(asteriskChannelId, initialData) {
         if (this.calls.has(asteriskChannelId)) {
             logger.warn(`[Tracker] Attempted to add existing main channel ID: ${asteriskChannelId}. Overwriting data.`);
+            // Clean up any existing port allocation
+            const existingCall = this.calls.get(asteriskChannelId);
+            if (existingCall.rtpPort) {
+                portManager.releasePort(existingCall.rtpPort, asteriskChannelId);
+            }
         }
+        
+        // Allocate RTP port if needed
+        let rtpPort = initialData.rtpPort || null;
+        if (!rtpPort && initialData.needsRtpPort) {
+            rtpPort = portManager.acquirePort(asteriskChannelId, {
+                asteriskChannelId,
+                twilioCallSid: initialData.twilioCallSid,
+                patientId: initialData.patientId
+            });
+            
+            if (!rtpPort) {
+                logger.error(`[Tracker] Failed to acquire RTP port for call ${asteriskChannelId}`);
+                // You might want to handle this failure case
+            }
+        }
+        
         const callData = {
             asteriskChannelId: asteriskChannelId,
             mainChannel: initialData.channel || null,
@@ -30,12 +80,12 @@ class ChannelTracker {
             mainBridgeId: null,
             conversationId: null, // Mongoose DB conversation _id
             recordingName: null, // Main bridge recording name
-            rtpPort: initialData.rtpPort || null, // The unique port allocated for this call
+            rtpPort: rtpPort, // The unique port allocated for this call
             rtpListener: null, // Reference to the dedicated RTP listener instance
 
             // --- Flag-Based State Properties ---
-            isReadStreamReady: false,  // NEW: Flag for inbound audio path (user->app)
-            isWriteStreamReady: false, // NEW: Flag for outbound audio path (app->user)
+            isReadStreamReady: false,  // Flag for inbound audio path (user->app)
+            isWriteStreamReady: false, // Flag for outbound audio path (app->user)
 
             // Snoop & Audio Capture Related Fields
             snoopMethod: null, // 'audiosocket' or 'externalMedia' or 'ffmpeg'
@@ -48,9 +98,7 @@ class ChannelTracker {
             localChannelId: null,
             
             // External Media RTP Fields
-            rtpPort: null, // NEW: The unique UDP port for receiving audio for this call
             rtpSessionId: null, // RTP session identifier
-            //expectingRtpChannel: false,
             pendingSnoopId: null,
             pendingPlaybackId: null,
             playbackChannel: null,
@@ -62,16 +110,16 @@ class ChannelTracker {
             unicastRtpChannel: null,
             unicastRtpChannelId: null,
             asteriskRtpEndpoint: null, // { host, port }
-            //rtp_ssrc: null, // Learned SSRC for ExternalMedia stream
-            //awaitingSsrcForRtp: false,
             snoopToRtpMapping: null,
             
             ffmpegTranscoder: null, // Reference to FFmpeg process if using that method
 
             ...initialData, // Apply any other passed initial data
+            rtpPort: rtpPort, // Ensure rtpPort is set after spread
         };
+        
         this.calls.set(asteriskChannelId, callData);
-        logger.info(`[Tracker] Added call: ${asteriskChannelId} (TwilioCallSid: ${callData.twilioCallSid || 'N/A'})`);
+        logger.info(`[Tracker] Added call: ${asteriskChannelId} (TwilioCallSid: ${callData.twilioCallSid || 'N/A'}, RTPPort: ${rtpPort || 'N/A'})`);
         this.logState();
         return callData;
     }
@@ -113,10 +161,32 @@ class ChannelTracker {
     updateCall(asteriskChannelId, updates) {
         const callData = this.calls.get(asteriskChannelId);
         if (callData) {
+            // Handle RTP port updates
+            if (updates.rtpPort !== undefined && updates.rtpPort !== callData.rtpPort) {
+                // Release old port if exists
+                if (callData.rtpPort) {
+                    portManager.releasePort(callData.rtpPort, asteriskChannelId);
+                }
+                // Acquire new port if specified
+                if (updates.rtpPort === 'acquire') {
+                    updates.rtpPort = portManager.acquirePort(asteriskChannelId, {
+                        asteriskChannelId,
+                        twilioCallSid: callData.twilioCallSid,
+                        patientId: callData.patientId
+                    });
+                }
+            }
+            
             Object.assign(callData, updates);
-            // Example: Log state change specifically
+            
+            // Log state change specifically
             if (updates.state) {
-                 logger.debug(`[Tracker] State change for ${asteriskChannelId}: ${callData.state} -> ${updates.state}`);
+                logger.debug(`[Tracker] State change for ${asteriskChannelId}: ${callData.state} -> ${updates.state}`);
+                
+                // Check if we're moving to a terminal state
+                if (this.isCallInTerminalState(asteriskChannelId)) {
+                    logger.debug(`[Tracker] Call ${asteriskChannelId} entered terminal state: ${updates.state}`);
+                }
             }
         } else {
             logger.warn(`[Tracker] Update failed: Call ${asteriskChannelId} not found.`);
@@ -134,8 +204,12 @@ class ChannelTracker {
         const callData = this.getCall(asteriskChannelId);
         if (callData) {
             // Warn if overwriting existing mappings
-            if(callData.audioSocketUuid && callData.audioSocketUuid !== audioSocketUuid) { logger.warn(`[Tracker] Overwriting UUID mapping for ${asteriskChannelId}.`); }
-            if (this.uuidToChannelId.has(audioSocketUuid) && this.uuidToChannelId.get(audioSocketUuid) !== asteriskChannelId) { logger.warn(`[Tracker] UUID ${audioSocketUuid} already mapped to ${this.uuidToChannelId.get(audioSocketUuid)}. Overwriting.`); }
+            if(callData.audioSocketUuid && callData.audioSocketUuid !== audioSocketUuid) { 
+                logger.warn(`[Tracker] Overwriting UUID mapping for ${asteriskChannelId}.`); 
+            }
+            if (this.uuidToChannelId.has(audioSocketUuid) && this.uuidToChannelId.get(audioSocketUuid) !== asteriskChannelId) { 
+                logger.warn(`[Tracker] UUID ${audioSocketUuid} already mapped to ${this.uuidToChannelId.get(audioSocketUuid)}. Overwriting.`); 
+            }
 
             callData.audioSocketUuid = audioSocketUuid;
             this.uuidToChannelId.set(audioSocketUuid, asteriskChannelId);
@@ -165,30 +239,37 @@ class ChannelTracker {
      */
     removeCall(asteriskChannelId) {
         const callData = this.calls.get(asteriskChannelId);
-        let uuidToRemove = null;
-        if (callData && callData.audioSocketUuid) { // Check if AudioSocket was used
-             uuidToRemove = callData.audioSocketUuid;
+        
+        if (!callData) {
+            logger.warn(`[Tracker] Attempted to remove non-existent channel ID: ${asteriskChannelId}`);
+            return false;
         }
-        // Note: We don't have a reverse map for SSRC, cleanup handled by RTP listener calling removeSsrcMapping
+        
+        // Release RTP port if allocated
+        if (callData.rtpPort) {
+            const released = portManager.releasePort(callData.rtpPort, asteriskChannelId);
+            if (!released) {
+                logger.error(`[Tracker] Failed to release RTP port ${callData.rtpPort} for call ${asteriskChannelId}`);
+            }
+        }
+        
+        // Clean up AudioSocket UUID mapping if it exists
+        if (callData.audioSocketUuid) {
+            if(this.uuidToChannelId.get(callData.audioSocketUuid) === asteriskChannelId) {
+                this.uuidToChannelId.delete(callData.audioSocketUuid);
+                logger.debug(`[Tracker] Removed AudioSocket UUID mapping for ${callData.audioSocketUuid}`);
+            } else {
+                logger.warn(`[Tracker] UUID ${callData.audioSocketUuid} was not mapped to removed channel ${asteriskChannelId} during cleanup.`);
+            }
+        }
 
         const deleted = this.calls.delete(asteriskChannelId);
-
-        // Clean up AudioSocket UUID mapping if it exists
-        if (uuidToRemove) {
-             if(this.uuidToChannelId.get(uuidToRemove) === asteriskChannelId) {
-                   this.uuidToChannelId.delete(uuidToRemove);
-                   logger.debug(`[Tracker] Removed AudioSocket UUID mapping for ${uuidToRemove}`);
-             } else {
-                  logger.warn(`[Tracker] UUID ${uuidToRemove} was not mapped to removed channel ${asteriskChannelId} during cleanup.`);
-             }
-        }
-
+        
         if (deleted) {
             logger.info(`[Tracker] Removed call: ${asteriskChannelId}`);
             this.logState();
-        } else {
-             logger.warn(`[Tracker] Attempted to remove non-existent channel ID: ${asteriskChannelId}`);
         }
+        
         return deleted;
     }
 
@@ -220,11 +301,11 @@ class ChannelTracker {
             conversationId: callData.conversationId,
             twilioCallSid: callData.twilioCallSid,
             asteriskChannelId: callData.asteriskChannelId,
-            rtp_ssrc: callData.rtp_ssrc,
             ffmpegTranscoder: callData.ffmpegTranscoder,
             recordingName: callData.recordingName,
             asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
-            rtpPort: callData.rtpPort, // NEW: Ensure port is available for cleanup
+            rtpPort: callData.rtpPort,
+            rtpListener: callData.rtpListener,
         } : null;
     }
 
@@ -242,27 +323,47 @@ class ChannelTracker {
         }
         return null;
     }
+    
+    /**
+     * Find call data by RTP port
+     * @param {number} rtpPort
+     * @returns {object | null} - Returns { asteriskChannelId, ...callData } or null
+     */
+    findCallByRtpPort(rtpPort) {
+        if (!rtpPort) return null;
+        for (const [asteriskId, data] of this.calls.entries()) {
+            if (data.rtpPort === rtpPort) {
+                return { asteriskChannelId: asteriskId, ...data };
+            }
+        }
+        return null;
+    }
 
     /**
      * Debugging helper to log current state.
      */
     logState() {
         try {
-             const callSummary = Array.from(this.calls.entries()).map(([id, data]) => ({
-                 astId: id,
-                 twilioCallSid: data.twilioCallSid,
-                 state: data.state,
-                 snoopMethod: data.snoopMethod,
-                 snoopId: data.snoopChannelId,
-                 localId: data.localChannelId,
-                 playbackId: data.playbackChannelId,
-                 ssrc: data.rtp_ssrc,
-                 rtpSession: data.rtpSessionId
-             }));
-             logger.debug(`[Tracker State] Active Calls: ${JSON.stringify(callSummary)}`);
-             logger.debug(`[Tracker State] AudioSocket UUIDs Mapped: ${JSON.stringify(Array.from(this.uuidToChannelId.keys()))}`);
+            const callSummary = Array.from(this.calls.entries()).map(([id, data]) => ({
+                astId: id,
+                twilioCallSid: data.twilioCallSid,
+                state: data.state,
+                snoopMethod: data.snoopMethod,
+                snoopId: data.snoopChannelId,
+                localId: data.localChannelId,
+                playbackId: data.playbackChannelId,
+                ssrc: data.rtp_ssrc,
+                rtpSession: data.rtpSessionId,
+                rtpPort: data.rtpPort
+            }));
+            logger.debug(`[Tracker State] Active Calls: ${JSON.stringify(callSummary)}`);
+            logger.debug(`[Tracker State] AudioSocket UUIDs Mapped: ${JSON.stringify(Array.from(this.uuidToChannelId.keys()))}`);
+            
+            // Add port manager stats
+            const portStats = portManager.getStats();
+            logger.debug(`[Tracker State] Port Usage: ${portStats.leased}/${portStats.totalPorts} (${portStats.utilizationPercent}%)`);
         } catch (e) {
-             logger.warn(`[Tracker State] Error logging state: ${e.message}`);
+            logger.warn(`[Tracker State] Error logging state: ${e.message}`);
         }
     }
 
@@ -275,7 +376,8 @@ class ChannelTracker {
             totalCalls: this.calls.size,
             callsByState: {},
             callsBySnoopMethod: {},
-            audioSocketMappings: this.uuidToChannelId.size
+            audioSocketMappings: this.uuidToChannelId.size,
+            portsAllocated: 0
         };
 
         for (const callData of this.calls.values()) {
@@ -286,7 +388,15 @@ class ChannelTracker {
             // Count by snoop method
             const method = callData.snoopMethod || 'none';
             stats.callsBySnoopMethod[method] = (stats.callsBySnoopMethod[method] || 0) + 1;
+            
+            // Count ports
+            if (callData.rtpPort) {
+                stats.portsAllocated++;
+            }
         }
+        
+        // Add port manager stats
+        stats.portManager = portManager.getStats();
 
         return stats;
     }
@@ -320,6 +430,177 @@ class ChannelTracker {
 
         const terminalStates = ['cleanup', 'completed', 'failed', 'error'];
         return terminalStates.includes(callData.state);
+    }
+    
+    /**
+     * Perform an audit of port allocations
+     * @returns {object} Audit results
+     */
+    performPortAudit() {
+        const audit = {
+            trackedCallsWithPorts: [],
+            orphanedPorts: [],
+            callsInTerminalStateWithPorts: []
+        };
+        
+        // Check all tracked calls
+        for (const [asteriskId, callData] of this.calls.entries()) {
+            if (callData.rtpPort) {
+                audit.trackedCallsWithPorts.push({
+                    asteriskChannelId: asteriskId,
+                    twilioCallSid: callData.twilioCallSid,
+                    port: callData.rtpPort,
+                    state: callData.state,
+                    duration: Math.round((Date.now() - callData.startTime) / 1000)
+                });
+                
+                if (this.isCallInTerminalState(asteriskId)) {
+                    audit.callsInTerminalStateWithPorts.push({
+                        asteriskChannelId: asteriskId,
+                        port: callData.rtpPort,
+                        state: callData.state
+                    });
+                }
+            }
+        }
+        
+        // Check port manager for orphaned ports
+        const portStats = portManager.getStats();
+        for (const leaseDetail of portStats.leasedDetails) {
+            const callData = this.getCallByPrimaryId(leaseDetail.callId);
+            if (!callData) {
+                audit.orphanedPorts.push({
+                    port: leaseDetail.port,
+                    callId: leaseDetail.callId,
+                    duration: leaseDetail.duration,
+                    metadata: leaseDetail.metadata
+                });
+            }
+        }
+        
+        // Log audit results
+        if (audit.orphanedPorts.length > 0) {
+            logger.error(`[Tracker] Port audit found ${audit.orphanedPorts.length} orphaned ports:`, audit.orphanedPorts);
+        }
+        
+        if (audit.callsInTerminalStateWithPorts.length > 0) {
+            logger.error(`[Tracker] Port audit found ${audit.callsInTerminalStateWithPorts.length} calls in terminal state with unreleased ports:`, 
+                audit.callsInTerminalStateWithPorts);
+        }
+        
+        logger.info(`[Tracker] Port audit complete. Tracked calls with ports: ${audit.trackedCallsWithPorts.length}`);
+        
+        return audit;
+    }
+    
+    /**
+     * Clean up orphaned resources based on audit
+     * @param {boolean} autoRelease - If true, automatically release orphaned ports
+     * @returns {object} Cleanup results
+     */
+    cleanupOrphanedResources(autoRelease = false) {
+        const audit = this.performPortAudit();
+        const cleanup = {
+            portsReleased: 0,
+            callsRemoved: 0,
+            errors: []
+        };
+        
+        // Handle orphaned ports
+        for (const orphan of audit.orphanedPorts) {
+            if (autoRelease) {
+                try {
+                    portManager.releasePort(orphan.port, orphan.callId);
+                    cleanup.portsReleased++;
+                    logger.info(`[Tracker] Released orphaned port ${orphan.port} from call ${orphan.callId}`);
+                } catch (error) {
+                    cleanup.errors.push({ type: 'port_release', port: orphan.port, error: error.message });
+                }
+            } else {
+                logger.warn(`[Tracker] Found orphaned port ${orphan.port} for call ${orphan.callId} (duration: ${orphan.duration}s)`);
+            }
+        }
+        
+        // Handle terminal state calls with ports
+        for (const terminalCall of audit.callsInTerminalStateWithPorts) {
+            if (autoRelease) {
+                try {
+                    // Release port through removeCall which handles cleanup
+                    this.removeCall(terminalCall.asteriskChannelId);
+                    cleanup.callsRemoved++;
+                    logger.info(`[Tracker] Removed terminal call ${terminalCall.asteriskChannelId} and released port ${terminalCall.port}`);
+                } catch (error) {
+                    cleanup.errors.push({ 
+                        type: 'call_removal', 
+                        asteriskChannelId: terminalCall.asteriskChannelId, 
+                        error: error.message 
+                    });
+                }
+            } else {
+                logger.warn(`[Tracker] Call ${terminalCall.asteriskChannelId} in terminal state '${terminalCall.state}' still has port ${terminalCall.port}`);
+            }
+        }
+        
+        if (cleanup.errors.length > 0) {
+            logger.error('[Tracker] Cleanup encountered errors:', cleanup.errors);
+        }
+        
+        logger.info(`[Tracker] Cleanup complete. Ports released: ${cleanup.portsReleased}, Calls removed: ${cleanup.callsRemoved}`);
+        return cleanup;
+    }
+    
+    /**
+     * Get detailed information about a specific call including port status
+     * @param {string} callId - Asterisk channel ID or Twilio SID
+     * @returns {object | null}
+     */
+    getCallDetails(callId) {
+        const callData = this.getCallByPrimaryId(callId);
+        if (!callData) return null;
+        
+        const details = { ...callData };
+        
+        // Add port information if available
+        if (callData.rtpPort) {
+            const portInfo = portManager.getLeaseInfo(callData.rtpPort);
+            details.portInfo = portInfo || { error: 'Port lease not found in manager' };
+        }
+        
+        // Add duration
+        details.callDuration = Math.round((Date.now() - callData.startTime) / 1000);
+        
+        // Add terminal state check
+        details.isTerminal = this.isCallInTerminalState(callData.asteriskChannelId);
+        
+        return details;
+    }
+    
+    /**
+     * Gracefully shutdown the tracker
+     */
+    async shutdown() {
+        logger.info('[Tracker] Starting graceful shutdown...');
+        
+        // Perform final audit
+        const audit = this.performPortAudit();
+        logger.info('[Tracker] Final audit:', {
+            activeCalls: this.calls.size,
+            orphanedPorts: audit.orphanedPorts.length,
+            terminalCallsWithPorts: audit.callsInTerminalStateWithPorts.length
+        });
+        
+        // Release all ports
+        for (const [asteriskId, callData] of this.calls.entries()) {
+            if (callData.rtpPort) {
+                portManager.releasePort(callData.rtpPort, asteriskId);
+            }
+        }
+        
+        // Clear all mappings
+        this.calls.clear();
+        this.uuidToChannelId.clear();
+        
+        logger.info('[Tracker] Shutdown complete');
     }
 }
 
