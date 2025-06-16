@@ -851,8 +851,9 @@ router.post('/cleanup-all', async (req, res) => {
         // Clean up OpenAI connections
         await openAIService.disconnectAll();
         
-        // Clear SSRC mappings
-        const clearedCount = rtpListener.clearAllSsrcMappings();
+        // Clear SSRC mappings -- does not exist anymore
+        //const clearedCount = rtpListener.clearAllSsrcMappings();
+        const clearedCount = 0;
         
         res.json({
             success: true,
@@ -899,7 +900,7 @@ router.get('/network-debug', async (req, res) => {
  *       "200":
  *         description: WebSocket test results
  */
-router.get('/test/ari-websocket', async (req, res) => {
+router.get('/ari-websocket', async (req, res) => {
     try {
         const WebSocket = require('ws');
         const testResults = {
@@ -988,7 +989,7 @@ router.get('/test/ari-websocket', async (req, res) => {
  *       "200":
  *         description: RTP flow test results
  */
-router.post('/test/simulate-rtp-flow', async (req, res) => {
+router.post('/simulate-rtp-flow', async (req, res) => {
     const dgram = require('dgram');
     const testCallId = `test-${Date.now()}`;
     let allocatedPort = null;
@@ -1090,7 +1091,7 @@ router.post('/test/simulate-rtp-flow', async (req, res) => {
  *       "200":
  *         description: Port audit results
  */
-router.get('/test/port-audit', (req, res) => {
+router.get('/port-audit', (req, res) => {
     try {
         const audit = channelTracker.performPortAudit();
         const portManager = require('../../services/port.manager.service');
@@ -1133,7 +1134,7 @@ router.get('/test/port-audit', (req, res) => {
  *       "200":
  *         description: Cleanup results
  */
-router.post('/test/port-cleanup', (req, res) => {
+router.post('/port-cleanup', (req, res) => {
     try {
         const { autoRelease = false } = req.body;
         const cleanup = channelTracker.cleanupOrphanedResources(autoRelease);
@@ -1160,7 +1161,7 @@ router.post('/test/port-cleanup', (req, res) => {
  *       "200":
  *         description: Integration validation results
  */
-router.get('/test/validate-integration', async (req, res) => {
+router.get('/validate-integration', async (req, res) => {
     const results = {
         timestamp: new Date().toISOString(),
         checks: {}
