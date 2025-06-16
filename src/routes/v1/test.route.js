@@ -867,5 +867,368 @@ router.post('/cleanup-all', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/network-debug:
+ *   get:
+ *     summary: Debug network configuration
+ *     description: Shows detailed network information including public IP detection
+ *     tags: [Test - Network]
+ *     responses:
+ *       "200":
+ *         description: Network debug information
+ */
+router.get('/network-debug', async (req, res) => {
+    try {
+        const { getNetworkDebugInfo } = require('../../utils/network.utils');
+        const debugInfo = await getNetworkDebugInfo();
+        res.json(debugInfo);
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+/**
+ * @swagger
+ * /test/ari-websocket:
+ *   get:
+ *     summary: Test ARI WebSocket connection
+ *     description: Tests the WebSocket connection to Asterisk ARI for real-time events
+ *     tags: [Test - Asterisk]
+ *     responses:
+ *       "200":
+ *         description: WebSocket test results
+ */
+router.get('/test/ari-websocket', async (req, res) => {
+    try {
+        const WebSocket = require('ws');
+        const testResults = {
+            httpConnection: false,
+            wsConnection: false,
+            wsUrl: null,
+            events: [],
+            error: null
+        };
+
+        // First test HTTP connection
+        const instance = ariClient.getAriClientInstance();
+        testResults.httpConnection = instance.isConnected;
+        
+        if (!testResults.httpConnection) {
+            throw new Error('ARI HTTP connection not established');
+        }
+
+        // Build WebSocket URL
+        const ariUrl = config.asterisk.url;
+        const wsUrl = ariUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+        testResults.wsUrl = `${wsUrl}/ari/events?api_key=${config.asterisk.username}:${config.asterisk.password}&app=${instance.CONFIG?.STASIS_APP_NAME || 'myphonefriend'}`;
+
+        // Test WebSocket connection
+        await new Promise((resolve, reject) => {
+            const ws = new WebSocket(testResults.wsUrl);
+            const timeout = setTimeout(() => {
+                ws.close();
+                reject(new Error('WebSocket connection timeout'));
+            }, 5000);
+
+            ws.on('open', () => {
+                testResults.wsConnection = true;
+                clearTimeout(timeout);
+            });
+
+            ws.on('message', (data) => {
+                try {
+                    const event = JSON.parse(data);
+                    testResults.events.push({
+                        type: event.type,
+                        timestamp: new Date().toISOString()
+                    });
+                } catch (e) {
+                    // Ignore parse errors
+                }
+            });
+
+            ws.on('error', (error) => {
+                testResults.error = error.message;
+                clearTimeout(timeout);
+                reject(error);
+            });
+
+            ws.on('close', () => {
+                clearTimeout(timeout);
+                resolve();
+            });
+
+            // Give it 3 seconds to collect some events
+            setTimeout(() => {
+                ws.close();
+                resolve();
+            }, 3000);
+        }).catch(err => {
+            testResults.error = err.message;
+        });
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({ 
+            error: err.message,
+            suggestion: 'Make sure Asterisk ARI WebSocket is enabled and accessible'
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/simulate-rtp-flow:
+ *   post:
+ *     summary: Simulate complete RTP flow
+ *     description: Tests the complete RTP audio flow including port allocation
+ *     tags: [Test - RTP]
+ *     responses:
+ *       "200":
+ *         description: RTP flow test results
+ */
+router.post('/test/simulate-rtp-flow', async (req, res) => {
+    const dgram = require('dgram');
+    const testCallId = `test-${Date.now()}`;
+    let allocatedPort = null;
+    
+    try {
+        const portManager = require('../../services/port.manager.service');
+        const results = {
+            portAllocation: false,
+            listenerStarted: false,
+            packetSent: false,
+            packetReceived: false,
+            errors: []
+        };
+
+        // Step 1: Allocate port
+        allocatedPort = portManager.acquirePort(testCallId, {
+            asteriskChannelId: testCallId,
+            twilioCallSid: `CA-test-${Date.now()}`
+        });
+        
+        if (!allocatedPort) {
+            throw new Error('Failed to allocate port');
+        }
+        results.portAllocation = true;
+        results.allocatedPort = allocatedPort;
+
+        // Step 2: Start RTP listener
+        await rtpListener.startRtpListenerForCall(allocatedPort, testCallId, testCallId);
+        results.listenerStarted = true;
+
+        // Step 3: Wait a bit for listener to be ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Step 4: Send test RTP packet
+        const publicIp = await getFargateIp();
+        const rtpHeader = Buffer.alloc(12);
+        rtpHeader[0] = 0x80; // V=2, P=0, X=0, CC=0
+        rtpHeader[1] = 0; // M=0, PT=0 (PCMU)
+        rtpHeader.writeUInt16BE(1, 2); // Sequence
+        rtpHeader.writeUInt32BE(Date.now() & 0xFFFFFFFF, 4); // Timestamp
+        rtpHeader.writeUInt32BE(0x12345678, 8); // SSRC
+        
+        const payload = Buffer.from('test audio payload');
+        const packet = Buffer.concat([rtpHeader, payload]);
+        
+        const socket = dgram.createSocket('udp4');
+        await new Promise((resolve, reject) => {
+            socket.send(packet, allocatedPort, publicIp === 'localhost' ? 'localhost' : '127.0.0.1', (err) => {
+                socket.close();
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        results.packetSent = true;
+
+        // Step 5: Check if packet was received (check listener stats)
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const listenerStats = rtpListener.getListenerForCall(testCallId)?.getStats();
+        results.packetReceived = listenerStats?.packetsReceived > 0;
+        results.listenerStats = listenerStats;
+
+        // Cleanup
+        rtpListener.stopRtpListenerForCall(testCallId);
+        portManager.releasePort(allocatedPort, testCallId);
+
+        res.json({
+            success: results.packetReceived,
+            results,
+            publicIp
+        });
+
+    } catch (err) {
+        // Cleanup on error
+        if (allocatedPort) {
+            try {
+                rtpListener.stopRtpListenerForCall(testCallId);
+                const portManager = require('../../services/port.manager.service');
+                portManager.releasePort(allocatedPort, testCallId);
+            } catch (cleanupErr) {
+                // Ignore cleanup errors
+            }
+        }
+        
+        res.status(500).json({ 
+            error: err.message,
+            stack: err.stack
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/port-audit:
+ *   get:
+ *     summary: Audit port allocations
+ *     description: Check for orphaned ports and port leaks
+ *     tags: [Test - Maintenance]
+ *     responses:
+ *       "200":
+ *         description: Port audit results
+ */
+router.get('/test/port-audit', (req, res) => {
+    try {
+        const audit = channelTracker.performPortAudit();
+        const portManager = require('../../services/port.manager.service');
+        const portStats = portManager.getStats();
+        
+        res.json({
+            audit,
+            portStats,
+            recommendations: {
+                hasOrphanedPorts: audit.orphanedPorts.length > 0,
+                hasTerminalCallsWithPorts: audit.callsInTerminalStateWithPorts.length > 0,
+                suggestedAction: (audit.orphanedPorts.length > 0 || audit.callsInTerminalStateWithPorts.length > 0) 
+                    ? 'Run POST /test/port-cleanup to fix issues' 
+                    : 'No issues found'
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/port-cleanup:
+ *   post:
+ *     summary: Clean up orphaned ports
+ *     description: Release orphaned ports and clean up terminal calls
+ *     tags: [Test - Maintenance]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               autoRelease:
+ *                 type: boolean
+ *                 default: false
+ *                 description: If true, automatically releases orphaned resources
+ *     responses:
+ *       "200":
+ *         description: Cleanup results
+ */
+router.post('/test/port-cleanup', (req, res) => {
+    try {
+        const { autoRelease = false } = req.body;
+        const cleanup = channelTracker.cleanupOrphanedResources(autoRelease);
+        
+        res.json({
+            cleanup,
+            message: autoRelease 
+                ? `Released ${cleanup.portsReleased} ports and removed ${cleanup.callsRemoved} calls`
+                : 'Audit complete. Set autoRelease=true to perform cleanup'
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/validate-integration:
+ *   get:
+ *     summary: Validate complete system integration
+ *     description: Runs a comprehensive check of all system components
+ *     tags: [Test - System]
+ *     responses:
+ *       "200":
+ *         description: Integration validation results
+ */
+router.get('/test/validate-integration', async (req, res) => {
+    const results = {
+        timestamp: new Date().toISOString(),
+        checks: {}
+    };
+
+    // 1. Check ARI Connection
+    try {
+        const instance = ariClient.getAriClientInstance();
+        results.checks.ariConnection = {
+            connected: instance.isConnected,
+            health: await instance.healthCheck()
+        };
+    } catch (err) {
+        results.checks.ariConnection = { error: err.message };
+    }
+
+    // 2. Check Public IP Detection
+    try {
+        const publicIp = await getFargateIp();
+        results.checks.publicIp = {
+            detected: publicIp,
+            isPrivate: publicIp.startsWith('172.') || publicIp.startsWith('10.') || publicIp.startsWith('192.168.'),
+            isLocalhost: publicIp === 'localhost'
+        };
+    } catch (err) {
+        results.checks.publicIp = { error: err.message };
+    }
+
+    // 3. Check Port Manager
+    try {
+        const portManager = require('../../services/port.manager.service');
+        const stats = portManager.getStats();
+        results.checks.portManager = {
+            healthy: stats.available > 0,
+            stats
+        };
+    } catch (err) {
+        results.checks.portManager = { error: err.message };
+    }
+
+    // 4. Check Service Discovery
+    try {
+        const asteriskResolved = await dns.resolve4('asterisk.myphonefriend.internal');
+        results.checks.serviceDiscovery = {
+            asteriskResolved: asteriskResolved.length > 0,
+            asteriskIp: asteriskResolved[0]
+        };
+    } catch (err) {
+        results.checks.serviceDiscovery = { error: err.message };
+    }
+
+    // 5. Check OpenAI Service
+    try {
+        results.checks.openAI = {
+            connections: openAIService.connections.size,
+            healthy: true
+        };
+    } catch (err) {
+        results.checks.openAI = { error: err.message };
+    }
+
+    // Overall health
+    results.healthy = Object.values(results.checks).every(check => 
+        !check.error && (check.connected || check.detected || check.healthy || check.asteriskResolved)
+    );
+
+    res.json(results);
+});
+
 // Export the complete test routes
 module.exports = router;

@@ -552,6 +552,16 @@ resource "aws_security_group" "asterisk_ec2_sg" {
   tags = { Name = "asterisk-ec2-sg" }
 }
 
+resource "aws_security_group_rule" "asterisk_egress_https" {
+  type              = "egress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = ["0.0.0.0/0"]  # Or restrict to VPC CIDR
+  description       = "HTTPS/WSS outbound for ALB connection"
+}
+
 resource "aws_security_group" "efs_sg" {
   name        = "mongodb-efs-sg"
   description = "Allow NFS traffic from ECS tasks to EFS"
@@ -832,20 +842,25 @@ resource "aws_ecs_task_definition" "app_task" {
       essential = true
       portMappings = [
         { containerPort = var.container_port, hostPort = var.container_port, protocol = "tcp" },
-        # { containerPort = var.app_rtp_listener_port, hostPort = var.app_rtp_listener_port, protocol = "udp" }
+        # Add UDP port mappings for RTP
+        { containerPort = var.app_rtp_port_start, hostPort = var.app_rtp_port_start, protocol = "udp" },
+        { containerPort = var.app_rtp_port_end, hostPort = var.app_rtp_port_end, protocol = "udp" }
       ]
       environment = [
         { name = "AWS_REGION", value = var.aws_region },
         { name = "MONGODB_URL", value = "mongodb://localhost:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
-        { name = "WBSOCKET_URL", value = "wss://app.myphonefriend.com" },
+        { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" }, # Fixed typo
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
-        { name = "RTP_LISTENER_HOST", value = "bianca-app.${aws_service_discovery_private_dns_namespace.internal.name}" },
         { name = "AWS_SES_REGION", value = var.aws_region },
         { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
-        { name = "BIANCA_PUBLIC_IP", value = "AUTO" },
+        { name = "RTP_LISTENER_HOST", value = "0.0.0.0" }, # Keep only this one
+        { name = "BIANCA_PUBLIC_IP", value = "AUTO" }, # Let the app detect it
+        # Add these for better debugging
+        { name = "USE_EXTERNAL_IP_SERVICE", value = "true" },
+        { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name }
       ]
       secrets = [
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
