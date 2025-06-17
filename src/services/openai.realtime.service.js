@@ -224,6 +224,29 @@ class OpenAIRealtimeService {
         ws.on('close', (code, reason) => this.handleClose(callId, code, reason));
     }
 
+    sendResponseCreate(callId) {
+        const connection = this.connections.get(callId);
+        if (!connection || !connection.ws || connection.ws.readyState !== WebSocket.OPEN) {
+            logger.warn(`[OpenAI Realtime] Cannot send response.create - no active connection for ${callId}`);
+            return;
+        }
+
+        try {
+            const responseCreateEvent = {
+                type: 'response.create',
+                response: {
+                    modalities: ['text', 'audio'],
+                    instructions: 'Please greet the caller warmly and ask how you can help them today.'
+                }
+            };
+            
+            connection.ws.send(JSON.stringify(responseCreateEvent));
+            logger.info(`[OpenAI Realtime] Sent response.create for ${callId}`);
+        } catch (err) {
+            logger.error(`[OpenAI Realtime] Error sending response.create for ${callId}: ${err.message}`);
+        }
+    }
+
     /**
      * Handle WebSocket open event
      */

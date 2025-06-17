@@ -177,7 +177,6 @@ class AsteriskAriClient extends EventEmitter {
         this.setupGracefulShutdown();
     }
 
-    // --- REFACTOR 3: Add the core readiness check logic ---
     checkMediaPipelineReady(asteriskChannelId) {
         const callData = this.tracker.getCall(asteriskChannelId);
         // Only proceed if we are in the pending state
@@ -190,8 +189,22 @@ class AsteriskAriClient extends EventEmitter {
             logger.info(`[ARI Pipeline] Bidirectional media pipeline is now active for ${asteriskChannelId}`);
             this.updateCallState(asteriskChannelId, 'pipeline_active');
             
-            // TODO: This is the ideal place to trigger the initial greeting from the AI
-            // openAIService.startConversation(callData.twilioCallSid);
+            // Trigger the initial greeting from the AI
+            const primarySid = callData.twilioCallSid || asteriskChannelId;
+            
+            // Send a response.create to trigger the AI to speak
+            logger.info(`[ARI Pipeline] Triggering initial AI greeting for ${primarySid}`);
+            
+            // Send a system message to prompt greeting
+            openAIService.sendResponseCreate(primarySid);
+            
+            // Alternative - send silence to trigger VAD
+            // This can help ensure the AI knows the call is active
+            setTimeout(() => {
+                // Send a small amount of silence to ensure the connection is active
+                const silenceBase64 = Buffer.alloc(160, 0xFF).toString('base64'); // 20ms of μ-law silence
+                openAIService.sendAudioChunk(primarySid, silenceBase64);
+            }, 100);
         }
     }
     
@@ -586,19 +599,28 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     findParentCallForRtpChannel(channel) {
-        // Look for calls with allocated RTP ports
-        for (const [callId, data] of this.tracker.calls.entries()) {
-            if (data.rtpPort) {
-                // Check if this RTP channel belongs to this specific call
-                const channelName = channel.name || '';
-                // Check if channel name contains the call ID or Twilio SID
-                if (channelName.includes(callId) || 
-                    (data.twilioCallSid && channelName.includes(data.twilioCallSid)) ||
-                    this.isChannelForCall(channel, callId, data)) {
-                    return { parentId: callId, callData: data };
-                }
-            }
+        const channelName = channel.name || '';
+        
+        // Extract port from channel name (e.g., "UnicastRTP/3.21.122.60:16384-...")
+        const portMatch = channelName.match(/:(\d+)/);
+        if (!portMatch) {
+            logger.warn(`[ARI] Could not extract port from RTP channel name: ${channelName}`);
+            return null;
         }
+        
+        const port = parseInt(portMatch[1]);
+        
+        // Use channel tracker's existing method
+        const callData = this.tracker.findCallByRtpPort(port);
+        if (callData) {
+            logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
+            return { 
+                parentId: callData.asteriskChannelId, 
+                callData: callData 
+            };
+        }
+        
+        logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
         return null;
     }
 
@@ -616,32 +638,32 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     async handleInboundRtpChannel(channel, parentId, callData) {
-        if (!callData.mainBridgeId) {
-            throw new Error(`No bridge found for parent ${parentId}`);
-        }
-        // Added extra debugging logs to be certain of the flow
-        logger.info(`[ARI DEBUG] Entering handleInboundRtpChannel for ${channel.id}`);
+        logger.info(`[ARI] Setting up INBOUND RTP channel ${channel.id} for call ${parentId}`);
+        
         try {
+            // Answer the RTP channel
             await channel.answer();
-            logger.info(`[ARI DEBUG] Channel ${channel.id} was successfully answered.`);
+            logger.info(`[ARI] Answered inbound RTP channel ${channel.id}`);
             
-            // This is the critical part that sets the flag and checks for readiness
+            // For inbound RTP (read direction), we don't need to add it to a bridge
+            // It will automatically start sending RTP to our listener
+            
+            // Update tracking with the RTP channel info
             this.tracker.updateCall(parentId, { 
                 inboundRtpChannel: channel,
                 inboundRtpChannelId: channel.id,
-                awaitingSsrcForRtp: true,
-                isReadStreamReady: true   // Set the flag
+                isReadStreamReady: true   // Set the readiness flag
             });
+            
             logger.info(`[ARI Pipeline] READ stream is now ready for ${parentId}.`);
 
-            // Check if this completes the pipeline.
+            // Check if this completes the pipeline
             this.checkMediaPipelineReady(parentId);
-            logger.info(`[ARI DEBUG] handleInboundRtpChannel finished for ${channel.id}.`);
-
+            
         } catch (err) {
-            logger.error(`[ARI DEBUG] CRITICAL ERROR inside handleInboundRtpChannel for ${channel.id}: ${err.message}`, { stack: err.stack });
+            logger.error(`[ARI] Error setting up inbound RTP channel ${channel.id}: ${err.message}`, err);
             this.updateCallState(parentId, 'failed');
-            // Do not re-throw, as this might be happening in an unchained promise.
+            throw err;
         }
     }
 

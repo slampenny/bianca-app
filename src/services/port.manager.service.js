@@ -143,6 +143,24 @@ class PortManager extends EventEmitter {
     }
     
     /**
+     * Find call information by port number
+     * @param {number} port - The port to look up
+     * @returns {object | null} - Returns lease info with callId and metadata
+     */
+    getCallByPort(port) {
+        const leaseInfo = this.leasedPorts.get(port);
+        if (leaseInfo) {
+            return {
+                callId: leaseInfo.callId,
+                asteriskChannelId: leaseInfo.metadata.asteriskChannelId,
+                twilioCallSid: leaseInfo.metadata.twilioCallSid,
+                ...leaseInfo
+            };
+        }
+        return null;
+    }
+    
+    /**
      * Get lease information for a port
      * @param {number} port
      * @returns {object | null}
