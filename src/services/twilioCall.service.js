@@ -134,7 +134,7 @@ class TwilioCallService {
       const asteriskUrl = new URL('http://sip.myphonefriend.com:5061');
       const sipHost = asteriskUrl.hostname;
       const sipPort = config.asterisk.externalPort || 5061;
-      const sipUser = config.asterisk.sipUserName; // Or make dynamic if needed
+      const sipUser = req.body.Called || req.body.To || 'incoming';
       const sipUri = `sip:${sipUser}@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};patientId=${encodeURIComponent(patientId)}`;
 
       // Connect to Asterisk SIP endpoint with patientId as a parameter
