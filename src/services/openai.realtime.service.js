@@ -224,6 +224,14 @@ class OpenAIRealtimeService {
         ws.on('close', (code, reason) => this.handleClose(callId, code, reason));
     }
 
+    isConnectionReady(callId) {
+        const connection = this.connections.get(callId);
+        return connection && 
+            connection.ws && 
+            connection.ws.readyState === WebSocket.OPEN &&
+            connection.sessionReady === true;
+    }
+
     sendResponseCreate(callId) {
         const connection = this.connections.get(callId);
         if (!connection || !connection.ws || connection.ws.readyState !== WebSocket.OPEN) {

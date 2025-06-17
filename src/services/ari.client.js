@@ -192,18 +192,24 @@ class AsteriskAriClient extends EventEmitter {
             // Trigger the initial greeting from the AI
             const primarySid = callData.twilioCallSid || asteriskChannelId;
             
-            // Send a response.create to trigger the AI to speak
             logger.info(`[ARI Pipeline] Triggering initial AI greeting for ${primarySid}`);
             
-            // Send a system message to prompt greeting
-            openAIService.sendResponseCreate(primarySid);
-            
-            // Alternative - send silence to trigger VAD
-            // This can help ensure the AI knows the call is active
+            // Delay the greeting slightly to ensure OpenAI connection is ready
             setTimeout(() => {
-                // Send a small amount of silence to ensure the connection is active
-                const silenceBase64 = Buffer.alloc(160, 0xFF).toString('base64'); // 20ms of μ-law silence
-                openAIService.sendAudioChunk(primarySid, silenceBase64);
+                // Check if OpenAI is ready before sending
+                if (openAIService.isConnectionReady(primarySid)) {
+                    openAIService.sendResponseCreate(primarySid);
+                } else {
+                    logger.info(`[ARI Pipeline] OpenAI not ready yet, sending silence to trigger connection`);
+                    // Send silence to ensure the connection is active
+                    const silenceBase64 = Buffer.alloc(160, 0xFF).toString('base64'); // 20ms of μ-law silence
+                    openAIService.sendAudioChunk(primarySid, silenceBase64);
+                    
+                    // Try greeting again after a short delay
+                    setTimeout(() => {
+                        openAIService.sendResponseCreate(primarySid);
+                    }, 500);
+                }
             }, 100);
         }
     }
@@ -603,24 +609,40 @@ class AsteriskAriClient extends EventEmitter {
         
         // Extract port from channel name (e.g., "UnicastRTP/3.21.122.60:16384-...")
         const portMatch = channelName.match(/:(\d+)/);
-        if (!portMatch) {
-            logger.warn(`[ARI] Could not extract port from RTP channel name: ${channelName}`);
+        if (portMatch) {
+            const port = parseInt(portMatch[1]);
+            
+            // Use channel tracker's existing method
+            const callData = this.tracker.findCallByRtpPort(port);
+            if (callData) {
+                logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
+                return { 
+                    parentId: callData.asteriskChannelId, 
+                    callData: callData 
+                };
+            }
+            
+            logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
             return null;
         }
         
-        const port = parseInt(portMatch[1]);
-        
-        // Use channel tracker's existing method
-        const callData = this.tracker.findCallByRtpPort(port);
-        if (callData) {
-            logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
-            return { 
-                parentId: callData.asteriskChannelId, 
-                callData: callData 
-            };
+        // For outbound RTP channels that don't have a port in the name
+        // Check if this is an outbound channel by looking for our app host
+        if (channelName.includes(this.RTP_BIANCA_HOST)) {
+            logger.info(`[ARI] Detected outbound RTP channel ${channel.id} for host ${this.RTP_BIANCA_HOST}`);
+            
+            // Find a call that's expecting an outbound RTP channel
+            for (const [callId, data] of this.tracker.calls.entries()) {
+                if (data.state === 'pending_media' && !data.outboundRtpChannelId) {
+                    logger.info(`[ARI] Found parent call ${callId} expecting outbound RTP channel`);
+                    return { parentId: callId, callData: data };
+                }
+            }
+            
+            logger.warn(`[ARI] No call found expecting outbound RTP channel`);
         }
         
-        logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
+        logger.warn(`[ARI] Could not identify parent for RTP channel: ${channelName}`);
         return null;
     }
 
