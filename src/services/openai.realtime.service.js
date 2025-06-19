@@ -1441,22 +1441,24 @@ async processAudioResponseDebug(callId, audioBase64PCM) {
         // Append RAW input from OpenAI
         await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm24k.raw', inputBuffer);
         
-        // STAGE 2: Resample from 24kHz to 8kHz
-        const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
-        const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
+        // // STAGE 2: Resample from 24kHz to 8kHz
+        // const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
+        // const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
 
-        const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
+        // const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
         
-        if (!resampledBuffer || resampledBuffer.length === 0) {
-            logger.error(`[AUDIO DEBUG] Resampling FAILED for ${callId}`);
-            return;
-        }
+        // if (!resampledBuffer || resampledBuffer.length === 0) {
+        //     logger.error(`[AUDIO DEBUG] Resampling FAILED for ${callId}`);
+        //     return;
+        // }
         
-        // Append resampled audio
-        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
+        // // Append resampled audio
+        // await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
+
+        const bufferToConvert = inputBuffer; // Use the input buffer directly for conversion
 
         // STAGE 3: Convert PCM to uLaw
-        const ulawBase64 = await AudioUtils.convertPcmToUlaw(resampledBuffer);
+        const ulawBase64 = await AudioUtils.convertPcmToUlaw(bufferToConvert);
         
         if (!ulawBase64 || ulawBase64.length === 0) {
             logger.error(`[AUDIO DEBUG] PCM to uLaw conversion FAILED`);
