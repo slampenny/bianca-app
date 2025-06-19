@@ -41,6 +41,31 @@ class AudioUtils {
     }
 
     /**
+     * Resample using linear interpolation. This is safer for chunk-based/stream processing.
+     * @private
+     */
+    static resampleWithLinear(inputSamples, inputRate, outputRate) {
+        const ratio = inputRate / outputRate;
+        const outputLength = Math.ceil(inputSamples.length / ratio);
+        const outputSamples = new Float32Array(outputLength);
+
+        for (let i = 0; i < outputLength; i++) {
+            const srcPos = i * ratio;
+            const srcIndex = Math.floor(srcPos);
+            const frac = srcPos - srcIndex;
+
+            const p1 = inputSamples[srcIndex] || 0;
+            // Get the next sample; if at the very end, just repeat the last sample
+            const p2 = inputSamples[Math.min(inputSamples.length - 1, srcIndex + 1)] || 0;
+
+            // Simple linear interpolation
+            outputSamples[i] = p1 + (p2 - p1) * frac;
+        }
+        
+        return outputSamples;
+    }
+
+    /**
      * Convert uLaw to 16-bit PCM
      * @param {Buffer} ulawBuffer - Input uLaw buffer
      * @returns {Promise<Buffer>} PCM buffer (16-bit samples)
@@ -107,7 +132,7 @@ class AudioUtils {
             }
 
             // Use cubic interpolation for good quality/performance balance
-            const outputSamples = this.resampleWithCubic(inputSamples, inputRate, outputRate);
+            const outputSamples = this.resampleWithLinear(inputSamples, inputRate, outputRate);
 
             // Convert back to buffer
             const outputBuffer = Buffer.alloc(outputSamples.length * 2);

@@ -1404,7 +1404,7 @@ function analyzeAudioPipeline(debugInfo) {
  */
 router.post('/audio-conversion-test', async (req, res) => {
     try {
-        const AudioUtils = require('../api/audio.utils');
+        const AudioUtils = require('../../api/audio.utils');
         const testResults = {
             timestamp: new Date().toISOString(),
             steps: []
@@ -1678,7 +1678,7 @@ router.post('/test-audio-chain', async (req, res) => {
     }
 
     try {
-        const AudioUtils = require('../api/audio.utils');
+        const AudioUtils = require('../../api/audio.utils');
         const result = {
             callId,
             testType,
