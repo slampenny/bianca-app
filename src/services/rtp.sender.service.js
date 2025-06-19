@@ -150,6 +150,15 @@ class RtpSenderService extends EventEmitter {
             return;
         }
 
+        // ADD DEBUGGING
+        if (!this.audioChunkCount) this.audioChunkCount = {};
+        if (!this.audioChunkCount[callId]) this.audioChunkCount[callId] = 0;
+        this.audioChunkCount[callId]++;
+        
+        if (this.audioChunkCount[callId] <= 20 || this.audioChunkCount[callId] % 50 === 0) {
+            logger.info(`[RTP Sender] Processing audio chunk #${this.audioChunkCount[callId]} for ${callId} (size: ${audioBase64Ulaw.length})`);
+        }
+
         try {
             const ulawBuffer = Buffer.from(audioBase64Ulaw, 'base64');
             if (ulawBuffer.length === 0) {
@@ -302,6 +311,15 @@ class RtpSenderService extends EventEmitter {
 
             const startTime = Date.now();
             
+            // ADD THIS DEBUG LOG
+            if (!this.packetsSentCount) this.packetsSentCount = {};
+            if (!this.packetsSentCount[callId]) this.packetsSentCount[callId] = 0;
+            this.packetsSentCount[callId]++;
+            
+            if (this.packetsSentCount[callId] <= 10 || this.packetsSentCount[callId] % 100 === 0) {
+                logger.info(`[RTP Sender] Sending RTP packet #${this.packetsSentCount[callId]} to ${host}:${port} for ${callId} (size: ${rtpPacket.length})`);
+            }
+            
             socket.send(rtpPacket, 0, rtpPacket.length, port, host, (err, bytes) => {
                 const duration = Date.now() - startTime;
                 
@@ -312,6 +330,11 @@ class RtpSenderService extends EventEmitter {
                 } else {
                     if (duration > 100) { // Log slow sends
                         logger.warn(`[RTP Sender] Slow UDP send to ${host}:${port} for ${callId}: ${duration}ms`);
+                    }
+                    
+                    // Log first few successful sends
+                    if (this.packetsSentCount[callId] <= 5) {
+                        logger.info(`[RTP Sender] Successfully sent packet #${this.packetsSentCount[callId]} (${bytes} bytes) to ${host}:${port}`);
                     }
                     
                     this.updateStats(callId, 'packet_sent', { bytes });

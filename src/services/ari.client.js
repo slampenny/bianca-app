@@ -1036,27 +1036,39 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     handleOpenAIAudio(callId, data) {
-    if (!data?.audio) {
-        logger.warn(`[ARI] Received empty audio for ${callId}`);
-        return;
-    }
+        if (!data?.audio) {
+            logger.warn(`[ARI] Received empty audio for ${callId}`);
+            return;
+        }
 
-    // The callId here is already the Twilio SID
-    // Find the call data using the Twilio SID
-    const callData = this.tracker.findCallByTwilioCallSid(callId);
-    
-    if (callData) {
-        this.sendAudioToChannel(callData.asteriskChannelId, data.audio);
-    } else {
-        // Check if it's an Asterisk ID (backward compatibility)
-        const directCallData = this.tracker.getCall(callId);
-        if (directCallData) {
-            this.sendAudioToChannel(callId, data.audio);
+        // ADD THIS DEBUG LOG
+        if (!this.openAiAudioCount) this.openAiAudioCount = {};
+        if (!this.openAiAudioCount[callId]) this.openAiAudioCount[callId] = 0;
+        this.openAiAudioCount[callId]++;
+        
+        // Log more frequently - every chunk for first 20, then every 10
+        if (this.openAiAudioCount[callId] <= 20 || this.openAiAudioCount[callId] % 10 === 0) {
+            logger.info(`[ARI] Received audio chunk #${this.openAiAudioCount[callId]} from OpenAI for ${callId} (size: ${data.audio.length})`);
+        }
+
+        // The callId here is already the Twilio SID
+        // Find the call data using the Twilio SID
+        const callData = this.tracker.findCallByTwilioCallSid(callId);
+        
+        if (callData) {
+            logger.debug(`[ARI] Sending audio to RTP sender for asterisk channel ${callData.asteriskChannelId}`);
+            this.sendAudioToChannel(callData.asteriskChannelId, data.audio);
         } else {
-            logger.warn(`[ARI] Received audio for unknown call ID: ${callId}`);
+            // Check if it's an Asterisk ID (backward compatibility)
+            const directCallData = this.tracker.getCall(callId);
+            if (directCallData) {
+                logger.debug(`[ARI] Sending audio to RTP sender for direct channel ${callId}`);
+                this.sendAudioToChannel(callId, data.audio);
+            } else {
+                logger.warn(`[ARI] Received audio for unknown call ID: ${callId}`);
+            }
         }
     }
-}
 
     handleOpenAISessionExpired(callbackId) {
         const callData = this.findCallData(callbackId);

@@ -1231,5 +1231,540 @@ router.get('/validate-integration', async (req, res) => {
     res.json(results);
 });
 
+/**
+ * @swagger
+ * /test/audio-pipeline-debug:
+ *   get:
+ *     summary: Debug the complete audio pipeline
+ *     description: Shows detailed information about audio flow and conversion steps
+ *     tags: [Test - Audio Debug]
+ *     parameters:
+ *       - in: query
+ *         name: callId
+ *         schema:
+ *           type: string
+ *         description: Specific call ID to debug (optional)
+ *     responses:
+ *       "200":
+ *         description: Audio pipeline debug information
+ */
+router.get('/audio-pipeline-debug', async (req, res) => {
+    const { callId } = req.query;
+    
+    try {
+        const debugInfo = {
+            timestamp: new Date().toISOString(),
+            audioConfiguration: {
+                openai: {
+                    inputFormat: 'pcm16',
+                    outputFormat: 'pcm16',
+                    inputSampleRate: 24000,
+                    outputSampleRate: 24000
+                },
+                asterisk: {
+                    format: 'ulaw',
+                    sampleRate: 8000
+                },
+                conversionChain: {
+                    fromAsterisk: 'ulaw(8kHz) → pcm16(8kHz) → pcm16(24kHz) → OpenAI',
+                    fromOpenAI: 'pcm16(24kHz) → pcm16(8kHz) → ulaw(8kHz) → Asterisk'
+                }
+            },
+            activeConnections: {},
+            audioStats: {},
+            debugFiles: {}
+        };
+
+        // Get OpenAI connection info
+        const openAIConnections = Array.from(openAIService.connections.entries());
+        
+        for (const [connId, conn] of openAIConnections) {
+            if (!callId || connId === callId) {
+                debugInfo.activeConnections[connId] = {
+                    status: conn.status,
+                    sessionReady: conn.sessionReady,
+                    audioChunksReceived: conn.audioChunksReceived,
+                    audioChunksSent: conn.audioChunksSent,
+                    lastActivity: new Date(conn.lastActivity).toISOString(),
+                    debugFilesInitialized: conn._debugFilesInitialized || false,
+                    openaiChunkCount: conn._openaiChunkCount || 0
+                };
+
+                // Check for debug audio files
+                const callAudioDir = path.join(__dirname, '..', '..', 'debug_audio_calls', connId);
+                if (fs.existsSync(callAudioDir)) {
+                    const files = fs.readdirSync(callAudioDir);
+                    debugInfo.debugFiles[connId] = {};
+                    
+                    files.forEach(file => {
+                        const filePath = path.join(callAudioDir, file);
+                        const stats = fs.statSync(filePath);
+                        debugInfo.debugFiles[connId][file] = {
+                            size: stats.size,
+                            sizeKB: (stats.size / 1024).toFixed(2),
+                            modified: stats.mtime.toISOString()
+                        };
+                    });
+                }
+
+                // Get RTP stats if available
+                const callData = channelTracker.getCall(connId) || 
+                    channelTracker.findCallByTwilioCallSid(connId);
+                    
+                if (callData?.rtpPort) {
+                    const listener = rtpListener.getListenerForCall(connId);
+                    if (listener) {
+                        debugInfo.audioStats[connId] = {
+                            rtpPort: callData.rtpPort,
+                            rtpStats: listener.getStats ? listener.getStats() : 'No stats available'
+                        };
+                    }
+                }
+            }
+        }
+
+        // Add recommendations based on common issues
+        debugInfo.diagnostics = analyzeAudioPipeline(debugInfo);
+
+        res.json(debugInfo);
+        
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+/**
+ * Helper function to analyze audio pipeline and provide diagnostics
+ */
+function analyzeAudioPipeline(debugInfo) {
+    const diagnostics = {
+        issues: [],
+        recommendations: []
+    };
+
+    // Check for common issues
+    for (const [callId, conn] of Object.entries(debugInfo.activeConnections)) {
+        if (conn.audioChunksReceived > 0 && conn.openaiChunkCount === 0) {
+            diagnostics.issues.push({
+                callId,
+                issue: 'No audio received from OpenAI',
+                severity: 'high'
+            });
+        }
+
+        if (conn.audioChunksSent > 100 && conn.audioChunksReceived < 10) {
+            diagnostics.issues.push({
+                callId,
+                issue: 'Low audio reception rate',
+                severity: 'medium'
+            });
+        }
+
+        // Check file sizes
+        const files = debugInfo.debugFiles[callId];
+        if (files) {
+            const fromOpenAI = files['continuous_from_openai_pcm24k.raw'];
+            const toOpenAI = files['continuous_from_asterisk_pcm24k.raw'];
+            
+            if (fromOpenAI && toOpenAI) {
+                const ratio = fromOpenAI.size / toOpenAI.size;
+                if (ratio < 0.1) {
+                    diagnostics.issues.push({
+                        callId,
+                        issue: `Very low OpenAI response ratio: ${(ratio * 100).toFixed(1)}%`,
+                        severity: 'high'
+                    });
+                }
+            }
+        }
+    }
+
+    // Add recommendations
+    if (diagnostics.issues.some(i => i.issue.includes('No audio received'))) {
+        diagnostics.recommendations.push(
+            'Check OpenAI API key and model permissions',
+            'Verify session.update is being sent correctly',
+            'Check if audio format is compatible with OpenAI expectations'
+        );
+    }
+
+    return diagnostics;
+}
+
+/**
+ * @swagger
+ * /test/audio-conversion-test:
+ *   post:
+ *     summary: Test audio conversion chain
+ *     description: Tests each step of the audio conversion process
+ *     tags: [Test - Audio Debug]
+ *     responses:
+ *       "200":
+ *         description: Audio conversion test results
+ */
+router.post('/audio-conversion-test', async (req, res) => {
+    try {
+        const AudioUtils = require('../api/audio.utils');
+        const testResults = {
+            timestamp: new Date().toISOString(),
+            steps: []
+        };
+
+        // Step 1: Create a test tone (1kHz sine wave)
+        const sampleRate = 8000;
+        const duration = 0.1; // 100ms
+        const frequency = 1000; // 1kHz
+        const numSamples = Math.floor(sampleRate * duration);
+        
+        const pcmBuffer = Buffer.alloc(numSamples * 2);
+        for (let i = 0; i < numSamples; i++) {
+            const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 16383;
+            pcmBuffer.writeInt16LE(Math.round(sample), i * 2);
+        }
+        
+        testResults.steps.push({
+            step: 'Create test PCM',
+            success: true,
+            details: {
+                sampleRate: 8000,
+                duration: '100ms',
+                frequency: '1kHz',
+                bufferSize: pcmBuffer.length,
+                samples: numSamples
+            }
+        });
+
+        // Step 2: Convert to uLaw
+        try {
+            const ulawBase64 = await AudioUtils.convertPcmToUlaw(pcmBuffer);
+            const ulawBuffer = Buffer.from(ulawBase64, 'base64');
+            testResults.steps.push({
+                step: 'PCM to uLaw conversion',
+                success: true,
+                details: {
+                    inputSize: pcmBuffer.length,
+                    outputSize: ulawBuffer.length,
+                    compressionRatio: (ulawBuffer.length / pcmBuffer.length).toFixed(2)
+                }
+            });
+
+            // Step 3: Convert back to PCM
+            const pcmBackBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+            testResults.steps.push({
+                step: 'uLaw to PCM conversion',
+                success: true,
+                details: {
+                    inputSize: ulawBuffer.length,
+                    outputSize: pcmBackBuffer.length,
+                    matchesOriginal: pcmBackBuffer.length === pcmBuffer.length
+                }
+            });
+        } catch (err) {
+            testResults.steps.push({
+                step: 'uLaw conversion',
+                success: false,
+                error: err.message
+            });
+        }
+
+        // Step 4: Test resampling
+        try {
+            const pcm24khz = AudioUtils.resamplePcm(pcmBuffer, 8000, 24000);
+            testResults.steps.push({
+                step: 'Resample 8kHz to 24kHz',
+                success: true,
+                details: {
+                    inputSize: pcmBuffer.length,
+                    outputSize: pcm24khz.length,
+                    expectedRatio: 3,
+                    actualRatio: (pcm24khz.length / pcmBuffer.length).toFixed(2)
+                }
+            });
+
+            const pcm8khzAgain = AudioUtils.resamplePcm(pcm24khz, 24000, 8000);
+            testResults.steps.push({
+                step: 'Resample 24kHz to 8kHz',
+                success: true,
+                details: {
+                    inputSize: pcm24khz.length,
+                    outputSize: pcm8khzAgain.length,
+                    matchesOriginal: pcm8khzAgain.length === pcmBuffer.length
+                }
+            });
+        } catch (err) {
+            testResults.steps.push({
+                step: 'Resampling',
+                success: false,
+                error: err.message
+            });
+        }
+
+        // Save test files
+        const testDir = path.join(__dirname, '..', '..', 'debug_audio_calls', 'CONVERSION_TEST');
+        if (!fs.existsSync(testDir)) {
+            fs.mkdirSync(testDir, { recursive: true });
+        }
+
+        const testFile = path.join(testDir, `test_${Date.now()}.json`);
+        fs.writeFileSync(testFile, JSON.stringify(testResults, null, 2));
+
+        testResults.savedTo = testFile;
+        res.json(testResults);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+/**
+ * @swagger
+ * /test/download-debug-audio:
+ *   get:
+ *     summary: Get debug audio files for a call
+ *     description: Returns URLs to download debug audio files
+ *     tags: [Test - Audio Debug]
+ *     parameters:
+ *       - in: query
+ *         name: callId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: Debug audio file information
+ */
+router.get('/download-debug-audio', async (req, res) => {
+    const { callId } = req.query;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const S3Service = require('../services/s3.service');
+        const result = {
+            callId,
+            localFiles: {},
+            s3Files: []
+        };
+
+        // Check local files
+        const callAudioDir = path.join(__dirname, '..', '..', 'debug_audio_calls', callId);
+        if (fs.existsSync(callAudioDir)) {
+            const files = fs.readdirSync(callAudioDir);
+            files.forEach(file => {
+                const filePath = path.join(callAudioDir, file);
+                const stats = fs.statSync(filePath);
+                result.localFiles[file] = {
+                    size: stats.size,
+                    sizeMB: (stats.size / 1024 / 1024).toFixed(2),
+                    modified: stats.mtime.toISOString(),
+                    path: filePath
+                };
+            });
+        }
+
+        // Check S3 files
+        try {
+            const s3Keys = [
+                `debug-audio/${callId}/caller_to_openai_8khz.wav`,
+                `debug-audio/${callId}/openai_to_caller_24khz.wav`
+            ];
+
+            for (const key of s3Keys) {
+                try {
+                    const url = await S3Service.getPresignedUrl(key, 3600);
+                    result.s3Files.push({
+                        key,
+                        url,
+                        description: key.includes('caller_to_openai') ? 
+                            'Audio from caller to OpenAI (8kHz)' : 
+                            'Audio from OpenAI to caller (24kHz)'
+                    });
+                } catch (err) {
+                    // File might not exist
+                }
+            }
+        } catch (err) {
+            result.s3Error = err.message;
+        }
+
+        // Add conversion instructions
+        result.conversionInstructions = {
+            pcm24k: 'ffplay -f s16le -ar 24000 -ac 1 continuous_from_openai_pcm24k.raw',
+            pcm8k: 'ffplay -f s16le -ar 8000 -ac 1 continuous_from_asterisk_pcm8k.raw',
+            ulaw: 'ffplay -f mulaw -ar 8000 -ac 1 continuous_from_asterisk_ulaw.ulaw',
+            convertToWav: 'ffmpeg -f s16le -ar 24000 -ac 1 -i input.raw output.wav'
+        };
+
+        res.json(result);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/force-audio-commit:
+ *   post:
+ *     summary: Force OpenAI to commit audio buffer
+ *     description: Manually triggers audio buffer commit for debugging
+ *     tags: [Test - Audio Debug]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 required: true
+ *     responses:
+ *       "200":
+ *         description: Commit result
+ */
+router.post('/force-audio-commit', async (req, res) => {
+    const { callId } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const success = await openAIService.forceCommit(callId);
+        
+        res.json({
+            success,
+            message: success ? 'Audio buffer commit sent' : 'Failed to send commit',
+            note: 'Check logs for OpenAI response'
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/test-audio-chain:
+ *   post:
+ *     summary: Test the complete audio chain with OpenAI
+ *     description: Sends test audio through the entire pipeline
+ *     tags: [Test - Audio Debug]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 description: Call ID to test with
+ *               testType:
+ *                 type: string
+ *                 enum: [sine, silence, white_noise]
+ *                 default: sine
+ *     responses:
+ *       "200":
+ *         description: Test results
+ */
+router.post('/test-audio-chain', async (req, res) => {
+    const { callId, testType = 'sine' } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const AudioUtils = require('../api/audio.utils');
+        const result = {
+            callId,
+            testType,
+            steps: []
+        };
+
+        // Generate test audio based on type
+        let testAudio;
+        const sampleRate = 8000;
+        const duration = 1; // 1 second
+        const numSamples = sampleRate * duration;
+        
+        switch (testType) {
+            case 'sine':
+                testAudio = Buffer.alloc(numSamples * 2);
+                for (let i = 0; i < numSamples; i++) {
+                    const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+                    testAudio.writeInt16LE(Math.round(sample), i * 2);
+                }
+                break;
+            case 'silence':
+                testAudio = Buffer.alloc(numSamples * 2, 0);
+                break;
+            case 'white_noise':
+                testAudio = Buffer.alloc(numSamples * 2);
+                for (let i = 0; i < numSamples; i++) {
+                    const sample = (Math.random() - 0.5) * 32767;
+                    testAudio.writeInt16LE(Math.round(sample), i * 2);
+                }
+                break;
+        }
+
+        result.steps.push({
+            step: 'Generated test audio',
+            details: {
+                type: testType,
+                duration: `${duration}s`,
+                samples: numSamples,
+                bufferSize: testAudio.length
+            }
+        });
+
+        // Convert to uLaw
+        const ulawBase64 = await AudioUtils.convertPcmToUlaw(testAudio);
+        result.steps.push({
+            step: 'Converted to uLaw',
+            details: {
+                base64Length: ulawBase64.length
+            }
+        });
+
+        // Send through OpenAI pipeline
+        const conn = openAIService.connections.get(callId);
+        if (!conn) {
+            return res.status(404).json({ error: 'No OpenAI connection found for callId' });
+        }
+
+        const beforeChunks = conn.audioChunksReceived || 0;
+        
+        // Send the audio
+        await openAIService.sendAudioChunk(callId, ulawBase64, true);
+        
+        result.steps.push({
+            step: 'Sent to OpenAI',
+            details: {
+                chunksBeforeSend: beforeChunks,
+                chunksAfterSend: conn.audioChunksReceived || 0
+            }
+        });
+
+        // Wait a bit and check for response
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        result.finalStats = {
+            audioChunksReceived: conn.audioChunksReceived || 0,
+            audioChunksSent: conn.audioChunksSent || 0,
+            openaiChunkCount: conn._openaiChunkCount || 0,
+            sessionReady: conn.sessionReady
+        };
+
+        res.json(result);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
 // Export the complete test routes
 module.exports = router;
