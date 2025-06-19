@@ -226,15 +226,19 @@ class OpenAIRealtimeService {
 
     isConnectionReady(callId) {
         const connection = this.connections.get(callId);
-        return connection && 
-            connection.ws && 
-            connection.ws.readyState === WebSocket.OPEN &&
+        const ready = connection && 
+            connection.webSocket &&  // Changed from 'ws' to 'webSocket'
+            connection.webSocket.readyState === WebSocket.OPEN &&
             connection.sessionReady === true;
+        
+        logger.debug(`[OpenAI Realtime] Connection ready check for ${callId}: ${ready ? 'YES' : 'NO'} (exists: ${!!connection}, ws: ${!!connection?.webSocket}, wsState: ${connection?.webSocket?.readyState}, sessionReady: ${connection?.sessionReady})`);
+        
+        return ready;
     }
 
     sendResponseCreate(callId) {
         const connection = this.connections.get(callId);
-        if (!connection || !connection.ws || connection.ws.readyState !== WebSocket.OPEN) {
+        if (!connection || !connection.webSocket || connection.webSocket.readyState !== WebSocket.OPEN) {
             logger.warn(`[OpenAI Realtime] Cannot send response.create - no active connection for ${callId}`);
             return;
         }
@@ -248,7 +252,7 @@ class OpenAIRealtimeService {
                 }
             };
             
-            connection.ws.send(JSON.stringify(responseCreateEvent));
+            connection.webSocket.send(JSON.stringify(responseCreateEvent));
             logger.info(`[OpenAI Realtime] Sent response.create for ${callId}`);
         } catch (err) {
             logger.error(`[OpenAI Realtime] Error sending response.create for ${callId}: ${err.message}`);
