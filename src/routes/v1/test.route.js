@@ -8,6 +8,8 @@ const config = require('../../config/config');
 const logger = require('../../config/logger');
 const { getFargateIp } = require('../../utils/network.utils');
 const dns = require('dns').promises;
+const fs = require('fs');
+const path = require('path');
 
 // Import services safely
 let ariClient, rtpListener, rtpSender, openAIService, channelTracker;
@@ -22,7 +24,7 @@ try {
 }
 
 // ============================================
-// YOUR ORIGINAL TEST ROUTES
+// ORIGINAL TEST ROUTES
 // ============================================
 
 /**
@@ -139,106 +141,6 @@ router.get('/debug', testController.getDebugInfo);
 
 /**
  * @swagger
- * /test/ecs-metadata:
- *   get:
- *     summary: Debug ECS metadata
- *     description: Shows ECS container and task metadata for debugging
- *     tags: [Test - RTP]
- *     responses:
- *       "200":
- *         description: ECS metadata retrieved successfully
- */
-router.get('/ecs-metadata', async (req, res) => {
-    if (!process.env.ECS_CONTAINER_METADATA_URI_V4) {
-        return res.json({ error: 'Not running in ECS' });
-    }
-    
-    try {
-        // Get container metadata
-        const containerResponse = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4);
-        const containerData = await containerResponse.json();
-        
-        // Get task metadata
-        const taskResponse = await fetch(`${process.env.ECS_CONTAINER_METADATA_URI_V4}/task`);
-        const taskData = await taskResponse.json();
-        
-        res.json({
-            container: {
-                Networks: containerData.Networks,
-                TaskARN: containerData.TaskARN
-            },
-            task: {
-                Attachments: taskData.Attachments,
-                Containers: taskData.Containers?.map(c => ({
-                    Name: c.Name,
-                    NetworkInterfaces: c.NetworkInterfaces
-                }))
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-debug:
- *   get:
- *     summary: Debug RTP configuration and network
- *     description: Shows current RTP configuration, ports, and network details
- *     tags: [Test - RTP]
- *     responses:
- *       "200":
- *         description: RTP debug information
- */
-router.get('/rtp-debug', async (req, res) => {
-    try {
-        const portManager = require('../../services/port.manager.service');
-        const { getFargateIp } = require('../../utils/network.utils');
-        
-        // Get public IP with better error handling
-        let publicIp = 'Not available';
-        let ipError = null;
-        
-        try {
-            // Make sure we await the promise
-            publicIp = await getFargateIp();
-        } catch (err) {
-            publicIp = 'Error getting IP';
-            ipError = err.message;
-        }
-        
-        // Get active listeners
-        const activeListeners = rtpListener.getAllActiveListeners();
-        
-        res.json({
-            network: {
-                publicIp: publicIp, // This should now be a string
-                ipError: ipError,   // Add error details if any
-                isRunningInECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
-                ecsMetadataUri: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set'
-            },
-            portManager: portManager.getStats(),
-            activeListeners,
-            config: {
-                appRtpPortRange: process.env.APP_RTP_PORT_RANGE || 'Not set',
-                rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set',
-                asteriskUrl: config.asterisk.url,
-                asteriskPublicIp: config.asterisk.publicIp || 'Not set'
-            },
-            environment: {
-                AWS_REGION: process.env.AWS_REGION,
-                NODE_ENV: process.env.NODE_ENV,
-                RTP_PORT_RANGE: process.env.RTP_PORT_RANGE
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message, stack: err.stack });
-    }
-});
-
-/**
- * @swagger
  * /test/websocket:
  *   get:
  *     summary: test open ai websocket connection
@@ -310,845 +212,8 @@ router.get('/websocket', testController.testOpenAIWebSocket);
 router.post('/create-caregiver', validate(caregiverValidation.createCaregiver), caregiverController.createCaregiver);
 
 // ============================================
-// NEW DEBUGGING TEST ROUTES
+// ESSENTIAL DEBUGGING ROUTES - CORE SYSTEM STATUS
 // ============================================
-
-/**
- * @swagger
- * /test/config:
- *   get:
- *     summary: Get current configuration
- *     description: Returns the current configuration values for Asterisk and RTP
- *     tags: [Test - Configuration]
- *     responses:
- *       "200":
- *         description: Configuration retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 environment:
- *                   type: string
- *                 asterisk:
- *                   type: object
- *                 rtpPorts:
- *                   type: object
- */
-router.get('/config', (req, res) => {
-    res.json({
-        environment: config.env,
-        asterisk: {
-            enabled: config.asterisk.enabled,
-            host: config.asterisk.host,
-            url: config.asterisk.url,
-            rtpBiancaHost: config.asterisk.rtpBiancaHost,
-            rtpAsteriskHost: config.asterisk.rtpAsteriskHost,
-        },
-        rtpPorts: {
-            appPortRange: process.env.APP_RTP_PORT_RANGE || '16384-16484',
-            // Remove listenerPort and senderPort
-        },
-        environmentVariables: {
-            NODE_ENV: process.env.NODE_ENV,
-            ASTERISK_URL: process.env.ASTERISK_URL,
-            RTP_LISTENER_HOST: process.env.RTP_LISTENER_HOST,
-            RTP_BIANCA_HOST: process.env.RTP_BIANCA_HOST,
-            RTP_ASTERISK_HOST: process.env.RTP_ASTERISK_HOST,
-        }
-    });
-});
-
-/**
- * @swagger
- * /test/dns:
- *   get:
- *     summary: Test DNS resolution
- *     description: Tests DNS resolution for all configured hostnames
- *     tags: [Test - Network]
- *     responses:
- *       "200":
- *         description: DNS resolution results
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 results:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       hostname:
- *                         type: string
- *                       resolved:
- *                         type: boolean
- *                       addresses:
- *                         type: array
- *                         items:
- *                           type: string
- *                       error:
- *                         type: string
- */
-router.get('/dns', async (req, res) => {
-    const hostnames = [
-        config.asterisk.host,
-        config.asterisk.rtpBiancaHost,
-        config.asterisk.rtpAsteriskHost,
-        'asterisk.myphonefriend.internal',
-        'bianca-app.myphonefriend.internal'
-    ];
-
-    const results = [];
-    
-    for (const hostname of hostnames) {
-        if (!hostname) continue;
-        
-        try {
-            const addresses = await dns.resolve4(hostname);
-            results.push({
-                hostname,
-                resolved: true,
-                addresses,
-                error: null
-            });
-        } catch (err) {
-            results.push({
-                hostname,
-                resolved: false,
-                addresses: [],
-                error: err.message
-            });
-        }
-    }
-
-    res.json({ results });
-});
-
-/**
- * @swagger
- * /test/ari-status:
- *   get:
- *     summary: Get ARI client status
- *     description: Returns the current status of the ARI client connection
- *     tags: [Test - Asterisk]
- *     responses:
- *       "200":
- *         description: ARI status retrieved successfully
- */
-router.get('/ari-status', async (req, res) => {
-    try {
-        const instance = ariClient.getAriClientInstance();
-        const health = await instance.healthCheck();
-        
-        res.json({
-            connected: instance.isConnected,
-            health,
-            retryCount: instance.retryCount,
-            config: {
-                url: config.asterisk.url,
-                username: config.asterisk.username,
-                stasisApp: instance.CONFIG?.STASIS_APP_NAME
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/ari-test-connection:
- *   post:
- *     summary: Test ARI connection
- *     description: Attempts to connect to Asterisk ARI and list applications
- *     tags: [Test - Asterisk]
- *     responses:
- *       "200":
- *         description: Connection test results
- */
-router.post('/ari-test-connection', async (req, res) => {
-    try {
-        const instance = ariClient.getAriClientInstance();
-        
-        if (!instance.isConnected) {
-            return res.status(503).json({ 
-                error: 'ARI client not connected',
-                suggestion: 'Try restarting the service or check Asterisk connectivity'
-            });
-        }
-
-        // Try to list applications
-        const apps = await instance.client.applications.list();
-        
-        res.json({
-            success: true,
-            applications: apps.map(app => ({
-                name: app.name,
-                bridge_ids: app.bridge_ids,
-                channel_ids: app.channel_ids,
-                device_names: app.device_names,
-                endpoint_ids: app.endpoint_ids
-            }))
-        });
-    } catch (err) {
-        res.status(500).json({ 
-            success: false,
-            error: err.message,
-            stack: err.stack
-        });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-listener-status:
- *   get:
- *     summary: Get RTP listener status
- *     description: Returns detailed status of the RTP listener service
- *     tags: [Test - RTP]
- *     responses:
- *       "200":
- *         description: RTP listener status
- */
-router.get('/rtp-listener-status', (req, res) => {
-    try {
-        const activeListeners = rtpListener.getAllActiveListeners();
-        
-        res.json({
-            activeListenerCount: Object.keys(activeListeners).length,
-            listeners: activeListeners,
-            // Remove the config.listenPort reference
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/rtp-sender-status:
- *   get:
- *     summary: Get RTP sender status
- *     description: Returns detailed status of the RTP sender service
- *     tags: [Test - RTP]
- *     responses:
- *       "200":
- *         description: RTP sender status
- */
-router.get('/rtp-sender-status', (req, res) => {
-    try {
-        const status = rtpSender.getStatus();
-        const health = rtpSender.healthCheck();
-        
-        res.json({
-            health,
-            status
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/channel-tracker:
- *   get:
- *     summary: Get channel tracker state
- *     description: Returns all tracked channels and their states
- *     tags: [Test - Call Tracking]
- *     responses:
- *       "200":
- *         description: Channel tracker state
- */
-router.get('/channel-tracker', (req, res) => {
-    try {
-        const stats = channelTracker.getStats();
-        const calls = Array.from(channelTracker.calls.entries()).map(([id, data]) => ({
-            asteriskChannelId: id,
-            twilioCallSid: data.twilioCallSid,
-            state: data.state,
-            allocatedRtpPort: data.rtpPort,  // ADD THIS - shows the allocated port
-            isReadStreamReady: data.isReadStreamReady,
-            isWriteStreamReady: data.isWriteStreamReady,
-            // Remove SSRC-related fields
-            // Remove snoopMethod field (outdated)
-            hasMainChannel: !!data.mainChannel,
-            hasSnoopChannel: !!data.snoopChannel,
-            hasPlaybackChannel: !!data.playbackChannel,
-            hasInboundRtpChannel: !!data.inboundRtpChannel,
-            hasOutboundRtpChannel: !!data.outboundRtpChannel,
-            mainBridgeId: data.mainBridgeId,
-            startTime: data.startTime
-        }));
-        
-        res.json({
-            stats,
-            calls
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/openai-connections:
- *   get:
- *     summary: Get OpenAI service connections
- *     description: Returns all active OpenAI realtime connections
- *     tags: [Test - OpenAI]
- *     responses:
- *       "200":
- *         description: OpenAI connections status
- */
-router.get('/openai-connections', (req, res) => {
-    try {
-        const connections = Array.from(openAIService.connections.entries()).map(([callId, conn]) => ({
-            callId,
-            status: conn.status,
-            sessionReady: conn.sessionReady,
-            sessionId: conn.sessionId,
-            asteriskChannelId: conn.asteriskChannelId,
-            audioChunksReceived: conn.audioChunksReceived,
-            audioChunksSent: conn.audioChunksSent,
-            lastActivity: conn.lastActivity,
-            startTime: conn.startTime,
-            websocketState: conn.webSocket?.readyState
-        }));
-        
-        res.json({
-            totalConnections: connections.length,
-            connections
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/send-test-rtp:
- *   post:
- *     summary: Send test RTP packet
- *     description: Sends a test RTP packet to the RTP listener
- *     tags: [Test - RTP]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               targetHost:
- *                 type: string
- *                 default: "localhost"
- *               targetPort:
- *                 type: number
- *                 default: 16384
- *               ssrc:
- *                 type: number
- *                 default: 12345
- *     responses:
- *       "200":
- *         description: Test packet sent
- */
-router.post('/send-test-rtp', (req, res) => {
-    const dgram = require('dgram');
-    const { targetHost = 'localhost', targetPort = 16384, ssrc = 12345 } = req.body;
-    
-    try {
-        // Create a simple RTP packet
-        const rtpHeader = Buffer.alloc(12);
-        rtpHeader[0] = 0x80; // Version 2, no padding, no extension, no CSRC
-        rtpHeader[1] = 0; // Marker = 0, Payload type = 0 (PCMU)
-        rtpHeader.writeUInt16BE(1, 2); // Sequence number
-        // Use a valid 32-bit timestamp (wrap around using unsigned 32-bit arithmetic)
-        const timestamp = Math.floor(Date.now() / 1000 * 8000) >>> 0; // Convert to RTP timestamp units and ensure 32-bit
-        rtpHeader.writeUInt32BE(timestamp, 4); // Timestamp
-        rtpHeader.writeUInt32BE(ssrc >>> 0, 8); // SSRC (ensure 32-bit)
-        
-        // Add some dummy payload
-        const payload = Buffer.from('test audio data');
-        const packet = Buffer.concat([rtpHeader, payload]);
-        
-        const socket = dgram.createSocket('udp4');
-        socket.send(packet, targetPort, targetHost, (err) => {
-            socket.close();
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json({ 
-                    success: true,
-                    packet: {
-                        targetHost,
-                        targetPort,
-                        ssrc,
-                        size: packet.length
-                    }
-                });
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/simulate-call-setup:
- *   post:
- *     summary: Simulate call setup
- *     description: Manually sets up tracking for a test call
- *     tags: [Test - Call Tracking]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               asteriskChannelId:
- *                 type: string
- *                 default: "test-channel-123"
- *               twilioCallSid:
- *                 type: string
- *                 default: "CA-test-123"
- *     responses:
- *       "200":
- *         description: Test call setup
- */
-router.post('/simulate-call-setup', (req, res) => {
-    const { asteriskChannelId = 'test-channel-123', twilioCallSid = 'CA-test-123' } = req.body;
-    
-    try {
-        // Add a test call to the tracker
-        channelTracker.addCall(asteriskChannelId, {
-            twilioCallSid,
-            state: 'external_media_read_active',
-            awaitingSsrcForRtp: true,
-            expectingRtpChannel: true
-        });
-        
-        res.json({
-            success: true,
-            call: channelTracker.getCall(asteriskChannelId)
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/test-udp-connectivity:
- *   post:
- *     summary: Test UDP connectivity
- *     description: Tests if UDP packets can reach the RTP listener from a specific host
- *     tags: [Test - Network]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               fromHost:
- *                 type: string
- *                 description: Host to test connectivity from (requires SSH access)
- *                 default: "asterisk.myphonefriend.internal"
- *     responses:
- *       "200":
- *         description: Connectivity test instructions
- */
-router.post('/test-udp-connectivity', async (req, res) => {
-    res.json({
-        instructions: `UDP connectivity test:`,
-        note: 'With one-port-per-call architecture, you need an active call first',
-        steps: [
-            '1. Make a test call',
-            '2. Check /test/channel-tracker to see the allocated port',
-            '3. SSH into Asterisk',
-            '4. Run: echo "test" | nc -u [FARGATE_IP] [ALLOCATED_PORT]'
-        ]
-    });
-});
-
-/**
- * @swagger
- * /test/test-openai-audio:
- *   post:
- *     summary: Test OpenAI audio processing
- *     description: Sends test audio to OpenAI for a specific call
- *     tags: [Test - OpenAI]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               callId:
- *                 type: string
- *                 description: Call ID or Twilio SID
- *               testMessage:
- *                 type: string
- *                 default: "Hello, this is a test"
- *     responses:
- *       "200":
- *         description: Audio sent to OpenAI
- */
-router.post('/test-openai-audio', async (req, res) => {
-    const { callId, testMessage = "Hello, this is a test" } = req.body;
-    
-    if (!callId) {
-        return res.status(400).json({ error: 'callId is required' });
-    }
-    
-    try {
-        // Check if OpenAI connection exists
-        const conn = openAIService.connections.get(callId);
-        if (!conn) {
-            return res.status(404).json({ error: 'No OpenAI connection found for this callId' });
-        }
-        
-        // Send a test text message
-        await openAIService.sendTextMessage(callId, testMessage);
-        
-        res.json({
-            success: true,
-            message: 'Test message sent to OpenAI',
-            connectionStatus: conn.status,
-            sessionReady: conn.sessionReady
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/cleanup-all:
- *   post:
- *     summary: Cleanup all connections
- *     description: Cleans up all active connections and resets services
- *     tags: [Test - Maintenance]
- *     responses:
- *       "200":
- *         description: Cleanup completed
- */
-router.post('/cleanup-all', async (req, res) => {
-    try {
-        // Clean up all tracked calls
-        const calls = Array.from(channelTracker.calls.keys());
-        for (const callId of calls) {
-            channelTracker.removeCall(callId);
-        }
-        
-        // Clean up RTP sender
-        rtpSender.cleanupAll();
-        
-        // Clean up OpenAI connections
-        await openAIService.disconnectAll();
-        
-        // Clear SSRC mappings -- does not exist anymore
-        //const clearedCount = rtpListener.clearAllSsrcMappings();
-        const clearedCount = 0;
-        
-        res.json({
-            success: true,
-            cleaned: {
-                calls: calls.length,
-                ssrcMappings: clearedCount,
-                message: 'All connections cleaned up'
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/network-debug:
- *   get:
- *     summary: Debug network configuration
- *     description: Shows detailed network information including public IP detection
- *     tags: [Test - Network]
- *     responses:
- *       "200":
- *         description: Network debug information
- */
-router.get('/network-debug', async (req, res) => {
-    try {
-        const { getNetworkDebugInfo } = require('../../utils/network.utils');
-        const debugInfo = await getNetworkDebugInfo();
-        res.json(debugInfo);
-    } catch (err) {
-        res.status(500).json({ error: err.message, stack: err.stack });
-    }
-});
-
-/**
- * @swagger
- * /test/ari-websocket:
- *   get:
- *     summary: Test ARI WebSocket connection
- *     description: Tests the WebSocket connection to Asterisk ARI for real-time events
- *     tags: [Test - Asterisk]
- *     responses:
- *       "200":
- *         description: WebSocket test results
- */
-router.get('/ari-websocket', async (req, res) => {
-    try {
-        const WebSocket = require('ws');
-        const testResults = {
-            httpConnection: false,
-            wsConnection: false,
-            wsUrl: null,
-            events: [],
-            error: null
-        };
-
-        // First test HTTP connection
-        const instance = ariClient.getAriClientInstance();
-        testResults.httpConnection = instance.isConnected;
-        
-        if (!testResults.httpConnection) {
-            throw new Error('ARI HTTP connection not established');
-        }
-
-        // Build WebSocket URL
-        const ariUrl = config.asterisk.url;
-        const wsUrl = ariUrl.replace('http://', 'ws://').replace('https://', 'wss://');
-        testResults.wsUrl = `${wsUrl}/ari/events?api_key=${config.asterisk.username}:${config.asterisk.password}&app=${instance.CONFIG?.STASIS_APP_NAME || 'myphonefriend'}`;
-
-        // Test WebSocket connection
-        await new Promise((resolve, reject) => {
-            const ws = new WebSocket(testResults.wsUrl);
-            const timeout = setTimeout(() => {
-                ws.close();
-                reject(new Error('WebSocket connection timeout'));
-            }, 5000);
-
-            ws.on('open', () => {
-                testResults.wsConnection = true;
-                clearTimeout(timeout);
-            });
-
-            ws.on('message', (data) => {
-                try {
-                    const event = JSON.parse(data);
-                    testResults.events.push({
-                        type: event.type,
-                        timestamp: new Date().toISOString()
-                    });
-                } catch (e) {
-                    // Ignore parse errors
-                }
-            });
-
-            ws.on('error', (error) => {
-                testResults.error = error.message;
-                clearTimeout(timeout);
-                reject(error);
-            });
-
-            ws.on('close', () => {
-                clearTimeout(timeout);
-                resolve();
-            });
-
-            // Give it 3 seconds to collect some events
-            setTimeout(() => {
-                ws.close();
-                resolve();
-            }, 3000);
-        }).catch(err => {
-            testResults.error = err.message;
-        });
-
-        res.json(testResults);
-    } catch (err) {
-        res.status(500).json({ 
-            error: err.message,
-            suggestion: 'Make sure Asterisk ARI WebSocket is enabled and accessible'
-        });
-    }
-});
-
-/**
- * @swagger
- * /test/simulate-rtp-flow:
- *   post:
- *     summary: Simulate complete RTP flow
- *     description: Tests the complete RTP audio flow including port allocation
- *     tags: [Test - RTP]
- *     responses:
- *       "200":
- *         description: RTP flow test results
- */
-router.post('/simulate-rtp-flow', async (req, res) => {
-    const dgram = require('dgram');
-    const testCallId = `test-${Date.now()}`;
-    let allocatedPort = null;
-    
-    try {
-        const portManager = require('../../services/port.manager.service');
-        const results = {
-            portAllocation: false,
-            listenerStarted: false,
-            packetSent: false,
-            packetReceived: false,
-            errors: []
-        };
-
-        // Step 1: Allocate port
-        allocatedPort = portManager.acquirePort(testCallId, {
-            asteriskChannelId: testCallId,
-            twilioCallSid: `CA-test-${Date.now()}`
-        });
-        
-        if (!allocatedPort) {
-            throw new Error('Failed to allocate port');
-        }
-        results.portAllocation = true;
-        results.allocatedPort = allocatedPort;
-
-        // Step 2: Start RTP listener
-        await rtpListener.startRtpListenerForCall(allocatedPort, testCallId, testCallId);
-        results.listenerStarted = true;
-
-        // Step 3: Wait a bit for listener to be ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Step 4: Send test RTP packet
-        const publicIp = await getFargateIp();
-        const rtpHeader = Buffer.alloc(12);
-        rtpHeader[0] = 0x80; // V=2, P=0, X=0, CC=0
-        rtpHeader[1] = 0; // M=0, PT=0 (PCMU)
-        rtpHeader.writeUInt16BE(1, 2); // Sequence
-        rtpHeader.writeUInt32BE(Date.now() & 0xFFFFFFFF, 4); // Timestamp
-        rtpHeader.writeUInt32BE(0x12345678, 8); // SSRC
-        
-        const payload = Buffer.from('test audio payload');
-        const packet = Buffer.concat([rtpHeader, payload]);
-        
-        const socket = dgram.createSocket('udp4');
-        await new Promise((resolve, reject) => {
-            socket.send(packet, allocatedPort, publicIp === 'localhost' ? 'localhost' : '127.0.0.1', (err) => {
-                socket.close();
-                if (err) reject(err);
-                else resolve();
-            });
-        });
-        results.packetSent = true;
-
-        // Step 5: Check if packet was received (check listener stats)
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const listenerStats = rtpListener.getListenerForCall(testCallId)?.getStats();
-        results.packetReceived = listenerStats?.packetsReceived > 0;
-        results.listenerStats = listenerStats;
-
-        // Cleanup
-        rtpListener.stopRtpListenerForCall(testCallId);
-        portManager.releasePort(allocatedPort, testCallId);
-
-        res.json({
-            success: results.packetReceived,
-            results,
-            publicIp
-        });
-
-    } catch (err) {
-        // Cleanup on error
-        if (allocatedPort) {
-            try {
-                rtpListener.stopRtpListenerForCall(testCallId);
-                const portManager = require('../../services/port.manager.service');
-                portManager.releasePort(allocatedPort, testCallId);
-            } catch (cleanupErr) {
-                // Ignore cleanup errors
-            }
-        }
-        
-        res.status(500).json({ 
-            error: err.message,
-            stack: err.stack
-        });
-    }
-});
-
-/**
- * @swagger
- * /test/port-audit:
- *   get:
- *     summary: Audit port allocations
- *     description: Check for orphaned ports and port leaks
- *     tags: [Test - Maintenance]
- *     responses:
- *       "200":
- *         description: Port audit results
- */
-router.get('/port-audit', (req, res) => {
-    try {
-        const audit = channelTracker.performPortAudit();
-        const portManager = require('../../services/port.manager.service');
-        const portStats = portManager.getStats();
-        
-        res.json({
-            audit,
-            portStats,
-            recommendations: {
-                hasOrphanedPorts: audit.orphanedPorts.length > 0,
-                hasTerminalCallsWithPorts: audit.callsInTerminalStateWithPorts.length > 0,
-                suggestedAction: (audit.orphanedPorts.length > 0 || audit.callsInTerminalStateWithPorts.length > 0) 
-                    ? 'Run POST /test/port-cleanup to fix issues' 
-                    : 'No issues found'
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /test/port-cleanup:
- *   post:
- *     summary: Clean up orphaned ports
- *     description: Release orphaned ports and clean up terminal calls
- *     tags: [Test - Maintenance]
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               autoRelease:
- *                 type: boolean
- *                 default: false
- *                 description: If true, automatically releases orphaned resources
- *     responses:
- *       "200":
- *         description: Cleanup results
- */
-router.post('/port-cleanup', (req, res) => {
-    try {
-        const { autoRelease = false } = req.body;
-        const cleanup = channelTracker.cleanupOrphanedResources(autoRelease);
-        
-        res.json({
-            cleanup,
-            message: autoRelease 
-                ? `Released ${cleanup.portsReleased} ports and removed ${cleanup.callsRemoved} calls`
-                : 'Audit complete. Set autoRelease=true to perform cleanup'
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 /**
  * @swagger
@@ -1230,6 +295,171 @@ router.get('/validate-integration', async (req, res) => {
 
     res.json(results);
 });
+
+/**
+ * @swagger
+ * /test/channel-tracker:
+ *   get:
+ *     summary: Get channel tracker state
+ *     description: Returns all tracked channels and their states
+ *     tags: [Test - Call Tracking]
+ *     responses:
+ *       "200":
+ *         description: Channel tracker state
+ */
+router.get('/channel-tracker', (req, res) => {
+    try {
+        const stats = channelTracker.getStats();
+        const calls = Array.from(channelTracker.calls.entries()).map(([id, data]) => ({
+            asteriskChannelId: id,
+            twilioCallSid: data.twilioCallSid,
+            state: data.state,
+            allocatedRtpPort: data.rtpPort,
+            isReadStreamReady: data.isReadStreamReady,
+            isWriteStreamReady: data.isWriteStreamReady,
+            hasMainChannel: !!data.mainChannel,
+            hasSnoopChannel: !!data.snoopChannel,
+            hasPlaybackChannel: !!data.playbackChannel,
+            hasInboundRtpChannel: !!data.inboundRtpChannel,
+            hasOutboundRtpChannel: !!data.outboundRtpChannel,
+            mainBridgeId: data.mainBridgeId,
+            startTime: data.startTime
+        }));
+        
+        res.json({
+            stats,
+            calls
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/openai-connections:
+ *   get:
+ *     summary: Get OpenAI service connections
+ *     description: Returns all active OpenAI realtime connections
+ *     tags: [Test - OpenAI]
+ *     responses:
+ *       "200":
+ *         description: OpenAI connections status
+ */
+router.get('/openai-connections', (req, res) => {
+    try {
+        const connections = Array.from(openAIService.connections.entries()).map(([callId, conn]) => ({
+            callId,
+            status: conn.status,
+            sessionReady: conn.sessionReady,
+            sessionId: conn.sessionId,
+            asteriskChannelId: conn.asteriskChannelId,
+            audioChunksReceived: conn.audioChunksReceived,
+            audioChunksSent: conn.audioChunksSent,
+            lastActivity: conn.lastActivity,
+            startTime: conn.startTime,
+            websocketState: conn.webSocket?.readyState
+        }));
+        
+        res.json({
+            totalConnections: connections.length,
+            connections
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/rtp-debug:
+ *   get:
+ *     summary: Debug RTP configuration and network
+ *     description: Shows current RTP configuration, ports, and network details
+ *     tags: [Test - RTP]
+ *     responses:
+ *       "200":
+ *         description: RTP debug information
+ */
+router.get('/rtp-debug', async (req, res) => {
+    try {
+        const portManager = require('../../services/port.manager.service');
+        
+        let publicIp = 'Not available';
+        let ipError = null;
+        
+        try {
+            publicIp = await getFargateIp();
+        } catch (err) {
+            publicIp = 'Error getting IP';
+            ipError = err.message;
+        }
+        
+        const activeListeners = rtpListener.getAllActiveListeners();
+        
+        res.json({
+            network: {
+                publicIp: publicIp,
+                ipError: ipError,
+                isRunningInECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
+                ecsMetadataUri: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set'
+            },
+            portManager: portManager.getStats(),
+            activeListeners,
+            config: {
+                appRtpPortRange: process.env.APP_RTP_PORT_RANGE || '16384-16484',
+                rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set',
+                asteriskUrl: config.asterisk.url,
+                asteriskPublicIp: config.asterisk.publicIp || 'Not set'
+            },
+            environment: {
+                AWS_REGION: process.env.AWS_REGION,
+                NODE_ENV: process.env.NODE_ENV,
+                RTP_PORT_RANGE: process.env.RTP_PORT_RANGE
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+/**
+ * @swagger
+ * /test/config:
+ *   get:
+ *     summary: Get current configuration
+ *     description: Returns the current configuration values for Asterisk and RTP
+ *     tags: [Test - Configuration]
+ *     responses:
+ *       "200":
+ *         description: Configuration retrieved successfully
+ */
+router.get('/config', (req, res) => {
+    res.json({
+        environment: config.env,
+        asterisk: {
+            enabled: config.asterisk.enabled,
+            host: config.asterisk.host,
+            url: config.asterisk.url,
+            rtpBiancaHost: config.asterisk.rtpBiancaHost,
+            rtpAsteriskHost: config.asterisk.rtpAsteriskHost,
+        },
+        rtpPorts: {
+            appPortRange: process.env.APP_RTP_PORT_RANGE || '16384-16484',
+        },
+        environmentVariables: {
+            NODE_ENV: process.env.NODE_ENV,
+            ASTERISK_URL: process.env.ASTERISK_URL,
+            RTP_LISTENER_HOST: process.env.RTP_LISTENER_HOST,
+            RTP_BIANCA_HOST: process.env.RTP_BIANCA_HOST,
+            RTP_ASTERISK_HOST: process.env.RTP_ASTERISK_HOST,
+        }
+    });
+});
+
+// ============================================
+// ESSENTIAL DEBUGGING ROUTES - AUDIO DEBUGGING
+// ============================================
 
 /**
  * @swagger
@@ -1393,6 +623,240 @@ function analyzeAudioPipeline(debugInfo) {
 
 /**
  * @swagger
+ * /test/compare-audio-stages:
+ *   get:
+ *     summary: Compare audio at different pipeline stages
+ *     description: Shows audio characteristics at each conversion stage
+ *     tags: [Test - Audio Debug]
+ *     parameters:
+ *       - in: query
+ *         name: callId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: Audio stage comparison
+ */
+router.get('/compare-audio-stages', async (req, res) => {
+    const { callId } = req.query;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const callAudioDir = path.join(__dirname, '..', '..', 'debug_audio_calls', callId);
+        
+        const stages = {
+            callId,
+            timestamp: new Date().toISOString(),
+            stages: {},
+            comparison: {}
+        };
+
+        // Define the audio files at each stage
+        const audioFiles = [
+            { name: 'continuous_from_asterisk_ulaw.ulaw', stage: 'input_from_asterisk', format: 'ulaw', sampleRate: 8000 },
+            { name: 'continuous_from_asterisk_pcm8k.raw', stage: 'converted_to_pcm_8k', format: 'pcm16', sampleRate: 8000 },
+            { name: 'continuous_from_asterisk_pcm24k.raw', stage: 'resampled_to_24k', format: 'pcm16', sampleRate: 24000 },
+            { name: 'output_for_openai.pcm', stage: 'sent_to_openai', format: 'pcm16', sampleRate: 24000 },
+            { name: 'continuous_from_openai_pcm24k.raw', stage: 'received_from_openai', format: 'pcm16', sampleRate: 24000 },
+            { name: 'continuous_from_openai_pcm8k.raw', stage: 'downsampled_to_8k', format: 'pcm16', sampleRate: 8000 },
+            { name: 'continuous_from_openai_ulaw.ulaw', stage: 'converted_to_ulaw', format: 'ulaw', sampleRate: 8000 }
+        ];
+
+        for (const file of audioFiles) {
+            const filePath = path.join(callAudioDir, file.name);
+            if (fs.existsSync(filePath)) {
+                const stats = fs.statSync(filePath);
+                const expectedBytesPerSecond = file.format === 'ulaw' ? file.sampleRate : file.sampleRate * 2;
+                const durationSeconds = stats.size / expectedBytesPerSecond;
+                
+                stages.stages[file.stage] = {
+                    file: file.name,
+                    exists: true,
+                    size: stats.size,
+                    sizeKB: (stats.size / 1024).toFixed(2),
+                    format: file.format,
+                    sampleRate: file.sampleRate,
+                    estimatedDuration: durationSeconds.toFixed(2) + 's',
+                    lastModified: stats.mtime.toISOString()
+                };
+            } else {
+                stages.stages[file.stage] = {
+                    file: file.name,
+                    exists: false
+                };
+            }
+        }
+
+        // Compare sizes to detect issues
+        const asteriskIn = stages.stages.input_from_asterisk;
+        const openAIOut = stages.stages.received_from_openai;
+        
+        if (asteriskIn?.exists && openAIOut?.exists) {
+            const asteriskDuration = parseFloat(asteriskIn.estimatedDuration);
+            const openAIDuration = parseFloat(openAIOut.estimatedDuration);
+            
+            stages.comparison = {
+                inputDuration: asteriskDuration + 's',
+                outputDuration: openAIDuration + 's',
+                ratio: (openAIDuration / asteriskDuration).toFixed(2),
+                analysis: []
+            };
+
+            if (openAIDuration < asteriskDuration * 0.1) {
+                stages.comparison.analysis.push('OpenAI output is much shorter than input - possible audio processing issue');
+            }
+            
+            if (asteriskIn.size === 0) {
+                stages.comparison.analysis.push('No audio received from Asterisk');
+            }
+            
+            if (openAIOut.size === 0) {
+                stages.comparison.analysis.push('No audio received from OpenAI');
+            }
+        }
+
+        res.json(stages);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/download-debug-audio:
+ *   get:
+ *     summary: Get debug audio files for a call
+ *     description: Returns URLs to download debug audio files
+ *     tags: [Test - Audio Debug]
+ *     parameters:
+ *       - in: query
+ *         name: callId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: Debug audio file information
+ */
+router.get('/download-debug-audio', async (req, res) => {
+    const { callId } = req.query;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const S3Service = require('../../services/s3.service');
+        const result = {
+            callId,
+            localFiles: {},
+            s3Files: []
+        };
+
+        // Check local files
+        const callAudioDir = path.join(__dirname, '..', '..', 'debug_audio_calls', callId);
+        if (fs.existsSync(callAudioDir)) {
+            const files = fs.readdirSync(callAudioDir);
+            files.forEach(file => {
+                const filePath = path.join(callAudioDir, file);
+                const stats = fs.statSync(filePath);
+                result.localFiles[file] = {
+                    size: stats.size,
+                    sizeMB: (stats.size / 1024 / 1024).toFixed(2),
+                    modified: stats.mtime.toISOString(),
+                    path: filePath
+                };
+            });
+        }
+
+        // Check S3 files
+        try {
+            const s3Keys = [
+                `debug-audio/${callId}/caller_to_openai_8khz.wav`,
+                `debug-audio/${callId}/openai_to_caller_24khz.wav`
+            ];
+
+            for (const key of s3Keys) {
+                try {
+                    const url = await S3Service.getPresignedUrl(key, 3600);
+                    result.s3Files.push({
+                        key,
+                        url,
+                        description: key.includes('caller_to_openai') ? 
+                            'Audio from caller to OpenAI (8kHz)' : 
+                            'Audio from OpenAI to caller (24kHz)'
+                    });
+                } catch (err) {
+                    // File might not exist
+                }
+            }
+        } catch (err) {
+            result.s3Error = err.message;
+        }
+
+        // Add conversion instructions
+        result.conversionInstructions = {
+            pcm24k: 'ffplay -f s16le -ar 24000 -ac 1 continuous_from_openai_pcm24k.raw',
+            pcm8k: 'ffplay -f s16le -ar 8000 -ac 1 continuous_from_asterisk_pcm8k.raw',
+            ulaw: 'ffplay -f mulaw -ar 8000 -ac 1 continuous_from_asterisk_ulaw.ulaw',
+            convertToWav: 'ffmpeg -f s16le -ar 24000 -ac 1 -i input.raw output.wav'
+        };
+
+        res.json(result);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/force-audio-commit:
+ *   post:
+ *     summary: Force OpenAI to commit audio buffer
+ *     description: Manually triggers audio buffer commit for debugging
+ *     tags: [Test - Audio Debug]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 required: true
+ *     responses:
+ *       "200":
+ *         description: Commit result
+ */
+router.post('/force-audio-commit', async (req, res) => {
+    const { callId } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const success = await openAIService.forceCommit(callId);
+        
+        res.json({
+            success,
+            message: success ? 'Audio buffer commit sent' : 'Failed to send commit',
+            note: 'Check logs for OpenAI response'
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
  * /test/audio-conversion-test:
  *   post:
  *     summary: Test audio conversion chain
@@ -1518,10 +982,10 @@ router.post('/audio-conversion-test', async (req, res) => {
 
 /**
  * @swagger
- * /test/download-debug-audio:
+ * /test/rtp-packet-analysis:
  *   get:
- *     summary: Get debug audio files for a call
- *     description: Returns URLs to download debug audio files
+ *     summary: Analyze RTP packet flow and payloads
+ *     description: Shows detailed RTP packet information and payload types
  *     tags: [Test - Audio Debug]
  *     parameters:
  *       - in: query
@@ -1531,9 +995,9 @@ router.post('/audio-conversion-test', async (req, res) => {
  *           type: string
  *     responses:
  *       "200":
- *         description: Debug audio file information
+ *         description: RTP packet analysis
  */
-router.get('/download-debug-audio', async (req, res) => {
+router.get('/rtp-packet-analysis', (req, res) => {
     const { callId } = req.query;
     
     if (!callId) {
@@ -1541,109 +1005,97 @@ router.get('/download-debug-audio', async (req, res) => {
     }
 
     try {
-        const S3Service = require('../services/s3.service');
-        const result = {
+        const listener = rtpListener.getListenerForCall(callId);
+        if (!listener) {
+            return res.status(404).json({ error: 'No RTP listener found for this call' });
+        }
+
+        const stats = listener.getStats();
+        
+        // Calculate packet rate
+        const uptimeSeconds = stats.uptime / 1000;
+        const packetRate = uptimeSeconds > 0 ? stats.packetsReceived / uptimeSeconds : 0;
+        
+        const analysis = {
             callId,
-            localFiles: {},
-            s3Files: []
+            listener: {
+                port: stats.port,
+                active: stats.active,
+                uptime: stats.uptime,
+                stats: {
+                    packetsReceived: stats.packetsReceived,
+                    packetsSent: stats.packetsSent,
+                    invalidPackets: stats.invalidPackets,
+                    errors: stats.errors
+                },
+                rates: {
+                    packetsPerSecond: packetRate.toFixed(2),
+                    expectedPacketsPerSecond: 50, // 20ms packetization = 50 packets/sec
+                    percentageOfExpected: ((packetRate / 50) * 100).toFixed(1)
+                }
+            },
+            issues: []
         };
 
-        // Check local files
-        const callAudioDir = path.join(__dirname, '..', '..', 'debug_audio_calls', callId);
-        if (fs.existsSync(callAudioDir)) {
-            const files = fs.readdirSync(callAudioDir);
-            files.forEach(file => {
-                const filePath = path.join(callAudioDir, file);
-                const stats = fs.statSync(filePath);
-                result.localFiles[file] = {
-                    size: stats.size,
-                    sizeMB: (stats.size / 1024 / 1024).toFixed(2),
-                    modified: stats.mtime.toISOString(),
-                    path: filePath
-                };
+        // Check for common RTP issues
+        if (stats.packetsReceived === 0) {
+            analysis.issues.push({
+                severity: 'critical',
+                issue: 'No RTP packets received',
+                possibleCauses: [
+                    'Asterisk not sending to correct IP/port',
+                    'Firewall blocking UDP traffic',
+                    'ExternalMedia not configured correctly'
+                ]
             });
         }
 
-        // Check S3 files
-        try {
-            const s3Keys = [
-                `debug-audio/${callId}/caller_to_openai_8khz.wav`,
-                `debug-audio/${callId}/openai_to_caller_24khz.wav`
-            ];
-
-            for (const key of s3Keys) {
-                try {
-                    const url = await S3Service.getPresignedUrl(key, 3600);
-                    result.s3Files.push({
-                        key,
-                        url,
-                        description: key.includes('caller_to_openai') ? 
-                            'Audio from caller to OpenAI (8kHz)' : 
-                            'Audio from OpenAI to caller (24kHz)'
-                    });
-                } catch (err) {
-                    // File might not exist
-                }
-            }
-        } catch (err) {
-            result.s3Error = err.message;
+        if (stats.invalidPackets > stats.packetsReceived * 0.05) {
+            analysis.issues.push({
+                severity: 'high',
+                issue: `High invalid packet rate: ${((stats.invalidPackets / stats.packetsReceived) * 100).toFixed(1)}%`,
+                possibleCauses: [
+                    'Non-RTP traffic on the port',
+                    'Corrupted packets',
+                    'Wrong RTP version or format'
+                ]
+            });
         }
 
-        // Add conversion instructions
-        result.conversionInstructions = {
-            pcm24k: 'ffplay -f s16le -ar 24000 -ac 1 continuous_from_openai_pcm24k.raw',
-            pcm8k: 'ffplay -f s16le -ar 8000 -ac 1 continuous_from_asterisk_pcm8k.raw',
-            ulaw: 'ffplay -f mulaw -ar 8000 -ac 1 continuous_from_asterisk_ulaw.ulaw',
-            convertToWav: 'ffmpeg -f s16le -ar 24000 -ac 1 -i input.raw output.wav'
-        };
+        if (packetRate < 40 && stats.packetsReceived > 0) {
+            analysis.issues.push({
+                severity: 'medium',
+                issue: `Low packet rate: ${packetRate.toFixed(1)} packets/sec`,
+                possibleCauses: [
+                    'Network congestion',
+                    'Packet loss',
+                    'Incorrect packetization time'
+                ]
+            });
+        }
 
-        res.json(result);
+        if (stats.errors > 0) {
+            analysis.issues.push({
+                severity: 'medium',
+                issue: `Processing errors: ${stats.errors}`,
+                possibleCauses: [
+                    'Invalid audio format',
+                    'OpenAI service issues',
+                    'Memory or processing issues'
+                ]
+            });
+        }
+
+        res.json(analysis);
 
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-/**
- * @swagger
- * /test/force-audio-commit:
- *   post:
- *     summary: Force OpenAI to commit audio buffer
- *     description: Manually triggers audio buffer commit for debugging
- *     tags: [Test - Audio Debug]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               callId:
- *                 type: string
- *                 required: true
- *     responses:
- *       "200":
- *         description: Commit result
- */
-router.post('/force-audio-commit', async (req, res) => {
-    const { callId } = req.body;
-    
-    if (!callId) {
-        return res.status(400).json({ error: 'callId is required' });
-    }
-
-    try {
-        const success = await openAIService.forceCommit(callId);
-        
-        res.json({
-            success,
-            message: success ? 'Audio buffer commit sent' : 'Failed to send commit',
-            note: 'Check logs for OpenAI response'
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+// ============================================
+// ESSENTIAL DEBUGGING ROUTES - TROUBLESHOOTING ACTIONS
+// ============================================
 
 /**
  * @swagger
@@ -1766,5 +1218,157 @@ router.post('/test-audio-chain', async (req, res) => {
     }
 });
 
-// Export the complete test routes
+/**
+ * @swagger
+ * /test/simulate-audio-to-openai:
+ *   post:
+ *     summary: Send test audio directly to OpenAI
+ *     description: Bypasses RTP and sends test audio to verify OpenAI processing
+ *     tags: [Test - Audio Debug]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 required: true
+ *               testPattern:
+ *                 type: string
+ *                 enum: [sine, speech_sample, silence]
+ *                 default: sine
+ *     responses:
+ *       "200":
+ *         description: Test result
+ */
+router.post('/simulate-audio-to-openai', async (req, res) => {
+    const { callId, testPattern = 'sine' } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const conn = openAIService.connections.get(callId);
+        if (!conn || !conn.sessionReady) {
+            return res.status(400).json({ error: 'OpenAI connection not ready' });
+        }
+
+        const AudioUtils = require('../../api/audio.utils');
+        let testAudio;
+
+        switch (testPattern) {
+            case 'sine':
+                // Generate 1 second of 440Hz sine wave at 8kHz
+                const samples = 8000;
+                testAudio = Buffer.alloc(samples * 2);
+                for (let i = 0; i < samples; i++) {
+                    const sample = Math.sin(2 * Math.PI * 440 * i / 8000) * 16383;
+                    testAudio.writeInt16LE(Math.round(sample), i * 2);
+                }
+                break;
+            
+            case 'silence':
+                testAudio = Buffer.alloc(8000 * 2, 0); // 1 second of silence
+                break;
+            
+            case 'speech_sample':
+                // This would ideally be a real speech sample
+                // For now, use a complex waveform
+                testAudio = Buffer.alloc(8000 * 2);
+                for (let i = 0; i < 8000; i++) {
+                    const sample = Math.sin(2 * Math.PI * 200 * i / 8000) * 8000 +
+                                 Math.sin(2 * Math.PI * 500 * i / 8000) * 4000 +
+                                 Math.sin(2 * Math.PI * 1200 * i / 8000) * 2000;
+                    testAudio.writeInt16LE(Math.round(sample), i * 2);
+                }
+                break;
+        }
+
+        // Convert to uLaw
+        const ulawBase64 = await AudioUtils.convertPcmToUlaw(testAudio);
+        
+        // Track before/after stats
+        const before = {
+            chunksReceived: conn.audioChunksReceived,
+            chunksSent: conn.audioChunksSent,
+            openaiChunks: conn._openaiChunkCount || 0
+        };
+
+        // Send to OpenAI
+        await openAIService.sendAudioChunk(callId, ulawBase64, true);
+        
+        // Force commit
+        await openAIService.forceCommit(callId);
+
+        // Wait for response
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const after = {
+            chunksReceived: conn.audioChunksReceived,
+            chunksSent: conn.audioChunksSent,
+            openaiChunks: conn._openaiChunkCount || 0
+        };
+
+        res.json({
+            success: true,
+            testPattern,
+            audioSize: testAudio.length,
+            before,
+            after,
+            changes: {
+                chunksSentToOpenAI: after.chunksSent - before.chunksSent,
+                responseFromOpenAI: after.openaiChunks - before.openaiChunks
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+/**
+ * @swagger
+ * /test/cleanup-all:
+ *   post:
+ *     summary: Cleanup all connections
+ *     description: Cleans up all active connections and resets services
+ *     tags: [Test - Maintenance]
+ *     responses:
+ *       "200":
+ *         description: Cleanup completed
+ */
+router.post('/cleanup-all', async (req, res) => {
+    try {
+        // Clean up all tracked calls
+        const calls = Array.from(channelTracker.calls.keys());
+        for (const callId of calls) {
+            channelTracker.removeCall(callId);
+        }
+        
+        // Clean up RTP sender
+        rtpSender.cleanupAll();
+        
+        // Clean up OpenAI connections
+        await openAIService.disconnectAll();
+        
+        // Clear SSRC mappings -- does not exist anymore
+        const clearedCount = 0;
+        
+        res.json({
+            success: true,
+            cleaned: {
+                calls: calls.length,
+                ssrcMappings: clearedCount,
+                message: 'All connections cleaned up'
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Export the router
 module.exports = router;
