@@ -932,7 +932,7 @@ class AsteriskAriClient extends EventEmitter {
                 success: true,
                 asteriskChannelId,
                 twilioCallSid,
-                allocatedPort,
+                allocatedReadPort,
                 bridgeId: mainBridge.id
             };
 
@@ -947,15 +947,25 @@ class AsteriskAriClient extends EventEmitter {
                 try {
                     const rtpListenerService = require('./rtp.listener.service');
                     rtpListenerService.stopRtpListenerForCall(twilioCallSid || asteriskChannelId);
+                    rtpListenerService.stopRtpListenerForCall(`${twilioCallSid || asteriskChannelId}-write`);
                 } catch (cleanupErr) {
                     logger.error(`[ARI Pipeline] Error stopping RTP listener during cleanup: ${cleanupErr.message}`);
                 }
             }
             
-            if (allocatedPort) {
+            if (allocatedReadPort) {
                 try {
-                    portManager.releasePort(allocatedPort, asteriskChannelId);
-                    logger.info(`[ARI Pipeline] Released port ${allocatedPort} after setup failure`);
+                    portManager.releasePort(allocatedReadPort, asteriskChannelId);
+                    logger.info(`[ARI Pipeline] Released port ${allocatedReadPort} after setup failure`);
+                } catch (cleanupErr) {
+                    logger.error(`[ARI Pipeline] Error releasing port during cleanup: ${cleanupErr.message}`);
+                }
+            }
+            
+            if (allocatedWritePort) {
+                try {
+                    portManager.releasePort(allocatedWritePort, `${asteriskChannelId}-write`);
+                    logger.info(`[ARI Pipeline] Released port ${allocatedWritePort} after setup failure`);
                 } catch (cleanupErr) {
                     logger.error(`[ARI Pipeline] Error releasing port during cleanup: ${cleanupErr.message}`);
                 }
@@ -1661,7 +1671,8 @@ class AsteriskAriClient extends EventEmitter {
             logger.info(`[ARI] Port Manager final stats:`, portStats);
             
             if (this.client) {
-                this.client.close();
+                //this.client.close();
+                this.client.removeAllListeners();
                 this.client = null;
                 logger.info('[ARI] Client closed');
             }
