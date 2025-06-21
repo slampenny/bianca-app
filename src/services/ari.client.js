@@ -167,8 +167,8 @@ class AsteriskAriClient extends EventEmitter {
         // Configuration for ExternalMedia
         this.RTP_BIANCA_HOST = sanitizeHost(config.asterisk.rtpBiancaHost);
         this.RTP_ASTERISK_HOST = sanitizeHost(config.asterisk.rtpAsteriskHost);
-        this.RTP_BIANCA_RECEIVE_PORT = config.asterisk.rtpBiancaReceivePort;
-        this.RTP_BIANCA_SEND_PORT = config.asterisk.rtpBiancaSendPort || (config.asterisk.rtpBiancaReceivePort + 1);
+        // this.RTP_BIANCA_RECEIVE_PORT = config.asterisk.rtpBiancaReceivePort;
+        // this.RTP_BIANCA_SEND_PORT = config.asterisk.rtpBiancaSendPort || (config.asterisk.rtpBiancaReceivePort + 1);
 
         // Set global reference safely
         this.setGlobalReference();
@@ -832,34 +832,54 @@ class AsteriskAriClient extends EventEmitter {
         logger.info(`[ARI Pipeline] Setting up for Asterisk ID: ${asteriskChannelId}, Twilio SID: ${twilioCallSid}, PatientID: ${patientId}`);
         
         let mainBridge = null;
-        let allocatedPort = null;
+        let allocatedReadPort = null;
+        let allocatedWritePort = null;
         let rtpListener = null;
 
         try {
-            // Step 1: Allocate a unique port for this call
-            allocatedPort = portManager.acquirePort(asteriskChannelId, {
+            // Step 1: Allocate TWO unique ports for this call
+            allocatedReadPort = portManager.acquirePort(`${asteriskChannelId}-read`, {
                 asteriskChannelId,
                 twilioCallSid,
-                patientId
+                patientId,
+                direction: 'read'
             });
             
-            if (!allocatedPort) {
+            allocatedWritePort = portManager.acquirePort(`${asteriskChannelId}-write`, {
+                asteriskChannelId,
+                twilioCallSid,
+                patientId,
+                direction: 'write'
+            });
+            
+            if (!allocatedReadPort || !allocatedWritePort) {
                 throw new Error('No available RTP ports for media pipeline');
             }
             
-            logger.info(`[ARI Pipeline] Allocated port ${allocatedPort} for call ${asteriskChannelId}`);
+            logger.info(`[ARI Pipeline] Allocated ports - READ: ${allocatedReadPort}, WRITE: ${allocatedWritePort}`);
 
-            // Step 2: Start the dedicated RTP listener for this call
+            // Step 2: Start RTP listeners on BOTH ports
             const rtpListenerService = require('./rtp.listener.service');
-            rtpListener = await rtpListenerService.startRtpListenerForCall(
-                allocatedPort,
+            
+            // Listener for READ (from Asterisk)
+            await rtpListenerService.startRtpListenerForCall(
+                allocatedReadPort,
                 twilioCallSid || asteriskChannelId,
                 asteriskChannelId
             );
+            
+            // Listener for WRITE (for OpenAI to send to)
+            await rtpListenerService.startRtpListenerForCall(
+                allocatedWritePort,
+                `${twilioCallSid || asteriskChannelId}-write`,
+                asteriskChannelId
+            );
 
-            // Step 3: Update call tracking with port information
+            // Step 3: Update call tracking with BOTH port information
             this.tracker.updateCall(asteriskChannelId, {
-                rtpPort: allocatedPort,
+                rtpPort: allocatedReadPort,        // Keep for backward compatibility
+                rtpReadPort: allocatedReadPort,    // Explicit read port
+                rtpWritePort: allocatedWritePort,  // Explicit write port
                 rtpListener: rtpListener,
                 state: 'setting_up_media'
             });
@@ -1188,7 +1208,11 @@ class AsteriskAriClient extends EventEmitter {
             await this.client.bridges.addChannel({ bridgeId: parentCallData.mainBridgeId, channel: channelId });
             logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
 
-            const rtpAsteriskSource = `${this.RTP_BIANCA_HOST}:${this.RTP_BIANCA_SEND_PORT}`;
+            // USE DYNAMIC PORT INSTEAD OF STATIC CONFIG
+            const rtpHost = await getFargateIp();
+            const rtpAsteriskSource = `${rtpHost}:${parentCallData.rtpWritePort}`;
+            
+            logger.info(`[ARI] Creating WRITE ExternalMedia to ${rtpAsteriskSource}`);
             
             const unicastRtpChannel = await channel.externalMedia({
                 app: CONFIG.STASIS_APP_NAME,
@@ -1231,221 +1255,243 @@ class AsteriskAriClient extends EventEmitter {
     }
     
     async initializeRtpSenderWithEndpoint(asteriskChannelId, rtpEndpoint) {
-    const callData = this.tracker.getCall(asteriskChannelId);
-    if (!callData) {
-        logger.error(`[RTP Sender] No call data found for ${asteriskChannelId}`);
-        return;
-    }
-
-    // Use Twilio SID as the primary identifier
-    const callId = callData.twilioCallSid || asteriskChannelId;
-    logger.info(`[RTP Sender] Initializing for ${callId} to ${rtpEndpoint.host}:${rtpEndpoint.port}`);
-    
-    try {
-        const rtpSenderService = require('./rtp.sender.service');
-        await rtpSenderService.initializeCall(callId, {
-            asteriskChannelId,
-            rtpHost: rtpEndpoint.host,
-            rtpPort: rtpEndpoint.port,
-            format: CONFIG.RTP_SEND_FORMAT
-        });
-        
-        logger.info(`[RTP Sender] Successfully initialized for ${callId}`);
-        
-        // Set the flag and check for pipeline completion
-        this.tracker.updateCall(asteriskChannelId, { isWriteStreamReady: true });
-        logger.info(`[ARI Pipeline] WRITE stream is now ready for ${asteriskChannelId}.`);
-        this.checkMediaPipelineReady(asteriskChannelId);
-
-    } catch (err) {
-        logger.error(`[RTP Sender] Failed to initialize: ${err.message}`, err);
-        this.updateCallState(asteriskChannelId, 'failed');
-        throw err;
-    }
-}
-
-    sendAudioToChannel(asteriskChannelId, audioBase64Ulaw) {
-    if (!audioBase64Ulaw) {
-        logger.warn(`[ARI Audio] Empty audio for ${asteriskChannelId}`);
-        return;
-    }
-    
-    const callData = this.tracker.getCall(asteriskChannelId);
-    if (!callData) {
-        logger.warn(`[ARI Audio] No call data found for ${asteriskChannelId}`);
-        return;
-    }
-
-    // Use Twilio SID as primary identifier for RTP sender
-    const callId = callData.twilioCallSid || asteriskChannelId;
-    
-    try {
-        const rtpSenderService = require('./rtp.sender.service');
-        rtpSenderService.sendAudio(callId, audioBase64Ulaw);
-    } catch (err) {
-        logger.error(`[ARI Audio] Error sending audio: ${err.message}`, err);
-    }
-}
-
-    async cleanupChannel(asteriskChannelId, reason = "Unknown") {
-    logger.info(`[Cleanup] Starting cleanup for ${asteriskChannelId}. Reason: ${reason}`);
-    
-    // Abort any ongoing operations for this channel
-    this.resourceManager.abortOperations(asteriskChannelId);
-    
-    // Get all resources associated with this call
-    const resources = this.tracker.getResources(asteriskChannelId);
-    if (!resources) {
-        logger.warn(`[Cleanup] No resources found for ${asteriskChannelId}, already cleaned up.`);
-        return;
-    }
-    
-    // Determine the primary identifier for external services
-    const primarySid = resources.twilioCallSid || resources.asteriskChannelId || asteriskChannelId;
-    
-    // Remove from tracker early to prevent duplicate cleanup attempts
-    this.tracker.removeCall(asteriskChannelId);
-    
-    // Track cleanup errors but continue with other cleanup steps
-    const cleanupErrors = [];
-    
-    try {
-        // Step 1: Stop and cleanup RTP listener
-        if (resources.rtpPort) {
-            try {
-                const rtpListenerService = require('./rtp.listener.service');
-                rtpListenerService.stopRtpListenerForCall(primarySid);
-                logger.info(`[Cleanup] Stopped RTP listener for ${primarySid}`);
-            } catch (err) {
-                logger.error(`[Cleanup] Error stopping RTP listener: ${err.message}`);
-                cleanupErrors.push(`RTP listener: ${err.message}`);
-            }
-            
-            try {
-                portManager.releasePort(resources.rtpPort, asteriskChannelId);
-                logger.info(`[Cleanup] Released port ${resources.rtpPort} for ${asteriskChannelId}`);
-            } catch (err) {
-                logger.error(`[Cleanup] Error releasing port: ${err.message}`);
-                cleanupErrors.push(`Port release: ${err.message}`);
-            }
+        const callData = this.tracker.getCall(asteriskChannelId);
+        if (!callData) {
+            logger.error(`[RTP Sender] No call data found for ${asteriskChannelId}`);
+            return;
         }
+
+        // Use Twilio SID as the primary identifier
+        const callId = callData.twilioCallSid || asteriskChannelId;
+        logger.info(`[RTP Sender] Initializing for ${callId} to ${rtpEndpoint.host}:${rtpEndpoint.port}`);
         
-        // Step 2: Cleanup RTP sender service
         try {
             const rtpSenderService = require('./rtp.sender.service');
-            rtpSenderService.cleanupCall(primarySid);
-            logger.info(`[Cleanup] Cleaned up RTP sender for ${primarySid}`);
+            await rtpSenderService.initializeCall(callId, {
+                asteriskChannelId,
+                rtpHost: rtpEndpoint.host,
+                rtpPort: rtpEndpoint.port,
+                format: CONFIG.RTP_SEND_FORMAT
+            });
+            
+            logger.info(`[RTP Sender] Successfully initialized for ${callId}`);
+            
+            // Set the flag and check for pipeline completion
+            this.tracker.updateCall(asteriskChannelId, { isWriteStreamReady: true });
+            logger.info(`[ARI Pipeline] WRITE stream is now ready for ${asteriskChannelId}.`);
+            this.checkMediaPipelineReady(asteriskChannelId);
+
         } catch (err) {
-            logger.warn(`[Cleanup] Error cleaning up RTP sender: ${err.message}`);
-            cleanupErrors.push(`RTP sender: ${err.message}`);
+            logger.error(`[RTP Sender] Failed to initialize: ${err.message}`, err);
+            this.updateCallState(asteriskChannelId, 'failed');
+            throw err;
         }
-        
-        // Step 3: Disconnect OpenAI service
-        try {
-            await openAIService.disconnect(primarySid);
-            logger.info(`[Cleanup] Disconnected OpenAI service for ${primarySid}`);
-        } catch (err) {
-            logger.warn(`[Cleanup] Error disconnecting OpenAI: ${err.message}`);
-            cleanupErrors.push(`OpenAI disconnect: ${err.message}`);
-        }
-        
-        // Step 4: Stop any active recordings
-        if (resources.recordingName) {
-            try {
-                await this.client.recordings.stop({ recordingName: resources.recordingName });
-                logger.info(`[Cleanup] Stopped recording ${resources.recordingName}`);
-            } catch (err) {
-                if (!err.message?.includes('404')) {
-                    logger.warn(`[Cleanup] Error stopping recording: ${err.message}`);
-                    cleanupErrors.push(`Recording stop: ${err.message}`);
-                }
-            }
-        }
-        
-        // Step 5: Cleanup all channels in order (auxiliary first, then main)
-        const channelsToCleanup = [
-            { channel: resources.snoopChannel, channelId: resources.snoopChannelId, type: 'Snoop' },
-            { channel: resources.playbackChannel, channelId: resources.playbackChannelId, type: 'Playback' },
-            { channel: resources.localChannel, channelId: resources.localChannelId, type: 'Local' },
-            { channel: resources.inboundRtpChannel, channelId: resources.inboundRtpChannelId, type: 'InboundRTP' },
-            { channel: resources.outboundRtpChannel, channelId: resources.outboundRtpChannelId, type: 'OutboundRTP' },
-            { channel: resources.unicastRtpChannel, channelId: resources.unicastRtpChannelId, type: 'UnicastRTP' },
-            { channel: resources.mainChannel, channelId: asteriskChannelId, type: 'Main' }
-        ];
-        
-        for (const { channel, channelId, type } of channelsToCleanup) {
-            if (channel || channelId) {
-                try {
-                    await this.safeHangup(channel || { id: channelId, hangup: async () => { 
-                        await this.client.channels.hangup({ channelId }); 
-                    }}, type);
-                    logger.info(`[Cleanup] Hung up ${type} channel ${channelId || channel?.id}`);
-                } catch (err) {
-                    if (!err.message?.includes('404')) {
-                        cleanupErrors.push(`${type} channel hangup: ${err.message}`);
-                    }
-                }
-            }
-        }
-        
-        // Step 6: Cleanup bridges
-        const bridgesToCleanup = [
-            { bridge: resources.snoopBridge, bridgeId: resources.snoopBridgeId, type: 'Snoop' },
-            { bridge: resources.mainBridge, bridgeId: resources.mainBridgeId, type: 'Main' }
-        ];
-        
-        for (const { bridge, bridgeId, type } of bridgesToCleanup) {
-            if (bridge || bridgeId) {
-                try {
-                    await this.safeDestroy(bridge || { id: bridgeId, destroy: async () => {
-                        await this.client.bridges.destroy({ bridgeId });
-                    }}, type);
-                    logger.info(`[Cleanup] Destroyed ${type} bridge ${bridgeId || bridge?.id}`);
-                } catch (err) {
-                    if (!err.message?.includes('404')) {
-                        cleanupErrors.push(`${type} bridge destroy: ${err.message}`);
-                    }
-                }
-            }
-        }
-        
-        // Step 7: Update conversation record in database
-        if (resources.conversationId) {
-            try {
-                const Conversation = require('../models').Conversation;
-                await Conversation.findByIdAndUpdate(
-                    resources.conversationId,
-                    {
-                        status: 'completed',
-                        endTime: new Date(),
-                        cleanupReason: reason,
-                        cleanupErrors: cleanupErrors.length > 0 ? cleanupErrors : undefined
-                    }
-                );
-                logger.info(`[Cleanup] Updated conversation record ${resources.conversationId}`);
-            } catch (err) {
-                logger.error(`[Cleanup] Error updating conversation record: ${err.message}`);
-                cleanupErrors.push(`Conversation update: ${err.message}`);
-            }
-        }
-        
-        // Log summary
-        if (cleanupErrors.length > 0) {
-            logger.warn(`[Cleanup] Completed with ${cleanupErrors.length} errors for ${asteriskChannelId}: ${cleanupErrors.join(', ')}`);
-        } else {
-            logger.info(`[Cleanup] Successfully completed all cleanup for ${asteriskChannelId}`);
-        }
-        
-        return {
-            success: cleanupErrors.length === 0,
-            errors: cleanupErrors
-        };
-        
-    } catch (err) {
-        logger.error(`[Cleanup] Unexpected error during cleanup for ${asteriskChannelId}: ${err.message}`, err);
-        throw err;
     }
-}
+
+        sendAudioToChannel(asteriskChannelId, audioBase64Ulaw) {
+        if (!audioBase64Ulaw) {
+            logger.warn(`[ARI Audio] Empty audio for ${asteriskChannelId}`);
+            return;
+        }
+        
+        const callData = this.tracker.getCall(asteriskChannelId);
+        if (!callData) {
+            logger.warn(`[ARI Audio] No call data found for ${asteriskChannelId}`);
+            return;
+        }
+
+        // Use Twilio SID as primary identifier for RTP sender
+        const callId = callData.twilioCallSid || asteriskChannelId;
+        
+        try {
+            const rtpSenderService = require('./rtp.sender.service');
+            rtpSenderService.sendAudio(callId, audioBase64Ulaw);
+        } catch (err) {
+            logger.error(`[ARI Audio] Error sending audio: ${err.message}`, err);
+        }
+    }
+
+    async cleanupChannel(asteriskChannelId, reason = "Unknown") {
+        logger.info(`[Cleanup] Starting cleanup for ${asteriskChannelId}. Reason: ${reason}`);
+        
+        // Abort any ongoing operations for this channel
+        this.resourceManager.abortOperations(asteriskChannelId);
+        
+        // Get all resources associated with this call
+        const resources = this.tracker.getResources(asteriskChannelId);
+        if (!resources) {
+            logger.warn(`[Cleanup] No resources found for ${asteriskChannelId}, already cleaned up.`);
+            return;
+        }
+        
+        // Determine the primary identifier for external services
+        const primarySid = resources.twilioCallSid || resources.asteriskChannelId || asteriskChannelId;
+        
+        // Remove from tracker early to prevent duplicate cleanup attempts
+        this.tracker.removeCall(asteriskChannelId);
+        
+        // Track cleanup errors but continue with other cleanup steps
+        const cleanupErrors = [];
+        
+        try {
+            // Step 1: Stop and cleanup RTP listeners (BOTH read and write)
+            // Handle the read port (backward compatible with rtpPort)
+            if (resources.rtpReadPort || resources.rtpPort) {
+                const readPort = resources.rtpReadPort || resources.rtpPort;
+                try {
+                    const rtpListenerService = require('./rtp.listener.service');
+                    rtpListenerService.stopRtpListenerForCall(primarySid);
+                    logger.info(`[Cleanup] Stopped RTP listener (read) for ${primarySid}`);
+                } catch (err) {
+                    logger.error(`[Cleanup] Error stopping RTP listener (read): ${err.message}`);
+                    cleanupErrors.push(`RTP listener read: ${err.message}`);
+                }
+                
+                try {
+                    portManager.releasePort(readPort, asteriskChannelId);
+                    logger.info(`[Cleanup] Released read port ${readPort} for ${asteriskChannelId}`);
+                } catch (err) {
+                    logger.error(`[Cleanup] Error releasing read port: ${err.message}`);
+                    cleanupErrors.push(`Read port release: ${err.message}`);
+                }
+            }
+            
+            // Handle the write port if it exists
+            if (resources.rtpWritePort) {
+                try {
+                    const rtpListenerService = require('./rtp.listener.service');
+                    rtpListenerService.stopRtpListenerForCall(`${primarySid}-write`);
+                    logger.info(`[Cleanup] Stopped RTP listener (write) for ${primarySid}-write`);
+                } catch (err) {
+                    logger.error(`[Cleanup] Error stopping RTP listener (write): ${err.message}`);
+                    cleanupErrors.push(`RTP listener write: ${err.message}`);
+                }
+                
+                try {
+                    portManager.releasePort(resources.rtpWritePort, `${asteriskChannelId}-write`);
+                    logger.info(`[Cleanup] Released write port ${resources.rtpWritePort} for ${asteriskChannelId}`);
+                } catch (err) {
+                    logger.error(`[Cleanup] Error releasing write port: ${err.message}`);
+                    cleanupErrors.push(`Write port release: ${err.message}`);
+                }
+            }
+            
+            // Step 2: Cleanup RTP sender service
+            try {
+                const rtpSenderService = require('./rtp.sender.service');
+                rtpSenderService.cleanupCall(primarySid);
+                logger.info(`[Cleanup] Cleaned up RTP sender for ${primarySid}`);
+            } catch (err) {
+                logger.warn(`[Cleanup] Error cleaning up RTP sender: ${err.message}`);
+                cleanupErrors.push(`RTP sender: ${err.message}`);
+            }
+            
+            // Step 3: Disconnect OpenAI service
+            try {
+                await openAIService.disconnect(primarySid);
+                logger.info(`[Cleanup] Disconnected OpenAI service for ${primarySid}`);
+            } catch (err) {
+                logger.warn(`[Cleanup] Error disconnecting OpenAI: ${err.message}`);
+                cleanupErrors.push(`OpenAI disconnect: ${err.message}`);
+            }
+            
+            // Step 4: Stop any active recordings
+            if (resources.recordingName) {
+                try {
+                    await this.client.recordings.stop({ recordingName: resources.recordingName });
+                    logger.info(`[Cleanup] Stopped recording ${resources.recordingName}`);
+                } catch (err) {
+                    if (!err.message?.includes('404')) {
+                        logger.warn(`[Cleanup] Error stopping recording: ${err.message}`);
+                        cleanupErrors.push(`Recording stop: ${err.message}`);
+                    }
+                }
+            }
+            
+            // Step 5: Cleanup all channels in order (auxiliary first, then main)
+            const channelsToCleanup = [
+                { channel: resources.snoopChannel, channelId: resources.snoopChannelId, type: 'Snoop' },
+                { channel: resources.playbackChannel, channelId: resources.playbackChannelId, type: 'Playback' },
+                { channel: resources.localChannel, channelId: resources.localChannelId, type: 'Local' },
+                { channel: resources.inboundRtpChannel, channelId: resources.inboundRtpChannelId, type: 'InboundRTP' },
+                { channel: resources.outboundRtpChannel, channelId: resources.outboundRtpChannelId, type: 'OutboundRTP' },
+                { channel: resources.unicastRtpChannel, channelId: resources.unicastRtpChannelId, type: 'UnicastRTP' },
+                { channel: resources.mainChannel, channelId: asteriskChannelId, type: 'Main' }
+            ];
+            
+            for (const { channel, channelId, type } of channelsToCleanup) {
+                if (channel || channelId) {
+                    try {
+                        await this.safeHangup(channel || { id: channelId, hangup: async () => { 
+                            await this.client.channels.hangup({ channelId }); 
+                        }}, type);
+                        logger.info(`[Cleanup] Hung up ${type} channel ${channelId || channel?.id}`);
+                    } catch (err) {
+                        if (!err.message?.includes('404')) {
+                            cleanupErrors.push(`${type} channel hangup: ${err.message}`);
+                        }
+                    }
+                }
+            }
+            
+            // Step 6: Cleanup bridges
+            const bridgesToCleanup = [
+                { bridge: resources.snoopBridge, bridgeId: resources.snoopBridgeId, type: 'Snoop' },
+                { bridge: resources.mainBridge, bridgeId: resources.mainBridgeId, type: 'Main' }
+            ];
+            
+            for (const { bridge, bridgeId, type } of bridgesToCleanup) {
+                if (bridge || bridgeId) {
+                    try {
+                        await this.safeDestroy(bridge || { id: bridgeId, destroy: async () => {
+                            await this.client.bridges.destroy({ bridgeId });
+                        }}, type);
+                        logger.info(`[Cleanup] Destroyed ${type} bridge ${bridgeId || bridge?.id}`);
+                    } catch (err) {
+                        if (!err.message?.includes('404')) {
+                            cleanupErrors.push(`${type} bridge destroy: ${err.message}`);
+                        }
+                    }
+                }
+            }
+            
+            // Step 7: Update conversation record in database
+            if (resources.conversationId) {
+                try {
+                    const Conversation = require('../models').Conversation;
+                    await Conversation.findByIdAndUpdate(
+                        resources.conversationId,
+                        {
+                            status: 'completed',
+                            endTime: new Date(),
+                            cleanupReason: reason,
+                            cleanupErrors: cleanupErrors.length > 0 ? cleanupErrors : undefined
+                        }
+                    );
+                    logger.info(`[Cleanup] Updated conversation record ${resources.conversationId}`);
+                } catch (err) {
+                    logger.error(`[Cleanup] Error updating conversation record: ${err.message}`);
+                    cleanupErrors.push(`Conversation update: ${err.message}`);
+                }
+            }
+            
+            // Log summary
+            if (cleanupErrors.length > 0) {
+                logger.warn(`[Cleanup] Completed with ${cleanupErrors.length} errors for ${asteriskChannelId}: ${cleanupErrors.join(', ')}`);
+            } else {
+                logger.info(`[Cleanup] Successfully completed all cleanup for ${asteriskChannelId}`);
+            }
+            
+            return {
+                success: cleanupErrors.length === 0,
+                errors: cleanupErrors
+            };
+            
+        } catch (err) {
+            logger.error(`[Cleanup] Unexpected error during cleanup for ${asteriskChannelId}: ${err.message}`, err);
+            throw err;
+        }
+    }
 
     async cleanupExternalServices(primarySid, resources) {
         try {
