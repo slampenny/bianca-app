@@ -880,7 +880,6 @@ class AsteriskAriClient extends EventEmitter {
                 rtpPort: allocatedReadPort,        // Keep for backward compatibility
                 rtpReadPort: allocatedReadPort,    // Explicit read port
                 rtpWritePort: allocatedWritePort,  // Explicit write port
-                rtpListener: rtpListener,
                 state: 'setting_up_media'
             });
 
@@ -1163,9 +1162,9 @@ class AsteriskAriClient extends EventEmitter {
         const parentChannelId = match?.[1];
         
         const parentCallData = this.tracker.getCall(parentChannelId);
-        if (!parentCallData || !parentCallData.rtpPort) {
-            logger.error(`[ARI] No allocated port for parent call ${parentChannelId}`);
-            return this.safeHangup(channel, 'No allocated port');
+        if (!parentCallData || !parentCallData.rtpReadPort) {
+            logger.error(`[ARI] No allocated read port for parent call ${parentChannelId}`);
+            return this.safeHangup(channel, 'No allocated read port');
         }
         
         try {
@@ -1173,7 +1172,7 @@ class AsteriskAriClient extends EventEmitter {
             
             // Use the call-specific port instead of the shared port
             const rtpHost = await getFargateIp(); 
-            const rtpReadDest = `${rtpHost}:${parentCallData.rtpPort}`;
+            const rtpReadDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
             
             await channel.externalMedia({
                 app: CONFIG.STASIS_APP_NAME,

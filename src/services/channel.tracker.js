@@ -54,21 +54,6 @@ class ChannelTracker {
             }
         }
         
-        // Allocate RTP port if needed
-        let rtpPort = initialData.rtpPort || null;
-        if (!rtpPort && initialData.needsRtpPort) {
-            rtpPort = portManager.acquirePort(asteriskChannelId, {
-                asteriskChannelId,
-                twilioCallSid: initialData.twilioCallSid,
-                patientId: initialData.patientId
-            });
-            
-            if (!rtpPort) {
-                logger.error(`[Tracker] Failed to acquire RTP port for call ${asteriskChannelId}`);
-                // You might want to handle this failure case
-            }
-        }
-        
         const callData = {
             asteriskChannelId: asteriskChannelId,
             mainChannel: initialData.channel || null,
@@ -80,7 +65,6 @@ class ChannelTracker {
             mainBridgeId: null,
             conversationId: null, // Mongoose DB conversation _id
             recordingName: null, // Main bridge recording name
-            rtpPort: rtpPort, // The unique port allocated for this call
             rtpListener: null, // Reference to the dedicated RTP listener instance
 
             // --- Flag-Based State Properties ---
@@ -245,21 +229,14 @@ class ChannelTracker {
             return false;
         }
         
-        // Release RTP port if allocated
-        if (callData.rtpPort) {
-            const released = portManager.releasePort(callData.rtpPort, asteriskChannelId);
-            if (!released) {
-                logger.error(`[Tracker] Failed to release RTP port ${callData.rtpPort} for call ${asteriskChannelId}`);
-            }
-        }
-        
+        // ✅ Port release is now handled by ari.client.js's cleanupChannel, so we remove it from here
+        // to prevent double-releases or errors.
+
         // Clean up AudioSocket UUID mapping if it exists
         if (callData.audioSocketUuid) {
             if(this.uuidToChannelId.get(callData.audioSocketUuid) === asteriskChannelId) {
                 this.uuidToChannelId.delete(callData.audioSocketUuid);
                 logger.debug(`[Tracker] Removed AudioSocket UUID mapping for ${callData.audioSocketUuid}`);
-            } else {
-                logger.warn(`[Tracker] UUID ${callData.audioSocketUuid} was not mapped to removed channel ${asteriskChannelId} during cleanup.`);
             }
         }
 
@@ -304,7 +281,8 @@ class ChannelTracker {
             ffmpegTranscoder: callData.ffmpegTranscoder,
             recordingName: callData.recordingName,
             asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
-            rtpPort: callData.rtpPort,
+            rtpReadPort: callData.rtpReadPort,   // ✅ Explicit
+            rtpWritePort: callData.rtpWritePort,
             rtpListener: callData.rtpListener,
         } : null;
     }
@@ -332,7 +310,8 @@ class ChannelTracker {
     findCallByRtpPort(rtpPort) {
         if (!rtpPort) return null;
         for (const [asteriskId, data] of this.calls.entries()) {
-            if (data.rtpPort === rtpPort) {
+            // ✅ Only check the explicit read and write ports
+            if (data.rtpReadPort === rtpPort || data.rtpWritePort === rtpPort) {
                 return { asteriskChannelId: asteriskId, ...data };
             }
         }
@@ -354,7 +333,8 @@ class ChannelTracker {
                 playbackId: data.playbackChannelId,
                 ssrc: data.rtp_ssrc,
                 rtpSession: data.rtpSessionId,
-                rtpPort: data.rtpPort
+                rtpReadPort: data.rtpReadPort,
+                rtpWritePort: data.rtpWritePort,
             }));
             logger.debug(`[Tracker State] Active Calls: ${JSON.stringify(callSummary)}`);
             logger.debug(`[Tracker State] AudioSocket UUIDs Mapped: ${JSON.stringify(Array.from(this.uuidToChannelId.keys()))}`);
