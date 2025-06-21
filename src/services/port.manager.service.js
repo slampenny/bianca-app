@@ -50,14 +50,28 @@ class PortManager extends EventEmitter {
             return existingPort;
         }
         
+        // Atomic port acquisition to prevent race conditions
         if (this.availablePorts.size === 0) {
             logger.error('[PortManager] No available RTP ports to lease.');
             this.emit('ports-exhausted');
             return null;
         }
         
-        const port = this.availablePorts.values().next().value;
-        this.availablePorts.delete(port);
+        // Get first available port and immediately remove it
+        const availablePorts = Array.from(this.availablePorts);
+        const port = availablePorts[0];
+        
+        // Validate port is in expected range and format
+        if (!this.isValidPort(port)) {
+            logger.error(`[PortManager] Invalid port ${port} selected from pool`);
+            this.availablePorts.delete(port); // Remove invalid port
+            return this.acquirePort(callId, metadata); // Try again
+        }
+        
+        if (!this.availablePorts.delete(port)) {
+            logger.error(`[PortManager] Failed to reserve port ${port} - already taken`);
+            return null;
+        }
         
         const leaseInfo = {
             callId,
@@ -65,16 +79,28 @@ class PortManager extends EventEmitter {
             metadata: {
                 ...metadata,
                 asteriskChannelId: metadata.asteriskChannelId || callId,
-                twilioCallSid: metadata.twilioCallSid
+                twilioCallSid: metadata.twilioCallSid,
+                direction: metadata.direction || 'unknown'
             }
         };
         
         this.leasedPorts.set(port, leaseInfo);
         
-        logger.info(`[PortManager] Acquired port ${port} for call ${callId}. Available: ${this.availablePorts.size}, Leased: ${this.leasedPorts.size}`);
+        logger.info(`[PortManager] Acquired port ${port} for call ${callId} (${metadata.direction || 'unknown'}). Available: ${this.availablePorts.size}, Leased: ${this.leasedPorts.size}`);
         this.emit('port-acquired', { port, callId, leaseInfo });
         
         return port;
+    }
+    
+    /**
+     * Validates that a port is in the expected range and format
+     * @param {number} port
+     * @returns {boolean}
+     */
+    isValidPort(port) {
+        return port >= this.RTP_PORT_START && 
+               port <= this.RTP_PORT_END && 
+               port % 2 === 0; // Must be even for RTP
     }
     
     /**
@@ -87,7 +113,7 @@ class PortManager extends EventEmitter {
         const leaseInfo = this.leasedPorts.get(port);
         
         if (!leaseInfo) {
-            logger.warn(`[PortManager] Attempted to release port ${port} which was not leased.`);
+            logger.debug(`[PortManager] Attempted to release port ${port} which was not leased.`);
             return false;
         }
         
@@ -127,6 +153,30 @@ class PortManager extends EventEmitter {
     }
     
     /**
+     * Release all ports associated with a call (for cases where a call might have multiple ports)
+     * @param {string} callId - The call identifier
+     * @returns {number[]} Array of ports that were released
+     */
+    releaseAllPortsForCall(callId) {
+        if (!callId) return [];
+        
+        const releasedPorts = [];
+        for (const [port, leaseInfo] of this.leasedPorts.entries()) {
+            if (leaseInfo.callId === callId) {
+                if (this.releasePort(port)) {
+                    releasedPorts.push(port);
+                }
+            }
+        }
+        
+        if (releasedPorts.length > 0) {
+            logger.info(`[PortManager] Released ${releasedPorts.length} ports for call ${callId}: ${releasedPorts.join(', ')}`);
+        }
+        
+        return releasedPorts;
+    }
+    
+    /**
      * Find port by call ID
      * @param {string} callId
      * @returns {number | null}
@@ -143,6 +193,23 @@ class PortManager extends EventEmitter {
     }
     
     /**
+     * Find all ports by call ID (for cases where a call might have multiple ports)
+     * @param {string} callId
+     * @returns {number[]}
+     */
+    findAllPortsByCallId(callId) {
+        if (!callId) return [];
+        
+        const ports = [];
+        for (const [port, leaseInfo] of this.leasedPorts.entries()) {
+            if (leaseInfo.callId === callId) {
+                ports.push(port);
+            }
+        }
+        return ports;
+    }
+    
+    /**
      * Find call information by port number
      * @param {number} port - The port to look up
      * @returns {object | null} - Returns lease info with callId and metadata
@@ -154,6 +221,7 @@ class PortManager extends EventEmitter {
                 callId: leaseInfo.callId,
                 asteriskChannelId: leaseInfo.metadata.asteriskChannelId,
                 twilioCallSid: leaseInfo.metadata.twilioCallSid,
+                direction: leaseInfo.metadata.direction,
                 ...leaseInfo
             };
         }
@@ -204,11 +272,13 @@ class PortManager extends EventEmitter {
             });
         }
         
+        const totalPorts = Math.floor((this.RTP_PORT_END - this.RTP_PORT_START) / 2) + 1;
+        
         return {
-            totalPorts: Math.floor((this.RTP_PORT_END - this.RTP_PORT_START) / 2) + 1,
+            totalPorts,
             available: this.availablePorts.size,
             leased: this.leasedPorts.size,
-            utilizationPercent: Math.round((this.leasedPorts.size / (this.availablePorts.size + this.leasedPorts.size)) * 100),
+            utilizationPercent: Math.round((this.leasedPorts.size / totalPorts) * 100),
             leasedDetails,
             oldestLease: leasedDetails.reduce((oldest, lease) => 
                 lease.duration > (oldest?.duration || 0) ? lease : oldest, null
@@ -241,6 +311,13 @@ class PortManager extends EventEmitter {
             logger.warn(`[PortManager] Health check found ${stuckPorts.length} ports leased for over 1 hour:`, stuckPorts);
             this.emit('stuck-ports-detected', stuckPorts);
         }
+        
+        // Also check for pool exhaustion
+        const stats = this.getStats();
+        if (stats.utilizationPercent > 90) {
+            logger.warn(`[PortManager] High port utilization: ${stats.utilizationPercent}%`);
+            this.emit('high-utilization', stats);
+        }
     }
     
     /**
@@ -267,6 +344,36 @@ class PortManager extends EventEmitter {
     }
     
     /**
+     * Get detailed port allocation report
+     * @returns {object}
+     */
+    getDetailedReport() {
+        const stats = this.getStats();
+        const callGroups = {};
+        
+        // Group ports by call
+        for (const detail of stats.leasedDetails) {
+            const callId = detail.callId;
+            if (!callGroups[callId]) {
+                callGroups[callId] = {
+                    callId,
+                    ports: [],
+                    totalPorts: 0,
+                    metadata: detail.metadata
+                };
+            }
+            callGroups[callId].ports.push(detail.port);
+            callGroups[callId].totalPorts++;
+        }
+        
+        return {
+            ...stats,
+            callGroups: Object.values(callGroups),
+            multiPortCalls: Object.values(callGroups).filter(group => group.totalPorts > 1)
+        };
+    }
+    
+    /**
      * Clean up resources
      */
     destroy() {
@@ -274,8 +381,15 @@ class PortManager extends EventEmitter {
             clearInterval(this.healthCheckInterval);
             this.healthCheckInterval = null;
         }
+        
+        // Release all ports
+        const allPorts = Array.from(this.leasedPorts.keys());
+        for (const port of allPorts) {
+            this.releasePort(port);
+        }
+        
         this.removeAllListeners();
-        logger.info('[PortManager] Destroyed');
+        logger.info('[PortManager] Destroyed and released all ports');
     }
 }
 

@@ -832,54 +832,36 @@ class AsteriskAriClient extends EventEmitter {
         logger.info(`[ARI Pipeline] Setting up for Asterisk ID: ${asteriskChannelId}, Twilio SID: ${twilioCallSid}, PatientID: ${patientId}`);
         
         let mainBridge = null;
-        let allocatedReadPort = null;
-        let allocatedWritePort = null;
-        let rtpListener = null;
 
         try {
-            // Step 1: Allocate TWO unique ports for this call
-            allocatedReadPort = portManager.acquirePort(`${asteriskChannelId}-read`, {
-                asteriskChannelId,
-                twilioCallSid,
-                patientId,
-                direction: 'read'
-            });
+            // Step 1: Allocate TWO unique ports for this call via the tracker
+            const { readPort, writePort } = this.tracker.allocatePortsForCall(asteriskChannelId);
             
-            allocatedWritePort = portManager.acquirePort(`${asteriskChannelId}-write`, {
-                asteriskChannelId,
-                twilioCallSid,
-                patientId,
-                direction: 'write'
-            });
-            
-            if (!allocatedReadPort || !allocatedWritePort) {
-                throw new Error('No available RTP ports for media pipeline');
+            if (!readPort || !writePort) {
+                throw new Error('Failed to allocate RTP ports for media pipeline');
             }
             
-            logger.info(`[ARI Pipeline] Allocated ports - READ: ${allocatedReadPort}, WRITE: ${allocatedWritePort}`);
+            logger.info(`[ARI Pipeline] Allocated ports - READ: ${readPort}, WRITE: ${writePort}`);
 
             // Step 2: Start RTP listeners on BOTH ports
             const rtpListenerService = require('./rtp.listener.service');
             
             // Listener for READ (from Asterisk)
             await rtpListenerService.startRtpListenerForCall(
-                allocatedReadPort,
+                readPort,
                 twilioCallSid || asteriskChannelId,
                 asteriskChannelId
             );
             
             // Listener for WRITE (for OpenAI to send to)
             await rtpListenerService.startRtpListenerForCall(
-                allocatedWritePort,
+                writePort,
                 `${twilioCallSid || asteriskChannelId}-write`,
                 asteriskChannelId
             );
 
-            // Step 3: Update call tracking with BOTH port information
+            // Step 3: Update call tracking - ports are already set by allocatePortsForCall
             this.tracker.updateCall(asteriskChannelId, {
-                rtpPort: allocatedReadPort,        // Keep for backward compatibility
-                rtpReadPort: allocatedReadPort,    // Explicit read port
-                rtpWritePort: allocatedWritePort,  // Explicit write port
                 state: 'setting_up_media'
             });
 
@@ -931,7 +913,8 @@ class AsteriskAriClient extends EventEmitter {
                 success: true,
                 asteriskChannelId,
                 twilioCallSid,
-                allocatedReadPort,
+                readPort,
+                writePort,
                 bridgeId: mainBridge.id
             };
 
@@ -941,33 +924,13 @@ class AsteriskAriClient extends EventEmitter {
             // Update state to failed
             this.updateCallState(asteriskChannelId, 'failed');
             
-            // Cleanup on error
-            if (rtpListener) {
-                try {
-                    const rtpListenerService = require('./rtp.listener.service');
-                    rtpListenerService.stopRtpListenerForCall(twilioCallSid || asteriskChannelId);
-                    rtpListenerService.stopRtpListenerForCall(`${twilioCallSid || asteriskChannelId}-write`);
-                } catch (cleanupErr) {
-                    logger.error(`[ARI Pipeline] Error stopping RTP listener during cleanup: ${cleanupErr.message}`);
-                }
-            }
-            
-            if (allocatedReadPort) {
-                try {
-                    portManager.releasePort(allocatedReadPort, asteriskChannelId);
-                    logger.info(`[ARI Pipeline] Released port ${allocatedReadPort} after setup failure`);
-                } catch (cleanupErr) {
-                    logger.error(`[ARI Pipeline] Error releasing port during cleanup: ${cleanupErr.message}`);
-                }
-            }
-            
-            if (allocatedWritePort) {
-                try {
-                    portManager.releasePort(allocatedWritePort, `${asteriskChannelId}-write`);
-                    logger.info(`[ARI Pipeline] Released port ${allocatedWritePort} after setup failure`);
-                } catch (cleanupErr) {
-                    logger.error(`[ARI Pipeline] Error releasing port during cleanup: ${cleanupErr.message}`);
-                }
+            // Cleanup on error - the tracker will handle port release
+            try {
+                const rtpListenerService = require('./rtp.listener.service');
+                rtpListenerService.stopRtpListenerForCall(twilioCallSid || asteriskChannelId);
+                rtpListenerService.stopRtpListenerForCall(`${twilioCallSid || asteriskChannelId}-write`);
+            } catch (cleanupErr) {
+                logger.error(`[ARI Pipeline] Error stopping RTP listener during cleanup: ${cleanupErr.message}`);
             }
             
             if (mainBridge?.id) {
@@ -1155,8 +1118,7 @@ class AsteriskAriClient extends EventEmitter {
         }
     }
 
-
-    async handleStasisStartForSnoop(channel, channelName) {
+ async handleStasisStartForSnoop(channel, channelName) {
         const channelId = channel.id;
         const match = channelName.match(/^Snoop\/([^-]+)-/);
         const parentChannelId = match?.[1];
@@ -1336,52 +1298,20 @@ class AsteriskAriClient extends EventEmitter {
         // Determine the primary identifier for external services
         const primarySid = resources.twilioCallSid || resources.asteriskChannelId || asteriskChannelId;
         
-        // Remove from tracker early to prevent duplicate cleanup attempts
-        this.tracker.removeCall(asteriskChannelId);
-        
         // Track cleanup errors but continue with other cleanup steps
         const cleanupErrors = [];
         
         try {
             // Step 1: Stop and cleanup RTP listeners (BOTH read and write)
-            // Handle the read port (backward compatible with rtpPort)
-            if (resources.rtpReadPort || resources.rtpPort) {
-                const readPort = resources.rtpReadPort || resources.rtpPort;
+            if (resources.rtpReadPort || resources.rtpWritePort) {
                 try {
                     const rtpListenerService = require('./rtp.listener.service');
                     rtpListenerService.stopRtpListenerForCall(primarySid);
-                    logger.info(`[Cleanup] Stopped RTP listener (read) for ${primarySid}`);
-                } catch (err) {
-                    logger.error(`[Cleanup] Error stopping RTP listener (read): ${err.message}`);
-                    cleanupErrors.push(`RTP listener read: ${err.message}`);
-                }
-                
-                try {
-                    portManager.releasePort(readPort, asteriskChannelId);
-                    logger.info(`[Cleanup] Released read port ${readPort} for ${asteriskChannelId}`);
-                } catch (err) {
-                    logger.error(`[Cleanup] Error releasing read port: ${err.message}`);
-                    cleanupErrors.push(`Read port release: ${err.message}`);
-                }
-            }
-            
-            // Handle the write port if it exists
-            if (resources.rtpWritePort) {
-                try {
-                    const rtpListenerService = require('./rtp.listener.service');
                     rtpListenerService.stopRtpListenerForCall(`${primarySid}-write`);
-                    logger.info(`[Cleanup] Stopped RTP listener (write) for ${primarySid}-write`);
+                    logger.info(`[Cleanup] Stopped RTP listeners for ${primarySid}`);
                 } catch (err) {
-                    logger.error(`[Cleanup] Error stopping RTP listener (write): ${err.message}`);
-                    cleanupErrors.push(`RTP listener write: ${err.message}`);
-                }
-                
-                try {
-                    portManager.releasePort(resources.rtpWritePort, `${asteriskChannelId}-write`);
-                    logger.info(`[Cleanup] Released write port ${resources.rtpWritePort} for ${asteriskChannelId}`);
-                } catch (err) {
-                    logger.error(`[Cleanup] Error releasing write port: ${err.message}`);
-                    cleanupErrors.push(`Write port release: ${err.message}`);
+                    logger.error(`[Cleanup] Error stopping RTP listeners: ${err.message}`);
+                    cleanupErrors.push(`RTP listeners: ${err.message}`);
                 }
             }
             
@@ -1484,6 +1414,10 @@ class AsteriskAriClient extends EventEmitter {
                 }
             }
             
+            // Step 8: Remove from tracker (this will also release ports automatically)
+            this.tracker.removeCall(asteriskChannelId);
+            logger.info(`[Cleanup] Removed call from tracker and released ports for ${asteriskChannelId}`);
+            
             // Log summary
             if (cleanupErrors.length > 0) {
                 logger.warn(`[Cleanup] Completed with ${cleanupErrors.length} errors for ${asteriskChannelId}: ${cleanupErrors.join(', ')}`);
@@ -1498,6 +1432,72 @@ class AsteriskAriClient extends EventEmitter {
             
         } catch (err) {
             logger.error(`[Cleanup] Unexpected error during cleanup for ${asteriskChannelId}: ${err.message}`, err);
+            // Even on error, try to remove from tracker to release ports
+            try {
+                this.tracker.removeCall(asteriskChannelId);
+                logger.info(`[Cleanup] Emergency removal from tracker completed for ${asteriskChannelId}`);
+            } catch (trackerErr) {
+                logger.error(`[Cleanup] Failed to remove from tracker: ${trackerErr.message}`);
+            }
+            throw err;
+        }
+    }
+
+    async shutdown() {
+        logger.info('[ARI] Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        try {
+            const activeCalls = Array.from(this.tracker.calls.keys());
+            logger.info(`[ARI] Cleaning up ${activeCalls.length} active calls`);
+            
+            await Promise.allSettled(
+                activeCalls.map(callId => 
+                    this.cleanupChannel(callId, 'System shutdown')
+                )
+            );
+            
+            try {
+                const rtpSenderService = require('./rtp.sender.service');
+                rtpSenderService.cleanupAll();
+            } catch (err) {
+                logger.warn(`[ARI] Error cleaning up RTP sender: ${err.message}`);
+            }
+            
+            if (this.healthCheckInterval) {
+                clearInterval(this.healthCheckInterval);
+                this.healthCheckInterval = null;
+            }
+            
+            if (this.reconnectTimer) {
+                clearTimeout(this.reconnectTimer);
+                this.reconnectTimer = null;
+            }
+            
+            // Ensure channel tracker is properly shut down (this will release all remaining ports)
+            await this.tracker.shutdown();
+            
+            // Log port manager final stats
+            const portStats = portManager.getStats();
+            logger.info(`[ARI] Port Manager final stats:`, portStats);
+            
+            if (this.client) {
+                this.client.removeAllListeners();
+                this.client = null;
+                logger.info('[ARI] Client closed');
+            }
+            
+            this.cleanup();
+            this.isConnected = false;
+            
+            if (typeof global !== 'undefined') {
+                global.ariClient = null;
+            }
+            
+            logger.info('[ARI] Graceful shutdown completed');
+            
+        } catch (err) {
+            logger.error(`[ARI] Error during shutdown: ${err.message}`, err);
             throw err;
         }
     }
@@ -1630,67 +1630,18 @@ class AsteriskAriClient extends EventEmitter {
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-
-    async shutdown() {
-        logger.info('[ARI] Initiating graceful shutdown...');
-        this.isShuttingDown = true;
+        // Additional helper method for port-related operations
+    getAllocatedPortsForCall(asteriskChannelId) {
+        const callData = this.tracker.getCall(asteriskChannelId);
+        if (!callData) return { readPort: null, writePort: null };
         
-        try {
-            const activeCalls = Array.from(this.tracker.calls.keys());
-            logger.info(`[ARI] Cleaning up ${activeCalls.length} active calls`);
-            
-            await Promise.allSettled(
-                activeCalls.map(callId => 
-                    this.cleanupChannel(callId, 'System shutdown')
-                )
-            );
-            
-            try {
-                const rtpSenderService = require('./rtp.sender.service');
-                rtpSenderService.cleanupAll();
-            } catch (err) {
-                logger.warn(`[ARI] Error cleaning up RTP sender: ${err.message}`);
-            }
-            
-            if (this.healthCheckInterval) {
-                clearInterval(this.healthCheckInterval);
-                this.healthCheckInterval = null;
-            }
-            
-            if (this.reconnectTimer) {
-                clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = null;
-            }
-            
-            // Ensure channel tracker is properly shut down
-            await this.tracker.shutdown();
-            
-            // Log port manager final stats
-            const portStats = portManager.getStats();
-            logger.info(`[ARI] Port Manager final stats:`, portStats);
-            
-            if (this.client) {
-                //this.client.close();
-                this.client.removeAllListeners();
-                this.client = null;
-                logger.info('[ARI] Client closed');
-            }
-            
-            this.cleanup();
-            this.isConnected = false;
-            
-            if (typeof global !== 'undefined') {
-                global.ariClient = null;
-            }
-            
-            logger.info('[ARI] Graceful shutdown completed');
-            
-        } catch (err) {
-            logger.error(`[ARI] Error during shutdown: ${err.message}`, err);
-            throw err;
-        }
+        return {
+            readPort: callData.rtpReadPort,
+            writePort: callData.rtpWritePort
+        };
     }
 
+    // Health check method updated to include port information
     async healthCheck() {
         if (!this.isConnected || !this.client) {
             return { status: 'disconnected', healthy: false };
@@ -1703,11 +1654,18 @@ class AsteriskAriClient extends EventEmitter {
                 'Health check'
             );
             
+            const trackerStats = this.tracker.getStats();
+            const portStats = portManager.getStats();
+            
             return { 
                 status: 'connected', 
                 healthy: true,
                 activeCalls: this.tracker.calls.size,
-                retryCount: this.retryCount
+                retryCount: this.retryCount,
+                portUtilization: `${portStats.leased}/${portStats.totalPorts} (${portStats.utilizationPercent}%)`,
+                callsWithPorts: trackerStats.callsWithBothPorts,
+                trackerStats,
+                portStats
             };
         } catch (err) {
             return { 

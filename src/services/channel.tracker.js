@@ -27,8 +27,8 @@ class ChannelTracker {
                     logger.error(`[Tracker] Stuck port ${stuckPort.port} for non-existent call ${stuckPort.callId}. Consider force release.`);
                 } else if (this.isCallInTerminalState(callData.asteriskChannelId)) {
                     logger.error(`[Tracker] Call ${stuckPort.callId} in terminal state but port ${stuckPort.port} not released!`);
-                    // Auto-release the port
-                    portManager.releasePort(stuckPort.port, stuckPort.callId);
+                    // Auto-release the port through proper cleanup
+                    this.releasePortsForCall(callData.asteriskChannelId);
                 }
             }
         });
@@ -36,6 +36,10 @@ class ChannelTracker {
         portManager.on('ports-exhausted', () => {
             logger.error('[Tracker] Port pool exhausted! Check for leaked ports.');
             this.performPortAudit();
+        });
+        
+        portManager.on('high-utilization', (stats) => {
+            logger.warn(`[Tracker] High port utilization detected: ${stats.utilizationPercent}%`);
         });
     }
 
@@ -46,12 +50,9 @@ class ChannelTracker {
      */
     addCall(asteriskChannelId, initialData) {
         if (this.calls.has(asteriskChannelId)) {
-            logger.warn(`[Tracker] Attempted to add existing main channel ID: ${asteriskChannelId}. Overwriting data.`);
-            // Clean up any existing port allocation
-            const existingCall = this.calls.get(asteriskChannelId);
-            if (existingCall.rtpPort) {
-                portManager.releasePort(existingCall.rtpPort, asteriskChannelId);
-            }
+            logger.warn(`[Tracker] Attempted to add existing main channel ID: ${asteriskChannelId}. Cleaning up existing call first.`);
+            // Clean up the existing call properly
+            this.removeCall(asteriskChannelId);
         }
         
         const callData = {
@@ -96,16 +97,124 @@ class ChannelTracker {
             asteriskRtpEndpoint: null, // { host, port }
             snoopToRtpMapping: null,
             
+            // Port management - MANAGED BY THIS TRACKER
+            rtpReadPort: null,    // Explicit read port for this call
+            rtpWritePort: null,   // Explicit write port for this call
+            
             ffmpegTranscoder: null, // Reference to FFmpeg process if using that method
 
-            ...initialData, // Apply any other passed initial data
-            rtpPort: rtpPort, // Ensure rtpPort is set after spread
+            ...initialData, // Apply any other passed initial data (but ports are managed here)
         };
         
         this.calls.set(asteriskChannelId, callData);
-        logger.info(`[Tracker] Added call: ${asteriskChannelId} (TwilioCallSid: ${callData.twilioCallSid || 'N/A'}, RTPPort: ${rtpPort || 'N/A'})`);
+        logger.info(`[Tracker] Added call: ${asteriskChannelId} (TwilioCallSid: ${callData.twilioCallSid || 'N/A'})`);
         this.logState();
         return callData;
+    }
+
+    /**
+     * Allocate RTP ports for a call (both read and write)
+     * @param {string} asteriskChannelId
+     * @returns {object} { readPort, writePort } or { readPort: null, writePort: null } on failure
+     */
+    allocatePortsForCall(asteriskChannelId) {
+        const callData = this.getCall(asteriskChannelId);
+        if (!callData) {
+            logger.error(`[Tracker] Cannot allocate ports for unknown call: ${asteriskChannelId}`);
+            return { readPort: null, writePort: null };
+        }
+
+        // Check if ports are already allocated
+        if (callData.rtpReadPort && callData.rtpWritePort) {
+            logger.info(`[Tracker] Ports already allocated for ${asteriskChannelId}: read=${callData.rtpReadPort}, write=${callData.rtpWritePort}`);
+            return { readPort: callData.rtpReadPort, writePort: callData.rtpWritePort };
+        }
+
+        const primarySid = callData.twilioCallSid || asteriskChannelId;
+        
+        // Allocate read port
+        const readPort = portManager.acquirePort(`${primarySid}-read`, {
+            asteriskChannelId,
+            twilioCallSid: callData.twilioCallSid,
+            patientId: callData.patientId,
+            direction: 'read'
+        });
+
+        if (!readPort) {
+            logger.error(`[Tracker] Failed to allocate read port for ${asteriskChannelId}`);
+            return { readPort: null, writePort: null };
+        }
+
+        // Allocate write port
+        const writePort = portManager.acquirePort(`${primarySid}-write`, {
+            asteriskChannelId,
+            twilioCallSid: callData.twilioCallSid,
+            patientId: callData.patientId,
+            direction: 'write'
+        });
+
+        if (!writePort) {
+            logger.error(`[Tracker] Failed to allocate write port for ${asteriskChannelId}, releasing read port`);
+            portManager.releasePort(readPort, `${primarySid}-read`);
+            return { readPort: null, writePort: null };
+        }
+
+        // Update call data with allocated ports
+        this.updateCall(asteriskChannelId, {
+            rtpReadPort: readPort,
+            rtpWritePort: writePort
+        });
+
+        logger.info(`[Tracker] Allocated ports for ${asteriskChannelId}: read=${readPort}, write=${writePort}`);
+        return { readPort, writePort };
+    }
+
+    /**
+     * Release all ports associated with a call
+     * @param {string} asteriskChannelId
+     * @returns {boolean} True if any ports were released
+     */
+    releasePortsForCall(asteriskChannelId) {
+        const callData = this.getCall(asteriskChannelId);
+        if (!callData) {
+            logger.debug(`[Tracker] No call data found for ${asteriskChannelId} to release ports`);
+            return false;
+        }
+
+        const primarySid = callData.twilioCallSid || asteriskChannelId;
+        let releasedCount = 0;
+
+        // Release read port
+        if (callData.rtpReadPort) {
+            if (portManager.releasePort(callData.rtpReadPort, `${primarySid}-read`)) {
+                releasedCount++;
+                logger.info(`[Tracker] Released read port ${callData.rtpReadPort} for ${asteriskChannelId}`);
+            }
+        }
+
+        // Release write port
+        if (callData.rtpWritePort) {
+            if (portManager.releasePort(callData.rtpWritePort, `${primarySid}-write`)) {
+                releasedCount++;
+                logger.info(`[Tracker] Released write port ${callData.rtpWritePort} for ${asteriskChannelId}`);
+            }
+        }
+
+        // Also check for any other ports that might be associated with this call
+        const additionalPorts = portManager.releaseAllPortsForCall(primarySid);
+        releasedCount += additionalPorts.length;
+
+        if (releasedCount > 0) {
+            // Clear port fields from call data
+            this.updateCall(asteriskChannelId, {
+                rtpReadPort: null,
+                rtpWritePort: null
+            });
+            
+            logger.info(`[Tracker] Released ${releasedCount} total ports for call ${asteriskChannelId}`);
+        }
+
+        return releasedCount > 0;
     }
 
     /**
@@ -145,22 +254,7 @@ class ChannelTracker {
     updateCall(asteriskChannelId, updates) {
         const callData = this.calls.get(asteriskChannelId);
         if (callData) {
-            // Handle RTP port updates
-            if (updates.rtpPort !== undefined && updates.rtpPort !== callData.rtpPort) {
-                // Release old port if exists
-                if (callData.rtpPort) {
-                    portManager.releasePort(callData.rtpPort, asteriskChannelId);
-                }
-                // Acquire new port if specified
-                if (updates.rtpPort === 'acquire') {
-                    updates.rtpPort = portManager.acquirePort(asteriskChannelId, {
-                        asteriskChannelId,
-                        twilioCallSid: callData.twilioCallSid,
-                        patientId: callData.patientId
-                    });
-                }
-            }
-            
+            // Apply updates directly - port management is handled by dedicated methods
             Object.assign(callData, updates);
             
             // Log state change specifically
@@ -229,8 +323,8 @@ class ChannelTracker {
             return false;
         }
         
-        // ✅ Port release is now handled by ari.client.js's cleanupChannel, so we remove it from here
-        // to prevent double-releases or errors.
+        // Release all ports associated with this call
+        this.releasePortsForCall(asteriskChannelId);
 
         // Clean up AudioSocket UUID mapping if it exists
         if (callData.audioSocketUuid) {
@@ -258,9 +352,12 @@ class ChannelTracker {
     getResources(asteriskChannelId) {
         const callData = this.getCall(asteriskChannelId);
         return callData ? {
+            // Main channel and bridges
             mainChannel: callData.mainChannel,
             mainBridge: callData.mainBridge,
             mainBridgeId: callData.mainBridgeId,
+            
+            // Auxiliary channels
             snoopChannel: callData.snoopChannel,
             snoopChannelId: callData.snoopChannelId,
             snoopBridge: callData.snoopBridge,
@@ -269,21 +366,38 @@ class ChannelTracker {
             localChannelId: callData.localChannelId,
             playbackChannel: callData.playbackChannel,
             playbackChannelId: callData.playbackChannelId,
+            
+            // RTP channels
             inboundRtpChannel: callData.inboundRtpChannel,
             inboundRtpChannelId: callData.inboundRtpChannelId,
             outboundRtpChannel: callData.outboundRtpChannel,
             outboundRtpChannelId: callData.outboundRtpChannelId,
             unicastRtpChannel: callData.unicastRtpChannel,
             unicastRtpChannelId: callData.unicastRtpChannelId,
+            
+            // Database and external IDs
             conversationId: callData.conversationId,
             twilioCallSid: callData.twilioCallSid,
             asteriskChannelId: callData.asteriskChannelId,
+            audioSocketUuid: callData.audioSocketUuid,
+            
+            // Method and state info
+            snoopMethod: callData.snoopMethod,
+            state: callData.state,
+            
+            // RTP and media info
+            rtpReadPort: callData.rtpReadPort,       // Explicit read port
+            rtpWritePort: callData.rtpWritePort,     // Explicit write port
+            asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
+            rtpListener: callData.rtpListener,
+            
+            // Other resources
             ffmpegTranscoder: callData.ffmpegTranscoder,
             recordingName: callData.recordingName,
-            asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
-            rtpReadPort: callData.rtpReadPort,   // ✅ Explicit
-            rtpWritePort: callData.rtpWritePort,
-            rtpListener: callData.rtpListener,
+            
+            // Readiness flags
+            isReadStreamReady: callData.isReadStreamReady,
+            isWriteStreamReady: callData.isWriteStreamReady,
         } : null;
     }
 
@@ -303,14 +417,14 @@ class ChannelTracker {
     }
     
     /**
-     * Find call data by RTP port
+     * Find call data by RTP port (checks both read and write ports)
      * @param {number} rtpPort
      * @returns {object | null} - Returns { asteriskChannelId, ...callData } or null
      */
     findCallByRtpPort(rtpPort) {
         if (!rtpPort) return null;
         for (const [asteriskId, data] of this.calls.entries()) {
-            // ✅ Only check the explicit read and write ports
+            // Check both explicit read and write ports
             if (data.rtpReadPort === rtpPort || data.rtpWritePort === rtpPort) {
                 return { asteriskChannelId: asteriskId, ...data };
             }
@@ -357,7 +471,10 @@ class ChannelTracker {
             callsByState: {},
             callsBySnoopMethod: {},
             audioSocketMappings: this.uuidToChannelId.size,
-            portsAllocated: 0
+            portsAllocated: 0,
+            callsWithReadPorts: 0,
+            callsWithWritePorts: 0,
+            callsWithBothPorts: 0
         };
 
         for (const callData of this.calls.values()) {
@@ -370,8 +487,16 @@ class ChannelTracker {
             stats.callsBySnoopMethod[method] = (stats.callsBySnoopMethod[method] || 0) + 1;
             
             // Count ports
-            if (callData.rtpPort) {
+            if (callData.rtpReadPort) {
+                stats.callsWithReadPorts++;
                 stats.portsAllocated++;
+            }
+            if (callData.rtpWritePort) {
+                stats.callsWithWritePorts++;
+                stats.portsAllocated++;
+            }
+            if (callData.rtpReadPort && callData.rtpWritePort) {
+                stats.callsWithBothPorts++;
             }
         }
         
@@ -420,26 +545,45 @@ class ChannelTracker {
         const audit = {
             trackedCallsWithPorts: [],
             orphanedPorts: [],
-            callsInTerminalStateWithPorts: []
+            callsInTerminalStateWithPorts: [],
+            inconsistentPortMappings: []
         };
         
         // Check all tracked calls
         for (const [asteriskId, callData] of this.calls.entries()) {
-            if (callData.rtpPort) {
-                audit.trackedCallsWithPorts.push({
-                    asteriskChannelId: asteriskId,
-                    twilioCallSid: callData.twilioCallSid,
-                    port: callData.rtpPort,
-                    state: callData.state,
-                    duration: Math.round((Date.now() - callData.startTime) / 1000)
-                });
+            const portInfo = {
+                asteriskChannelId: asteriskId,
+                twilioCallSid: callData.twilioCallSid,
+                state: callData.state,
+                duration: Math.round((Date.now() - callData.startTime) / 1000),
+                ports: []
+            };
+
+            if (callData.rtpReadPort) {
+                portInfo.ports.push({ port: callData.rtpReadPort, type: 'read' });
+            }
+            if (callData.rtpWritePort) {
+                portInfo.ports.push({ port: callData.rtpWritePort, type: 'write' });
+            }
+
+            if (portInfo.ports.length > 0) {
+                audit.trackedCallsWithPorts.push(portInfo);
                 
                 if (this.isCallInTerminalState(asteriskId)) {
-                    audit.callsInTerminalStateWithPorts.push({
-                        asteriskChannelId: asteriskId,
-                        port: callData.rtpPort,
-                        state: callData.state
-                    });
+                    audit.callsInTerminalStateWithPorts.push(portInfo);
+                }
+
+                // Check for inconsistencies between tracker and port manager
+                for (const portEntry of portInfo.ports) {
+                    const leaseInfo = portManager.getLeaseInfo(portEntry.port);
+                    if (!leaseInfo) {
+                        audit.inconsistentPortMappings.push({
+                            asteriskChannelId: asteriskId,
+                            port: portEntry.port,
+                            type: portEntry.type,
+                            issue: 'Port tracked by call but not leased in port manager'
+                        });
+                    }
                 }
             }
         }
@@ -467,6 +611,11 @@ class ChannelTracker {
             logger.error(`[Tracker] Port audit found ${audit.callsInTerminalStateWithPorts.length} calls in terminal state with unreleased ports:`, 
                 audit.callsInTerminalStateWithPorts);
         }
+
+        if (audit.inconsistentPortMappings.length > 0) {
+            logger.error(`[Tracker] Port audit found ${audit.inconsistentPortMappings.length} inconsistent port mappings:`, 
+                audit.inconsistentPortMappings);
+        }
         
         logger.info(`[Tracker] Port audit complete. Tracked calls with ports: ${audit.trackedCallsWithPorts.length}`);
         
@@ -483,6 +632,7 @@ class ChannelTracker {
         const cleanup = {
             portsReleased: 0,
             callsRemoved: 0,
+            inconsistenciesFixed: 0,
             errors: []
         };
         
@@ -505,10 +655,10 @@ class ChannelTracker {
         for (const terminalCall of audit.callsInTerminalStateWithPorts) {
             if (autoRelease) {
                 try {
-                    // Release port through removeCall which handles cleanup
+                    // Release ports and remove call
                     this.removeCall(terminalCall.asteriskChannelId);
                     cleanup.callsRemoved++;
-                    logger.info(`[Tracker] Removed terminal call ${terminalCall.asteriskChannelId} and released port ${terminalCall.port}`);
+                    logger.info(`[Tracker] Removed terminal call ${terminalCall.asteriskChannelId} and released its ports`);
                 } catch (error) {
                     cleanup.errors.push({ 
                         type: 'call_removal', 
@@ -517,7 +667,34 @@ class ChannelTracker {
                     });
                 }
             } else {
-                logger.warn(`[Tracker] Call ${terminalCall.asteriskChannelId} in terminal state '${terminalCall.state}' still has port ${terminalCall.port}`);
+                logger.warn(`[Tracker] Call ${terminalCall.asteriskChannelId} in terminal state '${terminalCall.state}' still has ports: ${terminalCall.ports.map(p => p.port).join(', ')}`);
+            }
+        }
+
+        // Handle inconsistent port mappings
+        for (const inconsistency of audit.inconsistentPortMappings) {
+            if (autoRelease) {
+                try {
+                    // Clear the port from call data since it's not actually leased
+                    const updates = {};
+                    if (inconsistency.type === 'read') {
+                        updates.rtpReadPort = null;
+                    } else if (inconsistency.type === 'write') {
+                        updates.rtpWritePort = null;
+                    }
+                    this.updateCall(inconsistency.asteriskChannelId, updates);
+                    cleanup.inconsistenciesFixed++;
+                    logger.info(`[Tracker] Fixed inconsistent port mapping for ${inconsistency.asteriskChannelId}, port ${inconsistency.port}`);
+                } catch (error) {
+                    cleanup.errors.push({ 
+                        type: 'inconsistency_fix', 
+                        asteriskChannelId: inconsistency.asteriskChannelId, 
+                        port: inconsistency.port,
+                        error: error.message 
+                    });
+                }
+            } else {
+                logger.warn(`[Tracker] Inconsistent port mapping: ${inconsistency.issue} (call: ${inconsistency.asteriskChannelId}, port: ${inconsistency.port})`);
             }
         }
         
@@ -525,7 +702,7 @@ class ChannelTracker {
             logger.error('[Tracker] Cleanup encountered errors:', cleanup.errors);
         }
         
-        logger.info(`[Tracker] Cleanup complete. Ports released: ${cleanup.portsReleased}, Calls removed: ${cleanup.callsRemoved}`);
+        logger.info(`[Tracker] Cleanup complete. Ports released: ${cleanup.portsReleased}, Calls removed: ${cleanup.callsRemoved}, Inconsistencies fixed: ${cleanup.inconsistenciesFixed}`);
         return cleanup;
     }
     
@@ -541,9 +718,14 @@ class ChannelTracker {
         const details = { ...callData };
         
         // Add port information if available
-        if (callData.rtpPort) {
-            const portInfo = portManager.getLeaseInfo(callData.rtpPort);
-            details.portInfo = portInfo || { error: 'Port lease not found in manager' };
+        details.portDetails = {};
+        if (callData.rtpReadPort) {
+            const readPortInfo = portManager.getLeaseInfo(callData.rtpReadPort);
+            details.portDetails.read = readPortInfo || { error: 'Port lease not found in manager' };
+        }
+        if (callData.rtpWritePort) {
+            const writePortInfo = portManager.getLeaseInfo(callData.rtpWritePort);
+            details.portDetails.write = writePortInfo || { error: 'Port lease not found in manager' };
         }
         
         // Add duration
@@ -566,14 +748,14 @@ class ChannelTracker {
         logger.info('[Tracker] Final audit:', {
             activeCalls: this.calls.size,
             orphanedPorts: audit.orphanedPorts.length,
-            terminalCallsWithPorts: audit.callsInTerminalStateWithPorts.length
+            terminalCallsWithPorts: audit.callsInTerminalStateWithPorts.length,
+            inconsistentMappings: audit.inconsistentPortMappings.length
         });
         
-        // Release all ports
-        for (const [asteriskId, callData] of this.calls.entries()) {
-            if (callData.rtpPort) {
-                portManager.releasePort(callData.rtpPort, asteriskId);
-            }
+        // Release all ports for all calls
+        const allCalls = Array.from(this.calls.keys());
+        for (const asteriskId of allCalls) {
+            this.releasePortsForCall(asteriskId);
         }
         
         // Clear all mappings
