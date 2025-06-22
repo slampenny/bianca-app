@@ -854,11 +854,11 @@ class AsteriskAriClient extends EventEmitter {
             );
             
             // Listener for WRITE (for OpenAI to send to)
-            await rtpListenerService.startRtpListenerForCall(
-                writePort,
-                `${twilioCallSid || asteriskChannelId}-write`,
-                asteriskChannelId
-            );
+            // await rtpListenerService.startRtpListenerForCall(
+            //     writePort,
+            //     `${twilioCallSid || asteriskChannelId}-write`,
+            //     asteriskChannelId
+            // );
 
             // Step 3: Update call tracking - ports are already set by allocatePortsForCall
             this.tracker.updateCall(asteriskChannelId, {

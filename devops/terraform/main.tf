@@ -468,7 +468,8 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   to_port                  = var.app_rtp_port_end
   protocol                 = "udp"
   security_group_id        = aws_security_group.bianca_app_sg.id
-  cidr_blocks       = ["${aws_instance.asterisk.private_ip}/32"]
+  cidr_blocks       = ["${aws_instance.asterisk.private_ip}/32",
+    "${aws_eip.asterisk_eip.public_ip}/32"]
   description              = "RTP from Asterisk to App"
 }
 
