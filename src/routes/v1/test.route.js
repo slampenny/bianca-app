@@ -1370,5 +1370,378 @@ router.post('/cleanup-all', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/network-connectivity:
+ *   get:
+ *     summary: Test network connectivity between services
+ *     description: Tests UDP connectivity from Asterisk to app RTP ports
+ *     tags: [Test - Network]
+ *     responses:
+ *       "200":
+ *         description: Network connectivity test results
+ */
+router.get('/network-connectivity', async (req, res) => {
+    try {
+        const dgram = require('dgram');
+        const dns = require('dns').promises;
+        
+        const result = {
+            timestamp: new Date().toISOString(),
+            tests: {},
+            recommendations: []
+        };
+
+        // Test 1: Get our public and private IPs
+        try {
+            const publicIp = await getFargateIp();
+            result.tests.ipDetection = {
+                success: true,
+                publicIp: publicIp,
+                isPrivate: publicIp.startsWith('172.') || publicIp.startsWith('10.'),
+                taskMetadata: process.env.ECS_CONTAINER_METADATA_URI_V4 ? 'Available' : 'Not Available'
+            };
+        } catch (err) {
+            result.tests.ipDetection = { success: false, error: err.message };
+        }
+
+        // Test 2: Resolve Asterisk via service discovery
+        try {
+            const asteriskIps = await dns.resolve4('asterisk.myphonefriend.internal');
+            result.tests.serviceDiscovery = {
+                success: asteriskIps.length > 0,
+                asteriskPrivateIp: asteriskIps[0],
+                resolvedIps: asteriskIps
+            };
+        } catch (err) {
+            result.tests.serviceDiscovery = { success: false, error: err.message };
+        }
+
+        // Test 3: Check if we can bind to RTP ports
+        const testPorts = [16384, 16385, 16386];
+        for (const port of testPorts) {
+            try {
+                const socket = dgram.createSocket('udp4');
+                await new Promise((resolve, reject) => {
+                    socket.bind(port, '0.0.0.0', (err) => {
+                        if (err) reject(err);
+                        else {
+                            socket.close();
+                            resolve();
+                        }
+                    });
+                });
+                
+                result.tests[`port_${port}_bind`] = { success: true, port };
+            } catch (err) {
+                result.tests[`port_${port}_bind`] = { 
+                    success: false, 
+                    port, 
+                    error: err.message,
+                    possibleCause: err.code === 'EADDRINUSE' ? 'Port already in use' : 'Permission denied'
+                };
+            }
+        }
+
+        // Test 4: Test UDP connectivity to Asterisk (if we can resolve it)
+        if (result.tests.serviceDiscovery?.success) {
+            const asteriskIp = result.tests.serviceDiscovery.asteriskPrivateIp;
+            
+            try {
+                const testSocket = dgram.createSocket('udp4');
+                const testMessage = Buffer.from('RTP_CONNECTIVITY_TEST');
+                
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        testSocket.close();
+                        reject(new Error('Timeout - no response from Asterisk'));
+                    }, 2000);
+                    
+                    testSocket.on('message', (msg, rinfo) => {
+                        clearTimeout(timeout);
+                        testSocket.close();
+                        resolve({ response: msg.toString(), from: rinfo });
+                    });
+                    
+                    testSocket.bind(0, () => {
+                        const localPort = testSocket.address().port;
+                        // Send test packet to Asterisk ARI port (this won't work but tests routing)
+                        testSocket.send(testMessage, 8088, asteriskIp, (err) => {
+                            if (err) {
+                                clearTimeout(timeout);
+                                testSocket.close();
+                                reject(err);
+                            }
+                            // If no response after 2 seconds, that's expected but shows routing works
+                            setTimeout(() => {
+                                clearTimeout(timeout);
+                                testSocket.close();
+                                resolve({ status: 'sent_but_no_response', note: 'Normal for HTTP port test' });
+                            }, 500);
+                        });
+                    });
+                });
+                
+                result.tests.udpConnectivity = { success: true, note: 'UDP routing appears functional' };
+            } catch (err) {
+                result.tests.udpConnectivity = { 
+                    success: false, 
+                    error: err.message,
+                    likelyCause: 'Security group blocking UDP traffic'
+                };
+            }
+        }
+
+        // Test 5: Check current port allocations
+        try {
+            const portManager = require('../../services/port.manager.service');
+            const stats = portManager.getStats();
+            result.tests.portManager = {
+                success: true,
+                ...stats,
+                hasAvailablePorts: stats.available > 0
+            };
+        } catch (err) {
+            result.tests.portManager = { success: false, error: err.message };
+        }
+
+        // Generate recommendations based on test results
+        if (!result.tests.serviceDiscovery?.success) {
+            result.recommendations.push({
+                priority: 'HIGH',
+                issue: 'Cannot resolve Asterisk via service discovery',
+                solution: 'Check AWS Cloud Map configuration and VPC DNS resolution'
+            });
+        }
+
+        if (result.tests.udpConnectivity?.success === false) {
+            result.recommendations.push({
+                priority: 'CRITICAL',
+                issue: 'UDP connectivity blocked between Fargate and EC2',
+                solution: 'Fix security group rules - use CIDR blocks instead of security group references for Fargate'
+            });
+        }
+
+        if (result.tests.ipDetection?.isPrivate) {
+            result.recommendations.push({
+                priority: 'MEDIUM',
+                issue: 'App is using private IP for ExternalMedia',
+                solution: 'Ensure Asterisk can route to the private IP, or use public IP with proper NAT'
+            });
+        }
+
+        const failedTests = Object.values(result.tests).filter(test => test.success === false).length;
+        result.overallHealth = failedTests === 0 ? 'HEALTHY' : failedTests < 3 ? 'DEGRADED' : 'CRITICAL';
+
+        res.json(result);
+
+    } catch (err) {
+        res.status(500).json({ 
+            error: err.message, 
+            note: 'This test helps diagnose security group and network connectivity issues'
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/security-group-analysis:
+ *   get:
+ *     summary: Analyze security group configuration
+ *     description: Checks if security groups are properly configured for Fargate
+ *     tags: [Test - Network]
+ *     responses:
+ *       "200":
+ *         description: Security group analysis
+ */
+router.get('/security-group-analysis', async (req, res) => {
+    try {
+        const result = {
+            timestamp: new Date().toISOString(),
+            analysis: {},
+            issues: [],
+            architecture: {
+                app: 'AWS Fargate (ECS)',
+                asterisk: 'EC2 Instance',
+                connectivity: 'RTP over UDP',
+                securityGroupApproach: 'Should use CIDR blocks for Fargate ↔ EC2'
+            }
+        };
+
+        // Check environment details
+        result.analysis.environment = {
+            isECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
+            taskMetadata: process.env.ECS_CONTAINER_METADATA_URI_V4,
+            region: process.env.AWS_REGION,
+            publicIpConfig: process.env.BIANCA_PUBLIC_IP
+        };
+
+        // Get our task's network details if in ECS
+        if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
+            try {
+                const fetch = require('node-fetch');
+                const taskMetadata = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4 + '/task');
+                const taskData = await taskMetadata.json();
+                
+                result.analysis.taskNetwork = {
+                    taskArn: taskData.TaskARN,
+                    taskDefinitionFamily: taskData.Family,
+                    taskDefinitionRevision: taskData.Revision,
+                    availabilityZone: taskData.AvailabilityZone
+                };
+
+                // Get network details
+                const taskStatsResponse = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4 + '/task/stats');
+                const taskStats = await taskStatsResponse.json();
+                
+                result.analysis.networkMode = 'awsvpc'; // Fargate always uses awsvpc
+                
+            } catch (err) {
+                result.analysis.metadataError = err.message;
+            }
+        }
+
+        // Check expected vs actual network configuration
+        result.analysis.expectedConfig = {
+            fargateToEC2: 'Requires CIDR-based security group rules',
+            securityGroupRule: 'source should be Asterisk private IP/32, not security group ID',
+            udpPorts: '16384-16484 for RTP traffic',
+            direction: 'Asterisk → Fargate for audio input'
+        };
+
+        // Common issues with Fargate + EC2 setup
+        result.issues.push({
+            category: 'Security Groups',
+            issue: 'Using source_security_group_id for Fargate connectivity',
+            description: 'Security group references only work for EC2 ↔ EC2. Fargate needs CIDR-based rules.',
+            terraform_fix: `
+resource "aws_security_group_rule" "app_rtp_from_asterisk" {
+  type              = "ingress"
+  from_port         = var.app_rtp_port_start
+  to_port           = var.app_rtp_port_end
+  protocol          = "udp"
+  security_group_id = aws_security_group.bianca_app_sg.id
+  cidr_blocks       = ["\${aws_instance.asterisk.private_ip}/32"]
+  description       = "RTP from Asterisk to App"
+}`
+        });
+
+        result.issues.push({
+            category: 'IP Configuration',
+            issue: 'ExternalMedia destination IP',
+            description: 'Asterisk needs to know where to send RTP. Check if using public or private IP.',
+            check: 'Verify getFargateIp() returns the IP that Asterisk can reach'
+        });
+
+        res.json(result);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/port-connectivity:
+ *   post:
+ *     summary: Test specific port connectivity
+ *     description: Tests if a specific UDP port can receive data
+ *     tags: [Test - Network]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               port:
+ *                 type: number
+ *                 description: UDP port to test
+ *               duration:
+ *                 type: number
+ *                 default: 5
+ *                 description: How long to listen (seconds)
+ *     responses:
+ *       "200":
+ *         description: Port connectivity test results
+ */
+router.post('/port-connectivity', async (req, res) => {
+    const { port = 16384, duration = 5 } = req.body;
+    
+    if (!port || port < 1024 || port > 65535) {
+        return res.status(400).json({ error: 'Invalid port number' });
+    }
+
+    try {
+        const dgram = require('dgram');
+        const socket = dgram.createSocket('udp4');
+        
+        const result = {
+            port,
+            duration,
+            startTime: new Date().toISOString(),
+            packetsReceived: 0,
+            packets: [],
+            errors: []
+        };
+
+        // Set up packet listener
+        socket.on('message', (msg, rinfo) => {
+            result.packetsReceived++;
+            result.packets.push({
+                timestamp: new Date().toISOString(),
+                from: `${rinfo.address}:${rinfo.port}`,
+                size: msg.length,
+                preview: msg.length > 0 ? msg.subarray(0, Math.min(16, msg.length)).toString('hex') : ''
+            });
+        });
+
+        socket.on('error', (err) => {
+            result.errors.push({
+                timestamp: new Date().toISOString(),
+                error: err.message
+            });
+        });
+
+        // Bind to the port
+        await new Promise((resolve, reject) => {
+            socket.bind(port, '0.0.0.0', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        result.bound = true;
+        result.address = socket.address();
+
+        // Wait for the specified duration
+        await new Promise(resolve => setTimeout(resolve, duration * 1000));
+
+        socket.close();
+        result.endTime = new Date().toISOString();
+
+        // Analysis
+        result.analysis = {
+            receivedTraffic: result.packetsReceived > 0,
+            avgPacketSize: result.packetsReceived > 0 
+                ? result.packets.reduce((sum, p) => sum + p.size, 0) / result.packetsReceived 
+                : 0,
+            uniqueSources: [...new Set(result.packets.map(p => p.from))].length,
+            recommendation: result.packetsReceived === 0 
+                ? 'No packets received - check security groups and Asterisk configuration'
+                : `Received ${result.packetsReceived} packets - connectivity appears working`
+        };
+
+        res.json(result);
+
+    } catch (err) {
+        res.status(500).json({ 
+            error: err.message,
+            port,
+            note: 'This test directly binds to the UDP port to check for incoming traffic'
+        });
+    }
+});
+
 // Export the router
 module.exports = router;

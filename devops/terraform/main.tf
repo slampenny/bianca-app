@@ -468,7 +468,7 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   to_port                  = var.app_rtp_port_end
   protocol                 = "udp"
   security_group_id        = aws_security_group.bianca_app_sg.id
-  source_security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = ["${aws_instance.asterisk.private_ip}/32"]
   description              = "RTP from Asterisk to App"
 }
 
@@ -481,6 +481,16 @@ resource "aws_security_group_rule" "asterisk_rtp_from_app" {
   security_group_id        = aws_security_group.asterisk_ec2_sg.id
   source_security_group_id = aws_security_group.bianca_app_sg.id
   description              = "RTP from App to Asterisk"
+}
+
+resource "aws_security_group_rule" "asterisk_to_app_response" {
+  type              = "egress"
+  from_port         = var.app_rtp_port_start
+  to_port           = var.app_rtp_port_end
+  protocol          = "udp"
+  security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = ["172.31.100.0/24", "172.31.101.0/24"]  # Your Fargate subnets
+  description       = "Allow Asterisk to send RTP to Fargate"
 }
 
 resource "aws_security_group" "asterisk_ec2_sg" {
