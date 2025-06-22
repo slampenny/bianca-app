@@ -1414,9 +1414,6 @@ async saveDebugAudio(callId, label, buffer, format = 'pcm16', sampleRate = null)
     }
 }
 
-/**
- * Updated processAudioResponse with debugging
- */
 async processAudioResponseDebug(callId, audioBase64PCM) {
     if (!audioBase64PCM) {
         logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
@@ -1424,7 +1421,6 @@ async processAudioResponseDebug(callId, audioBase64PCM) {
     }
     
     try {
-        // Initialize files on first audio from OpenAI if needed
         const conn = this.connections.get(callId);
         if (conn && !conn._debugFilesInitialized) {
             this.initializeContinuousDebugFiles(callId);
@@ -1438,35 +1434,77 @@ async processAudioResponseDebug(callId, audioBase64PCM) {
             return;
         }
         
+        // Calculate audio duration at 24kHz
+        const samples24k = inputBuffer.length / 2; // 16-bit samples
+        const duration24k = samples24k / 24000 * 1000; // milliseconds
+        
+        logger.info(`[AUDIO CONVERSION] Stage 1 - From OpenAI:`, {
+            bytes: inputBuffer.length,
+            samples: samples24k,
+            durationMs: duration24k.toFixed(1),
+            sampleRate: 24000
+        });
+        
         // Append RAW input from OpenAI
         await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm24k.raw', inputBuffer);
         
-        // // STAGE 2: Resample from 24kHz to 8kHz
-        // const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
-        // const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
+        // STAGE 2: Resample from 24kHz to 8kHz
+        const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
+        const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
 
-        // const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
+        const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
         
-        // if (!resampledBuffer || resampledBuffer.length === 0) {
-        //     logger.error(`[AUDIO DEBUG] Resampling FAILED for ${callId}`);
-        //     return;
-        // }
-        
-        // // Append resampled audio
-        // await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
-
-        const bufferToConvert = inputBuffer; // Use the input buffer directly for conversion
-
-        // STAGE 3: Convert PCM to uLaw
-        const ulawBase64 = await AudioUtils.convertPcmToUlaw(bufferToConvert);
-        
-        if (!ulawBase64 || ulawBase64.length === 0) {
-            logger.error(`[AUDIO DEBUG] PCM to uLaw conversion FAILED`);
+        if (!resampledBuffer || resampledBuffer.length === 0) {
+            logger.error(`[AUDIO CONVERSION] Resampling FAILED for ${callId}`);
             return;
         }
         
-        // Append final uLaw
+        // Calculate audio duration at 8kHz
+        const samples8k = resampledBuffer.length / 2; // 16-bit samples
+        const duration8k = samples8k / 8000 * 1000; // milliseconds
+        const resampleRatio = samples24k / samples8k;
+        
+        logger.info(`[AUDIO CONVERSION] Stage 2 - After resampling:`, {
+            bytes: resampledBuffer.length,
+            samples: samples8k,
+            durationMs: duration8k.toFixed(1),
+            sampleRate: 8000,
+            resampleRatio: resampleRatio.toFixed(2),
+            expectedRatio: 3.0
+        });
+        
+        // WARNING: Check if resampling actually happened
+        if (Math.abs(resampleRatio - 3.0) > 0.1) {
+            logger.error(`[AUDIO CONVERSION] WARNING: Resample ratio is ${resampleRatio.toFixed(2)}, expected ~3.0!`);
+        }
+        
+        // Append resampled audio
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
+
+        // STAGE 3: Convert PCM to uLaw
+        const ulawBase64 = await AudioUtils.convertPcmToUlaw(resampledBuffer);
+        
+        if (!ulawBase64 || ulawBase64.length === 0) {
+            logger.error(`[AUDIO CONVERSION] PCM to uLaw conversion FAILED`);
+            return;
+        }
+        
         const ulawRawBuffer = Buffer.from(ulawBase64, 'base64');
+        const ulawDuration = ulawRawBuffer.length / 8000 * 1000; // 8000 samples/sec for uLaw
+        
+        logger.info(`[AUDIO CONVERSION] Stage 3 - After uLaw conversion:`, {
+            bytes: ulawRawBuffer.length,
+            samples: ulawRawBuffer.length,
+            durationMs: ulawDuration.toFixed(1),
+            format: 'ulaw'
+        });
+        
+        // CRITICAL CHECK: Duration should be preserved
+        if (Math.abs(duration24k - ulawDuration) > 10) { // Allow 10ms tolerance
+            logger.error(`[AUDIO CONVERSION] CRITICAL: Duration mismatch! Input: ${duration24k.toFixed(1)}ms, Output: ${ulawDuration.toFixed(1)}ms`);
+        }
+        
+        // Append final uLaw
         await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawRawBuffer);
         
         // Log progress every 100 chunks
@@ -1480,6 +1518,52 @@ async processAudioResponseDebug(callId, audioBase64PCM) {
         
     } catch (err) {
         logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
+    }
+}
+
+// Also check in your RTP sender what it's receiving:
+async sendAudio(callId, audioBase64Ulaw) {
+    if (!audioBase64Ulaw || audioBase64Ulaw.length === 0) return;
+
+    const callConfig = this.activeCalls.get(callId);
+    if (!callConfig || !callConfig.initialized) {
+        logger.warn(`[RTP Sender] Call ${callId} not initialized`);
+        return;
+    }
+
+    try {
+        const ulawBuffer = Buffer.from(audioBase64Ulaw, 'base64');
+        
+        // Track cumulative audio duration
+        if (!this.audioDuration) this.audioDuration = new Map();
+        const duration = this.audioDuration.get(callId) || { 
+            totalBytes: 0, 
+            startTime: Date.now(),
+            realTime: 0 
+        };
+        
+        duration.totalBytes += ulawBuffer.length;
+        duration.realTime = (Date.now() - duration.startTime) / 1000;
+        const audioDuration = duration.totalBytes / 8000; // uLaw at 8kHz = 8000 bytes/sec
+        const playbackSpeed = audioDuration / duration.realTime;
+        
+        this.audioDuration.set(callId, duration);
+        
+        // Log every 5 seconds
+        if (Math.floor(duration.realTime) % 5 === 0 && Math.floor(duration.realTime) !== duration.lastLog) {
+            duration.lastLog = Math.floor(duration.realTime);
+            logger.info(`[RTP PLAYBACK SPEED] Call ${callId}:`, {
+                audioSeconds: audioDuration.toFixed(1),
+                realSeconds: duration.realTime.toFixed(1),
+                playbackSpeed: playbackSpeed.toFixed(2) + 'x',
+                status: playbackSpeed < 0.9 ? 'TOO SLOW' : playbackSpeed > 1.1 ? 'TOO FAST' : 'NORMAL'
+            });
+        }
+        
+        // Continue with existing send logic...
+        
+    } catch (err) {
+        logger.error(`[RTP Sender] Error processing audio for ${callId}: ${err.message}`, err);
     }
 }
 
