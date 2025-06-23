@@ -582,67 +582,119 @@ class AsteriskAriClient extends EventEmitter {
         };
     }
 
+    // async handleStasisStartForUnicastRTP(channel) {
+    //     logger.info(`[ARI] Processing UnicastRTP channel: ${channel.id}`);
+
+    //     const parentCallData = this.findParentCallForRtpChannel(channel);
+    //     if (!parentCallData) {
+    //         logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}. Hanging up.`);
+    //         await this.safeHangup(channel, 'Orphaned UnicastRTP');
+    //         return;
+    //     }
+
+    //     const { parentId, callData } = parentCallData;
+        
+    //     // This UnicastRTP channel is for the READ stream (user->app)
+    //     if (!callData.inboundRtpChannelId) {
+    //          await this.handleInboundRtpChannel(channel, parentId, callData);
+    //     } 
+    //     // This UnicastRTP channel is for the WRITE stream (app->user)
+    //     else if (!callData.outboundRtpChannelId) {
+    //          await this.handleOutboundRtpChannel(channel, parentId, callData);
+    //     }
+    // }
+
+    // findParentCallForRtpChannel(channel) {
+    //     const channelName = channel.name || '';
+        
+    //     // Extract port from channel name (e.g., "UnicastRTP/3.21.122.60:16384-...")
+    //     const portMatch = channelName.match(/:(\d+)/);
+    //     if (portMatch) {
+    //         const port = parseInt(portMatch[1]);
+            
+    //         // Use channel tracker's existing method
+    //         const callData = this.tracker.findCallByRtpPort(port);
+    //         if (callData) {
+    //             logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
+    //             return { 
+    //                 parentId: callData.asteriskChannelId, 
+    //                 callData: callData 
+    //             };
+    //         }
+            
+    //         logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
+    //         return null;
+    //     }
+        
+    //     // For outbound RTP channels that don't have a port in the name
+    //     // Check if this is an outbound channel by looking for our app host
+    //     if (channelName.includes(this.RTP_BIANCA_HOST)) {
+    //         logger.info(`[ARI] Detected outbound RTP channel ${channel.id} for host ${this.RTP_BIANCA_HOST}`);
+            
+    //         // Find a call that's expecting an outbound RTP channel
+    //         for (const [callId, data] of this.tracker.calls.entries()) {
+    //             if (data.state === 'pending_media' && !data.outboundRtpChannelId) {
+    //                 logger.info(`[ARI] Found parent call ${callId} expecting outbound RTP channel`);
+    //                 return { parentId: callId, callData: data };
+    //             }
+    //         }
+            
+    //         logger.warn(`[ARI] No call found expecting outbound RTP channel`);
+    //     }
+        
+    //     logger.warn(`[ARI] Could not identify parent for RTP channel: ${channelName}`);
+    //     return null;
+    // }
+
     async handleStasisStartForUnicastRTP(channel) {
         logger.info(`[ARI] Processing UnicastRTP channel: ${channel.id}`);
 
-        const parentCallData = this.findParentCallForRtpChannel(channel);
-        if (!parentCallData) {
+        const parentInfo = this.findParentCallForRtpChannel(channel);
+        if (!parentInfo) {
             logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}. Hanging up.`);
-            await this.safeHangup(channel, 'Orphaned UnicastRTP');
-            return;
+            return this.safeHangup(channel, 'Orphaned UnicastRTP');
         }
 
-        const { parentId, callData } = parentCallData;
-        
-        // This UnicastRTP channel is for the READ stream (user->app)
-        if (!callData.inboundRtpChannelId) {
-             await this.handleInboundRtpChannel(channel, parentId, callData);
-        } 
-        // This UnicastRTP channel is for the WRITE stream (app->user)
-        else if (!callData.outboundRtpChannelId) {
-             await this.handleOutboundRtpChannel(channel, parentId, callData);
+        const { parentId, callData, port } = parentInfo;
+
+        // Use the port to determine the direction of the stream
+        if (port === callData.rtpReadPort && !callData.inboundRtpChannel) {
+            // This is the INBOUND stream (user -> app)
+            await this.handleInboundRtpChannel(channel, parentId, callData);
+
+        } else if (port === callData.rtpWritePort && !callData.outboundRtpChannel) {
+            // This is the OUTBOUND stream (app -> user)
+            await this.handleOutboundRtpChannel(channel, parentId, callData);
+
+        } else {
+            logger.warn(`[ARI] RTP channel ${channel.id} on port ${port} does not match an expected stream for call ${parentId}. Hanging up.`);
+            await this.safeHangup(channel, 'Unexpected RTP channel');
         }
     }
 
     findParentCallForRtpChannel(channel) {
         const channelName = channel.name || '';
         
-        // Extract port from channel name (e.g., "UnicastRTP/3.21.122.60:16384-...")
+        // Extract port from channel name (e.g., "UnicastRTP/...:16384-...")
         const portMatch = channelName.match(/:(\d+)/);
-        if (portMatch) {
-            const port = parseInt(portMatch[1]);
-            
-            // Use channel tracker's existing method
-            const callData = this.tracker.findCallByRtpPort(port);
-            if (callData) {
-                logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
-                return { 
-                    parentId: callData.asteriskChannelId, 
-                    callData: callData 
-                };
-            }
-            
-            logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
+        if (!portMatch) {
+            logger.warn(`[ARI] Could not extract RTP port from channel name: ${channelName}`);
             return null;
         }
-        
-        // For outbound RTP channels that don't have a port in the name
-        // Check if this is an outbound channel by looking for our app host
-        if (channelName.includes(this.RTP_BIANCA_HOST)) {
-            logger.info(`[ARI] Detected outbound RTP channel ${channel.id} for host ${this.RTP_BIANCA_HOST}`);
-            
-            // Find a call that's expecting an outbound RTP channel
-            for (const [callId, data] of this.tracker.calls.entries()) {
-                if (data.state === 'pending_media' && !data.outboundRtpChannelId) {
-                    logger.info(`[ARI] Found parent call ${callId} expecting outbound RTP channel`);
-                    return { parentId: callId, callData: data };
-                }
-            }
-            
-            logger.warn(`[ARI] No call found expecting outbound RTP channel`);
+
+        const port = parseInt(portMatch[1]);
+        const callData = this.tracker.findCallByRtpPort(port);
+
+        if (callData) {
+            logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
+            return { 
+                parentId: callData.asteriskChannelId, 
+                callData: callData,
+                port: port // Also return the port for direction checking
+            };
         }
         
-        logger.warn(`[ARI] Could not identify parent for RTP channel: ${channelName}`);
+        logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
         return null;
     }
 
