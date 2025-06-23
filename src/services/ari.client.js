@@ -1133,7 +1133,7 @@ class AsteriskAriClient extends EventEmitter {
             await channel.answer();
             
             // Use the call-specific port instead of the shared port
-            const rtpHost = await getFargateIp(); 
+            const rtpHost = 'bianca-app.myphonefriend.internal';//await getFargateIp(); 
             const rtpReadDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
             
             await channel.externalMedia({
@@ -1180,7 +1180,7 @@ class AsteriskAriClient extends EventEmitter {
             logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
 
             // USE DYNAMIC PORT INSTEAD OF STATIC CONFIG
-            const rtpHost = await getFargateIp();
+            const rtpHost = 'bianca-app.myphonefriend.internal'; //await getFargateIp();
             const rtpAsteriskSource = `${rtpHost}:${parentCallData.rtpWritePort}`;
             
             logger.info(`[ARI] Creating WRITE ExternalMedia to ${rtpAsteriskSource}`);
