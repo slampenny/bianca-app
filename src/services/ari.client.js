@@ -500,7 +500,31 @@ class AsteriskAriClient extends EventEmitter {
             } else if (channelName.startsWith('PJSIP/twilio-trunk-')) {
                 await this.handleStasisStartForMainChannel(channel, event);
             } else if (channelName.startsWith('UnicastRTP/')) {
-                await this.handleStasisStartForUnicastRTP(channel);
+                const rtpUuid = event.args[0]; // Get the unique ID from the event
+                if (!rtpUuid) {
+                    throw new Error('UnicastRTP channel is missing the appArgs UUID tag.');
+                }
+
+                const parentInfo = this.tracker.findCallByPendingRtpUuid(rtpUuid);
+                if (!parentInfo) {
+                    throw new Error(`No parent call found in tracker for RTP UUID: ${rtpUuid}`);
+                }
+
+                const { asteriskChannelId: parentId, direction } = parentInfo;
+                const callData = this.tracker.getCall(parentId);
+
+                logger.info(`[ARI] Identified UnicastRTP channel ${channelId} via UUID ${rtpUuid} for call ${parentId}, direction: ${direction}.`);
+                
+                // Clear the pending UUID from the tracker so it can't be reused
+                const updateKey = direction === 'read' ? 'pendingReadRtpUuid' : 'pendingWriteRtpUuid';
+                this.tracker.updateCall(parentId, { [updateKey]: null });
+
+                if (direction === 'read') {
+                    await this.handleInboundRtpChannel(channel, parentId, callData);
+                } else if (direction === 'write') {
+                    await this.handleOutboundRtpChannel(channel, parentId, callData);
+                }
+                //await this.handleStasisStartForUnicastRTP(channel);
             } else if (channelName.startsWith('Local/')) {
                 logger.warn(`[ARI] Unexpected Local channel ${channelId}. Hanging up.`);
                 await this.safeHangup(channel, 'Unexpected Local channel');
@@ -1128,6 +1152,10 @@ class AsteriskAriClient extends EventEmitter {
             logger.error(`[ARI] No allocated read port for parent call ${parentChannelId}`);
             return this.safeHangup(channel, 'No allocated read port');
         }
+
+        
+        const rtpReadUuid = uuidv4();
+        this.tracker.updateCall(parentChannelId, { pendingReadRtpUuid: rtpReadUuid });
         
         try {
             await channel.answer();
@@ -1140,7 +1168,8 @@ class AsteriskAriClient extends EventEmitter {
                 app: CONFIG.STASIS_APP_NAME,
                 external_host: rtpReadDest,
                 format: CONFIG.RTP_SEND_FORMAT,
-                direction: 'read'
+                direction: 'read',
+                appArgs: rtpReadUuid
             });
             
             logger.info(`[ARI] READ ExternalMedia configured: snoop ${channelId} → ${rtpReadDest} (dedicated port)`);
@@ -1168,6 +1197,9 @@ class AsteriskAriClient extends EventEmitter {
             logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}. Hanging up.`);
             return this.safeHangup(channel, 'Orphaned playback channel');
         }
+
+        const rtpWriteUuid = uuidv4();
+        this.tracker.updateCall(parentChannelId, { pendingWriteRtpUuid: rtpWriteUuid });
         
         const parentCallData = this.tracker.getCall(parentChannelId);
 
@@ -1189,7 +1221,8 @@ class AsteriskAriClient extends EventEmitter {
                 app: CONFIG.STASIS_APP_NAME,
                 external_host: rtpAsteriskSource,
                 format: CONFIG.RTP_SEND_FORMAT,
-                direction: 'write'
+                direction: 'write',
+                appArgs: rtpWriteUuid
             });
             
             logger.info(`[ARI] WRITE ExternalMedia requested, created channel ${unicastRtpChannel.id}`);
