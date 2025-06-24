@@ -1258,7 +1258,7 @@ async diagnoseAudioFlow(asteriskChannelId) {
             this.client.channels.snoopChannel({
                 channelId: asteriskChannelId,
                 snoopId: snoopId,
-                spy: 'in',
+                spy: 'out',
                 app: CONFIG.STASIS_APP_NAME
             }).catch(err => logger.error(`[ARI] Snoop channel creation failed to initiate for ${asteriskChannelId}: ${err.message}`));
 
