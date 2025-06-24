@@ -667,16 +667,8 @@ class AsteriskAriClient extends EventEmitter {
         await channel.answer();
         logger.info(`[ARI] Answered inbound RTP channel ${channel.id}`);
         
-        // CRITICAL: Add the RTP channel to the snoop bridge
-        if (callData.snoopBridgeId) {
-            await this.client.bridges.addChannel({
-                bridgeId: callData.snoopBridgeId,
-                channel: channel.id
-            });
-            logger.info(`[ARI] Added inbound RTP channel ${channel.id} to snoop bridge ${callData.snoopBridgeId}`);
-        } else {
-            logger.error(`[ARI] No snoop bridge found for call ${parentId}!`);
-        }
+        // NO BRIDGE - The RTP channel operates independently
+        // It will automatically send RTP to your listener based on the external_host configuration
         
         // Get and log the RTP endpoint info for debugging
         try {
@@ -1243,40 +1235,42 @@ async diagnoseAudioFlow(asteriskChannelId) {
         return callData;
     }
 
-    // --- REFACTOR 7: Greatly simplify this function to only create resources ---
     async initiateSnoopForExternalMedia(asteriskChannelId) {
-        logger.info(`[ExternalMedia Setup] Starting resource creation for main channel: ${asteriskChannelId}`);
+    logger.info(`[ExternalMedia Setup] Starting resource creation for main channel: ${asteriskChannelId}`);
+    
+    try {
+        const snoopId = `snoop-extmedia-${uuidv4()}`;
+        this.tracker.updateCall(asteriskChannelId, {
+            pendingSnoopId: snoopId,
+            expectingRtpChannels: true,
+        });
         
-        try {
-            const snoopId = `snoop-extmedia-${uuidv4()}`;
-            this.tracker.updateCall(asteriskChannelId, {
-                pendingSnoopId: snoopId,
-                expectingRtpChannels: true,
-            });
-            
-            // Fire and forget the creation commands. The event handlers will take over.
-            this.client.channels.snoopChannel({
-                channelId: asteriskChannelId,
-                snoopId: snoopId,
-                spy: 'out',
-                app: CONFIG.STASIS_APP_NAME
-            }).catch(err => logger.error(`[ARI] Snoop channel creation failed to initiate for ${asteriskChannelId}: ${err.message}`));
+        // Use 'in' to capture caller's voice, but with whisper='none' to prevent injection
+        this.client.channels.snoopChannel({
+            channelId: asteriskChannelId,
+            snoopId: snoopId,
+            spy: 'in',        // Caller's voice coming IN from Twilio
+            whisper: 'none',  // Don't inject anything back
+            app: CONFIG.STASIS_APP_NAME
+        }).catch(err => logger.error(`[ARI] Snoop channel creation failed to initiate for ${asteriskChannelId}: ${err.message}`));
 
-            this.client.channels.originate({
-                endpoint: `Local/playback-${asteriskChannelId}@playback-context`,
-                app: CONFIG.STASIS_APP_NAME,
-                appArgs: `playback-for-${asteriskChannelId}`,
-                callerId: 'OpenAI <openai>'
-            }).catch(err => logger.error(`[ARI] Playback channel creation failed to initiate for ${asteriskChannelId}: ${err.message}`));
+        this.client.channels.originate({
+            endpoint: `Local/playback-${asteriskChannelId}@playback-context`,
+            app: CONFIG.STASIS_APP_NAME,
+            appArgs: `playback-for-${asteriskChannelId}`,
+            callerId: 'OpenAI <openai>'
+        }).catch(err => logger.error(`[ARI] Playback channel creation failed to initiate for ${asteriskChannelId}: ${err.message}`));
 
-        } catch (err) {
-            logger.error(`[ExternalMedia Setup] Failed for ${asteriskChannelId}: ${err.message}`, err);
-            this.updateCallState(asteriskChannelId, 'failed');
-            throw err;
-        }
+    } catch (err) {
+        logger.error(`[ExternalMedia Setup] Failed for ${asteriskChannelId}: ${err.message}`, err);
+        this.updateCallState(asteriskChannelId, 'failed');
+        throw err;
     }
+}
 
- async handleStasisStartForSnoop(channel, channelName) {
+ // Replace your handleStasisStartForSnoop function with this version that doesn't use a bridge:
+
+async handleStasisStartForSnoop(channel, channelName) {
     const channelId = channel.id;
     const match = channelName.match(/^Snoop\/([^-]+)-/);
     const parentChannelId = match?.[1];
@@ -1298,46 +1292,26 @@ async diagnoseAudioFlow(asteriskChannelId) {
             snoopChannelId: channelId
         });
         
-        // Step 3: Create a bridge for the snoop channel - THIS IS CRITICAL!
-        const snoopBridge = await this.client.bridges.create({
-            type: 'mixing',
-            name: `snoop-bridge-${parentChannelId}`
-        });
+        // REMOVED: No bridge creation for snoop channel
+        // The snoop channel operates independently
         
-        logger.info(`[ARI] Created snoop bridge ${snoopBridge.id} for call ${parentChannelId}`);
-        
-        // Step 4: Add the snoop channel to the bridge
-        await this.client.bridges.addChannel({
-            bridgeId: snoopBridge.id,
-            channel: channelId
-        });
-        
-        logger.info(`[ARI] Added snoop channel ${channelId} to bridge ${snoopBridge.id}`);
-        
-        // Step 5: Update tracking with bridge info
-        this.tracker.updateCall(parentChannelId, {
-            snoopBridge: snoopBridge,
-            snoopBridgeId: snoopBridge.id
-        });
-        
-        // Step 6: Create ExternalMedia with BOTH direction
-        // IMPORTANT: When using 'read' direction, Asterisk RECEIVES RTP, not sends it
-        // We need to use 'both' and let the UnicastRTP channel handle the actual sending
+        // Step 3: Create ExternalMedia directly on the snoop channel
         const rtpHost = await getFargateIp(); 
         const rtpReadDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
         
         logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpReadDest}`);
         
+        // Use 'both' direction to allow bidirectional flow
         const rtpChannel = await channel.externalMedia({
             app: CONFIG.STASIS_APP_NAME,
             external_host: rtpReadDest,
             format: CONFIG.RTP_SEND_FORMAT,
-            direction: 'write' // Use 'both' instead of 'read'
+            direction: 'both'  // This allows audio to flow through the channel
         });
         
         logger.info(`[ARI] ExternalMedia created: ${rtpChannel.id} (${rtpChannel.name})`);
         
-        // The UnicastRTP channel will enter Stasis and we'll handle it there
+        // The UnicastRTP channel will enter Stasis separately
         
     } catch (err) {
         logger.error(`[ARI] Failed to setup snoop channel: ${err.message}`, err);
