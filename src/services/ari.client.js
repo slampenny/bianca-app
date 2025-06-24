@@ -499,36 +499,14 @@ class AsteriskAriClient extends EventEmitter {
                 await this.handleStasisStartForPlayback(channel, channelName, event);
             } else if (channelName.startsWith('PJSIP/twilio-trunk-')) {
                 await this.handleStasisStartForMainChannel(channel, event);
-            } else if (channelName.startsWith('UnicastRTP/')) {
-                const rtpUuid = event.args[0]; // Get the unique ID from the event
-                if (!rtpUuid) {
-                    throw new Error('UnicastRTP channel is missing the appArgs UUID tag.');
-                }
-
-                const parentInfo = this.tracker.findCallByPendingRtpUuid(rtpUuid);
-                if (!parentInfo) {
-                    throw new Error(`No parent call found in tracker for RTP UUID: ${rtpUuid}`);
-                }
-
-                const { asteriskChannelId: parentId, direction } = parentInfo;
-                const callData = this.tracker.getCall(parentId);
-
-                logger.info(`[ARI] Identified UnicastRTP channel ${channelId} via UUID ${rtpUuid} for call ${parentId}, direction: ${direction}.`);
-                
-                // Clear the pending UUID from the tracker so it can't be reused
-                const updateKey = direction === 'read' ? 'pendingReadRtpUuid' : 'pendingWriteRtpUuid';
-                this.tracker.updateCall(parentId, { [updateKey]: null });
-
-                if (direction === 'read') {
-                    await this.handleInboundRtpChannel(channel, parentId, callData);
-                } else if (direction === 'write') {
-                    await this.handleOutboundRtpChannel(channel, parentId, callData);
-                }
-                //await this.handleStasisStartForUnicastRTP(channel);
-            } else if (channelName.startsWith('Local/')) {
-                logger.warn(`[ARI] Unexpected Local channel ${channelId}. Hanging up.`);
-                await this.safeHangup(channel, 'Unexpected Local channel');
-            } else {
+            }
+            //  else if (channelName.startsWith('UnicastRTP/')) {
+            //     await this.handleStasisStartForUnicastRTP(channel);
+            // } else if (channelName.startsWith('Local/')) {
+            //     logger.warn(`[ARI] Unexpected Local channel ${channelId}. Hanging up.`);
+            //     await this.safeHangup(channel, 'Unexpected Local channel');
+            // } 
+            else {
                 logger.warn(`[ARI] Unhandled channel type: ${channelId} (${channelName}). Hanging up.`);
                 await this.safeHangup(channel, 'Unhandled channel type');
             }
@@ -606,69 +584,69 @@ class AsteriskAriClient extends EventEmitter {
         };
     }
 
-    async handleStasisStartForUnicastRTP(channel) {
-        logger.info(`[ARI] Processing UnicastRTP channel: ${channel.id}`);
+    // async handleStasisStartForUnicastRTP(channel) {
+    //     logger.info(`[ARI] Processing UnicastRTP channel: ${channel.id}`);
 
-        const parentCallData = this.findParentCallForRtpChannel(channel);
-        if (!parentCallData) {
-            logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}. Hanging up.`);
-            await this.safeHangup(channel, 'Orphaned UnicastRTP');
-            return;
-        }
+    //     const parentCallData = this.findParentCallForRtpChannel(channel);
+    //     if (!parentCallData) {
+    //         logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}. Hanging up.`);
+    //         await this.safeHangup(channel, 'Orphaned UnicastRTP');
+    //         return;
+    //     }
 
-        const { parentId, callData } = parentCallData;
+    //     const { parentId, callData } = parentCallData;
         
-        // This UnicastRTP channel is for the READ stream (user->app)
-        if (!callData.inboundRtpChannelId) {
-             await this.handleInboundRtpChannel(channel, parentId, callData);
-        } 
-        // This UnicastRTP channel is for the WRITE stream (app->user)
-        else if (!callData.outboundRtpChannelId) {
-             await this.handleOutboundRtpChannel(channel, parentId, callData);
-        }
-    }
+    //     // This UnicastRTP channel is for the READ stream (user->app)
+    //     if (!callData.inboundRtpChannelId) {
+    //          await this.handleInboundRtpChannel(channel, parentId, callData);
+    //     } 
+    //     // This UnicastRTP channel is for the WRITE stream (app->user)
+    //     else if (!callData.outboundRtpChannelId) {
+    //          await this.handleOutboundRtpChannel(channel, parentId, callData);
+    //     }
+    // }
 
-    findParentCallForRtpChannel(channel) {
-        const channelName = channel.name || '';
+    // findParentCallForRtpChannel(channel) {
+    //     const channelName = channel.name || '';
         
-        // Extract port from channel name (e.g., "UnicastRTP/3.21.122.60:16384-...")
-        const portMatch = channelName.match(/:(\d+)/);
-        if (portMatch) {
-            const port = parseInt(portMatch[1]);
+    //     // Extract port from channel name (e.g., "UnicastRTP/3.21.122.60:16384-...")
+    //     const portMatch = channelName.match(/:(\d+)/);
+    //     if (portMatch) {
+    //         const port = parseInt(portMatch[1]);
             
-            // Use channel tracker's existing method
-            const callData = this.tracker.findCallByRtpPort(port);
-            if (callData) {
-                logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
-                return { 
-                    parentId: callData.asteriskChannelId, 
-                    callData: callData 
-                };
-            }
+    //         // Use channel tracker's existing method
+    //         const callData = this.tracker.findCallByRtpPort(port);
+    //         if (callData) {
+    //             logger.info(`[ARI] Found parent call ${callData.asteriskChannelId} for RTP channel ${channel.id} by port ${port}`);
+    //             return { 
+    //                 parentId: callData.asteriskChannelId, 
+    //                 callData: callData 
+    //             };
+    //         }
             
-            logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
-            return null;
-        }
+    //         logger.warn(`[ARI] No call found with RTP port ${port} for channel ${channel.id}`);
+    //         return null;
+    //     }
         
-        // For outbound RTP channels that don't have a port in the name
-        // Check if this is an outbound channel by looking for our app host
-        if (channelName.includes(this.RTP_BIANCA_HOST)) {
-            logger.info(`[ARI] Detected outbound RTP channel ${channel.id} for host ${this.RTP_BIANCA_HOST}`);
+    //     // For outbound RTP channels that don't have a port in the name
+    //     // Check if this is an outbound channel by looking for our app host
+    //     if (channelName.includes(this.RTP_BIANCA_HOST)) {
+    //         logger.info(`[ARI] Detected outbound RTP channel ${channel.id} for host ${this.RTP_BIANCA_HOST}`);
             
-            // Find a call that's expecting an outbound RTP channel
-            for (const [callId, data] of this.tracker.calls.entries()) {
-                if (data.state === 'pending_media' && !data.outboundRtpChannelId) {
-                    logger.info(`[ARI] Found parent call ${callId} expecting outbound RTP channel`);
-                    return { parentId: callId, callData: data };
-                }
-            }
+    //         // Find a call that's expecting an outbound RTP channel
+    //         for (const [callId, data] of this.tracker.calls.entries()) {
+    //             if (data.state === 'pending_media' && !data.outboundRtpChannelId) {
+    //                 logger.info(`[ARI] Found parent call ${callId} expecting outbound RTP channel`);
+    //                 return { parentId: callId, callData: data };
+    //             }
+    //         }
             
-            logger.warn(`[ARI] No call found expecting outbound RTP channel`);
-        }
+    //         logger.warn(`[ARI] No call found expecting outbound RTP channel`);
+    //     }
         
-        logger.warn(`[ARI] Could not identify parent for RTP channel: ${channelName}`);
-        return null;
-    }
+    //     logger.warn(`[ARI] Could not identify parent for RTP channel: ${channelName}`);
+    //     return null;
+    // }
 
     isChannelForCall(channel, callId, callData) {
         // Determine if an RTP channel belongs to a specific call
@@ -1140,102 +1118,193 @@ class AsteriskAriClient extends EventEmitter {
             this.updateCallState(asteriskChannelId, 'failed');
             throw err;
         }
+    
     }
 
- async handleStasisStartForSnoop(channel, channelName) {
-        const channelId = channel.id;
-        const match = channelName.match(/^Snoop\/([^-]+)-/);
-        const parentChannelId = match?.[1];
-        
+    // In ari.client.js
+async handleStasisStartForSnoop(channel, channelName) {
+    const channelId = channel.id;
+    const match = channelName.match(/^Snoop\/([^-]+)-/);
+    const parentChannelId = match?.[1];
+
+    if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
+        logger.error(`[ARI] No parent call found for snoop channel ${channelId}`);
+        return this.safeHangup(channel, 'Orphaned snoop channel');
+    }
+    
+    try {
+        await channel.answer();
+        logger.info(`[ARI] Answered snoop channel ${channelId}`);
+
         const parentCallData = this.tracker.getCall(parentChannelId);
-        if (!parentCallData || !parentCallData.rtpReadPort) {
-            logger.error(`[ARI] No allocated read port for parent call ${parentChannelId}`);
-            return this.safeHangup(channel, 'No allocated read port');
-        }
+        const rtpReadDest = `bianca-app.myphonefriend.internal:${parentCallData.rtpReadPort}`;
 
+        // Create the media channel but DO NOT pass the 'app' parameter.
+        // This prevents it from entering Stasis.
+        const rtpChannel = await channel.externalMedia({
+            external_host: rtpReadDest,
+            format: CONFIG.RTP_SEND_FORMAT,
+            direction: 'read'
+        });
+
+        logger.info(`[ARI] Created READ UnicastRTP channel ${rtpChannel.id} which will NOT enter Stasis.`);
         
-        const rtpReadUuid = uuidv4();
-        this.tracker.updateCall(parentChannelId, { pendingReadRtpUuid: rtpReadUuid });
-        
-        try {
-            await channel.answer();
-            
-            // Use the call-specific port instead of the shared port
-            const rtpHost = await getFargateIp(); 
-            const rtpReadDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
-            
-            await channel.externalMedia({
-                app: CONFIG.STASIS_APP_NAME,
-                external_host: rtpReadDest,
-                format: CONFIG.RTP_SEND_FORMAT,
-                direction: 'read',
-                appArgs: rtpReadUuid
-            });
-            
-            logger.info(`[ARI] READ ExternalMedia configured: snoop ${channelId} → ${rtpReadDest} (dedicated port)`);
-        } catch (err) {
-            logger.error(`[ARI] Failed to start ExternalMedia: ${err.message}`);
-            await this.cleanupChannel(parentChannelId, `ExternalMedia setup failed`);
-        }
+        // Now that we have the channel object, we can track it immediately.
+        this.tracker.updateCall(parentChannelId, {
+            inboundRtpChannel: rtpChannel,
+            inboundRtpChannelId: rtpChannel.id,
+            isReadStreamReady: true // The stream is ready NOW
+        });
+
+        this.checkMediaPipelineReady(parentChannelId);
+
+    } catch (err) {
+        logger.error(`[ARI] Failed to set up snoop channel ${channelId}: ${err.message}`, err);
+        await this.cleanupChannel(parentChannelId, `Snoop setup failed`);
     }
+}
+
+//  async handleStasisStartForSnoop(channel, channelName) {
+//         const channelId = channel.id;
+//         const match = channelName.match(/^Snoop\/([^-]+)-/);
+//         const parentChannelId = match?.[1];
+
+//         const rtpReadUuid = uuidv4();
+//         this.tracker.updateCall(parentChannelId, { pendingReadRtpUuid: rtpReadUuid });
+        
+//         const parentCallData = this.tracker.getCall(parentChannelId);
+//         if (!parentCallData || !parentCallData.rtpReadPort) {
+//             logger.error(`[ARI] No allocated read port for parent call ${parentChannelId}`);
+//             return this.safeHangup(channel, 'No allocated read port');
+//         }
+        
+//         try {
+//             await channel.answer();
+            
+//             // Use the call-specific port instead of the shared port
+//             const rtpHost = await getFargateIp(); 
+//             const rtpReadDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
+            
+//             await channel.externalMedia({
+//                 app: CONFIG.STASIS_APP_NAME,
+//                 external_host: rtpReadDest,
+//                 format: CONFIG.RTP_SEND_FORMAT,
+//                 direction: 'read',
+//             });
+            
+//             logger.info(`[ARI] READ ExternalMedia configured: snoop ${channelId} → ${rtpReadDest} (dedicated port)`);
+//         } catch (err) {
+//             logger.error(`[ARI] Failed to start ExternalMedia: ${err.message}`);
+//             await this.cleanupChannel(parentChannelId, `ExternalMedia setup failed`);
+//         }
+//     }
 
     // --- REFACTOR 9: Simplify playback handler ---
-    async handleStasisStartForPlayback(channel, channelName, event) {
-        const channelId = channel.id;
-        const isLeg2 = channelName.includes(';2');
+    // async handleStasisStartForPlayback(channel, channelName, event) {
+    //     const channelId = channel.id;
+    //     const isLeg2 = channelName.includes(';2');
 
-        if (!isLeg2) {
-            logger.info(`[ARI] Ignoring playback leg 1: ${channelId}`);
-            return;
-        }
+    //     if (!isLeg2) {
+    //         logger.info(`[ARI] Ignoring playback leg 1: ${channelId}`);
+    //         return;
+    //     }
 
-        logger.info(`[ARI] StasisStart for Playback channel leg 2: ${channelId}`);
-        const match = channelName.match(/^Local\/playback-([^@]+)@/);
-        const parentChannelId = match?.[1];
+    //     logger.info(`[ARI] StasisStart for Playback channel leg 2: ${channelId}`);
+    //     const match = channelName.match(/^Local\/playback-([^@]+)@/);
+    //     const parentChannelId = match?.[1];
         
-        if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
-            logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}. Hanging up.`);
-            return this.safeHangup(channel, 'Orphaned playback channel');
-        }
-
-        const rtpWriteUuid = uuidv4();
-        this.tracker.updateCall(parentChannelId, { pendingWriteRtpUuid: rtpWriteUuid });
+    //     if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
+    //         logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}. Hanging up.`);
+    //         return this.safeHangup(channel, 'Orphaned playback channel');
+    //     }
         
-        const parentCallData = this.tracker.getCall(parentChannelId);
+    //     const parentCallData = this.tracker.getCall(parentChannelId);
 
-        try {
-            this.tracker.updateCall(parentChannelId, { playbackChannel: channel, playbackChannelId: channelId });
-            await channel.answer();
-            logger.info(`[ARI] Answered playback channel ${channelId}`);
+    //     try {
+    //         this.tracker.updateCall(parentChannelId, { playbackChannel: channel, playbackChannelId: channelId });
+    //         await channel.answer();
+    //         logger.info(`[ARI] Answered playback channel ${channelId}`);
             
-            await this.client.bridges.addChannel({ bridgeId: parentCallData.mainBridgeId, channel: channelId });
-            logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
+    //         await this.client.bridges.addChannel({ bridgeId: parentCallData.mainBridgeId, channel: channelId });
+    //         logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
 
-            // USE DYNAMIC PORT INSTEAD OF STATIC CONFIG
-            const rtpHost = await getFargateIp();
-            const rtpAsteriskSource = `${rtpHost}:${parentCallData.rtpWritePort}`;
+    //         // USE DYNAMIC PORT INSTEAD OF STATIC CONFIG
+    //         const rtpHost = await getFargateIp();
+    //         const rtpAsteriskSource = `${rtpHost}:${parentCallData.rtpWritePort}`;
             
-            logger.info(`[ARI] Creating WRITE ExternalMedia to ${rtpAsteriskSource}`);
+    //         logger.info(`[ARI] Creating WRITE ExternalMedia to ${rtpAsteriskSource}`);
             
-            const unicastRtpChannel = await channel.externalMedia({
-                app: CONFIG.STASIS_APP_NAME,
-                external_host: rtpAsteriskSource,
-                format: CONFIG.RTP_SEND_FORMAT,
-                direction: 'write',
-                appArgs: rtpWriteUuid
-            });
+    //         const unicastRtpChannel = await channel.externalMedia({
+    //             app: CONFIG.STASIS_APP_NAME,
+    //             external_host: rtpAsteriskSource,
+    //             format: CONFIG.RTP_SEND_FORMAT,
+    //             direction: 'write'
+    //         });
             
-            logger.info(`[ARI] WRITE ExternalMedia requested, created channel ${unicastRtpChannel.id}`);
-            const asteriskRtpEndpoint = await this.getRtpEndpoint(unicastRtpChannel);
+    //         logger.info(`[ARI] WRITE ExternalMedia requested, created channel ${unicastRtpChannel.id}`);
+    //         const asteriskRtpEndpoint = await this.getRtpEndpoint(unicastRtpChannel);
             
-            this.tracker.updateCall(parentChannelId, { asteriskRtpEndpoint, unicastRtpChannel, unicastRtpChannelId: unicastRtpChannel.id });
-            await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+    //         this.tracker.updateCall(parentChannelId, { asteriskRtpEndpoint, unicastRtpChannel, unicastRtpChannelId: unicastRtpChannel.id });
+    //         await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
             
-        } catch (err) {
-            logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
-            await this.cleanupChannel(parentChannelId, `WRITE ExternalMedia setup failed: ${err.message}`);
-        }
+    //     } catch (err) {
+    //         logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
+    //         await this.cleanupChannel(parentChannelId, `WRITE ExternalMedia setup failed: ${err.message}`);
+    //     }
+    // }
+
+async handleStasisStartForPlayback(channel, channelName, event) {
+    const channelId = channel.id;
+    const isLeg2 = channelName.includes(';2');
+
+    if (!isLeg2) {
+        return; // Ignore leg 1
     }
+
+    const match = channelName.match(/^Local\/playback-([^@]+)@/);
+    const parentChannelId = match?.[1];
+
+    if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
+        logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}.`);
+        return this.safeHangup(channel, 'Orphaned playback channel');
+    }
+    
+    const parentCallData = this.tracker.getCall(parentChannelId);
+
+    try {
+        await channel.answer();
+        logger.info(`[ARI] Answered playback channel ${channelId}`);
+
+        await this.client.bridges.addChannel({ bridgeId: parentCallData.mainBridgeId, channel: channelId });
+        logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
+
+        const rtpAsteriskSource = `bianca-app.myphonefriend.internal:${parentCallData.rtpWritePort}`;
+
+        // Create the media channel but DO NOT pass the 'app' parameter.
+        const unicastRtpChannel = await channel.externalMedia({
+            external_host: rtpAsteriskSource,
+            format: CONFIG.RTP_SEND_FORMAT,
+            direction: 'write'
+        });
+
+        logger.info(`[ARI] Created WRITE UnicastRTP channel ${unicastRtpChannel.id} which will NOT enter Stasis.`);
+
+        // Track it immediately
+        this.tracker.updateCall(parentChannelId, { 
+            playbackChannel: channel, 
+            playbackChannelId: channelId,
+            outboundRtpChannel: unicastRtpChannel,
+            outboundRtpChannelId: unicastRtpChannel.id
+        });
+        
+        const asteriskRtpEndpoint = await this.getRtpEndpoint(unicastRtpChannel);
+        await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+        
+    } catch (err) {
+        logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
+        await this.cleanupChannel(parentChannelId, `WRITE ExternalMedia setup failed: ${err.message}`);
+    }
+}
 
     async getRtpEndpoint(unicastRtpChannel) {
         try {

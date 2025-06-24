@@ -621,25 +621,6 @@ class ChannelTracker {
         
         return audit;
     }
-
-    /**
-     * Finds a call that has a pending RTP channel with a specific UUID.
-     * @param {string} uuid - The unique ID passed via appArgs.
-     * @returns {object | null}
-     */
-    findCallByPendingRtpUuid(uuid) {
-        if (!uuid) return null;
-        for (const [asteriskId, data] of this.calls.entries()) {
-            // Check both possible pending UUID fields
-            if (data.pendingReadRtpUuid === uuid) {
-                return { ...data, direction: 'read' };
-            }
-            if (data.pendingWriteRtpUuid === uuid) {
-                return { ...data, direction: 'write' };
-            }
-        }
-        return null;
-    }
     
     /**
      * Clean up orphaned resources based on audit
