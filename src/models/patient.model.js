@@ -39,6 +39,24 @@ const patientSchema = mongoose.Schema(
         }
       },
     },
+    preferredName: {
+      type: String,
+      trim: true,
+      // What they like to be called (e.g., "Mrs. Smith" vs "Betty")
+    },
+    
+    age: {
+      type: Number,
+      min: 0,
+      max: 150,
+      // Helps Bianca adjust conversation style appropriately
+    },
+    
+    notes: {
+      type: String,
+      // General notes about the patient for context
+      // Can include things like "prefers morning calls", "loves talking about grandchildren", etc.
+    },
     isEmailVerified: {
       type: Boolean,
       default: false,

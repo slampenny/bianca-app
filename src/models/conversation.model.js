@@ -32,6 +32,22 @@ const conversationSchema = mongoose.Schema(
     history: {
       type: String,
     },
+    callType: {
+      type: String,
+      enum: ['inbound', 'wellness-check', 'follow-up'],
+      default: 'inbound',
+    },
+    
+    status: {
+      type: String,
+      enum: ['initiated', 'in-progress', 'completed', 'failed', 'machine'],
+      default: 'initiated',
+    },
+    
+    asteriskChannelId: {
+      type: String,
+      // For tracking the Asterisk side of the call
+    },
     analyzedData: {
       type: mongoose.Schema.Types.Mixed,
       default: {},

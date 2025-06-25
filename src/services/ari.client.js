@@ -1010,25 +1010,26 @@ async diagnoseAudioFlow(asteriskChannelId) {
                 twilioCallSid || asteriskChannelId,
                 asteriskChannelId
             );
-            
-            // Listener for WRITE (for OpenAI to send to)
-            // await rtpListenerService.startRtpListenerForCall(
-            //     writePort,
-            //     `${twilioCallSid || asteriskChannelId}-write`,
-            //     asteriskChannelId
-            // );
 
             // Step 3: Update call tracking - ports are already set by allocatePortsForCall
             this.tracker.updateCall(asteriskChannelId, {
                 state: 'setting_up_media'
             });
 
+            // Step 4: Get call type from SIP parameters or default to inbound
+            const callType = this.extractCallTypeFromChannel(channel) || 'inbound';
+
+            const conversationService = require('./conversation.service');
+            const enhancedPrompt = await conversationService.buildEnhancedPrompt(patientId, callType);
+            
+            logger.info(`[ARI Pipeline] Built enhanced prompt for patient ${patientId} (${callType} call)`);
+
+            
             // Step 4: Create conversation record in database
-            const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId);
+            const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId, callType);
 
             // Step 5: Initialize OpenAI service for this call
-            const initialPrompt = "You are Bianca, a helpful AI assistant from the patient's care team.";
-            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, initialPrompt);
+            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, enhancedPrompt);
 
             // Step 6: Create the main bridge for mixing audio
             mainBridge = await this.client.bridges.create({
@@ -1039,7 +1040,8 @@ async diagnoseAudioFlow(asteriskChannelId) {
             this.tracker.updateCall(asteriskChannelId, {
                 mainBridge: mainBridge,
                 mainBridgeId: mainBridge.id,
-                conversationId: dbConversationId
+                conversationId: dbConversationId,
+                callType: callType // Store call type for later use
             });
             
             logger.info(`[ARI Pipeline] Created main bridge ${mainBridge.id}`);
@@ -1073,7 +1075,8 @@ async diagnoseAudioFlow(asteriskChannelId) {
                 twilioCallSid,
                 readPort,
                 writePort,
-                bridgeId: mainBridge.id
+                bridgeId: mainBridge.id,
+                conversationId: dbConversationId
             };
 
         } catch (err) {
@@ -1086,7 +1089,6 @@ async diagnoseAudioFlow(asteriskChannelId) {
             try {
                 const rtpListenerService = require('./rtp.listener.service');
                 rtpListenerService.stopRtpListenerForCall(twilioCallSid || asteriskChannelId);
-                rtpListenerService.stopRtpListenerForCall(`${twilioCallSid || asteriskChannelId}-write`);
             } catch (cleanupErr) {
                 logger.error(`[ARI Pipeline] Error stopping RTP listener during cleanup: ${cleanupErr.message}`);
             }
@@ -1096,6 +1098,27 @@ async diagnoseAudioFlow(asteriskChannelId) {
             }
             
             throw err;
+        }
+    }
+
+    extractCallTypeFromChannel(channel) {
+        try {
+            // Try to get call type from channel variables or SIP headers
+            const channelVars = channel.channelvars || {};
+            
+            // Check for call type in various possible locations
+            if (channelVars.callType) return channelVars.callType;
+            if (channelVars.CALL_TYPE) return channelVars.CALL_TYPE;
+            
+            // Parse from channel name if it contains parameters
+            const channelName = channel.name || '';
+            if (channelName.includes('wellness-check')) return 'wellness-check';
+            
+            // Default for inbound calls
+            return 'inbound';
+        } catch (err) {
+            logger.warn(`[ARI Pipeline] Could not extract call type: ${err.message}`);
+            return 'inbound';
         }
     }
 
