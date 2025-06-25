@@ -541,15 +541,15 @@ class OpenAIRealtimeService {
                     logger.info(`[OpenAI Realtime] Speech stopped detected for ${callId}`);
                     this.notify(callId, 'speech_stopped', {});
                     // Automatically trigger response generation if VAD is disabled
-                    const connForResponse = this.connections.get(callId);
-                    if (connForResponse?.sessionReady) {
-                        logger.info(`[OpenAI Realtime] Triggering response generation for ${callId}`);
-                        try {
-                            await this.sendJsonMessage(callId, { type: 'response.create' });
-                        } catch (err) {
-                            logger.error(`[OpenAI Realtime] Failed to trigger response: ${err.message}`);
-                        }
-                    }
+                    // const connForResponse = this.connections.get(callId);
+                    // if (connForResponse?.sessionReady) {
+                    //     logger.info(`[OpenAI Realtime] Triggering response generation for ${callId}`);
+                    //     try {
+                    //         await this.sendJsonMessage(callId, { type: 'response.create' });
+                    //     } catch (err) {
+                    //         logger.error(`[OpenAI Realtime] Failed to trigger response: ${err.message}`);
+                    //     }
+                    // }
                     break;
 
                 case 'input_audio_buffer.committed':
@@ -613,9 +613,9 @@ class OpenAIRealtimeService {
                 // Add turn detection for automatic response generation
                 turn_detection: {
                     type: 'server_vad',
-                    threshold: 0.5,
-                    prefix_padding_ms: 300,
-                    silence_duration_ms: 500  // Wait 1 second after speech stops
+                    threshold: 0.3,
+                    prefix_padding_ms: 200,
+                    silence_duration_ms: 800  // Wait 1 second after speech stops
                 },
                 // Add input transcription to help with debugging
                 input_audio_transcription: {
@@ -1074,16 +1074,16 @@ async handleApiError(callId, message) {
                     currentConn.pendingCommit = true;
                     
                     // Optional: Trigger response after a delay if no VAD response comes
-                    setTimeout(async () => {
-                        if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
-                            logger.info(`[OpenAI Realtime] Triggering manual response for ${callId} (fallback)`);
-                            try {
-                                await this.sendJsonMessage(callId, { type: 'response.create' });
-                            } catch (respErr) {
-                                logger.error(`[OpenAI Realtime] Failed to trigger manual response: ${respErr.message}`);
-                            }
-                        }
-                    }, 2000); // Wait 2 seconds for VAD, then trigger manually
+                    // setTimeout(async () => {
+                    //     if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
+                    //         logger.info(`[OpenAI Realtime] Triggering manual response for ${callId} (fallback)`);
+                    //         try {
+                    //             await this.sendJsonMessage(callId, { type: 'response.create' });
+                    //         } catch (respErr) {
+                    //             logger.error(`[OpenAI Realtime] Failed to trigger manual response: ${respErr.message}`);
+                    //         }
+                    //     }
+                    // }, 2000); // Wait 2 seconds for VAD, then trigger manually
                     
                 } catch (commitErr) {
                     logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);

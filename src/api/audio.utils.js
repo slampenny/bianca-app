@@ -41,31 +41,6 @@ class AudioUtils {
     }
 
     /**
-     * Resample using linear interpolation. This is safer for chunk-based/stream processing.
-     * @private
-     */
-    static resampleWithLinear(inputSamples, inputRate, outputRate) {
-        const ratio = inputRate / outputRate;
-        const outputLength = Math.ceil(inputSamples.length / ratio);
-        const outputSamples = new Float32Array(outputLength);
-
-        for (let i = 0; i < outputLength; i++) {
-            const srcPos = i * ratio;
-            const srcIndex = Math.floor(srcPos);
-            const frac = srcPos - srcIndex;
-
-            const p1 = inputSamples[srcIndex] || 0;
-            // Get the next sample; if at the very end, just repeat the last sample
-            const p2 = inputSamples[Math.min(inputSamples.length - 1, srcIndex + 1)] || 0;
-
-            // Simple linear interpolation
-            outputSamples[i] = p1 + (p2 - p1) * frac;
-        }
-        
-        return outputSamples;
-    }
-
-    /**
      * Convert uLaw to 16-bit PCM
      * @param {Buffer} ulawBuffer - Input uLaw buffer
      * @returns {Promise<Buffer>} PCM buffer (16-bit samples)
@@ -99,7 +74,8 @@ class AudioUtils {
     }
 
     /**
-     * Resample PCM audio from one sample rate to another using better interpolation
+     * Resample PCM audio from one sample rate to another
+     * Uses high-quality upsampling for better OpenAI speech recognition
      * @param {Buffer} inputBuffer - Input PCM buffer
      * @param {number} inputRate - Input sample rate (Hz)
      * @param {number} outputRate - Output sample rate (Hz)
@@ -121,32 +97,188 @@ class AudioUtils {
         }
 
         try {
-            // Extract samples
+            // Use high-quality resampling for upsampling (especially 8kHz → 24kHz)
+            if (outputRate > inputRate) {
+                return this.resamplePcmHighQuality(inputBuffer, inputRate, outputRate);
+            }
+
+            // Use existing linear method for downsampling (works well for OpenAI → Asterisk)
+            return this.resampleWithLinearMethod(inputBuffer, inputRate, outputRate);
+
+        } catch (err) {
+            console.error(`Error resampling PCM from ${inputRate}Hz to ${outputRate}Hz: ${err.message}`, err.stack);
+            throw new Error(`PCM resampling failed: ${err.message}`);
+        }
+    }
+
+    /**
+     * High-quality resampling specifically optimized for upsampling (8kHz → 24kHz)
+     * Uses anti-aliasing for clean upsampling that OpenAI can understand better
+     * @private
+     */
+    static resamplePcmHighQuality(inputBuffer, inputRate, outputRate) {
+        if (!inputBuffer || inputBuffer.length === 0) {
+            return Buffer.alloc(0);
+        }
+
+        try {
+            // Extract samples as float32 for better precision
             const inputSamples = [];
             for (let i = 0; i < inputBuffer.length; i += 2) {
-                inputSamples.push(inputBuffer.readInt16LE(i));
+                inputSamples.push(inputBuffer.readInt16LE(i) / 32768.0); // Normalize to -1 to 1
             }
 
             if (inputSamples.length === 0) {
                 return Buffer.alloc(0);
             }
 
-            // Use cubic interpolation for good quality/performance balance
-            const outputSamples = this.resampleWithLinear(inputSamples, inputRate, outputRate);
+            let outputSamples;
 
-            // Convert back to buffer
+            // Special handling for exact integer ratios (like 8kHz → 24kHz = 3x)
+            if (outputRate % inputRate === 0) {
+                const ratio = Math.round(outputRate / inputRate);
+                outputSamples = this.upsampleWithAntiAliasing(inputSamples, ratio);
+            } else {
+                // General case - use high-quality sinc interpolation
+                outputSamples = this.resampleWithSinc(inputSamples, inputRate, outputRate);
+            }
+
+            // Convert back to 16-bit PCM buffer
             const outputBuffer = Buffer.alloc(outputSamples.length * 2);
             for (let i = 0; i < outputSamples.length; i++) {
-                // Clamp values to prevent overflow
-                const sample = Math.max(-32768, Math.min(32767, Math.round(outputSamples[i])));
-                outputBuffer.writeInt16LE(sample, i * 2);
+                // Clamp and denormalize
+                const sample = Math.max(-1.0, Math.min(1.0, outputSamples[i]));
+                const intSample = Math.round(sample * 32767);
+                outputBuffer.writeInt16LE(intSample, i * 2);
             }
 
             return outputBuffer;
         } catch (err) {
-            console.error(`Error resampling PCM from ${inputRate}Hz to ${outputRate}Hz: ${err.message}`, err.stack);
-            throw new Error(`PCM resampling failed: ${err.message}`);
+            console.error(`Error in high-quality resampling: ${err.message}`);
+            // Fallback to simple resampling
+            return this.resampleWithLinearMethod(inputBuffer, inputRate, outputRate);
         }
+    }
+
+    /**
+     * Upsample by integer ratio with anti-aliasing filter
+     * Much better than linear interpolation for integer upsampling
+     * @private
+     */
+    static upsampleWithAntiAliasing(inputSamples, ratio) {
+        // Step 1: Zero-stuff (insert zeros between samples)
+        const zeroStuffed = new Float32Array(inputSamples.length * ratio);
+        for (let i = 0; i < inputSamples.length; i++) {
+            zeroStuffed[i * ratio] = inputSamples[i];
+        }
+
+        // Step 2: Apply low-pass filter to remove imaging artifacts
+        return this.applyLowPassFilter(zeroStuffed, 1.0 / ratio);
+    }
+
+    /**
+     * Simple but effective low-pass filter using windowed sinc
+     * @private
+     */
+    static applyLowPassFilter(samples, cutoffRatio) {
+        const filterLength = 64; // Length of the filter kernel
+        const halfLength = filterLength / 2;
+        
+        // Create sinc filter kernel
+        const kernel = new Float32Array(filterLength);
+        let kernelSum = 0;
+        
+        for (let i = 0; i < filterLength; i++) {
+            const x = (i - halfLength + 0.5) * Math.PI * cutoffRatio;
+            
+            if (Math.abs(x) < 1e-10) {
+                kernel[i] = cutoffRatio;
+            } else {
+                kernel[i] = Math.sin(x) / x * cutoffRatio;
+            }
+            
+            // Apply Hamming window
+            const windowValue = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (filterLength - 1));
+            kernel[i] *= windowValue;
+            kernelSum += kernel[i];
+        }
+        
+        // Normalize kernel
+        for (let i = 0; i < filterLength; i++) {
+            kernel[i] /= kernelSum;
+        }
+        
+        // Apply filter using convolution
+        const filtered = new Float32Array(samples.length);
+        
+        for (let i = 0; i < samples.length; i++) {
+            let sum = 0;
+            
+            for (let j = 0; j < filterLength; j++) {
+                const sampleIndex = i - halfLength + j;
+                if (sampleIndex >= 0 && sampleIndex < samples.length) {
+                    sum += samples[sampleIndex] * kernel[j];
+                }
+            }
+            
+            filtered[i] = sum;
+        }
+        
+        return filtered;
+    }
+
+    /**
+     * Original linear interpolation method (renamed, used for downsampling)
+     * @private
+     */
+    static resampleWithLinearMethod(inputBuffer, inputRate, outputRate) {
+        // Extract samples
+        const inputSamples = [];
+        for (let i = 0; i < inputBuffer.length; i += 2) {
+            inputSamples.push(inputBuffer.readInt16LE(i));
+        }
+
+        if (inputSamples.length === 0) {
+            return Buffer.alloc(0);
+        }
+
+        // Use linear interpolation (good for downsampling)
+        const outputSamples = this.resampleWithLinear(inputSamples, inputRate, outputRate);
+
+        // Convert back to buffer
+        const outputBuffer = Buffer.alloc(outputSamples.length * 2);
+        for (let i = 0; i < outputSamples.length; i++) {
+            // Clamp values to prevent overflow
+            const sample = Math.max(-32768, Math.min(32767, Math.round(outputSamples[i])));
+            outputBuffer.writeInt16LE(sample, i * 2);
+        }
+
+        return outputBuffer;
+    }
+
+    /**
+     * Resample using linear interpolation. This is safer for chunk-based/stream processing.
+     * @private
+     */
+    static resampleWithLinear(inputSamples, inputRate, outputRate) {
+        const ratio = inputRate / outputRate;
+        const outputLength = Math.ceil(inputSamples.length / ratio);
+        const outputSamples = new Float32Array(outputLength);
+
+        for (let i = 0; i < outputLength; i++) {
+            const srcPos = i * ratio;
+            const srcIndex = Math.floor(srcPos);
+            const frac = srcPos - srcIndex;
+
+            const p1 = inputSamples[srcIndex] || 0;
+            // Get the next sample; if at the very end, just repeat the last sample
+            const p2 = inputSamples[Math.min(inputSamples.length - 1, srcIndex + 1)] || 0;
+
+            // Simple linear interpolation
+            outputSamples[i] = p1 + (p2 - p1) * frac;
+        }
+        
+        return outputSamples;
     }
 
     /**
