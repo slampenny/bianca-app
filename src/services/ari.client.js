@@ -1131,8 +1131,8 @@ async diagnoseAudioFlow(asteriskChannelId) {
             callSid: twilioCallSid,
             asteriskChannelId,
             startTime: new Date(),
-            callType: 'asterisk-call',
-            status: 'active',
+            callType: 'inbound',
+            status: 'in-progress',
             patientId: null
         };
 
