@@ -1777,7 +1777,7 @@ router.post('/port-connectivity', async (req, res) => {
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/:patientId/conversations')
+  .route('patients/:patientId/conversations')
   .get(
     validate(patientValidation.getConversationsByPatient),
     patientController.getConversationsByPatient

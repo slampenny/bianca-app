@@ -113,17 +113,6 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
       enhancedPrompt += `\n- Age: ${patient.age}`;
     }
 
-    // Add medical context if available
-    if (patient.medicalConditions?.length > 0) {
-      enhancedPrompt += `\n- Medical Conditions: ${patient.medicalConditions.join(', ')}`;
-    }
-    if (patient.allergies?.length > 0) {
-      enhancedPrompt += `\n- Allergies: ${patient.allergies.join(', ')}`;
-    }
-    if (patient.currentMedications?.length > 0) {
-      enhancedPrompt += `\n- Current Medications: ${patient.currentMedications.join(', ')}`;
-    }
-
     // Add conversation history context if available
     if (conversationHistory) {
       enhancedPrompt += `\n\nPrevious Conversation Context:
