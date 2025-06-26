@@ -2,7 +2,9 @@ const express = require('express');
 const validate = require('../../middlewares/validate');
 const caregiverValidation = require('../../validations/caregiver.validation');
 const caregiverController = require('../../controllers/caregiver.controller');
+const patientController = require('../../controllers/patient.controller');
 const testController = require('../../controllers/test.controller');
+const patientValidation = require('../../validations/patient.validation');
 const router = express.Router();
 const config = require('../../config/config');
 const logger = require('../../config/logger');
@@ -1742,6 +1744,44 @@ router.post('/port-connectivity', async (req, res) => {
         });
     }
 });
+
+
+/**
+ * @swagger
+ * /test/patients/{patientId}/conversations:
+ *   get:
+ *     summary: Get conversations by patient
+ *     description: Logged in Patients can fetch only their own conversation information. Only admins can fetch other Patients' conversations.
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient id
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Conversation'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+  .route('/:patientId/conversations')
+  .get(
+    validate(patientValidation.getConversationsByPatient),
+    patientController.getConversationsByPatient
+  );
 
 // Export the router
 module.exports = router;
