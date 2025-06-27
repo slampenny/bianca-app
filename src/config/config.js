@@ -155,6 +155,7 @@ const baselineConfig = {
     apiKey: envVars.OPENAI_API_KEY,
     // **NEW:** Realtime model used for the live interaction via WebSocket
     realtimeModel: envVars.OPENAI_REALTIME_MODEL,
+    debugAudio: true, // Enable debug audio for testing
   },
   stripe: {
     secretKey: envVars.STRIPE_SECRET_KEY,

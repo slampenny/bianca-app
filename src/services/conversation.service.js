@@ -2,6 +2,9 @@ const httpStatus = require('http-status');
 const { Conversation, Message, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+
+    // Generate summary using your existing LangChain service
+    const { langChainAPI } = require('../api/langChainAPI');
 const { prompts } = require('../templates/prompts'); // Your Bianca system prompt
 
 // ===== EXISTING METHODS (unchanged) =====
@@ -148,18 +151,23 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
   try {
     if (!content || !content.trim()) return null;
 
+    // Simple message types now
+    const normalizedType = messageType === 'assistant_response' ? 'assistant_response' : 
+                          messageType === 'user_message' ? 'user_message' : 
+                          messageType;
+
     const message = await Message.create({
-      role: role === 'assistant' ? 'assistant' : 'user', // Normalize roles
+      role: role === 'assistant' ? 'assistant' : 'user',
       content: content.trim(),
       conversationId,
-      messageType,
+      messageType: normalizedType,
       timestamp: new Date()
     });
 
-    logger.debug(`[Realtime Message] Saved ${role} message to conversation ${conversationId}: "${content.substring(0, 50)}..."`);
+    logger.debug(`[Realtime Message] Saved ${role} message to conversation ${conversationId}`);
     return message;
   } catch (err) {
-    logger.error(`[Realtime Message] Error saving message for conversation ${conversationId}: ${err.message}`);
+    logger.error(`[Realtime Message] Error saving message: ${err.message}`);
     return null;
   }
 };
@@ -231,9 +239,6 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     if (conversation.patientId?.age >= 65) {
       userDomain = 'elderly wellness conversation';
     }
-
-    // Generate summary using your existing LangChain service
-    const { langChainAPI } = require('./langchain.service');
     
     const summaryPrompt = "Create a concise summary of this patient conversation with Bianca, highlighting key topics discussed, any concerns raised, and the patient's overall mood or needs.";
     
