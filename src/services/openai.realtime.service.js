@@ -56,6 +56,13 @@ class OpenAIRealtimeService {
     this._healthCheckInterval = null; // Store interval ID
 
     this.notifyCallback = null;
+
+    // Add this to track the interval
+    this._transcriptCleanupInterval = null;
+    
+    // Start the cleanup when service initializes
+    this.startTranscriptAccumulatorCleanup();
+
     logger.info('[OpenAI Realtime] Service initialized');
   }
 
@@ -99,6 +106,9 @@ class OpenAIRealtimeService {
   }
 
   async appendAudioToLocalFile(callId, pcmBuffer) {
+    const useDebugMode = config.openai?.debugAudio !== false;
+    if (!useDebugMode) return;
+
     if (!pcmBuffer || pcmBuffer.length === 0) {
       return;
     }
@@ -488,121 +498,116 @@ class OpenAIRealtimeService {
   /**
    * Process messages received from the OpenAI WebSocket - Simplified flow
    */
-  async handleOpenAIMessage(callId, data) {
+  /**
+ * UPDATED: Main message handler with all transcript saving
+ */
+async handleOpenAIMessage(callId, data) {
     let message;
     try {
-      message = JSON.parse(data);
+        message = JSON.parse(data);
     } catch (err) {
-      logger.error(`[OpenAI Realtime] Failed JSON parse for ${callId}: ${err.message}`);
-      return;
+        logger.error(`[OpenAI Realtime] Failed JSON parse for ${callId}: ${err.message}`);
+        return;
     }
 
     const conn = this.connections.get(callId);
     if (!conn) {
-      logger.warn(`[OpenAI Realtime] Received message for non-existent connection ${callId}. Discarding.`);
-      return;
+        logger.warn(`[OpenAI Realtime] Received message for non-existent connection ${callId}. Discarding.`);
+        return;
     }
     conn.lastActivity = Date.now();
 
     // Log all message types for debugging
     logger.info(
-      `[OpenAI Realtime] RECEIVED from OpenAI (${callId}): type=${message.type}${
-        message.type === 'response.content_part.added' && message.part ? `, part_type=${message.part.type}` : ''
-      }${
-        message.type === 'conversation.item.created' ? `, item_type=${message.item?.type}, role=${message.item?.role}` : ''
-      }`
+        `[OpenAI Realtime] RECEIVED from OpenAI (${callId}): type=${message.type}${
+            message.type === 'response.content_part.added' && message.part ? `, part_type=${message.part.type}` : ''
+        }${
+            message.type === 'conversation.item.created' ? `, item_type=${message.item?.type}, role=${message.item?.role}` : ''
+        }`
     );
 
     try {
-      switch (message.type) {
-        case 'session.created':
-          await this.handleSessionCreated(callId, message);
-          break;
+        switch (message.type) {
+            case 'session.created':
+                await this.handleSessionCreated(callId, message);
+                break;
 
-        case 'session.updated':
-          await this.handleSessionUpdated(callId, message);
-          break;
+            case 'session.updated':
+                await this.handleSessionUpdated(callId, message);
+                break;
 
-        case 'response.content_part.added':
-          await this.handleContentPartAdded(callId, message);
-          break;
-        case 'response.audio.delta':
-          await this.handleResponseAudioDelta(callId, message);
-          break;
-        case 'conversation.item.created':
-          await this.handleConversationItemCreated(callId, message);
-          break;
+            case 'response.content_part.added':
+                await this.handleContentPartAdded(callId, message);
+                break;
+                
+            case 'response.audio.delta':
+                await this.handleResponseAudioDelta(callId, message);
+                break;
+                
+            case 'conversation.item.created':
+                await this.handleConversationItemCreated(callId, message);
+                break;
 
-        case 'response.done':
-          logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
-          this.notify(callId, 'response_done', {});
-          break;
+            case 'response.done':
+                logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
+                await this.handleResponseDone(callId);
+                break;
 
-        case 'conversation.item.input_audio_transcription.completed':
-          logger.info(`[OpenAI Realtime] Audio transcription completed for ${callId}: "${message.transcript}"`);
-          break;
+            // ENHANCED: Save user speech transcripts
+            case 'conversation.item.input_audio_transcription.completed':
+                await this.handleInputAudioTranscriptionCompleted(callId, message);
+                break;
 
-        case 'response.audio_transcript.delta':
-          logger.info(`[OpenAI Realtime] Audio transcript delta for ${callId}: "${message.delta}"`);
-          break;
+            // ENHANCED: Save assistant speech transcripts
+            case 'response.audio_transcript.delta':
+                await this.handleResponseAudioTranscriptDelta(callId, message);
+                break;
 
-        case 'input_audio_buffer.speech_started':
-          logger.info(`[OpenAI Realtime] Speech started detected for ${callId}`);
-          this.notify(callId, 'speech_started', {});
-          break;
+            case 'input_audio_buffer.speech_started':
+                logger.info(`[OpenAI Realtime] Speech started detected for ${callId}`);
+                this.notify(callId, 'speech_started', {});
+                break;
 
-        case 'input_audio_buffer.speech_stopped':
-          logger.info(`[OpenAI Realtime] Speech stopped detected for ${callId}`);
-          this.notify(callId, 'speech_stopped', {});
-          // Automatically trigger response generation if VAD is disabled
-          // const connForResponse = this.connections.get(callId);
-          // if (connForResponse?.sessionReady) {
-          //     logger.info(`[OpenAI Realtime] Triggering response generation for ${callId}`);
-          //     try {
-          //         await this.sendJsonMessage(callId, { type: 'response.create' });
-          //     } catch (err) {
-          //         logger.error(`[OpenAI Realtime] Failed to trigger response: ${err.message}`);
-          //     }
-          // }
-          break;
+            case 'input_audio_buffer.speech_stopped':
+                logger.info(`[OpenAI Realtime] Speech stopped detected for ${callId}`);
+                this.notify(callId, 'speech_stopped', {});
+                break;
 
-        case 'input_audio_buffer.committed':
-          logger.info(`[OpenAI Realtime] Audio buffer committed successfully for ${callId}`);
-          // Reset counters and flags when audio is actually committed
-          if (conn) {
-            conn.pendingCommit = false;
-            conn.lastCommitTime = Date.now();
-            // Reset counters since the audio has been processed
-            const chunksProcessed = conn.audioChunksSent || 0;
-            conn.audioChunksSent = 0;
-            logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks`);
-          }
-          break;
+            case 'input_audio_buffer.committed':
+                logger.info(`[OpenAI Realtime] Audio buffer committed successfully for ${callId}`);
+                if (conn) {
+                    conn.pendingCommit = false;
+                    conn.lastCommitTime = Date.now();
+                    const chunksProcessed = conn.audioChunksSent || 0;
+                    conn.audioChunksSent = 0;
+                    logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks`);
+                }
+                break;
 
-        case 'input_audio_buffer.cleared':
-          logger.info(`[OpenAI Realtime] Audio buffer cleared for ${callId}`);
-          break;
+            case 'input_audio_buffer.cleared':
+                logger.info(`[OpenAI Realtime] Audio buffer cleared for ${callId}`);
+                break;
 
-        case 'response.created':
-          logger.info(`[OpenAI Realtime] Response created for ${callId}`);
-          break;
+            case 'response.created':
+                logger.info(`[OpenAI Realtime] Response created for ${callId}`);
+                break;
 
-        case 'error':
-          await this.handleApiError(callId, message);
-          break;
+            case 'error':
+                await this.handleApiError(callId, message);
+                break;
 
-        case 'session.expired':
-          await this.handleSessionExpired(callId);
-          break;
+            case 'session.expired':
+                await this.handleSessionExpired(callId);
+                break;
 
-        default:
-          logger.debug(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId}`);
-      }
+            default:
+                logger.debug(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId}`);
+        }
     } catch (err) {
-      logger.error(`[OpenAI Realtime] Error processing message type ${message?.type} for ${callId}: ${err.message}`, err);
-      this.notify(callId, 'openai_message_processing_error', { messageType: message?.type, error: err.message });
+        logger.error(`[OpenAI Realtime] Error processing message type ${message?.type} for ${callId}: ${err.message}`, err);
+        this.notify(callId, 'openai_message_processing_error', { messageType: message?.type, error: err.message });
     }
-  }
+}
 
   /**
    * Handle session.created - Send session.update immediately like test method
@@ -683,46 +688,261 @@ class OpenAIRealtimeService {
    * Handle content part added
    */
   async handleContentPartAdded(callId, message) {
-    // Access message.part instead of message.content_part
     const part = message.part;
     if (!part) {
-      logger.warn(`[OpenAI Realtime] No part in content_part.added message for ${callId}`);
-      return;
+        logger.warn(`[OpenAI Realtime] No part in content_part.added message for ${callId}`);
+        return;
     }
 
-    if (part.type === 'audio') {
-      logger.info(`[OpenAI Realtime] Received 'response.content_part.added' with part_type=audio for ${callId}.`);
-      if (part.audio && typeof part.audio === 'string' && part.audio.length > 0) {
-        logger.info(
-          `[OpenAI Realtime] 'response.content_part.added' (audio) has data. Processing via processAudioResponse.`
-        );
-        await this.processAudioResponse(callId, part.audio);
-      } else {
-        // This is the warning you were seeing. It's valid if OpenAI sends this structure without data.
-        logger.warn(
-          `[OpenAI Realtime] 'response.content_part.added' (audio) for ${callId} is missing 'part.audio' data. Audio is expected via 'response.audio.delta'.`
-        );
-      }
-    } else if (part.type === 'text') {
-      logger.info(`[OpenAI Realtime] Received TEXT content part for ${callId}: "${part.text}"`);
-      // Note: 'conversation.item.created' usually handles full text message saving.
-      // This 'content_part.added' for text is more like a delta.
-      this.notify(callId, 'openai_text_delta', { text: part.text, sessionId: this.connections.get(callId)?.sessionId });
+    if (part.type === 'text') {
+        logger.info(`[OpenAI Realtime] Received TEXT content part for ${callId}: "${part.text}"`);
+        
+        // SAVE TEXT CONTENT TO DATABASE
+        const conn = this.connections.get(callId);
+        if (conn?.conversationId && part.text) {
+            try {
+                const conversationService = require('./conversation.service');
+                await conversationService.saveRealtimeMessage(
+                    conn.conversationId,
+                    'assistant', // This is AI response text
+                    part.text,
+                    'text'
+                );
+                logger.debug(`[OpenAI Realtime] Saved assistant text content to conversation ${conn.conversationId}`);
+            } catch (dbErr) {
+                logger.error(`[OpenAI Realtime] Failed to save text content: ${dbErr.message}`);
+            }
+        }
+        
+        this.notify(callId, 'openai_text_delta', { 
+            text: part.text, 
+            sessionId: this.connections.get(callId)?.sessionId 
+        });
+        
+    } else if (part.type === 'audio') {
+        logger.info(`[OpenAI Realtime] Received 'response.content_part.added' with part_type=audio for ${callId}.`);
+        if (part.audio && typeof part.audio === 'string' && part.audio.length > 0) {
+            await this.processAudioResponse(callId, part.audio);
+        }
     } else {
-      logger.debug(`[OpenAI Realtime] Unhandled part type '${part.type}' in response.content_part.added for ${callId}`);
+        logger.debug(`[OpenAI Realtime] Unhandled part type '${part.type}' in response.content_part.added for ${callId}`);
     }
-  }
+}
 
-  async handleResponseAudioDelta(callId, message) {
-    // <<<< NEW HANDLER
-    if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
-      logger.warn(
-        `[OpenAI Realtime] Received 'response.audio.delta' for ${callId} but 'message.delta' (audio data) is missing or empty.`
-      );
-      return;
+async handleResponseAudioDelta(callId, message) {
+  // <<<< NEW HANDLER
+  if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
+    logger.warn(
+      `[OpenAI Realtime] Received 'response.audio.delta' for ${callId} but 'message.delta' (audio data) is missing or empty.`
+    );
+    return;
+  }
+  // logger.debug(`[OpenAI Realtime] Processing response.audio.delta for ${callId}, data length: ${message.delta.length}`);
+  await this.processAudioResponse(callId, message.delta);
+}
+
+/**
+ * Handle audio transcript deltas - ENHANCED to save transcripts
+ */
+async handleResponseAudioTranscriptDelta(callId, message) {
+    if (message.delta) {
+        logger.info(`[OpenAI Realtime] Audio transcript delta for ${callId}: "${message.delta}"`);
+        
+        // SAVE TRANSCRIPT DELTA TO DATABASE
+        const conn = this.connections.get(callId);
+        if (conn?.conversationId) {
+            try {
+                const conversationService = require('./conversation.service');
+                await conversationService.saveRealtimeMessage(
+                    conn.conversationId,
+                    'assistant', // This is AI response transcript
+                    message.delta,
+                    'audio_transcript_delta'
+                );
+                logger.debug(`[OpenAI Realtime] Saved assistant transcript delta to conversation ${conn.conversationId}`);
+            } catch (dbErr) {
+                logger.error(`[OpenAI Realtime] Failed to save transcript delta: ${dbErr.message}`);
+            }
+        }
     }
-    // logger.debug(`[OpenAI Realtime] Processing response.audio.delta for ${callId}, data length: ${message.delta.length}`);
-    await this.processAudioResponse(callId, message.delta);
+}
+
+  accumulateTranscriptDeltas(callId, delta, role) {
+    const conn = this.connections.get(callId);
+    if (!conn) return;
+    
+    // Initialize transcript accumulator if it doesn't exist
+    if (!conn.transcriptAccumulator) {
+        conn.transcriptAccumulator = { 
+            assistant: { text: '', lastUpdate: Date.now() },
+            user: { text: '', lastUpdate: Date.now() }
+        };
+    }
+    
+    // Add delta to accumulator
+    conn.transcriptAccumulator[role].text += delta;
+    conn.transcriptAccumulator[role].lastUpdate = Date.now();
+    
+    logger.debug(`[Transcript Accumulator] Added "${delta}" to ${role} transcript for ${callId}. Total length: ${conn.transcriptAccumulator[role].text.length}`);
+    
+    // Trigger save if we detect end of sentence or after a pause
+    this.checkForCompleteTranscript(callId, role);
+}
+
+/**
+ * Check if we should save the accumulated transcript as a complete message
+ */
+checkForCompleteTranscript(callId, role) {
+    const conn = this.connections.get(callId);
+    if (!conn?.transcriptAccumulator?.[role]) return;
+    
+    const accumulated = conn.transcriptAccumulator[role];
+    const text = accumulated.text.trim();
+    
+    // Don't save if text is too short
+    if (text.length < 3) return;
+    
+    // Save if we detect end of sentence
+    if (this.detectEndOfSentence(text)) {
+        this.saveAccumulatedTranscript(callId, role);
+        return;
+    }
+    
+    // Also save after a timeout (no new deltas for 2 seconds)
+    const timeSinceLastUpdate = Date.now() - accumulated.lastUpdate;
+    if (timeSinceLastUpdate > 2000 && text.length > 0) {
+        logger.debug(`[Transcript Accumulator] Timeout triggered, saving accumulated ${role} transcript for ${callId}`);
+        this.saveAccumulatedTranscript(callId, role);
+    }
+}
+
+/**
+ * Detect if the accumulated text represents a complete sentence/thought
+ */
+detectEndOfSentence(text) {
+    // Simple heuristics for sentence completion
+    const trimmed = text.trim();
+    
+    // Ends with sentence punctuation
+    if (/[.!?]$/.test(trimmed)) return true;
+    
+    // Contains complete phrases (adjust these based on your needs)
+    const completePatterns = [
+        /\b(thank you|thanks|goodbye|bye|see you|talk soon)\b/i,
+        /\b(how are you|how's it going|what's up)\b/i,
+        /\b(I'm fine|I'm good|I'm doing well|not bad)\b/i
+    ];
+    
+    return completePatterns.some(pattern => pattern.test(trimmed));
+}
+
+/**
+ * Save accumulated transcript as a complete message
+ */
+async saveAccumulatedTranscript(callId, role) {
+    const conn = this.connections.get(callId);
+    if (!conn?.transcriptAccumulator?.[role] || !conn.conversationId) return;
+    
+    const accumulated = conn.transcriptAccumulator[role];
+    const completeText = accumulated.text.trim();
+    
+    if (completeText.length === 0) return;
+    
+    logger.info(`[Transcript Accumulator] Saving complete ${role} transcript for ${callId}: "${completeText}"`);
+    
+    try {
+        const conversationService = require('./conversation.service');
+        await conversationService.saveRealtimeMessage(
+            conn.conversationId,
+            role,
+            completeText,
+            'complete_transcript' // Mark as complete accumulated transcript
+        );
+        
+        logger.debug(`[Transcript Accumulator] Successfully saved complete ${role} transcript to conversation ${conn.conversationId}`);
+        
+        // Clear the accumulator for this role
+        conn.transcriptAccumulator[role] = { text: '', lastUpdate: Date.now() };
+        
+    } catch (dbErr) {
+        logger.error(`[Transcript Accumulator] Failed to save complete transcript: ${dbErr.message}`);
+    }
+}
+
+/**
+ * Handle response.done - UPDATED to flush any remaining transcripts
+ */
+async handleResponseDone(callId) {
+    logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
+    
+    // Flush any remaining accumulated transcript
+    await this.flushAccumulatedTranscripts(callId);
+    
+    this.notify(callId, 'response_done', {});
+}
+
+/**
+ * Flush any remaining accumulated transcripts when response is done
+ */
+async flushAccumulatedTranscripts(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn?.transcriptAccumulator) return;
+    
+    // Save any remaining assistant transcript
+    if (conn.transcriptAccumulator.assistant.text.trim().length > 0) {
+        logger.debug(`[Transcript Accumulator] Flushing remaining assistant transcript for ${callId}`);
+        await this.saveAccumulatedTranscript(callId, 'assistant');
+    }
+    
+    // Save any remaining user transcript
+    if (conn.transcriptAccumulator.user.text.trim().length > 0) {
+        logger.debug(`[Transcript Accumulator] Flushing remaining user transcript for ${callId}`);
+        await this.saveAccumulatedTranscript(callId, 'user');
+    }
+}
+
+/**
+ * Optional: Add a periodic cleanup task to save stale accumulated transcripts
+ */
+startTranscriptAccumulatorCleanup() {
+    // Prevent multiple intervals
+    if (this._transcriptCleanupInterval) {
+        clearInterval(this._transcriptCleanupInterval);
+    }
+    
+    this._transcriptCleanupInterval = setInterval(() => {
+        const now = Date.now();
+    
+      for (const [callId, conn] of this.connections.entries()) {
+          if (!conn.transcriptAccumulator) continue;
+          
+          // Check both assistant and user accumulators
+          ['assistant', 'user'].forEach(role => {
+              const accumulated = conn.transcriptAccumulator[role];
+              if (!accumulated || accumulated.text.trim().length === 0) return;
+              
+              // If no updates for 5 seconds, save what we have
+              const timeSinceLastUpdate = now - accumulated.lastUpdate;
+              if (timeSinceLastUpdate > 5000) {
+                  logger.debug(`[Transcript Accumulator] Cleanup: saving stale ${role} transcript for ${callId}`);
+                  this.saveAccumulatedTranscript(callId, role);
+              }
+          });
+      }
+    }, 10000);
+    
+    logger.info('[OpenAI Realtime] Started transcript accumulator cleanup');
+}
+
+  /**
+   * Stop transcript accumulator cleanup
+   */
+  stopTranscriptAccumulatorCleanup() {
+    if (this._transcriptCleanupInterval) {
+      clearInterval(this._transcriptCleanupInterval);
+      this._transcriptCleanupInterval = null;
+      logger.info('[OpenAI Realtime] Stopped transcript accumulator cleanup');
+    }
   }
 
   /**
@@ -733,6 +953,32 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Conversation item created for ${callId}`);
     await this.handleConversationItem(callId, message.item, conn?.conversationId);
   }
+
+/**
+ * Handle input audio transcription completed - ENHANCED to save user speech
+ */
+async handleInputAudioTranscriptionCompleted(callId, message) {
+    if (message.transcript) {
+        logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
+        
+        // SAVE USER SPEECH TRANSCRIPT TO DATABASE
+        const conn = this.connections.get(callId);
+        if (conn?.conversationId) {
+            try {
+                const conversationService = require('./conversation.service');
+                await conversationService.saveRealtimeMessage(
+                    conn.conversationId,
+                    'user', // This is USER speech
+                    message.transcript,
+                    'user_speech_transcript'
+                );
+                logger.debug(`[OpenAI Realtime] Saved user speech transcript to conversation ${conn.conversationId}`);
+            } catch (dbErr) {
+                logger.error(`[OpenAI Realtime] Failed to save user transcript: ${dbErr.message}`);
+            }
+        }
+    }
+}
 
   /**
    * Handle API errors
@@ -820,41 +1066,83 @@ class OpenAIRealtimeService {
   /**
    * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
    */
-  async processAudioResponse(callId, audioBase64PCM) {
-    return this.processAudioResponseDebug(callId, audioBase64PCM);
-    // if (!audioBase64PCM) {
-    //     logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
-    //     return;
-    // }
-    // try {
-    //     const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
-    //     if (inputBuffer.length === 0) {
-    //         logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
-    //         return;
-    //     }
-
-    //     // OpenAI sends PCM16 at 24kHz, need to downsample to 8kHz for Asterisk
-    //     const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
-    //     const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
-
-    //     logger.debug(`[OpenAI Realtime] Resampling OpenAI audio for ${callId} from ${openaiOutputRate}Hz to ${asteriskPlaybackRate}Hz`);
-    //     const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
-    //     if (!resampledBuffer || resampledBuffer.length === 0) {
-    //         logger.warn(`[OpenAI Realtime] Resampling failed for ${callId}`);
-    //         return;
-    //     }
-
-    //     const ulawBase64ToNotify = await AudioUtils.convertPcmToUlaw(resampledBuffer);
-    //     if (ulawBase64ToNotify && ulawBase64ToNotify.length > 0) {
-    //         logger.info(`[OpenAI Realtime] Notifying ARI with processed uLaw audio for ${callId}`);
-    //         this.notify(callId, 'audio_chunk', { audio: ulawBase64ToNotify });
-    //     } else {
-    //         logger.warn(`[OpenAI Realtime] uLaw conversion failed for ${callId}`);
-    //     }
-    // } catch (err) {
-    //     logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
-    // }
+  /**
+ * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
+ */
+async processAudioResponse(callId, audioBase64PCM) {
+  if (!audioBase64PCM) {
+    logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
+    return;
   }
+
+  try {
+    // Use config flag to determine if debug mode is enabled
+    const useDebugMode = config.openai?.debugAudio !== false; // Default to true
+    
+    const conn = this.connections.get(callId);
+    
+    // Initialize debug files on first audio from OpenAI if debug mode is enabled
+    if (useDebugMode && conn && !conn._debugFilesInitialized) {
+      this.initializeContinuousDebugFiles(callId);
+      conn._debugFilesInitialized = true;
+    }
+
+    // STAGE 1: Decode base64 from OpenAI
+    const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
+    if (inputBuffer.length === 0) {
+      logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
+      return;
+    }
+
+    // Append RAW input from OpenAI if debug mode is enabled
+    if (useDebugMode) {
+      await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm24k.raw', inputBuffer);
+    }
+
+    // STAGE 2: Resample from 24kHz to 8kHz
+    const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
+    const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
+
+    const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
+
+    if (!resampledBuffer || resampledBuffer.length === 0) {
+      logger.error(`[AUDIO DEBUG] Resampling FAILED for ${callId}`);
+      return;
+    }
+
+    // Append resampled audio if debug mode is enabled
+    if (useDebugMode) {
+      await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
+    }
+
+    // STAGE 3: Convert PCM to uLaw
+    const ulawBase64 = await AudioUtils.convertPcmToUlaw(resampledBuffer);
+
+    if (!ulawBase64 || ulawBase64.length === 0) {
+      logger.error(`[AUDIO DEBUG] PCM to uLaw conversion FAILED`);
+      return;
+    }
+
+    // Append final uLaw if debug mode is enabled
+    if (useDebugMode) {
+      const ulawRawBuffer = Buffer.from(ulawBase64, 'base64');
+      await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawRawBuffer);
+    }
+
+    // Log progress every 100 chunks if debug mode is enabled
+    if (useDebugMode && conn) {
+      if (!conn._openaiChunkCount) conn._openaiChunkCount = 0;
+      conn._openaiChunkCount++;
+      if (conn._openaiChunkCount % 100 === 0) {
+        logger.info(`[AUDIO DEBUG] Processed ${conn._openaiChunkCount} chunks from OpenAI for ${callId}`);
+      }
+    }
+
+    this.notify(callId, 'audio_chunk', { audio: ulawBase64 });
+  } catch (err) {
+    logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
+  }
+}
 
   /**
    * Handle conversation items
@@ -871,9 +1159,9 @@ class OpenAIRealtimeService {
                 .trim();
 
             if (contentText) {
-                logger.info(`[OpenAI Realtime] Message (${item.role}): "${contentText.substring(0, 100)}..."`);
+                logger.info(`[OpenAI Realtime] COMPLETED Message (${item.role}): "${contentText.substring(0, 100)}..."`);
                 
-                // Save to database using the enhanced conversation service
+                // Save COMPLETED message to database
                 if (dbConversationId) {
                     try {
                         const conversationService = require('./conversation.service');
@@ -881,29 +1169,28 @@ class OpenAIRealtimeService {
                             dbConversationId, 
                             item.role, 
                             contentText, 
-                            'text'
+                            'completed_message'
                         );
-                        logger.debug(`[OpenAI Realtime] Saved ${item.role} message to conversation ${dbConversationId}`);
+                        logger.debug(`[OpenAI Realtime] Saved COMPLETED ${item.role} message to conversation ${dbConversationId}`);
                     } catch (dbErr) {
-                        logger.error(`[OpenAI Realtime] Failed to save message to database: ${dbErr.message}`);
-                        // Continue processing even if DB save fails
+                        logger.error(`[OpenAI Realtime] Failed to save completed message: ${dbErr.message}`);
                     }
                 }
                 
-                // Notify with the message for real-time processing
                 this.notify(callId, 'text_message', { 
                     role: item.role, 
                     content: contentText, 
                     itemId: item.id,
                     timestamp: new Date(),
-                    conversationId: dbConversationId
+                    conversationId: dbConversationId,
+                    status: 'completed'
                 });
             }
         }
         
         // Handle audio messages with transcriptions
         if (item.audio?.transcript) {
-            logger.info(`[OpenAI Realtime] Audio transcript (${item.role}): "${item.audio.transcript}"`);
+            logger.info(`[OpenAI Realtime] COMPLETED Audio transcript (${item.role}): "${item.audio.transcript}"`);
             
             if (dbConversationId) {
                 try {
@@ -912,27 +1199,18 @@ class OpenAIRealtimeService {
                         dbConversationId, 
                         item.role, 
                         item.audio.transcript, 
-                        'audio_transcript'
+                        'completed_audio_transcript'
                     );
                 } catch (dbErr) {
-                    logger.error(`[OpenAI Realtime] Failed to save audio transcript: ${dbErr.message}`);
+                    logger.error(`[OpenAI Realtime] Failed to save completed audio transcript: ${dbErr.message}`);
                 }
             }
-            
-            // Notify about transcript
-            this.notify(callId, 'audio_transcript', {
-                role: item.role,
-                transcript: item.audio.transcript,
-                itemId: item.id,
-                timestamp: new Date()
-            });
         }
 
         // Handle function calls
         if (item.type === 'function_call') {
             logger.info(`[OpenAI Realtime] Function call: ${item.function_call?.name}`);
             
-            // Save function call as a message for context
             if (dbConversationId && item.function_call) {
                 try {
                     const conversationService = require('./conversation.service');
@@ -1227,84 +1505,120 @@ class OpenAIRealtimeService {
   /**
    * IMPROVED: Send audio chunk with audio conversion for OpenAI
    */
-  async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
-    return this.sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering);
-    // if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
-    //     logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
-    //     return;
-    // }
-
-    // const conn = this.connections.get(callId);
-    // if (!conn) {
-    //     logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
-    //     return;
-    // }
-
-    // conn.audioChunksReceived++;
-    // if (conn.audioChunksReceived % 100 === 0) { // Log less frequently
-    //     logger.info(`[OpenAI Realtime] Received ${conn.audioChunksReceived} audio chunks from RTP for ${callId}`);
-    // }
-
-    // if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
-    //     // logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Session not ready or WS not open. Buffering.`);
-    //     if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
-    //         const pending = this.pendingAudio.get(callId) || [];
-    //         if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-    //             pending.push(audioChunkBase64ULaw);
-    //             this.pendingAudio.set(callId, pending);
-    //         } else {
-    //             logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
-    //         }
-    //     }
-    //     return;
-    // }
-
-    // let ulawBuffer, pcm8khzBuffer, pcm24khzBuffer, pcm24khzBase64ToSend;
-    // try {
-    //     ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-    //     if (!ulawBuffer || ulawBuffer.length === 0) {
-    //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Decoded uLaw buffer empty. Base64 len: ${audioChunkBase64ULaw.length}. Skipping.`);
-    //         return;
-    //     }
-
-    //     pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
-    //     if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
-    //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): convertUlawToPcm empty. uLaw bytes: ${ulawBuffer.length}. Skipping.`);
-    //         return;
-    //     }
-
-    //     pcm24khzBuffer = AudioUtils.resamplePcm(pcm8khzBuffer, CONSTANTS.ASTERISK_SAMPLE_RATE, CONSTANTS.DEFAULT_SAMPLE_RATE);
-    //     if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
-    //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): resamplePcm empty. PCM8k bytes: ${pcm8khzBuffer.length}. Skipping.`);
-    //         return;
-    //     }
-
-    //     await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
-
-    //     pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
-    //     if (!pcm24khzBase64ToSend) {
-    //         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Base64 encoding empty. PCM24k bytes: ${pcm24khzBuffer.length}. Skipping.`);
-    //         return;
-    //     }
-    //     // DETAILED LOG FOR EACH APPEND ATTEMPT
-    //     logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Appending. uLaw bytes: ${ulawBuffer.length}, PCM8k: ${pcm8khzBuffer.length}, PCM24k: ${pcm24khzBuffer.length}, B64PCM24k len: ${pcm24khzBase64ToSend.length}`);
-
-    //     await this.sendJsonMessage(callId, {
-    //         type: 'input_audio_buffer.append',
-    //         audio: pcm24khzBase64ToSend
-    //     });
-
-    //     conn.audioChunksSent++;
-    //     if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
-    //         // logger.info(`[OpenAI Realtime] Sent ${conn.audioChunksSent} converted chunks since last commit, triggering debounce commit for ${callId}`);
-    //         this.debounceCommit(callId);
-    //     }
-
-    // } catch (audioProcessingError) {
-    //     logger.error(`[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`, audioProcessingError.stack);
-    //     return;
-    // }
+ /**
+ * Send audio chunk with audio conversion for OpenAI
+ */
+async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
+  if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
+    logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
+    return;
   }
+
+  const conn = this.connections.get(callId);
+  if (!conn) {
+    logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
+    return;
+  }
+
+  // Use config flag to determine if debug mode is enabled
+  const useDebugMode = config.openai?.debugAudio !== false; // Default to true
+
+  // Initialize files on first audio from Asterisk if debug mode is enabled
+  if (useDebugMode && !conn._debugFilesInitialized) {
+    this.initializeContinuousDebugFiles(callId);
+    conn._debugFilesInitialized = true;
+  }
+
+  conn.audioChunksReceived++;
+
+  if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
+    if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
+      const pending = this.pendingAudio.get(callId) || [];
+      if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+        pending.push(audioChunkBase64ULaw);
+        this.pendingAudio.set(callId, pending);
+      } else {
+        logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
+      }
+    }
+    return;
+  }
+
+  try {
+    // STAGE 1: Decode base64 uLaw from Asterisk
+    const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+    if (!ulawBuffer || ulawBuffer.length === 0) {
+      logger.warn(`[AUDIO DEBUG] Decoded uLaw buffer empty`);
+      return;
+    }
+
+    // Append RAW uLaw from Asterisk if debug mode is enabled
+    if (useDebugMode) {
+      await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
+    }
+
+    // STAGE 2: Convert uLaw to PCM 8kHz
+    const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+    if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
+      logger.error(`[AUDIO DEBUG] uLaw to PCM conversion FAILED`);
+      return;
+    }
+
+    // Append PCM 8kHz if debug mode is enabled
+    if (useDebugMode) {
+      await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm8k.raw', pcm8khzBuffer);
+    }
+
+    // STAGE 3: Resample PCM from 8kHz to 24kHz
+    const pcm24khzBuffer = AudioUtils.resamplePcm(
+      pcm8khzBuffer,
+      CONSTANTS.ASTERISK_SAMPLE_RATE,
+      CONSTANTS.DEFAULT_SAMPLE_RATE
+    );
+    if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
+      logger.error(`[AUDIO DEBUG] Resampling FAILED`);
+      return;
+    }
+
+    // Append PCM 24kHz if debug mode is enabled
+    if (useDebugMode) {
+      await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm24k.raw', pcm24khzBuffer);
+      
+      // Also append to the existing output_for_openai.pcm file
+      await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
+    }
+
+    // STAGE 4: Convert to base64 for OpenAI
+    const pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
+    if (!pcm24khzBase64ToSend) {
+      logger.error(`[AUDIO DEBUG] Base64 encoding FAILED`);
+      return;
+    }
+
+    // Log progress every 100 chunks if debug mode is enabled
+    if (useDebugMode && conn.audioChunksReceived % 100 === 0) {
+      logger.info(`[AUDIO DEBUG] Processed ${conn.audioChunksReceived} chunks from Asterisk for ${callId}`);
+    }
+
+    await this.sendJsonMessage(callId, {
+      type: 'input_audio_buffer.append',
+      audio: pcm24khzBase64ToSend,
+    });
+
+    conn.audioChunksSent++;
+    if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
+      this.debounceCommit(callId);
+    }
+  } catch (audioProcessingError) {
+    logger.error(
+      `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
+      audioProcessingError.stack
+    );
+    return;
+  }
+}
+
+// Remove the sendAudioChunkDebug method entirely
 
   /**
    * Send a text message to OpenAI
@@ -1400,18 +1714,12 @@ class OpenAIRealtimeService {
           logger.info(`[OpenAI Realtime] Closing WebSocket for ${callId}`);
           ws.close(1000, 'Client initiated disconnect');
         } else if (ws.readyState === WebSocket.CONNECTING) {
-          logger.info(`[OpenAI Realtime] Terminating connecting WebSocket for ${callId}`);
-          // Use async termination to prevent race condition
-          setImmediate(() => {
+            logger.info(`[OpenAI Realtime] Terminating connecting WebSocket for ${callId}`);
             try {
-              if (ws.readyState === WebSocket.CONNECTING) {
                 ws.terminate();
-              }
             } catch (termErr) {
-              // Ignore termination errors silently
-              logger.debug(`[OpenAI Realtime] WebSocket terminate ignored: ${termErr.message}`);
+                logger.debug(`[OpenAI Realtime] WebSocket terminate ignored: ${termErr.message}`);
             }
-          });
         }
       } catch (err) {
         // Don't throw errors during cleanup
@@ -1470,6 +1778,7 @@ class OpenAIRealtimeService {
 
     await Promise.allSettled(disconnectPromises);
     this.stopHealthCheck();
+    this.stopTranscriptAccumulatorCleanup(); 
     logger.info(`[OpenAI Realtime] All connections disconnected`);
   }
 
@@ -1548,72 +1857,6 @@ class OpenAIRealtimeService {
       );
     } catch (err) {
       logger.error(`[AUDIO DEBUG] Failed to save debug audio: ${err.message}`);
-    }
-  }
-
-  /**
-   * Updated processAudioResponse with debugging
-   */
-  async processAudioResponseDebug(callId, audioBase64PCM) {
-    if (!audioBase64PCM) {
-      logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
-      return;
-    }
-
-    try {
-      // Initialize files on first audio from OpenAI if needed
-      const conn = this.connections.get(callId);
-      if (conn && !conn._debugFilesInitialized) {
-        this.initializeContinuousDebugFiles(callId);
-        conn._debugFilesInitialized = true;
-      }
-
-      // STAGE 1: Decode base64 from OpenAI
-      const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
-      if (inputBuffer.length === 0) {
-        logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
-        return;
-      }
-
-      // Append RAW input from OpenAI
-      await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm24k.raw', inputBuffer);
-
-      // STAGE 2: Resample from 24kHz to 8kHz
-      const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
-      const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
-
-      const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
-
-      if (!resampledBuffer || resampledBuffer.length === 0) {
-        logger.error(`[AUDIO DEBUG] Resampling FAILED for ${callId}`);
-        return;
-      }
-
-      // Append resampled audio
-      await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
-
-      // STAGE 3: Convert PCM to uLaw
-      const ulawBase64 = await AudioUtils.convertPcmToUlaw(resampledBuffer);
-
-      if (!ulawBase64 || ulawBase64.length === 0) {
-        logger.error(`[AUDIO DEBUG] PCM to uLaw conversion FAILED`);
-        return;
-      }
-
-      // Append final uLaw
-      const ulawRawBuffer = Buffer.from(ulawBase64, 'base64');
-      await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawRawBuffer);
-
-      // Log progress every 100 chunks
-      if (!conn._openaiChunkCount) conn._openaiChunkCount = 0;
-      conn._openaiChunkCount++;
-      if (conn._openaiChunkCount % 100 === 0) {
-        logger.info(`[AUDIO DEBUG] Processed ${conn._openaiChunkCount} chunks from OpenAI for ${callId}`);
-      }
-
-      this.notify(callId, 'audio_chunk', { audio: ulawBase64 });
-    } catch (err) {
-      logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
     }
   }
 
@@ -1922,112 +2165,112 @@ class OpenAIRealtimeService {
   /**
    * Updated sendAudioChunk with debugging
    */
-  async sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering = false) {
-    if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
-      logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
-      return;
-    }
+  // async sendAudioChunkDebug(callId, audioChunkBase64ULaw, bypassBuffering = false) {
+  //   if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
+  //     logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
+  //     return;
+  //   }
 
-    const conn = this.connections.get(callId);
-    if (!conn) {
-      logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
-      return;
-    }
+  //   const conn = this.connections.get(callId);
+  //   if (!conn) {
+  //     logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
+  //     return;
+  //   }
 
-    // Initialize files on first audio from Asterisk if needed
-    if (!conn._debugFilesInitialized) {
-      this.initializeContinuousDebugFiles(callId);
-      conn._debugFilesInitialized = true;
-    }
+  //   // Initialize files on first audio from Asterisk if needed
+  //   if (!conn._debugFilesInitialized) {
+  //     this.initializeContinuousDebugFiles(callId);
+  //     conn._debugFilesInitialized = true;
+  //   }
 
-    conn.audioChunksReceived++;
+  //   conn.audioChunksReceived++;
 
-    if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
-      if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
-        const pending = this.pendingAudio.get(callId) || [];
-        if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-          pending.push(audioChunkBase64ULaw);
-          this.pendingAudio.set(callId, pending);
-        } else {
-          logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
-        }
-      }
-      return;
-    }
+  //   if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
+  //     if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
+  //       const pending = this.pendingAudio.get(callId) || [];
+  //       if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+  //         pending.push(audioChunkBase64ULaw);
+  //         this.pendingAudio.set(callId, pending);
+  //       } else {
+  //         logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
+  //       }
+  //     }
+  //     return;
+  //   }
 
-    try {
-      // STAGE 1: Decode base64 uLaw from Asterisk
-      const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-      if (!ulawBuffer || ulawBuffer.length === 0) {
-        logger.warn(`[AUDIO DEBUG] Decoded uLaw buffer empty`);
-        return;
-      }
+  //   try {
+  //     // STAGE 1: Decode base64 uLaw from Asterisk
+  //     const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+  //     if (!ulawBuffer || ulawBuffer.length === 0) {
+  //       logger.warn(`[AUDIO DEBUG] Decoded uLaw buffer empty`);
+  //       return;
+  //     }
 
-      // Append RAW uLaw from Asterisk
-      await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
+  //     // Append RAW uLaw from Asterisk
+  //     await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
 
-      // STAGE 2: Convert uLaw to PCM 8kHz
-      const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
-      if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
-        logger.error(`[AUDIO DEBUG] uLaw to PCM conversion FAILED`);
-        return;
-      }
+  //     // STAGE 2: Convert uLaw to PCM 8kHz
+  //     const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+  //     if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
+  //       logger.error(`[AUDIO DEBUG] uLaw to PCM conversion FAILED`);
+  //       return;
+  //     }
 
-      // Append PCM 8kHz
-      await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm8k.raw', pcm8khzBuffer);
+  //     // Append PCM 8kHz
+  //     await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm8k.raw', pcm8khzBuffer);
 
-      // STAGE 3: Resample PCM from 8kHz to 24kHz
-      const pcm24khzBuffer = AudioUtils.resamplePcm(
-        pcm8khzBuffer,
-        CONSTANTS.ASTERISK_SAMPLE_RATE,
-        CONSTANTS.DEFAULT_SAMPLE_RATE
-      );
-      if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
-        logger.error(`[AUDIO DEBUG] Resampling FAILED`);
-        return;
-      }
+  //     // STAGE 3: Resample PCM from 8kHz to 24kHz
+  //     const pcm24khzBuffer = AudioUtils.resamplePcm(
+  //       pcm8khzBuffer,
+  //       CONSTANTS.ASTERISK_SAMPLE_RATE,
+  //       CONSTANTS.DEFAULT_SAMPLE_RATE
+  //     );
+  //     if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
+  //       logger.error(`[AUDIO DEBUG] Resampling FAILED`);
+  //       return;
+  //     }
 
-      // Append PCM 24kHz
-      await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm24k.raw', pcm24khzBuffer);
+  //     // Append PCM 24kHz
+  //     await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm24k.raw', pcm24khzBuffer);
 
-      // Also append to the existing output_for_openai.pcm file
-      await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
+  //     // Also append to the existing output_for_openai.pcm file
+  //     await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
 
-      // STAGE 4: Convert to base64 for OpenAI
-      const pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
-      if (!pcm24khzBase64ToSend) {
-        logger.error(`[AUDIO DEBUG] Base64 encoding FAILED`);
-        return;
-      }
+  //     // STAGE 4: Convert to base64 for OpenAI
+  //     const pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
+  //     if (!pcm24khzBase64ToSend) {
+  //       logger.error(`[AUDIO DEBUG] Base64 encoding FAILED`);
+  //       return;
+  //     }
 
-      // Log progress every 100 chunks
-      if (conn.audioChunksReceived % 100 === 0) {
-        logger.info(`[AUDIO DEBUG] Processed ${conn.audioChunksReceived} chunks from Asterisk for ${callId}`);
-      }
+  //     // Log progress every 100 chunks
+  //     if (conn.audioChunksReceived % 100 === 0) {
+  //       logger.info(`[AUDIO DEBUG] Processed ${conn.audioChunksReceived} chunks from Asterisk for ${callId}`);
+  //     }
 
-      await this.sendJsonMessage(callId, {
-        type: 'input_audio_buffer.append',
-        audio: pcm24khzBase64ToSend,
-      });
+  //     await this.sendJsonMessage(callId, {
+  //       type: 'input_audio_buffer.append',
+  //       audio: pcm24khzBase64ToSend,
+  //     });
 
-      conn.audioChunksSent++;
-      if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
-        this.debounceCommit(callId);
-      }
-    } catch (audioProcessingError) {
-      logger.error(
-        `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
-        audioProcessingError.stack
-      );
-      return;
-    }
-  }
+  //     conn.audioChunksSent++;
+  //     if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
+  //       this.debounceCommit(callId);
+  //     }
+  //   } catch (audioProcessingError) {
+  //     logger.error(
+  //       `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
+  //       audioProcessingError.stack
+  //     );
+  //     return;
+  //   }
+  // }
 
   /**
    * Test basic WebSocket connection and session handshake with OpenAI
    */
   async testBasicConnectionAndSession(testId = `test-${Date.now()}`) {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       logger.info(`[OpenAI TestConn] Starting test: ${testId}`);
       let wsClient = null;
       let testTimeoutId = null;
