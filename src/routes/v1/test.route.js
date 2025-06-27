@@ -1748,18 +1748,11 @@ router.post('/port-connectivity', async (req, res) => {
 
 /**
  * @swagger
- * /test/patients/{patientId}/conversations:
+ * /test/patient/conversations:
  *   get:
  *     summary: Get conversations by patient
  *     description: Logged in Patients can fetch only their own conversation information. Only admins can fetch other Patients' conversations.
  *     tags: [Test]
- *     parameters:
- *       - in: path
- *         name: patientId
- *         required: true
- *         schema:
- *           type: string
- *         description: Patient id
  *     responses:
  *       "200":
  *         description: OK
@@ -1777,10 +1770,10 @@ router.post('/port-connectivity', async (req, res) => {
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('patients/:patientId/conversations')
+  .route('/patient/conversations')
   .get(
     validate(patientValidation.getConversationsByPatient),
-    patientController.getConversationsByPatient
+    testController.getConversationsByPatient
   );
 
 // Export the router

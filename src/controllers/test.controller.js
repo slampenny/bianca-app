@@ -1,7 +1,8 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { chatService, testService, twilioCallService } = require('../services');
+const { chatService, conversationService, testService, twilioCallService } = require('../services');
 const { Patient, Conversation } = require('../models');
+const { ConversationDTO } = require('../dtos');
 const logger = require('../config/logger');
 const DebugUtils = require('../utils/debug');
 const openAIService = require('../services/openai.realtime.service');
@@ -154,11 +155,26 @@ const testCall = catchAsync(async (req, res) => {
   }, 5000); // allow Twilio 5s to fetch TwiML and connect to stream
 });
 
+const getConversationsByPatient = catchAsync(async (req, res) => {
+  const patient = await Patient.findOne().sort({ createdAt: 1 }).exec();
+  
+  if (!patient) {
+    logger.error('[Test] No patients found in database');
+    return res.status(httpStatus.NOT_FOUND).send({ 
+      message: 'No patients found in database. Create a patient first.' 
+    });
+  }
+
+  const conversations = await conversationService.getConversationsByPatient(patient.id);
+  res.status(httpStatus.OK).send(conversations.map(ConversationDTO));
+});
+
 module.exports = {
   testCall,
   testSeed,
   testSummarize,
   testCleanDB,
   getDebugInfo,
-  testOpenAIWebSocket
+  testOpenAIWebSocket,
+  getConversationsByPatient,
 };

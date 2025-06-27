@@ -100,6 +100,7 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
   const { patientId } = req.params;
 
   const patient = await patientService.getPatientById(patientId);
+  logger.info(`Fetching conversations for patient: ${patientId}`, { patient });
   if (!patient) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid patient ID');
   }
