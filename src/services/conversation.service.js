@@ -19,7 +19,11 @@ const addMessageToConversation = async (conversationId, role, content) => {
   if (!conversation) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
-  const message = new Message({ role, content });
+  const message = new Message({ 
+    role, 
+    content, 
+    conversationId 
+  });
   await message.save();
   conversation.messages.push(message._id);
   await conversation.save();
@@ -162,6 +166,15 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
       conversationId,
       messageType: normalizedType,
     });
+
+    // Also update the conversation's messages array for proper references
+    await Conversation.findByIdAndUpdate(
+      conversationId,
+      { 
+        $push: { messages: message._id },
+        $inc: { totalMessages: 1 }
+      }
+    );
 
     logger.debug(`[Realtime Message] Saved ${role} message to conversation ${conversationId}`);
     return message;
