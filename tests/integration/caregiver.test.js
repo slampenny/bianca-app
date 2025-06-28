@@ -337,7 +337,7 @@ describe('Caregiver routes', () => {
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
 
       await request(app)
-        .get(`/v1/caregivers/${mongoose.Types.ObjectId()}`)
+        .get(`/v1/caregivers/${new mongoose.Types.ObjectId()}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.NOT_FOUND);
@@ -415,7 +415,7 @@ describe('Caregiver routes', () => {
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
 
       await request(app)
-        .delete(`/v1/caregivers/${mongoose.Types.ObjectId()}`)
+        .delete(`/v1/caregivers/${new mongoose.Types.ObjectId()}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.NOT_FOUND);
@@ -495,7 +495,7 @@ describe('Caregiver routes', () => {
       const updateBody = { name: faker.name.findName() };
 
       await request(app)
-        .patch(`/v1/caregivers/${mongoose.Types.ObjectId()}`)
+        .patch(`/v1/caregivers/${new mongoose.Types.ObjectId()}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send(updateBody)
         .expect(httpStatus.NOT_FOUND);

@@ -125,7 +125,7 @@ const deleteCaregiverById = async (caregiverId) => {
     await org.save();
 
     // Remove caregiver from all patients' caregivers array
-    const patients = await Patient.find({ caregivers: { $in: [mongoose.Types.ObjectId(caregiverId)] } });
+    const patients = await Patient.find({ caregivers: { $in: [new mongoose.Types.ObjectId(caregiverId)] } });
     for (const patient of patients) {
       patient.caregivers = patient.caregivers.filter((id) => !id.equals(caregiverId));
       await patient.save();

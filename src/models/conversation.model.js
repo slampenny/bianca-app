@@ -157,7 +157,7 @@ conversationSchema.statics.aggregateUnchargedConversations = async function (pat
   return await this.aggregate([
     {
       $match: {
-        patientId: mongoose.Types.ObjectId(patientId),
+        patientId: new mongoose.Types.ObjectId(patientId),
         lineItemId: null,
       },
     },

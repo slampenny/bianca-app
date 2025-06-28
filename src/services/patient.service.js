@@ -76,7 +76,7 @@ const deletePatientById = async (patientId) => {
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
-  await patient.remove();
+  await patient.deleteOne();
   return patient;
 };
 

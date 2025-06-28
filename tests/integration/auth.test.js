@@ -308,7 +308,7 @@ describe('Auth routes', () => {
       const refreshToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.REFRESH);
       await tokenService.saveToken(refreshToken, dbCaregiver.id, expires, tokenTypes.REFRESH);
 
-      dbCaregiver.remove();
+      dbCaregiver.deleteOne();
       await request(app).post('/v1/auth/refresh-tokens').send({ refreshToken }).expect(httpStatus.UNAUTHORIZED);
     });
   });
@@ -402,7 +402,7 @@ describe('Auth routes', () => {
       const expires = moment().add(config.jwt.resetPasswordExpirationMinutes, 'minutes');
       const resetPasswordToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.RESET_PASSWORD);
       await tokenService.saveToken(resetPasswordToken, dbCaregiver.id, expires, tokenTypes.RESET_PASSWORD);
-      dbCaregiver.remove();
+      dbCaregiver.deleteOne();
       await request(app)
         .post('/v1/auth/reset-password')
         .query({ token: resetPasswordToken })

@@ -8,7 +8,7 @@ const generateMessage = (role) => ({
 });
 
 const conversationOne = {
-  patientId: mongoose.Types.ObjectId(),
+  patientId: new mongoose.Types.ObjectId(),
   messages: [generateMessage('patient'), generateMessage('doctor')],
   history: faker.lorem.paragraph(),
   analyzedData: {},
@@ -19,7 +19,7 @@ const conversationOne = {
 };
 
 const conversationTwo = {
-  patientId: mongoose.Types.ObjectId(),
+  patientId: new mongoose.Types.ObjectId(),
   messages: [generateMessage('patient'), generateMessage('doctor')],
   history: faker.lorem.paragraph(),
   analyzedData: {},

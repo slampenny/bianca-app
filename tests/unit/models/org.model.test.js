@@ -25,8 +25,8 @@ describe('Org Model', () => {
       email: faker.internet.email().toLowerCase(),
       phone: faker.phone.phoneNumberFormat(1),
       isEmailVerified: false,
-      caregivers: [mongoose.Types.ObjectId()],
-      admins: [mongoose.Types.ObjectId()],
+      caregivers: [new mongoose.Types.ObjectId()],
+      admins: [new mongoose.Types.ObjectId()],
     };
   });
 
@@ -46,7 +46,7 @@ describe('Org Model', () => {
 
   test('should correctly check if email is taken', async () => {
     await new Org(newOrg).save();
-    const isEmailTaken = await Org.isEmailTaken(newOrg.email, mongoose.Types.ObjectId());
+    const isEmailTaken = await Org.isEmailTaken(newOrg.email, new mongoose.Types.ObjectId());
     expect(isEmailTaken).toBe(true);
     const isEmailTaken2 = await Org.isEmailTaken(faker.internet.email().toLowerCase());
     expect(isEmailTaken2).toBe(false);

@@ -89,7 +89,7 @@ describe('Schedule Service', () => {
     });
 
     test('should throw an error if schedule is not found', async () => {
-      const invalidId = mongoose.Types.ObjectId();
+      const invalidId = new mongoose.Types.ObjectId();
 
       await expect(scheduleService.getScheduleById(invalidId)).rejects.toThrow('Schedule not found');
     });

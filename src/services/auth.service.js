@@ -28,7 +28,7 @@ const logout = async (refreshToken) => {
   if (!refreshTokenDoc) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Not found');
   }
-  await refreshTokenDoc.remove();
+  await refreshTokenDoc.deleteOne();
 };
 
 /**
@@ -43,7 +43,7 @@ const refreshAuth = async (refreshToken) => {
     if (!caregiver) {
       throw new ApiError(httpStatus.UNAUTHORIZED, `Caregiver not found: ${refreshTokenDoc.caregiver}`);
     }
-    await refreshTokenDoc.remove();
+    await refreshTokenDoc.deleteOne();
 
     return tokenService.generateAuthTokens(caregiver);
   } catch (error) {
