@@ -176,8 +176,6 @@ class OpenAIRealtimeService {
       // Track timing for each speaker
       lastUserSpeechTime: null,
       lastAssistantSpeechTime: null,
-      pendingUserTranscript: '',
-      pendingAssistantTranscript: '',
     });
     this.reconnectAttempts.set(callId, 0);
     this.isReconnecting.set(callId, false);
@@ -790,7 +788,7 @@ startTranscriptCleanupInterval() {
       clearInterval(this._transcriptCleanupInterval);
   }
   
-  this._transcriptCleanupInterval = setInterval(() => {
+  this._transcriptCleanupInterval = setInterval(async () => {
       const now = Date.now();
       const STALE_THRESHOLD = 5000; // 5 seconds of silence
       
@@ -799,13 +797,20 @@ startTranscriptCleanupInterval() {
           if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
               const userSilenceTime = now - (conn.lastUserSpeechTime || 0);
               if (userSilenceTime > STALE_THRESHOLD) {
+                  // Capture the transcript to save
+                  const transcriptToSave = conn.pendingUserTranscript;
                   logger.debug(`[Transcript Cleanup] Saving stale user transcript for ${callId} (silent for ${userSilenceTime}ms)`);
-                  this.saveCompleteMessage(callId, 'user', conn.pendingUserTranscript)
-                      .then(() => { 
+                  
+                  try {
+                      await this.saveCompleteMessage(callId, 'user', transcriptToSave);
+                      // Only clear if it hasn't changed
+                      if (conn.pendingUserTranscript === transcriptToSave) {
                           conn.pendingUserTranscript = '';
                           conn.lastUserSpeechTime = null;
-                      })
-                      .catch(err => logger.error(`[Transcript Cleanup] Error: ${err.message}`));
+                      }
+                  } catch (err) {
+                      logger.error(`[Transcript Cleanup] Error: ${err.message}`);
+                  }
               }
           }
           
@@ -813,13 +818,20 @@ startTranscriptCleanupInterval() {
           if (conn.pendingAssistantTranscript && conn.pendingAssistantTranscript.trim()) {
               const assistantSilenceTime = now - (conn.lastAssistantSpeechTime || 0);
               if (assistantSilenceTime > STALE_THRESHOLD) {
+                  // Capture the transcript to save
+                  const transcriptToSave = conn.pendingAssistantTranscript;
                   logger.debug(`[Transcript Cleanup] Saving stale assistant transcript for ${callId} (silent for ${assistantSilenceTime}ms)`);
-                  this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript)
-                      .then(() => { 
+                  
+                  try {
+                      await this.saveCompleteMessage(callId, 'assistant', transcriptToSave);
+                      // Only clear if it hasn't changed
+                      if (conn.pendingAssistantTranscript === transcriptToSave) {
                           conn.pendingAssistantTranscript = '';
                           conn.lastAssistantSpeechTime = null;
-                      })
-                      .catch(err => logger.error(`[Transcript Cleanup] Error: ${err.message}`));
+                      }
+                  } catch (err) {
+                      logger.error(`[Transcript Cleanup] Error: ${err.message}`);
+                  }
               }
           }
       }
@@ -1924,18 +1936,6 @@ async handleCallEnd(callId) {
               logger.info(`[OpenAI Call End] Saving pending assistant message for ${callId}`);
               await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
               conn.pendingAssistantTranscript = '';
-          }
-          
-          // Also check the transcript accumulator (for backwards compatibility)
-          if (conn.transcriptAccumulator) {
-              if (conn.transcriptAccumulator.user?.text?.trim()) {
-                  logger.info(`[OpenAI Call End] Saving accumulated user transcript for ${callId}`);
-                  await this.saveCompleteMessage(callId, 'user', conn.transcriptAccumulator.user.text);
-              }
-              if (conn.transcriptAccumulator.assistant?.text?.trim()) {
-                  logger.info(`[OpenAI Call End] Saving accumulated assistant transcript for ${callId}`);
-                  await this.saveCompleteMessage(callId, 'assistant', conn.transcriptAccumulator.assistant.text);
-              }
           }
       }
       

@@ -2,8 +2,36 @@ const mongoose = require('mongoose');
 const { toJSON, paginate } = require('./plugins');
 
 const messageSchema = mongoose.Schema({
-  role: String,
-  content: String,
+  role: {
+    type: String,
+    required: true,
+    enum: ['user', 'assistant', 'system'],
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+  conversationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conversation',
+    required: true,
+    index: true,  // Add index for faster queries
+  },
+  messageType: {
+    type: String,
+    enum: ['text', 'assistant_response', 'user_message', 'function_call', 'audio_transcript_delta'],
+    default: 'text',
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  }
+}, {
+  timestamps: true,  // This adds createdAt and updatedAt automatically
 });
 
 // Conversation Schema
@@ -68,6 +96,50 @@ const conversationSchema = mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Add these fields to your conversationSchema:
+
+    debugAudioUrls: [{
+      description: String,
+      url: String,
+      key: String,
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+
+    callEndReason: {
+      type: String,
+      enum: ['normal_completion', 'user_hangup', 'assistant_error', 'network_error', 'timeout', 'unknown'],
+      default: null,
+    },
+
+    // Also consider adding these for better tracking:
+    realtimeSessionId: {
+      type: String,
+      // OpenAI session ID for debugging
+    },
+
+    totalMessages: {
+      type: Number,
+      default: 0,
+    },
+
+    // For tracking conversation quality
+    conversationQuality: {
+      audioIssues: {
+        type: Boolean,
+        default: false,
+      },
+      transcriptionErrors: {
+        type: Number,
+        default: 0,
+      },
+      reconnectCount: {
+        type: Number,
+        default: 0,
+      }
+    }  
   },
   {
     timestamps: true,

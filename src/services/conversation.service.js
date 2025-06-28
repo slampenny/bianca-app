@@ -161,7 +161,6 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
       content: content.trim(),
       conversationId,
       messageType: normalizedType,
-      timestamp: new Date()
     });
 
     logger.debug(`[Realtime Message] Saved ${role} message to conversation ${conversationId}`);
@@ -192,7 +191,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     if (useRealtimeMessages) {
       // Get messages from Message collection (realtime calls)
       messages = await Message.find({ conversationId })
-        .sort({ timestamp: 1 })
+        .sort({ createdAt: 1 })
         .select('role content timestamp')
         .lean();
 
