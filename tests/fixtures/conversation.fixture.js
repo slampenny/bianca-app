@@ -9,7 +9,7 @@ const generateMessage = (role) => ({
 
 const conversationOne = {
   patientId: new mongoose.Types.ObjectId(),
-  messages: [generateMessage('patient'), generateMessage('doctor')],
+  messages: [generateMessage('user'), generateMessage('assistant')],
   history: faker.lorem.paragraph(),
   analyzedData: {},
   metadata: {},
@@ -20,7 +20,7 @@ const conversationOne = {
 
 const conversationTwo = {
   patientId: new mongoose.Types.ObjectId(),
-  messages: [generateMessage('patient'), generateMessage('doctor')],
+  messages: [generateMessage('user'), generateMessage('assistant')],
   history: faker.lorem.paragraph(),
   analyzedData: {},
   metadata: {},
@@ -30,19 +30,32 @@ const conversationTwo = {
 };
 
 const insertConversations = async (conversations) => {
-  // First, save messages individually and get their IDs
-  const messages = [];
-  for (const conversation of conversations) {
-    for (const message of conversation.messages) {
-      const newMessage = new Message(message);
-      await newMessage.save();
-      messages.push(newMessage._id);
+  const createdConversations = [];
+  
+  for (const conversationData of conversations) {
+    // Create the conversation first
+    const conversation = new Conversation(conversationData);
+    await conversation.save();
+    
+    // Create messages with the conversation ID
+    const messageIds = [];
+    for (const messageData of conversationData.messages) {
+      const message = new Message({
+        ...messageData,
+        conversationId: conversation._id,
+      });
+      await message.save();
+      messageIds.push(message._id);
     }
-    conversation.messages = messages;
+    
+    // Update conversation with message IDs
+    conversation.messages = messageIds;
+    await conversation.save();
+    
+    createdConversations.push(conversation);
   }
 
-  // Insert conversations with message IDs
-  return await Conversation.insertMany(conversations);
+  return createdConversations;
 };
 
 module.exports = {

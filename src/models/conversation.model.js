@@ -110,7 +110,7 @@ const conversationSchema = mongoose.Schema(
 
     callEndReason: {
       type: String,
-      enum: ['normal_completion', 'user_hangup', 'assistant_error', 'network_error', 'timeout', 'unknown'],
+      enum: ['normal_completion', 'user_hangup', 'assistant_error', 'network_error', 'timeout', 'unknown', null],
       default: null,
     },
 

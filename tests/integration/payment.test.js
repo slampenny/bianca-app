@@ -54,13 +54,15 @@ describe('Payment routes', () => {
 
       // Create messages first
       const message1 = await Message.create({
-        role: 'patient',
+        role: 'user',
         content: 'Test patient message',
+        conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
 
       const message2 = await Message.create({
-        role: 'doctor',
+        role: 'assistant',
         content: 'Test doctor response',
+        conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
 
       // Modify the conversation fixtures to use the patient ID and message IDs
@@ -105,12 +107,14 @@ describe('Payment routes', () => {
 
       // Create messages for the conversation
       const message1 = await Message.create({
-        role: 'patient',
+        role: 'user',
         content: 'Test patient message for unassigned patient',
+        conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
       const message2 = await Message.create({
-        role: 'doctor',
+        role: 'assistant',
         content: 'Test doctor response for unassigned patient',
+        conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
 
       const patientConversations = [
