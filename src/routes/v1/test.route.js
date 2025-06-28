@@ -1776,5 +1776,141 @@ router
     testController.getConversationsByPatient
   );
 
+/**
+ * @swagger
+ * /test/email:
+ *   post:
+ *     summary: Test email functionality with Amazon SES
+ *     description: Sends a test email to verify Amazon SES configuration is working
+ *     tags: [Test]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               to:
+ *                 type: string
+ *                 format: email
+ *                 default: "negascout@gmail.com"
+ *                 description: Email address to send test email to
+ *               subject:
+ *                 type: string
+ *                 default: "Test Email from Bianca App"
+ *                 description: Subject line for the test email
+ *               message:
+ *                 type: string
+ *                 default: "This is a test email to verify Amazon SES is working correctly."
+ *                 description: Message content for the test email
+ *     responses:
+ *       "200":
+ *         description: Email test successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 emailInfo:
+ *                   type: object
+ *                   properties:
+ *                     messageId:
+ *                       type: string
+ *                     to:
+ *                       type: string
+ *                     from:
+ *                       type: string
+ *                     subject:
+ *                       type: string
+ *                     previewUrl:
+ *                       type: string
+ *                       description: Preview URL for development environment (Ethereal)
+ *       "400":
+ *         description: Bad request
+ *       "500":
+ *         description: Email sending failed
+ */
+router.post('/email', async (req, res) => {
+    try {
+        const { 
+            to = 'negascout@gmail.com', 
+            subject = 'Test Email from Bianca App', 
+            message = 'This is a test email to verify Amazon SES is working correctly.' 
+        } = req.body;
+
+        // Validate email address
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(to)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid email address format'
+            });
+        }
+
+        // Import email service
+        const emailService = require('../../services/email.service');
+
+        // Create HTML version of the email
+        const htmlMessage = `
+            <html>
+                <body>
+                    <h2>Test Email from Bianca App</h2>
+                    <p><strong>Message:</strong> ${message}</p>
+                    <p><strong>Sent at:</strong> ${new Date().toISOString()}</p>
+                    <p><strong>Environment:</strong> ${config.env}</p>
+                    <p><strong>From:</strong> ${config.email?.from || 'Not configured'}</p>
+                    <hr>
+                    <p><em>This is an automated test email to verify email functionality.</em></p>
+                </body>
+            </html>
+        `;
+
+        // Send the email
+        const emailInfo = await emailService.sendEmail(to, subject, message, htmlMessage);
+
+        // Prepare response
+        const response = {
+            success: true,
+            message: 'Test email sent successfully',
+            emailInfo: {
+                messageId: emailInfo.messageId,
+                to: to,
+                from: config.email?.from || 'Not configured',
+                subject: subject,
+                environment: config.env
+            }
+        };
+
+        // Add preview URL for development environment
+        if (config.env !== 'production' && config.env !== 'test') {
+            const nodemailer = require('nodemailer');
+            const previewUrl = nodemailer.getTestMessageUrl(emailInfo);
+            if (previewUrl) {
+                response.emailInfo.previewUrl = previewUrl;
+            }
+        }
+
+        logger.info(`Test email sent successfully to ${to}`, response.emailInfo);
+        res.json(response);
+
+    } catch (error) {
+        logger.error('Failed to send test email:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to send test email',
+            details: error.message,
+            environment: config.env,
+            emailConfig: {
+                from: config.email?.from || 'Not configured',
+                sesRegion: config.email?.ses?.region || 'Not configured'
+            }
+        });
+    }
+});
+
 // Export the router
 module.exports = router;

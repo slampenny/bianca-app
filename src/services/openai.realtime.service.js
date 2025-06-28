@@ -705,6 +705,18 @@ async handleOpenAIMessage(callId, data) {
     }
   }
 
+  async handleResponseAudioDelta(callId, message) {
+    // <<<< NEW HANDLER
+    if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
+      logger.warn(
+        `[OpenAI Realtime] Received 'response.audio.delta' for ${callId} but 'message.delta' (audio data) is missing or empty.`
+      );
+      return;
+    }
+    // logger.debug(`[OpenAI Realtime] Processing response.audio.delta for ${callId}, data length: ${message.delta.length}`);
+    await this.processAudioResponse(callId, message.delta);
+  }
+
   /**
    * Handle content part added
    */
