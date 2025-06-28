@@ -166,6 +166,7 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
       conversationId,
       messageType: normalizedType,
     });
+    
 
     // Also update the conversation's messages array for proper references
     await Conversation.findByIdAndUpdate(
