@@ -9,6 +9,7 @@ const MAX_PACKET_SIZE = 65507;
 const STATS_LOG_INTERVAL = 10000;
 
 class RtpListener {
+    
     constructor(port, callId, asteriskChannelId) {
         this.port = port;
         this.callId = callId;
