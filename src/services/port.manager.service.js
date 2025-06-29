@@ -23,10 +23,13 @@ class PortManager extends EventEmitter {
             this.availablePorts.add(i);
         }
         
-        // Periodic health check for stuck ports
-        this.healthCheckInterval = setInterval(() => {
-            this.performHealthCheck();
-        }, 60000); // Every minute
+        // Only start health check if not in test environment
+        if (process.env.NODE_ENV !== 'test') {
+            // Periodic health check for stuck ports
+            this.healthCheckInterval = setInterval(() => {
+                this.performHealthCheck();
+            }, 60000); // Every minute
+        }
         
         logger.info(`[PortManager] Initialized with ${this.availablePorts.size} available ports in range ${this.RTP_PORT_START}-${this.RTP_PORT_END}`);
     }
@@ -371,6 +374,21 @@ class PortManager extends EventEmitter {
             callGroups: Object.values(callGroups),
             multiPortCalls: Object.values(callGroups).filter(group => group.totalPorts > 1)
         };
+    }
+    
+    /**
+     * Start health check interval (for testing or manual control)
+     */
+    startHealthCheck() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+        }
+        
+        this.healthCheckInterval = setInterval(() => {
+            this.performHealthCheck();
+        }, 60000); // Every minute
+        
+        logger.info('[PortManager] Started health check interval');
     }
     
     /**

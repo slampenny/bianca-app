@@ -1,0 +1,986 @@
+const dgram = require('dgram');
+const { Buffer } = require('buffer');
+const rtpListenerService = require('../../../src/services/rtp.listener.service');
+
+// Mock dependencies
+jest.mock('../../../src/config/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn()
+}));
+
+jest.mock('../../../src/services/openai.realtime.service', () => ({
+  sendAudioChunk: jest.fn()
+}));
+
+describe('RTP Listener Service', () => {
+  let mockUdpServer;
+  let mockLogger;
+  let mockOpenAIService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    // Mock UDP server
+    mockUdpServer = {
+      on: jest.fn(),
+      bind: jest.fn(),
+      close: jest.fn(),
+      address: jest.fn().mockReturnValue({ address: '0.0.0.0', port: 1234 })
+    };
+    
+    dgram.createSocket = jest.fn().mockReturnValue(mockUdpServer);
+    
+    // Get mocked modules
+    mockLogger = require('../../../src/config/logger');
+    mockOpenAIService = require('../../../src/services/openai.realtime.service');
+  });
+
+  afterEach(() => {
+    // Clean up any active listeners
+    rtpListenerService.stopAllListeners();
+  });
+
+  describe('RtpListener Class', () => {
+    let listener;
+    const testPort = 1234;
+    const testCallId = 'test-call-123';
+    const testAsteriskChannelId = 'test-channel-456';
+
+    beforeEach(() => {
+      listener = new (require('../../../src/services/rtp.listener.service').RtpListener)(
+        testPort, 
+        testCallId, 
+        testAsteriskChannelId
+      );
+    });
+
+    describe('Constructor', () => {
+      it('should initialize with correct properties', () => {
+        expect(listener.port).toBe(testPort);
+        expect(listener.callId).toBe(testCallId);
+        expect(listener.asteriskChannelId).toBe(testAsteriskChannelId);
+        expect(listener.udpServer).toBeNull();
+        expect(listener.isActive).toBe(false);
+        expect(listener.isShuttingDown).toBe(false);
+        expect(listener.stats).toEqual({
+          packetsReceived: 0,
+          packetsSent: 0,
+          invalidPackets: 0,
+          errors: 0,
+          startTime: expect.any(Number),
+          lastStatsLog: expect.any(Number)
+        });
+      });
+
+      it('should throw error if port is missing', () => {
+        expect(() => {
+          new (require('../../../src/services/rtp.listener.service').RtpListener)(
+            null, 
+            testCallId, 
+            testAsteriskChannelId
+          );
+        }).not.toThrow(); // Constructor doesn't validate, but start() will
+      });
+    });
+
+    describe('start()', () => {
+      it('should start UDP server successfully', async () => {
+        mockUdpServer.bind.mockImplementation((port, address, callback) => {
+          callback(null);
+        });
+
+        await listener.start();
+
+        expect(dgram.createSocket).toHaveBeenCalledWith('udp4');
+        expect(mockUdpServer.on).toHaveBeenCalledWith('message', expect.any(Function));
+        expect(mockUdpServer.on).toHaveBeenCalledWith('error', expect.any(Function));
+        expect(mockUdpServer.on).toHaveBeenCalledWith('listening', expect.any(Function));
+        expect(mockUdpServer.on).toHaveBeenCalledWith('close', expect.any(Function));
+        expect(mockUdpServer.bind).toHaveBeenCalledWith(testPort, '0.0.0.0', expect.any(Function));
+        expect(listener.udpServer).toBe(mockUdpServer);
+      });
+
+      it('should not start if already running', async () => {
+        listener.udpServer = mockUdpServer;
+        
+        await listener.start();
+        
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Already running')
+        );
+        expect(mockUdpServer.bind).not.toHaveBeenCalled();
+      });
+
+      it('should handle bind error', async () => {
+        const bindError = new Error('Port already in use');
+        mockUdpServer.bind.mockImplementation((port, address, callback) => {
+          callback(bindError);
+        });
+
+        await expect(listener.start()).rejects.toThrow('Port already in use');
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to bind')
+        );
+        expect(listener.udpServer).toBeNull();
+      });
+
+      it('should set isActive to true when listening', async () => {
+        mockUdpServer.bind.mockImplementation((port, address, callback) => {
+          callback(null);
+        });
+
+        await listener.start();
+        
+        // Simulate listening event
+        const listeningCallback = mockUdpServer.on.mock.calls.find(
+          call => call[0] === 'listening'
+        )[1];
+        listeningCallback();
+
+        expect(listener.isActive).toBe(true);
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.stringContaining('Listening on')
+        );
+      });
+    });
+
+    describe('stop()', () => {
+      it('should stop UDP server gracefully', () => {
+        listener.udpServer = mockUdpServer;
+        listener.isShuttingDown = false;
+
+        listener.stop();
+
+        expect(listener.isShuttingDown).toBe(true);
+        expect(mockUdpServer.close).toHaveBeenCalled();
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.stringContaining('Stopping')
+        );
+      });
+
+      it('should not stop if already shutting down', () => {
+        listener.udpServer = mockUdpServer;
+        listener.isShuttingDown = true;
+
+        listener.stop();
+
+        expect(mockUdpServer.close).not.toHaveBeenCalled();
+      });
+
+      it('should handle close error', () => {
+        listener.udpServer = mockUdpServer;
+        mockUdpServer.close.mockImplementation(() => {
+          throw new Error('Close error');
+        });
+
+        listener.stop();
+
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.stringContaining('Error closing UDP server')
+        );
+      });
+
+      it('should handle stop when no UDP server exists', () => {
+        listener.udpServer = null;
+        listener.isShuttingDown = false;
+
+        expect(() => listener.stop()).not.toThrow();
+        expect(listener.isShuttingDown).toBe(true);
+      });
+    });
+
+    describe('parseRtpPacket()', () => {
+      it('should parse valid RTP packet correctly', () => {
+        // Create a minimal valid RTP packet
+        const buffer = Buffer.alloc(20);
+        buffer[0] = 0x80; // Version 2, no padding, no extension, no CSRC
+        buffer[1] = 0x00; // No marker, payload type 0
+        buffer.writeUInt16BE(1234, 2); // Sequence number
+        buffer.writeUInt32BE(567890, 4); // Timestamp
+        buffer.writeUInt32BE(987654321, 8); // SSRC
+        // Add some payload data
+        buffer.write('test audio data', 12);
+
+        const result = listener.parseRtpPacket(buffer);
+
+        expect(result).toEqual({
+          version: 2,
+          padding: 0,
+          extension: 0,
+          csrcCount: 0,
+          marker: 0,
+          payloadType: 0,
+          sequenceNumber: 1234,
+          timestamp: 567890,
+          ssrc: 987654321,
+          payload: expect.any(Buffer),
+          headerLength: 12
+        });
+        expect(result.payload.toString()).toBe('test audio data');
+      });
+
+      it('should return null for buffer too short', () => {
+        const shortBuffer = Buffer.alloc(10);
+        const result = listener.parseRtpPacket(shortBuffer);
+        expect(result).toBeNull();
+      });
+
+      it('should return null for invalid RTP version', () => {
+        const buffer = Buffer.alloc(20);
+        buffer[0] = 0x00; // Version 0
+        buffer[1] = 0x00;
+        
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeNull();
+      });
+
+      it('should handle RTP packet with padding', () => {
+        const buffer = Buffer.alloc(25);
+        buffer[0] = 0xA0; // Version 2, padding enabled
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.write('test audio data', 12);
+        buffer[24] = 5; // Padding length
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.padding).toBe(1);
+      });
+
+      it('should handle RTP packet with CSRC', () => {
+        const buffer = Buffer.alloc(24);
+        buffer[0] = 0x81; // Version 2, 1 CSRC
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.writeUInt32BE(111111111, 12); // CSRC
+        buffer.write('test', 16);
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.csrcCount).toBe(1);
+        expect(result.headerLength).toBe(16);
+      });
+
+      it('should handle RTP packet with extension header', () => {
+        const buffer = Buffer.alloc(32);
+        buffer[0] = 0x90; // Version 2, extension enabled
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.writeUInt16BE(0x1234, 12); // Extension profile
+        buffer.writeUInt16BE(2, 14); // Extension length (2 * 4 = 8 bytes)
+        buffer.writeUInt32BE(0xDEADBEEF, 16); // Extension data
+        buffer.writeUInt32BE(0xCAFEBABE, 20); // Extension data
+        buffer.write('test', 24); // Payload
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.extension).toBe(1);
+        expect(result.headerLength).toBe(24); // 12 + 4 + 8
+        expect(result.payload.toString()).toBe('test');
+      });
+
+      it('should handle RTP packet with extension header but insufficient data', () => {
+        const buffer = Buffer.alloc(16);
+        buffer[0] = 0x90; // Version 2, extension enabled
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.writeUInt16BE(0x1234, 12); // Extension profile
+        buffer.writeUInt16BE(2, 14); // Extension length (2 * 4 = 8 bytes)
+        // Not enough data for extension
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeNull();
+      });
+
+      it('should handle RTP packet with marker bit set', () => {
+        const buffer = Buffer.alloc(20);
+        buffer[0] = 0x80; // Version 2
+        buffer[1] = 0x80; // Marker bit set, payload type 0
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.write('test audio data', 12);
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.marker).toBe(1);
+        expect(result.payloadType).toBe(0);
+      });
+
+      it('should handle RTP packet with different payload types', () => {
+        const buffer = Buffer.alloc(20);
+        buffer[0] = 0x80; // Version 2
+        buffer[1] = 0x0A; // Payload type 10
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.write('test audio data', 12);
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.payloadType).toBe(10);
+      });
+
+      it('should handle RTP packet with multiple CSRC entries', () => {
+        const buffer = Buffer.alloc(28);
+        buffer[0] = 0x82; // Version 2, 2 CSRC entries
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.writeUInt32BE(111111111, 12); // CSRC 1
+        buffer.writeUInt32BE(222222222, 16); // CSRC 2
+        buffer.write('test', 20);
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.csrcCount).toBe(2);
+        expect(result.headerLength).toBe(20); // 12 + (2 * 4)
+      });
+
+      it('should handle RTP packet with padding but invalid padding length', () => {
+        const buffer = Buffer.alloc(25);
+        buffer[0] = 0xA0; // Version 2, padding enabled
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.write('test audio data', 12);
+        buffer[24] = 20; // Padding length > payload length
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.padding).toBe(1);
+        // Should not remove padding since length is invalid
+        expect(result.payload.toString()).toBe('test audio data');
+      });
+
+      it('should handle RTP packet with zero padding length', () => {
+        const buffer = Buffer.alloc(25);
+        buffer[0] = 0xA0; // Version 2, padding enabled
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.write('test audio data', 12);
+        buffer[24] = 0; // Zero padding length
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeTruthy();
+        expect(result.padding).toBe(1);
+        expect(result.payload.toString()).toBe('test audio data');
+      });
+
+      it('should return null for empty payload after padding removal', () => {
+        const buffer = Buffer.alloc(13);
+        buffer[0] = 0xA0; // Version 2, padding enabled
+        buffer[1] = 0x00;
+        buffer.writeUInt16BE(1234, 2);
+        buffer.writeUInt32BE(567890, 4);
+        buffer.writeUInt32BE(987654321, 8);
+        buffer.writeUInt32BE(0x12345678, 12); // Some data
+        buffer[12] = 4; // Padding length equals payload length
+
+        const result = listener.parseRtpPacket(buffer);
+        expect(result).toBeNull();
+      });
+
+      it('should handle parsing errors gracefully', () => {
+        const invalidBuffer = Buffer.from([0x80, 0x00]); // Too short
+        
+        const result = listener.parseRtpPacket(invalidBuffer);
+        expect(result).toBeNull();
+      });
+
+      it('should handle null buffer', () => {
+        const result = listener.parseRtpPacket(null);
+        expect(result).toBeNull();
+      });
+
+      it('should handle undefined buffer', () => {
+        const result = listener.parseRtpPacket(undefined);
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('handleMessage()', () => {
+      beforeEach(async () => {
+        mockUdpServer.bind.mockImplementation((port, address, callback) => {
+          callback(null);
+        });
+        await listener.start();
+      });
+
+      it('should process valid RTP packet and forward audio', async () => {
+        const rinfo = { address: '127.0.0.1', port: 5000 };
+        const audioData = Buffer.from('test audio data');
+        
+        // Create RTP packet
+        const rtpPacket = Buffer.alloc(12 + audioData.length);
+        rtpPacket[0] = 0x80; // Version 2
+        rtpPacket[1] = 0x00;
+        rtpPacket.writeUInt16BE(1234, 2);
+        rtpPacket.writeUInt32BE(567890, 4);
+        rtpPacket.writeUInt32BE(987654321, 8);
+        audioData.copy(rtpPacket, 12);
+
+        await listener.handleMessage(rtpPacket, rinfo);
+
+        expect(listener.stats.packetsReceived).toBe(1);
+        expect(mockOpenAIService.sendAudioChunk).toHaveBeenCalledWith(
+          testCallId,
+          expect.any(String) // base64 encoded audio
+        );
+        expect(listener.stats.packetsSent).toBe(1);
+      });
+
+      it('should handle oversized packets', async () => {
+        const oversizedPacket = Buffer.alloc(70000); // Larger than MAX_PACKET_SIZE
+        const rinfo = { address: '127.0.0.1', port: 5000 };
+
+        await listener.handleMessage(oversizedPacket, rinfo);
+
+        expect(listener.stats.packetsReceived).toBe(1);
+        expect(listener.stats.invalidPackets).toBe(1);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Oversized packet')
+        );
+        expect(mockOpenAIService.sendAudioChunk).not.toHaveBeenCalled();
+      });
+
+      it('should handle invalid RTP packets', async () => {
+        const invalidPacket = Buffer.from('invalid data');
+        const rinfo = { address: '127.0.0.1', port: 5000 };
+
+        await listener.handleMessage(invalidPacket, rinfo);
+
+        expect(listener.stats.packetsReceived).toBe(1);
+        expect(listener.stats.invalidPackets).toBe(1);
+        expect(mockOpenAIService.sendAudioChunk).not.toHaveBeenCalled();
+      });
+
+      it('should handle empty audio payload', async () => {
+        const rinfo = { address: '127.0.0.1', port: 5000 };
+        
+        // Create RTP packet with no payload
+        const rtpPacket = Buffer.alloc(12);
+        rtpPacket[0] = 0x80;
+        rtpPacket[1] = 0x00;
+
+        await listener.handleMessage(rtpPacket, rinfo);
+
+        expect(listener.stats.packetsReceived).toBe(1);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Empty audio data')
+        );
+        expect(mockOpenAIService.sendAudioChunk).not.toHaveBeenCalled();
+      });
+
+      it('should handle audio processing errors', async () => {
+        const rinfo = { address: '127.0.0.1', port: 5000 };
+        const audioData = Buffer.from('test audio data');
+        
+        const rtpPacket = Buffer.alloc(12 + audioData.length);
+        rtpPacket[0] = 0x80;
+        rtpPacket[1] = 0x00;
+        audioData.copy(rtpPacket, 12);
+
+        mockOpenAIService.sendAudioChunk.mockRejectedValue(new Error('OpenAI error'));
+
+        await listener.handleMessage(rtpPacket, rinfo);
+
+        expect(listener.stats.errors).toBe(1);
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.stringContaining('Error processing audio')
+        );
+      });
+
+      it('should not process messages when shutting down', async () => {
+        listener.isShuttingDown = true;
+        const rinfo = { address: '127.0.0.1', port: 5000 };
+        const audioData = Buffer.from('test audio data');
+        
+        const rtpPacket = Buffer.alloc(12 + audioData.length);
+        rtpPacket[0] = 0x80;
+        rtpPacket[1] = 0x00;
+        audioData.copy(rtpPacket, 12);
+
+        await listener.handleMessage(rtpPacket, rinfo);
+
+        expect(mockOpenAIService.sendAudioChunk).not.toHaveBeenCalled();
+      });
+
+      it('should handle null or undefined message', async () => {
+        const rinfo = { address: '127.0.0.1', port: 5000 };
+
+        await listener.handleMessage(null, rinfo);
+        expect(listener.stats.packetsReceived).toBe(1);
+        expect(listener.stats.invalidPackets).toBe(1);
+
+        await listener.handleMessage(undefined, rinfo);
+        expect(listener.stats.packetsReceived).toBe(2);
+        expect(listener.stats.invalidPackets).toBe(2);
+      });
+
+      it('should handle message with empty rinfo', async () => {
+        const audioData = Buffer.from('test audio data');
+        const rtpPacket = Buffer.alloc(12 + audioData.length);
+        rtpPacket[0] = 0x80;
+        rtpPacket[1] = 0x00;
+        audioData.copy(rtpPacket, 12);
+
+        await listener.handleMessage(rtpPacket, {});
+
+        expect(listener.stats.packetsReceived).toBe(1);
+        expect(mockOpenAIService.sendAudioChunk).toHaveBeenCalled();
+      });
+    });
+
+    describe('logStatsIfNeeded()', () => {
+      it('should log stats at intervals', () => {
+        listener.stats.packetsReceived = 100;
+        listener.stats.packetsSent = 95;
+        listener.stats.invalidPackets = 3;
+        listener.stats.errors = 2;
+        listener.stats.lastStatsLog = Date.now() - 15000; // 15 seconds ago
+
+        listener.logStatsIfNeeded();
+
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.stringContaining('Stats for call')
+        );
+        expect(listener.stats.lastStatsLog).toBeGreaterThan(Date.now() - 1000);
+      });
+
+      it('should not log stats before interval', () => {
+        listener.stats.lastStatsLog = Date.now() - 5000; // 5 seconds ago
+
+        listener.logStatsIfNeeded();
+
+        expect(mockLogger.info).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('getStats()', () => {
+      it('should return complete stats', () => {
+        listener.stats.packetsReceived = 100;
+        listener.stats.packetsSent = 95;
+        listener.stats.invalidPackets = 3;
+        listener.stats.errors = 2;
+        listener.isActive = true;
+
+        const stats = listener.getStats();
+
+        expect(stats).toEqual({
+          packetsReceived: 100,
+          packetsSent: 95,
+          invalidPackets: 3,
+          errors: 2,
+          startTime: expect.any(Number),
+          lastStatsLog: expect.any(Number),
+          uptime: expect.any(Number),
+          active: true,
+          port: testPort,
+          callId: testCallId
+        });
+      });
+    });
+  });
+
+  describe('Module-level functions', () => {
+    const testPort = 1234;
+    const testCallId = 'test-call-123';
+    const testAsteriskChannelId = 'test-channel-456';
+
+    beforeEach(() => {
+      mockUdpServer.bind.mockImplementation((port, address, callback) => {
+        callback(null);
+      });
+    });
+
+    describe('startRtpListenerForCall()', () => {
+      it('should start listener for new call', async () => {
+        const listener = await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+
+        expect(listener).toBeDefined();
+        expect(listener.port).toBe(testPort);
+        expect(listener.callId).toBe(testCallId);
+        expect(dgram.createSocket).toHaveBeenCalled();
+      });
+
+      it('should return existing listener for same call', async () => {
+        const listener1 = await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+        
+        const listener2 = await rtpListenerService.startRtpListenerForCall(
+          testPort + 1, // Different port
+          testCallId, 
+          testAsteriskChannelId
+        );
+
+        expect(listener1).toBe(listener2);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Listener already exists')
+        );
+      });
+
+      it('should throw error for missing parameters', async () => {
+        await expect(rtpListenerService.startRtpListenerForCall(null, testCallId))
+          .rejects.toThrow('Port and callId are required');
+        
+        await expect(rtpListenerService.startRtpListenerForCall(testPort, null))
+          .rejects.toThrow('Port and callId are required');
+        
+        await expect(rtpListenerService.startRtpListenerForCall(undefined, testCallId))
+          .rejects.toThrow('Port and callId are required');
+        
+        await expect(rtpListenerService.startRtpListenerForCall(testPort, undefined))
+          .rejects.toThrow('Port and callId are required');
+        
+        await expect(rtpListenerService.startRtpListenerForCall('', testCallId))
+          .rejects.toThrow('Port and callId are required');
+        
+        await expect(rtpListenerService.startRtpListenerForCall(testPort, ''))
+          .rejects.toThrow('Port and callId are required');
+      });
+
+      it('should handle start failure', async () => {
+        mockUdpServer.bind.mockImplementation((port, address, callback) => {
+          callback(new Error('Port in use'));
+        });
+
+        await expect(rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        )).rejects.toThrow('Port in use');
+      });
+
+      it('should handle concurrent start requests for same call', async () => {
+        // Start multiple listeners for the same call concurrently
+        const promises = [
+          rtpListenerService.startRtpListenerForCall(testPort, testCallId, testAsteriskChannelId),
+          rtpListenerService.startRtpListenerForCall(testPort + 1, testCallId, testAsteriskChannelId),
+          rtpListenerService.startRtpListenerForCall(testPort + 2, testCallId, testAsteriskChannelId)
+        ];
+
+        const listeners = await Promise.all(promises);
+        
+        // All should return the same listener instance
+        expect(listeners[0]).toBe(listeners[1]);
+        expect(listeners[1]).toBe(listeners[2]);
+      });
+    });
+
+    describe('stopRtpListenerForCall()', () => {
+      it('should stop and remove listener', async () => {
+        await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+
+        const result = rtpListenerService.stopRtpListenerForCall(testCallId);
+
+        expect(result).toBe(true);
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.stringContaining('Stopped and removed listener')
+        );
+      });
+
+      it('should return false for non-existent listener', () => {
+        const result = rtpListenerService.stopRtpListenerForCall('non-existent');
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('getListenerForCall()', () => {
+      it('should return listener for existing call', async () => {
+        const createdListener = await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+
+        const retrievedListener = rtpListenerService.getListenerForCall(testCallId);
+
+        expect(retrievedListener).toBe(createdListener);
+      });
+
+      it('should return undefined for non-existent call', () => {
+        const listener = rtpListenerService.getListenerForCall('non-existent');
+        expect(listener).toBeUndefined();
+      });
+    });
+
+    describe('getAllActiveListeners()', () => {
+      it('should return stats for all active listeners', async () => {
+        await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+        
+        await rtpListenerService.startRtpListenerForCall(
+          testPort + 1, 
+          'test-call-456', 
+          'test-channel-789'
+        );
+
+        const listeners = rtpListenerService.getAllActiveListeners();
+
+        expect(Object.keys(listeners)).toHaveLength(2);
+        expect(listeners[testCallId]).toBeDefined();
+        expect(listeners['test-call-456']).toBeDefined();
+        expect(listeners[testCallId]).toHaveProperty('port', testPort);
+        expect(listeners['test-call-456']).toHaveProperty('port', testPort + 1);
+      });
+
+      it('should return empty object when no listeners', () => {
+        const listeners = rtpListenerService.getAllActiveListeners();
+        expect(listeners).toEqual({});
+      });
+    });
+
+    describe('stopAllListeners()', () => {
+      it('should stop all active listeners', async () => {
+        await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+        
+        await rtpListenerService.startRtpListenerForCall(
+          testPort + 1, 
+          'test-call-456', 
+          'test-channel-789'
+        );
+
+        rtpListenerService.stopAllListeners();
+
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.stringContaining('Stopping all 2 active listeners')
+        );
+        expect(rtpListenerService.getAllActiveListeners()).toEqual({});
+      });
+
+      it('should handle stopAllListeners when no listeners exist', () => {
+        expect(() => rtpListenerService.stopAllListeners()).not.toThrow();
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.stringContaining('Stopping all 0 active listeners')
+        );
+      });
+
+      it('should handle stopAllListeners with listeners that have errors', async () => {
+        await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+
+        // Mock the stop method to throw an error
+        const listener = rtpListenerService.getListenerForCall(testCallId);
+        const originalStop = listener.stop;
+        listener.stop = jest.fn().mockImplementation(() => {
+          throw new Error('Stop error');
+        });
+
+        expect(() => rtpListenerService.stopAllListeners()).not.toThrow();
+        
+        // Restore original method
+        listener.stop = originalStop;
+      });
+    });
+
+    describe('healthCheck()', () => {
+      it('should return health status with active listeners', async () => {
+        await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+
+        const health = rtpListenerService.healthCheck();
+
+        expect(health).toEqual({
+          healthy: true,
+          activeListeners: 1,
+          listeners: expect.any(Object)
+        });
+        expect(health.listeners[testCallId]).toBeDefined();
+      });
+
+      it('should return health status with no listeners', () => {
+        const health = rtpListenerService.healthCheck();
+
+        expect(health).toEqual({
+          healthy: true,
+          activeListeners: 0,
+          listeners: {}
+        });
+      });
+    });
+  });
+
+  describe('Error handling', () => {
+    it('should handle UDP server errors', async () => {
+      const testPort = 1234;
+      const testCallId = 'test-call-123';
+      
+      mockUdpServer.bind.mockImplementation((port, address, callback) => {
+        callback(null);
+      });
+
+      const listener = await rtpListenerService.startRtpListenerForCall(
+        testPort, 
+        testCallId
+      );
+
+      // Simulate UDP error
+      const errorCallback = mockUdpServer.on.mock.calls.find(
+        call => call[0] === 'error'
+      )[1];
+      
+      errorCallback(new Error('UDP error'));
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('UDP error')
+      );
+      expect(listener.stats.errors).toBe(1);
+    });
+
+    it('should handle UDP server errors when shutting down', async () => {
+      const testPort = 1234;
+      const testCallId = 'test-call-123';
+      
+      mockUdpServer.bind.mockImplementation((port, address, callback) => {
+        callback(null);
+      });
+
+      const listener = await rtpListenerService.startRtpListenerForCall(
+        testPort, 
+        testCallId
+      );
+
+      listener.isShuttingDown = true;
+
+      // Simulate UDP error
+      const errorCallback = mockUdpServer.on.mock.calls.find(
+        call => call[0] === 'error'
+      )[1];
+      
+      errorCallback(new Error('UDP error'));
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('UDP error')
+      );
+      expect(listener.stats.errors).toBe(1);
+      // Should not call stop() when already shutting down
+      expect(mockUdpServer.close).not.toHaveBeenCalled();
+    });
+
+    it('should handle message processing errors', async () => {
+      const testPort = 1234;
+      const testCallId = 'test-call-123';
+      
+      mockUdpServer.bind.mockImplementation((port, address, callback) => {
+        callback(null);
+      });
+
+      const listener = await rtpListenerService.startRtpListenerForCall(
+        testPort, 
+        testCallId
+      );
+
+      // Simulate message event with error
+      const messageCallback = mockUdpServer.on.mock.calls.find(
+        call => call[0] === 'message'
+      )[1];
+      
+      // Mock parseRtpPacket to throw error
+      const originalParse = listener.parseRtpPacket;
+      listener.parseRtpPacket = jest.fn().mockImplementation(() => {
+        throw new Error('Parse error');
+      });
+
+      await messageCallback(Buffer.from('test'), { address: '127.0.0.1', port: 5000 });
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error handling message')
+      );
+      expect(listener.stats.errors).toBe(1);
+
+      // Restore original method
+      listener.parseRtpPacket = originalParse;
+    });
+
+    it('should handle UDP server close event', async () => {
+      const testPort = 1234;
+      const testCallId = 'test-call-123';
+      
+      mockUdpServer.bind.mockImplementation((port, address, callback) => {
+        callback(null);
+      });
+
+      const listener = await rtpListenerService.startRtpListenerForCall(
+        testPort, 
+        testCallId
+      );
+
+      // Simulate close event
+      const closeCallback = mockUdpServer.on.mock.calls.find(
+        call => call[0] === 'close'
+      )[1];
+      
+      closeCallback();
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('UDP server closed')
+      );
+      expect(listener.isActive).toBe(false);
+      expect(listener.udpServer).toBeNull();
+    });
+  });
+
+  describe('Graceful shutdown', () => {
+    it('should handle SIGTERM signal', () => {
+      const originalProcess = global.process;
+      const mockProcess = {
+        ...originalProcess,
+        once: jest.fn()
+      };
+      
+      // Temporarily replace global.process
+      global.process = mockProcess;
+
+      try {
+        // Re-require the module to trigger the signal handlers
+        jest.resetModules();
+        require('../../../src/services/rtp.listener.service');
+
+        expect(mockProcess.once).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+        expect(mockProcess.once).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      } finally {
+        // Always restore the original process
+        global.process = originalProcess;
+      }
+    });
+  });
+}); 

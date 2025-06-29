@@ -2287,11 +2287,17 @@ let openAIRealtimeServiceInstance = null;
 function getOpenAIServiceInstance() {
   if (!openAIRealtimeServiceInstance) {
     openAIRealtimeServiceInstance = new OpenAIRealtimeService();
-    openAIRealtimeServiceInstance.startHealthCheck();
-    openAIRealtimeServiceInstance.startTranscriptCleanupInterval();
+    
+    // Only start intervals if not in test environment
+    if (process.env.NODE_ENV !== 'test') {
+      openAIRealtimeServiceInstance.startHealthCheck();
+      openAIRealtimeServiceInstance.startTranscriptCleanupInterval();
+    }
   }
   return openAIRealtimeServiceInstance;
 }
 
-// Export a function to get the singleton instance
+// Export both the singleton instance and the class for testing
 module.exports = getOpenAIServiceInstance();
+module.exports.OpenAIRealtimeService = OpenAIRealtimeService;
+module.exports.getOpenAIServiceInstance = getOpenAIServiceInstance;
