@@ -216,7 +216,7 @@ variable "github_repo" {
 variable "github_branch" {
   description = "GitHub branch for CodePipeline."
   type        = string
-  default     = "main"
+  default     = "audio/fix-networking"
 }
 
 variable "github_app_connection_arn" {
@@ -286,7 +286,7 @@ data "aws_ami" "amazon_linux_2" {
 }
 
 ################################################################################
-# NETWORKING - PUBLIC SUBNETS
+# NETWORKING - PUBLIC AND PRIVATE SUBNETS
 ################################################################################
 
 # Get the list of Availability Zones in your region to ensure high availability
@@ -357,6 +357,67 @@ resource "aws_route_table_association" "public_b" {
   route_table_id = aws_route_table.public.id
 }
 
+################################################################################
+# NEW: PRIVATE SUBNETS FOR APPLICATION
+################################################################################
+
+# Private subnet for Fargate applications
+resource "aws_subnet" "private_a" {
+  vpc_id            = var.vpc_id
+  cidr_block        = "172.31.110.0/24"  # Adjust to avoid conflicts
+  availability_zone = data.aws_availability_zones.available.names[0]
+  
+  tags = {
+    Name = "bianca-private-a"
+  }
+}
+
+resource "aws_subnet" "private_b" {
+  vpc_id            = var.vpc_id
+  cidr_block        = "172.31.111.0/24"  # Adjust to avoid conflicts
+  availability_zone = data.aws_availability_zones.available.names[1]
+  
+  tags = {
+    Name = "bianca-private-b"
+  }
+}
+
+# NAT Gateway for private subnet internet access
+resource "aws_eip" "nat_gateway" {
+  domain = "vpc"
+  tags   = { Name = "bianca-nat-gateway-eip" }
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat_gateway.id
+  subnet_id     = aws_subnet.public_a.id  # NAT goes in public subnet
+  
+  tags = { Name = "bianca-nat-gateway" }
+  depends_on = [aws_internet_gateway.gw]
+}
+
+# Private route table
+resource "aws_route_table" "private" {
+  vpc_id = var.vpc_id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
+  }
+
+  tags = { Name = "bianca-private-rt" }
+}
+
+# Associate private subnets with private route table
+resource "aws_route_table_association" "private_a" {
+  subnet_id      = aws_subnet.private_a.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_b" {
+  subnet_id      = aws_subnet.private_b.id
+  route_table_id = aws_route_table.private.id
+}
 
 ################################################################################
 # SERVICE DISCOVERY (AWS Cloud Map)
@@ -398,7 +459,7 @@ resource "aws_service_discovery_service" "bianca_app_sd_service" {
 }
 
 ################################################################################
-# SECURITY GROUPS
+# SECURITY GROUPS - UPDATED FOR HYBRID NETWORKING
 ################################################################################
 
 resource "aws_security_group" "alb_sg" {
@@ -435,6 +496,7 @@ resource "aws_security_group" "alb_sg" {
   tags = { Name = "alb-sg" }
 }
 
+# UPDATED: App security group for private communication
 resource "aws_security_group" "bianca_app_sg" {
   name        = "bianca-app-sg"
   description = "Security group for Bianca application ECS tasks"
@@ -444,6 +506,7 @@ resource "aws_security_group" "bianca_app_sg" {
     ignore_changes = [description, tags, tags_all]
   }
 
+  # ALB traffic (external)
   ingress {
     description     = "Allow ALB traffic on App HTTP Port"
     from_port       = var.container_port
@@ -452,54 +515,24 @@ resource "aws_security_group" "bianca_app_sg" {
     security_groups = [aws_security_group.alb_sg.id]
   }
 
+  # Egress rules
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   tags = { Name = "bianca-app-sg" }
 }
 
-# Allow RTP from Asterisk to App (for the app's RTP listener)
-resource "aws_security_group_rule" "app_rtp_from_asterisk" {
-  type                     = "ingress"
-  from_port                = var.app_rtp_port_start
-  to_port                  = var.app_rtp_port_end
-  protocol                 = "udp"
-  security_group_id        = aws_security_group.bianca_app_sg.id
-  cidr_blocks       = ["${aws_instance.asterisk.private_ip}/32",
-    "${aws_eip.asterisk_eip.public_ip}/32"]
-  description              = "RTP from Asterisk to App"
-}
-
-# Allow RTP from App to Asterisk (for ExternalMedia)
-resource "aws_security_group_rule" "asterisk_rtp_from_app" {
-  type                     = "ingress"
-  from_port                = var.asterisk_rtp_start_port
-  to_port                  = var.asterisk_rtp_end_port
-  protocol                 = "udp"
-  security_group_id        = aws_security_group.asterisk_ec2_sg.id
-  source_security_group_id = aws_security_group.bianca_app_sg.id
-  description              = "RTP from App to Asterisk"
-}
-
-resource "aws_security_group_rule" "asterisk_to_app_response" {
-  type              = "egress"
-  from_port         = var.app_rtp_port_start
-  to_port           = var.app_rtp_port_end
-  protocol          = "udp"
-  security_group_id = aws_security_group.asterisk_ec2_sg.id
-  cidr_blocks       = ["172.31.100.0/24", "172.31.101.0/24"]  # Your Fargate subnets
-  description       = "Allow Asterisk to send RTP to Fargate"
-}
-
+# UPDATED: Asterisk security group to handle both Twilio and internal traffic
 resource "aws_security_group" "asterisk_ec2_sg" {
   name        = "asterisk-ec2-sg"
   description = "Security group for Asterisk EC2 instance"
   vpc_id      = var.vpc_id
 
-  # SIP UDP
+  # SIP UDP from Twilio (external)
   ingress {
     from_port   = var.asterisk_sip_udp_port
     to_port     = var.asterisk_sip_udp_port
@@ -508,7 +541,7 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     description = "SIP UDP from Twilio & Bianca Client"
   }
 
-  # SIP TCP
+  # SIP TCP from Twilio (external)
   ingress {
     from_port   = var.asterisk_sip_tcp_port
     to_port     = var.asterisk_sip_tcp_port
@@ -517,7 +550,7 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     description = "SIP TCP from Twilio & Bianca Client"
   }
 
-  # RTP Range - Direct from Twilio
+  # RTP Range from Twilio (external) - for Twilio calls
   ingress {
     from_port   = var.asterisk_rtp_start_port
     to_port     = var.asterisk_rtp_end_port
@@ -526,16 +559,7 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     description = "RTP UDP from Twilio"
   }
 
-  # ARI HTTP from Bianca App
-  ingress {
-    from_port       = var.asterisk_ari_http_port
-    to_port         = var.asterisk_ari_http_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.bianca_app_sg.id]
-    description     = "ARI access from Bianca App Backend"
-  }
-
-  # SSH Access (optional - remove if not needed)
+  # SSH Access (optional)
   ingress {
     from_port   = 22
     to_port     = 22
@@ -544,15 +568,7 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     description = "SSH access"
   }
 
-  # Allow RTP from Bianca App (for ExternalMedia)
-  ingress {
-    from_port       = 1024
-    to_port         = 65535
-    protocol        = "udp"
-    security_groups = [aws_security_group.bianca_app_sg.id]
-    description     = "RTP from Bianca App for ExternalMedia"
-  }
-
+  # Egress rules
   egress {
     from_port   = 0
     to_port     = 0
@@ -563,14 +579,38 @@ resource "aws_security_group" "asterisk_ec2_sg" {
   tags = { Name = "asterisk-ec2-sg" }
 }
 
-resource "aws_security_group_rule" "asterisk_egress_https" {
-  type              = "egress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.asterisk_ec2_sg.id
-  cidr_blocks       = ["0.0.0.0/0"]  # Or restrict to VPC CIDR
-  description       = "HTTPS/WSS outbound for ALB connection"
+# SEPARATE RULES: Add these as separate security group rules for cross-referencing
+# RTP from Bianca App to Asterisk (internal)
+resource "aws_security_group_rule" "asterisk_rtp_from_bianca_app" {
+  type                     = "ingress"
+  from_port                = var.asterisk_rtp_start_port
+  to_port                  = var.asterisk_rtp_end_port
+  protocol                 = "udp"
+  security_group_id        = aws_security_group.asterisk_ec2_sg.id
+  source_security_group_id = aws_security_group.bianca_app_sg.id
+  description              = "RTP UDP from Bianca App (internal)"
+}
+
+# ARI HTTP from Bianca App to Asterisk (internal)
+resource "aws_security_group_rule" "asterisk_ari_from_bianca_app" {
+  type                     = "ingress"
+  from_port                = var.asterisk_ari_http_port
+  to_port                  = var.asterisk_ari_http_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.asterisk_ec2_sg.id
+  source_security_group_id = aws_security_group.bianca_app_sg.id
+  description              = "ARI access from Bianca App Backend"
+}
+
+# RTP from Asterisk to Bianca App (internal)
+resource "aws_security_group_rule" "bianca_app_rtp_from_asterisk" {
+  type                     = "ingress"
+  from_port                = var.app_rtp_port_start
+  to_port                  = var.app_rtp_port_end
+  protocol                 = "udp"
+  security_group_id        = aws_security_group.bianca_app_sg.id
+  source_security_group_id = aws_security_group.asterisk_ec2_sg.id
+  description              = "RTP from Asterisk (internal network)"
 }
 
 resource "aws_security_group" "efs_sg" {
@@ -596,7 +636,7 @@ resource "aws_security_group" "efs_sg" {
 }
 
 ################################################################################
-# ASTERISK EC2 INSTANCE
+# ASTERISK EC2 INSTANCE - KEPT IN PUBLIC SUBNET
 ################################################################################
 
 # Elastic IP for Asterisk
@@ -661,11 +701,11 @@ resource "aws_iam_role_policy" "asterisk_secrets" {
   })
 }
 
-# EC2 Instance
+# EC2 Instance - KEPT IN PUBLIC SUBNET FOR TWILIO ACCESS
 resource "aws_instance" "asterisk" {
   ami           = var.asterisk_ami_id != "" ? var.asterisk_ami_id : data.aws_ami.amazon_linux_2.id
   instance_type = var.asterisk_instance_type
-  # MODIFIED: Place the Asterisk instance in the new public subnet
+  # KEPT: Asterisk in public subnet for Twilio direct access
   subnet_id = aws_subnet.public_a.id
 
   vpc_security_group_ids = [aws_security_group.asterisk_ec2_sg.id]
@@ -681,6 +721,8 @@ resource "aws_instance" "asterisk" {
     ari_password_secret    = data.aws_secretsmanager_secret.app_secret.arn
     bianca_password_secret = data.aws_secretsmanager_secret.app_secret.arn
     region                 = var.aws_region
+    # Pass private subnet CIDR for RTP routing
+    private_subnet_cidrs   = "172.31.110.0/24,172.31.111.0/24"
   }))
 
   root_block_device {
@@ -706,7 +748,7 @@ resource "aws_service_discovery_instance" "asterisk" {
 }
 
 ################################################################################
-# EFS (for MongoDB Persistence)
+# EFS (for MongoDB Persistence) - UPDATED FOR PRIVATE SUBNETS
 ################################################################################
 
 resource "aws_efs_file_system" "mongodb_data" {
@@ -731,11 +773,11 @@ resource "aws_efs_access_point" "mongo_ap" {
   tags = { Name = "MongoDB Access Point for ${var.cluster_name}" }
 }
 
+# UPDATED: Mount EFS in private subnets where Fargate runs
 resource "aws_efs_mount_target" "mongodb_mount" {
-  # MODIFIED: Mount EFS in the new public subnets so Fargate can access it
-  count           = 2 # One for each new public subnet
+  count           = 2
   file_system_id  = aws_efs_file_system.mongodb_data.id
-  subnet_id       = [aws_subnet.public_a.id, aws_subnet.public_b.id][count.index]
+  subnet_id       = [aws_subnet.private_a.id, aws_subnet.private_b.id][count.index]
   security_groups = [aws_security_group.efs_sg.id]
 }
 
@@ -769,7 +811,7 @@ resource "aws_lb" "app_lb" {
   load_balancer_type = "application"
   idle_timeout       = 120
   security_groups    = [aws_security_group.alb_sg.id]
-  # MODIFIED: Place the ALB in the new public subnets
+  # ALB stays in public subnets to receive external traffic
   subnets = [aws_subnet.public_a.id, aws_subnet.public_b.id]
   tags    = { Name = var.load_balancer_name }
 }
@@ -814,7 +856,7 @@ resource "aws_lb_listener" "https_listener" {
 }
 
 ################################################################################
-# ECS (Cluster, Task Definitions, Services) - Bianca App Only
+# ECS (Cluster, Task Definitions, Services) - UPDATED FOR PRIVATE NETWORKING
 ################################################################################
 
 resource "aws_ecs_cluster" "cluster" {
@@ -826,6 +868,7 @@ resource "aws_ecs_cluster" "cluster" {
   tags = { Name = var.cluster_name }
 }
 
+# UPDATED: Task definition with hybrid networking environment variables
 resource "aws_ecs_task_definition" "app_task" {
   family                   = var.service_name
   network_mode             = "awsvpc"
@@ -861,16 +904,23 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "AWS_REGION", value = var.aws_region },
         { name = "MONGODB_URL", value = "mongodb://localhost:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
-        { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" }, # Fixed typo
+        { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
+        
+        # Internal communication uses private IP
         { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
+        { name = "ASTERISK_PRIVATE_IP", value = aws_instance.asterisk.private_ip },
+        
+        # External SIP signaling uses public IP (for Twilio)
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
+        
         { name = "AWS_SES_REGION", value = var.aws_region },
         { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
-        { name = "RTP_LISTENER_HOST", value = "0.0.0.0" }, # Keep only this one
-        { name = "BIANCA_PUBLIC_IP", value = "AUTO" }, # Let the app detect it
-        # Add these for better debugging
-        { name = "USE_EXTERNAL_IP_SERVICE", value = "true" },
+        { name = "RTP_LISTENER_HOST", value = "0.0.0.0" },
+        
+        # App will auto-detect its private IP for RTP
+        { name = "USE_PRIVATE_NETWORK_FOR_RTP", value = "true" },
+        { name = "NETWORK_MODE", value = "HYBRID" },
         { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name }
       ]
       secrets = [
@@ -930,6 +980,7 @@ resource "aws_ecs_task_definition" "app_task" {
   tags = { Name = var.service_name }
 }
 
+# UPDATED: ECS service moved to private subnets
 resource "aws_ecs_service" "app_service" {
   name = var.service_name
   cluster = aws_ecs_cluster.cluster.id
@@ -943,10 +994,11 @@ resource "aws_ecs_service" "app_service" {
   health_check_grace_period_seconds  = 120
 
   network_configuration {
-    # MODIFIED: Place the Fargate tasks in the new public subnets
-    subnets          = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+    # CHANGED: Use private subnets for Fargate
+    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
     security_groups  = [aws_security_group.bianca_app_sg.id]
-    assign_public_ip = true
+    # CHANGED: No public IP needed since we're in private subnets
+    assign_public_ip = false
   }
 
   service_registries {
@@ -1184,7 +1236,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_s3_debug_audio_attach" {
   policy_arn = aws_iam_policy.ecs_task_s3_debug_audio_policy.arn
 }
 
-# CodeBuild and CodePipeline IAM roles remain the same
+# CodeBuild and CodePipeline IAM roles
 data "aws_iam_policy_document" "codebuild_assume_role_policy" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -1311,49 +1363,58 @@ resource "aws_iam_role" "codepipeline_role" {
     }]
   })
   tags = { Name = var.codepipeline_role_name }
+}
 
-  inline_policy {
-    name = "CodePipelineBasePermissions"
-    policy = jsonencode({
-      Version = "2012-10-17",
-      Statement = [
-        {
-          Effect   = "Allow",
-          Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:ListBucket"],
-          Resource = [aws_s3_bucket.artifact_bucket.arn, "${aws_s3_bucket.artifact_bucket.arn}/*"]
-        },
-        {
-          Effect   = "Allow",
-          Action   = ["codebuild:StartBuild", "codebuild:StopBuild", "codebuild:BatchGetBuilds"],
-          Resource = aws_codebuild_project.bianca_project.arn
-        },
-        {
-          Effect = "Allow",
-          Action = ["ecs:DescribeServices", "ecs:UpdateService", "ecs:DescribeTaskDefinition"],
-          Resource = [
-            aws_ecs_service.app_service.id,
-            "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/*"
-          ]
-        },
-        {
-          Effect    = "Allow",
-          Action    = "iam:PassRole",
-          Resource  = [aws_iam_role.ecs_execution_role.arn, aws_iam_role.ecs_task_role.arn],
-          Condition = { StringEqualsIfExists = { "iam:PassedToService" = "ecs-tasks.amazonaws.com" } }
-        },
-        {
-          Effect   = "Allow",
-          Action   = "codestar-connections:UseConnection",
-          Resource = var.github_app_connection_arn
-        },
-        {
-          Effect   = "Allow",
-          Action   = "secretsmanager:GetSecretValue",
-          Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
-        }
-      ]
-    })
-  }
+# Separate IAM policy for CodePipeline (replacing inline_policy)
+resource "aws_iam_policy" "codepipeline_base_policy" {
+  name        = "CodePipelineBasePermissions"
+  description = "Base permissions for CodePipeline"
+  
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:ListBucket"],
+        Resource = [aws_s3_bucket.artifact_bucket.arn, "${aws_s3_bucket.artifact_bucket.arn}/*"]
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["codebuild:StartBuild", "codebuild:StopBuild", "codebuild:BatchGetBuilds"],
+        Resource = aws_codebuild_project.bianca_project.arn
+      },
+      {
+        Effect = "Allow",
+        Action = ["ecs:DescribeServices", "ecs:UpdateService", "ecs:DescribeTaskDefinition"],
+        Resource = [
+          aws_ecs_service.app_service.id,
+          "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/*"
+        ]
+      },
+      {
+        Effect    = "Allow",
+        Action    = "iam:PassRole",
+        Resource  = [aws_iam_role.ecs_execution_role.arn, aws_iam_role.ecs_task_role.arn],
+        Condition = { StringEqualsIfExists = { "iam:PassedToService" = "ecs-tasks.amazonaws.com" } }
+      },
+      {
+        Effect   = "Allow",
+        Action   = "codestar-connections:UseConnection",
+        Resource = var.github_app_connection_arn
+      },
+      {
+        Effect   = "Allow",
+        Action   = "secretsmanager:GetSecretValue",
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
+      }
+    ]
+  })
+}
+
+# Attach the policy to the role
+resource "aws_iam_role_policy_attachment" "codepipeline_base_policy_attach" {
+  role       = aws_iam_role.codepipeline_role.name
+  policy_arn = aws_iam_policy.codepipeline_base_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
@@ -1475,6 +1536,7 @@ resource "aws_route53_record" "app_subdomain" {
   }
 }
 
+# KEPT: Direct EIP mapping for SIP (Twilio needs direct access)
 resource "aws_route53_record" "sip_subdomain" {
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
   name    = "sip.myphonefriend.com"
@@ -1521,16 +1583,16 @@ resource "aws_route53_record" "ses_dkim_records" {
 }
 
 ################################################################################
-# OUTPUTS
+# OUTPUTS - UPDATED FOR VERIFICATION
 ################################################################################
 
 output "asterisk_public_ip" {
-  description = "Permanent public IP address for Asterisk EC2 instance"
+  description = "Public IP for Twilio/external SIP traffic"
   value       = aws_eip.asterisk_eip.public_ip
 }
 
 output "asterisk_private_ip" {
-  description = "Private IP address for Asterisk EC2 instance"
+  description = "Private IP for internal App-Asterisk RTP"
   value       = aws_instance.asterisk.private_ip
 }
 
@@ -1547,4 +1609,19 @@ output "app_alb_dns_name" {
 output "asterisk_instance_id" {
   description = "EC2 instance ID for Asterisk"
   value       = aws_instance.asterisk.id
+}
+
+output "private_subnet_cidrs" {
+  description = "Private subnet CIDRs where Fargate runs"
+  value       = ["172.31.110.0/24", "172.31.111.0/24"]
+}
+
+output "network_architecture" {
+  description = "Network architecture summary"
+  value = "Hybrid: Twilio->Asterisk(public), App<->Asterisk(private)"
+}
+
+output "nat_gateway_ip" {
+  description = "NAT Gateway IP for private subnet internet access"
+  value       = aws_eip.nat_gateway.public_ip
 }

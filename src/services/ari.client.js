@@ -11,7 +11,7 @@ const { Conversation, Patient } = require('../models');
 const channelTracker = require('./channel.tracker');
 const portManager = require('./port.manager.service');
 const rtpListenerService = require('./rtp.listener.service');
-const { getFargateIp } = require('../utils/network.utils');
+const { getFargateIp, getRTPAddress } = require('../utils/network.utils');
 
 // Configuration constants
 const CONFIG = {
@@ -165,8 +165,8 @@ class AsteriskAriClient extends EventEmitter {
         this.healthCheckInterval = null;
 
         // Configuration for ExternalMedia
-        this.RTP_BIANCA_HOST = sanitizeHost(config.asterisk.rtpBiancaHost);
-        this.RTP_ASTERISK_HOST = sanitizeHost(config.asterisk.rtpAsteriskHost);
+        this.RTP_BIANCA_HOST = null;
+        this.RTP_ASTERISK_HOST = getAsteriskIP();
         // this.RTP_BIANCA_RECEIVE_PORT = config.asterisk.rtpBiancaReceivePort;
         // this.RTP_BIANCA_SEND_PORT = config.asterisk.rtpBiancaSendPort || (config.asterisk.rtpBiancaReceivePort + 1);
 
@@ -175,6 +175,29 @@ class AsteriskAriClient extends EventEmitter {
         
         // Setup graceful shutdown
         this.setupGracefulShutdown();
+    }
+
+    // Add method to initialize network configuration
+    async initializeNetworkConfiguration() {
+        try {
+            // Get our RTP address (private IP in hybrid mode)
+            this.RTP_BIANCA_HOST = await getRTPAddress();
+            logger.info(`[ARI Network] Bianca RTP Host: ${this.RTP_BIANCA_HOST}`);
+            logger.info(`[ARI Network] Asterisk Host: ${this.RTP_ASTERISK_HOST}`);
+            
+            // Log network debug info
+            const debugInfo = await getNetworkDebugInfo();
+            logger.info(`[ARI Network] Network configuration:`, {
+                networkMode: debugInfo.environment.NETWORK_MODE,
+                usePrivateRTP: debugInfo.environment.USE_PRIVATE_NETWORK_FOR_RTP,
+                rtpAddress: debugInfo.rtpAddress,
+                asteriskIP: debugInfo.asteriskIP
+            });
+            
+        } catch (err) {
+            logger.error(`[ARI Network] Failed to initialize network configuration: ${err.message}`);
+            throw err;
+        }
     }
 
     checkMediaPipelineReady(asteriskChannelId) {
@@ -265,6 +288,9 @@ class AsteriskAriClient extends EventEmitter {
     }
 
     async start() {
+        // Initialize network configuration first
+        await this.initializeNetworkConfiguration();
+        
     // Wait for Asterisk to be ready before attempting connection
         await this.waitForAsteriskReady();
         
@@ -785,87 +811,152 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
     }
 }
 
-async diagnoseAudioFlow(asteriskChannelId) {
-    const callData = this.tracker.getCall(asteriskChannelId);
-    if (!callData) {
-        logger.error('[Audio Diagnose] No call data found');
-        return;
-    }
-    
-    logger.info('[Audio Diagnose] ===== AUDIO FLOW DIAGNOSTIC =====');
-    logger.info('[Audio Diagnose] Call State:', {
-        asteriskChannelId,
-        twilioCallSid: callData.twilioCallSid,
-        state: callData.state,
-        isReadStreamReady: callData.isReadStreamReady,
-        isWriteStreamReady: callData.isWriteStreamReady
-    });
-    
-    // Check bridges
-    logger.info('[Audio Diagnose] Bridges:', {
-        mainBridgeId: callData.mainBridgeId,
-        snoopBridgeId: callData.snoopBridgeId,
-        hasSnoopBridge: !!callData.snoopBridgeId
-    });
-    
-    // Check channels
-    logger.info('[Audio Diagnose] Channels:', {
-        mainChannel: !!callData.mainChannel,
-        snoopChannel: !!callData.snoopChannel,
-        inboundRtpChannel: !!callData.inboundRtpChannel,
-        outboundRtpChannel: !!callData.outboundRtpChannel,
-        playbackChannel: !!callData.playbackChannel
-    });
-    
-    // Check RTP ports
-    logger.info('[Audio Diagnose] RTP Ports:', {
-        readPort: callData.rtpReadPort,
-        writePort: callData.rtpWritePort
-    });
-    
-    // Check RTP listener
-    const rtpListener = require('./rtp.listener.service');
-    const listenerStatus = rtpListener.getFullStatus?.();
-    const ourListener = listenerStatus?.listeners?.find(l => l.port === callData.rtpReadPort);
-    
-    if (ourListener) {
-        logger.info('[Audio Diagnose] RTP Listener:', {
-            port: ourListener.port,
-            packetsReceived: ourListener.packetsReceived,
-            bytesReceived: ourListener.bytesReceived,
-            packetsPerSecond: ourListener.packetsPerSecond,
-            source: ourListener.source
+    // Update the network debug function to use new utilities
+    async diagnoseAudioFlow(asteriskChannelId) {
+        const callData = this.tracker.getCall(asteriskChannelId);
+        if (!callData) {
+            logger.error('[Audio Diagnose] No call data found');
+            return;
+        }
+        
+        // Get comprehensive network debug info
+        const networkDebug = await getNetworkDebugInfo();
+        
+        logger.info('[Audio Diagnose] ===== AUDIO FLOW DIAGNOSTIC =====');
+        logger.info('[Audio Diagnose] Network Configuration:', {
+            networkMode: networkDebug.environment.NETWORK_MODE,
+            usePrivateRTP: networkDebug.environment.USE_PRIVATE_NETWORK_FOR_RTP,
+            rtpAddress: networkDebug.rtpAddress,
+            asteriskIP: networkDebug.asteriskIP,
+            currentIPs: networkDebug.currentIPs
         });
-    } else {
-        logger.error('[Audio Diagnose] NO RTP LISTENER FOUND!');
-    }
-    
-    // Check RTP sender
-    const rtpSender = require('./rtp.sender.service');
-    const senderStatus = rtpSender.getStatus();
-    const ourSender = senderStatus.calls.find(c => 
-        c.callId === callData.twilioCallSid || c.callId === asteriskChannelId
-    );
-    
-    if (ourSender) {
-        logger.info('[Audio Diagnose] RTP Sender:', {
-            target: `${ourSender.rtpHost}:${ourSender.rtpPort}`,
-            packetsSent: ourSender.stats.packetsSent,
-            bytesSent: ourSender.stats.bytesSent,
-            errors: ourSender.stats.errors
+        
+        logger.info('[Audio Diagnose] Call State:', {
+            asteriskChannelId,
+            twilioCallSid: callData.twilioCallSid,
+            state: callData.state,
+            isReadStreamReady: callData.isReadStreamReady,
+            isWriteStreamReady: callData.isWriteStreamReady
         });
-    } else {
-        logger.error('[Audio Diagnose] NO RTP SENDER FOUND!');
+        
+        // Check bridges
+        logger.info('[Audio Diagnose] Bridges:', {
+            mainBridgeId: callData.mainBridgeId,
+            snoopBridgeId: callData.snoopBridgeId,
+            hasSnoopBridge: !!callData.snoopBridgeId
+        });
+        
+        // Check channels
+        logger.info('[Audio Diagnose] Channels:', {
+            mainChannel: !!callData.mainChannel,
+            snoopChannel: !!callData.snoopChannel,
+            inboundRtpChannel: !!callData.inboundRtpChannel,
+            outboundRtpChannel: !!callData.outboundRtpChannel,
+            playbackChannel: !!callData.playbackChannel
+        });
+        
+        // Check RTP ports
+        logger.info('[Audio Diagnose] RTP Ports:', {
+            readPort: callData.rtpReadPort,
+            writePort: callData.rtpWritePort
+        });
+        
+        // Check RTP listener
+        const rtpListener = require('./rtp.listener.service');
+        const listenerStatus = rtpListener.getFullStatus?.();
+        const ourListener = listenerStatus?.listeners?.find(l => l.port === callData.rtpReadPort);
+        
+        if (ourListener) {
+            logger.info('[Audio Diagnose] RTP Listener:', {
+                port: ourListener.port,
+                packetsReceived: ourListener.packetsReceived,
+                bytesReceived: ourListener.bytesReceived,
+                packetsPerSecond: ourListener.packetsPerSecond,
+                source: ourListener.source
+            });
+        } else {
+            logger.error('[Audio Diagnose] NO RTP LISTENER FOUND!');
+        }
+        
+        // Check RTP sender
+        const rtpSender = require('./rtp.sender.service');
+        const senderStatus = rtpSender.getStatus();
+        const ourSender = senderStatus.calls.find(c => 
+            c.callId === callData.twilioCallSid || c.callId === asteriskChannelId
+        );
+        
+        if (ourSender) {
+            logger.info('[Audio Diagnose] RTP Sender:', {
+                target: `${ourSender.rtpHost}:${ourSender.rtpPort}`,
+                packetsSent: ourSender.stats.packetsSent,
+                bytesSent: ourSender.stats.bytesSent,
+                errors: ourSender.stats.errors
+            });
+        } else {
+            logger.error('[Audio Diagnose] NO RTP SENDER FOUND!');
+        }
+        
+        // Check OpenAI connection
+        const openAIConnected = openAIService.isConnectionReady(callData.twilioCallSid || asteriskChannelId);
+        logger.info('[Audio Diagnose] OpenAI Connection:', {
+            isReady: openAIConnected
+        });
+        
+        logger.info('[Audio Diagnose] =================================');
     }
-    
-    // Check OpenAI connection
-    const openAIConnected = openAIService.isConnectionReady(callData.twilioCallSid || asteriskChannelId);
-    logger.info('[Audio Diagnose] OpenAI Connection:', {
-        isReady: openAIConnected
-    });
-    
-    logger.info('[Audio Diagnose] =================================');
-}
+
+    // Add a method to refresh network configuration if needed
+    async refreshNetworkConfiguration() {
+        try {
+            await this.initializeNetworkConfiguration();
+            logger.info('[ARI Network] Network configuration refreshed');
+        } catch (err) {
+            logger.error(`[ARI Network] Failed to refresh network configuration: ${err.message}`);
+            throw err;
+        }
+    }
+
+    // Update the health check to include network information
+    async healthCheck() {
+        if (!this.isConnected || !this.client) {
+            return { status: 'disconnected', healthy: false };
+        }
+
+        try {
+            await withTimeout(
+                this.client.applications.list(),
+                5000,
+                'Health check'
+            );
+            
+            const trackerStats = this.tracker.getStats();
+            const portStats = portManager.getStats();
+            const networkDebug = await getNetworkDebugInfo();
+            
+            return { 
+                status: 'connected', 
+                healthy: true,
+                activeCalls: this.tracker.calls.size,
+                retryCount: this.retryCount,
+                portUtilization: `${portStats.leased}/${portStats.totalPorts} (${portStats.utilizationPercent}%)`,
+                callsWithPorts: trackerStats.callsWithBothPorts,
+                trackerStats,
+                portStats,
+                networkConfiguration: {
+                    networkMode: networkDebug.environment.NETWORK_MODE,
+                    usePrivateRTP: networkDebug.environment.USE_PRIVATE_NETWORK_FOR_RTP,
+                    rtpAddress: networkDebug.rtpAddress,
+                    asteriskIP: networkDebug.asteriskIP
+                }
+            };
+        } catch (err) {
+            return { 
+                status: 'error', 
+                healthy: false, 
+                error: err.message 
+            };
+        }
+    }
 
     async handleStasisEnd(event, channel) {
         const channelId = channel.id;
@@ -1346,7 +1437,7 @@ async diagnoseAudioFlow(asteriskChannelId) {
         // Step 6: Create ExternalMedia with BOTH direction
         // IMPORTANT: When using 'read' direction, Asterisk RECEIVES RTP, not sends it
         // We need to use 'both' and let the UnicastRTP channel handle the actual sending
-        const rtpHost = await getFargateIp(); 
+        const rtpHost = this.RTP_BIANCA_HOST; 
         const rtpReadDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
         
         logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpReadDest}`);
@@ -1398,7 +1489,7 @@ async diagnoseAudioFlow(asteriskChannelId) {
             logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
 
             // USE DYNAMIC PORT INSTEAD OF STATIC CONFIG
-            const rtpHost = await getFargateIp();
+            const rtpHost = this.RTP_BIANCA_HOST;
             const rtpAsteriskSource = `${rtpHost}:${parentCallData.rtpWritePort}`;
             
             logger.info(`[ARI] Creating WRITE ExternalMedia to ${rtpAsteriskSource}`);
@@ -1857,41 +1948,6 @@ async diagnoseAudioFlow(asteriskChannelId) {
             readPort: callData.rtpReadPort,
             writePort: callData.rtpWritePort
         };
-    }
-
-    // Health check method updated to include port information
-    async healthCheck() {
-        if (!this.isConnected || !this.client) {
-            return { status: 'disconnected', healthy: false };
-        }
-
-        try {
-            await withTimeout(
-                this.client.applications.list(),
-                5000,
-                'Health check'
-            );
-            
-            const trackerStats = this.tracker.getStats();
-            const portStats = portManager.getStats();
-            
-            return { 
-                status: 'connected', 
-                healthy: true,
-                activeCalls: this.tracker.calls.size,
-                retryCount: this.retryCount,
-                portUtilization: `${portStats.leased}/${portStats.totalPorts} (${portStats.utilizationPercent}%)`,
-                callsWithPorts: trackerStats.callsWithBothPorts,
-                trackerStats,
-                portStats
-            };
-        } catch (err) {
-            return { 
-                status: 'error', 
-                healthy: false, 
-                error: err.message 
-            };
-        }
     }
 }
 

@@ -8,7 +8,7 @@ const patientValidation = require('../../validations/patient.validation');
 const router = express.Router();
 const config = require('../../config/config');
 const logger = require('../../config/logger');
-const { getFargateIp } = require('../../utils/network.utils');
+//const { getFargateIp } = require('../../utils/network.utils');
 const dns = require('dns').promises;
 const fs = require('fs');
 const path = require('path');
@@ -372,58 +372,58 @@ router.get('/openai-connections', (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /test/rtp-debug:
- *   get:
- *     summary: Debug RTP configuration and network
- *     description: Shows current RTP configuration, ports, and network details
- *     tags: [Test - RTP]
- *     responses:
- *       "200":
- *         description: RTP debug information
- */
-router.get('/rtp-debug', async (req, res) => {
-    try {
-        const portManager = require('../../services/port.manager.service');
+// /**
+//  * @swagger
+//  * /test/rtp-debug:
+//  *   get:
+//  *     summary: Debug RTP configuration and network
+//  *     description: Shows current RTP configuration, ports, and network details
+//  *     tags: [Test - RTP]
+//  *     responses:
+//  *       "200":
+//  *         description: RTP debug information
+//  */
+// router.get('/rtp-debug', async (req, res) => {
+//     try {
+//         const portManager = require('../../services/port.manager.service');
         
-        let publicIp = 'Not available';
-        let ipError = null;
+//         let publicIp = 'Not available';
+//         let ipError = null;
         
-        try {
-            publicIp = await getFargateIp();
-        } catch (err) {
-            publicIp = 'Error getting IP';
-            ipError = err.message;
-        }
+//         try {
+//             publicIp = await getFargateIp();
+//         } catch (err) {
+//             publicIp = 'Error getting IP';
+//             ipError = err.message;
+//         }
         
-        const activeListeners = rtpListener.getAllActiveListeners();
+//         const activeListeners = rtpListener.getAllActiveListeners();
         
-        res.json({
-            network: {
-                publicIp: publicIp,
-                ipError: ipError,
-                isRunningInECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
-                ecsMetadataUri: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set'
-            },
-            portManager: portManager.getStats(),
-            activeListeners,
-            config: {
-                appRtpPortRange: process.env.APP_RTP_PORT_RANGE || '16384-16484',
-                rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set',
-                asteriskUrl: config.asterisk.url,
-                asteriskPublicIp: config.asterisk.publicIp || 'Not set'
-            },
-            environment: {
-                AWS_REGION: process.env.AWS_REGION,
-                NODE_ENV: process.env.NODE_ENV,
-                RTP_PORT_RANGE: process.env.RTP_PORT_RANGE
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message, stack: err.stack });
-    }
-});
+//         res.json({
+//             network: {
+//                 publicIp: publicIp,
+//                 ipError: ipError,
+//                 isRunningInECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
+//                 ecsMetadataUri: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set'
+//             },
+//             portManager: portManager.getStats(),
+//             activeListeners,
+//             config: {
+//                 appRtpPortRange: process.env.APP_RTP_PORT_RANGE || '16384-16484',
+//                 rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set',
+//                 asteriskUrl: config.asterisk.url,
+//                 asteriskPublicIp: config.asterisk.publicIp || 'Not set'
+//             },
+//             environment: {
+//                 AWS_REGION: process.env.AWS_REGION,
+//                 NODE_ENV: process.env.NODE_ENV,
+//                 RTP_PORT_RANGE: process.env.RTP_PORT_RANGE
+//             }
+//         });
+//     } catch (err) {
+//         res.status(500).json({ error: err.message, stack: err.stack });
+//     }
+// });
 
 /**
  * @swagger
