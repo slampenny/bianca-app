@@ -20,6 +20,22 @@ const templates = {
 
   Summary:
   `,
+    userExtraction: `Extract and organize information about the user from the conversation history. Focus ONLY on information about the user, ignoring assistant responses. Return the information in a structured format:
+
+User Information:
+- Name: [extract if mentioned]
+- Age: [extract if mentioned]
+- Location: [extract if mentioned]
+- Occupation: [extract if mentioned]
+- Health Information: [extract any health-related details]
+- Personal Preferences: [extract likes, dislikes, habits]
+- Family Information: [extract family details if mentioned]
+- Other Relevant Details: [any other personal information]
+
+Conversation History: {history}
+User Domain: {userdomain}
+
+Extracted Information:`,
   },
   multirole: {
     role: `Multirole Expert Conversational Assistant`,

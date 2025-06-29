@@ -1,13 +1,12 @@
 // Import the necessary modules and packages
-const { LLMChain } = require('langchain/chains'); // Import the LLMChain class from the langchain package
-const { OpenAI } = require('@langchain/openai'); // Import the OpenAIClient class from the @langchain/openai package
+const { ChatOpenAI } = require('@langchain/openai'); // Import the ChatOpenAI class from the modern @langchain/openai package
 const { PromptTemplate } = require('@langchain/core/prompts'); // Import the PromptTemplate class from the @langchain/core package
 const { templates } = require('../templates/templates'); // Import the templates from the local templates directory
 const config = require('../config/config'); // Import the configuration settings
 
-// Create a new instance of the OpenAI client
-const llm = new OpenAI({
-  concurrency: 10, // Set the maximum number of concurrent requests
+// Create a new instance of the ChatOpenAI client
+const llm = new ChatOpenAI({
+  maxConcurrency: 10, // Set the maximum number of concurrent requests
   temperature: 0, // Set the randomness of the AI's responses
   modelName: config.openai.model, // Set the model name from an environment variable
 });
@@ -33,27 +32,64 @@ const langChainAPI = {
         history: conversationHistory,
         userdomain: userDomain,
       });
-      // Create a new LLMChain instance
-      const chain = new LLMChain({
-        llm,
-        prompt,
-      });
-      // Log the creation of the LLMChain instance
-      console.log('LangChain - LLM Chain created');
-      // Call the LLMChain instance with the formatted history and get the result
-      const result = await chain.call({
-        prompt: message,
-        history: formattedHistory,
-        userdomain: userDomain,
-      });
+      
+      // Use the modern invoke method instead of chain.call
+      const result = await llm.invoke(formattedHistory);
       // Log the summarized conversation
-      console.log(`LangChain - Summarized Conversation: ${result.text}`);
+      console.log(`LangChain - Summarized Conversation: ${result.content}`);
       // Return the summarized conversation
-      return result.text;
+      return result.content;
     } catch (err) {
       // Log any errors that occur
       console.error(`LangChain - Error with Request: ${err}`);
       // Return the error message
+      throw err;
+    }
+  },
+
+  // Define the extractUserInformation method
+  async extractUserInformation(conversationHistory, userDomain = 'casual conversation') {
+    try {
+      // Get the user extraction template
+      const template = templates.generic.userExtraction;
+      // Log the template being used
+      console.log(`LangChain - Using User Extraction Template`);
+      
+      const prompt = new PromptTemplate({
+        template,
+        inputVariables: ['history', 'userdomain'],
+      });
+
+      const formattedPrompt = await prompt.format({
+        history: conversationHistory,
+        userdomain: userDomain,
+      });
+
+      const result = await llm.invoke(formattedPrompt);
+      console.log(`LangChain - Extracted User Information: ${result.content}`);
+      return result.content;
+    } catch (err) {
+      console.error(`LangChain - Error extracting user information: ${err}`);
+      throw err;
+    }
+  },
+
+  // Define the processConversation method that runs both summarization and user extraction
+  async processConversation(message, conversationHistory, userDomain = 'casual conversation') {
+    try {
+      // Run both operations in parallel for efficiency
+      const [summary, userInfo] = await Promise.all([
+        this.summarizeConversation(message, conversationHistory, userDomain),
+        this.extractUserInformation(conversationHistory, userDomain)
+      ]);
+
+      return {
+        summary,
+        userInformation: userInfo,
+        timestamp: new Date().toISOString()
+      };
+    } catch (err) {
+      console.error(`LangChain - Error processing conversation: ${err}`);
       throw err;
     }
   },
