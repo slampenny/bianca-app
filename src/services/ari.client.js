@@ -11,7 +11,7 @@ const { Conversation, Patient } = require('../models');
 const channelTracker = require('./channel.tracker');
 const portManager = require('./port.manager.service');
 const rtpListenerService = require('./rtp.listener.service');
-const { getFargateIp, getRTPAddress } = require('../utils/network.utils');
+const { getAsteriskIP, getRTPAddress, getNetworkDebugInfo } = require('../utils/network.utils');
 
 // Configuration constants
 const CONFIG = {

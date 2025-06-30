@@ -216,7 +216,7 @@ variable "github_repo" {
 variable "github_branch" {
   description = "GitHub branch for CodePipeline."
   type        = string
-  default     = "audio/fix-networking"
+  default     = "main"
 }
 
 variable "github_app_connection_arn" {
@@ -825,10 +825,11 @@ resource "aws_lb_target_group" "app_tg" {
 
   health_check {
     path                = "/health"
-    interval            = 10
-    timeout             = 5
-    healthy_threshold   = 3
-    unhealthy_threshold = 2
+    interval            = 30        # Increased from 10
+    timeout             = 10        # Increased from 5
+    healthy_threshold   = 2         # Decreased from 3
+    unhealthy_threshold = 5         # Increased from 2
+    matcher             = "200"
   }
   tags = { Name = "bianca-target-group" }
 }
