@@ -216,7 +216,7 @@ variable "github_repo" {
 variable "github_branch" {
   description = "GitHub branch for CodePipeline."
   type        = string
-  default     = "audio/fix-networking"
+  default     = "main"
 }
 
 variable "github_app_connection_arn" {
