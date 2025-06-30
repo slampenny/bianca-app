@@ -462,6 +462,17 @@ resource "aws_service_discovery_service" "bianca_app_sd_service" {
 # SECURITY GROUPS - UPDATED FOR HYBRID NETWORKING
 ################################################################################
 
+# Add explicit ALB to Fargate egress rule
+resource "aws_security_group_rule" "alb_to_fargate_egress" {
+  type                     = "egress"
+  from_port                = var.container_port
+  to_port                  = var.container_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.alb_sg.id
+  source_security_group_id = aws_security_group.bianca_app_sg.id
+  description              = "Allow ALB to reach Fargate tasks"
+}
+
 resource "aws_security_group" "alb_sg" {
   name        = "alb-sg"
   description = "Security group for the Application Load Balancer"
@@ -487,6 +498,7 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Keep the general egress rule but add specific one below
   egress {
     from_port   = 0
     to_port     = 0
@@ -602,15 +614,26 @@ resource "aws_security_group_rule" "asterisk_ari_from_bianca_app" {
   description              = "ARI access from Bianca App Backend"
 }
 
-# RTP from Asterisk to Bianca App (internal)
-resource "aws_security_group_rule" "bianca_app_rtp_from_asterisk" {
+# Debug: Add more specific RTP debugging rules
+resource "aws_security_group_rule" "bianca_app_rtp_from_asterisk_debug" {
   type                     = "ingress"
   from_port                = var.app_rtp_port_start
   to_port                  = var.app_rtp_port_end
   protocol                 = "udp"
   security_group_id        = aws_security_group.bianca_app_sg.id
   source_security_group_id = aws_security_group.asterisk_ec2_sg.id
-  description              = "RTP from Asterisk (internal network)"
+  description              = "RTP from Asterisk (internal network) - Debug"
+}
+
+# Also allow all UDP traffic temporarily for debugging
+resource "aws_security_group_rule" "bianca_app_debug_udp" {
+  type              = "ingress"
+  from_port         = 10000
+  to_port           = 65535
+  protocol          = "udp"
+  security_group_id = aws_security_group.bianca_app_sg.id
+  cidr_blocks       = ["172.31.0.0/16"]  # Allow from entire VPC
+  description       = "DEBUG: Allow all UDP from VPC"
 }
 
 resource "aws_security_group" "efs_sg" {
@@ -825,11 +848,13 @@ resource "aws_lb_target_group" "app_tg" {
 
   health_check {
     path                = "/health"
-    interval            = 30        # Increased from 10
-    timeout             = 10        # Increased from 5
-    healthy_threshold   = 2         # Decreased from 3
-    unhealthy_threshold = 5         # Increased from 2
+    interval            = 60        # Increased to give more time
+    timeout             = 15        # Increased timeout
+    healthy_threshold   = 2         # Reduced threshold
+    unhealthy_threshold = 10        # Increased to be more forgiving
     matcher             = "200"
+    port                = "traffic-port"
+    protocol            = "HTTP"
   }
   tags = { Name = "bianca-target-group" }
 }
