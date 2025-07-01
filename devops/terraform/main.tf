@@ -1738,4 +1738,4 @@ output "connection_test_commands" {
     # Then inside container:
     curl http://${aws_instance.asterisk.private_ip}:8088/ari/asterisk/info
   EOT
-}
+} 
