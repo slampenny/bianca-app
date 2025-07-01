@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native"
 import { useResetPasswordMutation } from "../services/api/authApi" // Adjust the path as necessary
+import { colors } from "app/theme/colors"
 
 export const ConfirmResetScreen = () => {
   const [confirmReset, { isLoading }] = useResetPasswordMutation()
@@ -72,34 +73,38 @@ export const ConfirmResetScreen = () => {
 const styles = StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: "#007BFF",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     padding: 10,
   },
   buttonText: {
-    color: "white",
+    color: colors.palette.neutral100,
     fontSize: 16,
   },
   container: {
     flex: 1,
     justifyContent: "center",
     padding: 16,
+    backgroundColor: colors.palette.biancaBackground,
   },
   errorText: {
-    color: "red",
+    color: colors.palette.biancaError,
     marginBottom: 10,
   },
   input: {
-    borderColor: "gray",
+    borderColor: colors.palette.biancaBorder,
     borderWidth: 1,
     height: 40,
     marginBottom: 10,
     paddingHorizontal: 10,
+    color: colors.palette.biancaHeader,
+    backgroundColor: colors.palette.neutral100,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
+    color: colors.palette.biancaHeader,
   },
 })

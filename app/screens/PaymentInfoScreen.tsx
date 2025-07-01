@@ -16,6 +16,7 @@ import { getOrg } from "../store/orgSlice"
 import { useGetInvoicesByOrgQuery } from "../services/api/paymentApi"
 import { WebView } from "react-native-webview"
 import Config from "../config"
+import { colors } from "app/theme/colors"
 
 // --- Define the required roles ---
 const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
@@ -51,7 +52,16 @@ function PaymentMethodsScreen() {
   return (
     <View style={styles.screenContainer}>
       {Platform.OS === "web" ? (
-        <iframe src={paymentPageUrl} style={styles.iframe} title="Payment Method" />
+        <iframe
+          src={paymentPageUrl}
+          style={{
+            border: "none",
+            height: "100%",
+            width: "100%",
+            minHeight: 400, // fallback for web
+          }}
+          title="Payment Method"
+        />
       ) : (
         <WebView
           source={{ uri: paymentPageUrl }}
@@ -227,11 +237,11 @@ export function PaymentInfoScreen() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: "#3498db",
-        tabBarInactiveTintColor: "#7f8c8d",
+        tabBarActiveTintColor: colors.palette.biancaButtonSelected,
+        tabBarInactiveTintColor: colors.palette.neutral600,
         tabBarLabelStyle: { fontSize: 16, fontWeight: "600" },
-        tabBarStyle: { backgroundColor: "#fff" },
-        tabBarIndicatorStyle: { backgroundColor: "#3498db" },
+        tabBarStyle: { backgroundColor: colors.palette.neutral100 },
+        tabBarIndicatorStyle: { backgroundColor: colors.palette.biancaButtonSelected },
       }}
     >
       <Tab.Screen name="Payment Methods" component={PaymentMethodsScreen} />
@@ -243,7 +253,7 @@ export function PaymentInfoScreen() {
 // --- Styles (Combined and added message styles) ---
 const styles = StyleSheet.create({
   billingHeader: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 10,
@@ -255,40 +265,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   detailText: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 14,
     marginVertical: 3, // Increased vertical margin
   },
   emptyText: {
-    color: "#7f8c8d",
+    color: colors.palette.neutral600,
     fontSize: 15,
     marginTop: 20,
     textAlign: "center",
   },
   expandIcon: {
-    color: "#3498db",
+    color: colors.palette.biancaButtonSelected,
     fontSize: 16,
   },
-  iframe: {
-    border: "none",
-    height: "100%",
-    width: "100%",
-  },
   invoiceContainer: {
-    backgroundColor: "#fff",
-    borderColor: "#e0e0e0",
+    backgroundColor: colors.palette.neutral100,
+    borderColor: colors.palette.neutral300,
     borderRadius: 8,
     borderWidth: 1,
     elevation: 2,
     marginBottom: 10,
     overflow: "hidden",
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
   },
   invoiceDetails: {
-    borderTopColor: "#ecf0f1",
+    borderTopColor: colors.palette.biancaBackground,
     borderTopWidth: 1,
     padding: 12,
   },
@@ -298,10 +303,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#f9f9f9", // Lighter header bg
+    backgroundColor: colors.palette.neutral200, // Lighter header bg
   },
   invoiceHeaderText: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -311,17 +316,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 30,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: colors.palette.neutral200,
   },
   messageText: {
-    color: "#34495e",
+    color: colors.palette.neutral700,
     fontSize: 16,
     lineHeight: 22,
     marginBottom: 10,
     textAlign: "center",
   },
   messageTitle: {
-    color: "#e74c3c",
+    color: colors.palette.angry500,
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 15,
@@ -331,22 +336,22 @@ const styles = StyleSheet.create({
     // Used by sub-screens
     flex: 1,
     padding: 15, // Slightly reduced padding
-    backgroundColor: "#f4f6f8", // Lighter background grey
+    backgroundColor: colors.palette.neutral200,
   },
   sectionTitle: {
     fontSize: 17, // Slightly larger
     fontWeight: "600",
-    color: "#34495e", // Darker grey
+    color: colors.palette.neutral700,
     marginTop: 20,
     marginBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: colors.palette.neutral300,
     paddingBottom: 5,
   },
   webview: {
     flex: 1,
     borderWidth: 1, // Add border to see boundaries if needed
-    borderColor: "#ccc",
+    borderColor: colors.palette.neutral400,
   },
 })
 

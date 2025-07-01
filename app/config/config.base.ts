@@ -2,7 +2,7 @@ export interface ConfigBaseProps {
   persistNavigation: "always" | "dev" | "prod" | "never"
   catchErrors: "always" | "dev" | "prod" | "never"
   exitRoutes: string[]
-  paymethodMethodGatewayUrl: string
+  paymentMethodGatewayUrl: string
 }
 
 export type PersistNavigationConfig = ConfigBaseProps["persistNavigation"]

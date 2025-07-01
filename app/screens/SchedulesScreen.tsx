@@ -12,6 +12,7 @@ import { getSchedules, setSchedule, getSchedule } from "../store/scheduleSlice"
 import { LoadingScreen } from "./LoadingScreen"
 import { Schedule } from "app/services/api"
 import { getPatient } from "app/store/patientSlice"
+import { colors } from "app/theme/colors"
 
 export const SchedulesScreen = () => {
   const dispatch = useDispatch()
@@ -91,7 +92,7 @@ export const SchedulesScreen = () => {
         <Pressable
           style={({ pressed }) => [
             {
-              backgroundColor: pressed ? "rgba(52, 152, 219, 0.5)" : "#3498DB",
+              backgroundColor: pressed ? colors.palette.biancaButtonUnselected : colors.palette.biancaButtonSelected,
               padding: 10,
               justifyContent: "center",
               alignItems: "center",
@@ -106,7 +107,7 @@ export const SchedulesScreen = () => {
         <Pressable
           style={({ pressed }) => [
             {
-              backgroundColor: pressed ? "rgba(231, 76, 60, 0.5)" : "#E74C3C",
+              backgroundColor: pressed ? colors.palette.angry100 : colors.palette.angry500,
               padding: 10,
               justifyContent: "center",
               alignItems: "center",
@@ -134,36 +135,36 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   buttonText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 16,
   },
   container: {
-    backgroundColor: "#ECF0F1",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
     padding: 20,
   },
   header: {
-    color: "#2C3E50",
+    color: colors.palette.biancaHeader,
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
   },
   label: {
-    color: "#7F8C8D",
+    color: colors.palette.neutral600,
     fontSize: 18,
     marginBottom: 5,
   },
   noSchedulesText: {
-    color: "#7F8C8D",
+    color: colors.palette.neutral600,
     fontSize: 18,
     marginBottom: 20,
   },
   picker: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     height: 50,
   },
   pickerContainer: {
-    borderColor: "#BDC3C7",
+    borderColor: colors.palette.biancaBorder,
     borderRadius: 5,
     borderWidth: 1,
     marginBottom: 20,

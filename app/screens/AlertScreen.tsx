@@ -8,14 +8,15 @@ import {
   useGetAllAlertsQuery,
 } from "../services/api"
 import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSlice"
-import { Alert } from "../services/api/api.types"
+import { Alert, Caregiver } from "../services/api/api.types"
 import { getCurrentUser } from "app/store/authSlice"
+import { colors } from "app/theme/colors"
 
 export function AlertScreen() {
   const dispatch = useDispatch()
   const alerts = useSelector(getAlerts)
   const unreadAlertCount = useSelector(selectUnreadAlertCount)
-  const currentUser = useSelector(getCurrentUser)
+  const currentUser = useSelector(getCurrentUser) as Caregiver | null
   const [showUnread, setShowUnread] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -43,8 +44,9 @@ export function AlertScreen() {
   }
 
   const handleMarkAllAsRead = async () => {
+    if (!currentUser) return
     const filteredAlerts = showUnread
-      ? alerts.filter((alert) => !alert.readBy?.includes(currentUser?.id))
+      ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!))
       : alerts
 
     await markAllAsRead({ alerts: filteredAlerts })
@@ -67,10 +69,10 @@ export function AlertScreen() {
       <View style={styles.alertContent}>
         <View style={styles.alertHeader}>
           <Toggle
-            value={!!item.readBy?.includes(currentUser?.id)}
+            value={!!item.readBy?.includes(currentUser?.id || "")}
             onValueChange={() => handleAlertPress(item)}
             variant="checkbox"
-            style={styles.alertToggle}
+            containerStyle={styles.alertToggle}
           />
           <Text style={styles.alertMessage} numberOfLines={1}>
             {item.message}
@@ -87,13 +89,13 @@ export function AlertScreen() {
   )
 
   const filteredAlerts = showUnread
-    ? alerts.filter((alert) => !alert.readBy?.includes(currentUser?.id))
+    ? (currentUser ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!)) : [])
     : alerts
 
   if (isFetching) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.palette.biancaButtonSelected} />
       </View>
     )
   }
@@ -127,7 +129,7 @@ export function AlertScreen() {
               value={false}
               onValueChange={handleMarkAllAsRead}
               variant="checkbox"
-              style={styles.markAllToggle}
+              containerStyle={styles.markAllToggle}
             />
             <Text style={styles.markAllText}>Mark all as read</Text>
           </View>
@@ -156,16 +158,16 @@ export function AlertScreen() {
 
 const styles = StyleSheet.create({
   activeTab: {
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
   },
   activeTabText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
   },
   alertContent: {
     flex: 1,
   },
   alertDetails: {
-    color: "#7f8c8d",
+    color: colors.palette.neutral600,
     fontSize: 14,
   },
   alertHeader: {
@@ -174,7 +176,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   alertMessage: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     flexShrink: 1,
     fontSize: 16,
     fontWeight: "bold",
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   container: {
-    backgroundColor: "#ecf0f1",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
   contentContainer: {
@@ -195,56 +197,58 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   inactiveTab: {
-    backgroundColor: "#ccc",
+    backgroundColor: colors.palette.biancaButtonUnselected,
   },
   inactiveTabText: {
-    color: "#2c3e50",
+    color: colors.palette.biancaButtonSelected,
   },
   listItem: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
-    elevation: 2,
-    marginVertical: 6,
-    padding: 12,
-    shadowColor: "#000",
+    marginBottom: 10,
+    padding: 10,
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 2,
   },
-  listView: {
-    marginBottom: 16,
-  },
   loaderContainer: {
-    alignItems: "center",
-    backgroundColor: "#ecf0f1",
     flex: 1,
     justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.palette.biancaBackground,
   },
   markAllContainer: {
-    alignItems: "center",
     flexDirection: "row",
-    marginBottom: 16,
+    alignItems: "center",
+    marginVertical: 10,
   },
   markAllText: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 16,
+    marginLeft: 8,
   },
   markAllToggle: {
     marginRight: 8,
   },
   refreshButton: {
-    backgroundColor: "#3498db",
-    marginBottom: 20,
+    backgroundColor: colors.palette.biancaButtonSelected,
+    borderRadius: 5,
+    marginTop: 20,
+    paddingVertical: 10,
+    alignItems: "center",
   },
   tabButton: {
-    borderRadius: 5,
     flex: 1,
-    marginHorizontal: 5,
-    paddingVertical: 12,
+    borderRadius: 5,
+    marginHorizontal: 4,
+    paddingVertical: 10,
   },
   tabRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     marginBottom: 16,
+  },
+  listView: {
+    marginTop: 10,
   },
 })

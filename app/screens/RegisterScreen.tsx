@@ -4,6 +4,7 @@ import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
+import { colors } from "app/theme/colors"
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
@@ -173,7 +174,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: "#ecf0f1",
+        backgroundColor: colors.palette.biancaBackground,
         overflowY: "scroll",
         msOverflowStyle: "scrollbar",
         WebkitOverflowScrolling: "touch",
@@ -348,110 +349,83 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 // Add your StyleSheet definitions here
 const styles = StyleSheet.create({
   button: {
-    // from original code
     alignItems: "center",
-    backgroundColor: "lightgray",
+    backgroundColor: colors.palette.biancaButtonUnselected,
     borderRadius: 4,
     flex: 1,
     marginHorizontal: 5,
     paddingVertical: 10,
   },
   buttonContainer: {
-    // from original code
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 20,
   },
   errorText: {
-    // from original code
-    width: "100%", // Make the container span the width
-    textAlign: "center", // Center the text within the container
-    fontSize: 16, // Slightly larger font size
-    fontWeight: "500", // Medium weight to make it stand out
-    color: "#cc0000", // Keep dark red color
-    backgroundColor: "rgba(255, 0, 0, 0.08)", // Subtle background tint
-    paddingVertical: 10, // Vertical padding
-    paddingHorizontal: 12, // Horizontal padding
-    marginBottom: 15, // Space above the element below (submit button)
-    borderRadius: 6, // Slightly more rounded corners
+    width: "100%",
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.palette.biancaError,
+    backgroundColor: colors.palette.biancaErrorBackground,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 15,
+    borderRadius: 6,
   },
   explanationText: {
-    // from original code
-    color: "gray",
+    color: colors.palette.biancaExplanation,
     fontSize: 14,
     marginBottom: 20,
     textAlign: "center",
   },
   fieldContainer: {
-    // from original code
-    marginBottom: 15, // Increased spacing between fields slightly
+    marginBottom: 15,
   },
-  fieldErrorText: { // This might be redundant if using TextField's helper/status prop
-    // from original code
-    color: "red",
+  fieldErrorText: {
+    color: colors.palette.biancaError,
     fontSize: 12,
-    // marginBottom: 8, // Handled by TextField helper prop margin
     marginTop: 4,
   },
   header: {
-    // from original code
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderBottomWidth: 1,
-    borderColor: "#ddd",
+    borderColor: colors.palette.biancaBorder,
     paddingVertical: 20,
   },
   headerTitle: {
-    // from original code
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 20,
     fontWeight: "600",
   },
   linkButton: {
-    // from original code
     marginBottom: 40,
     marginTop: 15,
   },
   linkButtonText: {
-    // from original code
-    color: "#3498db",
+    color: colors.palette.biancaButtonSelected,
     fontSize: 16,
     textAlign: "center",
   },
   registerButton: {
-    // from original code - You might adjust this if using presets heavily
-    // alignItems: "center", // Handled by base preset
-    // backgroundColor: "#3498db", // Handled by 'filled' preset (example)
-    // borderRadius: 4, // Handled by base preset
-    marginTop: 10, // Keep or adjust as needed
-    // paddingVertical: 12, // Handled by base preset
+    marginTop: 10,
     width: "100%",
   },
   selectedButton: {
-    // from original code - Using presets might make this less necessary,
-    // or you might apply specific styles here not covered by presets.
-    // Example: Add extra visual cue beyond background color if needed.
-    // alignItems: "center", // Handled by base preset
-    // backgroundColor: "#3498db", // Handled by 'filled' preset (example)
-    // borderRadius: 4, // Handled by base preset
     flex: 1,
     marginHorizontal: 5,
-    // paddingVertical: 10, // Handled by base preset
-    // Add specific selected styles if needed, e.g., border
-    // borderWidth: 2,
-    // borderColor: 'blue',
   },
   successText: {
-    // from original code
-    width: "100%", // Make the container span the width
-    textAlign: "center", // Center the text within the container
-    fontSize: 16, // Slightly larger font size
-    fontWeight: "500", // Medium weight to make it stand out
-    color: "#006400", // Keep dark green color
-    backgroundColor: "rgba(0, 200, 0, 0.1)", // Subtle background tint
-    paddingVertical: 10, // Vertical padding
-    paddingHorizontal: 12, // Horizontal padding
-    marginBottom: 15, // Space above the element below (submit button)
-    borderRadius: 6, // Slightly more rounded corners
+    width: "100%",
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.palette.biancaSuccess,
+    backgroundColor: colors.palette.biancaSuccessBackground,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 15,
+    borderRadius: 6,
   },
 })

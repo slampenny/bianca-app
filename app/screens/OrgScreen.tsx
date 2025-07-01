@@ -7,6 +7,7 @@ import { LoadingScreen } from "./LoadingScreen"
 import { goBack } from "app/navigators"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
+import { colors } from "app/theme/colors"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
@@ -71,21 +72,21 @@ export function OrgScreen() {
           placeholder="Name"
           value={name}
           onChangeText={setName}
-          placeholderTextColor="#7f8c8d"
+          placeholderTextColor={colors.palette.neutral600}
         />
         <TextInput
           style={styles.input}
           placeholder="Email"
           value={email}
           onChangeText={setEmail}
-          placeholderTextColor="#7f8c8d"
+          placeholderTextColor={colors.palette.neutral600}
         />
         <TextInput
           style={styles.input}
           placeholder="Phone"
           value={phone}
           onChangeText={setPhone}
-          placeholderTextColor="#7f8c8d"
+          placeholderTextColor={colors.palette.neutral600}
         />
         <Pressable style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>SAVE</Text>
@@ -100,46 +101,46 @@ export function OrgScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#ecf0f1",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
   contentContainer: {
     padding: 20,
   },
   errorText: {
-    color: "red",
+    color: colors.palette.biancaError,
     marginBottom: 10,
     textAlign: "center",
   },
   formCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
     elevation: 2,
     marginBottom: 20,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
   header: {
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderBottomWidth: 1,
-    borderColor: "#ddd",
+    borderColor: colors.palette.biancaBorder,
     marginBottom: 20,
     paddingVertical: 16,
   },
   headerTitle: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 24,
     fontWeight: "600",
   },
   input: {
-    borderColor: "#bdc3c7",
+    borderColor: colors.palette.neutral300,
     borderRadius: 5,
     borderWidth: 1,
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 16,
     height: 45,
     marginBottom: 15,
@@ -147,24 +148,24 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     alignItems: "center",
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     paddingVertical: 15,
   },
   saveButtonText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 18,
     fontWeight: "600",
   },
   viewCaregiversButton: {
     alignItems: "center",
-    backgroundColor: "#2ecc71",
+    backgroundColor: colors.palette.biancaSuccess,
     borderRadius: 5,
     marginTop: 10,
     paddingVertical: 15,
   },
   viewCaregiversButtonText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 18,
     fontWeight: "600",
   },

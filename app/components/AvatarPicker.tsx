@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { Platform, Image, View, StyleSheet, Pressable, Text } from "react-native"
 import * as ImagePicker from "expo-image-picker"
+import { colors } from "app/theme/colors"
 
 interface AvatarPickerProps {
   initialAvatar: string | null
@@ -155,13 +156,13 @@ const styles = StyleSheet.create({
     fontSize: 48,
   },
   selectButton: {
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   selectButtonText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 16,
     fontWeight: "600",
   },

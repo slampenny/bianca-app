@@ -4,6 +4,7 @@ import { useSelector } from "react-redux"
 import { useGetConversationsByPatientQuery } from "../services/api/conversationApi"
 import { getPatient } from "../store/patientSlice"
 import { Conversation, Message } from "../services/api/api.types"
+import { colors } from "app/theme/colors"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
@@ -46,7 +47,8 @@ export function ConversationsScreen() {
             style={[
               styles.messageBubble,
               // Example of slightly different background for patient vs doctor
-              message.role === "patient" ? styles.patientBubble : styles.doctorBubble,
+              message.role === "patient" ? styles.patientBubble : undefined,
+              message.role !== "patient" ? styles.doctorBubble : undefined,
             ]}
           >
             <Text style={styles.messageRole}>{message.role}:</Text>
@@ -66,7 +68,7 @@ export function ConversationsScreen() {
       {/* Loading/Error States */}
       {isLoading && (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#3498db" />
+          <ActivityIndicator size="large" color={colors.palette.biancaButtonSelected} />
         </View>
       )}
       {error && (
@@ -79,7 +81,7 @@ export function ConversationsScreen() {
       {!isLoading && !error && (
         <FlatList
           data={conversations}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => item.id ? String(item.id) : String(index)}
           renderItem={renderConversation}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.listContent}
@@ -100,50 +102,46 @@ function Header({ title }: { title: string }) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#ecf0f1",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
   conversationCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     padding: 16,
     marginBottom: 12,
     borderRadius: 6,
-
-    // iOS shadow
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-
-    // Android elevation
     elevation: 2,
   },
   conversationTitle: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 12,
   },
   doctorBubble: {
-    backgroundColor: "#e2ffd0", // Light green
+    backgroundColor: colors.palette.biancaSuccessBackground, // Light green
   },
   errorContainer: {
     alignItems: "center",
     padding: 20,
   },
   errorText: {
-    color: "red",
+    color: colors.palette.biancaError,
     fontSize: 16,
   },
   header: {
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderBottomWidth: 1,
-    borderColor: "#ddd",
+    borderColor: colors.palette.biancaBorder,
     paddingVertical: 16,
   },
   headerTitle: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 20,
     fontWeight: "600",
   },
@@ -161,21 +159,21 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   messageRole: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontWeight: "bold",
     marginBottom: 4,
   },
   messageText: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 14,
   },
   noConversationsText: {
-    color: "#7f8c8d",
+    color: colors.palette.neutral600,
     fontSize: 16,
     marginTop: 20,
     textAlign: "center",
   },
   patientBubble: {
-    backgroundColor: "#d0ebff", // Light blue
+    backgroundColor: colors.palette.biancaButtonUnselected, // Light blue
   },
 })

@@ -9,6 +9,7 @@ import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { Caregiver, Patient } from "../services/api/api.types"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { RootState } from "../store/store"
+import { colors } from "app/theme/colors"
 
 export function HomeScreen() {
   const dispatch = useDispatch()
@@ -39,7 +40,7 @@ export function HomeScreen() {
         </View>
         <Pressable
           style={styles.editButton}
-          android_ripple={{ color: "#2980b9" }}
+          android_ripple={{ color: colors.palette.biancaButtonSelected }}
           onPress={() => handlePatientPress(item)}
           testID="edit-patient-button"
         >
@@ -70,7 +71,7 @@ export function HomeScreen() {
       {/* Footer (Add Patient) */}
       <Pressable
         style={styles.addButton}
-        android_ripple={{ color: "#27ae60" }}
+        android_ripple={{ color: colors.palette.biancaSuccess }}
         onPress={handleAddPatient}
         testID="add-patient-button"
       >
@@ -83,44 +84,44 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   addButton: {
     alignItems: "center",
-    backgroundColor: "#2ecc71",
+    backgroundColor: colors.palette.biancaSuccess,
     paddingVertical: 16,
   },
   addButtonText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 18,
     fontWeight: "600",
   },
   avatar: {
-    backgroundColor: "#bdc3c7",
+    backgroundColor: colors.palette.neutral300,
     borderRadius: 24,
     height: 48,
     marginRight: 12,
     width: 48,
   },
   container: {
-    backgroundColor: "#ecf0f1",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
   editButton: {
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   editButtonText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 16,
   },
   header: {
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderBottomWidth: 1,
-    borderColor: "#ddd",
+    borderColor: colors.palette.biancaBorder,
     paddingVertical: 20,
   },
   headerTitle: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 20,
     fontWeight: "600",
   },
@@ -129,13 +130,13 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   noUsersText: {
-    color: "#7f8c8d",
+    color: colors.palette.neutral600,
     fontSize: 16,
     marginTop: 20,
     textAlign: "center",
   },
   patientCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
 
     // iOS shadow
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   patientName: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     flexShrink: 1,
     fontSize: 16,
   },

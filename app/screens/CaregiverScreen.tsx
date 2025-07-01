@@ -20,6 +20,7 @@ import {
 } from "../services/api/caregiverApi"
 import { useSendInviteMutation } from "../services/api/orgApi"
 import { LoadingScreen } from "./LoadingScreen"
+import { colors } from "app/theme/colors"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
@@ -214,7 +215,7 @@ function CaregiverScreen() {
           <Pressable
             style={[
               styles.button,
-              (!email || !phone || emailError || phoneError) && styles.buttonDisabled,
+              (!email || !phone || emailError || phoneError) ? styles.buttonDisabled : undefined,
             ]}
             onPress={handleSave}
             disabled={!email || !phone || !!emailError || !!phoneError}
@@ -227,7 +228,7 @@ function CaregiverScreen() {
               style={[
                 styles.button,
                 styles.deleteButton,
-                (!caregiver || !caregiver.id) && styles.buttonDisabled,
+                (!caregiver || !caregiver.id) ? styles.buttonDisabled : undefined,
               ]}
               onPress={handleDelete}
               disabled={!caregiver || !caregiver.id}
@@ -244,40 +245,40 @@ function CaregiverScreen() {
 const styles = StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     marginBottom: 15,
     paddingVertical: 15,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  container: { backgroundColor: "#ecf0f1", flex: 1 },
+  buttonText: { color: colors.palette.neutral100, fontSize: 18, fontWeight: "600" },
+  container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
   contentContainer: { padding: 20 },
-  deleteButton: { backgroundColor: "#e74c3c" },
-  error: { color: "red", marginBottom: 10, textAlign: "center" },
-  fieldError: { color: "red", fontSize: 14, marginBottom: 10 },
+  deleteButton: { backgroundColor: colors.palette.angry500 },
+  error: { color: colors.palette.biancaError, marginBottom: 10, textAlign: "center" },
+  fieldError: { color: colors.palette.biancaError, fontSize: 14, marginBottom: 10 },
   formCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
     elevation: 2,
     marginBottom: 20,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
   input: {
-    borderColor: "#bdc3c7",
+    borderColor: colors.palette.neutral300,
     borderRadius: 5,
     borderWidth: 1,
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 16,
     height: 45,
     marginBottom: 15,
     paddingHorizontal: 10,
   },
-  success: { color: "green", fontSize: 16, marginBottom: 10, textAlign: "center" },
+  success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
 })
 
 export { CaregiverScreen }

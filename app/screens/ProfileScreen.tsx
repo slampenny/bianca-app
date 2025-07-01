@@ -15,6 +15,8 @@ import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
 import { LoadingScreen } from "./LoadingScreen"
+import { colors } from "app/theme/colors"
+import { navigationRef } from "app/navigators/navigationUtilities"
 
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
@@ -71,7 +73,10 @@ function ProfileScreen() {
   }
 
   const handleLogout = () => {
-    navigation.navigate("Logout")
+    if (navigationRef.isReady()) {
+      // @ts-expect-error: cross-stack navigation, Logout is a valid route in DrawerParamList/HomeStack
+      navigationRef.navigate("Logout")
+    }
   }
 
   const handleSave = async () => {
@@ -157,14 +162,14 @@ function ProfileScreen() {
           <TextInput
             style={styles.input}
             placeholder="Name"
-            placeholderTextColor="#7f8c8d"
+            placeholderTextColor={colors.palette.neutral600}
             value={name}
             onChangeText={setName}
           />
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#7f8c8d"
+            placeholderTextColor={colors.palette.neutral600}
             value={email}
             onChangeText={validateEmail}
           />
@@ -172,7 +177,7 @@ function ProfileScreen() {
           <TextInput
             style={styles.input}
             placeholder="Phone"
-            placeholderTextColor="#7f8c8d"
+            placeholderTextColor={colors.palette.neutral600}
             value={phone}
             onChangeText={validatePhone}
           />
@@ -181,7 +186,7 @@ function ProfileScreen() {
           <Pressable
             style={[
               styles.button,
-              (!email || !phone || emailError || phoneError) && styles.buttonDisabled,
+              (!email || !phone || emailError || phoneError) ? styles.buttonDisabled : undefined,
             ]}
             onPress={handleSave}
             disabled={!email || !phone || !!emailError || !!phoneError}
@@ -201,57 +206,57 @@ function ProfileScreen() {
 const styles = StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     marginBottom: 15,
     paddingVertical: 15,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  container: { backgroundColor: "#ecf0f1", flex: 1 },
+  buttonText: { color: colors.palette.neutral100, fontSize: 18, fontWeight: "600" },
+  container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
   contentContainer: { padding: 20 },
-  error: { color: "red", marginBottom: 10, textAlign: "center" },
+  error: { color: colors.palette.biancaError, marginBottom: 10, textAlign: "center" },
   fieldError: {
-    color: "red",
+    color: colors.palette.biancaError,
     fontSize: 14,
     marginBottom: 10,
     textAlign: "center",
   },
   formCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
     elevation: 2,
     marginBottom: 20,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
   formTitle: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 20,
     fontWeight: "600",
     marginBottom: 20,
     textAlign: "center",
   },
   input: {
-    borderColor: "#bdc3c7",
+    borderColor: colors.palette.neutral300,
     borderRadius: 5,
     borderWidth: 1,
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 16,
     height: 45,
     marginBottom: 15,
     paddingHorizontal: 10,
   },
   logoutButton: {
-    backgroundColor: "#9b59b6", // Purple color for logout
+    backgroundColor: colors.palette.secondary500,
     paddingVertical: 15,
     borderRadius: 5,
     alignItems: "center",
   },
-  success: { color: "green", fontSize: 16, marginBottom: 10, textAlign: "center" },
+  success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
 })
 
 export { ProfileScreen }

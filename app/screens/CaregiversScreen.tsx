@@ -8,12 +8,13 @@ import { Caregiver } from "app/services/api/api.types"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { useSyncOrgCaregivers } from "app/utils/useSyncOrgCaregivers"
+import { colors } from "app/theme/colors"
 
 export function CaregiversScreen() {
   const dispatch = useDispatch()
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const caregivers = useSelector(getCaregivers)
-  const currentUser = useSelector(getCurrentUser)
+  const currentUser = useSelector(getCurrentUser) as Caregiver | null
 
   useSyncOrgCaregivers()
 
@@ -28,7 +29,7 @@ export function CaregiversScreen() {
 
   const filteredCaregivers = orgCaregivers.filter((cg: Caregiver) => {
     if (filter === "all") return true
-    return cg.employmentType === filter
+    return (cg as any).employmentType === filter
   })
 
   const handleCaregiverPress = (caregiver: Caregiver) => {
@@ -45,10 +46,10 @@ export function CaregiversScreen() {
   const renderCaregiver = ({ item }: { item: Caregiver }) => (
     <View style={styles.caregiverCard}>
       <View style={styles.caregiverInfo}>
-        <AutoImage source={{ uri: item.avatar }} style={styles.avatar} />
+        <AutoImage source={{ uri: item.avatar || "https://www.gravatar.com/avatar/?d=mp" }} style={styles.avatar} />
         <View style={styles.infoTextContainer}>
           <Text style={styles.caregiverName}>{item.name}</Text>
-          {item.role === "invited" && (
+          {(item.role as string) === "invited" && (
             <View style={styles.invitedBadge}>
               <Text style={styles.invitedBadgeText}>Invited</Text>
             </View>
@@ -58,7 +59,7 @@ export function CaregiversScreen() {
       <Pressable
         style={styles.editButton}
         onPress={() => handleCaregiverPress(item)}
-        android_ripple={{ color: "#2980b9" }}
+        android_ripple={{ color: colors.palette.biancaButtonSelected }}
       >
         <Text style={styles.editButtonText}>Edit</Text>
       </Pressable>
@@ -71,36 +72,36 @@ export function CaregiversScreen() {
     <View style={styles.container}>
       <View style={styles.filterRow}>
         <Pressable
-          style={[styles.filterButton, filter === "all" && styles.filterButtonActive]}
+          style={[styles.filterButton, filter === "all" ? styles.filterButtonActive : undefined]}
           onPress={() => setFilter("all")}
         >
           <Text
-            style={[styles.filterButtonText, filter === "all" && styles.filterButtonTextActive]}
+            style={[styles.filterButtonText, filter === "all" ? styles.filterButtonTextActive : undefined]}
           >
             All
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.filterButton, filter === "full-time" && styles.filterButtonActive]}
+          style={[styles.filterButton, filter === "full-time" ? styles.filterButtonActive : undefined]}
           onPress={() => setFilter("full-time")}
         >
           <Text
             style={[
               styles.filterButtonText,
-              filter === "full-time" && styles.filterButtonTextActive,
+              filter === "full-time" ? styles.filterButtonTextActive : undefined,
             ]}
           >
             Full-Time
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.filterButton, filter === "part-time" && styles.filterButtonActive]}
+          style={[styles.filterButton, filter === "part-time" ? styles.filterButtonActive : undefined]}
           onPress={() => setFilter("part-time")}
         >
           <Text
             style={[
               styles.filterButtonText,
-              filter === "part-time" && styles.filterButtonTextActive,
+              filter === "part-time" ? styles.filterButtonTextActive : undefined,
             ]}
           >
             Part-Time
@@ -126,48 +127,48 @@ export function CaregiversScreen() {
 const styles = StyleSheet.create({
   addButton: {
     alignItems: "center",
-    backgroundColor: "#2ecc71",
+    backgroundColor: colors.palette.biancaSuccess,
     borderRadius: 6,
     margin: 16,
     paddingVertical: 16,
   },
-  addButtonText: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  avatar: { backgroundColor: "#bdc3c7", borderRadius: 24, height: 48, marginRight: 12, width: 48 },
+  addButtonText: { color: colors.palette.neutral100, fontSize: 18, fontWeight: "600" },
+  avatar: { backgroundColor: colors.palette.neutral300, borderRadius: 24, height: 48, marginRight: 12, width: 48 },
   caregiverCard: {
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
     elevation: 2,
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 12,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
   caregiverInfo: { alignItems: "center", flexDirection: "row" },
-  caregiverName: { color: "#2c3e50", flexShrink: 1, fontSize: 16 },
-  container: { backgroundColor: "#ecf0f1", flex: 1 },
+  caregiverName: { color: colors.palette.biancaHeader, flexShrink: 1, fontSize: 16 },
+  container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
   editButton: {
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  editButtonText: { color: "#fff", fontSize: 16 },
+  editButtonText: { color: colors.palette.neutral100, fontSize: 16 },
   filterButton: {
-    backgroundColor: "#ccc",
+    backgroundColor: colors.palette.neutral400,
     borderRadius: 5,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  filterButtonActive: { backgroundColor: "#3498db" },
-  filterButtonText: { color: "#2c3e50", fontSize: 16 },
-  filterButtonTextActive: { color: "#fff" },
+  filterButtonActive: { backgroundColor: colors.palette.biancaButtonSelected },
+  filterButtonText: { color: colors.palette.biancaHeader, fontSize: 16 },
+  filterButtonTextActive: { color: colors.palette.neutral100 },
   filterRow: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
     flexDirection: "row",
     justifyContent: "space-around",
@@ -178,13 +179,13 @@ const styles = StyleSheet.create({
   infoTextContainer: { flexDirection: "column" },
   invitedBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "#f39c12",
+    backgroundColor: colors.palette.accent400,
     borderRadius: 4,
     marginTop: 4,
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
-  invitedBadgeText: { color: "#fff", fontSize: 12 },
+  invitedBadgeText: { color: colors.palette.neutral100, fontSize: 12 },
   listContentContainer: { paddingHorizontal: 16, paddingVertical: 20 },
-  noCaregiversText: { color: "#7f8c8d", fontSize: 16, marginTop: 20, textAlign: "center" },
+  noCaregiversText: { color: colors.palette.neutral600, fontSize: 16, marginTop: 20, textAlign: "center" },
 })

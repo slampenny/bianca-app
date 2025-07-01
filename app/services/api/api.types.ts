@@ -79,6 +79,8 @@ export interface Org {
   isEmailVerified: boolean
   caregivers: string[]
   patients: string[]
+  planName?: string
+  nextBillingDate?: string
 }
 
 export interface PatientPages {

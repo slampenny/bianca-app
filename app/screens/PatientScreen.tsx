@@ -21,9 +21,27 @@ import {
   useUploadPatientAvatarMutation,
 } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen"
+import { colors } from "app/theme/colors"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
+
+// Helper to extract error messages from API errors
+const extractErrorMessage = (error: any): string => {
+  if (
+    error &&
+    "data" in error &&
+    typeof error.data === "object" &&
+    error.data &&
+    "message" in error.data
+  ) {
+    return (error.data as { message: string }).message
+  }
+  if (error && "error" in error) {
+    return String(error.error)
+  }
+  return "An unknown error occurred."
+}
 
 function PatientScreen() {
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
@@ -35,7 +53,7 @@ function PatientScreen() {
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [avatar, setAvatar] = useState("")
-  const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null)
+  const [avatarBlob, setAvatarBlob] = useState<Blob | undefined>(undefined)
   const [emailError, setEmailError] = useState("")
   const [phoneError, setPhoneError] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -66,7 +84,7 @@ function PatientScreen() {
       setPhoneError("")
       setApiError("")
       setSuccessMessage("")
-      setAvatarBlob(null) // Clear any previously selected blob
+      setAvatarBlob(undefined) // Clear any previously selected blob
       setConfirmDelete(false) // Reset delete confirmation
     } else {
       // Reset form for new patient
@@ -78,7 +96,7 @@ function PatientScreen() {
       setPhoneError("")
       setApiError("")
       setSuccessMessage("")
-      setAvatarBlob(null)
+      setAvatarBlob(undefined)
       setConfirmDelete(false)
     }
   }, [patient])
@@ -107,21 +125,6 @@ function PatientScreen() {
   // Effect to consolidate API errors
   useEffect(() => {
     let errorMsg = ""
-    const extractErrorMessage = (error: any): string => {
-      if (
-        error &&
-        "data" in error &&
-        typeof error.data === "object" &&
-        error.data &&
-        "message" in error.data
-      ) {
-        return (error.data as { message: string }).message
-      }
-      if (error && "error" in error) {
-        return String(error.error)
-      }
-      return "An unknown error occurred."
-    }
 
     if (createError) errorMsg = `Error creating: ${extractErrorMessage(createError)}`
     else if (updateError) errorMsg = `Error updating: ${extractErrorMessage(updateError)}`
@@ -151,7 +154,7 @@ function PatientScreen() {
     clearMessages() // Clear success/api errors on input change
   }
 
-  const handleAvatarChange = ({ uri, blob }: { uri: string; blob: Blob | null }) => {
+  const handleAvatarChange = ({ uri, blob }: { uri: string; blob?: Blob }) => {
     setAvatar(uri)
     if (blob) setAvatarBlob(blob)
     clearMessages() // Clear success/api errors on input change
@@ -221,7 +224,7 @@ function PatientScreen() {
             const uploadResult = await uploadAvatar({ id: patient.id, avatar: avatarBlob }).unwrap()
             uploadedAvatarUrl = uploadResult.avatar // Get the new URL from backend
             updatedPatientData.patient.avatar = uploadedAvatarUrl // Update payload
-            setAvatarBlob(null) // Clear the blob after successful upload
+            setAvatarBlob(undefined) // Clear the blob after successful upload
           } catch (err) {
             console.error("Avatar upload error during update:", err)
             // Error is captured by uploadError state and handled by useEffect
@@ -252,10 +255,8 @@ function PatientScreen() {
             name,
             email,
             phone,
-            // Send the initial avatar URI (might be default or a temp one if selected)
-            // Backend might ignore this or use it temporarily.
-            // Or, send null/empty initially if avatar is handled entirely in step 2. Let's send null.
-            avatar: null, // Or defaultAvatarUrl - depends on backend logic
+            // Send undefined for avatar if not set, to match type expectations
+            avatar: undefined, // Or defaultAvatarUrl - depends on backend logic
           },
         }).unwrap()
 
@@ -274,7 +275,7 @@ function PatientScreen() {
                 id: createdPatient.id,
                 patient: { ...createdPatient, avatar: uploadResult.avatar }, // Update only avatar field
               }).unwrap()
-              setAvatarBlob(null) // Clear blob after successful upload and final update
+              setAvatarBlob(undefined) // Clear blob after successful upload and final update
             }
           } catch (err) {
             console.error("Avatar upload/update error during create:", err)
@@ -335,112 +336,104 @@ function PatientScreen() {
   }
 
   return (
-    // Wrap with TouchableWithoutFeedback to dismiss keyboard and cancel delete confirm
-    <TouchableWithoutFeedback
-      onPress={() => {
-        Keyboard.dismiss()
-        handleCancelDelete()
-      }}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      keyboardShouldPersistTaps="handled"
     >
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
-        keyboardShouldPersistTaps="handled" // Helps with pressing buttons while keyboard is up
-      >
-        {/* Display API Errors */}
-        {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
+      {/* Display API Errors */}
+      {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
 
-        {/* Display Success Message */}
-        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+      {/* Display Success Message */}
+      {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
-        <View style={styles.formCard}>
-          <AvatarPicker
-            // Use local avatar state which defaults correctly
-            initialAvatar={avatar}
-            onAvatarChanged={handleAvatarChange}
-          />
+      <View style={styles.formCard}>
+        <AvatarPicker
+          // Use local avatar state which defaults correctly
+          initialAvatar={avatar}
+          onAvatarChanged={handleAvatarChange}
+        />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Name *"
-            placeholderTextColor="#7f8c8d"
-            value={name}
-            onChangeText={handleNameChange} // Use specific handler
-            onFocus={clearMessages} // Clear messages on focus
-          />
-          {/* Consider adding a Name validation error if needed */}
+        <TextInput
+          style={styles.input}
+          placeholder="Name *"
+          placeholderTextColor={colors.palette.neutral600}
+          value={name}
+          onChangeText={handleNameChange} // Use specific handler
+          onFocus={clearMessages} // Clear messages on focus
+        />
+        {/* Consider adding a Name validation error if needed */}
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email *"
-            placeholderTextColor="#7f8c8d"
-            value={email}
-            onChangeText={validateEmail} // Validation sets error state
-            keyboardType="email-address"
-            autoCapitalize="none"
-            onFocus={clearMessages}
-          />
-          {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
+        <TextInput
+          style={styles.input}
+          placeholder="Email *"
+          placeholderTextColor={colors.palette.neutral600}
+          value={email}
+          onChangeText={validateEmail} // Validation sets error state
+          keyboardType="email-address"
+          autoCapitalize="none"
+          onFocus={clearMessages}
+        />
+        {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
 
-          <TextInput
-            style={styles.input}
-            placeholder="Phone *"
-            placeholderTextColor="#7f8c8d"
-            value={phone}
-            onChangeText={validatePhone} // Validation sets error state
-            keyboardType="phone-pad" // Use phone pad
-            onFocus={clearMessages}
-          />
-          {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
+        <TextInput
+          style={styles.input}
+          placeholder="Phone *"
+          placeholderTextColor={colors.palette.neutral600}
+          value={phone}
+          onChangeText={validatePhone} // Validation sets error state
+          keyboardType="phone-pad" // Use phone pad
+          onFocus={clearMessages}
+        />
+        {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
-          {/* --- Action Buttons --- */}
-          <Pressable
-            style={[
-              styles.button,
-              styles.saveButton,
-              (!name || !email || !phone || !!emailError || !!phoneError) && styles.buttonDisabled,
-            ]}
-            onPress={handleSave}
-            disabled={!name || !email || !phone || !!emailError || !!phoneError || isLoading} // Also disable while loading
-          >
-            <Text style={styles.buttonText}>
-              {patient && patient.id ? "UPDATE PATIENT" : "CREATE PATIENT"}
-            </Text>
-          </Pressable>
+        {/* --- Action Buttons --- */}
+        <Pressable
+          style={[
+            styles.button,
+            styles.saveButton,
+            (!name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined,
+          ]}
+          onPress={handleSave}
+          disabled={!name || !email || !phone || !!emailError || !!phoneError || isLoading} // Also disable while loading
+        >
+          <Text style={styles.buttonText}>
+            {patient && patient.id ? "UPDATE PATIENT" : "CREATE PATIENT"}
+          </Text>
+        </Pressable>
 
-          {/* Show Delete, Schedules, Conversations only for existing patients */}
-          {patient && patient.id && (
-            <>
-              <Pressable
-                style={[styles.button, styles.manageButton]}
-                onPress={handleManageSchedules}
-                disabled={isLoading} // Disable while loading
-              >
-                <Text style={styles.buttonText}>MANAGE SCHEDULES</Text>
-              </Pressable>
+        {/* Show Delete, Schedules, Conversations only for existing patients */}
+        {patient && patient.id && (
+          <>
+            <Pressable
+              style={[styles.button, styles.manageButton]}
+              onPress={handleManageSchedules}
+              disabled={isLoading} // Disable while loading
+            >
+              <Text style={styles.buttonText}>MANAGE SCHEDULES</Text>
+            </Pressable>
 
-              <Pressable
-                style={[styles.button, styles.manageButton]}
-                onPress={handleManageConversations}
-                disabled={isLoading} // Disable while loading
-              >
-                <Text style={styles.buttonText}>MANAGE CONVERSATIONS</Text>
-              </Pressable>
+            <Pressable
+              style={[styles.button, styles.manageButton]}
+              onPress={handleManageConversations}
+              disabled={isLoading} // Disable while loading
+            >
+              <Text style={styles.buttonText}>MANAGE CONVERSATIONS</Text>
+            </Pressable>
 
-              <Pressable
-                style={[styles.button, styles.deleteButton, isLoading && styles.buttonDisabled]}
-                onPress={handleDelete}
-                disabled={isLoading} // Disable while loading
-              >
-                <Text style={styles.buttonText}>
-                  {confirmDelete ? "CONFIRM DELETE" : "DELETE PATIENT"}
-                </Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-      </ScrollView>
-    </TouchableWithoutFeedback>
+            <Pressable
+              style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
+              onPress={handleDelete}
+              disabled={isLoading} // Disable while loading
+            >
+              <Text style={styles.buttonText}>
+                {confirmDelete ? "CONFIRM DELETE" : "DELETE PATIENT"}
+              </Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </ScrollView>
   )
 }
 
@@ -455,16 +448,16 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5, // Standard disabled look
-    backgroundColor: "#bdc3c7", // Grey out background when disabled
+    backgroundColor: colors.palette.neutral300, // Grey out background when disabled
   },
   buttonText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 16, // Slightly smaller font for more text
     fontWeight: "600",
     textAlign: "center",
   },
   container: {
-    backgroundColor: "#ecf0f1",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
   contentContainer: {
@@ -472,34 +465,34 @@ const styles = StyleSheet.create({
     paddingBottom: 40, // Add padding at the bottom
   },
   deleteButton: {
-    backgroundColor: "#e74c3c", // Red for delete
+    backgroundColor: colors.palette.angry500, // Red for delete
   },
   error: {
     // General API error style
-    color: "#e74c3c", // Red
+    color: colors.palette.angry500, // Red
     textAlign: "center",
     marginBottom: 15,
     fontSize: 15,
     fontWeight: "500",
-    backgroundColor: "rgba(231, 76, 60, 0.1)", // Light red background
+    backgroundColor: colors.palette.angry100, // Light red background
     padding: 10,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: "rgba(231, 76, 60, 0.3)",
+    borderColor: colors.palette.overlay20,
   },
   fieldError: {
     // Field-specific validation error
-    color: "#c0392b", // Darker red for field errors
+    color: colors.palette.angry500, // Darker red for field errors
     fontSize: 13,
     marginBottom: 10, // Space after error before next input
     paddingLeft: 5,
   },
   formCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     padding: 20,
     borderRadius: 8, // Slightly larger radius
     marginBottom: 20,
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4, // Slightly larger shadow
@@ -507,33 +500,33 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 50, // Slightly taller input
-    borderColor: "#bdc3c7",
+    borderColor: colors.palette.neutral300,
     borderWidth: 1,
     borderRadius: 5,
     paddingHorizontal: 15, // More padding
     marginBottom: 5, // Reduce margin slightly before error
     fontSize: 16,
-    color: "#2c3e50",
-    backgroundColor: "#f8f9f9", // Very light background for input
+    color: colors.palette.biancaHeader,
+    backgroundColor: colors.palette.neutral200, // Very light background for input
   },
   manageButton: {
-    backgroundColor: "#8e44ad", // Purple for manage buttons
+    backgroundColor: colors.palette.secondary500, // Muted purple for manage buttons
   },
   saveButton: {
-    backgroundColor: "#2980b9", // Slightly darker blue for save/update
+    backgroundColor: colors.palette.biancaButtonSelected, // Muted blue for save/update
   },
   success: {
     // Success message style
-    color: "#27ae60", // Green
+    color: colors.palette.biancaSuccess, // Green
     textAlign: "center",
     marginBottom: 15,
     fontSize: 15,
     fontWeight: "500",
-    backgroundColor: "rgba(39, 174, 96, 0.1)", // Light green background
+    backgroundColor: colors.palette.biancaSuccessBackground, // Light green background
     padding: 10,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: "rgba(39, 174, 96, 0.3)",
+    borderColor: colors.palette.overlay20,
   },
 })
 

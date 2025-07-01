@@ -11,6 +11,7 @@ import { StackScreenProps } from "@react-navigation/stack"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Text, TextField, Button } from "app/components"
 import { useForgotPasswordMutation } from "../services/api/authApi"
+import { colors } from "app/theme/colors"
 
 export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
@@ -50,7 +51,7 @@ export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, 
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: "#ecf0f1",
+        backgroundColor: colors.palette.biancaBackground,
         overflowY: "scroll",
         msOverflowStyle: "scrollbar",
         WebkitOverflowScrolling: "touch",
@@ -98,26 +99,26 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   fieldErrorText: {
-    color: "red",
+    color: colors.palette.biancaError,
     fontSize: 12,
     marginBottom: 8,
     marginTop: 2,
     textAlign: "center",
   },
   formContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
     elevation: 2,
     marginBottom: 20,
     marginTop: 40,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
   headerTitle: {
-    color: "#2c3e50",
+    color: colors.palette.biancaHeader,
     fontSize: 20,
     fontWeight: "600",
     marginBottom: 20,
@@ -128,13 +129,13 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   linkButtonText: {
-    color: "#3498db",
+    color: colors.palette.biancaButtonSelected,
     fontSize: 16,
     textAlign: "center",
   },
   registerButton: {
     alignItems: "center",
-    backgroundColor: "#3498db",
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 4,
     justifyContent: "center",
     marginTop: 10,
@@ -142,9 +143,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   successText: {
-    backgroundColor: "rgba(0,255,0,0.05)",
+    backgroundColor: colors.palette.biancaSuccessBackground,
     borderRadius: 4,
-    color: "green",
+    color: colors.palette.biancaSuccess,
     marginBottom: 20,
     padding: 10,
     textAlign: "center",

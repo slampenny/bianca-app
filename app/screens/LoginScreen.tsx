@@ -6,6 +6,7 @@ import { useLoginMutation } from "../services/api/authApi"
 import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail } from "../store/authSlice"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Button, Header, Screen, Text, TextField } from "app/components"
+import { colors } from "app/theme/colors"
 
 type LoginScreenNavigationProp = StackNavigationProp<LoginStackParamList, "Login">
 
@@ -84,6 +85,9 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         autoCorrect={false}
         returnKeyType="next"
         onSubmitEditing={focusPasswordInput}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
       />
       <TextField
         testID="password-input"
@@ -97,9 +101,26 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         autoCorrect={false}
         returnKeyType="done"
         onSubmitEditing={handleLoginPress}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
       />
-      <Button testID="login-button" tx="loginScreen.signIn" onPress={handleLoginPress} />
-      <Button testID="register-button" tx="loginScreen.register" onPress={handleRegisterPress} />
+      <Button
+        testID="login-button"
+        tx="loginScreen.signIn"
+        onPress={handleLoginPress}
+        style={styles.loginButton}
+        textStyle={styles.loginButtonText}
+        preset="filled"
+      />
+      <Button
+        testID="register-button"
+        tx="loginScreen.register"
+        onPress={handleRegisterPress}
+        style={styles.registerButton}
+        textStyle={styles.registerButtonText}
+        preset="default"
+      />
       <Pressable testID="forgot-password-link" style={styles.linkButton} onPress={handleForgotPasswordPress}>
         <Text style={styles.linkButtonText} tx="loginScreen.forgotPassword" />
       </Pressable>
@@ -110,53 +131,75 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    backgroundColor: "#f0f0f0",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
     justifyContent: "center",
     padding: 20,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
     width: "100%",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
+  inputWrapper: {
+    backgroundColor: colors.palette.neutral100,
+    borderColor: colors.palette.biancaBorder,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
+    shadowColor: colors.palette.neutral900,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  // input: {
-  //   backgroundColor: 'white',
-  //   paddingHorizontal: 15,
-  //   paddingVertical: 10,
-  //   borderRadius: 5,
-  //   borderWidth: 1,
-  //   borderColor: '#dedede',
-  //   marginBottom: 10,
-  // },
-  button: {
-    backgroundColor: "#3498db",
+  input: {
+    color: colors.palette.biancaHeader,
+    fontSize: 16,
+  },
+  loginButton: {
+    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
-    marginBottom: 10,
-    marginTop: 10,
+    marginTop: 16,
+    marginBottom: 8,
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    width: "100%",
   },
-  buttonText: {
-    color: "white",
+  loginButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  registerButton: {
+    backgroundColor: colors.palette.biancaButtonUnselected,
+    borderRadius: 5,
+    marginBottom: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    width: "100%",
+  },
+  registerButtonText: {
+    color: colors.palette.biancaButtonSelected,
     fontSize: 18,
     fontWeight: "bold",
     textAlign: "center",
   },
   linkButton: {
     marginTop: 10,
+    alignSelf: "center",
   },
   linkButtonText: {
-    color: "#3498db",
+    color: colors.palette.biancaButtonSelected,
     fontSize: 16,
     textAlign: "center",
+    textDecorationLine: "underline",
   },
   error: {
-    color: "red",
+    color: colors.palette.biancaError,
     marginBottom: 20,
+    textAlign: "center",
   },
 })

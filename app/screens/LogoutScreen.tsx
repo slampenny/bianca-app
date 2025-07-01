@@ -4,6 +4,7 @@ import { useSelector } from "react-redux"
 import { useLogoutMutation } from "../services/api/authApi"
 import { getAuthTokens } from "../store/authSlice"
 import { Button, Screen, Text } from "app/components"
+import { colors } from "app/theme/colors"
 
 export const LogoutScreen = () => {
   const [logout] = useLogoutMutation()
@@ -25,28 +26,21 @@ export const LogoutScreen = () => {
   return (
     <Screen style={styles.container}>
       <Text style={styles.title} tx="logoutScreen.logoutMessage" />
-      <Button tx="logoutScreen.logoutButton" onPress={handleLogoutPress} />
+      <Button
+        tx="logoutScreen.logoutButton"
+        onPress={handleLogoutPress}
+        style={styles.logoutButton}
+        textStyle={styles.logoutButtonText}
+        preset="filled"
+      />
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  button: {
-    backgroundColor: "#3498db",
-    borderRadius: 5,
-    marginTop: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
   container: {
     alignItems: "center",
-    backgroundColor: "#f0f0f0",
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
     justifyContent: "center",
     padding: 20,
@@ -55,5 +49,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
+    color: colors.palette.biancaHeader,
+    textAlign: "center",
+  },
+  logoutButton: {
+    backgroundColor: colors.palette.biancaButtonSelected,
+    borderRadius: 5,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    width: "100%",
+  },
+  logoutButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 })

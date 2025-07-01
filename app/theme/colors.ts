@@ -35,6 +35,18 @@ const palette = {
 
   overlay20: "rgba(25, 16, 21, 0.2)",
   overlay50: "rgba(25, 16, 21, 0.5)",
+
+  // Bianca RegisterScreen additions
+  biancaBackground: "#ecf0f1", // RegisterScreen background
+  biancaHeader: "#2c3e50", // Header text
+  biancaButtonSelected: "#5b7fa3", // Muted blue for selected button
+  biancaButtonUnselected: "#e3eaf1", // Very light blue for unselected button
+  biancaError: "#cc0000", // Error text
+  biancaErrorBackground: "rgba(255, 0, 0, 0.08)", // Error background
+  biancaSuccess: "#6ab187", // Muted green for success text
+  biancaSuccessBackground: "rgba(106, 177, 135, 0.1)", // Muted green background
+  biancaExplanation: "#5b7fa3", // Muted blue for explanation text
+  biancaBorder: "#bfc9d1", // Soft blue-gray border
 } as const
 
 export const colors = {
