@@ -647,28 +647,40 @@ resource "aws_security_group" "asterisk_ec2_sg" {
   tags = { Name = "asterisk-ec2-sg" }
 }
 
-# NEW: Simplified rules for same-subnet communication
-resource "aws_security_group_rule" "asterisk_from_app_all" {
+# RTP from private subnets (app) to Asterisk for internal RTP
+resource "aws_security_group_rule" "asterisk_rtp_from_private" {
+  type              = "ingress"
+  from_port         = var.asterisk_rtp_start_port
+  to_port           = var.asterisk_rtp_end_port
+  protocol          = "udp"
+  security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = ["172.31.110.0/24", "172.31.111.0/24"]
+  description       = "RTP from private subnets (app)"
+}
+
+# ARI HTTP from Bianca App to Asterisk (internal)
+resource "aws_security_group_rule" "asterisk_ari_from_bianca_app" {
   type                     = "ingress"
-  from_port                = 0
-  to_port                  = 65535
-  protocol                 = "-1"
+  from_port                = var.asterisk_ari_http_port
+  to_port                  = var.asterisk_ari_http_port
+  protocol                 = "tcp"
   security_group_id        = aws_security_group.asterisk_ec2_sg.id
   source_security_group_id = aws_security_group.bianca_app_sg.id
-  description              = "All traffic from Bianca App (same subnet)"
+  description              = "ARI access from Bianca App Backend"
 }
 
-resource "aws_security_group_rule" "app_from_asterisk_all" {
-  type                     = "ingress"
-  from_port                = 0
-  to_port                  = 65535
-  protocol                 = "-1"
-  security_group_id        = aws_security_group.bianca_app_sg.id
-  source_security_group_id = aws_security_group.asterisk_ec2_sg.id
-  description              = "All traffic from Asterisk (same subnet)"
+# Allow app to receive RTP from Asterisk
+resource "aws_security_group_rule" "app_rtp_from_asterisk" {
+  type              = "ingress"
+  from_port         = var.app_rtp_port_start
+  to_port           = var.app_rtp_port_end
+  protocol          = "udp"
+  security_group_id = aws_security_group.bianca_app_sg.id
+  cidr_blocks       = ["172.31.100.0/24", "172.31.101.0/24"]  # Asterisk's public subnets
+  description       = "RTP from Asterisk (public subnet)"
 }
 
-# REMOVED the old cross-subnet rules since they're in the same subnet now
+# REMOVED the catch-all rules since they're in different subnets now
 
 resource "aws_security_group" "efs_sg" {
   name        = "mongodb-efs-sg"
@@ -693,7 +705,7 @@ resource "aws_security_group" "efs_sg" {
 }
 
 ################################################################################
-# ASTERISK EC2 INSTANCE - NOW IN PRIVATE SUBNET
+# ASTERISK EC2 INSTANCE - BACK IN PUBLIC SUBNET
 ################################################################################
 
 # Elastic IP for Asterisk (still needed for Twilio SIP signaling)
@@ -752,13 +764,13 @@ resource "aws_iam_role_policy" "asterisk_secrets" {
   })
 }
 
-# EC2 Instance - NOW IN PRIVATE SUBNET
+# EC2 Instance - BACK IN PUBLIC SUBNET
 resource "aws_instance" "asterisk" {
   ami           = var.asterisk_ami_id != "" ? var.asterisk_ami_id : data.aws_ami.amazon_linux_2.id
   instance_type = var.asterisk_instance_type
   
-  # CHANGED: Asterisk now in private subnet with Fargate
-  subnet_id = aws_subnet.private_a.id
+  # REVERTED: Asterisk back in public subnet for Twilio access
+  subnet_id = aws_subnet.public_a.id
 
   vpc_security_group_ids = [aws_security_group.asterisk_ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.asterisk_profile.name
@@ -770,6 +782,7 @@ resource "aws_instance" "asterisk" {
   # User data script to install Docker and run Asterisk
   user_data = base64encode(templatefile("${path.module}/asterisk-userdata.sh", {
     external_ip            = aws_eip.asterisk_eip.public_ip
+    private_ip             = aws_instance.asterisk.private_ip  # ADD THIS
     ari_password_secret    = data.aws_secretsmanager_secret.app_secret.arn
     bianca_password_secret = data.aws_secretsmanager_secret.app_secret.arn
     region                 = var.aws_region
@@ -968,9 +981,10 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
-        # Internal communication uses private IP (now in same subnet!)
+        # Internal communication uses private IP for both ARI and RTP
         { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
         { name = "ASTERISK_PRIVATE_IP", value = aws_instance.asterisk.private_ip },
+        { name = "ASTERISK_RTP_HOST", value = aws_instance.asterisk.private_ip },  # ADDED: Ensure RTP uses private IP
         
         # External SIP signaling uses public IP (for Twilio)
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
@@ -984,7 +998,7 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "NETWORK_MODE", value = "HYBRID" },
         { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name },
         
-        # NEW: Help with Asterisk connection retry
+        # Help with Asterisk connection retry
         { name = "ASTERISK_CONNECT_TIMEOUT", value = "300000" },  # 5 minutes
         { name = "ASTERISK_RETRY_INTERVAL", value = "15000" }     # 15 seconds
       ]
@@ -1684,7 +1698,7 @@ output "private_subnet_cidrs" {
 
 output "network_architecture" {
   description = "Network architecture summary"
-  value = "Hybrid: Twilio->Asterisk(public EIP), App<->Asterisk(private same subnet)"
+  value = "Hybrid: Asterisk in public subnet with EIP for Twilio, App in private subnet. RTP uses private IPs within VPC."
 }
 
 output "nat_gateway_ip" {
