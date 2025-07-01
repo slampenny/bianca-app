@@ -669,6 +669,17 @@ resource "aws_security_group_rule" "asterisk_ari_from_bianca_app" {
   description              = "ARI access from Bianca App Backend"
 }
 
+# ADDITIONAL: Allow ARI from entire VPC (for debugging)
+resource "aws_security_group_rule" "asterisk_ari_from_vpc" {
+  type              = "ingress"
+  from_port         = var.asterisk_ari_http_port
+  to_port           = var.asterisk_ari_http_port
+  protocol          = "tcp"
+  security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = ["172.31.0.0/16"]  # Entire VPC
+  description       = "ARI access from entire VPC"
+}
+
 # Allow app to receive RTP from Asterisk
 resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   type              = "ingress"
@@ -782,7 +793,6 @@ resource "aws_instance" "asterisk" {
   # User data script to install Docker and run Asterisk
   user_data = base64encode(templatefile("${path.module}/asterisk-userdata.sh", {
     external_ip            = aws_eip.asterisk_eip.public_ip
-    private_ip             = aws_instance.asterisk.private_ip  # ADD THIS
     ari_password_secret    = data.aws_secretsmanager_secret.app_secret.arn
     bianca_password_secret = data.aws_secretsmanager_secret.app_secret.arn
     region                 = var.aws_region
@@ -1024,8 +1034,8 @@ resource "aws_ecs_task_definition" "app_task" {
         command     = ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
         interval    = 30
         timeout     = 10        # Increased from 5
-        retries     = 5         # Increased from 3
-        startPeriod = 180       # Increased from 60 to 3 minutes
+        retries     = 10        # Increased from 5
+        startPeriod = 300       # Increased to 5 minutes
       }
       dependsOn = [{ "containerName" : "mongodb", "condition" : "HEALTHY" }]
     },
@@ -1073,11 +1083,11 @@ resource "aws_ecs_service" "app_service" {
   health_check_grace_period_seconds  = 300  # Increased from 120
 
   network_configuration {
-    # Use private subnets for Fargate
-    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+    # TEMPORARY: Use public subnet for debugging
+    subnets          = [aws_subnet.public_a.id, aws_subnet.public_b.id]
     security_groups  = [aws_security_group.bianca_app_sg.id]
-    # No public IP needed since we're in private subnets
-    assign_public_ip = false
+    # Need public IP in public subnet
+    assign_public_ip = true
   }
 
   service_registries {
@@ -1097,7 +1107,8 @@ resource "aws_ecs_service" "app_service" {
     aws_lb_listener.https_listener,
     aws_service_discovery_service.bianca_app_sd_service,
     aws_security_group.bianca_app_sg,
-    aws_instance.asterisk  # NEW: Wait for Asterisk to be ready
+    aws_instance.asterisk,  # Wait for Asterisk
+    aws_eip_association.asterisk_eip_assoc  # NEW: Also wait for EIP association
   ]
   tags = { Name = var.service_name }
 }

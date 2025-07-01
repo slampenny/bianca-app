@@ -40,14 +40,22 @@ async function seedDatabase() {
 
     // Insert caregivers and add them to org1.
     // This will insert both admin and caregiverOne to org1.
-    const [caregiver] = await insertCaregiversAndAddToOrg(org1, [admin, caregiverOne]);
-    console.log('Inserted caregivers:', caregiver);
+    const caregivers = await insertCaregiversAndAddToOrg(org1, [admin, caregiverOne]);
+    console.log('Inserted caregivers:', caregivers);
+
+    // Find the caregiverOne (fake@example.org) to associate patients with
+    const caregiverOneRecord = caregivers.find(c => c.email === 'fake@example.org');
+    const adminRecord = caregivers.find(c => c.email === 'admin@example.org');
+    
+    if (!caregiverOneRecord) {
+      throw new Error('caregiverOne not found in inserted caregivers');
+    }
 
     // Insert alerts
-    await insertAlerts(caregiver, 'Caregiver', [alertOne, alertTwo, alertThree, expiredAlert]);
+    await insertAlerts(caregiverOneRecord, 'Caregiver', [alertOne, alertTwo, alertThree, expiredAlert]);
 
-    // Insert patients and add them to the caregiver.
-    const [patient1, patient2] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne, patientTwo]);
+    // Insert patients and add them to the caregiverOne (fake@example.org)
+    const [patient1, patient2] = await insertPatientsAndAddToCaregiver(caregiverOneRecord, [patientOne, patientTwo]);
     console.log('Inserted patients:', patient1, patient2);
 
     // Insert conversations for patients.
@@ -88,7 +96,7 @@ async function seedDatabase() {
     console.log('Seeded Invoice:', invoiceRecord);
 
     console.log('Database seeded!');
-    return { org1, caregiver, patients: [patient1, patient2], invoiceRecord, paymentMethods };
+    return { org1, caregiver: caregiverOneRecord, patients: [patient1, patient2], invoiceRecord, paymentMethods };
   } catch (error) {
     console.error('Error seeding database:', error);
     throw error;
