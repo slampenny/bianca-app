@@ -459,7 +459,64 @@ resource "aws_service_discovery_service" "bianca_app_sd_service" {
 }
 
 ################################################################################
-# SECURITY GROUPS - UPDATED FOR HYBRID NETWORKING
+# VPC ENDPOINTS FOR ECR (NEW - for private subnet access)
+################################################################################
+
+resource "aws_security_group" "vpc_endpoints_sg" {
+  name        = "vpc-endpoints-sg"
+  description = "Security group for VPC endpoints"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  tags = { Name = "vpc-endpoints-sg" }
+}
+
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+  security_group_ids  = [aws_security_group.vpc_endpoints_sg.id]
+  private_dns_enabled = true
+  
+  tags = { Name = "ecr-api-endpoint" }
+}
+
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+  security_group_ids  = [aws_security_group.vpc_endpoints_sg.id]
+  private_dns_enabled = true
+  
+  tags = { Name = "ecr-dkr-endpoint" }
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private.id]
+  
+  tags = { Name = "s3-endpoint" }
+}
+
+################################################################################
+# SECURITY GROUPS - UPDATED FOR SAME-SUBNET COMMUNICATION
 ################################################################################
 
 # Add explicit ALB to Fargate egress rule
@@ -498,7 +555,6 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Keep the general egress rule but add specific one below
   egress {
     from_port   = 0
     to_port     = 0
@@ -591,50 +647,28 @@ resource "aws_security_group" "asterisk_ec2_sg" {
   tags = { Name = "asterisk-ec2-sg" }
 }
 
-# SEPARATE RULES: Add these as separate security group rules for cross-referencing
-# RTP from Bianca App to Asterisk (internal)
-resource "aws_security_group_rule" "asterisk_rtp_from_bianca_app" {
+# NEW: Simplified rules for same-subnet communication
+resource "aws_security_group_rule" "asterisk_from_app_all" {
   type                     = "ingress"
-  from_port                = var.asterisk_rtp_start_port
-  to_port                  = var.asterisk_rtp_end_port
-  protocol                 = "udp"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "-1"
   security_group_id        = aws_security_group.asterisk_ec2_sg.id
   source_security_group_id = aws_security_group.bianca_app_sg.id
-  description              = "RTP UDP from Bianca App (internal)"
+  description              = "All traffic from Bianca App (same subnet)"
 }
 
-# ARI HTTP from Bianca App to Asterisk (internal)
-resource "aws_security_group_rule" "asterisk_ari_from_bianca_app" {
+resource "aws_security_group_rule" "app_from_asterisk_all" {
   type                     = "ingress"
-  from_port                = var.asterisk_ari_http_port
-  to_port                  = var.asterisk_ari_http_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.asterisk_ec2_sg.id
-  source_security_group_id = aws_security_group.bianca_app_sg.id
-  description              = "ARI access from Bianca App Backend"
-}
-
-# Debug: Add more specific RTP debugging rules
-resource "aws_security_group_rule" "bianca_app_rtp_from_asterisk_debug" {
-  type                     = "ingress"
-  from_port                = var.app_rtp_port_start
-  to_port                  = var.app_rtp_port_end
-  protocol                 = "udp"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "-1"
   security_group_id        = aws_security_group.bianca_app_sg.id
   source_security_group_id = aws_security_group.asterisk_ec2_sg.id
-  description              = "RTP from Asterisk (internal network) - Debug"
+  description              = "All traffic from Asterisk (same subnet)"
 }
 
-# Also allow all UDP traffic temporarily for debugging
-resource "aws_security_group_rule" "bianca_app_debug_udp" {
-  type              = "ingress"
-  from_port         = 10000
-  to_port           = 65535
-  protocol          = "udp"
-  security_group_id = aws_security_group.bianca_app_sg.id
-  cidr_blocks       = ["172.31.0.0/16"]  # Allow from entire VPC
-  description       = "DEBUG: Allow all UDP from VPC"
-}
+# REMOVED the old cross-subnet rules since they're in the same subnet now
 
 resource "aws_security_group" "efs_sg" {
   name        = "mongodb-efs-sg"
@@ -659,19 +693,13 @@ resource "aws_security_group" "efs_sg" {
 }
 
 ################################################################################
-# ASTERISK EC2 INSTANCE - KEPT IN PUBLIC SUBNET
+# ASTERISK EC2 INSTANCE - NOW IN PRIVATE SUBNET
 ################################################################################
 
-# Elastic IP for Asterisk
+# Elastic IP for Asterisk (still needed for Twilio SIP signaling)
 resource "aws_eip" "asterisk_eip" {
   domain = "vpc"
   tags   = { Name = "asterisk-permanent-eip" }
-}
-
-# EIP Association
-resource "aws_eip_association" "asterisk_eip_assoc" {
-  instance_id   = aws_instance.asterisk.id
-  allocation_id = aws_eip.asterisk_eip.id
 }
 
 # IAM Role for EC2 Instance
@@ -724,12 +752,13 @@ resource "aws_iam_role_policy" "asterisk_secrets" {
   })
 }
 
-# EC2 Instance - KEPT IN PUBLIC SUBNET FOR TWILIO ACCESS
+# EC2 Instance - NOW IN PRIVATE SUBNET
 resource "aws_instance" "asterisk" {
   ami           = var.asterisk_ami_id != "" ? var.asterisk_ami_id : data.aws_ami.amazon_linux_2.id
   instance_type = var.asterisk_instance_type
-  # KEPT: Asterisk in public subnet for Twilio direct access
-  subnet_id = aws_subnet.public_a.id
+  
+  # CHANGED: Asterisk now in private subnet with Fargate
+  subnet_id = aws_subnet.private_a.id
 
   vpc_security_group_ids = [aws_security_group.asterisk_ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.asterisk_profile.name
@@ -758,6 +787,12 @@ resource "aws_instance" "asterisk" {
     Name = "asterisk-server",
     Environment = "production",
   }
+}
+
+# EIP Association (still works with instance in private subnet!)
+resource "aws_eip_association" "asterisk_eip_assoc" {
+  instance_id   = aws_instance.asterisk.id
+  allocation_id = aws_eip.asterisk_eip.id
 }
 
 # Service Discovery Instance for Asterisk EC2
@@ -894,7 +929,7 @@ resource "aws_ecs_cluster" "cluster" {
   tags = { Name = var.cluster_name }
 }
 
-# UPDATED: Task definition with hybrid networking environment variables
+# UPDATED: Task definition with improved health check and startup
 resource "aws_ecs_task_definition" "app_task" {
   family                   = var.service_name
   network_mode             = "awsvpc"
@@ -933,7 +968,7 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
-        # Internal communication uses private IP
+        # Internal communication uses private IP (now in same subnet!)
         { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
         { name = "ASTERISK_PRIVATE_IP", value = aws_instance.asterisk.private_ip },
         
@@ -947,7 +982,11 @@ resource "aws_ecs_task_definition" "app_task" {
         # App will auto-detect its private IP for RTP
         { name = "USE_PRIVATE_NETWORK_FOR_RTP", value = "true" },
         { name = "NETWORK_MODE", value = "HYBRID" },
-        { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name }
+        { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name },
+        
+        # NEW: Help with Asterisk connection retry
+        { name = "ASTERISK_CONNECT_TIMEOUT", value = "300000" },  # 5 minutes
+        { name = "ASTERISK_RETRY_INTERVAL", value = "15000" }     # 15 seconds
       ]
       secrets = [
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
@@ -970,9 +1009,9 @@ resource "aws_ecs_task_definition" "app_task" {
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
         interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 60
+        timeout     = 10        # Increased from 5
+        retries     = 5         # Increased from 3
+        startPeriod = 180       # Increased from 60 to 3 minutes
       }
       dependsOn = [{ "containerName" : "mongodb", "condition" : "HEALTHY" }]
     },
@@ -1006,7 +1045,7 @@ resource "aws_ecs_task_definition" "app_task" {
   tags = { Name = var.service_name }
 }
 
-# UPDATED: ECS service moved to private subnets
+# UPDATED: ECS service with better health check grace period
 resource "aws_ecs_service" "app_service" {
   name = var.service_name
   cluster = aws_ecs_cluster.cluster.id
@@ -1017,13 +1056,13 @@ resource "aws_ecs_service" "app_service" {
   deployment_maximum_percent         = 100
   deployment_minimum_healthy_percent = 0
   enable_execute_command             = true
-  health_check_grace_period_seconds  = 120
+  health_check_grace_period_seconds  = 300  # Increased from 120
 
   network_configuration {
-    # CHANGED: Use private subnets for Fargate
+    # Use private subnets for Fargate
     subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
     security_groups  = [aws_security_group.bianca_app_sg.id]
-    # CHANGED: No public IP needed since we're in private subnets
+    # No public IP needed since we're in private subnets
     assign_public_ip = false
   }
 
@@ -1043,7 +1082,8 @@ resource "aws_ecs_service" "app_service" {
     aws_lb_listener.http_listener,
     aws_lb_listener.https_listener,
     aws_service_discovery_service.bianca_app_sd_service,
-    aws_security_group.bianca_app_sg
+    aws_security_group.bianca_app_sg,
+    aws_instance.asterisk  # NEW: Wait for Asterisk to be ready
   ]
   tags = { Name = var.service_name }
 }
@@ -1644,10 +1684,33 @@ output "private_subnet_cidrs" {
 
 output "network_architecture" {
   description = "Network architecture summary"
-  value = "Hybrid: Twilio->Asterisk(public), App<->Asterisk(private)"
+  value = "Hybrid: Twilio->Asterisk(public EIP), App<->Asterisk(private same subnet)"
 }
 
 output "nat_gateway_ip" {
   description = "NAT Gateway IP for private subnet internet access"
   value       = aws_eip.nat_gateway.public_ip
+}
+
+output "connection_test_commands" {
+  description = "Commands to test connectivity after deployment"
+  value = <<-EOT
+    # Test from local machine:
+    curl -u asterisk:YOUR_ARI_PASSWORD http://${aws_eip.asterisk_eip.public_ip}:8088/ari/asterisk/info
+    
+    # SSH to Asterisk instance:
+    ssh -i your-key.pem ec2-user@${aws_eip.asterisk_eip.public_ip}
+    
+    # From Asterisk instance, test internal connectivity:
+    curl http://localhost:8088/ari/asterisk/info
+    
+    # Check Docker status on Asterisk:
+    sudo docker ps
+    sudo docker logs asterisk
+    
+    # Use ECS Exec to test from app container:
+    aws ecs execute-command --cluster ${var.cluster_name} --task TASK_ID --container ${var.container_name} --interactive --command "/bin/sh"
+    # Then inside container:
+    curl http://${aws_instance.asterisk.private_ip}:8088/ari/asterisk/info
+  EOT
 }
