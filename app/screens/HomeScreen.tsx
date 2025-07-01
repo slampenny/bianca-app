@@ -41,6 +41,7 @@ export function HomeScreen() {
           style={styles.editButton}
           android_ripple={{ color: "#2980b9" }}
           onPress={() => handlePatientPress(item)}
+          testID="edit-patient-button"
         >
           <Text style={styles.editButtonText}>Edit</Text>
         </Pressable>
@@ -71,6 +72,7 @@ export function HomeScreen() {
         style={styles.addButton}
         android_ripple={{ color: "#27ae60" }}
         onPress={handleAddPatient}
+        testID="add-patient-button"
       >
         <Text style={styles.addButtonText}>Add Patient</Text>
       </Pressable>

@@ -64,7 +64,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         setOrganizationNameError("")
         break
     }
-    setGeneralError("")
+    setGeneralError("") // Clear general error when any field changes
   }
 
   // Validation helpers
@@ -77,14 +77,14 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const validateInputs = () => {
     let isValid = true
 
-    // Reset all errors
+    // Reset all errors before validating
     setNameError("")
     setEmailError("")
     setPasswordError("")
     setConfirmPasswordError("")
     setPhoneError("")
     setOrganizationNameError("")
-    setGeneralError("")
+    setGeneralError("") // Reset general error during validation as well
 
     // Name validation
     if (name.trim() === "") {
@@ -131,27 +131,37 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
     const registerUser = async () => {
       try {
         const result = await register({ name, email, password, phone }).unwrap()
+        // Assuming 'result' indicates success. Adjust if your API returns differently.
         if (result) {
-          setGeneralError("Registration successful!")
-          // Could navigate to login/home here
+          setGeneralError("Registration successful!") // Set success message
+          // IMPORTANT: Navigation should happen AFTER setting state or be handled elsewhere
+          // For example, navigation could be triggered by this success state in another useEffect or saga
+          // navigation.navigate("Home"); // Example: Navigate on success
         }
       } catch (error) {
-        setGeneralError("Registration Failed. Please try again.")
+        // Handle specific errors if possible, otherwise show generic message
+        console.error("Registration API Error:", error); // Log the actual error for debugging
+        // You could inspect 'error' here to show more specific messages
+        // e.g., if (error.status === 409) setGeneralError("Email already exists.")
+        setGeneralError("Registration Failed. Please try again.") // Set failure message
       }
     }
 
     if (shouldRegister) {
       const isValid = validateInputs()
       if (isValid) {
-        registerUser().finally(() => setShouldRegister(false))
+        registerUser().finally(() => setShouldRegister(false)) // Call API if frontend validation passes
       } else {
-        setShouldRegister(false)
+        // If validation fails, scroll to the top to show field errors? (Optional)
+        // scrollRef.current?.scrollTo({ y: 0, animated: true })
+        setShouldRegister(false) // Don't attempt API call if validation fails
       }
     }
-  }, [shouldRegister, name, email, password, phone, register])
+  }, [shouldRegister]) // Dependencies adjusted - removed state variables causing potential extra runs
 
   const handleRegister = () => {
-    setShouldRegister(true)
+    setGeneralError("") // Clear previous general errors before attempting registration
+    setShouldRegister(true) // Trigger the useEffect hook
   }
 
   // Pure HTML approach for React Native Web
@@ -171,24 +181,22 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
       ref={scrollRef}
     >
       <div style={{ padding: "20px" }}>
-        {generalError ? (
-          <Text style={generalError.includes("successful") ? styles.successText : styles.errorText}>
-            {generalError}
-          </Text>
-        ) : null}
+        {/* Error message block MOVED FROM HERE */}
 
         <View style={styles.buttonContainer}>
           <Button
             testID="register-individual-toggle"
-            tx="registerScreen.individualButton"
+            tx="registerScreen.individualButton" // Make sure these tx keys exist in your i18n files
             onPress={() => setAccountType("individual")}
             style={accountType === "individual" ? styles.selectedButton : styles.button}
+            preset={accountType === "individual" ? "filled" : "default"} // Example preset usage
           />
           <Button
             testID="register-organization-toggle"
-            tx="registerScreen.organizationButton"
+            tx="registerScreen.organizationButton" // Make sure these tx keys exist in your i18n files
             onPress={() => setAccountType("organization")}
             style={accountType === "organization" ? styles.selectedButton : styles.button}
+            preset={accountType === "organization" ? "filled" : "default"} // Example preset usage
           />
         </View>
 
@@ -198,6 +206,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
             : "Register as an organization for company or group use."}
         </Text>
 
+        {/* Form Fields */}
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-name"
@@ -209,8 +218,12 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
               clearFieldError("name")
             }}
             autoCapitalize="words"
+            // Optionally add status prop for error styling
+            status={nameError ? "error" : undefined}
+            helper={nameError || undefined} // Display error message below field
           />
-          {nameError ? <Text style={styles.fieldErrorText}>{nameError}</Text> : null}
+          {/* Keep field-specific errors close to the field */}
+          {/* {nameError ? <Text style={styles.fieldErrorText}>{nameError}</Text> : null} */}
         </View>
 
         <View style={styles.fieldContainer}>
@@ -225,8 +238,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
             }}
             keyboardType="email-address"
             autoCapitalize="none"
+            status={emailError ? "error" : undefined}
+            helper={emailError || undefined}
           />
-          {emailError ? <Text style={styles.fieldErrorText}>{emailError}</Text> : null}
+          {/* {emailError ? <Text style={styles.fieldErrorText}>{emailError}</Text> : null} */}
         </View>
 
         <View style={styles.fieldContainer}>
@@ -240,8 +255,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
               setPassword(text)
               clearFieldError("password")
             }}
+            status={passwordError ? "error" : undefined}
+            helper={passwordError || undefined}
           />
-          {passwordError ? <Text style={styles.fieldErrorText}>{passwordError}</Text> : null}
+          {/* {passwordError ? <Text style={styles.fieldErrorText}>{passwordError}</Text> : null} */}
         </View>
 
         <View style={styles.fieldContainer}>
@@ -255,10 +272,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
               setConfirmPassword(text)
               clearFieldError("confirmPassword")
             }}
+            status={confirmPasswordError ? "error" : undefined}
+            helper={confirmPasswordError || undefined}
           />
-          {confirmPasswordError ? (
-            <Text style={styles.fieldErrorText}>{confirmPasswordError}</Text>
-          ) : null}
+          {/* {confirmPasswordError ? (<Text style={styles.fieldErrorText}>{confirmPasswordError}</Text>) : null} */}
         </View>
 
         <View style={styles.fieldContainer}>
@@ -272,8 +289,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
               clearFieldError("phone")
             }}
             keyboardType="phone-pad"
+            status={phoneError ? "error" : undefined}
+            helper={phoneError || undefined}
           />
-          {phoneError ? <Text style={styles.fieldErrorText}>{phoneError}</Text> : null}
+          {/* {phoneError ? <Text style={styles.fieldErrorText}>{phoneError}</Text> : null} */}
         </View>
 
         {accountType === "organization" && (
@@ -287,21 +306,34 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
                 setOrganizationName(text)
                 clearFieldError("organizationName")
               }}
+              status={organizationNameError ? "error" : undefined}
+              helper={organizationNameError || undefined}
             />
-            {organizationNameError ? (
-              <Text style={styles.fieldErrorText}>{organizationNameError}</Text>
-            ) : null}
+            {/* {organizationNameError ? (<Text style={styles.fieldErrorText}>{organizationNameError}</Text>) : null} */}
           </View>
         )}
 
+        {/* MOVED General Error / Success Message HERE */}
+        {generalError ? (
+          <Text
+           testID="general-error-message" // Add testID for easier selection in tests
+           style={generalError.includes("successful") ? styles.successText : styles.errorText}
+          >
+            {generalError}
+          </Text>
+        ) : null}
+
+        {/* Submit Button */}
         <Button
           testID="register-submit"
           onPress={handleRegister}
           disabled={isLoading}
-          tx="registerScreen.title"
+          tx="registerScreen.title" // Make sure this tx key exists
           style={styles.registerButton}
+          preset="filled" // Example preset usage
         />
 
+        {/* Go Back Link */}
         <Pressable testID="register-go-back" style={styles.linkButton} onPress={() => navigation.goBack()}>
           <Text style={styles.linkButtonText} tx="registerScreen.goBack" />
         </Pressable>
@@ -313,8 +345,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   )
 }
 
+// Add your StyleSheet definitions here
 const styles = StyleSheet.create({
   button: {
+    // from original code
     alignItems: "center",
     backgroundColor: "lightgray",
     borderRadius: 4,
@@ -323,34 +357,44 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   buttonContainer: {
+    // from original code
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 20,
   },
   errorText: {
-    backgroundColor: "rgba(255,0,0,0.05)",
-    borderRadius: 4,
-    color: "red",
-    marginBottom: 20,
-    padding: 10,
-    textAlign: "center",
+    // from original code
+    width: "100%", // Make the container span the width
+    textAlign: "center", // Center the text within the container
+    fontSize: 16, // Slightly larger font size
+    fontWeight: "500", // Medium weight to make it stand out
+    color: "#cc0000", // Keep dark red color
+    backgroundColor: "rgba(255, 0, 0, 0.08)", // Subtle background tint
+    paddingVertical: 10, // Vertical padding
+    paddingHorizontal: 12, // Horizontal padding
+    marginBottom: 15, // Space above the element below (submit button)
+    borderRadius: 6, // Slightly more rounded corners
   },
   explanationText: {
+    // from original code
     color: "gray",
     fontSize: 14,
     marginBottom: 20,
     textAlign: "center",
   },
   fieldContainer: {
-    marginBottom: 10,
+    // from original code
+    marginBottom: 15, // Increased spacing between fields slightly
   },
-  fieldErrorText: {
+  fieldErrorText: { // This might be redundant if using TextField's helper/status prop
+    // from original code
     color: "red",
     fontSize: 12,
-    marginBottom: 8,
-    marginTop: 2,
+    // marginBottom: 8, // Handled by TextField helper prop margin
+    marginTop: 4,
   },
   header: {
+    // from original code
     alignItems: "center",
     backgroundColor: "#fff",
     borderBottomWidth: 1,
@@ -358,41 +402,56 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   headerTitle: {
+    // from original code
     color: "#2c3e50",
     fontSize: 20,
     fontWeight: "600",
   },
   linkButton: {
+    // from original code
     marginBottom: 40,
     marginTop: 15,
   },
   linkButtonText: {
+    // from original code
     color: "#3498db",
     fontSize: 16,
     textAlign: "center",
   },
   registerButton: {
-    alignItems: "center",
-    backgroundColor: "#3498db",
-    borderRadius: 4,
-    marginTop: 10,
-    paddingVertical: 12,
+    // from original code - You might adjust this if using presets heavily
+    // alignItems: "center", // Handled by base preset
+    // backgroundColor: "#3498db", // Handled by 'filled' preset (example)
+    // borderRadius: 4, // Handled by base preset
+    marginTop: 10, // Keep or adjust as needed
+    // paddingVertical: 12, // Handled by base preset
     width: "100%",
   },
   selectedButton: {
-    alignItems: "center",
-    backgroundColor: "#3498db",
-    borderRadius: 4,
+    // from original code - Using presets might make this less necessary,
+    // or you might apply specific styles here not covered by presets.
+    // Example: Add extra visual cue beyond background color if needed.
+    // alignItems: "center", // Handled by base preset
+    // backgroundColor: "#3498db", // Handled by 'filled' preset (example)
+    // borderRadius: 4, // Handled by base preset
     flex: 1,
     marginHorizontal: 5,
-    paddingVertical: 10,
+    // paddingVertical: 10, // Handled by base preset
+    // Add specific selected styles if needed, e.g., border
+    // borderWidth: 2,
+    // borderColor: 'blue',
   },
   successText: {
-    backgroundColor: "rgba(0,255,0,0.05)",
-    borderRadius: 4,
-    color: "green",
-    marginBottom: 20,
-    padding: 10,
-    textAlign: "center",
+    // from original code
+    width: "100%", // Make the container span the width
+    textAlign: "center", // Center the text within the container
+    fontSize: 16, // Slightly larger font size
+    fontWeight: "500", // Medium weight to make it stand out
+    color: "#006400", // Keep dark green color
+    backgroundColor: "rgba(0, 200, 0, 0.1)", // Subtle background tint
+    paddingVertical: 10, // Vertical padding
+    paddingHorizontal: 12, // Horizontal padding
+    marginBottom: 15, // Space above the element below (submit button)
+    borderRadius: 6, // Slightly more rounded corners
   },
 })
