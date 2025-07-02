@@ -14,7 +14,7 @@ const alertSchema = new mongoose.Schema(
     },
     alertType: {
       type: String,
-      enum: ['conversation', 'patient', 'system', 'schedule'],
+      enum: ['conversation', 'patient', 'system'],
       required: true,
     },
     // Reference to the related entity (patient or conversation)

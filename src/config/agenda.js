@@ -69,6 +69,8 @@ async function runSchedules() {
       await alertService.createAlert({
         message: `Called ${patient.name} for their scheduled check-in at ${now.toISOString()}`,
         importance: 'low',
+        alertType: 'patient',
+        relatedPatient: schedule.patient,
         createdBy: schedule.id,
         createdModel: 'Schedule',
         visibility: 'assignedCaregivers',
@@ -82,6 +84,8 @@ async function runSchedules() {
       await alertService.createAlert({
         message: `Call to ${patient.name} for their scheduled check-in at ${now.toISOString()} generated an error: ${error}`,
         importance: 'high',
+        alertType: 'system',
+        relatedPatient: schedule.patient,
         createdBy: schedule.id,
         createdModel: 'Schedule',
         visibility: 'allCaregivers',

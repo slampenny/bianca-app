@@ -32,7 +32,7 @@ const alertThree = {
 const expiredAlert = {
   message: faker.lorem.sentence(),
   importance: 'medium',
-  alertType: 'schedule',
+  alertType: 'system',
   visibility: 'allCaregivers',
   relevanceUntil: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
   readBy: [],

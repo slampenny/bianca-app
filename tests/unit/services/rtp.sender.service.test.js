@@ -83,6 +83,11 @@ describe('RTP Sender Service', () => {
     if (service && typeof service.destroy === 'function') {
       service.destroy();
     }
+    
+    // Ensure Buffer.alloc is restored to original state
+    if (Buffer.alloc && Buffer.alloc.mockRestore) {
+      Buffer.alloc.mockRestore();
+    }
   });
 
   afterAll(async () => {
@@ -483,15 +488,17 @@ describe('RTP Sender Service', () => {
         throw new Error('Buffer allocation failed');
       });
       
-      const packet = service.createRtpPacket(testCallId, testAudioData, testConfig, testTimestamp);
-      
-      expect(packet).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error creating RTP packet')
-      );
-      
-      // Restore original method
-      Buffer.alloc = originalAlloc;
+      try {
+        const packet = service.createRtpPacket(testCallId, testAudioData, testConfig, testTimestamp);
+        
+        expect(packet).toBeNull();
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.stringContaining('Error creating RTP packet')
+        );
+      } finally {
+        // Always restore original method
+        Buffer.alloc = originalAlloc;
+      }
     });
   });
 

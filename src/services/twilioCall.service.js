@@ -238,14 +238,15 @@ class TwilioCallService {
           // Create alert for failed call
           try {
             await alertService.createAlert({
-              patientId: conversation.patientId,
-              type: 'failed-call',
               message: `Wellness check call failed: ${CallStatus}`,
-              severity: 'medium',
-              data: {
-                callSid: CallSid,
-                status: CallStatus
-              }
+              importance: 'medium',
+              alertType: 'patient',
+              relatedPatient: conversation.patientId,
+              relatedConversation: conversation._id,
+              createdBy: conversation.patientId, // Using patient as creator since it's about their call
+              createdModel: 'Patient',
+              visibility: 'assignedCaregivers',
+              relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
             });
             logger.info(`[Twilio Service] Created alert for failed call ${CallSid}`);
           } catch (alertError) {

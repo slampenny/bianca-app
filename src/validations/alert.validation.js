@@ -5,8 +5,11 @@ const createAlert = {
   body: Joi.object().keys({
     message: Joi.string().required(),
     importance: Joi.string().valid('low', 'medium', 'high', 'urgent').required(),
+    alertType: Joi.string().valid('conversation', 'patient', 'system').required(),
+    relatedPatient: Joi.string().custom(objectId).optional(),
+    relatedConversation: Joi.string().custom(objectId).optional(),
     createdBy: Joi.string().custom(objectId).required(),
-    createdModel: Joi.string().valid('Patient', 'Caregiver', 'Org').required(),
+    createdModel: Joi.string().valid('Patient', 'Caregiver', 'Org', 'Schedule').required(),
     visibility: Joi.string().valid('orgAdmin', 'allCaregivers', 'assignedCaregivers').required(),
     relevanceUntil: Joi.date().optional(),
     readBy: Joi.array().items(Joi.string().custom(objectId)),

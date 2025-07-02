@@ -1,6 +1,6 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
-const ariClient = require('../../../src/services/ari.client');
+let ariClient = require('../../../src/services/ari.client');
 
 // Mock dependencies
 jest.mock('../../../src/config/logger', () => ({
