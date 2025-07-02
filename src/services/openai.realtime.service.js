@@ -1198,7 +1198,7 @@ class OpenAIRealtimeService {
     this.pendingAudio.set(callId, []);
 
     let successfullyProcessedAndSentCount = 0;
-    let totalInputULawBytes = 0;
+    let totalInputULawBytes = 0; 
     let totalOutputPCM24Bytes = 0; 
 
     for (const chunkULawBase64 of chunksToProcess) {
