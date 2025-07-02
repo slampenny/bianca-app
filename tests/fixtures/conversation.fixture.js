@@ -2,12 +2,39 @@ const mongoose = require('mongoose');
 const faker = require('faker');
 const { Conversation, Message } = require('../../src/models');
 
-const generateMessage = (role) => ({
-  role,
-  content: faker.lorem.sentence(),
-  messageType: 'text',
-  timestamp: new Date(),
-});
+const generateMessage = (role) => {
+  const userMessages = [
+    "Hello, how are you feeling today?",
+    "I've been having some trouble sleeping lately.",
+    "Can you help me with my medication schedule?",
+    "I'm feeling a bit anxious about my upcoming appointment.",
+    "Thank you for checking in on me.",
+    "I've been doing my exercises as recommended.",
+    "Is it normal to feel tired after taking the new medication?",
+    "I'd like to schedule a follow-up call.",
+  ];
+  
+  const assistantMessages = [
+    "Hello! I'm here to help. How are you feeling today?",
+    "I understand that sleep issues can be challenging. Let's talk about what might be causing this.",
+    "Of course! I can help you organize your medication schedule. What medications are you currently taking?",
+    "It's completely normal to feel anxious about medical appointments. Would you like to discuss what's concerning you?",
+    "You're very welcome! It's my pleasure to support you.",
+    "That's excellent! Regular exercise is so important for your health. How has it been going?",
+    "Yes, fatigue can be a common side effect. How long have you been taking it?",
+    "I'd be happy to schedule a follow-up call. What time works best for you?",
+  ];
+  
+  const content = role === 'user' 
+    ? faker.random.arrayElement(userMessages)
+    : faker.random.arrayElement(assistantMessages);
+  
+  return {
+    role,
+    content,
+    messageType: 'text',
+  };
+};
 
 const conversationOne = {
   patientId: new mongoose.Types.ObjectId(),
@@ -45,7 +72,16 @@ const insertConversations = async (conversations) => {
     
     // Create messages with the conversation ID
     const messageIds = [];
-    const messageDataArray = [generateMessage('user'), generateMessage('assistant')];
+    
+    // Generate different numbers of messages for each conversation to test variety
+    const messageCount = faker.datatype.number({ min: 3, max: 8 });
+    const messageDataArray = [];
+    
+    for (let i = 0; i < messageCount; i++) {
+      // Alternate between user and assistant messages
+      const role = i % 2 === 0 ? 'user' : 'assistant';
+      messageDataArray.push(generateMessage(role));
+    }
     
     for (const messageData of messageDataArray) {
       const message = new Message({

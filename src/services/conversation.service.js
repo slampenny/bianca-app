@@ -46,6 +46,24 @@ const getConversationsByPatient = async (patientId) => {
   return conversations;
 };
 
+/**
+ * Query conversations by patient with pagination
+ * @param {ObjectId} patientId
+ * @param {Object} options - Query options
+ * @param {string} [options.sortBy] - Sort option in the format: sortField:(desc|asc)
+ * @param {number} [options.limit] - Maximum number of results per page (default = 10)
+ * @param {number} [options.page] - Current page (default = 1)
+ * @returns {Promise<QueryResult>}
+ */
+const queryConversationsByPatient = async (patientId, options) => {
+  const filter = { patientId };
+  return await Conversation.paginate(filter, {
+    ...options,
+    populate: 'messages',
+    sortBy: options.sortBy || 'startTime:desc',
+  });
+};
+
 // ===== NEW ENHANCED METHODS =====
 
 /**
@@ -323,6 +341,7 @@ module.exports = {
   addMessageToConversation,
   getConversationById,
   getConversationsByPatient,
+  queryConversationsByPatient,
   
   // New enhanced methods
   getConversationHistory,

@@ -114,6 +114,11 @@ const getConversationsByPatient = {
   params: Joi.object().keys({
     patientId: Joi.string().custom(objectId),
   }),
+  query: Joi.object().keys({
+    sortBy: Joi.string(),
+    limit: Joi.number().integer(),
+    page: Joi.number().integer(),
+  }),
 };
 
 const getCaregivers = {

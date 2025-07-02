@@ -22,10 +22,6 @@ const messageSchema = mongoose.Schema({
     enum: ['text', 'assistant_response', 'user_message', 'function_call', 'audio_transcript_delta'],
     default: 'text',
   },
-  timestamp: {
-    type: Date,
-    default: Date.now,
-  },
   metadata: {
     type: mongoose.Schema.Types.Mixed,
     default: {},

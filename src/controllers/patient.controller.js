@@ -98,6 +98,7 @@ const getPatientsByCaregiver = catchAsync(async (req, res) => {
 
 const getConversationsByPatient = catchAsync(async (req, res) => {
   const { patientId } = req.params;
+  const options = pick(req.query, ['sortBy', 'limit', 'page']);
 
   const patient = await patientService.getPatientById(patientId);
   logger.info(`Fetching conversations for patient: ${patientId}`, { patient });
@@ -105,8 +106,8 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid patient ID');
   }
 
-  const conversations = await conversationService.getConversationsByPatient(patientId);
-  res.status(httpStatus.OK).send(conversations.map(ConversationDTO));
+  const result = await conversationService.queryConversationsByPatient(patientId, options);
+  res.status(httpStatus.OK).send(result);
 });
 
 const getCaregivers = catchAsync(async (req, res) => {
