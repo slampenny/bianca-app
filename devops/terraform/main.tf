@@ -1083,11 +1083,11 @@ resource "aws_ecs_service" "app_service" {
   health_check_grace_period_seconds  = 300  # Increased from 120
 
   network_configuration {
-    # TEMPORARY: Use public subnet for debugging
-    subnets          = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+    # Use private subnets for Fargate
+    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
     security_groups  = [aws_security_group.bianca_app_sg.id]
-    # Need public IP in public subnet
-    assign_public_ip = true
+    # No public IP needed since we're in private subnets
+    assign_public_ip = false
   }
 
   service_registries {
@@ -1738,4 +1738,4 @@ output "connection_test_commands" {
     # Then inside container:
     curl http://${aws_instance.asterisk.private_ip}:8088/ari/asterisk/info
   EOT
-} 
+}
