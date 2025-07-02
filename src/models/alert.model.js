@@ -12,6 +12,26 @@ const alertSchema = new mongoose.Schema(
       enum: ['low', 'medium', 'high', 'urgent'],
       default: 'low',
     },
+    alertType: {
+      type: String,
+      enum: ['conversation', 'patient', 'system', 'schedule'],
+      required: true,
+    },
+    // Reference to the related entity (patient or conversation)
+    relatedPatient: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Patient',
+      required: function() {
+        return this.alertType === 'conversation' || this.alertType === 'patient';
+      },
+    },
+    relatedConversation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Conversation',
+      required: function() {
+        return this.alertType === 'conversation';
+      },
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,

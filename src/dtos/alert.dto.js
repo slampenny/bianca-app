@@ -1,7 +1,19 @@
 // alert.dto.js
 
 const AlertDTO = (alert) => {
-  const { _id, message, importance, createdBy, createdModel, visibility, readBy, relevanceUntil } = alert;
+  const { 
+    _id, 
+    message, 
+    importance, 
+    alertType,
+    relatedPatient,
+    relatedConversation,
+    createdBy, 
+    createdModel, 
+    visibility, 
+    readBy, 
+    relevanceUntil 
+  } = alert;
 
   const id = _id;
 
@@ -9,6 +21,9 @@ const AlertDTO = (alert) => {
     id,
     message,
     importance,
+    alertType,
+    relatedPatient,
+    relatedConversation,
     createdBy,
     createdModel,
     visibility,

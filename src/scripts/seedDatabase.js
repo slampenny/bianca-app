@@ -58,6 +58,7 @@ async function seedDatabase() {
     const alertFour = {
       message: "Patient John Smith missed their scheduled medication dose",
       importance: 'high',
+      alertType: 'patient',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 12), // 12 hours from now
       readBy: [],
@@ -66,6 +67,7 @@ async function seedDatabase() {
     const alertFive = {
       message: "New patient registration completed for Sarah Johnson",
       importance: 'low',
+      alertType: 'patient',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 72), // 72 hours from now
       readBy: [],
@@ -74,6 +76,7 @@ async function seedDatabase() {
     const alertSix = {
       message: "System maintenance scheduled for tonight at 2 AM",
       importance: 'medium',
+      alertType: 'system',
       visibility: 'orgAdmin',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 6), // 6 hours from now
       readBy: [],
@@ -82,6 +85,7 @@ async function seedDatabase() {
     const alertSeven = {
       message: "Patient Mary Wilson reported feeling dizzy after medication",
       importance: 'urgent',
+      alertType: 'patient',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 2), // 2 hours from now
       readBy: [],
@@ -90,6 +94,7 @@ async function seedDatabase() {
     const alertEight = {
       message: "Monthly billing report is ready for review",
       importance: 'low',
+      alertType: 'system',
       visibility: 'orgAdmin',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 168), // 1 week from now
       readBy: [],
@@ -98,6 +103,7 @@ async function seedDatabase() {
     const alertNine = {
       message: "Patient Robert Davis completed their wellness check",
       importance: 'low',
+      alertType: 'patient',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
       readBy: [],
@@ -106,6 +112,7 @@ async function seedDatabase() {
     const alertTen = {
       message: "New caregiver training materials available",
       importance: 'medium',
+      alertType: 'system',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 120), // 5 days from now
       readBy: [],
@@ -114,6 +121,7 @@ async function seedDatabase() {
     const alertEleven = {
       message: "Patient Lisa Brown needs follow-up appointment scheduling",
       importance: 'high',
+      alertType: 'patient',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 48), // 48 hours from now
       readBy: [],
@@ -122,6 +130,7 @@ async function seedDatabase() {
     const alertTwelve = {
       message: "Database backup completed successfully",
       importance: 'low',
+      alertType: 'system',
       visibility: 'orgAdmin',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
       readBy: [],
@@ -130,6 +139,7 @@ async function seedDatabase() {
     const alertThirteen = {
       message: "Patient Michael Chen reported improved symptoms",
       importance: 'low',
+      alertType: 'patient',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 36), // 36 hours from now
       readBy: [],
@@ -138,6 +148,7 @@ async function seedDatabase() {
     const alertFourteen = {
       message: "Emergency contact protocol updated",
       importance: 'high',
+      alertType: 'system',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 168), // 1 week from now
       readBy: [],
@@ -146,14 +157,15 @@ async function seedDatabase() {
     const alertFifteen = {
       message: "Patient Jennifer Lee missed their wellness check call",
       importance: 'medium',
+      alertType: 'patient',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 4), // 4 hours from now
       readBy: [],
     };
     
+    // Insert alerts first (without patient references)
     await insertAlerts(caregiverOneRecord, 'Caregiver', [
-      alertOne, alertTwo, alertThree, expiredAlert, alertFour, alertFive, alertSix, alertSeven,
-      alertEight, alertNine, alertTen, alertEleven, alertTwelve, alertThirteen, alertFourteen, alertFifteen
+      alertOne, alertTwo, alertThree, expiredAlert, alertSix, alertEight, alertTen, alertTwelve, alertFourteen
     ]);
 
     // Insert patients and add them to the caregiverOne (fake@example.org)
@@ -223,6 +235,47 @@ async function seedDatabase() {
       ]);
     
     console.log('Inserted patients:', patient1, patient2, patient3, patient4, patient5, patient6, patient7, patient8, patient9, patient10);
+
+    // Insert patient-specific alerts
+    const patientAlertFour = {
+      ...alertFour,
+      relatedPatient: patient1._id,
+    };
+    
+    const patientAlertFive = {
+      ...alertFive,
+      relatedPatient: patient2._id,
+    };
+    
+    const patientAlertSeven = {
+      ...alertSeven,
+      relatedPatient: patient3._id,
+    };
+    
+    const patientAlertNine = {
+      ...alertNine,
+      relatedPatient: patient4._id,
+    };
+    
+    const patientAlertEleven = {
+      ...alertEleven,
+      relatedPatient: patient5._id,
+    };
+    
+    const patientAlertThirteen = {
+      ...alertThirteen,
+      relatedPatient: patient6._id,
+    };
+    
+    const patientAlertFifteen = {
+      ...alertFifteen,
+      relatedPatient: patient7._id,
+    };
+
+    await insertAlerts(caregiverOneRecord, 'Caregiver', [
+      patientAlertFour, patientAlertFive, patientAlertSeven, patientAlertNine,
+      patientAlertEleven, patientAlertThirteen, patientAlertFifteen
+    ]);
 
     // Insert conversations for patients.
     conversationOne.patientId = patient1._id;
@@ -398,12 +451,46 @@ async function seedDatabase() {
       callType: 'wellness-check',
     };
     
-    await insertConversations([
-      conversationOne, conversationTwo, conversationThree, conversationFour, conversationFive,
-      conversationSix, conversationSeven, conversationEight, conversationNine, conversationTen,
-      conversationEleven, conversationTwelve, conversationThirteen, conversationFourteen, conversationFifteen
-    ]);
+    const [conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8, conv9, conv10, conv11, conv12, conv13, conv14, conv15] = 
+      await insertConversations([
+        conversationOne, conversationTwo, conversationThree, conversationFour, conversationFive,
+        conversationSix, conversationSeven, conversationEight, conversationNine, conversationTen,
+        conversationEleven, conversationTwelve, conversationThirteen, conversationFourteen, conversationFifteen
+      ]);
     console.log('Inserted conversations');
+
+    // Insert conversation-specific alerts
+    const conversationAlertThree = {
+      ...alertThree,
+      relatedPatient: patient1._id,
+      relatedConversation: conv3._id,
+    };
+
+    const conversationAlertSchedule = {
+      message: "Wellness check conversation completed - follow-up scheduled",
+      importance: 'medium',
+      alertType: 'conversation',
+      relatedPatient: patient1._id,
+      relatedConversation: conv6._id,
+      visibility: 'assignedCaregivers',
+      relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
+      readBy: [],
+    };
+
+    const conversationAlertUrgent = {
+      message: "Patient reported concerning symptoms during conversation",
+      importance: 'urgent',
+      alertType: 'conversation',
+      relatedPatient: patient1._id,
+      relatedConversation: conv7._id,
+      visibility: 'assignedCaregivers',
+      relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 2), // 2 hours from now
+      readBy: [],
+    };
+
+    await insertAlerts(caregiverOneRecord, 'Caregiver', [
+      conversationAlertThree, conversationAlertSchedule, conversationAlertUrgent
+    ]);
 
     // Seed schedules for patients.
     await insertScheduleAndAddToPatient(patient1, scheduleOne);
