@@ -1199,7 +1199,7 @@ class OpenAIRealtimeService {
 
     let successfullyProcessedAndSentCount = 0;
     let totalInputULawBytes = 0;
-    let totalOutputPCM24Bytes = 0;
+    let totalOutputPCM24Bytes = 0; 
 
     for (const chunkULawBase64 of chunksToProcess) {
       let ulawBuffer, pcm8khzBuffer, pcm24khzBuffer, pcm24khzBase64ToSend;
