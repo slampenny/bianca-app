@@ -642,8 +642,8 @@ class OpenAIRealtimeService {
         instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant.',
         voice: config.openai.realtimeVoice || 'alloy',
         // USE PCM16 instead of g711_ulaw for better quality and reliability
-        input_audio_format: 'pcm16', // Much better speech recognition
-        output_audio_format: 'pcm16', // Higher quality output
+        input_audio_format: 'g711_ulaw', // Much better speech recognition
+        output_audio_format: 'g711_ulaw', // Higher quality output
         // Add turn detection for automatic response generation
         turn_detection: {
           type: 'server_vad',
