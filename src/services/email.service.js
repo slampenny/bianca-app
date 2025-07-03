@@ -172,7 +172,7 @@ const sendEmail = async (to, subject, text, html) => {
         logger.info(`Ethereal message sent! Preview URL: ${previewUrl}`);
       } else {
         logger.info(`Ethereal message sent with ID: ${info.messageId}`);
-      }
+      } 
     } else if (info.messageId) { // For SES
       logger.info(`Email sent successfully to ${to} via SES. Message ID: ${info.messageId}`);
     } else { // For console transport or other cases
