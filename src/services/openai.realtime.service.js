@@ -654,7 +654,7 @@ class OpenAIRealtimeService {
         // Add input transcription to help with debugging
         input_audio_transcription: {
           model: 'whisper-1',
-        },
+        }, 
         //...(config.openai.realtimeSessionConfig || {})
       },
     }; 
