@@ -657,7 +657,7 @@ class OpenAIRealtimeService {
         },
         //...(config.openai.realtimeSessionConfig || {})
       },
-    };
+    }; 
 
     logger.info(`[OpenAI Realtime] Sending session.update for ${callId}`);
     try {
