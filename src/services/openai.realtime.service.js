@@ -974,80 +974,89 @@ class OpenAIRealtimeService {
   /**
  * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
  */
-  async processAudioResponse(callId, audioBase64PCM) {
-    if (!audioBase64PCM) {
-      logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audioBase64PCM for ${callId}`);
-      return;
+  async processAudioResponse(callId, audioBase64) {
+    if (!audioBase64) {
+        logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audio for ${callId}`);
+        return;
     }
-
+    
     try {
-      // Use config flag to determine if debug mode is enabled
-      const useDebugMode = config.openai?.debugAudio !== false; // Default to true
-
-      const conn = this.connections.get(callId);
-
-      // Initialize debug files on first audio from OpenAI if debug mode is enabled
-      if (useDebugMode && conn && !conn._debugFilesInitialized) {
-        this.initializeContinuousDebugFiles(callId);
-        conn._debugFilesInitialized = true;
-      }
-
-      // STAGE 1: Decode base64 from OpenAI
-      const inputBuffer = Buffer.from(audioBase64PCM, 'base64');
-      if (inputBuffer.length === 0) {
-        logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
-        return;
-      }
-
-      // Append RAW input from OpenAI if debug mode is enabled
-      if (useDebugMode) {
-        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm24k.raw', inputBuffer);
-      }
-
-      // STAGE 2: Resample from 24kHz to 8kHz
-      const openaiOutputRate = CONSTANTS.OPENAI_PCM_OUTPUT_RATE; // 24kHz
-      const asteriskPlaybackRate = CONSTANTS.ASTERISK_SAMPLE_RATE; // 8kHz
-
-      const resampledBuffer = AudioUtils.resamplePcm(inputBuffer, openaiOutputRate, asteriskPlaybackRate);
-
-      if (!resampledBuffer || resampledBuffer.length === 0) {
-        logger.error(`[AUDIO DEBUG] Resampling FAILED for ${callId}`);
-        return;
-      }
-
-      // Append resampled audio if debug mode is enabled
-      if (useDebugMode) {
-        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_pcm8k.raw', resampledBuffer);
-      }
-
-      // STAGE 3: Convert PCM to uLaw
-      const ulawBase64 = await AudioUtils.convertPcmToUlaw(resampledBuffer);
-
-      if (!ulawBase64 || ulawBase64.length === 0) {
-        logger.error(`[AUDIO DEBUG] PCM to uLaw conversion FAILED`);
-        return;
-      }
-
-      // Append final uLaw if debug mode is enabled
-      if (useDebugMode) {
-        const ulawRawBuffer = Buffer.from(ulawBase64, 'base64');
-        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawRawBuffer);
-      }
-
-      // Log progress every 100 chunks if debug mode is enabled
-      if (useDebugMode && conn) {
-        if (!conn._openaiChunkCount) conn._openaiChunkCount = 0;
-        conn._openaiChunkCount++;
-        if (conn._openaiChunkCount % 100 === 0) {
-          logger.info(`[AUDIO DEBUG] Processed ${conn._openaiChunkCount} chunks from OpenAI for ${callId}`);
+        const useDebugMode = config.openai?.debugAudio !== false;
+        const conn = this.connections.get(callId);
+        
+        // Add timing measurement
+        const startTime = process.hrtime.bigint();
+        
+        if (useDebugMode && conn && !conn._debugFilesInitialized) {
+            this.initializeContinuousDebugFiles(callId);
+            conn._debugFilesInitialized = true;
         }
-      }
-
-      this.notify(callId, 'audio_chunk', { audio: ulawBase64 });
+        
+        // Since OpenAI is sending g711_ulaw at 8kHz, we can use it directly
+        const ulawBuffer = Buffer.from(audioBase64, 'base64');
+        if (ulawBuffer.length === 0) {
+            logger.warn(`[OpenAI Realtime] processAudioResponse: Decoded audio buffer is empty for ${callId}`);
+            return;
+        }
+        
+        // Log audio characteristics
+        if (!conn._audioStatsLogged || conn._openaiChunkCount % 100 === 0) {
+            logger.info(`[AUDIO QUALITY] OpenAI uLaw audio characteristics:`, {
+                callId,
+                bufferSize: ulawBuffer.length,
+                durationMs: (ulawBuffer.length / 8).toFixed(2), // 8kHz, 1 byte per sample
+                chunkCount: conn._openaiChunkCount || 0
+            });
+            conn._audioStatsLogged = true;
+        }
+        
+        if (useDebugMode) {
+            await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawBuffer);
+        }
+        
+        // Calculate minimal processing time
+        const totalTime = Number(process.hrtime.bigint() - startTime) / 1000000; // Convert to ms
+        
+        // Track timing stats
+        if (!conn._timingStats) {
+            conn._timingStats = {
+                count: 0,
+                totalMs: 0,
+                maxMs: 0
+            };
+        }
+        
+        conn._timingStats.count++;
+        conn._timingStats.totalMs += totalTime;
+        conn._timingStats.maxMs = Math.max(conn._timingStats.maxMs, totalTime);
+        
+        // Log timing every 100 chunks
+        if (conn._timingStats.count % 100 === 0) {
+            logger.info(`[AUDIO TIMING] Direct uLaw pass-through for ${callId}:`, {
+                chunks: conn._timingStats.count,
+                avgTotalMs: (conn._timingStats.totalMs / conn._timingStats.count).toFixed(2),
+                maxMs: conn._timingStats.maxMs.toFixed(2),
+                currentChunkMs: totalTime.toFixed(2)
+            });
+        }
+        
+        if (useDebugMode && conn) {
+            if (!conn._openaiChunkCount) conn._openaiChunkCount = 0;
+            conn._openaiChunkCount++;
+        }
+        
+        // CRITICAL: Send to RTP immediately - direct pass-through
+        this.notify(callId, 'audio_chunk', { 
+            audio: audioBase64, // Already base64 uLaw from OpenAI
+            processingTimeMs: totalTime,
+            originalSizeBytes: ulawBuffer.length,
+            ulawSizeBytes: ulawBuffer.length
+        });
+        
     } catch (err) {
-      logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
+        logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
     }
-  }
+}
 
   /**
    * Handle conversation items
@@ -1179,122 +1188,92 @@ class OpenAIRealtimeService {
   async flushPendingAudio(callId) {
     const conn = this.connections.get(callId);
     if (!conn) {
-      logger.warn(`[OpenAI Realtime] flushPendingAudio: No connection for ${callId}.`);
-      return;
+        logger.warn(`[OpenAI Realtime] flushPendingAudio: No connection for ${callId}.`);
+        return;
     }
+    
     if (!conn.sessionReady) {
-      logger.warn(`[OpenAI Realtime] flushPendingAudio: Session not ready for ${callId}. Cannot flush.`);
-      return;
+        logger.warn(`[OpenAI Realtime] flushPendingAudio: Session not ready for ${callId}. Cannot flush.`);
+        return;
     }
-
+    
     const chunksULawBase64 = this.pendingAudio.get(callId);
     if (!chunksULawBase64 || chunksULawBase64.length === 0) {
-      logger.info(`[OpenAI Realtime] No pending uLaw audio to flush for ${callId}.`);
-      return;
+        logger.info(`[OpenAI Realtime] No pending uLaw audio to flush for ${callId}.`);
+        return;
     }
-
+    
     logger.info(`[OpenAI Realtime] Flushing ${chunksULawBase64.length} pending uLaw audio chunks for ${callId}.`);
+    
     const chunksToProcess = [...chunksULawBase64];
     this.pendingAudio.set(callId, []);
-
+    
     let successfullyProcessedAndSentCount = 0;
-    let totalInputULawBytes = 0; 
-    let totalOutputPCM24Bytes = 0; 
-
+    let totalULawBytes = 0;
+    
     for (const chunkULawBase64 of chunksToProcess) {
-      let ulawBuffer, pcm8khzBuffer, pcm24khzBuffer, pcm24khzBase64ToSend;
-      try {
-        if (!chunkULawBase64 || chunkULawBase64.length === 0) {
-          logger.warn(`[OpenAI Realtime] flushPendingAudio (${callId}): Encountered empty base64 uLaw chunk. Skipping.`);
-          continue;
-        }
-        ulawBuffer = Buffer.from(chunkULawBase64, 'base64');
-        totalInputULawBytes += ulawBuffer.length;
-        if (!ulawBuffer || ulawBuffer.length === 0) {
-          logger.warn(
-            `[OpenAI Realtime] flushPendingAudio (${callId}): Decoded uLaw buffer is empty. Original base64 length: ${chunkULawBase64.length}. Skipping.`
-          );
-          continue;
-        }
-
-        pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
-        if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
-          logger.warn(
-            `[OpenAI Realtime] flushPendingAudio (${callId}): AudioUtils.convertUlawToPcm returned empty buffer. uLaw bytes: ${ulawBuffer.length}. Skipping.`
-          );
-          continue;
-        }
-
-        pcm24khzBuffer = AudioUtils.resamplePcm(
-          pcm8khzBuffer,
-          CONSTANTS.ASTERISK_SAMPLE_RATE,
-          CONSTANTS.DEFAULT_SAMPLE_RATE
-        );
-        if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
-          logger.warn(
-            `[OpenAI Realtime] flushPendingAudio (${callId}): AudioUtils.resamplePcm returned empty buffer. PCM 8kHz bytes: ${pcm8khzBuffer.length}. Skipping.`
-          );
-          continue;
-        }
-        totalOutputPCM24Bytes += pcm24khzBuffer.length;
-
-        await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
-
-        pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
-        if (!pcm24khzBase64ToSend) {
-          logger.warn(
-            `[OpenAI Realtime] flushPendingAudio (${callId}): Base64 encoding of 24kHz PCM resulted in an empty string. PCM 24kHz bytes: ${pcm24khzBuffer.length}. Skipping.`
-          );
-          continue;
-        }
-        // DETAILED LOG FOR EACH APPEND ATTEMPT
-        logger.debug(
-          `[OpenAI Realtime] flushPendingAudio (${callId}): Attempting append. uLaw bytes: ${ulawBuffer.length}, PCM8k bytes: ${pcm8khzBuffer.length}, PCM24k bytes: ${pcm24khzBuffer.length}, Base64 PCM24k len: ${pcm24khzBase64ToSend.length}`
-        );
-
-        await this.sendJsonMessage(callId, {
-          type: 'input_audio_buffer.append',
-          audio: pcm24khzBase64ToSend,
-        });
-        conn.audioChunksSent++;
-        successfullyProcessedAndSentCount++;
-      } catch (audioProcessingError) {
-        logger.error(
-          `[OpenAI Realtime] flushPendingAudio (${callId}): Error processing a pending chunk: ${audioProcessingError.message}`,
-          audioProcessingError.stack
-        );
-      }
-    }
-
-    logger.info(
-      `[OpenAI Realtime] flushPendingAudio (${callId}): Finished processing. Sent ${successfullyProcessedAndSentCount} of ${chunksToProcess.length} chunks. Total input uLaw bytes: ${totalInputULawBytes}, Total output PCM24k bytes (before base64): ${totalOutputPCM24Bytes}.`
-    );
-
-    if (successfullyProcessedAndSentCount > 0) {
-      if (conn.sessionReady && conn.webSocket?.readyState === WebSocket.OPEN && !conn.pendingCommit) {
-        logger.info(
-          `[OpenAI Realtime] flushPendingAudio (${callId}): Committing ${successfullyProcessedAndSentCount} appended audio chunks.`
-        );
         try {
-          await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-          conn.pendingCommit = true;
-        } catch (commitErr) {
-          logger.error(
-            `[OpenAI Realtime] flushPendingAudio (${callId}): Failed to send commit after flushing: ${commitErr.message}`
-          );
-          conn.pendingCommit = false; // Ensure it's reset on commit send failure
+            if (!chunkULawBase64 || chunkULawBase64.length === 0) {
+                logger.warn(`[OpenAI Realtime] flushPendingAudio (${callId}): Encountered empty base64 uLaw chunk. Skipping.`);
+                continue;
+            }
+            
+            const ulawBuffer = Buffer.from(chunkULawBase64, 'base64');
+            totalULawBytes += ulawBuffer.length;
+            
+            if (!ulawBuffer || ulawBuffer.length === 0) {
+                logger.warn(
+                    `[OpenAI Realtime] flushPendingAudio (${callId}): Decoded uLaw buffer is empty. Original base64 length: ${chunkULawBase64.length}. Skipping.`
+                );
+                continue;
+            }
+            
+            // Send directly as g711_ulaw - no conversion needed
+            await this.sendJsonMessage(callId, {
+                type: 'input_audio_buffer.append',
+                audio: chunkULawBase64,
+            });
+            
+            conn.audioChunksSent++;
+            successfullyProcessedAndSentCount++;
+            
+        } catch (audioProcessingError) {
+            logger.error(
+                `[OpenAI Realtime] flushPendingAudio (${callId}): Error processing a pending chunk: ${audioProcessingError.message}`,
+                audioProcessingError.stack
+            );
         }
-      } else {
-        logger.warn(
-          `[OpenAI Realtime] flushPendingAudio (${callId}): Conditions not met for commit. sessionReady: ${conn.sessionReady}, wsState: ${conn.webSocket?.readyState}, pendingCommit: ${conn.pendingCommit}`
-        );
-      }
-    } else if (chunksToProcess.length > 0) {
-      logger.warn(
-        `[OpenAI Realtime] flushPendingAudio (${callId}): No chunks were successfully processed. No commit will be sent.`
-      );
     }
-  }
+    
+    logger.info(
+        `[OpenAI Realtime] flushPendingAudio (${callId}): Finished processing. Sent ${successfullyProcessedAndSentCount} of ${chunksToProcess.length} chunks. Total uLaw bytes: ${totalULawBytes}.`
+    );
+    
+    if (successfullyProcessedAndSentCount > 0) {
+        if (conn.sessionReady && conn.webSocket?.readyState === WebSocket.OPEN && !conn.pendingCommit) {
+            logger.info(
+                `[OpenAI Realtime] flushPendingAudio (${callId}): Committing ${successfullyProcessedAndSentCount} appended audio chunks.`
+            );
+            try {
+                await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+                conn.pendingCommit = true;
+            } catch (commitErr) {
+                logger.error(
+                    `[OpenAI Realtime] flushPendingAudio (${callId}): Failed to send commit after flushing: ${commitErr.message}`
+                );
+                conn.pendingCommit = false;
+            }
+        } else {
+            logger.warn(
+                `[OpenAI Realtime] flushPendingAudio (${callId}): Conditions not met for commit. sessionReady: ${conn.sessionReady}, wsState: ${conn.webSocket?.readyState}, pendingCommit: ${conn.pendingCommit}`
+            );
+        }
+    } else if (chunksToProcess.length > 0) {
+        logger.warn(
+            `[OpenAI Realtime] flushPendingAudio (${callId}): No chunks were successfully processed. No commit will be sent.`
+        );
+    }
+}
 
   /**
    * Force send a commit for testing
@@ -1378,113 +1357,76 @@ class OpenAIRealtimeService {
   */
   async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
     if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
-      logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
-      return;
+        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
+        return;
     }
-
+    
     const conn = this.connections.get(callId);
     if (!conn) {
-      logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
-      return;
+        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): No connection. Skipping.`);
+        return;
     }
-
-    // Use config flag to determine if debug mode is enabled
-    const useDebugMode = config.openai?.debugAudio !== false; // Default to true
-
-    // Initialize files on first audio from Asterisk if debug mode is enabled
+    
+    const useDebugMode = config.openai?.debugAudio !== false;
+    
     if (useDebugMode && !conn._debugFilesInitialized) {
-      this.initializeContinuousDebugFiles(callId);
-      conn._debugFilesInitialized = true;
+        this.initializeContinuousDebugFiles(callId);
+        conn._debugFilesInitialized = true;
     }
-
+    
     conn.audioChunksReceived++;
-
+    
     if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
-      if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
-        const pending = this.pendingAudio.get(callId) || [];
-        if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-          pending.push(audioChunkBase64ULaw);
-          this.pendingAudio.set(callId, pending);
-        } else {
-          logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
+        if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
+            const pending = this.pendingAudio.get(callId) || [];
+            if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+                pending.push(audioChunkBase64ULaw);
+                this.pendingAudio.set(callId, pending);
+            } else {
+                logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
+            }
         }
-      }
-      return;
+        return;
     }
-
+    
     try {
-      // STAGE 1: Decode base64 uLaw from Asterisk
-      const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-      if (!ulawBuffer || ulawBuffer.length === 0) {
-        logger.warn(`[AUDIO DEBUG] Decoded uLaw buffer empty`);
-        return;
-      }
-
-      // Append RAW uLaw from Asterisk if debug mode is enabled
-      if (useDebugMode) {
-        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
-      }
-
-      // STAGE 2: Convert uLaw to PCM 8kHz
-      const pcm8khzBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
-      if (!pcm8khzBuffer || pcm8khzBuffer.length === 0) {
-        logger.error(`[AUDIO DEBUG] uLaw to PCM conversion FAILED`);
-        return;
-      }
-
-      // Append PCM 8kHz if debug mode is enabled
-      if (useDebugMode) {
-        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm8k.raw', pcm8khzBuffer);
-      }
-
-      // STAGE 3: Resample PCM from 8kHz to 24kHz
-      const pcm24khzBuffer = AudioUtils.resamplePcm(
-        pcm8khzBuffer,
-        CONSTANTS.ASTERISK_SAMPLE_RATE,
-        CONSTANTS.DEFAULT_SAMPLE_RATE
-      );
-      if (!pcm24khzBuffer || pcm24khzBuffer.length === 0) {
-        logger.error(`[AUDIO DEBUG] Resampling FAILED`);
-        return;
-      }
-
-      // Append PCM 24kHz if debug mode is enabled
-      if (useDebugMode) {
-        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_pcm24k.raw', pcm24khzBuffer);
-
-        // Also append to the existing output_for_openai.pcm file
-        await this.appendAudioToLocalFile(callId, pcm24khzBuffer);
-      }
-
-      // STAGE 4: Convert to base64 for OpenAI
-      const pcm24khzBase64ToSend = pcm24khzBuffer.toString('base64');
-      if (!pcm24khzBase64ToSend) {
-        logger.error(`[AUDIO DEBUG] Base64 encoding FAILED`);
-        return;
-      }
-
-      // Log progress every 100 chunks if debug mode is enabled
-      if (useDebugMode && conn.audioChunksReceived % 100 === 0) {
-        logger.info(`[AUDIO DEBUG] Processed ${conn.audioChunksReceived} chunks from Asterisk for ${callId}`);
-      }
-
-      await this.sendJsonMessage(callId, {
-        type: 'input_audio_buffer.append',
-        audio: pcm24khzBase64ToSend,
-      });
-
-      conn.audioChunksSent++;
-      if (conn.audioChunksSent > 0 && conn.audioChunksSent % CONSTANTS.AUDIO_BATCH_SIZE === 0) {
-        this.debounceCommit(callId);
-      }
+        // Since we're using g711_ulaw format, just send it directly!
+        // No conversion needed - OpenAI accepts g711_ulaw natively
+        
+        if (useDebugMode) {
+            // Still log the raw uLaw for debugging if needed
+            const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+            await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
+        }
+        
+        // Log progress every 100 chunks
+        if (conn.audioChunksReceived % 100 === 0) {
+            logger.info(`[AUDIO DEBUG] Sent ${conn.audioChunksReceived} uLaw chunks directly to OpenAI for ${callId}`);
+        }
+        
+        await this.sendJsonMessage(callId, {
+            type: 'input_audio_buffer.append',
+            audio: audioChunkBase64ULaw,
+        });
+        
+        conn.audioChunksSent++;
+        
+        // Commit more frequently for better responsiveness
+        if (conn.audioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
+            this.debounceCommit(callId);
+        } else if (conn.audioChunksSent === 1) {
+            // Start a timer for the first chunk to ensure we don't wait too long
+            this.debounceCommit(callId);
+        }
+        
     } catch (audioProcessingError) {
-      logger.error(
-        `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
-        audioProcessingError.stack
-      );
-      return;
+        logger.error(
+            `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
+            audioProcessingError.stack
+        );
+        return;
     }
-  }
+}
 
   // Remove the sendAudioChunkDebug method entirely
 
@@ -2141,8 +2083,8 @@ class OpenAIRealtimeService {
               session: {
                 instructions: `Test connection prompt for ${testId}`,
                 voice: config.openai.realtimeVoice || 'alloy',
-                input_audio_format: 'pcm16',
-                output_audio_format: 'pcm16',
+                input_audio_format: 'g711_ulaw',
+                output_audio_format: 'g711_ulaw',
               },
               _testWebSocket: wsClient,
               _testId: testId,
