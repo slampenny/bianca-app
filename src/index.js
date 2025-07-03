@@ -4,7 +4,7 @@ const http = require('http');
 const config = require('./config/config');
 const logger = require('./config/logger');
 const { startAriClient, getAriClientInstance, shutdownAriClient } = require('./services/ari.client'); // Updated path
-const { stopAllListeners  } = require('./services/rtp.listener.service'); // Updated path
+const { stopAllListeners } = require('./services/rtp.listener.service'); // Updated path
 
 /**
  * Starts the application server and initializes all components
@@ -17,6 +17,24 @@ async function startServer() {
 
     // Import Express app (after config is loaded)
     const app = require('./app');
+
+    // Initialize Email Service
+    let emailReady = false;
+    try {
+      logger.info('Initializing email service...');
+      const emailService = require('./services/email.service');
+      await emailService.initializeEmailTransport();
+      emailReady = true;
+      logger.info('✅ Email service initialized successfully');
+    } catch (emailError) {
+      logger.error('❌ Email service initialization failed:', emailError);
+      if (config.env === 'production') {
+        logger.error('Email service is critical in production, exiting...');
+        process.exit(1);
+      } else {
+        logger.warn('Continuing without email service in development...');
+      }
+    }
 
     // Connect to MongoDB (Your existing logic is perfect)
     let mongoConnected = false;
@@ -75,11 +93,14 @@ async function startServer() {
     const server = http.createServer(app);
     const port = config.port || 3000;
     server.listen(port, '0.0.0.0', () => {
-      logger.info(`Server listening on port ${port}`);
+      logger.info(`🚀 Server listening on port ${port}`);
       logger.info('=== Final Service Status ===');
-      logger.info(`MongoDB: ${mongoConnected ? 'Connected' : 'Not connected'}`);
-      logger.info(`ARI Client: ${ariReady ? 'Ready' : 'Not ready'}`);
+      logger.info(`MongoDB: ${mongoConnected ? '✅ Connected' : '❌ Not connected'}`);
+      logger.info(`Email Service: ${emailReady ? '✅ Ready' : '❌ Not ready'}`);
+      logger.info(`ARI Client: ${ariReady ? '✅ Ready' : '❌ Not ready'}`);
       logger.info('=============================');
+      logger.info(`📊 Health check: http://localhost:${port}/health`);
+      logger.info(`📧 Email test: http://localhost:${port}/v1/test/email`);
     });
 
     // Set up graceful shutdown handlers
@@ -136,6 +157,16 @@ function setupShutdownHandlers(server) {
       logger.info('RTP sender service stopped');
     } catch (err) {
       logger.error('Error stopping RTP sender:', err);
+    }
+
+    try {
+      // 4. Close email service transport if needed
+      logger.info('Shutting down email service...');
+      const emailService = require('./services/email.service');
+      // Email service cleanup is handled by process.on('exit') in the email service
+      logger.info('Email service shutdown completed');
+    } catch (err) {
+      logger.error('Error shutting down email service:', err);
     }
     
     if (server) {

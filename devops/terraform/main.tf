@@ -216,7 +216,7 @@ variable "github_repo" {
 variable "github_branch" {
   description = "GitHub branch for CodePipeline."
   type        = string
-  default     = "fix/ulaw"
+  default     = "main"
 }
 
 variable "github_app_connection_arn" {
@@ -1281,7 +1281,13 @@ resource "aws_iam_policy" "ecs_task_ses_policy" {
       Effect = "Allow"
       Action = [
         "ses:SendEmail",
-        "ses:SendRawEmail"
+        "ses:SendRawEmail",
+        # Add these additional permissions for diagnostics and connectivity testing
+        "ses:GetSendQuota",
+        "ses:GetSendStatistics",
+        "ses:ListIdentities",
+        "ses:GetIdentityVerificationAttributes",
+        "ses:GetAccountSendingEnabled"
       ]
       Resource = "*"
     }]

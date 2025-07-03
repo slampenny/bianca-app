@@ -21,8 +21,61 @@ const logger = require('./config/logger');
 
 const app = express();
 
+// Enhanced health check that includes service status
 app.get('/health', (req, res) => {
-  res.status(200).send('OK');
+  try {
+    const mongoose = require('mongoose');
+    
+    // Check email service status
+    let emailStatus = { ready: false, status: 'Service not loaded' };
+    try {
+      const emailService = require('./services/email.service');
+      emailStatus = {
+        ready: emailService.isReady(),
+        status: emailService.getStatus()
+      };
+    } catch (error) {
+      emailStatus = { ready: false, status: 'Service not available' };
+    }
+
+    // Check ARI client status
+    let ariStatus = { ready: false, status: 'Service not loaded' };
+    try {
+      const { getAriClientInstance } = require('./services/ari.client');
+      const ariClient = getAriClientInstance();
+      ariStatus = {
+        ready: ariClient && ariClient.isReady(),
+        status: ariClient ? 'Connected' : 'Not connected'
+      };
+    } catch (error) {
+      ariStatus = { ready: false, status: 'Service not available' };
+    }
+
+    const healthData = {
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      environment: config.env,
+      services: {
+        mongodb: {
+          ready: mongoose.connection.readyState === 1,
+          status: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+        },
+        email: emailStatus,
+        asterisk: ariStatus
+      }
+    };
+
+    res.status(200).json(healthData);
+    
+  } catch (error) {
+    // Fallback if something goes wrong
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      environment: config.env,
+      error: 'Could not retrieve service status'
+    });
+  }
 });
 
 // Trust proxy headers
@@ -88,7 +141,6 @@ app.use(helmet({
 }));
 
 // Serve static files from uploads directory
-
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // v1 API routes
@@ -107,6 +159,7 @@ app.use(errorHandler);
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
 });
+
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
