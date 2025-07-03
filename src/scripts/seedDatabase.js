@@ -6,7 +6,7 @@ const config = require('../config/config');
 
 const { orgOne, insertOrgs } = require('../../tests/fixtures/org.fixture');
 // Use only these two caregivers to be in the same org:
-const { caregiverOne, admin, insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.fixture');
+const { caregiverOne, admin, hashedPassword, insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.fixture');
 const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = require('../../tests/fixtures/patient.fixture');
 const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = require('../../tests/fixtures/alert.fixture');
 const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = require('../../tests/fixtures/schedule.fixture');
@@ -168,63 +168,94 @@ async function seedDatabase() {
       alertOne, alertTwo, alertThree, expiredAlert, alertSix, alertEight, alertTen, alertTwelve, alertFourteen
     ]);
 
-    // Insert patients and add them to the caregiverOne (fake@example.org)
-    const [patient1, patient2] = await insertPatientsAndAddToCaregiver(caregiverOneRecord, [patientOne, patientTwo]);
+    // Create a caregiver with no patients for testing "No patients found" scenario
+    const caregiverWithNoPatients = {
+      name: 'Test User No Patients',
+      email: 'no-patients@example.org',
+      phone: '+16045624264',
+      password: hashedPassword,
+      role: 'staff',
+      org: org1._id,
+      patients: [],
+      isEmailVerified: true,
+    };
     
-    // Create additional patients for testing
+    const caregiverNoPatientsRecord = await insertCaregiversAndAddToOrg(org1, [caregiverWithNoPatients]);
+    console.log('Inserted caregiver with no patients:', caregiverNoPatientsRecord);
+
+    // Create patients with specific names that match the frontend tests
+    const agnesAlphabet = {
+      name: 'Agnes Alphabet',
+      email: 'agnes@example.org',
+      phone: '1234567890',
+      schedules: [],
+    };
+    
+    const barnabyButton = {
+      name: 'Barnaby Button',
+      email: 'barnaby@example.org',
+      phone: '1234567891',
+      schedules: [],
+    };
+    
+    // Insert the specific test patients for caregiverOne (fake@example.org)
+    const [patient1, patient2] = await insertPatientsAndAddToCaregiver(caregiverOneRecord, [agnesAlphabet, barnabyButton]);
+    console.log('Inserted test patients:', patient1.name, patient2.name);
+    
+    // Create additional patients for testing with predictable names
     const patientThree = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
+      name: 'John Smith',
+      email: 'john.smith@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
     const patientFour = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
-      phone: '+16045624263',
+      name: 'Sarah Johnson',
+      email: 'sarah.johnson@example.org',
+      phone: '+16045624264',
       schedules: [],
     };
     
     const patientFive = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
-      phone: '+16045624263',
+      name: 'Mary Wilson',
+      email: 'mary.wilson@example.org',
+      phone: '+16045624265',
       schedules: [],
     };
     
     const patientSix = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
-      phone: '+16045624263',
+      name: 'Robert Davis',
+      email: 'robert.davis@example.org',
+      phone: '+16045624266',
       schedules: [],
     };
     
     const patientSeven = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
-      phone: '+16045624263',
+      name: 'Lisa Brown',
+      email: 'lisa.brown@example.org',
+      phone: '+16045624267',
       schedules: [],
     };
     
     const patientEight = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
-      phone: '+16045624263',
+      name: 'Michael Chen',
+      email: 'michael.chen@example.org',
+      phone: '+16045624268',
       schedules: [],
     };
     
     const patientNine = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
-      phone: '+16045624263',
+      name: 'Jennifer Lee',
+      email: 'jennifer.lee@example.org',
+      phone: '+16045624269',
       schedules: [],
     };
     
     const patientTen = {
-      name: faker.name.findName(),
-      email: faker.internet.email().toLowerCase(),
-      phone: '+16045624263',
+      name: 'David Miller',
+      email: 'david.miller@example.org',
+      phone: '+16045624270',
       schedules: [],
     };
     

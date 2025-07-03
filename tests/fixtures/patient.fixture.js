@@ -3,16 +3,16 @@ const faker = require('faker');
 const { Patient } = require('../../src/models');
 
 const patientOne = {
-  name: faker.name.findName(),
-  email: faker.internet.email().toLowerCase(),
-  phone: '+16045624263',
+  name: 'Agnes Alphabet',
+  email: 'agnes@example.org',
+  phone: '1234567890',
   schedules: [],
 };
 
 const patientTwo = {
-  name: faker.name.findName(),
-  email: faker.internet.email().toLowerCase(),
-  phone: '+16045624263',
+  name: 'Barnaby Button',
+  email: 'barnaby@example.org',
+  phone: '1234567891',
   schedules: [],
 };
 
