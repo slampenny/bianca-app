@@ -659,14 +659,45 @@ resource "aws_security_group_rule" "asterisk_rtp_from_private" {
 }
 
 # ARI HTTP from Bianca App to Asterisk (internal)
-resource "aws_security_group_rule" "asterisk_ari_from_bianca_app" {
-  type                     = "ingress"
-  from_port                = var.asterisk_ari_http_port
-  to_port                  = var.asterisk_ari_http_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.asterisk_ec2_sg.id
-  source_security_group_id = aws_security_group.bianca_app_sg.id
-  description              = "ARI access from Bianca App Backend"
+resource "aws_security_group_rule" "asterisk_ari_from_private_subnets_debug" {
+  type              = "ingress"
+  from_port         = var.asterisk_ari_http_port
+  to_port           = var.asterisk_ari_http_port
+  protocol          = "tcp"
+  security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = [
+    "172.31.110.0/24",  # private_a subnet
+    "172.31.111.0/24"   # private_b subnet
+  ]
+  description = "ARI access from Fargate private subnets (CIDR-based)"
+}
+
+# Also add explicit egress rule for the app
+resource "aws_security_group_rule" "app_to_asterisk_ari_explicit" {
+  type              = "egress"
+  from_port         = var.asterisk_ari_http_port
+  to_port           = var.asterisk_ari_http_port
+  protocol          = "tcp"
+  security_group_id = aws_security_group.bianca_app_sg.id
+  cidr_blocks       = [
+    "172.31.100.0/24",  # public_a subnet where Asterisk is
+    "172.31.101.0/24"   # public_b subnet 
+  ]
+  description = "Explicit egress to Asterisk ARI"
+}
+
+# For debugging, temporarily allow all traffic between subnets
+resource "aws_security_group_rule" "debug_all_from_private_to_public" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 65535
+  protocol          = "tcp"
+  security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = [
+    "172.31.110.0/24",
+    "172.31.111.0/24"
+  ]
+  description = "DEBUG: Allow all TCP from private subnets"
 }
 
 # ADDITIONAL: Allow ARI from entire VPC (for debugging)
@@ -1083,10 +1114,11 @@ resource "aws_ecs_service" "app_service" {
   health_check_grace_period_seconds  = 300  # Increased from 120
 
   network_configuration {
-    # Use private subnets for Fargate
     subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
-    security_groups  = [aws_security_group.bianca_app_sg.id]
-    # No public IP needed since we're in private subnets
+    security_groups  = [
+      aws_security_group.bianca_app_sg.id,
+      aws_security_group.vpc_endpoints_sg.id  # CRITICAL: Add this
+    ]
     assign_public_ip = false
   }
 
