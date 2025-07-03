@@ -95,6 +95,22 @@ export const patientApi = createApi({
         method: "GET",
       }),
     }),
+    getUnassignedPatients: builder.query<Patient[], void>({
+      query: () => ({
+        url: "/patients/unassigned",
+        method: "GET",
+      }),
+    }),
+    assignUnassignedPatients: builder.mutation<
+      Patient[],
+      { caregiverId: string; patientIds: string[] }
+    >({
+      query: ({ caregiverId, patientIds }) => ({
+        url: "/patients/assign-unassigned",
+        method: "POST",
+        body: { caregiverId, patientIds },
+      }),
+    }),
   }),
 })
 
@@ -109,4 +125,6 @@ export const {
   useUnassignCaregiverMutation,
   // useGetConversationsByPatientQuery,
   useGetCaregiversQuery,
+  useGetUnassignedPatientsQuery,
+  useAssignUnassignedPatientsMutation,
 } = patientApi

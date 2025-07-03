@@ -104,6 +104,10 @@ interface BaseToggleProps extends Omit<TouchableOpacityProps, "style"> {
    * Pass any additional props directly to the helper Text component.
    */
   HelperTextProps?: TextProps
+  /**
+   * Optional testID for E2E testing
+   */
+  testID?: string
 }
 
 interface CheckboxToggleProps extends BaseToggleProps {
@@ -150,6 +154,7 @@ interface ToggleInputProps {
   detailStyle: Omit<ViewStyle & ImageStyle, "overflow">
   switchAccessibilityMode?: SwitchToggleProps["switchAccessibilityMode"]
   checkboxIcon?: CheckboxToggleProps["checkboxIcon"]
+  testID?: string
 }
 
 /**
@@ -174,6 +179,7 @@ export function Toggle(props: ToggleProps) {
     HelperTextProps,
     containerStyle: $containerStyleOverride,
     inputWrapperStyle: $inputWrapperStyleOverride,
+    testID,
     ...WrapperProps
   } = props
 
@@ -207,12 +213,13 @@ export function Toggle(props: ToggleProps) {
 
   return (
     <Wrapper
-      activeOpacity={1}
       accessibilityRole={variant}
       accessibilityState={{ checked: value, disabled }}
-      {...WrapperProps}
-      style={$containerStyles}
+      activeOpacity={0.7}
       onPress={handlePress}
+      style={$containerStyles}
+      testID={testID}
+      {...WrapperProps}
     >
       <View style={$inputWrapperStyles}>
         {labelPosition === "left" && <FieldLabel {...props} labelPosition={labelPosition} />}
@@ -226,6 +233,7 @@ export function Toggle(props: ToggleProps) {
           detailStyle={props.inputDetailStyle ?? {}}
           switchAccessibilityMode={switchAccessibilityMode}
           checkboxIcon={checkboxIcon}
+          testID={testID}
         />
 
         {labelPosition === "right" && <FieldLabel {...props} labelPosition={labelPosition} />}
@@ -255,7 +263,7 @@ const ToggleInputs: Record<Variants, FC<ToggleInputProps>> = {
  * @param {ToggleInputProps} props - The props for the `Checkbox` component.
  * @returns {JSX.Element} The rendered `Checkbox` component.
  */
-function Checkbox(props: ToggleInputProps) {
+function Checkbox(props: ToggleInputProps & { testID?: string }) {
   const {
     on,
     status,
@@ -264,6 +272,7 @@ function Checkbox(props: ToggleInputProps) {
     outerStyle: $outerStyleOverride,
     innerStyle: $innerStyleOverride,
     detailStyle: $detailStyleOverride,
+    testID,
   } = props
 
   const offBackgroundColor = [
@@ -298,6 +307,7 @@ function Checkbox(props: ToggleInputProps) {
         { backgroundColor: offBackgroundColor, borderColor: outerBorderColor },
         $outerStyleOverride,
       ]}
+      testID={testID}
     >
       <Animated.View
         style={[
@@ -324,7 +334,7 @@ function Checkbox(props: ToggleInputProps) {
  * @param {ToggleInputProps} props - The props for the `Radio` component.
  * @returns {JSX.Element} The rendered `Radio` component.
  */
-function Radio(props: ToggleInputProps) {
+function Radio(props: ToggleInputProps & { testID?: string }) {
   const {
     on,
     status,
@@ -332,6 +342,7 @@ function Radio(props: ToggleInputProps) {
     outerStyle: $outerStyleOverride,
     innerStyle: $innerStyleOverride,
     detailStyle: $detailStyleOverride,
+    testID,
   } = props
 
   const offBackgroundColor = [
@@ -366,6 +377,7 @@ function Radio(props: ToggleInputProps) {
         { backgroundColor: offBackgroundColor, borderColor: outerBorderColor },
         $outerStyleOverride,
       ]}
+      testID={testID}
     >
       <Animated.View
         style={[
@@ -387,7 +399,7 @@ function Radio(props: ToggleInputProps) {
  * @param {ToggleInputProps} props - The props for the `Switch` component.
  * @returns {JSX.Element} The rendered `Switch` component.
  */
-function Switch(props: ToggleInputProps) {
+function Switch(props: ToggleInputProps & { testID?: string }) {
   const {
     on,
     status,
@@ -395,6 +407,7 @@ function Switch(props: ToggleInputProps) {
     outerStyle: $outerStyleOverride,
     innerStyle: $innerStyleOverride,
     detailStyle: $detailStyleOverride,
+    testID,
   } = props
 
   const knobSizeFallback = 2
@@ -463,6 +476,7 @@ function Switch(props: ToggleInputProps) {
         { backgroundColor: offBackgroundColor },
         $outerStyleOverride,
       ]}
+      testID={testID}
     >
       <Animated.View
         style={[

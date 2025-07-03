@@ -90,4 +90,6 @@ web-build/
 # Configurations
 !env.js
 
+test-results/
+
 /coverage

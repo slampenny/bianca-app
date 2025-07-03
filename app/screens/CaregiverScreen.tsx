@@ -7,18 +7,22 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   View,
+  FlatList,
+  Modal,
 } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver, getCurrentOrg, clearCaregiver } from "../store/caregiverSlice"
+import { getCurrentUser } from "../store/authSlice"
 import {
   useUpdateCaregiverMutation,
   useUploadAvatarMutation,
   useDeleteCaregiverMutation,
 } from "../services/api/caregiverApi"
 import { useSendInviteMutation } from "../services/api/orgApi"
+import { useGetUnassignedPatientsQuery, useAssignUnassignedPatientsMutation } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { colors } from "app/theme/colors"
 
@@ -30,6 +34,7 @@ function CaregiverScreen() {
   const dispatch = useDispatch()
   const caregiver = useSelector(getCaregiver)
   const currentOrg = useSelector(getCurrentOrg)
+  const currentUser = useSelector(getCurrentUser)
 
   // Mutations for editing/deleting
   const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
@@ -41,6 +46,10 @@ function CaregiverScreen() {
   // Mutation for inviting a new caregiver
   const [sendInvite, { isLoading: isInviting, error: inviteError }] = useSendInviteMutation()
 
+  // Queries and mutations for unassigned patients
+  const { data: unassignedPatients, isLoading: isLoadingUnassigned } = useGetUnassignedPatientsQuery()
+  const [assignUnassignedPatients, { isLoading: isAssigning }] = useAssignUnassignedPatientsMutation()
+
   const [name, setName] = useState("")
   const [avatar, setAvatar] = useState("")
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null)
@@ -50,6 +59,10 @@ function CaregiverScreen() {
   const [phoneError, setPhoneError] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
+  
+  // State for unassigned patients modal
+  const [showUnassignedModal, setShowUnassignedModal] = useState(false)
+  const [selectedPatients, setSelectedPatients] = useState<string[]>([])
 
   useEffect(() => {
     if (caregiver) {
@@ -102,6 +115,44 @@ function CaregiverScreen() {
 
   const handleCancelDelete = () => {
     setConfirmDelete(false)
+  }
+
+  // Functions for unassigned patients assignment
+  const handleAssignUnassignedPatients = () => {
+    setShowUnassignedModal(true)
+    setSelectedPatients([])
+  }
+
+  const handlePatientSelection = (patientId: string) => {
+    setSelectedPatients(prev => 
+      prev.includes(patientId) 
+        ? prev.filter(id => id !== patientId)
+        : [...prev, patientId]
+    )
+  }
+
+  const handleAssignSelectedPatients = async () => {
+    if (selectedPatients.length === 0 || !caregiver?.id) return
+
+    try {
+      await assignUnassignedPatients({
+        caregiverId: caregiver.id,
+        patientIds: selectedPatients
+      }).unwrap()
+      
+      setSuccessMessage(`${selectedPatients.length} patient(s) assigned successfully!`)
+      setShowUnassignedModal(false)
+      setSelectedPatients([])
+      
+      setTimeout(() => {
+        setSuccessMessage("")
+      }, 3000)
+    } catch (error) {
+      setSuccessMessage("Failed to assign patients. Please try again.")
+      setTimeout(() => {
+        setSuccessMessage("")
+      }, 3000)
+    }
   }
 
   const handleSave = async () => {
@@ -236,7 +287,86 @@ function CaregiverScreen() {
               <Text style={styles.buttonText}>{confirmDelete ? "CONFIRM DELETE" : "DELETE"}</Text>
             </Pressable>
           )}
+
+          {/* Assign Unassigned Patients Button - Only show for orgAdmins */}
+          {caregiver && caregiver.id && currentUser?.role === 'orgAdmin' && (
+            <Pressable
+              style={[styles.button, styles.assignButton]}
+              onPress={handleAssignUnassignedPatients}
+              disabled={isLoadingUnassigned}
+            >
+              <Text style={styles.buttonText}>
+                {isLoadingUnassigned ? "Loading..." : "Assign Unassigned Patients"}
+              </Text>
+            </Pressable>
+          )}
         </View>
+
+        {/* Unassigned Patients Modal */}
+        <Modal
+          visible={showUnassignedModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowUnassignedModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Assign Unassigned Patients</Text>
+              
+              {isLoadingUnassigned ? (
+                <Text style={styles.loadingText}>Loading unassigned patients...</Text>
+              ) : unassignedPatients && unassignedPatients.length > 0 ? (
+                <>
+                  <FlatList
+                    data={unassignedPatients}
+                    keyExtractor={(item) => item.id || ''}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        style={[
+                          styles.patientItem,
+                          selectedPatients.includes(item.id || '') && styles.selectedPatientItem
+                        ]}
+                        onPress={() => handlePatientSelection(item.id || '')}
+                      >
+                        <Text style={styles.patientName}>{item.name}</Text>
+                        <Text style={styles.patientEmail}>{item.email}</Text>
+                        {selectedPatients.includes(item.id || '') && (
+                          <Text style={styles.selectedIndicator}>✓</Text>
+                        )}
+                      </Pressable>
+                    )}
+                    style={styles.patientList}
+                  />
+                  
+                  <View style={styles.modalButtons}>
+                    <Pressable
+                      style={[
+                        styles.modalButton,
+                        styles.cancelButton,
+                        selectedPatients.length === 0 && styles.buttonDisabled
+                      ]}
+                      onPress={handleAssignSelectedPatients}
+                      disabled={selectedPatients.length === 0 || isAssigning}
+                    >
+                      <Text style={styles.modalButtonText}>
+                        {isAssigning ? "Assigning..." : `Assign Selected (${selectedPatients.length})`}
+                      </Text>
+                    </Pressable>
+                    
+                    <Pressable
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={() => setShowUnassignedModal(false)}
+                    >
+                      <Text style={styles.modalButtonText}>Cancel</Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.noPatientsText}>No unassigned patients found.</Text>
+              )}
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </TouchableWithoutFeedback>
   )
@@ -279,6 +409,77 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: colors.palette.neutral100,
+    padding: 20,
+    borderRadius: 10,
+    width: "80%",
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  loadingText: {
+    marginBottom: 10,
+  },
+  patientItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.palette.neutral300,
+  },
+  selectedPatientItem: {
+    backgroundColor: colors.palette.biancaSuccessBackground,
+  },
+  patientName: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  patientEmail: {
+    fontSize: 14,
+  },
+  selectedIndicator: {
+    fontSize: 14,
+    fontWeight: "bold",
+    marginLeft: 10,
+  },
+  patientList: {
+    flex: 1,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  modalButton: {
+    padding: 10,
+    borderRadius: 5,
+    backgroundColor: colors.palette.biancaButtonSelected,
+  },
+  cancelButton: {
+    padding: 10,
+    borderRadius: 5,
+    backgroundColor: colors.palette.neutral400,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.palette.neutral100,
+  },
+  noPatientsText: {
+    fontSize: 16,
+    textAlign: "center",
+  },
+  assignButton: {
+    backgroundColor: colors.palette.biancaSuccess,
+  },
 })
 
 export { CaregiverScreen }

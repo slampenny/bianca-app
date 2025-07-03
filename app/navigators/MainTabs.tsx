@@ -125,15 +125,16 @@ export default function MainTabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Org" component={OrgStack} />
-      <Tab.Screen name="Payment" component={PaymentStack} />
+      <Tab.Screen name="Home" component={HomeStack} options={{ tabBarTestID: "tab-home" }} />
+      <Tab.Screen name="Org" component={OrgStack} options={{ tabBarTestID: "tab-org" }} />
+      <Tab.Screen name="Payment" component={PaymentStack} options={{ tabBarTestID: "tab-payment" }} />
       <Tab.Screen
         name="Alert"
         component={AlertStack}
         options={{
           tabBarLabel: "Alert", // Custom label
           tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : null, // Show badge if unread count > 0
+          tabBarTestID: "tab-alert",
         }}
       />
     </Tab.Navigator>

@@ -67,10 +67,15 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
   }
   const restoreState = async () => {
     try {
-      const state = (await storageKey.load(persistenceKey)) as
-        | NavigationProps["initialState"]
-        | null
-      if (state) setInitialNavigationState(state)
+      // Don't restore navigation state in development to ensure clean navigation after login
+      if (__DEV__) {
+        setInitialNavigationState(undefined)
+      } else {
+        const state = (await storageKey.load(persistenceKey)) as
+          | NavigationProps["initialState"]
+          | null
+        if (state) setInitialNavigationState(state)
+      }
     } finally {
       if (isMounted()) setIsRestored(true)
     }

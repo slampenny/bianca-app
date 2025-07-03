@@ -1,7 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
 import { DEFAULT_API_CONFIG } from "./api"
 import { RootState } from "../../store/store"
-import { Conversation } from "./api.types"
+import { Conversation, ConversationPages } from "./api.types"
 
 export const conversationApi = createApi({
   reducerPath: "conversationApi",
@@ -41,9 +41,17 @@ export const conversationApi = createApi({
         url: `/conversations/${conversationId}`,
       }),
     }),
-    getConversationsByPatient: builder.query<Conversation[], { patientId: string }>({
-      query: ({ patientId }) => ({
+    getConversationsByPatient: builder.query<
+      ConversationPages,
+      { patientId: string; page?: number; limit?: number; sortBy?: string }
+    >({
+      query: ({ patientId, page, limit, sortBy }) => ({
         url: `/patients/${patientId}/conversations`,
+        params: {
+          ...(page && { page }),
+          ...(limit && { limit }),
+          ...(sortBy && { sortBy }),
+        },
       }),
     }),
     deleteConversation: builder.mutation<{ success: boolean }, { conversationId: string }>({

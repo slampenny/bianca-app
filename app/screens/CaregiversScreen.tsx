@@ -20,6 +20,9 @@ export function CaregiversScreen() {
 
   const [filter, setFilter] = useState<"all" | "full-time" | "part-time">("all")
 
+  // Check if user is authorized to view caregivers (orgAdmin role)
+  const isAuthorized = currentUser?.role === 'orgAdmin'
+
   const orgCaregivers = caregivers.filter((cg: Caregiver) => {
     if (currentUser?.org) {
       return cg.org === currentUser.org
@@ -67,6 +70,20 @@ export function CaregiversScreen() {
   )
 
   const ListEmpty = () => <Text style={styles.noCaregiversText}>No caregivers found</Text>
+
+  // Show not authorized message for non-admin users
+  if (!isAuthorized) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.notAuthorizedContainer}>
+          <Text style={styles.notAuthorizedTitle}>Not Authorized</Text>
+          <Text style={styles.notAuthorizedText}>
+            You don't have permission to view caregivers. Only organization administrators can access this feature.
+          </Text>
+        </View>
+      </View>
+    )
+  }
 
   return (
     <View style={styles.container}>
@@ -188,4 +205,23 @@ const styles = StyleSheet.create({
   invitedBadgeText: { color: colors.palette.neutral100, fontSize: 12 },
   listContentContainer: { paddingHorizontal: 16, paddingVertical: 20 },
   noCaregiversText: { color: colors.palette.neutral600, fontSize: 16, marginTop: 20, textAlign: "center" },
+  notAuthorizedContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  notAuthorizedTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: colors.palette.biancaError,
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  notAuthorizedText: {
+    fontSize: 16,
+    color: colors.palette.neutral600,
+    textAlign: "center",
+    lineHeight: 24,
+  },
 })

@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { NavigationContainer } from "@react-navigation/native"
 import { useColorScheme } from "react-native"
 import { useSelector } from "react-redux"
@@ -13,7 +13,8 @@ import { navigationThemes } from "./NavigationConfig"
 import { NavigationProps } from "./navigationTypes"
 import * as storage from "../utils/storage" // Ensure this import is correct
 
-export const AppNavigator: React.FC<NavigationProps> = () => {
+export const AppNavigator: React.FC<NavigationProps> = (props) => {
+  const { linking, initialState, onStateChange, ...otherProps } = props
   const isLoggedIn = useSelector(isAuthenticated)
   const colorScheme = useColorScheme()
 
@@ -22,9 +23,16 @@ export const AppNavigator: React.FC<NavigationProps> = () => {
     return true // ['Home', 'Login'].includes(routeName); // Example routes where pressing back should exit the app
   })
 
+  // Clear navigation state when logging in/out to ensure we start at the correct screen
+  useEffect(() => {
+    if (__DEV__) {
+      storage.remove("navigationState")
+    }
+  }, [isLoggedIn])
+
   // Navigation state persistence setup
   const navigationPersistenceKey = "navigationState"
-  let navigationPersistenceProps = {}
+  let navigationPersistenceProps: { initialState?: any; onStateChange?: any } = {}
   if (__DEV__) {
     const { initialNavigationState, onNavigationStateChange } = useNavigationPersistence(
       storage,
@@ -40,7 +48,10 @@ export const AppNavigator: React.FC<NavigationProps> = () => {
     <NavigationContainer
       ref={navigationRef}
       theme={navigationThemes[colorScheme === "dark" ? "dark" : "light"]}
-      {...navigationPersistenceProps}
+      linking={linking}
+      initialState={initialState || navigationPersistenceProps.initialState}
+      onStateChange={onStateChange || navigationPersistenceProps.onStateChange}
+      {...otherProps}
     >
       {isLoggedIn ? <AuthStack /> : <UnauthStack />}
     </NavigationContainer>

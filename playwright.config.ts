@@ -16,4 +16,6 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
+  // Configure global setup for API calls
+  globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
 })

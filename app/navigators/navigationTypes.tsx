@@ -51,4 +51,8 @@ export type LoginStackParamList = {
   ConfirmReset: undefined
 }
 
-export interface NavigationProps extends Partial<NavigationContainerProps> {}
+export interface NavigationProps extends Partial<NavigationContainerProps> {
+  linking?: any
+  initialState?: any
+  onStateChange?: any
+}

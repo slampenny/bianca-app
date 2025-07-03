@@ -6,9 +6,10 @@ import {
   useMarkAllAsReadMutation,
   useMarkAlertAsReadMutation,
   useGetAllAlertsQuery,
+  useGetAllPatientsQuery,
 } from "../services/api"
 import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSlice"
-import { Alert, Caregiver } from "../services/api/api.types"
+import { Alert, Caregiver, Patient } from "../services/api/api.types"
 import { getCurrentUser } from "app/store/authSlice"
 import { colors } from "app/theme/colors"
 
@@ -26,6 +27,11 @@ export function AlertScreen() {
     error: fetchError,
     refetch,
   } = useGetAllAlertsQuery()
+
+  const {
+    data: patientsData,
+    isLoading: isPatientsLoading,
+  } = useGetAllPatientsQuery({})
 
   const [markAllAsRead] = useMarkAllAsReadMutation()
   const [markAlertAsRead] = useMarkAlertAsReadMutation()
@@ -64,8 +70,34 @@ export function AlertScreen() {
     }
   }
 
+  // Helper function to get patient name by ID
+  const getPatientName = (patientId: string) => {
+    if (!patientsData?.results) return "Unknown Patient"
+    const patient = patientsData.results.find(p => p.id === patientId)
+    return patient?.name || "Unknown Patient"
+  }
+
+  // Helper function to get alert type display text
+  const getAlertTypeDisplay = (alertType: string) => {
+    switch (alertType) {
+      case 'conversation':
+        return 'Conversation Alert'
+      case 'patient':
+        return 'Patient Alert'
+      case 'system':
+        return 'System Alert'
+      case 'schedule':
+        return 'Schedule Alert'
+      default:
+        return 'Alert'
+    }
+  }
+
+  // Helper function to determine if all visible alerts are read
+  const allVisibleAlertsRead = alerts.every(alert => alert.readBy?.includes(currentUser?.id || ""))
+
   const renderItem = ({ item }: { item: Alert }) => (
-    <ListItem onPress={() => handleAlertPress(item)} style={styles.listItem}>
+    <ListItem onPress={() => handleAlertPress(item)} style={styles.listItem} testID="alert-item">
       <View style={styles.alertContent}>
         <View style={styles.alertHeader}>
           <Toggle
@@ -73,11 +105,25 @@ export function AlertScreen() {
             onValueChange={() => handleAlertPress(item)}
             variant="checkbox"
             containerStyle={styles.alertToggle}
+            testID="alert-checkbox"
           />
-          <Text style={styles.alertMessage} numberOfLines={1}>
-            {item.message}
-          </Text>
+          <View style={styles.alertHeaderContent}>
+            <Text style={styles.alertMessage} numberOfLines={1}>
+              {item.message}
+            </Text>
+            <Text style={styles.alertType}>
+              {getAlertTypeDisplay(item.alertType)}
+            </Text>
+          </View>
         </View>
+        
+        {/* Show patient information if alert is related to a patient */}
+        {item.relatedPatient && (
+          <Text style={styles.alertDetails}>
+            Patient: {getPatientName(item.relatedPatient)}
+          </Text>
+        )}
+        
         <Text style={styles.alertDetails}>Importance: {item.importance}</Text>
         {item.relevanceUntil && (
           <Text style={styles.alertDetails}>
@@ -125,13 +171,12 @@ export function AlertScreen() {
 
         {alerts.length > 0 && (
           <View style={styles.markAllContainer}>
-            <Toggle
-              value={false}
-              onValueChange={handleMarkAllAsRead}
-              variant="checkbox"
-              containerStyle={styles.markAllToggle}
+            <Button
+              text="Mark all as read"
+              onPress={handleMarkAllAsRead}
+              style={styles.refreshButton}
+              testID="mark-all-checkbox"
             />
-            <Text style={styles.markAllText}>Mark all as read</Text>
           </View>
         )}
 
@@ -143,6 +188,7 @@ export function AlertScreen() {
             renderItem={renderItem}
             keyExtractor={(item) => item.id || ""}
             style={styles.listView}
+            testID="alert-list"
           />
         )}
 
@@ -175,11 +221,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginBottom: 4,
   },
+  alertHeaderContent: {
+    flex: 1,
+  },
   alertMessage: {
     color: colors.palette.biancaHeader,
     flexShrink: 1,
     fontSize: 16,
     fontWeight: "bold",
+  },
+  alertType: {
+    color: colors.palette.biancaButtonSelected,
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 2,
   },
   alertToggle: {
     marginRight: 8,
@@ -222,14 +277,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginVertical: 10,
-  },
-  markAllText: {
-    color: colors.palette.biancaHeader,
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  markAllToggle: {
-    marginRight: 8,
   },
   refreshButton: {
     backgroundColor: colors.palette.biancaButtonSelected,

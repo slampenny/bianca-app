@@ -11,6 +11,7 @@ export function newAlert(
     return {
       message: 'Test Alert' as string,
       importance,
+      alertType: 'system',
       createdBy: source.id, // replace with a valid ObjectId
       createdModel: model,
       visibility,

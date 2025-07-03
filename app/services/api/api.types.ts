@@ -46,14 +46,18 @@ export interface AlertPages {
   totalResults: number
 }
 
-export type CreatedModel = "Patient" | "Caregiver" | "Org"
+export type CreatedModel = "Patient" | "Caregiver" | "Org" | "Schedule"
 export type AlertVisibility = "orgAdmin" | "allCaregivers" | "assignedCaregivers"
 export type AlertImportance = "low" | "medium" | "high"
+export type AlertType = "conversation" | "patient" | "system"
 
 export interface Alert {
   id?: string
   message: string
   importance: AlertImportance
+  alertType: AlertType
+  relatedPatient?: string // Patient ID if alert is related to a patient or conversation
+  relatedConversation?: string // Conversation ID if alert is related to a conversation
   createdBy: string // Assuming this is the ID of the creator
   createdModel: CreatedModel
   visibility: AlertVisibility
@@ -120,6 +124,16 @@ export interface Message {
   id?: string
   role: string
   content: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface ConversationPages {
+  limit: number
+  page: number
+  results: Conversation[]
+  totalPages: number
+  totalResults: number
 }
 
 export interface Conversation {
