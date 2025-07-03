@@ -4,8 +4,24 @@
     "jest.runMode": {
       "type": "on-demand"
     },
+    "jest.autoRun": {
+      "watch": false,
+      "onSave": "test-file"
+    },
+    "jest.showCoverageOnLoad": true,
+    "jest.enableInlineErrorMessages": true,
+    "jest.enableCodeLens": true,
+    "jest.testExplorer": {
+      "enabled": true,
+      "showInlineError": true
+    },
+    "jest.debugMode": true,
     "terminal.integrated.env.linux": {
         "NODE_NO_IOURING": "1"
-    }
+    },
+    "testing.automaticallyOpenPeekView": "never",
+    "testing.followRunningTest": true,
+    "testing.gutterEnabled": true,
+    "testing.openTesting": "openOnTestStart"
   }
   

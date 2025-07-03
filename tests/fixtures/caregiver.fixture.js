@@ -29,7 +29,7 @@ const caregiverOneWithPassword = {
 };
 
 const caregiverTwo = {
-  name: faker.name.findName(),
+  name: 'Test User',
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
   role: 'staff',
@@ -37,7 +37,7 @@ const caregiverTwo = {
 };
 
 const admin = {
-  name: faker.name.findName(),
+  name: 'Admin User',
   email: 'admin@example.org',
   phone: '+16045624263',
   role: 'orgAdmin',
@@ -45,7 +45,7 @@ const admin = {
 };
 
 const superAdmin = {
-  name: faker.name.findName(),
+  name: 'Super Admin',
   email: 'superAdmin@example.org',
   phone: '+16045624263',
   role: 'superAdmin',

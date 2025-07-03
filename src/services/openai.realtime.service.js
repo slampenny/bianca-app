@@ -654,10 +654,10 @@ class OpenAIRealtimeService {
         // Add input transcription to help with debugging
         input_audio_transcription: {
           model: 'whisper-1',
-        },
+        }, 
         //...(config.openai.realtimeSessionConfig || {})
       },
-    };
+    }; 
 
     logger.info(`[OpenAI Realtime] Sending session.update for ${callId}`);
     try {
