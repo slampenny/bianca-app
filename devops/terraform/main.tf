@@ -458,6 +458,20 @@ resource "aws_service_discovery_service" "bianca_app_sd_service" {
   tags = { Name = "bianca-app-service-discovery" }
 }
 
+resource "aws_service_discovery_service" "mongodb_sd_service" {
+  name = "mongodb"
+
+  dns_config {
+    namespace_id   = aws_service_discovery_private_dns_namespace.internal.id
+    routing_policy = "MULTIVALUE"
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+  }
+  tags = { Name = "mongodb-service-discovery" }
+}
+
 ################################################################################
 # VPC ENDPOINTS FOR ECR (NEW - for private subnet access)
 ################################################################################
@@ -647,6 +661,30 @@ resource "aws_security_group" "asterisk_ec2_sg" {
   tags = { Name = "asterisk-ec2-sg" }
 }
 
+# NEW: MongoDB Security Group
+resource "aws_security_group" "mongodb_sg" {
+  name        = "mongodb-sg"
+  description = "Security group for MongoDB service"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "MongoDB from app"
+    from_port       = var.mongodb_port
+    to_port         = var.mongodb_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bianca_app_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  tags = { Name = "mongodb-sg" }
+}
+
 # RTP from private subnets (app) to Asterisk for internal RTP
 resource "aws_security_group_rule" "asterisk_rtp_from_private" {
   type              = "ingress"
@@ -744,6 +782,17 @@ resource "aws_security_group" "efs_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = { Name = "mongodb-efs-sg" }
+}
+
+# NEW: Allow MongoDB to access EFS
+resource "aws_security_group_rule" "efs_from_mongodb" {
+  type                     = "ingress"
+  from_port                = var.efs_nfs_port
+  to_port                  = var.efs_nfs_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.efs_sg.id
+  source_security_group_id = aws_security_group.mongodb_sg.id
+  description              = "NFS from MongoDB service"
 }
 
 ################################################################################
@@ -983,9 +1032,9 @@ resource "aws_ecs_cluster" "cluster" {
   tags = { Name = var.cluster_name }
 }
 
-# UPDATED: Task definition with improved health check and startup
-resource "aws_ecs_task_definition" "app_task" {
-  family                   = var.service_name
+# NEW: Separate MongoDB Task Definition
+resource "aws_ecs_task_definition" "mongodb_task" {
+  family                   = "mongodb-service"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "512"
@@ -1004,6 +1053,82 @@ resource "aws_ecs_task_definition" "app_task" {
     }
   }
 
+  container_definitions = jsonencode([{
+    name      = "mongodb"
+    image     = "mongo:7.0"  # Upgraded to 7.0
+    essential = true
+    portMappings = [
+      { containerPort = var.mongodb_port, protocol = "tcp" }
+    ]
+    mountPoints = [
+      { sourceVolume = "mongodb-data", containerPath = "/data/db", readOnly = false }
+    ]
+    environment = [
+      { name = "MONGODB_DIRECTORYPERDB", value = "true" },
+      { name = "MONGODB_JOURNAL_ENABLED", value = "true" }
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.mongodb_log_group.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "mongo"
+      }
+    }
+    healthCheck = {
+      # Updated for MongoDB 7.0 - uses mongosh instead of mongo
+      command     = ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
+      interval    = 30
+      timeout     = 10
+      retries     = 3
+      startPeriod = 60
+    }
+  }])
+  
+  tags = { Name = "mongodb-service" }
+}
+
+# NEW: MongoDB ECS Service
+resource "aws_ecs_service" "mongodb_service" {
+  name             = "mongodb-service"
+  cluster          = aws_ecs_cluster.cluster.id
+  task_definition  = aws_ecs_task_definition.mongodb_task.arn
+  launch_type      = "FARGATE"
+  platform_version = "LATEST"
+  desired_count    = 1
+
+  network_configuration {
+    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+    security_groups  = [aws_security_group.mongodb_sg.id]
+    assign_public_ip = false
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.mongodb_sd_service.arn
+  }
+
+  # No load balancer for MongoDB - it's internal only
+
+  lifecycle { 
+    ignore_changes = [desired_count]
+  }
+
+  tags = { Name = "mongodb-service" }
+}
+
+# UPDATED: Task definition with improved health check and startup
+# UPDATED: Task definition without MongoDB container
+resource "aws_ecs_task_definition" "app_task" {
+  family                   = var.service_name
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "512"
+  memory                   = "1024"
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  # REMOVED: volume block - app doesn't need direct EFS access
+
   container_definitions = jsonencode([
     {
       name      = var.container_name
@@ -1017,7 +1142,8 @@ resource "aws_ecs_task_definition" "app_task" {
       ]
       environment = [
         { name = "AWS_REGION", value = var.aws_region },
-        { name = "MONGODB_URL", value = "mongodb://localhost:${var.mongodb_port}/${var.service_name}" },
+        # UPDATED: Use service discovery DNS name instead of localhost
+        { name = "MONGODB_URL", value = "mongodb://mongodb.myphonefriend.internal:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
         { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
@@ -1066,41 +1192,17 @@ resource "aws_ecs_task_definition" "app_task" {
         interval    = 30
         timeout     = 10        # Increased from 5
         retries     = 10        # Increased from 5
-        startPeriod = 300       # Increased to 5 minutes
+        startPeriod = 120       # Reduced from 300 since no MongoDB dependency
       }
-      dependsOn = [{ "containerName" : "mongodb", "condition" : "HEALTHY" }]
-    },
-    {
-      name      = "mongodb"
-      image     = "mongo:4.4"
-      essential = true
-      portMappings = [
-        { containerPort = var.mongodb_port, protocol = "tcp" }
-      ]
-      mountPoints = [
-        { sourceVolume = "mongodb-data", containerPath = "/data/db", readOnly = false }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.mongodb_log_group.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "mongo"
-        }
-      }
-      healthCheck = {
-        command     = ["CMD-SHELL", "mongo --eval 'db.adminCommand(\"ping\")' || exit 1"]
-        interval    = 30
-        timeout     = 10
-        retries     = 3
-        startPeriod = 60
-      }
+      # REMOVED: dependsOn MongoDB
     }
+    # REMOVED: MongoDB container from here
   ])
   tags = { Name = var.service_name }
 }
 
 # UPDATED: ECS service with better health check grace period
+# UPDATED: ECS service with better deployment configuration
 resource "aws_ecs_service" "app_service" {
   name = var.service_name
   cluster = aws_ecs_cluster.cluster.id
@@ -1108,8 +1210,8 @@ resource "aws_ecs_service" "app_service" {
   launch_type = "FARGATE"
   platform_version                   = "LATEST"
   desired_count = 1
-  deployment_maximum_percent         = 100
-  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200  # CHANGED: Allow rolling updates
+  deployment_minimum_healthy_percent = 100  # CHANGED: Keep old version running during deploy
   enable_execute_command             = true
   health_check_grace_period_seconds  = 300  # Increased from 120
 
@@ -1140,7 +1242,8 @@ resource "aws_ecs_service" "app_service" {
     aws_service_discovery_service.bianca_app_sd_service,
     aws_security_group.bianca_app_sg,
     aws_instance.asterisk,  # Wait for Asterisk
-    aws_eip_association.asterisk_eip_assoc  # NEW: Also wait for EIP association
+    aws_eip_association.asterisk_eip_assoc,  # NEW: Also wait for EIP association
+    aws_ecs_service.mongodb_service  # NEW: Add dependency on MongoDB service
   ]
   tags = { Name = var.service_name }
 }
@@ -1775,5 +1878,22 @@ output "connection_test_commands" {
     aws ecs execute-command --cluster ${var.cluster_name} --task TASK_ID --container ${var.container_name} --interactive --command "/bin/sh"
     # Then inside container:
     curl http://${aws_instance.asterisk.private_ip}:8088/ari/asterisk/info
+    
+    # Test MongoDB connectivity from app container:
+    # First get MongoDB task ID:
+    aws ecs list-tasks --cluster ${var.cluster_name} --service-name mongodb-service
+    # Then test connection:
+    mongosh mongodb://mongodb.myphonefriend.internal:27017
   EOT
+}
+
+# NEW: MongoDB-specific outputs
+output "mongodb_service_discovery_dns" {
+  description = "MongoDB service discovery DNS name"
+  value       = "mongodb.myphonefriend.internal"
+}
+
+output "deployment_architecture" {
+  description = "Deployment architecture summary"
+  value = "MongoDB runs as separate ECS service. App deployments no longer affect MongoDB. Zero-downtime deployments enabled."
 }
