@@ -784,17 +784,6 @@ resource "aws_security_group" "efs_sg" {
   tags = { Name = "mongodb-efs-sg" }
 }
 
-# NEW: Allow MongoDB to access EFS
-resource "aws_security_group_rule" "efs_from_mongodb" {
-  type                     = "ingress"
-  from_port                = var.efs_nfs_port
-  to_port                  = var.efs_nfs_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.efs_sg.id
-  source_security_group_id = aws_security_group.mongodb_sg.id
-  description              = "NFS from MongoDB service"
-}
-
 ################################################################################
 # ASTERISK EC2 INSTANCE - BACK IN PUBLIC SUBNET
 ################################################################################
@@ -924,7 +913,7 @@ resource "aws_efs_access_point" "mongo_ap" {
     gid = 999
   }
   root_directory {
-    path = "/mongodb_new"
+    path = "/mongodb_v7_clean"  # NEW PATH to avoid old data
     creation_info {
       owner_uid   = 999
       owner_gid   = 999
@@ -1033,6 +1022,7 @@ resource "aws_ecs_cluster" "cluster" {
 }
 
 # NEW: Separate MongoDB Task Definition
+# Replace your existing aws_ecs_task_definition.mongodb_task with this:
 resource "aws_ecs_task_definition" "mongodb_task" {
   family                   = "mongodb-service"
   network_mode             = "awsvpc"
@@ -1055,7 +1045,7 @@ resource "aws_ecs_task_definition" "mongodb_task" {
 
   container_definitions = jsonencode([{
     name      = "mongodb"
-    image     = "mongo:7.0"  # Upgraded to 7.0
+    image     = "public.ecr.aws/docker/library/mongo:7.0"
     essential = true
     portMappings = [
       { containerPort = var.mongodb_port, protocol = "tcp" }
@@ -1076,7 +1066,6 @@ resource "aws_ecs_task_definition" "mongodb_task" {
       }
     }
     healthCheck = {
-      # Updated for MongoDB 7.0 - uses mongosh instead of mongo
       command     = ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
       interval    = 30
       timeout     = 10
@@ -1099,15 +1088,16 @@ resource "aws_ecs_service" "mongodb_service" {
 
   network_configuration {
     subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
-    security_groups  = [aws_security_group.mongodb_sg.id]
+    security_groups  = [
+      aws_security_group.mongodb_sg.id,
+      aws_security_group.vpc_endpoints_sg.id  # ADD THIS - critical for VPC endpoint access
+    ]
     assign_public_ip = false
   }
 
   service_registries {
     registry_arn = aws_service_discovery_service.mongodb_sd_service.arn
   }
-
-  # No load balancer for MongoDB - it's internal only
 
   lifecycle { 
     ignore_changes = [desired_count]
@@ -1116,6 +1106,27 @@ resource "aws_ecs_service" "mongodb_service" {
   tags = { Name = "mongodb-service" }
 }
 
+# Add this rule to allow MongoDB to reach EFS
+resource "aws_security_group_rule" "mongodb_to_efs_egress" {
+  type                     = "egress"
+  from_port                = 2049
+  to_port                  = 2049
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.mongodb_sg.id
+  source_security_group_id = aws_security_group.efs_sg.id
+  description              = "Allow MongoDB to reach EFS"
+}
+
+# Also ensure EFS allows MongoDB (you already have this but let's make sure)
+resource "aws_security_group_rule" "efs_from_mongodb" {
+  type                     = "ingress"
+  from_port                = var.efs_nfs_port
+  to_port                  = var.efs_nfs_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.efs_sg.id
+  source_security_group_id = aws_security_group.mongodb_sg.id
+  description              = "NFS from MongoDB service"
+}
 # UPDATED: Task definition with improved health check and startup
 # UPDATED: Task definition without MongoDB container
 resource "aws_ecs_task_definition" "app_task" {

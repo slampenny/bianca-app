@@ -171,7 +171,7 @@ if (envVars.NODE_ENV === 'production') {
   
   baselineConfig.baseUrl = 'https://app.myphonefriend.com'; // Example - VERIFY
   baselineConfig.apiUrl = `${baselineConfig.baseUrl}/v1`; // User's original value
-  baselineConfig.mongoose.url = 'mongodb://localhost:27017/bianca-app'; // User's original value
+  baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb.myphonefriend.internal:27017/bianca-app';
   baselineConfig.email.smtp.secure = true; // User's original value
   baselineConfig.twilio.apiUrl = baselineConfig.baseUrl; // User's original value (Ensure this is HTTPS)
 
