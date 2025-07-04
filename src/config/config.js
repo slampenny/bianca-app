@@ -81,11 +81,15 @@ const baselineConfig = {
   mongoose: {
     url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {
-      // useCreateIndex: true, // Deprecated
-      // useNewUrlParser: true, // Default in new Mongoose versions
-      // useUnifiedTopology: true // Default in new Mongoose versions
-      connectTimeoutMS: 30000, // 30 seconds (adjust as needed)
-      socketTimeoutMS: 45000,  // Optional: for operations after connection
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      connectTimeoutMS: 30000,           // How long to wait for initial connection
+      socketTimeoutMS: 60000,            // How long to wait on operations after connection
+      keepAlive: true,                   // Enable TCP keep-alive
+      keepAliveInitialDelay: 300000,     // Wait 5 min before first keepalive ping
+      maxPoolSize: 10,                   // Allow for more concurrent queries (esp. during seed)
+      retryWrites: true,                 // Safe to retry inserts on transient network errors
+      w: 'majority'                      // Write concern for retryWrites
     }
   },
   billing: { ratePerMinute: 0.1 }, // Example billing rate

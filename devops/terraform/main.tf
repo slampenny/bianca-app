@@ -710,6 +710,16 @@ resource "aws_security_group_rule" "asterisk_ari_from_private_subnets_debug" {
   description = "ARI access from Fargate private subnets (CIDR-based)"
 }
 
+resource "aws_security_group_rule" "asterisk_ari_from_bianca_app_sg" {
+  type                     = "ingress"
+  from_port                = var.asterisk_ari_http_port  # 8088
+  to_port                  = var.asterisk_ari_http_port  # 8088
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.asterisk_ec2_sg.id
+  source_security_group_id = aws_security_group.bianca_app_sg.id
+  description              = "ARI access from Bianca App security group"
+}
+
 # Also add explicit egress rule for the app
 resource "aws_security_group_rule" "app_to_asterisk_ari_explicit" {
   type              = "egress"
