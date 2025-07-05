@@ -985,10 +985,10 @@ resource "aws_lb_target_group" "app_tg" {
 
   health_check {
     path                = "/health"
-    interval            = 60        # Increased to give more time
-    timeout             = 15        # Increased timeout
-    healthy_threshold   = 2         # Reduced threshold
-    unhealthy_threshold = 10        # Increased to be more forgiving
+    interval            = 30        # Reduced for faster health detection
+    timeout             = 10        # Reduced timeout
+    healthy_threshold   = 2         # Keep at 2 for stability
+    unhealthy_threshold = 3         # Reduced to fail faster during deployment
     matcher             = "200"
     port                = "traffic-port"
     protocol            = "HTTP"
@@ -1212,8 +1212,8 @@ resource "aws_ecs_task_definition" "app_task" {
         command     = ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
         interval    = 30
         timeout     = 10        # Increased from 5
-        retries     = 10        # Increased from 5
-        startPeriod = 120       # Reduced from 300 since no MongoDB dependency
+        retries     = 5         # Reduced from 10 to fail faster during deployment
+        startPeriod = 180       # Increased to give more time for startup
       }
       # REMOVED: dependsOn MongoDB
     }
@@ -1231,10 +1231,16 @@ resource "aws_ecs_service" "app_service" {
   launch_type = "FARGATE"
   platform_version                   = "LATEST"
   desired_count = 1
-  deployment_maximum_percent         = 200  # CHANGED: Allow rolling updates
-  deployment_minimum_healthy_percent = 100  # CHANGED: Keep old version running during deploy
+  deployment_maximum_percent         = 200  # Allow 2 tasks during deployment
+  deployment_minimum_healthy_percent = 0    # FIXED: Allow 0 healthy during deployment to prevent race condition
   enable_execute_command             = true
   health_check_grace_period_seconds  = 300  # Increased from 120
+
+  # Add deployment circuit breaker for automatic rollback
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   network_configuration {
     subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
