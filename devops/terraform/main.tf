@@ -216,7 +216,7 @@ variable "github_repo" {
 variable "github_branch" {
   description = "GitHub branch for CodePipeline."
   type        = string
-  default     = "upgrade/mongo7.0"
+  default     = "main"
 }
 
 variable "github_app_connection_arn" {
