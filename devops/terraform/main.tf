@@ -785,6 +785,14 @@ resource "aws_security_group" "efs_sg" {
     security_groups = [aws_security_group.bianca_app_sg.id]
   }
 
+  ingress {
+    description     = "NFS from MongoDB ECS tasks"
+    from_port       = var.efs_nfs_port
+    to_port         = var.efs_nfs_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.mongodb_sg.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -906,6 +914,58 @@ resource "aws_service_discovery_instance" "asterisk" {
     AWS_INSTANCE_IPV4 = aws_instance.asterisk.private_ip
   }
 }
+
+# Wait for Asterisk to be fully ready before starting the app
+# resource "null_resource" "wait_for_asterisk" {
+#   depends_on = [
+#     aws_instance.asterisk,
+#     aws_eip_association.asterisk_eip_assoc
+#   ]
+
+#   triggers = {
+#     instance_id = aws_instance.asterisk.id
+#     eip_id      = aws_eip.asterisk_eip.id
+#   }
+
+#   provisioner "local-exec" {
+#     command = <<-EOT
+#       echo "Waiting for Asterisk to be ready..."
+      
+#       # Wait for user data script to complete (Docker install + Asterisk startup)
+#       echo "Waiting for user data script to complete..."
+#       sleep 180
+      
+#       # Test Asterisk ARI connectivity
+#       echo "Testing Asterisk ARI connectivity..."
+#       max_attempts=30
+#       attempt=1
+      
+#       while [ $attempt -le $max_attempts ]; do
+#         echo "Attempt $attempt/$max_attempts: Testing connection to ${aws_eip.asterisk_eip.public_ip}:${var.asterisk_ari_http_port}"
+        
+#         # Use curl with proper error handling
+#         if curl -f -s --connect-timeout 10 --max-time 30 "http://${aws_eip.asterisk_eip.public_ip}:${var.asterisk_ari_http_port}/ari/asterisk/info" > /dev/null 2>&1; then
+#           echo "✅ Asterisk ARI is ready!"
+#           break
+#         else
+#           echo "⏳ Asterisk not ready yet, waiting 10 seconds..."
+#           sleep 10
+#           attempt=$((attempt + 1))
+#         fi
+#       done
+      
+#       if [ $attempt -gt $max_attempts ]; then
+#         echo "❌ Asterisk failed to become ready after $max_attempts attempts"
+#         echo "This may indicate:"
+#         echo "1. Asterisk container failed to start"
+#         echo "2. Security group rules are incorrect"
+#         echo "3. User data script failed"
+#         echo "4. Network connectivity issues"
+#         exit 1
+#       fi
+#     EOT
+#   }
+# }
 
 ################################################################################
 # EFS (for MongoDB Persistence) - UPDATED FOR PRIVATE SUBNETS
@@ -1126,17 +1186,6 @@ resource "aws_security_group_rule" "mongodb_to_efs_egress" {
   source_security_group_id = aws_security_group.efs_sg.id
   description              = "Allow MongoDB to reach EFS"
 }
-
-# Also ensure EFS allows MongoDB (you already have this but let's make sure)
-resource "aws_security_group_rule" "efs_from_mongodb" {
-  type                     = "ingress"
-  from_port                = var.efs_nfs_port
-  to_port                  = var.efs_nfs_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.efs_sg.id
-  source_security_group_id = aws_security_group.mongodb_sg.id
-  description              = "NFS from MongoDB service"
-}
 # UPDATED: Task definition with improved health check and startup
 # UPDATED: Task definition without MongoDB container
 resource "aws_ecs_task_definition" "app_task" {
@@ -1188,7 +1237,10 @@ resource "aws_ecs_task_definition" "app_task" {
         
         # Help with Asterisk connection retry
         { name = "ASTERISK_CONNECT_TIMEOUT", value = "300000" },  # 5 minutes
-        { name = "ASTERISK_RETRY_INTERVAL", value = "15000" }     # 15 seconds
+        { name = "ASTERISK_RETRY_INTERVAL", value = "15000" },    # 15 seconds
+        { name = "ASTERISK_MAX_RETRIES", value = "20" },          # Maximum retry attempts
+        { name = "ASTERISK_HEALTH_CHECK_INTERVAL", value = "30000" },  # Health check every 30 seconds
+        { name = "ASTERISK_CONNECTION_POOL_SIZE", value = "5" }   # Connection pool size
       ]
       secrets = [
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
@@ -1270,7 +1322,8 @@ resource "aws_ecs_service" "app_service" {
     aws_security_group.bianca_app_sg,
     aws_instance.asterisk,  # Wait for Asterisk
     aws_eip_association.asterisk_eip_assoc,  # NEW: Also wait for EIP association
-    aws_ecs_service.mongodb_service  # NEW: Add dependency on MongoDB service
+    aws_ecs_service.mongodb_service,  # NEW: Add dependency on MongoDB service
+    # null_resource.wait_for_asterisk  # NEW: Wait for Asterisk to be fully ready
   ]
   tags = { Name = var.service_name }
 }

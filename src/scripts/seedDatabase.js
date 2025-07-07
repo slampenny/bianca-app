@@ -172,7 +172,7 @@ async function seedDatabase() {
     const caregiverWithNoPatients = {
       name: 'Test User No Patients',
       email: 'no-patients@example.org',
-      phone: '+16045624264',
+      phone: '+16045624263',
       password: hashedPassword,
       role: 'staff',
       org: org1._id,
@@ -187,14 +187,14 @@ async function seedDatabase() {
     const agnesAlphabet = {
       name: 'Agnes Alphabet',
       email: 'agnes@example.org',
-      phone: '1234567890',
+      phone: '+16045624263',
       schedules: [],
     };
     
     const barnabyButton = {
       name: 'Barnaby Button',
       email: 'barnaby@example.org',
-      phone: '1234567891',
+      phone: '+16045624263',
       schedules: [],
     };
     
@@ -213,49 +213,49 @@ async function seedDatabase() {
     const patientFour = {
       name: 'Sarah Johnson',
       email: 'sarah.johnson@example.org',
-      phone: '+16045624264',
+      phone: '+16045624263',
       schedules: [],
     };
     
     const patientFive = {
       name: 'Mary Wilson',
       email: 'mary.wilson@example.org',
-      phone: '+16045624265',
+      phone: '+16045624263',
       schedules: [],
     };
     
     const patientSix = {
       name: 'Robert Davis',
       email: 'robert.davis@example.org',
-      phone: '+16045624266',
+      phone: '+16045624263',
       schedules: [],
     };
     
     const patientSeven = {
       name: 'Lisa Brown',
       email: 'lisa.brown@example.org',
-      phone: '+16045624267',
+      phone: '+16045624263',
       schedules: [],
     };
     
     const patientEight = {
       name: 'Michael Chen',
       email: 'michael.chen@example.org',
-      phone: '+16045624268',
+      phone: '+16045624263',
       schedules: [],
     };
     
     const patientNine = {
       name: 'Jennifer Lee',
       email: 'jennifer.lee@example.org',
-      phone: '+16045624269',
+      phone: '+16045624263',
       schedules: [],
     };
     
     const patientTen = {
       name: 'David Miller',
       email: 'david.miller@example.org',
-      phone: '+16045624270',
+      phone: '+16045624263',
       schedules: [],
     };
     

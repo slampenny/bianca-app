@@ -58,33 +58,41 @@ async function startServer() {
       }
     }
 
-    // Initialize and wait for the ARI Client connection
+    // Initialize ARI Client connection (non-blocking)
     let ariReady = false;
     if (config.asterisk && config.asterisk.enabled) {
-      logger.info('Asterisk integration enabled, starting ARI client...');
+      logger.info('Asterisk integration enabled, starting ARI client in background...');
 
-      const ariMaxRetries = 12; // Try for up to 6 minutes (12 * 30s)
-      const ariRetryDelay = 30000; // 30 seconds is a good delay for waiting on an EC2 instance
+      // Start ARI connection in background - don't block server startup
+      const startAriInBackground = async () => {
+        const ariMaxRetries = 12; // Try for up to 6 minutes (12 * 30s)
+        const ariRetryDelay = 30000; // 30 seconds is a good delay for waiting on an EC2 instance
 
-      for (let attempt = 1; attempt <= ariMaxRetries; attempt++) {
-        try {
-          logger.info(`[Startup] Attempting to connect to ARI (Attempt ${attempt}/${ariMaxRetries})...`);
-          const ariClient = await startAriClient();
-          await ariClient.waitForReady();
-          
-          ariReady = true;
-          logger.info('[Startup] ARI client connected and ready.');
-          break; // Exit loop on success
-        } catch (err) {
-          logger.error(`[Startup] ARI connection failed on attempt ${attempt}: ${err.message}`);
-          if (attempt < ariMaxRetries) {
-            logger.info(`[Startup] Retrying in ${ariRetryDelay / 1000} seconds...`);
-            await new Promise(resolve => setTimeout(resolve, ariRetryDelay));
-          } else {
-            logger.error('[Startup] Max retries reached. Could not initialize ARI client.');
+        for (let attempt = 1; attempt <= ariMaxRetries; attempt++) {
+          try {
+            logger.info(`[Startup] Attempting to connect to ARI (Attempt ${attempt}/${ariMaxRetries})...`);
+            const ariClient = await startAriClient();
+            await ariClient.waitForReady();
+            
+            ariReady = true;
+            logger.info('[Startup] ARI client connected and ready.');
+            break; // Exit loop on success
+          } catch (err) {
+            logger.error(`[Startup] ARI connection failed on attempt ${attempt}: ${err.message}`);
+            if (attempt < ariMaxRetries) {
+              logger.info(`[Startup] Retrying in ${ariRetryDelay / 1000} seconds...`);
+              await new Promise(resolve => setTimeout(resolve, ariRetryDelay));
+            } else {
+              logger.error('[Startup] Max retries reached. ARI client will continue retrying in background.');
+            }
           }
         }
-      }
+      };
+
+      // Start ARI connection in background - don't wait for it
+      startAriInBackground().catch(err => {
+        logger.error('[Startup] Background ARI connection failed:', err);
+      });
     } else {
       logger.info('Asterisk integration disabled in configuration.');
     }

@@ -44,8 +44,8 @@ app.get('/health', (req, res) => {
       const { getAriClientInstance } = require('./services/ari.client');
       const ariClient = getAriClientInstance();
       ariStatus = {
-        ready: ariClient && ariClient.isReady(),
-        status: ariClient ? 'Connected' : 'Not connected'
+        ready: ariClient && ariClient.isConnected,
+        status: ariClient && ariClient.isConnected ? 'Connected' : 'Not connected'
       };
     } catch (error) {
       ariStatus = { ready: false, status: 'Service not available' };
@@ -65,6 +65,8 @@ app.get('/health', (req, res) => {
       }
     };
 
+    // Always return 200 - the app is healthy if it can respond to HTTP requests
+    // Individual service status is informational but doesn't affect overall health
     res.status(200).json(healthData);
     
   } catch (error) {
