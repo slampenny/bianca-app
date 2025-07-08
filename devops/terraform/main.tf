@@ -216,7 +216,7 @@ variable "github_repo" {
 variable "github_branch" {
   description = "GitHub branch for CodePipeline."
   type        = string
-  default     = "main"
+  default     = "release/web"
 }
 
 variable "github_app_connection_arn" {
@@ -1226,7 +1226,7 @@ resource "aws_ecs_task_definition" "app_task" {
         # UPDATED: Use service discovery DNS name instead of localhost
         { name = "MONGODB_URL", value = "mongodb://mongodb.myphonefriend.internal:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
-        { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" },
+        { name = "WEBSOCKET_URL", value = "wss://api.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
         # Internal communication uses private IP for both ARI and RTP
@@ -1360,6 +1360,16 @@ resource "aws_ecr_repository" "asterisk_repo" {
   image_tag_mutability = "MUTABLE"
   image_scanning_configuration { scan_on_push = true }
   tags                 = { Name = var.asterisk_ecr_repo_name }
+}
+
+resource "aws_ecr_repository" "frontend_repo" {
+  name = "bianca-app-frontend"
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+  tags = {
+    Name = "bianca-app-frontend"
+  }
 }
 
 ################################################################################
@@ -1816,7 +1826,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       provider         = "CodeBuild"
       version          = "1"
       input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["BuildOutput"]
+      output_artifacts = ["BuildOutputApp", "BuildOutputAsterisk", "BuildOutputFrontend"]
       configuration = {
         ProjectName = aws_codebuild_project.bianca_project.name
       }
@@ -1832,7 +1842,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       owner           = "AWS"
       provider        = "ECS"
       version         = "1"
-      input_artifacts = ["BuildOutput"]
+      input_artifacts = ["BuildOutputApp"]
       configuration = {
         ClusterName = aws_ecs_cluster.cluster.name
         ServiceName = aws_ecs_service.app_service.name
@@ -1848,9 +1858,9 @@ resource "aws_codepipeline" "bianca_pipeline" {
 # ROUTE 53 RECORDS
 ################################################################################
 
-resource "aws_route53_record" "app_subdomain" {
+resource "aws_route53_record" "api_subdomain" {
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "app.myphonefriend.com"
+  name    = "api.myphonefriend.com"
   type    = "A"
   alias {
     name                   = aws_lb.app_lb.dns_name
@@ -1924,9 +1934,9 @@ output "sip_dns_name" {
   value       = aws_route53_record.sip_subdomain.name
 }
 
-output "app_alb_dns_name" {
-  description = "DNS name for the Application Load Balancer (app.myphonefriend.com)"
-  value       = aws_route53_record.app_subdomain.name
+output "api_alb_dns_name" {
+  description = "DNS name for the Application Load Balancer (api.myphonefriend.com)"
+  value       = aws_route53_record.api_subdomain.name
 }
 
 output "asterisk_instance_id" {
@@ -1987,4 +1997,8 @@ output "mongodb_service_discovery_dns" {
 output "deployment_architecture" {
   description = "Deployment architecture summary"
   value = "MongoDB runs as separate ECS service. App deployments no longer affect MongoDB. Zero-downtime deployments enabled."
+}
+
+output "frontend_ecr_repo_url" {
+  value = aws_ecr_repository.frontend_repo.repository_url
 }
