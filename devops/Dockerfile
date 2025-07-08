@@ -4,10 +4,10 @@ FROM nginx:alpine
 RUN rm -rf /usr/share/nginx/html/*
 
 # Copy Expo web build to nginx public directory
-COPY ../dist/ /usr/share/nginx/html
+COPY dist/ /usr/share/nginx/html
 
 # Custom nginx config for SPA routing
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY devops/nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 80
 
