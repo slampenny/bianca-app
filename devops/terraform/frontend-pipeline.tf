@@ -190,6 +190,35 @@ resource "aws_ecs_service" "frontend_service" {
   tags = { Name = "bianca-frontend-service" }
 }
 
+# --- CodeBuild project for Frontend ---
+resource "aws_codebuild_project" "frontend_project" {
+  name          = "bianca-frontend-build"
+  description   = "Builds Docker image for Bianca frontend"
+  service_role  = data.terraform_remote_state.backend.outputs.codebuild_role_arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+    image_pull_credentials_type = "CODEBUILD"
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "devops/buildspec.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs { status = "ENABLED" }
+  }
+  tags = { Name = "bianca-frontend-build" }
+}
+
 # --- CodePipeline for Frontend ---
 variable "frontend_github_owner" {
   description = "GitHub owner for the frontend repo"
@@ -209,19 +238,28 @@ variable "frontend_github_branch" {
   default     = "release/web"
 }
 
-variable "frontend_github_connection_arn" {
-  description = "CodeStar connection ARN for the frontend repo"
+variable "github_app_connection_arn" {
+  description = "GitHub App connection ARN for CodePipeline (shared with backend)"
   type        = string
-  default     = "arn:aws:codestar-connections:us-east-2:YOUR_AWS_ACCOUNT_ID:connection/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+  default     = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+}
+
+data "terraform_remote_state" "backend" {
+  backend = "s3"
+  config = {
+    bucket = "bianca-terraform-state"
+    key    = "backend/terraform.tfstate"
+    region = "us-east-2"
+  }
 }
 
 resource "aws_codepipeline" "frontend_pipeline" {
   name     = "BiancaFrontend-ECS-Pipeline"
-  role_arn = aws_iam_role.codepipeline_role.arn
+  role_arn = data.terraform_remote_state.backend.outputs.codepipeline_role_arn
 
   artifact_store {
     type     = "S3"
-    location = aws_s3_bucket.artifact_bucket.bucket
+    location = data.terraform_remote_state.backend.outputs.artifact_bucket_name
   }
 
   stage {
@@ -234,7 +272,7 @@ resource "aws_codepipeline" "frontend_pipeline" {
       version          = "1"
       output_artifacts = ["SourceOutput"]
       configuration = {
-        ConnectionArn        = var.frontend_github_connection_arn
+        ConnectionArn        = var.github_app_connection_arn
         FullRepositoryId     = "${var.frontend_github_owner}/${var.frontend_github_repo}"
         BranchName           = var.frontend_github_branch
         OutputArtifactFormat = "CODE_ZIP"
@@ -270,7 +308,7 @@ resource "aws_codepipeline" "frontend_pipeline" {
       version         = "1"
       input_artifacts = ["BuildOutputFrontend"]
       configuration = {
-        ClusterName = data.aws_ecs_cluster.main.name
+        ClusterName = data.aws_ecs_cluster.main.cluster_name
         ServiceName = aws_ecs_service.frontend_service.name
         FileName    = "imagedefinitions_frontend.json"
       }
