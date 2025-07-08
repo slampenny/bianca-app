@@ -93,3 +93,51 @@ web-build/
 test-results/
 
 /coverage
+
+# Yarn v2+ (Berry)
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Expo
+.expo/*
+
+# Metro
+metro-cache/
+
+# Test/coverage
+coverage/
+test-results/
+
+# Build artifacts
+*.aab
+*.apk
+*.ipa
+*.app
+*.xcarchive
+
+# Log files
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Patch files
+*.patch
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+crash.log
+*.tfplan

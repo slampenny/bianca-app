@@ -1,0 +1,32 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: us-east-2
+    AWS_ACCOUNT_ID: 730335291008
+    REPOSITORY_NAME_FRONTEND: bianca-app-frontend
+    FRONTEND_CONTAINER_NAME: bianca-frontend
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION --profile jordan | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_FRONTEND
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)-$(date +%Y%m%d%H%M%S)
+  build:
+    commands:
+      - echo Build started on $(date)
+      - echo Building frontend image...
+      - docker build -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG -f devops/Dockerfile .
+      - docker tag $REPOSITORY_URI_FRONTEND:$IMAGE_TAG $REPOSITORY_URI_FRONTEND:latest
+  post_build:
+    commands:
+      - echo Build completed on $(date)
+      - echo Pushing frontend image...
+      - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_FRONTEND:latest
+      - echo Creating imagedefinitions_frontend.json
+      - echo "[{\"name\":\"$FRONTEND_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_FRONTEND:$IMAGE_TAG\"}]" > imagedefinitions_frontend.json
+artifacts:
+  files:
+    - imagedefinitions_frontend.json 
