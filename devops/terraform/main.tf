@@ -294,11 +294,22 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# VPC resource - this should match your existing VPC
+resource "aws_vpc" "main" {
+  cidr_block           = "172.31.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = "bianca-vpc"
+  }
+}
+
 # Use a resource block to create/manage the Internet Gateway.
 # On a fresh account, this will be created.
 # On your existing account, you have already imported it.
 resource "aws_internet_gateway" "gw" {
-  vpc_id = var.vpc_id
+  vpc_id = aws_vpc.main.id
 
   tags = {
     Name = "bianca-app-igw"
@@ -307,7 +318,7 @@ resource "aws_internet_gateway" "gw" {
 
 # Create a new Route Table for your public subnets
 resource "aws_route_table" "public" {
-  vpc_id = var.vpc_id
+  vpc_id = aws_vpc.main.id
 
   # This route sends all internet-bound traffic (0.0.0.0/0) to the Internet Gateway
   route {
@@ -322,7 +333,7 @@ resource "aws_route_table" "public" {
 
 # Create the first public subnet in the first available Availability Zone
 resource "aws_subnet" "public_a" {
-  vpc_id                  = var.vpc_id
+  vpc_id                  = aws_vpc.main.id
   # IMPORTANT: Adjust this CIDR block if it conflicts with existing subnets in your VPC
   cidr_block              = "172.31.100.0/24"
   availability_zone       = data.aws_availability_zones.available.names[0]
@@ -335,7 +346,7 @@ resource "aws_subnet" "public_a" {
 
 # Create the second public subnet in the second available Availability Zone
 resource "aws_subnet" "public_b" {
-  vpc_id                  = var.vpc_id
+  vpc_id                  = aws_vpc.main.id
   # IMPORTANT: Adjust this CIDR block if it conflicts with existing subnets in your VPC
   cidr_block              = "172.31.101.0/24"
   availability_zone       = data.aws_availability_zones.available.names[1]
@@ -363,7 +374,7 @@ resource "aws_route_table_association" "public_b" {
 
 # Private subnet for Fargate applications
 resource "aws_subnet" "private_a" {
-  vpc_id            = var.vpc_id
+  vpc_id            = aws_vpc.main.id
   cidr_block        = "172.31.110.0/24"  # Adjust to avoid conflicts
   availability_zone = data.aws_availability_zones.available.names[0]
   
@@ -373,7 +384,7 @@ resource "aws_subnet" "private_a" {
 }
 
 resource "aws_subnet" "private_b" {
-  vpc_id            = var.vpc_id
+  vpc_id            = aws_vpc.main.id
   cidr_block        = "172.31.111.0/24"  # Adjust to avoid conflicts
   availability_zone = data.aws_availability_zones.available.names[1]
   
@@ -398,7 +409,7 @@ resource "aws_nat_gateway" "main" {
 
 # Private route table
 resource "aws_route_table" "private" {
-  vpc_id = var.vpc_id
+  vpc_id = aws_vpc.main.id
 
   route {
     cidr_block     = "0.0.0.0/0"
@@ -426,7 +437,7 @@ resource "aws_route_table_association" "private_b" {
 resource "aws_service_discovery_private_dns_namespace" "internal" {
   name        = "myphonefriend.internal"
   description = "Private DNS namespace for internal services"
-  vpc         = var.vpc_id
+  vpc         = aws_vpc.main.id
   tags        = { Name = "myphonefriend-internal-namespace" }
 }
 
@@ -479,7 +490,7 @@ resource "aws_service_discovery_service" "mongodb_sd_service" {
 resource "aws_security_group" "vpc_endpoints_sg" {
   name        = "vpc-endpoints-sg"
   description = "Security group for VPC endpoints"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.main.id
 
   ingress {
     from_port   = 443
@@ -499,7 +510,7 @@ resource "aws_security_group" "vpc_endpoints_sg" {
 }
 
 resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = var.vpc_id
+  vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
@@ -510,7 +521,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
 }
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = var.vpc_id
+  vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
@@ -521,7 +532,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
 }
 
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = var.vpc_id
+  vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.private.id]
@@ -547,7 +558,7 @@ resource "aws_security_group_rule" "alb_to_fargate_egress" {
 resource "aws_security_group" "alb_sg" {
   name        = "alb-sg"
   description = "Security group for the Application Load Balancer"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.main.id
 
   lifecycle {
     ignore_changes = [description, tags, tags_all]
@@ -582,7 +593,7 @@ resource "aws_security_group" "alb_sg" {
 resource "aws_security_group" "bianca_app_sg" {
   name        = "bianca-app-sg"
   description = "Security group for Bianca application ECS tasks"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.main.id
 
   lifecycle {
     ignore_changes = [description, tags, tags_all]
@@ -612,7 +623,7 @@ resource "aws_security_group" "bianca_app_sg" {
 resource "aws_security_group" "asterisk_ec2_sg" {
   name        = "asterisk-ec2-sg"
   description = "Security group for Asterisk EC2 instance"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.main.id
 
   # SIP UDP from Twilio (external)
   ingress {
@@ -665,7 +676,7 @@ resource "aws_security_group" "asterisk_ec2_sg" {
 resource "aws_security_group" "mongodb_sg" {
   name        = "mongodb-sg"
   description = "Security group for MongoDB service"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.main.id
 
   ingress {
     description     = "MongoDB from app"
@@ -775,7 +786,7 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
 resource "aws_security_group" "efs_sg" {
   name        = "mongodb-efs-sg"
   description = "Allow NFS traffic from ECS tasks to EFS"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.main.id
 
   ingress {
     description     = "NFS from Bianca App ECS tasks"
@@ -1040,7 +1051,7 @@ resource "aws_lb_target_group" "app_tg" {
   name        = "bianca-target-group"
   port        = var.container_port
   protocol    = "HTTP"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.main.id
   target_type = "ip"
 
   health_check {
