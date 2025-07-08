@@ -244,112 +244,54 @@ function Header({ title }: { title: string }) {
 }
 
 const styles = StyleSheet.create({
+  assistantBubble: {
+    backgroundColor: colors.palette.biancaSuccess, // Green for assistant
+    borderBottomLeftRadius: 4, // WhatsApp-style tail
+  },
+  assistantMessageContainer: {
+    alignSelf: "flex-start",
+    marginRight: "20%",
+  },
+  assistantMessageText: {
+    color: colors.palette.neutral100, // White text on green
+  },
+  assistantMessageTime: {
+    color: colors.palette.neutral100,
+    textAlign: "left",
+  },
   container: {
     backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
   conversationCard: {
     backgroundColor: colors.palette.neutral100,
-    marginBottom: 8,
     borderRadius: 8,
+    elevation: 1,
+    marginBottom: 8,
+    overflow: "hidden",
     shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 1,
-    overflow: "hidden",
   },
   conversationHeader: {
+    alignItems: "center",
     flexDirection: "row",
     padding: 16,
-    alignItems: "center",
   },
   conversationInfo: {
     flex: 1,
-  },
-  conversationTitle: {
-    color: colors.palette.biancaHeader,
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
   },
   conversationPreview: {
     color: colors.palette.neutral600,
     fontSize: 14,
     marginBottom: 4,
   },
-  messageCount: {
-    color: colors.palette.biancaButtonSelected,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  expandIcon: {
-    marginLeft: 12,
-  },
-  expandIconText: {
-    color: colors.palette.biancaButtonSelected,
+  conversationTitle: {
+    color: colors.palette.biancaHeader,
     fontSize: 16,
-    fontWeight: "bold",
-  },
-  messagesContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.palette.biancaBorder,
-  },
-  messageContainer: {
-    marginBottom: 8,
-    maxWidth: "80%",
-  },
-  userMessageContainer: {
-    alignSelf: "flex-end",
-    marginLeft: "20%",
-  },
-  assistantMessageContainer: {
-    alignSelf: "flex-start",
-    marginRight: "20%",
-  },
-  messageBubble: {
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    shadowColor: colors.palette.neutral900,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  userBubble: {
-    backgroundColor: colors.palette.biancaButtonSelected, // Blue for user
-    borderBottomRightRadius: 4, // WhatsApp-style tail
-  },
-  assistantBubble: {
-    backgroundColor: colors.palette.biancaSuccess, // Green for assistant
-    borderBottomLeftRadius: 4, // WhatsApp-style tail
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 20,
+    fontWeight: "600",
     marginBottom: 4,
-  },
-  userMessageText: {
-    color: colors.palette.neutral100, // White text on blue
-  },
-  assistantMessageText: {
-    color: colors.palette.neutral100, // White text on green
-  },
-  messageTime: {
-    fontSize: 11,
-    opacity: 0.7,
-  },
-  userMessageTime: {
-    color: colors.palette.neutral100,
-    textAlign: "right",
-  },
-  assistantMessageTime: {
-    color: colors.palette.neutral100,
-    textAlign: "left",
   },
   errorContainer: {
     alignItems: "center",
@@ -358,6 +300,14 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.palette.biancaError,
     fontSize: 16,
+  },
+  expandIcon: {
+    marginLeft: 12,
+  },
+  expandIconText: {
+    color: colors.palette.biancaButtonSelected,
+    fontSize: 16,
+    fontWeight: "bold",
   },
   header: {
     alignItems: "center",
@@ -376,13 +326,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  loaderContainer: {
-    padding: 20,
-  },
   loadMoreContainer: {
+    alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
     padding: 16,
   },
   loadMoreText: {
@@ -390,10 +337,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 8,
   },
+  loaderContainer: {
+    padding: 20,
+  },
+  messageBubble: {
+    borderRadius: 18,
+    elevation: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    shadowColor: colors.palette.neutral900,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  messageContainer: {
+    marginBottom: 8,
+    maxWidth: "80%",
+  },
+  messageCount: {
+    color: colors.palette.biancaButtonSelected,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  messageTime: {
+    fontSize: 11,
+    opacity: 0.7,
+  },
+  messagesContainer: {
+    borderTopColor: colors.palette.biancaBorder,
+    borderTopWidth: 1,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
   noConversationsText: {
     color: colors.palette.neutral600,
     fontSize: 16,
     marginTop: 20,
     textAlign: "center",
+  },
+  userBubble: {
+    backgroundColor: colors.palette.biancaButtonSelected, // Blue for user
+    borderBottomRightRadius: 4, // WhatsApp-style tail
+  },
+  userMessageContainer: {
+    alignSelf: "flex-end",
+    marginLeft: "20%",
+  },
+  userMessageText: {
+    color: colors.palette.neutral100, // White text on blue
+  },
+  userMessageTime: {
+    color: colors.palette.neutral100,
+    textAlign: "right",
   },
 })

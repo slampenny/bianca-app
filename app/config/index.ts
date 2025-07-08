@@ -19,7 +19,7 @@ import DevConfig from "./config.dev"
 
 let ExtraConfig = ProdConfig
 
-if (__DEV__) {
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
   ExtraConfig = DevConfig
 }
 

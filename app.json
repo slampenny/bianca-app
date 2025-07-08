@@ -1,8 +1,8 @@
 {
   "name": "bianca_app_frontend",
-  "displayName": "bianca",
+  "displayName": "MyPhoneFriend",
   "expo": {
-    "name": "bianca_app_frontend",
+    "name": "MyPhoneFriend",
     "slug": "bianca_app_frontend",
     "scheme": "bianca",
     "version": "1.0.0",
@@ -22,7 +22,7 @@
     ],
     "android": {
       "icon": "./assets/images/app-icon-android-legacy.png",
-      "package": "com.bianca_app_frontend",
+      "package": "com.negascout.bianca",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
         "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
@@ -31,17 +31,27 @@
         "image": "./assets/images/splash-logo-android-universal.png",
         "resizeMode": "contain",
         "backgroundColor": "#191015"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
     },
     "ios": {
       "icon": "./assets/images/app-icon-ios.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.bianca_app_frontend",
+      "bundleIdentifier": "com.negascout.bianca",
       "splash": {
         "image": "./assets/images/splash-logo-ios-mobile.png",
         "tabletImage": "./assets/images/splash-logo-ios-tablet.png",
         "resizeMode": "contain",
         "backgroundColor": "#191015"
+      },
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone to make phone calls for wellness checks.",
+        "NSCameraUsageDescription": "This app may need access to the camera for profile pictures."
       }
     },
     "web": {
@@ -71,7 +81,14 @@
     ],
     "experiments": {
       "tsconfigPaths": true
-    }
+    },
+    "privacy": "public",
+    "extra": {
+      "eas": {
+        "projectId": "fb5ec1ef-180c-455a-8b64-2c41f9c8ca2d"
+      }
+    },
+    "owner": "negascout"
   },
   "ignite": {
     "version": "9.6.2"

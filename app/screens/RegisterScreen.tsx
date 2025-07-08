@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
-import { StyleSheet, View, Pressable, Platform, Dimensions } from "react-native"
+import { StyleSheet, View, Pressable, Platform, Dimensions, Linking } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField } from "app/components"
+import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
 
@@ -334,10 +335,29 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           preset="filled" // Example preset usage
         />
 
+        {/* Consent Notice */}
+        <View style={styles.consentContainer}>
+          <Text style={styles.consentText}>
+            By signing up, you agree to our{" "}
+            <Text style={styles.consentLink} onPress={() => Linking.openURL("https://app.myphonefriend.com/terms")}>
+              Terms of Service
+            </Text>{" "}
+            and{" "}
+            <Text style={styles.consentLink} onPress={() => Linking.openURL("https://app.myphonefriend.com/privacy")}>
+              Privacy Policy
+            </Text>
+          </Text>
+        </View>
+
         {/* Go Back Link */}
         <Pressable testID="register-go-back" style={styles.linkButton} onPress={() => navigation.goBack()}>
           <Text style={styles.linkButtonText} tx="registerScreen.goBack" />
         </Pressable>
+
+        {/* Legal Links */}
+        <View style={styles.legalLinksContainer}>
+          <LegalLinks style={styles.legalLinks} />
+        </View>
 
         {/* Add extra space at the bottom to ensure scrollability */}
         <div style={{ height: "100px" }}></div>
@@ -362,16 +382,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   errorText: {
-    width: "100%",
-    textAlign: "center",
+    backgroundColor: colors.palette.biancaErrorBackground,
+    borderRadius: 6,
+    color: colors.palette.biancaError,
     fontSize: 16,
     fontWeight: "500",
-    color: colors.palette.biancaError,
-    backgroundColor: colors.palette.biancaErrorBackground,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
     marginBottom: 15,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlign: "center",
+    width: "100%",
   },
   explanationText: {
     color: colors.palette.biancaExplanation,
@@ -417,15 +437,39 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   successText: {
-    width: "100%",
-    textAlign: "center",
+    backgroundColor: colors.palette.biancaSuccessBackground,
+    borderRadius: 6,
+    color: colors.palette.biancaSuccess,
     fontSize: 16,
     fontWeight: "500",
-    color: colors.palette.biancaSuccess,
-    backgroundColor: colors.palette.biancaSuccessBackground,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
     marginBottom: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlign: "center",
+    width: "100%",
+  },
+  legalLinksContainer: {
+    marginTop: 20,
+    paddingBottom: 20,
+  },
+  legalLinks: {
+    // Add any specific styles for LegalLinks if needed
+  },
+  consentContainer: {
+    marginTop: 20,
+    marginBottom: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: colors.palette.neutral200,
     borderRadius: 6,
+  },
+  consentText: {
+    color: colors.palette.neutral700,
+    fontSize: 14,
+    textAlign: "center",
+  },
+  consentLink: {
+    color: colors.palette.biancaButtonSelected,
+    textDecorationLine: "underline",
   },
 })

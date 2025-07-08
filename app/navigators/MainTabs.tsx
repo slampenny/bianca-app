@@ -45,17 +45,11 @@ function HomeStack() {
 }
 
 function ProfileStack() {
-  const currentUser = useSelector(getCurrentUser)
   return (
     <Stack.Navigator
       screenOptions={{
         headerRight: () =>
-          currentUser?.avatar ? (
-            <Avatar
-              source={{ uri: currentUser.avatar }}
-              style={{ marginRight: 15, width: 40, height: 40, borderRadius: 20 }}
-            />
-          ) : null,
+          <ProfileButton/>
       }}
     >
       <Stack.Screen name="Profile" component={CaregiverScreen} />
@@ -65,7 +59,12 @@ function ProfileStack() {
 
 function AlertStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerRight: () => <ProfileButton />,
+      }}
+    >
       <Stack.Screen name="Alert" component={AlertScreen} />
     </Stack.Navigator>
   )
@@ -73,7 +72,12 @@ function AlertStack() {
 
 function OrgStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerRight: () => <ProfileButton />,
+      }}
+    >
       <Stack.Screen name="Org" component={OrgScreen} />
       <Stack.Screen name="Caregivers" component={CaregiversScreen} />
       <Stack.Screen name="Caregiver" component={CaregiverScreen} />
@@ -83,7 +87,12 @@ function OrgStack() {
 
 function PaymentStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerRight: () => <ProfileButton />,
+      }}
+    >
       <Stack.Screen name="Payment" component={PaymentInfoScreen} />
     </Stack.Navigator>
   )
@@ -132,8 +141,8 @@ export default function MainTabNavigator() {
         name="Alert"
         component={AlertStack}
         options={{
-          tabBarLabel: "Alert", // Custom label
-          tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : null, // Show badge if unread count > 0
+          tabBarLabel: "Alert",
+          tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : null,
           tabBarTestID: "tab-alert",
         }}
       />

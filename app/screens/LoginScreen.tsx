@@ -136,6 +136,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
+  error: {
+    color: colors.palette.biancaError,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  input: {
+    color: colors.palette.biancaHeader,
+    fontSize: 16,
+  },
   inputContainer: {
     marginBottom: 16,
     width: "100%",
@@ -143,26 +152,32 @@ const styles = StyleSheet.create({
   inputWrapper: {
     backgroundColor: colors.palette.neutral100,
     borderColor: colors.palette.biancaBorder,
-    borderWidth: 1,
     borderRadius: 6,
+    borderWidth: 1,
+    elevation: 1,
+    marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    marginBottom: 8,
     shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 2,
-    elevation: 1,
   },
-  input: {
-    color: colors.palette.biancaHeader,
+  linkButton: {
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  linkButtonText: {
+    color: colors.palette.biancaButtonSelected,
     fontSize: 16,
+    textAlign: "center",
+    textDecorationLine: "underline",
   },
   loginButton: {
     backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
-    marginTop: 16,
     marginBottom: 8,
+    marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 12,
     width: "100%",
@@ -185,21 +200,6 @@ const styles = StyleSheet.create({
     color: colors.palette.biancaButtonSelected,
     fontSize: 18,
     fontWeight: "bold",
-    textAlign: "center",
-  },
-  linkButton: {
-    marginTop: 10,
-    alignSelf: "center",
-  },
-  linkButtonText: {
-    color: colors.palette.biancaButtonSelected,
-    fontSize: 16,
-    textAlign: "center",
-    textDecorationLine: "underline",
-  },
-  error: {
-    color: colors.palette.biancaError,
-    marginBottom: 20,
     textAlign: "center",
   },
 })

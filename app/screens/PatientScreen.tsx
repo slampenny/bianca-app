@@ -359,8 +359,9 @@ function PatientScreen() {
           placeholder="Name *"
           placeholderTextColor={colors.palette.neutral600}
           value={name}
-          onChangeText={handleNameChange} // Use specific handler
-          onFocus={clearMessages} // Clear messages on focus
+          onChangeText={handleNameChange}
+          onFocus={clearMessages}
+          testID="patient-name-input"
         />
         {/* Consider adding a Name validation error if needed */}
 
@@ -369,10 +370,11 @@ function PatientScreen() {
           placeholder="Email *"
           placeholderTextColor={colors.palette.neutral600}
           value={email}
-          onChangeText={validateEmail} // Validation sets error state
+          onChangeText={validateEmail}
           keyboardType="email-address"
           autoCapitalize="none"
           onFocus={clearMessages}
+          testID="patient-email-input"
         />
         {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
 
@@ -381,9 +383,10 @@ function PatientScreen() {
           placeholder="Phone *"
           placeholderTextColor={colors.palette.neutral600}
           value={phone}
-          onChangeText={validatePhone} // Validation sets error state
-          keyboardType="phone-pad" // Use phone pad
+          onChangeText={validatePhone}
+          keyboardType="phone-pad"
           onFocus={clearMessages}
+          testID="patient-phone-input"
         />
         {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
@@ -395,7 +398,8 @@ function PatientScreen() {
             (!name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined,
           ]}
           onPress={handleSave}
-          disabled={!name || !email || !phone || !!emailError || !!phoneError || isLoading} // Also disable while loading
+          disabled={!name || !email || !phone || !!emailError || !!phoneError || isLoading}
+          testID="save-patient-button"
         >
           <Text style={styles.buttonText}>
             {patient && patient.id ? "UPDATE PATIENT" : "CREATE PATIENT"}

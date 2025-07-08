@@ -10,6 +10,7 @@ import {
 } from "react-native"
 import { useSelector } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
+import { LegalLinks } from "app/components/LegalLinks"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
@@ -197,6 +198,9 @@ function ProfileScreen() {
           <Pressable style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.buttonText}>LOGOUT</Text>
           </Pressable>
+
+          {/* Legal Links */}
+          <LegalLinks style={styles.legalLinks} />
         </View>
       </ScrollView>
     </TouchableWithoutFeedback>
@@ -251,12 +255,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   logoutButton: {
-    backgroundColor: colors.palette.secondary500,
-    paddingVertical: 15,
-    borderRadius: 5,
     alignItems: "center",
+    backgroundColor: colors.palette.secondary500,
+    borderRadius: 5,
+    paddingVertical: 15,
   },
   success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
+  legalLinks: {
+    marginTop: 20,
+    alignSelf: "center",
+  },
 })
 
 export { ProfileScreen }

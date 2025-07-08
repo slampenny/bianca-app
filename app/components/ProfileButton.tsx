@@ -1,6 +1,8 @@
 import React from "react"
 import { Pressable, StyleSheet } from "react-native"
 import { useNavigation } from "@react-navigation/native"
+import type { DrawerParamList } from "app/navigators/navigationTypes"
+import type { StackNavigationProp } from "@react-navigation/stack"
 import { useSelector } from "react-redux"
 import { getCurrentUser } from "app/store/authSlice"
 import { AutoImage } from "app/components"
@@ -9,10 +11,16 @@ import { AutoImage } from "app/components"
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
 
 const ProfileButton: React.FC = () => {
-  const navigation = useNavigation()
+  const navigation = useNavigation<StackNavigationProp<DrawerParamList>>()
   const currentUser = useSelector(getCurrentUser)
   return (
-    <Pressable style={styles.profileButton} onPress={() => navigation.navigate("Profile")}>
+    <Pressable
+      style={styles.profileButton}
+      onPress={() => navigation.navigate("Profile")}
+      testID="profile-button"
+      accessibilityLabel="profile-button"
+      data-testid="profile-button"
+    >
       <AutoImage
         source={currentUser?.avatar ? { uri: currentUser.avatar } : { uri: defaultAvatarUrl }}
         style={styles.avatar}

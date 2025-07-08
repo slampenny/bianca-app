@@ -206,22 +206,22 @@ const styles = StyleSheet.create({
   listContentContainer: { paddingHorizontal: 16, paddingVertical: 20 },
   noCaregiversText: { color: colors.palette.neutral600, fontSize: 16, marginTop: 20, textAlign: "center" },
   notAuthorizedContainer: {
+    alignItems: "center",
     flex: 1,
     justifyContent: "center",
-    alignItems: "center",
     padding: 20,
   },
-  notAuthorizedTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.palette.biancaError,
-    marginBottom: 16,
+  notAuthorizedText: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+    lineHeight: 24,
     textAlign: "center",
   },
-  notAuthorizedText: {
-    fontSize: 16,
-    color: colors.palette.neutral600,
+  notAuthorizedTitle: {
+    color: colors.palette.biancaError,
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 16,
     textAlign: "center",
-    lineHeight: 24,
   },
 })

@@ -92,7 +92,7 @@ export function OrgScreen() {
           <Text style={styles.saveButtonText}>SAVE</Text>
         </Pressable>
       </View>
-      <Pressable style={styles.viewCaregiversButton} onPress={handleViewCaregivers}>
+      <Pressable style={styles.viewCaregiversButton} onPress={handleViewCaregivers} testID="view-caregivers-button">
         <Text style={styles.viewCaregiversButtonText}>View Caregivers</Text>
       </Pressable>
     </ScrollView>

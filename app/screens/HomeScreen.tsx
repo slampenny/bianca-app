@@ -1,6 +1,6 @@
 import React from "react"
-import { View, Text, StyleSheet, Pressable, FlatList } from "react-native"
-import { AutoImage, Card } from "app/components"
+import { View, StyleSheet, FlatList } from "react-native"
+import { AutoImage, Card, Button, Text } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
 import { setPatient, getPatientsForCaregiver, clearPatient } from "../store/patientSlice"
@@ -33,30 +33,34 @@ export function HomeScreen() {
 
   const renderPatient = ({ item }: { item: Patient }) => {
     return (
-      <View style={styles.patientCard}>
-        <View style={styles.patientInfo}>
-          <AutoImage source={{ uri: item.avatar }} style={styles.avatar} />
-          <Text style={styles.patientName}>{item.name}</Text>
-        </View>
-        <Pressable
-          style={styles.editButton}
-          android_ripple={{ color: colors.palette.biancaButtonSelected }}
-          onPress={() => handlePatientPress(item)}
-          testID="edit-patient-button"
-        >
-          <Text style={styles.editButtonText}>Edit</Text>
-        </Pressable>
-      </View>
+      <Card
+        style={styles.patientCard}
+        onPress={() => handlePatientPress(item)}
+        testID={`patient-card-${item.id}`}
+        accessibilityLabel={`patient-card-${item.name}`}
+        LeftComponent={<AutoImage source={{ uri: item.avatar }} style={styles.avatar} />}
+        content={item.name}
+        contentStyle={styles.patientName}
+        RightComponent={
+          <Button
+            text="Edit"
+            style={styles.editButton}
+            textStyle={styles.editButtonText}
+            onPress={() => handlePatientPress(item)}
+            testID={`edit-patient-button-${item.id}`}
+          />
+        }
+      />
     )
   }
 
-  const ListEmpty = () => <Text style={styles.noUsersText}>No patients found</Text>
+  const ListEmpty = () => <Text style={styles.noUsersText} testID="no-patients-label">No patients found</Text>
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Welcome, {currentUser ? currentUser.name : "Guest"}</Text>
+        <Text style={styles.headerTitle} testID="home-header">Welcome, {currentUser ? currentUser.name : "Guest"}</Text>
       </View>
 
       {/* Patient List */}
@@ -66,17 +70,17 @@ export function HomeScreen() {
         renderItem={renderPatient}
         contentContainerStyle={styles.listContentContainer}
         ListEmptyComponent={ListEmpty}
+        testID="patient-list"
       />
 
       {/* Footer (Add Patient) */}
-      <Pressable
+      <Button
+        text="Add Patient"
         style={styles.addButton}
-        android_ripple={{ color: colors.palette.biancaSuccess }}
+        textStyle={styles.addButtonText}
         onPress={handleAddPatient}
         testID="add-patient-button"
-      >
-        <Text style={styles.addButtonText}>Add Patient</Text>
-      </Pressable>
+      />
     </View>
   )
 }

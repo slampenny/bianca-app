@@ -1,12 +1,12 @@
 import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
-  timeout: 30000,
+  timeout: 5000,
   testDir: './test/e2e',
   use: {
     screenshot: 'only-on-failure',
-    baseURL: 'http://localhost:8081', // or 19006 depending on how you run expo web
-    headless: true,
+    baseURL: 'http://localhost:8081', // Set baseURL for Playwright
+    headless: false,
     browserName: 'chromium',
     viewport: { width: 1280, height: 720 },
   },

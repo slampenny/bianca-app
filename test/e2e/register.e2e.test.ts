@@ -1,11 +1,8 @@
-import { test, expect } from "@playwright/test"
+import { test } from './helpers/testHelpers'
+import { expect } from '@playwright/test'
 import { navigateToRegister, isLoginScreen, isHomeScreen } from "./helpers/navigation"
 
-const REGISTER_API_URL = '**/v1/auth/register';
 test.describe("Register Screen", () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToRegister(page) // Adjust if route is different
-  })
 
   test("can fill in all fields", async ({ page }) => {
     await page.getByTestId("register-name").fill("Jordan Lapp")

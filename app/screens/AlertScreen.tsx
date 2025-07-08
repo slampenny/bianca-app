@@ -230,14 +230,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  alertToggle: {
+    marginRight: 8,
+  },
   alertType: {
     color: colors.palette.biancaButtonSelected,
     fontSize: 12,
     fontWeight: "500",
     marginTop: 2,
-  },
-  alertToggle: {
-    marginRight: 8,
   },
   container: {
     backgroundColor: colors.palette.biancaBackground,
@@ -267,35 +267,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 2,
   },
+  listView: {
+    marginTop: 10,
+  },
   loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.palette.biancaBackground,
+    flex: 1,
+    justifyContent: "center",
   },
   markAllContainer: {
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
     marginVertical: 10,
   },
   refreshButton: {
+    alignItems: "center",
     backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     marginTop: 20,
     paddingVertical: 10,
-    alignItems: "center",
   },
   tabButton: {
-    flex: 1,
     borderRadius: 5,
+    flex: 1,
     marginHorizontal: 4,
     paddingVertical: 10,
   },
   tabRow: {
     flexDirection: "row",
     marginBottom: 16,
-  },
-  listView: {
-    marginTop: 10,
   },
 })

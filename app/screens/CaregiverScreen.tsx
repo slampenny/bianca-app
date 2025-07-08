@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import {
   Text,
   TextInput,
@@ -9,6 +9,8 @@ import {
   View,
   FlatList,
   Modal,
+  Animated,
+  Dimensions,
 } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
@@ -60,9 +62,13 @@ function CaregiverScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   
-  // State for unassigned patients modal
-  const [showUnassignedModal, setShowUnassignedModal] = useState(false)
+  // State for unassigned patients panel
+  const [showUnassignedPanel, setShowUnassignedPanel] = useState(false)
   const [selectedPatients, setSelectedPatients] = useState<string[]>([])
+  const [assignmentSuccess, setAssignmentSuccess] = useState(false)
+  
+  // Animation for the panel
+  const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current
 
   useEffect(() => {
     if (caregiver) {
@@ -119,8 +125,15 @@ function CaregiverScreen() {
 
   // Functions for unassigned patients assignment
   const handleAssignUnassignedPatients = () => {
-    setShowUnassignedModal(true)
+    setShowUnassignedPanel(true)
     setSelectedPatients([])
+    setAssignmentSuccess(false)
+    // Animate panel in
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start()
   }
 
   const handlePatientSelection = (patientId: string) => {
@@ -129,6 +142,29 @@ function CaregiverScreen() {
         ? prev.filter(id => id !== patientId)
         : [...prev, patientId]
     )
+  }
+
+  const handleSelectAll = () => {
+    if (unassignedPatients) {
+      const allPatientIds = unassignedPatients.map(patient => patient.id || '').filter(id => id)
+      setSelectedPatients(allPatientIds)
+    }
+  }
+
+  const handleDeselectAll = () => {
+    setSelectedPatients([])
+  }
+
+  const closeUnassignedPanel = () => {
+    Animated.timing(slideAnim, {
+      toValue: Dimensions.get('window').height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowUnassignedPanel(false)
+      setSelectedPatients([])
+      setAssignmentSuccess(false)
+    })
   }
 
   const handleAssignSelectedPatients = async () => {
@@ -140,18 +176,21 @@ function CaregiverScreen() {
         patientIds: selectedPatients
       }).unwrap()
       
+      setAssignmentSuccess(true)
       setSuccessMessage(`${selectedPatients.length} patient(s) assigned successfully!`)
-      setShowUnassignedModal(false)
-      setSelectedPatients([])
       
+      // Close panel after a short delay to show success message
+      setTimeout(() => {
+        closeUnassignedPanel()
+        setSuccessMessage("")
+      }, 2000)
+    } catch (error: any) {
+      console.error('Assignment error:', error)
+      const errorMessage = error?.data?.message || "Failed to assign patients. Please try again."
+      setSuccessMessage(`Error: ${errorMessage}`)
       setTimeout(() => {
         setSuccessMessage("")
-      }, 3000)
-    } catch (error) {
-      setSuccessMessage("Failed to assign patients. Please try again.")
-      setTimeout(() => {
-        setSuccessMessage("")
-      }, 3000)
+      }, 5000)
     }
   }
 
@@ -302,21 +341,54 @@ function CaregiverScreen() {
           )}
         </View>
 
-        {/* Unassigned Patients Modal */}
-        <Modal
-          visible={showUnassignedModal}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setShowUnassignedModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Assign Unassigned Patients</Text>
+        {/* Unassigned Patients Panel */}
+        {showUnassignedPanel && (
+          <Animated.View 
+            style={[
+              styles.panelOverlay,
+              {
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <Pressable 
+              style={styles.panelBackdrop} 
+              onPress={closeUnassignedPanel}
+            />
+            <View style={styles.panelContent}>
+              <View style={styles.panelHeader}>
+                <Text style={styles.panelTitle}>Assign Unassigned Patients</Text>
+                <Pressable
+                  style={styles.panelCloseButton}
+                  onPress={closeUnassignedPanel}
+                >
+                  <Text style={styles.panelCloseButtonText}>✕</Text>
+                </Pressable>
+              </View>
               
               {isLoadingUnassigned ? (
                 <Text style={styles.loadingText}>Loading unassigned patients...</Text>
+              ) : isAssigning ? (
+                <Text style={styles.loadingText}>Assigning patients...</Text>
+              ) : assignmentSuccess ? (
+                <Text style={styles.successText}>Patients assigned successfully!</Text>
               ) : unassignedPatients && unassignedPatients.length > 0 ? (
                 <>
+                  <View style={styles.selectionControls}>
+                    <Pressable
+                      style={styles.selectionButton}
+                      onPress={handleSelectAll}
+                    >
+                      <Text style={styles.selectionButtonText}>Select All</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.selectionButton}
+                      onPress={handleDeselectAll}
+                    >
+                      <Text style={styles.selectionButtonText}>Deselect All</Text>
+                    </Pressable>
+                  </View>
+                  
                   <FlatList
                     data={unassignedPatients}
                     keyExtractor={(item) => item.id || ''}
@@ -338,26 +410,26 @@ function CaregiverScreen() {
                     style={styles.patientList}
                   />
                   
-                  <View style={styles.modalButtons}>
+                  <View style={styles.panelButtons}>
                     <Pressable
                       style={[
-                        styles.modalButton,
-                        styles.cancelButton,
-                        selectedPatients.length === 0 && styles.buttonDisabled
+                        styles.panelButton,
+                        styles.assignButton,
+                        (selectedPatients.length === 0 || isAssigning) && styles.buttonDisabled
                       ]}
                       onPress={handleAssignSelectedPatients}
                       disabled={selectedPatients.length === 0 || isAssigning}
                     >
-                      <Text style={styles.modalButtonText}>
+                      <Text style={styles.panelButtonText}>
                         {isAssigning ? "Assigning..." : `Assign Selected (${selectedPatients.length})`}
                       </Text>
                     </Pressable>
                     
                     <Pressable
-                      style={[styles.modalButton, styles.cancelButton]}
-                      onPress={() => setShowUnassignedModal(false)}
+                      style={[styles.panelButton, styles.cancelButton]}
+                      onPress={closeUnassignedPanel}
                     >
-                      <Text style={styles.modalButtonText}>Cancel</Text>
+                      <Text style={styles.panelButtonText}>Cancel</Text>
                     </Pressable>
                   </View>
                 </>
@@ -365,14 +437,17 @@ function CaregiverScreen() {
                 <Text style={styles.noPatientsText}>No unassigned patients found.</Text>
               )}
             </View>
-          </View>
-        </Modal>
+          </Animated.View>
+        )}
       </ScrollView>
     </TouchableWithoutFeedback>
   )
 }
 
 const styles = StyleSheet.create({
+  assignButton: {
+    backgroundColor: colors.palette.biancaSuccess,
+  },
   button: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaButtonSelected,
@@ -382,6 +457,11 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: colors.palette.neutral100, fontSize: 18, fontWeight: "600" },
+  cancelButton: {
+    backgroundColor: colors.palette.neutral400,
+    borderRadius: 5,
+    padding: 10,
+  },
   container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
   contentContainer: { padding: 20 },
   deleteButton: { backgroundColor: colors.palette.angry500 },
@@ -408,77 +488,124 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 10,
   },
-  success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    backgroundColor: colors.palette.neutral100,
-    padding: 20,
-    borderRadius: 10,
-    width: "80%",
-    maxHeight: "80%",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
   loadingText: {
     marginBottom: 10,
   },
-  patientItem: {
+  panelButton: {
+    backgroundColor: colors.palette.biancaButtonSelected,
+    borderRadius: 5,
     padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.palette.neutral300,
   },
-  selectedPatientItem: {
-    backgroundColor: colors.palette.biancaSuccessBackground,
+  panelButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  panelButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  panelCloseButton: {
+    alignItems: "center",
+    backgroundColor: colors.palette.neutral300,
+    borderRadius: 15,
+    height: 30,
+    justifyContent: "center",
+    padding: 5,
+    width: 30,
+  },
+  panelCloseButtonText: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  panelContent: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 10,
+    maxHeight: "80%",
+    padding: 20,
+    width: "100%",
+  },
+  panelHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  panelBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "transparent",
+  },
+  panelOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    height: "100%",
+    justifyContent: "flex-end",
+  },
+  panelTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  noPatientsText: {
+    fontSize: 16,
+    textAlign: "center",
+  },
+  patientEmail: {
+    fontSize: 14,
+  },
+  patientItem: {
+    borderBottomColor: colors.palette.neutral300,
+    borderBottomWidth: 1,
+    padding: 10,
+  },
+  patientList: {
+    flex: 1,
   },
   patientName: {
     fontSize: 16,
     fontWeight: "bold",
-  },
-  patientEmail: {
-    fontSize: 14,
   },
   selectedIndicator: {
     fontSize: 14,
     fontWeight: "bold",
     marginLeft: 10,
   },
-  patientList: {
-    flex: 1,
+  selectedPatientItem: {
+    backgroundColor: colors.palette.biancaSuccessBackground,
   },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  modalButton: {
-    padding: 10,
+  selectionButton: {
+    backgroundColor: colors.palette.neutral300,
     borderRadius: 5,
-    backgroundColor: colors.palette.biancaButtonSelected,
+    flex: 0.48,
+    padding: 8,
   },
-  cancelButton: {
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: colors.palette.neutral400,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: colors.palette.neutral100,
-  },
-  noPatientsText: {
-    fontSize: 16,
+  selectionButtonText: {
+    color: colors.palette.neutral700,
+    fontSize: 14,
+    fontWeight: "600",
     textAlign: "center",
   },
-  assignButton: {
-    backgroundColor: colors.palette.biancaSuccess,
+  selectionControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
+  successText: {
+    color: colors.palette.biancaSuccess,
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
   },
 })
 

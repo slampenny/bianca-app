@@ -45,13 +45,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: colors.palette.biancaHeader,
-    textAlign: "center",
-  },
   logoutButton: {
     backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
@@ -64,6 +57,13 @@ const styles = StyleSheet.create({
     color: colors.palette.neutral100,
     fontSize: 18,
     fontWeight: "bold",
+    textAlign: "center",
+  },
+  title: {
+    color: colors.palette.biancaHeader,
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
     textAlign: "center",
   },
 })

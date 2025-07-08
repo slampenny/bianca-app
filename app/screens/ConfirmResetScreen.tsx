@@ -82,29 +82,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   container: {
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
     justifyContent: "center",
     padding: 16,
-    backgroundColor: colors.palette.biancaBackground,
   },
   errorText: {
     color: colors.palette.biancaError,
     marginBottom: 10,
   },
   input: {
+    backgroundColor: colors.palette.neutral100,
     borderColor: colors.palette.biancaBorder,
     borderWidth: 1,
+    color: colors.palette.biancaHeader,
     height: 40,
     marginBottom: 10,
     paddingHorizontal: 10,
-    color: colors.palette.biancaHeader,
-    backgroundColor: colors.palette.neutral100,
   },
   title: {
+    color: colors.palette.biancaHeader,
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
-    color: colors.palette.biancaHeader,
   },
 })
