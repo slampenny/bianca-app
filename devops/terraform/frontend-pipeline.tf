@@ -98,7 +98,7 @@ resource "aws_lb_listener_rule" "frontend_http" {
   }
   condition {
     host_header {
-      values = ["www.myphonefriend.com"]
+      values = ["app.myphonefriend.com"]
     }
   }
 }
@@ -113,7 +113,7 @@ resource "aws_lb_listener_rule" "frontend_https" {
   }
   condition {
     host_header {
-      values = ["www.myphonefriend.com"]
+      values = ["app.myphonefriend.com"]
     }
   }
 }
