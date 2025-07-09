@@ -52,7 +52,7 @@ const envVarsSchema = Joi.object({
   STRIPE_PUBLISHABLE_KEY: Joi.string(),
   // **NEW:** Realtime API specific variables
   OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
-  WEBSOCKET_URL: Joi.string().default('wss://app.myphonefriend.com'), // URL your WebSocket server listens on
+  WEBSOCKET_URL: Joi.string().default('wss://api.myphonefriend.com'), // URL your WebSocket server listens on
 }).unknown();
 
 // Validate environment variables
@@ -173,7 +173,7 @@ const baselineConfig = {
 if (envVars.NODE_ENV === 'production') {
   // Restore user's original production overrides
   
-  baselineConfig.baseUrl = 'https://app.myphonefriend.com'; // Example - VERIFY
+  baselineConfig.baseUrl = 'https://api.myphonefriend.com'; // Example - VERIFY
   baselineConfig.apiUrl = `${baselineConfig.baseUrl}/v1`; // User's original value
   baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb.myphonefriend.internal:27017/bianca-app';
   baselineConfig.email.smtp.secure = true; // User's original value
@@ -181,7 +181,7 @@ if (envVars.NODE_ENV === 'production') {
 
   // **NEW/UPDATED:** Add necessary production overrides for WebSocket URL
   // Ensure this uses wss:// and points to your correct production WebSocket endpoint
-  baselineConfig.twilio.websocketUrl = 'wss://app.myphonefriend.com'; // Example - **VERIFY THIS URL**
+  baselineConfig.twilio.websocketUrl = 'wss://api.myphonefriend.com'; // Example - **VERIFY THIS URL**
 
   // Ensure baseUrl is also correct for production if used elsewhere
   // Ensure Asterisk ARI URL points to the internal service discovery name in production

@@ -111,8 +111,23 @@ app.use(mongoSanitize());
 app.use(compression());
 
 // Enable CORS
-app.use(cors());
-app.options('*', cors());
+const corsOptions = {
+  origin: [
+    'https://app.myphonefriend.com',
+    'http://app.myphonefriend.com',
+    'https://www.myphonefriend.com',
+    'http://www.myphonefriend.com',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:8080'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // JWT authentication
 app.use(passport.initialize());
@@ -137,7 +152,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts
-      connectSrc: ["'self'", "wss:"], // Allow WebSocket connections
+      connectSrc: ["'self'", "wss:", "https://app.myphonefriend.com", "https://api.myphonefriend.com"], // Allow WebSocket connections and API calls
     }
   }
 }));

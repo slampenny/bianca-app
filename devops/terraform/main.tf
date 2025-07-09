@@ -216,7 +216,7 @@ variable "github_repo" {
 variable "github_branch" {
   description = "GitHub branch for CodePipeline."
   type        = string
-  default     = "main"
+  default     = "release/web"
 }
 
 variable "github_app_connection_arn" {
@@ -1067,6 +1067,8 @@ resource "aws_lb_target_group" "app_tg" {
   tags = { Name = "bianca-target-group" }
 }
 
+
+
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.app_lb.arn
   port              = 80
@@ -1128,6 +1130,7 @@ resource "aws_ecs_task_definition" "mongodb_task" {
     name      = "mongodb"
     image     = "public.ecr.aws/docker/library/mongo:7.0"
     essential = true
+    command   = ["sh", "-c", "mongod --bind_ip_all"]
     portMappings = [
       { containerPort = var.mongodb_port, protocol = "tcp" }
     ]
@@ -1146,13 +1149,14 @@ resource "aws_ecs_task_definition" "mongodb_task" {
         "awslogs-stream-prefix" = "mongo"
       }
     }
-    healthCheck = {
-      command     = ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
-      interval    = 30
-      timeout     = 10
-      retries     = 3
-      startPeriod = 60
-    }
+    # Temporarily removed health check to debug MongoDB startup
+    # healthCheck = {
+    #   command     = ["CMD-SHELL", "timeout 10 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/27017' || exit 1"]
+    #   interval    = 30
+    #   timeout     = 15
+    #   retries     = 5
+    #   startPeriod = 60
+    # }
   }])
   
   tags = { Name = "mongodb-service" }
@@ -1226,7 +1230,7 @@ resource "aws_ecs_task_definition" "app_task" {
         # UPDATED: Use service discovery DNS name instead of localhost
         { name = "MONGODB_URL", value = "mongodb://mongodb.myphonefriend.internal:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
-        { name = "WEBSOCKET_URL", value = "wss://app.myphonefriend.com" },
+        { name = "WEBSOCKET_URL", value = "wss://api.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
         # Internal communication uses private IP for both ARI and RTP
@@ -1360,6 +1364,16 @@ resource "aws_ecr_repository" "asterisk_repo" {
   image_tag_mutability = "MUTABLE"
   image_scanning_configuration { scan_on_push = true }
   tags                 = { Name = var.asterisk_ecr_repo_name }
+}
+
+resource "aws_ecr_repository" "frontend_repo" {
+  name = "bianca-app-frontend"
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+  tags = {
+    Name = "bianca-app-frontend"
+  }
 }
 
 ################################################################################
@@ -1593,7 +1607,8 @@ resource "aws_iam_policy" "codebuild_ecr_policy" {
         ],
         Resource = [
           aws_ecr_repository.app_repo.arn,
-          aws_ecr_repository.asterisk_repo.arn
+          aws_ecr_repository.asterisk_repo.arn,
+          aws_ecr_repository.frontend_repo.arn
         ]
       }
     ]
@@ -1647,7 +1662,7 @@ resource "aws_iam_policy" "codebuild_logs_policy" {
     Statement = [{
       Effect   = "Allow",
       Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-      Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/codebuild/${aws_codebuild_project.bianca_project.name}:*"
+      Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/codebuild/*:*"
     }]
   })
 }
@@ -1704,13 +1719,13 @@ resource "aws_iam_policy" "codepipeline_base_policy" {
       {
         Effect   = "Allow",
         Action   = ["codebuild:StartBuild", "codebuild:StopBuild", "codebuild:BatchGetBuilds"],
-        Resource = aws_codebuild_project.bianca_project.arn
+        Resource = "arn:aws:codebuild:${var.aws_region}:${var.aws_account_id}:project/*"
       },
       {
         Effect = "Allow",
         Action = ["ecs:DescribeServices", "ecs:UpdateService", "ecs:DescribeTaskDefinition"],
         Resource = [
-          aws_ecs_service.app_service.id,
+          "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/*",
           "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/*"
         ]
       },
@@ -1816,7 +1831,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       provider         = "CodeBuild"
       version          = "1"
       input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["BuildOutput"]
+      output_artifacts = ["BuildOutputApp", "BuildOutputAsterisk"]
       configuration = {
         ProjectName = aws_codebuild_project.bianca_project.name
       }
@@ -1832,7 +1847,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       owner           = "AWS"
       provider        = "ECS"
       version         = "1"
-      input_artifacts = ["BuildOutput"]
+      input_artifacts = ["BuildOutputApp"]
       configuration = {
         ClusterName = aws_ecs_cluster.cluster.name
         ServiceName = aws_ecs_service.app_service.name
@@ -1847,6 +1862,17 @@ resource "aws_codepipeline" "bianca_pipeline" {
 ################################################################################
 # ROUTE 53 RECORDS
 ################################################################################
+
+resource "aws_route53_record" "api_subdomain" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "api.myphonefriend.com"
+  type    = "A"
+  alias {
+    name                   = aws_lb.app_lb.dns_name
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
 
 resource "aws_route53_record" "app_subdomain" {
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
@@ -1924,9 +1950,9 @@ output "sip_dns_name" {
   value       = aws_route53_record.sip_subdomain.name
 }
 
-output "app_alb_dns_name" {
-  description = "DNS name for the Application Load Balancer (app.myphonefriend.com)"
-  value       = aws_route53_record.app_subdomain.name
+output "api_alb_dns_name" {
+  description = "DNS name for the Application Load Balancer (api.myphonefriend.com)"
+  value       = aws_route53_record.api_subdomain.name
 }
 
 output "asterisk_instance_id" {
@@ -1987,4 +2013,32 @@ output "mongodb_service_discovery_dns" {
 output "deployment_architecture" {
   description = "Deployment architecture summary"
   value = "MongoDB runs as separate ECS service. App deployments no longer affect MongoDB. Zero-downtime deployments enabled."
+}
+
+output "frontend_ecr_repo_url" {
+  value = aws_ecr_repository.frontend_repo.repository_url
+}
+
+output "codepipeline_role_arn" {
+  description = "ARN of the CodePipeline IAM role"
+  value       = aws_iam_role.codepipeline_role.arn
+}
+
+output "artifact_bucket_name" {
+  description = "Name of the S3 bucket for CodePipeline artifacts"
+  value       = aws_s3_bucket.artifact_bucket.bucket
+}
+
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = "bianca-terraform-state"
+  force_destroy = true
+  tags = {
+    Name = "bianca-terraform-state"
+    Purpose = "Terraform remote state storage"
+  }
+}
+
+output "codebuild_role_arn" {
+  description = "ARN of the CodeBuild IAM role"
+  value       = aws_iam_role.codebuild_role.arn
 }
