@@ -1603,7 +1603,8 @@ resource "aws_iam_policy" "codebuild_ecr_policy" {
         ],
         Resource = [
           aws_ecr_repository.app_repo.arn,
-          aws_ecr_repository.asterisk_repo.arn
+          aws_ecr_repository.asterisk_repo.arn,
+          aws_ecr_repository.frontend_repo.arn
         ]
       }
     ]
@@ -1657,7 +1658,7 @@ resource "aws_iam_policy" "codebuild_logs_policy" {
     Statement = [{
       Effect   = "Allow",
       Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-      Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/codebuild/${aws_codebuild_project.bianca_project.name}:*"
+      Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/aws/codebuild/*:*"
     }]
   })
 }
@@ -1714,13 +1715,13 @@ resource "aws_iam_policy" "codepipeline_base_policy" {
       {
         Effect   = "Allow",
         Action   = ["codebuild:StartBuild", "codebuild:StopBuild", "codebuild:BatchGetBuilds"],
-        Resource = aws_codebuild_project.bianca_project.arn
+        Resource = "arn:aws:codebuild:${var.aws_region}:${var.aws_account_id}:project/*"
       },
       {
         Effect = "Allow",
         Action = ["ecs:DescribeServices", "ecs:UpdateService", "ecs:DescribeTaskDefinition"],
         Resource = [
-          aws_ecs_service.app_service.id,
+          "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/*",
           "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/*"
         ]
       },
@@ -1826,7 +1827,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
       provider         = "CodeBuild"
       version          = "1"
       input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["BuildOutputApp", "BuildOutputAsterisk", "BuildOutputFrontend"]
+      output_artifacts = ["BuildOutputApp", "BuildOutputAsterisk"]
       configuration = {
         ProjectName = aws_codebuild_project.bianca_project.name
       }
@@ -2001,4 +2002,28 @@ output "deployment_architecture" {
 
 output "frontend_ecr_repo_url" {
   value = aws_ecr_repository.frontend_repo.repository_url
+}
+
+output "codepipeline_role_arn" {
+  description = "ARN of the CodePipeline IAM role"
+  value       = aws_iam_role.codepipeline_role.arn
+}
+
+output "artifact_bucket_name" {
+  description = "Name of the S3 bucket for CodePipeline artifacts"
+  value       = aws_s3_bucket.artifact_bucket.bucket
+}
+
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = "bianca-terraform-state"
+  force_destroy = true
+  tags = {
+    Name = "bianca-terraform-state"
+    Purpose = "Terraform remote state storage"
+  }
+}
+
+output "codebuild_role_arn" {
+  description = "ARN of the CodeBuild IAM role"
+  value       = aws_iam_role.codebuild_role.arn
 }
