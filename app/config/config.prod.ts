@@ -6,5 +6,5 @@
  * https://reactnative.dev/docs/security#storing-sensitive-info
  */
 export default {
-  API_URL: "https://app.myphonefriend.com/v1",
+  API_URL: "https://api.myphonefriend.com/v1",
 }
