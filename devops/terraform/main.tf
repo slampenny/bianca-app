@@ -1067,6 +1067,8 @@ resource "aws_lb_target_group" "app_tg" {
   tags = { Name = "bianca-target-group" }
 }
 
+
+
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.app_lb.arn
   port              = 80
@@ -1128,6 +1130,7 @@ resource "aws_ecs_task_definition" "mongodb_task" {
     name      = "mongodb"
     image     = "public.ecr.aws/docker/library/mongo:7.0"
     essential = true
+    command   = ["sh", "-c", "mongod --bind_ip_all"]
     portMappings = [
       { containerPort = var.mongodb_port, protocol = "tcp" }
     ]
@@ -1146,13 +1149,14 @@ resource "aws_ecs_task_definition" "mongodb_task" {
         "awslogs-stream-prefix" = "mongo"
       }
     }
-    healthCheck = {
-      command     = ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
-      interval    = 30
-      timeout     = 10
-      retries     = 3
-      startPeriod = 60
-    }
+    # Temporarily removed health check to debug MongoDB startup
+    # healthCheck = {
+    #   command     = ["CMD-SHELL", "timeout 10 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/27017' || exit 1"]
+    #   interval    = 30
+    #   timeout     = 15
+    #   retries     = 5
+    #   startPeriod = 60
+    # }
   }])
   
   tags = { Name = "mongodb-service" }
@@ -1862,6 +1866,17 @@ resource "aws_codepipeline" "bianca_pipeline" {
 resource "aws_route53_record" "api_subdomain" {
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
   name    = "api.myphonefriend.com"
+  type    = "A"
+  alias {
+    name                   = aws_lb.app_lb.dns_name
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "app_subdomain" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "app.myphonefriend.com"
   type    = "A"
   alias {
     name                   = aws_lb.app_lb.dns_name
