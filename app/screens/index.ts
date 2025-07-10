@@ -1,4 +1,5 @@
 export * from "./AlertScreen"
+export * from "./CaregiverInvitedScreen"
 export * from "./CaregiverScreen"
 export * from "./CaregiversScreen"
 export * from "./ConfirmResetScreen"
@@ -10,10 +11,12 @@ export * from "./LogoutScreen"
 export * from "./OrgScreen"
 export * from "./PatientScreen"
 export * from "./PaymentInfoScreen"
+export * from "./PrivacyScreen"
 export * from "./ProfileScreen"
 export * from "./RegisterScreen"
 export * from "./RequestResetScreen"
 export * from "./SchedulesScreen"
+export * from "./TermsScreen"
 
 export * from "./ErrorScreen/ErrorBoundary"
 // export other screens here

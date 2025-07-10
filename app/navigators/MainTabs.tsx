@@ -9,6 +9,7 @@ import {
   ConversationsScreen,
   CaregiverScreen,
   CaregiversScreen,
+  CaregiverInvitedScreen,
   AlertScreen,
   OrgScreen,
   PaymentInfoScreen,
@@ -81,6 +82,7 @@ function OrgStack() {
       <Stack.Screen name="Org" component={OrgScreen} />
       <Stack.Screen name="Caregivers" component={CaregiversScreen} />
       <Stack.Screen name="Caregiver" component={CaregiverScreen} />
+      <Stack.Screen name="CaregiverInvited" component={CaregiverInvitedScreen} />
     </Stack.Navigator>
   )
 }

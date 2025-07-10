@@ -6,13 +6,11 @@ import { authApi, caregiverApi, orgApi } from "app/services/api"
 interface CaregiverState {
   caregiver: Caregiver | null
   caregivers: Caregiver[]
-  currentOrg: string | null
 }
 
 const initialState: CaregiverState = {
   caregiver: null,
   caregivers: [],
-  currentOrg: null,
 }
 
 export const caregiverSlice = createSlice({
@@ -39,10 +37,7 @@ export const caregiverSlice = createSlice({
       console.log("[caregiverSlice] removeCaregiver called with id:", action.payload)
       state.caregivers = state.caregivers.filter((cg) => cg.id !== action.payload)
     },
-    setCurrentOrg: (state, action: PayloadAction<string>) => {
-      console.log("[caregiverSlice] setCurrentOrg called with:", action.payload)
-      state.currentOrg = action.payload
-    },
+
   },
   extraReducers: (builder) => {
     // Set current caregiver from login response
@@ -108,11 +103,9 @@ export const {
   clearCaregiver,
   clearCaregivers,
   removeCaregiver,
-  setCurrentOrg,
 } = caregiverSlice.actions
 
 export const getCaregiver = (state: RootState) => state.caregiver.caregiver
 export const getCaregivers = (state: RootState) => state.caregiver.caregivers
-export const getCurrentOrg = (state: RootState) => state.caregiver.currentOrg
 
 export default caregiverSlice.reducer

@@ -14,9 +14,11 @@ import {
 } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
+import { LoadingButton } from "app/components"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
-import { getCaregiver, getCurrentOrg, clearCaregiver } from "../store/caregiverSlice"
+import { getCaregiver, clearCaregiver } from "../store/caregiverSlice"
+import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
 import {
   useUpdateCaregiverMutation,
@@ -35,7 +37,7 @@ function CaregiverScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const dispatch = useDispatch()
   const caregiver = useSelector(getCaregiver)
-  const currentOrg = useSelector(getCurrentOrg)
+  const currentOrg = useSelector(getOrg)
   const currentUser = useSelector(getCurrentUser)
 
   // Mutations for editing/deleting
@@ -61,6 +63,7 @@ function CaregiverScreen() {
   const [phoneError, setPhoneError] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
+  const [errorMessage, setErrorMessage] = useState("")
   
   // State for unassigned patients panel
   const [showUnassignedPanel, setShowUnassignedPanel] = useState(false)
@@ -195,10 +198,12 @@ function CaregiverScreen() {
   }
 
   const handleSave = async () => {
+    console.log('handleSave called', { caregiver, name, email, phone, emailError, phoneError })
+    
     if (caregiver && caregiver.id) {
       // Update branch for an existing caregiver
+      console.log('Updating existing caregiver')
       const updatedCaregiver = {
-        ...caregiver,
         name,
         avatar,
         email,
@@ -213,26 +218,49 @@ function CaregiverScreen() {
         await updateCaregiver({ id: caregiver.id, caregiver: updatedCaregiver }).unwrap()
         navigation.navigate("Caregivers")
       } catch (error) {
+        console.error('Update error:', error)
         // Handle update error as needed
       }
     } else {
       // Invite branch for new caregiver
-      try {
-        if (currentOrg) {
-          const { caregiver: invitedCaregiver } = await sendInvite({
-            orgId: currentOrg,
-            name,
-            email,
-            phone,
-          }).unwrap()
-          setSuccessMessage(`Invitation sent to ${invitedCaregiver.name}!`)
+      console.log('Inviting new caregiver', { currentOrg, name, email, phone })
+      
+      // Check form validation
+      if (!email || !phone || emailError || phoneError) {
+        console.log('Form validation failed:', { email, phone, emailError, phoneError })
+        return
+      }
+      
+              try {
+          if (currentOrg?.id) {
+            console.log('Sending invite to backend...')
+            const { caregiver: invitedCaregiver } = await sendInvite({
+              orgId: currentOrg.id,
+              name,
+              email,
+              phone,
+            }).unwrap()
+          
+          console.log('Invite successful:', invitedCaregiver)
+          
+          // Clear caregiver state and navigate to success screen
           dispatch(clearCaregiver())
+          navigation.navigate("CaregiverInvited", {
+            caregiver: {
+              id: invitedCaregiver.id || "",
+              name: invitedCaregiver.name,
+              email: invitedCaregiver.email,
+            }
+          })
+        } else {
+          console.error('No currentOrg available')
+          setErrorMessage("Error: No organization found.")
           setTimeout(() => {
-            setSuccessMessage("")
-            navigation.navigate("Caregivers")
-          }, 2000)
+            setErrorMessage("")
+          }, 5000)
         }
       } catch (error: any) {
+        console.error('Invite error:', error)
         if (error?.data?.message === "Caregiver already invited") {
           setSuccessMessage("This email is already invited.")
           setTimeout(() => {
@@ -242,7 +270,7 @@ function CaregiverScreen() {
           setSuccessMessage("An error occurred while sending the invite.")
           setTimeout(() => {
             setSuccessMessage("")
-          }, 2000)
+          }, 5000)
         }
       }
     }
@@ -268,6 +296,7 @@ function CaregiverScreen() {
         )}
 
         {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
         <View style={styles.formCard}>
           <AvatarPicker
@@ -302,16 +331,19 @@ function CaregiverScreen() {
           />
           {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
-          <Pressable
-            style={[
-              styles.button,
-              (!email || !phone || emailError || phoneError) ? styles.buttonDisabled : undefined,
-            ]}
+          <LoadingButton
+            title={caregiver && caregiver.id ? "SAVE" : "INVITE"}
             onPress={handleSave}
+            loading={isUpdating || isInviting}
             disabled={!email || !phone || !!emailError || !!phoneError}
-          >
-            <Text style={styles.buttonText}>{caregiver && caregiver.id ? "SAVE" : "INVITE"}</Text>
-          </Pressable>
+            style={{
+              ...styles.button,
+              ...((!email || !phone || emailError || phoneError) && styles.buttonDisabled),
+            }}
+            loadingText={caregiver && caregiver.id ? "SAVING..." : "SENDING INVITE..."}
+            testID="caregiver-invite-button"
+            spinnerTestID="caregiver-invite-spinner"
+          />
 
           {caregiver && caregiver.id && (
             <Pressable

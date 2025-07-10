@@ -4,6 +4,8 @@ export type AppStackParamList = {
   Login: undefined
   MainTabs: undefined
   Profile: undefined
+  Privacy: undefined
+  Terms: undefined
 }
 
 export type DrawerParamList = {
@@ -34,6 +36,13 @@ export type OrgStackParamList = {
   Org: undefined
   Caregivers: undefined
   Caregiver: undefined
+  CaregiverInvited: {
+    caregiver: {
+      id: string
+      name: string
+      email: string
+    }
+  }
 }
 
 export type PaymentStackParamList = {
@@ -49,6 +58,8 @@ export type LoginStackParamList = {
   Register: undefined
   RequestReset: undefined
   ConfirmReset: undefined
+  Privacy: undefined
+  Terms: undefined
 }
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {

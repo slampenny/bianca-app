@@ -18,8 +18,6 @@ export function CaregiversScreen() {
 
   useSyncOrgCaregivers()
 
-  const [filter, setFilter] = useState<"all" | "full-time" | "part-time">("all")
-
   // Check if user is authorized to view caregivers (orgAdmin role)
   const isAuthorized = currentUser?.role === 'orgAdmin'
 
@@ -28,11 +26,6 @@ export function CaregiversScreen() {
       return cg.org === currentUser.org
     }
     return true
-  })
-
-  const filteredCaregivers = orgCaregivers.filter((cg: Caregiver) => {
-    if (filter === "all") return true
-    return (cg as any).employmentType === filter
   })
 
   const handleCaregiverPress = (caregiver: Caregiver) => {
@@ -46,28 +39,43 @@ export function CaregiversScreen() {
     navigation.navigate("Caregiver")
   }
 
-  const renderCaregiver = ({ item }: { item: Caregiver }) => (
-    <View style={styles.caregiverCard}>
-      <View style={styles.caregiverInfo}>
-        <AutoImage source={{ uri: item.avatar || "https://www.gravatar.com/avatar/?d=mp" }} style={styles.avatar} />
-        <View style={styles.infoTextContainer}>
-          <Text style={styles.caregiverName}>{item.name}</Text>
-          {(item.role as string) === "invited" && (
-            <View style={styles.invitedBadge}>
-              <Text style={styles.invitedBadgeText}>Invited</Text>
-            </View>
-          )}
+  const renderCaregiver = ({ item }: { item: Caregiver }) => {
+    const isInvited = (item.role as string) === "invited"
+    
+    return (
+      <View style={[
+        styles.caregiverCard,
+        isInvited && styles.invitedCaregiverCard
+      ]}>
+        <View style={styles.caregiverInfo}>
+          <AutoImage source={{ uri: item.avatar || "https://www.gravatar.com/avatar/?d=mp" }} style={styles.avatar} />
+          <View style={styles.infoTextContainer}>
+            <Text style={[
+              styles.caregiverName,
+              isInvited && styles.invitedCaregiverName
+            ]}>
+              {item.name}
+            </Text>
+            {isInvited && (
+              <View style={styles.invitedBadge}>
+                <Text style={styles.invitedBadgeText}>Invited</Text>
+              </View>
+            )}
+          </View>
         </View>
+        <Pressable
+          style={[
+            styles.editButton,
+            isInvited && styles.invitedEditButton
+          ]}
+          onPress={() => handleCaregiverPress(item)}
+          android_ripple={{ color: colors.palette.biancaButtonSelected }}
+        >
+          <Text style={styles.editButtonText}>Edit</Text>
+        </Pressable>
       </View>
-      <Pressable
-        style={styles.editButton}
-        onPress={() => handleCaregiverPress(item)}
-        android_ripple={{ color: colors.palette.biancaButtonSelected }}
-      >
-        <Text style={styles.editButtonText}>Edit</Text>
-      </Pressable>
-    </View>
-  )
+    )
+  }
 
   const ListEmpty = () => <Text style={styles.noCaregiversText}>No caregivers found</Text>
 
@@ -87,47 +95,8 @@ export function CaregiversScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.filterRow}>
-        <Pressable
-          style={[styles.filterButton, filter === "all" ? styles.filterButtonActive : undefined]}
-          onPress={() => setFilter("all")}
-        >
-          <Text
-            style={[styles.filterButtonText, filter === "all" ? styles.filterButtonTextActive : undefined]}
-          >
-            All
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.filterButton, filter === "full-time" ? styles.filterButtonActive : undefined]}
-          onPress={() => setFilter("full-time")}
-        >
-          <Text
-            style={[
-              styles.filterButtonText,
-              filter === "full-time" ? styles.filterButtonTextActive : undefined,
-            ]}
-          >
-            Full-Time
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.filterButton, filter === "part-time" ? styles.filterButtonActive : undefined]}
-          onPress={() => setFilter("part-time")}
-        >
-          <Text
-            style={[
-              styles.filterButtonText,
-              filter === "part-time" ? styles.filterButtonTextActive : undefined,
-            ]}
-          >
-            Part-Time
-          </Text>
-        </Pressable>
-      </View>
-
       <FlatList
-        data={filteredCaregivers}
+        data={orgCaregivers}
         keyExtractor={(item, index) => item.id || String(index)}
         renderItem={renderCaregiver}
         contentContainerStyle={styles.listContentContainer}
@@ -175,24 +144,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   editButtonText: { color: colors.palette.neutral100, fontSize: 16 },
-  filterButton: {
-    backgroundColor: colors.palette.neutral400,
-    borderRadius: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  filterButtonActive: { backgroundColor: colors.palette.biancaButtonSelected },
-  filterButtonText: { color: colors.palette.biancaHeader, fontSize: 16 },
-  filterButtonTextActive: { color: colors.palette.neutral100 },
-  filterRow: {
-    backgroundColor: colors.palette.neutral100,
-    borderRadius: 6,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginHorizontal: 10,
-    marginVertical: 10,
-    paddingVertical: 10,
-  },
   infoTextContainer: { flexDirection: "column" },
   invitedBadge: {
     alignSelf: "flex-start",
@@ -203,6 +154,17 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   invitedBadgeText: { color: colors.palette.neutral100, fontSize: 12 },
+  invitedCaregiverCard: {
+    backgroundColor: colors.palette.accent100,
+    borderColor: colors.palette.accent400,
+    borderWidth: 1,
+  },
+  invitedCaregiverName: {
+    color: colors.palette.accent500,
+  },
+  invitedEditButton: {
+    backgroundColor: colors.palette.accent400,
+  },
   listContentContainer: { paddingHorizontal: 16, paddingVertical: 20 },
   noCaregiversText: { color: colors.palette.neutral600, fontSize: 16, marginTop: 20, textAlign: "center" },
   notAuthorizedContainer: {
