@@ -2,16 +2,19 @@ import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { Text, TextInput, ScrollView, Pressable, StyleSheet, View } from "react-native"
 import { getOrg } from "../store/orgSlice"
+import { getCurrentUser } from "../store/authSlice"
 import { useUpdateOrgMutation } from "../services/api/orgApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { goBack } from "app/navigators"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
+import { clearCaregiver } from "../store/caregiverSlice"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
   const currentOrg = useSelector(getOrg)
+  const currentUser = useSelector(getCurrentUser)
   const [updateOrg, { isError, error }] = useUpdateOrgMutation()
   const [isLoading, setIsLoading] = useState(true)
   const [name, setName] = useState("")
@@ -19,6 +22,12 @@ export function OrgScreen() {
   const [phone, setPhone] = useState("")
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
+
+  // Check if user has permission to invite caregivers
+  const canInviteCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
+  
+  // Check if user has permission to edit org details
+  const canEditOrg = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
 
   useEffect(() => {
     if (currentOrg) {
@@ -51,6 +60,13 @@ export function OrgScreen() {
     navigation.navigate("Caregivers")
   }
 
+  const handleInviteCaregiver = () => {
+    // Clear any existing caregiver so the invite form starts fresh
+    dispatch(clearCaregiver())
+    // Navigate to caregiver screen in invite mode (no caregiver selected)
+    navigation.navigate("Caregiver")
+  }
+
   if (isLoading) {
     return <LoadingScreen />
   }
@@ -68,33 +84,43 @@ export function OrgScreen() {
       )}
       <View style={styles.formCard}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !canEditOrg && styles.readonlyInput]}
           placeholder="Name"
           value={name}
           onChangeText={setName}
           placeholderTextColor={colors.palette.neutral600}
+          editable={canEditOrg}
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, !canEditOrg && styles.readonlyInput]}
           placeholder="Email"
           value={email}
           onChangeText={setEmail}
           placeholderTextColor={colors.palette.neutral600}
+          editable={canEditOrg}
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, !canEditOrg && styles.readonlyInput]}
           placeholder="Phone"
           value={phone}
           onChangeText={setPhone}
           placeholderTextColor={colors.palette.neutral600}
+          editable={canEditOrg}
         />
-        <Pressable style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>SAVE</Text>
-        </Pressable>
+        {canEditOrg && (
+          <Pressable style={styles.saveButton} onPress={handleSave}>
+            <Text style={styles.saveButtonText}>SAVE</Text>
+          </Pressable>
+        )}
       </View>
       <Pressable style={styles.viewCaregiversButton} onPress={handleViewCaregivers} testID="view-caregivers-button">
         <Text style={styles.viewCaregiversButtonText}>View Caregivers</Text>
       </Pressable>
+      {canInviteCaregivers && (
+        <Pressable style={styles.inviteCaregiverButton} onPress={handleInviteCaregiver} testID="invite-caregiver-button">
+          <Text style={styles.inviteCaregiverButtonText}>Invite Caregiver</Text>
+        </Pressable>
+      )}
     </ScrollView>
   )
 }
@@ -146,6 +172,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 10,
   },
+  readonlyInput: {
+    backgroundColor: colors.palette.neutral200,
+    color: colors.palette.neutral600,
+    borderColor: colors.palette.neutral400,
+  },
   saveButton: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaButtonSelected,
@@ -165,6 +196,18 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   viewCaregiversButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  inviteCaregiverButton: {
+    alignItems: "center",
+    backgroundColor: colors.palette.biancaButtonSelected,
+    borderRadius: 5,
+    marginTop: 10,
+    paddingVertical: 15,
+  },
+  inviteCaregiverButtonText: {
     color: colors.palette.neutral100,
     fontSize: 18,
     fontWeight: "600",

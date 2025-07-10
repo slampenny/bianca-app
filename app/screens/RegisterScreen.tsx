@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
-import { StyleSheet, View, Pressable, Platform, Dimensions, Linking } from "react-native"
+import { StyleSheet, View, Pressable, Platform, Dimensions } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField } from "app/components"
@@ -135,7 +135,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         const result = await register({ name, email, password, phone }).unwrap()
         // Assuming 'result' indicates success. Adjust if your API returns differently.
         if (result) {
-          setGeneralError("Registration successful!") // Set success message
+          setGeneralError("Registration successful! Please check your email for verification instructions.")
           // IMPORTANT: Navigation should happen AFTER setting state or be handled elsewhere
           // For example, navigation could be triggered by this success state in another useEffect or saga
           // navigation.navigate("Home"); // Example: Navigate on success
@@ -339,11 +339,11 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.consentContainer}>
           <Text style={styles.consentText}>
             By signing up, you agree to our{" "}
-            <Text style={styles.consentLink} onPress={() => Linking.openURL("https://app.myphonefriend.com/terms")}>
+            <Text style={styles.consentLink} onPress={() => navigation.navigate("Terms" as never)}>
               Terms of Service
             </Text>{" "}
             and{" "}
-            <Text style={styles.consentLink} onPress={() => Linking.openURL("https://app.myphonefriend.com/privacy")}>
+            <Text style={styles.consentLink} onPress={() => navigation.navigate("Privacy" as never)}>
               Privacy Policy
             </Text>
           </Text>

@@ -1,5 +1,6 @@
 import React from "react"
-import { View, Text, StyleSheet, Pressable, Linking } from "react-native"
+import { View, Text, StyleSheet, Pressable } from "react-native"
+import { useNavigation } from "@react-navigation/native"
 import { colors } from "app/theme/colors"
 
 interface LegalLinksProps {
@@ -13,12 +14,14 @@ export const LegalLinks: React.FC<LegalLinksProps> = ({
   showTermsOfService = true,
   style
 }) => {
+  const navigation = useNavigation()
+
   const openPrivacyPolicy = () => {
-    Linking.openURL("https://app.myphonefriend.com/privacy")
+    navigation.navigate("Privacy" as never)
   }
 
   const openTermsOfService = () => {
-    Linking.openURL("https://app.myphonefriend.com/terms")
+    navigation.navigate("Terms" as never)
   }
 
   return (
@@ -48,7 +51,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   linkText: {
-    color: colors.primary,
+    color: colors.palette.primary500,
     fontSize: 14,
     textDecorationLine: "underline",
   },

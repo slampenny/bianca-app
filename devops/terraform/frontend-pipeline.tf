@@ -235,7 +235,7 @@ variable "frontend_github_repo" {
 variable "frontend_github_branch" {
   description = "Branch to watch for frontend pipeline"
   type        = string
-  default     = "release/web"
+  default     = "main"
 }
 
 variable "github_app_connection_arn" {
