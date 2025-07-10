@@ -18,8 +18,19 @@ const register = catchAsync(async (req, res, next) => {
     }
   );
 
-  const tokens = await tokenService.generateAuthTokens(org.caregivers[0]);
-  res.status(httpStatus.CREATED).send({ org, caregiver: CaregiverDTO(org.caregivers[0]), tokens });
+  const caregiver = org.caregivers[0];
+  const tokens = await tokenService.generateAuthTokens(caregiver);
+  
+  // Send verification email automatically after registration
+  try {
+    const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+  } catch (emailError) {
+    // Log the error but don't fail the registration
+    console.error('Failed to send verification email during registration:', emailError);
+  }
+  
+  res.status(httpStatus.CREATED).send({ org, caregiver: CaregiverDTO(caregiver), tokens });
 });
 
 const registerWithInvite = catchAsync(async (req, res) => {
