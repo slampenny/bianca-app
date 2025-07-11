@@ -43,7 +43,7 @@ const conversationOne = {
   analyzedData: {},
   metadata: {},
   startTime: new Date(),
-  endTime: new Date(),
+  endTime: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes later
   duration: faker.datatype.number({ min: 1, max: 60 }),
   status: 'completed',
   callType: 'inbound',
@@ -56,7 +56,7 @@ const conversationTwo = {
   analyzedData: {},
   metadata: {},
   startTime: new Date(),
-  endTime: new Date(),
+  endTime: new Date(Date.now() + 45 * 60 * 1000), // 45 minutes later
   duration: faker.datatype.number({ min: 1, max: 60 }),
   status: 'completed',
   callType: 'inbound',
@@ -66,6 +66,10 @@ const insertConversations = async (conversations) => {
   const createdConversations = [];
   
   for (const conversationData of conversations) {
+    // Ensure lineItemId is always set to null if not provided
+    if (conversationData.lineItemId === undefined) {
+      conversationData.lineItemId = null;
+    }
     // Create the conversation first without messages
     const conversation = new Conversation(conversationData);
     await conversation.save();
@@ -92,8 +96,11 @@ const insertConversations = async (conversations) => {
       messageIds.push(message._id);
     }
     
-    // Update conversation with message IDs
+    // Update conversation with message IDs, preserving lineItemId
     conversation.messages = messageIds;
+    if (conversationData.lineItemId !== undefined) {
+      conversation.lineItemId = conversationData.lineItemId;
+    }
     await conversation.save();
     
     createdConversations.push(conversation);

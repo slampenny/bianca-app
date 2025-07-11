@@ -59,10 +59,16 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
       paymentMethodData.bankName = bankAccount.bank_name;
       paymentMethodData.last4 = bankAccount.last4;
       paymentMethodData.accountType = bankAccount.account_type;
+    } else {
+      // Handle unknown payment method types - keep the original type
+      // Don't override the type, let it pass through
     }
 
     // Add billing details if available
-    if (paymentMethodDetails.billing_details) {
+    if (paymentMethodDetails.billing_details && 
+        (paymentMethodDetails.billing_details.name || 
+         paymentMethodDetails.billing_details.email || 
+         paymentMethodDetails.billing_details.phone)) {
       paymentMethodData.billingDetails = {
         name: paymentMethodDetails.billing_details.name,
         email: paymentMethodDetails.billing_details.email,
@@ -80,11 +86,18 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
         };
       }
     }
+    // Note: billingDetails will be undefined if not provided, which is the expected behavior
+    // Explicitly set to undefined if no billing details to prevent Mongoose from creating empty object
+    if (!paymentMethodData.billingDetails) {
+      paymentMethodData.billingDetails = undefined;
+    }
 
     // Check if this is the first payment method for the org
     const existingMethods = await PaymentMethod.countDocuments({ org: orgId });
     if (existingMethods === 0) {
       paymentMethodData.isDefault = true;
+    } else {
+      paymentMethodData.isDefault = false;
     }
 
     // Create the payment method in our database
@@ -108,7 +121,7 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
       throw new ApiError(httpStatus.BAD_REQUEST, `Invalid request: ${error.message}`);
     }
 
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error processing payment method');
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error creating payment method');
   }
 };
 
@@ -118,21 +131,14 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
  * @returns {Promise<Object>} The payment method
  */
 const getPaymentMethod = async (paymentMethodId) => {
-  // First check our database for the payment method
+  // Check our database for the payment method
   const dbPaymentMethod = await PaymentMethod.findById(paymentMethodId);
 
-  if (dbPaymentMethod) {
-    return dbPaymentMethod;
-  }
-
-  // If not found in our database, try to retrieve from Stripe directly
-  try {
-    const stripePaymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-    return stripePaymentMethod;
-  } catch (error) {
-    logger.error(`Error retrieving payment method ${paymentMethodId}:`, error);
+  if (!dbPaymentMethod) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Payment method not found');
   }
+
+  return dbPaymentMethod;
 };
 
 /**
@@ -143,7 +149,7 @@ const getPaymentMethod = async (paymentMethodId) => {
 const listPaymentMethods = async (orgId) => {
   const org = await Org.findById(orgId);
   if (!org) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
+    return []; // Return empty array instead of throwing error
   }
 
   // Return payment methods from our database
@@ -201,6 +207,11 @@ const updatePaymentMethod = async (paymentMethodId, updateBody) => {
 
     if (error.type === 'StripeInvalidRequestError') {
       throw new ApiError(httpStatus.BAD_REQUEST, `Invalid request: ${error.message}`);
+    }
+
+    // Re-throw the original error if it's already an ApiError
+    if (error instanceof ApiError) {
+      throw error;
     }
 
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error updating payment method');
@@ -272,11 +283,24 @@ const detachPaymentMethod = async (orgId, paymentMethodId) => {
 
   // Check if it's the default payment method
   if (paymentMethod.isDefault) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Cannot detach the default payment method. Set another payment method as default first.'
-    );
+    // Find another payment method to set as default
+    const otherPaymentMethod = await PaymentMethod.findOne({
+      _id: { $ne: paymentMethodId },
+      org: orgId,
+    });
+
+    if (otherPaymentMethod) {
+      // Set the other payment method as default
+      await setDefaultPaymentMethod(orgId, otherPaymentMethod._id);
+    } else {
+      // No other payment methods exist, so we can't delete the default
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Cannot detach the default payment method. Set another payment method as default first.'
+      );
+    }
   }
+
   try {
     try {
       // First detach from Stripe
@@ -308,15 +332,75 @@ const detachPaymentMethod = async (orgId, paymentMethodId) => {
     }
   } catch (error) {
     logger.error(`Error detaching payment method ${paymentMethodId}:`, error);
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error detaching payment method');
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error deleting payment method');
   }
+};
+
+/**
+ * Create a payment method (alias for attachPaymentMethod)
+ * @param {string} orgId - The organization ID
+ * @param {string} paymentMethodId - The Stripe payment method ID
+ * @returns {Promise<Object>} The created payment method
+ */
+const createPaymentMethod = async (orgId, paymentMethodId) => {
+  return attachPaymentMethod(orgId, paymentMethodId);
+};
+
+/**
+ * Get payment methods by organization (alias for listPaymentMethods)
+ * @param {string} orgId - The organization ID
+ * @returns {Promise<Array>} List of payment methods
+ */
+const getPaymentMethodsByOrg = async (orgId) => {
+  return listPaymentMethods(orgId);
+};
+
+/**
+ * Get payment method by ID (alias for getPaymentMethod)
+ * @param {string} paymentMethodId - The payment method ID
+ * @returns {Promise<Object>} The payment method
+ */
+const getPaymentMethodById = async (paymentMethodId) => {
+  return getPaymentMethod(paymentMethodId);
+};
+
+/**
+ * Delete a payment method (alias for detachPaymentMethod)
+ * @param {string} paymentMethodId - The payment method ID
+ * @returns {Promise<string>} The deleted payment method ID
+ */
+const deletePaymentMethod = async (paymentMethodId) => {
+  const paymentMethod = await PaymentMethod.findById(paymentMethodId);
+  if (!paymentMethod) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Payment method not found');
+  }
+  return detachPaymentMethod(paymentMethod.org, paymentMethodId);
+};
+
+/**
+ * Get the default payment method for an organization
+ * @param {string} orgId - The organization ID
+ * @returns {Promise<Object|null>} The default payment method or null
+ */
+const getDefaultPaymentMethod = async (orgId) => {
+  const org = await Org.findById(orgId);
+  if (!org) {
+    return null;
+  }
+  
+  return PaymentMethod.findOne({ org: orgId, isDefault: true });
 };
 
 module.exports = {
   attachPaymentMethod,
+  createPaymentMethod,
   getPaymentMethod,
+  getPaymentMethodById,
   listPaymentMethods,
+  getPaymentMethodsByOrg,
   updatePaymentMethod,
   setDefaultPaymentMethod,
   detachPaymentMethod,
+  deletePaymentMethod,
+  getDefaultPaymentMethod,
 };

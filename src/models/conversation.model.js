@@ -91,6 +91,16 @@ const conversationSchema = mongoose.Schema(
     duration: {
       type: Number,
       default: 0,
+      min: [0, 'Duration cannot be negative'],
+      validate: {
+        validator: function(v) {
+          return v >= 0;
+        },
+        message: 'Duration must be non-negative'
+      }
+      // Note: Zero-duration conversations are allowed to exist in the database
+      // but will be adjusted to minimum billable duration (30 seconds) for failed calls
+      // via the pre-save hook
     },
     // Add these fields to your conversationSchema:
 
@@ -144,7 +154,24 @@ const conversationSchema = mongoose.Schema(
 
 conversationSchema.pre('save', function (next) {
   if (this.startTime && this.endTime) {
-    this.duration = (this.endTime.getTime() - this.startTime.getTime()) / 1000; // duration in seconds
+    const calculatedDuration = (this.endTime.getTime() - this.startTime.getTime()) / 1000;
+    
+    // Billing Policy:
+    // - Successful calls (completed): Billed for actual duration
+    // - Failed calls (failed, machine, busy, no-answer): Billed minimum 30 seconds
+    // - Zero-duration calls: Adjusted to minimum 30 seconds for billing
+    // This ensures we charge for service attempts even when calls don't connect
+    if (calculatedDuration <= 0 || this.status === 'failed' || this.status === 'machine') {
+      // Set minimum billable duration for failed calls (e.g., 30 seconds)
+      this.duration = Math.max(calculatedDuration, 30); // Minimum 30 seconds for billing
+      
+      // If the calculated duration was actually 0, adjust endTime to reflect the minimum duration
+      if (calculatedDuration <= 0) {
+        this.endTime = new Date(this.startTime.getTime() + (this.duration * 1000));
+      }
+    } else {
+      this.duration = calculatedDuration;
+    }
   }
   next();
 });

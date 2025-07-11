@@ -20,7 +20,7 @@ const paymentMethodSchema = mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['card', 'bank_account', 'us_bank_account'],
+      // Allow any payment method type from Stripe, not just the ones we explicitly handle
     },
     // Card details
     brand: String,
@@ -32,17 +32,8 @@ const paymentMethodSchema = mongoose.Schema(
     accountType: String,
     // Common metadata
     billingDetails: {
-      name: String,
-      email: String,
-      phone: String,
-      address: {
-        line1: String,
-        line2: String,
-        city: String,
-        state: String,
-        postal_code: String,
-        country: String,
-      },
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined,
     },
     metadata: {
       type: Map,

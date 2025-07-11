@@ -2,6 +2,7 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const { paymentMethodService } = require('../services');
+const PaymentMethodDTO = require('../dtos/paymentMethod.dto');
 
 /**
  * Attach a payment method to an organization
@@ -10,7 +11,7 @@ const { paymentMethodService } = require('../services');
 const attachPaymentMethod = catchAsync(async (req, res) => {
   // The frontend sends the payment method ID created using Stripe.js
   const paymentMethod = await paymentMethodService.attachPaymentMethod(req.params.orgId, req.body.paymentMethodId);
-  res.status(httpStatus.CREATED).send(paymentMethod);
+  res.status(httpStatus.CREATED).send(PaymentMethodDTO(paymentMethod));
 });
 
 /**
@@ -19,7 +20,7 @@ const attachPaymentMethod = catchAsync(async (req, res) => {
  */
 const getOrgPaymentMethods = catchAsync(async (req, res) => {
   const paymentMethods = await paymentMethodService.listPaymentMethods(req.params.orgId);
-  res.send(paymentMethods);
+  res.send(paymentMethods.map(PaymentMethodDTO));
 });
 
 /**
@@ -32,7 +33,7 @@ const getPaymentMethod = catchAsync(async (req, res) => {
     res.status(httpStatus.NOT_FOUND).send();
     return;
   }
-  res.send(paymentMethod);
+  res.send(PaymentMethodDTO(paymentMethod));
 });
 
 /**
@@ -41,7 +42,7 @@ const getPaymentMethod = catchAsync(async (req, res) => {
  */
 const setDefaultPaymentMethod = catchAsync(async (req, res) => {
   const paymentMethod = await paymentMethodService.setDefaultPaymentMethod(req.params.orgId, req.params.paymentMethodId);
-  res.send(paymentMethod);
+  res.send(PaymentMethodDTO(paymentMethod));
 });
 
 /**

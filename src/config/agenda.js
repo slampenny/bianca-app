@@ -43,12 +43,26 @@ async function runSchedules() {
   });
 
   for (const schedule of schedules) {
+    // Check if today's day matches the schedule's day
     const interval = schedule.intervals.find(
       (i) => i.day === (schedule.frequency === 'weekly' ? now.getDay() : now.getDate())
     );
     if (!interval) continue;
 
-    logger.info(`Running schedule ${schedule.id}`);
+    // Check if the current time is within 1 hour of the scheduled time
+    const [scheduledHour, scheduledMinute] = schedule.time.split(':').map(Number);
+    const scheduledTime = new Date(now);
+    scheduledTime.setHours(scheduledHour, scheduledMinute, 0, 0);
+    
+    const timeDiff = Math.abs(now.getTime() - scheduledTime.getTime());
+    const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+    
+    if (timeDiff > oneHour) {
+      logger.info(`Skipping schedule ${schedule.id} - current time ${now.toLocaleTimeString()} is more than 1 hour from scheduled time ${schedule.time}`);
+      continue;
+    }
+
+    logger.info(`Running schedule ${schedule.id} for time ${schedule.time} (current time: ${now.toLocaleTimeString()})`);
 
     // Check that the schedule has a valid patient id
     if (!schedule.patient) {

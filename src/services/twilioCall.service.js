@@ -255,8 +255,22 @@ class TwilioCallService {
           break;
           
         default:
-          // Other statuses (initiated, ringing, in-progress)
-          conversation.status = CallStatus;
+          // Map Twilio statuses to our conversation statuses
+          switch (CallStatus) {
+            case 'ringing':
+              conversation.status = 'in-progress';
+              break;
+            case 'initiated':
+              conversation.status = 'initiated';
+              break;
+            case 'in-progress':
+              conversation.status = 'in-progress';
+              break;
+            default:
+              // For any other status, keep as initiated
+              conversation.status = 'initiated';
+              logger.warn(`[Twilio Service] Unknown call status: ${CallStatus}, defaulting to initiated`);
+          }
       }
       
       // Save the updated conversation

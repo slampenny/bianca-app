@@ -27,6 +27,7 @@
     "prepare": "husky install",
     "seed": "cross-env NODE_ENV=development node src/scripts/seedDatabase.js",
     "runschedules": "cross-env NODE_ENV=development node src/scripts/runSchedules.js",
+    "testcall": "cross-env NODE_ENV=production node src/scripts/testCall.js",
     "terraform:command": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest",
     "terraform:destroy": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest destroy --auto-approve",
     "terraform:taint": "docker run --rm -it -v \"$(pwd):/app\" -v \"/home/jordanlapp/.aws:/root/.aws\" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest taint",
