@@ -99,6 +99,10 @@ interface EmptyStateProps {
    * Pass any additional props directly to the Button component.
    */
   ButtonProps?: ButtonProps
+  /**
+   * Test ID for testing purposes.
+   */
+  testID?: string
 }
 
 interface EmptyStatePresetItem {
@@ -148,6 +152,7 @@ export function EmptyState(props: EmptyStateProps) {
     ContentTextProps,
     HeadingTextProps,
     ImageProps,
+    testID,
   } = props
 
   const isImagePresent = !!imageSource
@@ -183,7 +188,7 @@ export function EmptyState(props: EmptyStateProps) {
   ]
 
   return (
-    <View style={$containerStyles}>
+    <View style={$containerStyles} testID={testID}>
       {isImagePresent && <Image source={imageSource} {...ImageProps} style={$imageStyles} />}
 
       {isHeadingPresent && (

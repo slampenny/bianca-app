@@ -32,6 +32,7 @@ export const LogoutScreen = () => {
         style={styles.logoutButton}
         textStyle={styles.logoutButtonText}
         preset="filled"
+        testID="logout-button"
       />
     </Screen>
   )

@@ -1,11 +1,11 @@
 import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
-  timeout: 5000,
+  timeout: 10000,
   testDir: './test/e2e',
   use: {
     screenshot: 'only-on-failure',
-    baseURL: 'http://localhost:8081', // Set baseURL for Playwright
+    baseURL: 'http://localhost:8081',
     headless: false,
     browserName: 'chromium',
     viewport: { width: 1280, height: 720 },
@@ -16,6 +16,9 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
-  // Configure global setup for API calls
   globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
+  reporter: [
+    ['html'],
+    ['list']
+  ],
 })

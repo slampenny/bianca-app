@@ -118,7 +118,7 @@ export default function MainTabNavigator() {
         headerShown: false,
         tabBarActiveTintColor: "#3498db",
         tabBarInactiveTintColor: "#7f8c8d",
-        tabBarShowLabel: false, // Hide default labels
+        tabBarShowLabel: true, // Show labels
         tabBarIcon: ({ focused, color, size }) => {
           let iconName
 
@@ -136,14 +136,35 @@ export default function MainTabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeStack} options={{ tabBarTestID: "tab-home" }} />
-      <Tab.Screen name="Org" component={OrgStack} options={{ tabBarTestID: "tab-org" }} />
-      <Tab.Screen name="Payment" component={PaymentStack} options={{ tabBarTestID: "tab-payment" }} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeStack} 
+        options={{ 
+          tabBarLabel: "Home",
+          tabBarTestID: "tab-home" 
+        }} 
+      />
+      <Tab.Screen 
+        name="Org" 
+        component={OrgStack} 
+        options={{ 
+          tabBarLabel: "Org",
+          tabBarTestID: "tab-org" 
+        }} 
+      />
+      <Tab.Screen 
+        name="Payment" 
+        component={PaymentStack} 
+        options={{ 
+          tabBarLabel: "Payments",
+          tabBarTestID: "tab-payment" 
+        }} 
+      />
       <Tab.Screen
         name="Alert"
         component={AlertStack}
         options={{
-          tabBarLabel: "Alert",
+          tabBarLabel: "Alerts",
           tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : null,
           tabBarTestID: "tab-alert",
         }}

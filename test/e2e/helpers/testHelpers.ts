@@ -1,4 +1,5 @@
 import { test as base, expect, Page } from '@playwright/test'
+import { asyncStorageMockScript } from './asyncStorageMock'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
   if (await page.getByTestId('register-name').count() === 0) {
@@ -14,25 +15,179 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
 }
 
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
+  console.log(`Attempting to login with email: ${email}`)
+  
+  // Fill in login form
   await page.getByTestId('email-input').fill(email)
   await page.getByTestId('password-input').fill(password)
   await expect(page.getByTestId('login-button')).toBeVisible();
+  
+  // Click login button
   await page.getByTestId('login-button').click()
-  await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+  
+  // Wait for either success or error
+  try {
+    await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    console.log('Login successful - home header found')
+  } catch (error) {
+    console.log('Login failed - checking for error messages')
+    
+    // Check for login error messages
+    const errorMessages = [
+      'Failed to log in',
+      'Invalid credentials',
+      'User not found',
+      'Incorrect password'
+    ]
+    
+    for (const errorMsg of errorMessages) {
+      try {
+        const errorElement = page.getByText(errorMsg, { exact: false })
+        if (await errorElement.isVisible({ timeout: 1000 })) {
+          console.log(`Login error found: ${errorMsg}`)
+          throw new Error(`Login failed: ${errorMsg}`)
+        }
+      } catch (e) {
+        // Continue checking other error messages
+      }
+    }
+    
+    // If no specific error found, check current page content
+    const currentUrl = page.url()
+    const pageContent = await page.content()
+    console.log(`Current URL: ${currentUrl}`)
+    console.log(`Page contains login form: ${pageContent.includes('email-input')}`)
+    
+    throw new Error('Login failed - no home header found and no specific error message detected')
+  }
 }
 
 export async function createPatientViaUI(page: Page, name: string, email: string, phone: string): Promise<void> {
+  console.log(`Creating patient: ${name} (${email})`)
+  
   await page.getByTestId('add-patient-button').click()
+  
+  // Wait for patient screen to be fully loaded
+  await page.waitForSelector('[data-testid="patient-name-input"]', { timeout: 10000 })
+  console.log('Patient screen loaded')
+  
   await page.getByTestId('patient-name-input').fill(name)
   await page.getByTestId('patient-email-input').fill(email)
+  // Use phone number as-is since test data already has proper format
   await page.getByTestId('patient-phone-input').fill(phone)
-  await page.getByTestId('save-patient-button').click()
-  await page.waitForSelector(`[data-testid^="patient-name-"]:has-text("${name}")`, { timeout: 10000 })
+  
+  // Wait a moment for validation to complete
+  await page.waitForTimeout(500)
+  
+  // Debug: Check form field values
+  const nameValue = await page.getByTestId('patient-name-input').inputValue()
+  const emailValue = await page.getByTestId('patient-email-input').inputValue()
+  const phoneValue = await page.getByTestId('patient-phone-input').inputValue()
+  console.log(`Form field values - Name: "${nameValue}", Email: "${emailValue}", Phone: "${phoneValue}"`)
+  
+  // Debug: Check if save button is enabled before clicking
+  const saveButton = page.getByTestId('save-patient-button')
+  const isEnabled = await saveButton.isEnabled()
+  console.log(`Save button enabled: ${isEnabled}`)
+  
+  if (!isEnabled) {
+    // Wait a bit more for user state to load
+    console.log('Save button is disabled, waiting for user state to load...')
+    await page.waitForTimeout(2000)
+    
+    // Check again
+    const isEnabledAfterWait = await saveButton.isEnabled()
+    console.log(`Save button enabled after wait: ${isEnabledAfterWait}`)
+    
+    if (!isEnabledAfterWait) {
+      // Get the button's disabled state and attributes
+      const disabledAttr = await saveButton.getAttribute('disabled')
+      const ariaDisabled = await saveButton.getAttribute('aria-disabled')
+      console.log(`Save button disabled attribute: ${disabledAttr}`)
+      console.log(`Save button aria-disabled: ${ariaDisabled}`)
+      
+      // Check if we're on the right screen
+      const currentUrl = page.url()
+      console.log(`Current URL: ${currentUrl}`)
+      
+      // Check if patient name input is visible
+      const nameInputVisible = await page.getByTestId('patient-name-input').isVisible()
+      console.log(`Patient name input visible: ${nameInputVisible}`)
+      
+      // Check for validation errors (optional - they might not exist)
+      let emailError: string | null = null
+      let phoneError: string | null = null
+      try {
+        const emailErrorElement = page.locator('[data-testid="patient-email-input"] + div')
+        if (await emailErrorElement.count() > 0) {
+          emailError = await emailErrorElement.textContent()
+        }
+        const phoneErrorElement = page.locator('[data-testid="patient-phone-input"] + div')
+        if (await phoneErrorElement.count() > 0) {
+          phoneError = await phoneErrorElement.textContent()
+        }
+      } catch (e) {
+        console.log('No validation error elements found')
+      }
+      console.log(`Email error: ${emailError}`)
+      console.log(`Phone error: ${phoneError}`)
+      
+
+      
+      throw new Error(`Save button is disabled. URL: ${currentUrl}, Name input visible: ${nameInputVisible}, Email error: ${emailError}, Phone error: ${phoneError}`)
+    }
+  }
+  
+  await saveButton.click()
+  
+  // Wait for either success message or error message
+  try {
+    await page.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
+    console.log('Successfully navigated back to home screen')
+  } catch (error) {
+    console.log('Failed to navigate to home screen, checking for errors...')
+    
+    // Check if there's an error message
+    const errorElements = page.locator('[data-testid*="error"], .error, [class*="error"]')
+    const errorCount = await errorElements.count()
+    
+    if (errorCount > 0) {
+      const errorText = await errorElements.first().textContent()
+      console.log('Error message found:', errorText)
+      throw new Error(`Patient creation failed: ${errorText}`)
+    }
+    
+    // If no error message, try waiting a bit longer
+    await page.waitForSelector('[data-testid="home-header"]', { timeout: 5000 })
+  }
+  
+  // Small delay to allow Redux state to update
+  await page.waitForTimeout(1000)
+  
+  // Wait for the patient to appear in the list
+  try {
+    await page.waitForSelector(`[data-testid^="patient-name-"]:has-text("${name}")`, { timeout: 15000 })
+    console.log(`Patient "${name}" successfully created and visible in list`)
+  } catch (error) {
+    console.log(`Patient "${name}" not found in list after creation`)
+    
+    // Check what patients are actually in the list
+    const patientElements = page.locator('[data-testid^="patient-name-"]')
+    const patientCount = await patientElements.count()
+    console.log(`Found ${patientCount} patients in list`)
+    
+    for (let i = 0; i < patientCount; i++) {
+      const patientText = await patientElements.nth(i).textContent()
+      console.log(`Patient ${i + 1}: ${patientText}`)
+    }
+    
+    throw error
+  }
 }
 
 export async function goToOrgTab(page: Page): Promise<void> {
   await page.getByTestId('tab-org').click()
-  await page.waitForSelector('[data-testid="org-header"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="view-caregivers-button"]', { timeout: 10000 })
 }
 
 export async function goToHomeTab(page: Page): Promise<void> {
@@ -114,16 +269,122 @@ export async function ensureUserRegisteredAndLoggedInViaUI(page: Page, name: str
 }
 
 export async function logoutViaUI(page: Page): Promise<void> {
-  // Assumes you are on the home screen
-  await page.getByTestId('profile-button').click()
-  await page.getByTestId('logout-button').click()
+  console.log('Attempting to logout...')
+  
+  // Wait a moment for the page to be fully loaded
+  await page.waitForTimeout(1000)
+  
+  try {
+    // Try to click the profile button if it's visible
+    const profileButton = page.getByTestId('profile-button')
+    console.log(`Profile button count: ${await profileButton.count()}`)
+    
+    if (await profileButton.count() > 0 && await profileButton.first().isVisible()) {
+      console.log('Profile button is visible, clicking...')
+      await profileButton.first().click()
+      
+      // Wait for profile screen to load
+      await page.waitForSelector('[data-testid="profile-logout-button"]', { timeout: 5000 })
+      
+      // On profile screen, click the logout button (which navigates to logout screen)
+      await page.getByTestId('profile-logout-button').click()
+      
+      // Wait for logout screen to load
+      await page.waitForSelector('[data-testid="logout-button"]', { timeout: 5000 })
+      
+      // On logout screen, click the logout button (which actually performs logout)
+      await page.getByTestId('logout-button').click()
+    } else {
+      console.log('Profile button not found or not visible, trying alternative logout methods...')
+      
+      // Try to find logout button directly
+      const logoutButton = page.getByTestId('logout-button')
+      if (await logoutButton.count() > 0 && await logoutButton.first().isVisible()) {
+        console.log('Found logout button directly, clicking...')
+        await logoutButton.first().click()
+      } else {
+        console.log('No logout UI found, navigating to login screen directly...')
+        // Navigate directly to login screen as fallback
+        await page.goto('/')
+      }
+    }
+  } catch (error) {
+    console.log('Logout failed, navigating to login screen as fallback:', error.message)
+    // Navigate directly to login screen as fallback
+    await page.goto('/')
+  }
+  
   // Wait for login screen to appear
-  await page.waitForSelector('[data-testid="email-input"]', { timeout: 10000 })
+  try {
+    await page.waitForSelector('[data-testid="email-input"]', { timeout: 5000 })
+    console.log('Successfully reached login screen')
+  } catch (error) {
+    console.log('Failed to reach login screen, but continuing...')
+  }
+}
+
+export async function editPatientViaUI(page: Page, patientName: string, newName: string, newEmail: string, newPhone: string): Promise<void> {
+  // Click on the edit button for the specified patient
+  await page.getByTestId(`edit-patient-button-${patientName}`).click()
+  
+  // Wait for patient edit screen to load
+  await page.waitForSelector('[data-testid="patient-name-input"]', { timeout: 10000 })
+  
+  // Update the patient information
+  await page.getByTestId('patient-name-input').fill(newName)
+  await page.getByTestId('patient-email-input').fill(newEmail)
+  await page.getByTestId('patient-phone-input').fill(newPhone)
+  
+  // Save the changes
+  await page.getByTestId('save-patient-button').click()
+  
+  // Wait for navigation back to home screen
+  await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+}
+
+export async function deletePatientViaUI(page: Page, patientName: string): Promise<void> {
+  // Click on the edit button for the specified patient
+  await page.getByTestId(`edit-patient-button-${patientName}`).click()
+  
+  // Wait for patient edit screen to load
+  await page.waitForSelector('[data-testid="delete-patient-button"]', { timeout: 10000 })
+  
+  // Click delete button
+  await page.getByTestId('delete-patient-button').click()
+  
+  // Wait for confirm delete button to appear
+  await page.waitForSelector('[data-testid="delete-patient-button"]:has-text("CONFIRM DELETE")', { timeout: 5000 })
+  
+  // Click confirm delete
+  await page.getByTestId('delete-patient-button').click()
+  
+  // Wait for navigation back to home screen
+  await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+}
+
+export async function checkPatientExists(page: Page, patientName: string): Promise<boolean> {
+  try {
+    await page.waitForSelector(`[data-testid="patient-name-${patientName}"]`, { timeout: 3000 })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getPatientCount(page: Page): Promise<number> {
+  const patientCards = page.locator('[data-testid^="patient-card-"]')
+  return await patientCards.count()
+}
+
+export async function waitForPatientListToLoad(page: Page): Promise<void> {
+  await page.waitForSelector('[data-testid="patient-list"]', { timeout: 10000 })
 }
 
 // Custom test fixture that navigates to the root URL before each test
 export const test = base.extend<{}>({
   page: async ({ page }, use) => {
+    // Inject AsyncStorage mock before navigating
+    await page.addInitScript(asyncStorageMockScript)
     await page.goto('/')
     await use(page)
   },

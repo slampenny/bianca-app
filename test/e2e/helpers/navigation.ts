@@ -1,4 +1,6 @@
 import { Page, expect } from "@playwright/test"
+import { loginUserViaUI } from "./testHelpers"
+import { TEST_USERS } from "../fixtures/testData"
 
 export async function navigateToRegister(page: Page) {
   await page.goto("/")
@@ -6,9 +8,10 @@ export async function navigateToRegister(page: Page) {
   await expect(page.getByTestId("register-name")).toBeVisible()
 }
 
-export async function navigateToHome(page: Page) {
+export async function navigateToHome(page: Page, user?: { email: string; password: string }) {
   await page.goto("/")
-  await page.getByTestId("login-button").click()
+  const testUser = user || TEST_USERS.WITHOUT_PATIENTS;
+  await loginUserViaUI(page, testUser.email, testUser.password);
   await isHomeScreen(page)
 }
 
@@ -27,8 +30,14 @@ export async function isHomeScreen(page: Page) {
 
 export async function isPatientScreen(page: Page) {
   console.log("Checking if on Patient Screen...")
-  await expect(page.locator("text=Patient")).toBeVisible({ timeout: 10000 })
-  console.log("Confirmed on Patient Screen.")
+  // Look for either CREATE PATIENT or UPDATE PATIENT button which is specific to the patient screen
+  try {
+    await expect(page.getByText("CREATE PATIENT")).toBeVisible({ timeout: 5000 })
+    console.log("Confirmed on Patient Screen (Create mode).")
+  } catch {
+    await expect(page.getByText("UPDATE PATIENT")).toBeVisible({ timeout: 5000 })
+    console.log("Confirmed on Patient Screen (Update mode).")
+  }
 }
 
 export async function isNotAuthorizedScreen(page: Page) {

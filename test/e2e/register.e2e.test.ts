@@ -1,8 +1,13 @@
 import { test } from './helpers/testHelpers'
 import { expect } from '@playwright/test'
 import { navigateToRegister, isLoginScreen, isHomeScreen } from "./helpers/navigation"
+import { generateRegistrationData } from './fixtures/testData'
 
 test.describe("Register Screen", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await navigateToRegister(page)
+  })
 
   test("can fill in all fields", async ({ page }) => {
     await page.getByTestId("register-name").fill("Jordan Lapp")
@@ -80,25 +85,20 @@ test.describe("Register Screen", () => {
   })
 
   test("shows success message after valid submission", async ({ page }) => {
-
-    // await page.route(REGISTER_API_URL, async route => {
-    //   console.log(`Intercepted ${route.request().method()} ${route.request().url()} for success`);
-    //   await route.fulfill({
-    //     status: 200,
-    //     contentType: 'application/json',
-        
-    //     // Adjust body if your API/hook expects specific success data
-    //     body: JSON.stringify({ message: "Registration successful", userId: "123" }),
-    //   });
-    // });
-    const uniqueEmail = `valid_success_${Date.now()}@example.org`;
-    await page.getByTestId("register-name").fill("Valid User")
-    await page.getByTestId("register-email").fill(uniqueEmail)
-    await page.getByTestId("register-password").fill("StrongPass!1")
-    await page.getByTestId("register-confirm-password").fill("StrongPass!1")
-    await page.getByTestId("register-phone").fill("1234567890")
+    const registrationData = generateRegistrationData();
+    
+    // Ensure we're registering as an individual (not organization)
+    await page.getByTestId("register-individual-toggle").click();
+    
+    await page.getByTestId("register-name").fill(registrationData.name)
+    await page.getByTestId("register-email").fill(registrationData.email)
+    await page.getByTestId("register-password").fill(registrationData.password)
+    await page.getByTestId("register-confirm-password").fill(registrationData.confirmPassword)
+    await page.getByTestId("register-phone").fill(registrationData.phone)
 
     await page.getByTestId("register-submit").click()
+    
+    // Wait for successful registration and navigation to home screen
     await isHomeScreen(page);
   })
 

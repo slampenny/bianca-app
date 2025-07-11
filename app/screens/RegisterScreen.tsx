@@ -73,7 +73,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   const validatePassword = (password: string) =>
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(password)
-  const validatePhone = (phone: string) => /^\d{10,}$/.test(phone)
+  const validatePhone = (phone: string) => /^(\+1\d{10}|\d{10,})$/.test(phone)
 
   // Validate all inputs and set appropriate error messages
   const validateInputs = () => {
@@ -116,7 +116,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
     // Phone validation
     if (!validatePhone(phone)) {
-      setPhoneError("Phone number must contain at least 10 digits")
+      setPhoneError("Phone number must contain at least 10 digits or use +1XXXXXXXXXX format")
       isValid = false
     }
 

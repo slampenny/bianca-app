@@ -43,10 +43,13 @@ export function CaregiversScreen() {
     const isInvited = (item.role as string) === "invited"
     
     return (
-      <View style={[
-        styles.caregiverCard,
-        isInvited && styles.invitedCaregiverCard
-      ]}>
+      <View 
+        style={[
+          styles.caregiverCard,
+          isInvited && styles.invitedCaregiverCard
+        ]}
+        testID="caregiver-card"
+      >
         <View style={styles.caregiverInfo}>
           <AutoImage source={{ uri: item.avatar || "https://www.gravatar.com/avatar/?d=mp" }} style={styles.avatar} />
           <View style={styles.infoTextContainer}>
@@ -70,6 +73,7 @@ export function CaregiversScreen() {
           ]}
           onPress={() => handleCaregiverPress(item)}
           android_ripple={{ color: colors.palette.biancaButtonSelected }}
+          testID="edit-caregiver-button"
         >
           <Text style={styles.editButtonText}>Edit</Text>
         </Pressable>
@@ -103,7 +107,7 @@ export function CaregiversScreen() {
         ListEmptyComponent={ListEmpty}
       />
 
-      <Pressable style={styles.addButton} onPress={handleAddCaregiver}>
+      <Pressable style={styles.addButton} onPress={handleAddCaregiver} testID="add-caregiver-button">
         <Text style={styles.addButtonText}>Add Caregiver</Text>
       </Pressable>
     </View>

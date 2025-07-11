@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react" // Added useRef
 import {
   Text,
-  TextInput,
   ScrollView,
   Pressable,
   StyleSheet,
@@ -11,9 +10,11 @@ import {
 } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
+import { CaregiverAssignmentModal } from "../components/CaregiverAssignmentModal"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { getPatient, setPatient } from "../store/patientSlice"
+import { getCurrentUser } from "../store/authSlice"
 import {
   useCreatePatientMutation,
   useUpdatePatientMutation,
@@ -22,6 +23,7 @@ import {
 } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { colors } from "app/theme/colors"
+import { Button, TextField } from "app/components"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
@@ -59,9 +61,19 @@ function PatientScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [apiError, setApiError] = useState("") // Consolidated API error state
+  const [showCaregiverModal, setShowCaregiverModal] = useState(false)
 
   // Ref to store the timeout ID
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Get current user for role-based access control
+  const currentUser = useSelector(getCurrentUser)
+  
+  // Check if user has permission to create or edit patients
+  const canCreateOrEditPatient = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
+  
+  // Check if user has permission to manage caregivers
+  const canManageCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
 
   // --- RTK Query Hooks ---
   const [updatePatient, { isLoading: isUpdating, error: updateError }] = useUpdatePatientMutation()
@@ -144,8 +156,9 @@ function PatientScreen() {
 
   const validatePhone = (input: string) => {
     setPhone(input)
-    const phoneRegex = /^\d{10}$/ // Assuming 10 digit US/Canada format
-    setPhoneError(phoneRegex.test(input) ? "" : "Invalid phone format (10 digits)")
+    // Accept international format with +1 country code and 10 digits, or just 10 digits
+    const phoneRegex = /^(\+1\d{10}|\d{10})$/
+    setPhoneError(phoneRegex.test(input) ? "" : "Invalid phone format (10 digits or +1XXXXXXXXXX)")
     clearMessages() // Clear success/api errors on input change
   }
 
@@ -244,7 +257,10 @@ function PatientScreen() {
         const result = await updatePatient(updatedPatientData).unwrap()
         dispatch(setPatient(result)) // Update Redux with the final patient data
         setSuccessMessage("Patient updated successfully!") // Show success message
-        // DO NOT NAVIGATE AWAY
+        // Navigate back to home screen after successful update
+        setTimeout(() => {
+          navigation.navigate("Home")
+        }, 500) // Reduced timeout to 500ms
       } else {
         // --- New patient creation flow ---
 
@@ -292,7 +308,10 @@ function PatientScreen() {
         // 4. Update Redux with the final patient data (either with or without uploaded avatar)
         dispatch(setPatient(finalPatient))
         setSuccessMessage("Patient created successfully!") // Show success message
-        // DO NOT NAVIGATE AWAY
+        // Navigate back to home screen after successful creation
+        setTimeout(() => {
+          navigation.navigate("Home")
+        }, 500) // Reduced timeout to 500ms
       }
     } catch (error) {
       // Errors from createPatient or updatePatient are caught here
@@ -336,108 +355,145 @@ function PatientScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      keyboardShouldPersistTaps="handled"
-    >
-      {/* Display API Errors */}
-      {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Display API Errors */}
+        {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
 
-      {/* Display Success Message */}
-      {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+        {/* Display Success Message */}
+        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
-      <View style={styles.formCard}>
-        <AvatarPicker
-          // Use local avatar state which defaults correctly
-          initialAvatar={avatar}
-          onAvatarChanged={handleAvatarChange}
-        />
+        <View style={styles.formCard}>
+          <AvatarPicker
+            // Use local avatar state which defaults correctly
+            initialAvatar={avatar}
+            onAvatarChanged={handleAvatarChange}
+          />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Name *"
-          placeholderTextColor={colors.palette.neutral600}
-          value={name}
-          onChangeText={handleNameChange}
-          onFocus={clearMessages}
-          testID="patient-name-input"
-        />
-        {/* Consider adding a Name validation error if needed */}
+          <TextField
+            label="Name *"
+            placeholder="Enter patient name"
+            value={name}
+            onChangeText={handleNameChange}
+            onFocus={clearMessages}
+            testID="patient-name-input"
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
+            style={styles.input}
+          />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email *"
-          placeholderTextColor={colors.palette.neutral600}
-          value={email}
-          onChangeText={validateEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          onFocus={clearMessages}
-          testID="patient-email-input"
-        />
-        {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
+          <TextField
+            label="Email *"
+            placeholder="Enter email address"
+            value={email}
+            onChangeText={validateEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            onFocus={clearMessages}
+            testID="patient-email-input"
+            status={emailError ? "error" : undefined}
+            helper={emailError || undefined}
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
+            style={styles.input}
+          />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Phone *"
-          placeholderTextColor={colors.palette.neutral600}
-          value={phone}
-          onChangeText={validatePhone}
-          keyboardType="phone-pad"
-          onFocus={clearMessages}
-          testID="patient-phone-input"
-        />
-        {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
+          <TextField
+            label="Phone *"
+            placeholder="Enter phone number"
+            value={phone}
+            onChangeText={validatePhone}
+            keyboardType="phone-pad"
+            onFocus={clearMessages}
+            testID="patient-phone-input"
+            status={phoneError ? "error" : undefined}
+            helper={phoneError || undefined}
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
+            style={styles.input}
+          />
 
-        {/* --- Action Buttons --- */}
-        <Pressable
-          style={[
-            styles.button,
-            styles.saveButton,
-            (!name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined,
-          ]}
-          onPress={handleSave}
-          disabled={!name || !email || !phone || !!emailError || !!phoneError || isLoading}
-          testID="save-patient-button"
-        >
-          <Text style={styles.buttonText}>
-            {patient && patient.id ? "UPDATE PATIENT" : "CREATE PATIENT"}
-          </Text>
-        </Pressable>
+          {/* --- Action Buttons --- */}
+          <Button
+            text={patient && patient.id ? "UPDATE PATIENT" : "CREATE PATIENT"}
+            onPress={handleSave}
+            disabled={
+              !canCreateOrEditPatient ||
+              !name ||
+              !email ||
+              !phone ||
+              !!emailError ||
+              !!phoneError ||
+              isLoading
+            }
+            testID="save-patient-button"
+            style={[styles.button, styles.saveButton, (!canCreateOrEditPatient || !name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined]}
+            textStyle={styles.buttonText}
+            preset="filled"
+          />
 
-        {/* Show Delete, Schedules, Conversations only for existing patients */}
-        {patient && patient.id && (
-          <>
-            <Pressable
-              style={[styles.button, styles.manageButton]}
-              onPress={handleManageSchedules}
-              disabled={isLoading} // Disable while loading
-            >
-              <Text style={styles.buttonText}>MANAGE SCHEDULES</Text>
-            </Pressable>
+          {/* Show Delete, Schedules, Conversations only for existing patients */}
+          {patient && patient.id && (
+            <>
+              <Button
+                text="MANAGE SCHEDULES"
+                onPress={handleManageSchedules}
+                disabled={isLoading} // Disable while loading
+                testID="manage-schedules-button"
+                style={[styles.button, styles.manageButton]}
+                textStyle={styles.buttonText}
+                preset="filled"
+              />
 
-            <Pressable
-              style={[styles.button, styles.manageButton]}
-              onPress={handleManageConversations}
-              disabled={isLoading} // Disable while loading
-            >
-              <Text style={styles.buttonText}>MANAGE CONVERSATIONS</Text>
-            </Pressable>
+              <Button
+                text="MANAGE CONVERSATIONS"
+                onPress={handleManageConversations}
+                disabled={isLoading} // Disable while loading
+                testID="manage-conversations-button"
+                style={[styles.button, styles.manageButton]}
+                textStyle={styles.buttonText}
+                preset="filled"
+              />
 
-            <Pressable
-              style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
+                          {canManageCaregivers && (
+              <Button
+                text="MANAGE CAREGIVERS"
+                onPress={() => setShowCaregiverModal(true)}
+                disabled={isLoading} // Disable while loading
+                testID="manage-caregivers-button"
+                style={[styles.button, styles.manageButton]}
+                textStyle={styles.buttonText}
+                preset="filled"
+              />
+            )}
+
+              <Button
+              text={confirmDelete ? "CONFIRM DELETE" : "DELETE PATIENT"}
               onPress={handleDelete}
-              disabled={isLoading} // Disable while loading
-            >
-              <Text style={styles.buttonText}>
-                {confirmDelete ? "CONFIRM DELETE" : "DELETE PATIENT"}
-              </Text>
-            </Pressable>
-          </>
-        )}
-      </View>
-    </ScrollView>
+              disabled={isLoading}
+              testID="delete-patient-button"
+              style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
+              textStyle={styles.buttonText}
+              preset="filled"
+            />
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Caregiver Assignment Modal */}
+      {patient && patient.id && (
+        <CaregiverAssignmentModal
+          patient={patient}
+          isVisible={showCaregiverModal}
+          onClose={() => setShowCaregiverModal(false)}
+        />
+      )}
+    </>
   )
 }
 
@@ -513,6 +569,12 @@ const styles = StyleSheet.create({
     color: colors.palette.biancaHeader,
     backgroundColor: colors.palette.neutral200, // Very light background for input
   },
+  inputContainer: {
+    marginBottom: 15, // Increased margin between fields
+  },
+  inputWrapper: {
+    // Add any specific styles for the input wrapper if needed
+  },
   manageButton: {
     backgroundColor: colors.palette.secondary500, // Muted purple for manage buttons
   },
@@ -527,6 +589,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     backgroundColor: colors.palette.biancaSuccessBackground, // Light green background
+
     padding: 10,
     borderRadius: 4,
     borderWidth: 1,

@@ -1,4 +1,3 @@
-/*
 import { test, expect } from '@playwright/test'
 import {
   ensureUserRegisteredAndLoggedInViaUI,
@@ -11,7 +10,7 @@ import {
 import { registerNewAlert, registerNewOrgAndCaregiver } from '../helpers'
 import { newAlert } from '../fixtures/alert.fixture'
 
-test.describe.skip('AlertScreen E2E Tests', () => {
+test.describe('AlertScreen E2E Tests', () => {
   const testEmail = `test-${Date.now()}@example.com`
   const testPassword = 'TestPassword123!'
   const testName = 'Test Caregiver'
@@ -61,4 +60,3 @@ test.describe.skip('AlertScreen E2E Tests', () => {
     await expect(page.getByTestId('alert-empty-state')).toBeVisible()
   })
 })
-*/ 

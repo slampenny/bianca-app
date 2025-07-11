@@ -48,13 +48,38 @@ export const patientSlice = createSlice({
     builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state, { payload }) => {
       console.log("createPatient matchFulfilled:", payload)
       state.patient = payload
+      
+      // Add the patient to all caregivers' patient lists
       if (state.patient && state.patient.caregivers) {
         state.patient.caregivers.forEach((caregiverId: string) => {
           if (!state.patients[caregiverId]) {
             state.patients[caregiverId] = []
           }
-          state.patients[caregiverId].push(payload)
+          // Check if patient already exists to avoid duplicates
+          const existingIndex = state.patients[caregiverId].findIndex(p => p.id === payload.id)
+          if (existingIndex === -1) {
+            state.patients[caregiverId].push(payload)
+          }
         })
+      }
+      
+      // Also add to the current user's patient list if not already there
+      // This is a fallback in case the caregivers array is not populated
+      const currentUser = (state as any).auth?.user
+      if (currentUser && currentUser.id) {
+        console.log(`Adding patient to current user's list: ${currentUser.id}`)
+        if (!state.patients[currentUser.id]) {
+          state.patients[currentUser.id] = []
+        }
+        const existingIndex = state.patients[currentUser.id].findIndex(p => p.id === payload.id)
+        if (existingIndex === -1) {
+          state.patients[currentUser.id].push(payload)
+          console.log(`Patient added to user ${currentUser.id}'s list. Total patients: ${state.patients[currentUser.id].length}`)
+        } else {
+          console.log(`Patient already exists in user ${currentUser.id}'s list`)
+        }
+      } else {
+        console.log('No current user found in auth state')
       }
     })
     builder.addMatcher(patientApi.endpoints.updatePatient.matchFulfilled, (state, { payload }) => {

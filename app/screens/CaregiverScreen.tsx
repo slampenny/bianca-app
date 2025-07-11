@@ -14,7 +14,8 @@ import {
 } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
-import { LoadingButton } from "app/components"
+import { LoadingButton, Button } from "app/components"
+import { PatientReassignmentModal } from "../components/PatientReassignmentModal"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver, clearCaregiver } from "../store/caregiverSlice"
@@ -70,6 +71,10 @@ function CaregiverScreen() {
   const [selectedPatients, setSelectedPatients] = useState<string[]>([])
   const [assignmentSuccess, setAssignmentSuccess] = useState(false)
   
+  // State for patient reassignment modal
+  const [showReassignmentModal, setShowReassignmentModal] = useState(false)
+  const [patientsToReassign, setPatientsToReassign] = useState<any[]>([])
+  
   // Animation for the panel
   const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current
 
@@ -101,9 +106,10 @@ function CaregiverScreen() {
 
   const validatePhone = (phone: string) => {
     setPhone(phone)
-    const phoneRegex = /^\d{10}$/
+    // Accept international format with +1 country code or 10 digits
+    const phoneRegex = /^(\+1\d{10}|\d{10})$/
     if (!phoneRegex.test(phone)) {
-      setPhoneError("Invalid phone format")
+      setPhoneError("Invalid phone format (10 digits or +1XXXXXXXXXX)")
     } else {
       setPhoneError("")
     }
@@ -111,18 +117,49 @@ function CaregiverScreen() {
 
   const handleDelete = () => {
     if (confirmDelete && caregiver && caregiver.id) {
-      deleteCaregiver({ id: caregiver.id })
-        .unwrap()
-        .then(() => {
-          dispatch(clearCaregiver())
-          navigation.navigate("Caregivers")
-        })
+      // Check if the caregiver has patients
+      if (caregiver.patients && caregiver.patients.length > 0) {
+        // Show reassignment modal
+        setPatientsToReassign(caregiver.patients)
+        setShowReassignmentModal(true)
+        setConfirmDelete(false)
+      } else {
+        // No patients to reassign, proceed with deletion
+        deleteCaregiver({ id: caregiver.id })
+          .unwrap()
+          .then(() => {
+            dispatch(clearCaregiver())
+            navigation.navigate("Caregivers")
+          })
+      }
     } else {
       setConfirmDelete(true)
     }
   }
 
   const handleCancelDelete = () => {
+    setConfirmDelete(false)
+  }
+
+  const handleReassignmentComplete = () => {
+    // Close the reassignment modal
+    setShowReassignmentModal(false)
+    setPatientsToReassign([])
+    
+    // Now proceed with caregiver deletion
+    if (caregiver && caregiver.id) {
+      deleteCaregiver({ id: caregiver.id })
+        .unwrap()
+        .then(() => {
+          dispatch(clearCaregiver())
+          navigation.navigate("Caregivers")
+        })
+    }
+  }
+
+  const handleReassignmentCancel = () => {
+    setShowReassignmentModal(false)
+    setPatientsToReassign([])
     setConfirmDelete(false)
   }
 
@@ -313,6 +350,7 @@ function CaregiverScreen() {
             placeholderTextColor="#7f8c8d"
             value={name}
             onChangeText={setName}
+            testID="caregiver-name-input"
           />
           <TextInput
             style={styles.input}
@@ -320,6 +358,9 @@ function CaregiverScreen() {
             placeholderTextColor="#7f8c8d"
             value={email}
             onChangeText={validateEmail}
+            testID="caregiver-email-input"
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
           {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
           <TextInput
@@ -328,48 +369,55 @@ function CaregiverScreen() {
             placeholderTextColor="#7f8c8d"
             value={phone}
             onChangeText={validatePhone}
+            testID="caregiver-phone-input"
+            keyboardType="phone-pad"
           />
           {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
-          <LoadingButton
-            title={caregiver && caregiver.id ? "SAVE" : "INVITE"}
+          <Button
+            text={caregiver && caregiver.id ? "SAVE" : "INVITE"}
             onPress={handleSave}
-            loading={isUpdating || isInviting}
-            disabled={!email || !phone || !!emailError || !!phoneError}
-            style={{
-              ...styles.button,
-              ...((!email || !phone || emailError || phoneError) && styles.buttonDisabled),
-            }}
-            loadingText={caregiver && caregiver.id ? "SAVING..." : "SENDING INVITE..."}
-            testID="caregiver-invite-button"
-            spinnerTestID="caregiver-invite-spinner"
+            disabled={!email || !phone || !!emailError || !!phoneError || isUpdating || isInviting}
+            testID="caregiver-save-button"
+            style={[
+              styles.button,
+              (!email || !phone || emailError || phoneError || isUpdating || isInviting) ? styles.buttonDisabled : undefined
+            ]}
+            textStyle={styles.buttonText}
+            preset="filled"
           />
 
           {caregiver && caregiver.id && (
-            <Pressable
+            <Button
+              text={confirmDelete ? "CONFIRM DELETE" : "DELETE CAREGIVER"}
+              onPress={handleDelete}
+              disabled={isDeleting}
+              testID="delete-caregiver-button"
               style={[
                 styles.button,
                 styles.deleteButton,
-                (!caregiver || !caregiver.id) ? styles.buttonDisabled : undefined,
+                isDeleting ? styles.buttonDisabled : undefined
               ]}
-              onPress={handleDelete}
-              disabled={!caregiver || !caregiver.id}
-            >
-              <Text style={styles.buttonText}>{confirmDelete ? "CONFIRM DELETE" : "DELETE"}</Text>
-            </Pressable>
+              textStyle={styles.buttonText}
+              preset="filled"
+            />
           )}
 
           {/* Assign Unassigned Patients Button - Only show for orgAdmins */}
           {caregiver && caregiver.id && currentUser?.role === 'orgAdmin' && (
-            <Pressable
-              style={[styles.button, styles.assignButton]}
+            <Button
+              text="Assign Unassigned Patients"
               onPress={handleAssignUnassignedPatients}
               disabled={isLoadingUnassigned}
-            >
-              <Text style={styles.buttonText}>
-                {isLoadingUnassigned ? "Loading..." : "Assign Unassigned Patients"}
-              </Text>
-            </Pressable>
+              testID="assign-unassigned-patients-button"
+              style={[
+                styles.button,
+                styles.assignButton,
+                isLoadingUnassigned ? styles.buttonDisabled : undefined
+              ]}
+              textStyle={styles.buttonText}
+              preset="filled"
+            />
           )}
         </View>
 
@@ -387,7 +435,7 @@ function CaregiverScreen() {
               style={styles.panelBackdrop} 
               onPress={closeUnassignedPanel}
             />
-            <View style={styles.panelContent}>
+            <View style={styles.panelContent} testID="assign-unassigned-patients-modal">
               <View style={styles.panelHeader}>
                 <Text style={styles.panelTitle}>Assign Unassigned Patients</Text>
                 <Pressable
@@ -399,26 +447,30 @@ function CaregiverScreen() {
               </View>
               
               {isLoadingUnassigned ? (
-                <Text style={styles.loadingText}>Loading unassigned patients...</Text>
+                <Text style={styles.loadingText} testID="unassigned-patients-loading">Loading unassigned patients...</Text>
               ) : isAssigning ? (
                 <Text style={styles.loadingText}>Assigning patients...</Text>
               ) : assignmentSuccess ? (
-                <Text style={styles.successText}>Patients assigned successfully!</Text>
+                <Text style={styles.successText} testID="patients-assigned-success-message">Patients assigned successfully!</Text>
               ) : unassignedPatients && unassignedPatients.length > 0 ? (
                 <>
                   <View style={styles.selectionControls}>
-                    <Pressable
-                      style={styles.selectionButton}
+                    <Button
+                      text="Select All"
                       onPress={handleSelectAll}
-                    >
-                      <Text style={styles.selectionButtonText}>Select All</Text>
-                    </Pressable>
-                    <Pressable
+                      testID="select-all-patients-button"
                       style={styles.selectionButton}
+                      textStyle={styles.selectionButtonText}
+                      preset="default"
+                    />
+                    <Button
+                      text="Deselect All"
                       onPress={handleDeselectAll}
-                    >
-                      <Text style={styles.selectionButtonText}>Deselect All</Text>
-                    </Pressable>
+                      testID="deselect-all-patients-button"
+                      style={styles.selectionButton}
+                      textStyle={styles.selectionButtonText}
+                      preset="default"
+                    />
                   </View>
                   
                   <FlatList
@@ -431,6 +483,7 @@ function CaregiverScreen() {
                           selectedPatients.includes(item.id || '') && styles.selectedPatientItem
                         ]}
                         onPress={() => handlePatientSelection(item.id || '')}
+                        testID={`unassigned-patient-item-${item.name}`}
                       >
                         <Text style={styles.patientName}>{item.name}</Text>
                         <Text style={styles.patientEmail}>{item.email}</Text>
@@ -443,35 +496,48 @@ function CaregiverScreen() {
                   />
                   
                   <View style={styles.panelButtons}>
-                    <Pressable
+                    <Button
+                      text="Assign Selected"
+                      onPress={handleAssignSelectedPatients}
+                      disabled={selectedPatients.length === 0 || isAssigning}
+                      testID="assign-selected-patients-button"
                       style={[
                         styles.panelButton,
                         styles.assignButton,
-                        (selectedPatients.length === 0 || isAssigning) && styles.buttonDisabled
+                        (selectedPatients.length === 0 || isAssigning) ? styles.buttonDisabled : undefined
                       ]}
-                      onPress={handleAssignSelectedPatients}
-                      disabled={selectedPatients.length === 0 || isAssigning}
-                    >
-                      <Text style={styles.panelButtonText}>
-                        {isAssigning ? "Assigning..." : `Assign Selected (${selectedPatients.length})`}
-                      </Text>
-                    </Pressable>
+                      textStyle={styles.panelButtonText}
+                      preset="filled"
+                    />
                     
-                    <Pressable
-                      style={[styles.panelButton, styles.cancelButton]}
+                    <Button
+                      text="Cancel"
                       onPress={closeUnassignedPanel}
-                    >
-                      <Text style={styles.panelButtonText}>Cancel</Text>
-                    </Pressable>
+                      testID="cancel-unassigned-panel-button"
+                      style={[styles.panelButton, styles.cancelButton]}
+                      textStyle={styles.panelButtonText}
+                      preset="filled"
+                    />
                   </View>
                 </>
               ) : (
-                <Text style={styles.noPatientsText}>No unassigned patients found.</Text>
+                <Text style={styles.noPatientsText} testID="no-unassigned-patients-message">No unassigned patients found.</Text>
               )}
             </View>
           </Animated.View>
         )}
       </ScrollView>
+
+      {/* Patient Reassignment Modal */}
+      {currentOrg && (
+        <PatientReassignmentModal
+          patients={patientsToReassign}
+          isVisible={showReassignmentModal}
+          onClose={handleReassignmentCancel}
+          onComplete={handleReassignmentComplete}
+          orgId={currentOrg.id!}
+        />
+      )}
     </TouchableWithoutFeedback>
   )
 }
@@ -519,6 +585,17 @@ const styles = StyleSheet.create({
     height: 45,
     marginBottom: 15,
     paddingHorizontal: 10,
+  },
+  inputContainer: {
+    marginBottom: 15,
+  },
+  inputWrapper: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral300,
+    backgroundColor: colors.palette.neutral100,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   loadingText: {
     marginBottom: 10,

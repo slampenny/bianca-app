@@ -20,6 +20,7 @@ const ProfileButton: React.FC = () => {
       testID="profile-button"
       accessibilityLabel="profile-button"
       data-testid="profile-button"
+      accessibilityRole="button"
     >
       <AutoImage
         source={currentUser?.avatar ? { uri: currentUser.avatar } : { uri: defaultAvatarUrl }}

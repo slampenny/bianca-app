@@ -23,7 +23,7 @@ const BaseConfig: ConfigBaseProps = {
    */
   exitRoutes: ["MainTabsWithDrawer"],
 
-  paymentMethodGatewayUrl: "https://myphonefriend.com/payment-method",
+  paymentMethodGatewayUrl: "https://api.myphonefriend.com/payment-method",
 }
 
 export default BaseConfig

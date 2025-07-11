@@ -65,9 +65,10 @@ function ProfileScreen() {
 
   const validatePhone = (phone: string) => {
     setPhone(phone)
-    const phoneRegex = /^\d{10}$/
+    // Accept international format with +1 country code or 10 digits
+    const phoneRegex = /^(\+1\d{10}|\d{10})$/
     if (!phoneRegex.test(phone)) {
-      setPhoneError("Invalid phone format")
+      setPhoneError("Invalid phone format (10 digits or +1XXXXXXXXXX)")
     } else {
       setPhoneError("")
     }
@@ -195,7 +196,7 @@ function ProfileScreen() {
             <Text style={styles.buttonText}>UPDATE PROFILE</Text>
           </Pressable>
 
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+          <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button">
             <Text style={styles.buttonText}>LOGOUT</Text>
           </Pressable>
 

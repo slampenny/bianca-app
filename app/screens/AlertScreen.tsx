@@ -152,7 +152,7 @@ export function AlertScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="alert-header">
       <View style={styles.contentContainer}>
         <View style={styles.tabRow}>
           <Button
@@ -181,7 +181,7 @@ export function AlertScreen() {
         )}
 
         {filteredAlerts.length === 0 ? (
-          <EmptyState style={styles.emptyState} content="No alerts" heading="So empty... so sad" />
+          <EmptyState style={styles.emptyState} content="No alerts" heading="So empty... so sad" testID="alert-empty-state" />
         ) : (
           <FlatList
             data={filteredAlerts}
