@@ -9,14 +9,14 @@ const { Caregiver } = require('../../src/models');
 const tokenService = require('../../src/services/token.service');
 const { tokenTypes } = require('../../src/config/tokens');
 
-const password = 'password1';
+const password = 'Password1';
 const salt = bcrypt.genSaltSync(8);
 const hashedPassword = bcrypt.hashSync(password, salt);
 
 const fakeId = new mongoose.Types.ObjectId();
 
 const caregiverOne = {
-  name: faker.name.findName(),
+  name: 'Test User',
   email: 'fake@example.org',
   phone: '+16045624263',
   role: 'staff',

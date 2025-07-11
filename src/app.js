@@ -119,7 +119,8 @@ const corsOptions = {
     'http://www.myphonefriend.com',
     'http://localhost:3000',
     'http://localhost:3001',
-    'http://localhost:8080'
+    'http://localhost:8080',
+    'http://localhost:8081'  // Added for frontend development
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

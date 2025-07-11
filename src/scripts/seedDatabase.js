@@ -43,6 +43,21 @@ async function seedDatabase() {
     const caregivers = await insertCaregiversAndAddToOrg(org1, [admin, caregiverOne]);
     console.log('Inserted caregivers:', caregivers);
 
+    // Create and insert a super admin user
+    const superAdmin = {
+      name: 'Super Admin',
+      email: 'superadmin@example.org',
+      phone: '+16045624263',
+      password: hashedPassword,
+      role: 'superAdmin',
+      org: org1._id,
+      patients: [],
+      isEmailVerified: true,
+    };
+    
+    const superAdminRecord = await insertCaregiversAndAddToOrg(org1, [superAdmin]);
+    console.log('Inserted super admin:', superAdminRecord);
+
     // Find the caregiverOne (fake@example.org) to associate patients with
     const caregiverOneRecord = caregivers.find(c => c.email === 'fake@example.org');
     const adminRecord = caregivers.find(c => c.email === 'admin@example.org');
