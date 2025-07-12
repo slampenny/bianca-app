@@ -12,7 +12,7 @@ astlogdir => /var/log/asterisk
 astsbindir => /usr/sbin
 
 ; Include configuration files
-#include => /etc/asterisk/rtp.conf
+#include /etc/asterisk/rtp.conf
 
 ; RTP Configuration (also included in rtp.conf for redundancy)
 [rtp]
