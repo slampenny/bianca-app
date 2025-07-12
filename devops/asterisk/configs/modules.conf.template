@@ -7,5 +7,9 @@ autoload=yes
 load => res_http_websocket.so
 load => res_pjsip_transport_websocket.so
 
+; Explicitly load RTP support
+load => res_rtp_asterisk.so
+load => res_rtp_multihome.so
+
 ; Don't load deprecated modules
 noload => res_pjsip_transport_management.so

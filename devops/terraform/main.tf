@@ -773,8 +773,8 @@ resource "aws_security_group_rule" "asterisk_ari_from_vpc" {
 # Allow app to receive RTP from Asterisk
 resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   type              = "ingress"
-  from_port         = var.app_rtp_port_start
-  to_port           = var.app_rtp_port_end
+  from_port         = var.asterisk_rtp_start_port
+  to_port           = var.asterisk_rtp_end_port
   protocol          = "udp"
   security_group_id = aws_security_group.bianca_app_sg.id
   cidr_blocks       = ["172.31.100.0/24", "172.31.101.0/24"]  # Asterisk's public subnets
@@ -896,6 +896,8 @@ resource "aws_instance" "asterisk" {
     region                 = var.aws_region
     # Pass private subnet CIDR for RTP routing
     private_subnet_cidrs   = "172.31.110.0/24,172.31.111.0/24"
+    rtp_start_port         = var.asterisk_rtp_start_port
+    rtp_end_port           = var.asterisk_rtp_end_port
   }))
 
   root_block_device {
@@ -1220,10 +1222,9 @@ resource "aws_ecs_task_definition" "app_task" {
       image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest"
       essential = true
       portMappings = [
-        { containerPort = var.container_port, hostPort = var.container_port, protocol = "tcp" },
-        # Add UDP port mappings for RTP
-        { containerPort = var.app_rtp_port_start, hostPort = var.app_rtp_port_start, protocol = "udp" },
-        { containerPort = var.app_rtp_port_end, hostPort = var.app_rtp_port_end, protocol = "udp" }
+        { containerPort = var.container_port, hostPort = var.container_port, protocol = "tcp" }
+        # Note: UDP ports 10000-20000 are handled by security group rules, not port mappings
+        # Fargate doesn't support port range mappings, so we rely on security groups
       ]
       environment = [
         { name = "AWS_REGION", value = var.aws_region },
@@ -1253,6 +1254,10 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "USE_PRIVATE_NETWORK_FOR_RTP", value = "true" },
         { name = "NETWORK_MODE", value = "HYBRID" },
         { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name },
+        
+        # CRITICAL: Set the app's RTP host for Asterisk to connect to
+        { name = "RTP_BIANCA_HOST", value = "bianca-app.myphonefriend.internal" },
+        { name = "BIANCA_PUBLIC_IP", value = "bianca-app.myphonefriend.internal" },
         
         # Help with Asterisk connection retry
         { name = "ASTERISK_CONNECT_TIMEOUT", value = "300000" },  # 5 minutes

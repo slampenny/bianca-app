@@ -4,8 +4,8 @@
 [general]
 ; Define the starting and ending UDP ports Asterisk will use for RTP media.
 ; This range MUST match the ports forwarded by Docker and your FRP tunnel.
-rtpstart=10000
-rtpend=20000
+rtpstart=${RTP_START_PORT}
+rtpend=${RTP_END_PORT}
 
 ; Other common options (defaults are usually fine unless specific issues arise):
 ; rtpchecksums=no        ; RTP checksums are rarely used and can consume CPU

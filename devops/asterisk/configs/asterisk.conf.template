@@ -11,6 +11,15 @@ astrundir => /var/run/asterisk
 astlogdir => /var/log/asterisk
 astsbindir => /usr/sbin
 
+; Include configuration files
+#include => /etc/asterisk/rtp.conf
+
+; RTP Configuration (also included in rtp.conf for redundancy)
+[rtp]
+rtpstart=${RTP_START_PORT}
+rtpend=${RTP_END_PORT}
+strictrtp=no
+
 [options]
 ;verbose = 3
 ;debug = 3

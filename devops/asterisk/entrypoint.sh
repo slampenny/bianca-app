@@ -27,6 +27,14 @@ fi
 echo "Listing contents of $ASTERISK_CONF_DIR:"
 ls -la "$ASTERISK_CONF_DIR"
 
+# Debug environment variables
+echo "=== Environment Variables ==="
+echo "RTP_START_PORT: $RTP_START_PORT"
+echo "RTP_END_PORT: $RTP_END_PORT"
+echo "EXTERNAL_ADDRESS: $EXTERNAL_ADDRESS"
+echo "PRIVATE_ADDRESS: $PRIVATE_ADDRESS"
+echo "=== End Environment Variables ==="
+
 # Templating configs
 echo "Templating configuration files..."
 for template in "$ASTERISK_CONF_DIR"/*.template; do
@@ -34,6 +42,13 @@ for template in "$ASTERISK_CONF_DIR"/*.template; do
   conf_file="${template%.template}"
   echo "Processing template: $template -> $conf_file"
   envsubst < "$template" > "$conf_file"
+  
+  # Debug: Show the content of rtp.conf if it's being processed
+  if [[ "$conf_file" == *"rtp.conf" ]]; then
+    echo "=== RTP Configuration Content ==="
+    cat "$conf_file"
+    echo "=== End RTP Configuration ==="
+  fi
 done
 
 # Check which critical config files exist
@@ -50,6 +65,15 @@ done
 # Debug the output
 echo "Final configuration files:"
 ls -la "$ASTERISK_CONF_DIR"
+
+# Test RTP configuration before starting
+echo "Testing RTP configuration..."
+if [ -f "$ASTERISK_CONF_DIR/rtp.conf" ]; then
+  echo "RTP config file exists and contains:"
+  cat "$ASTERISK_CONF_DIR/rtp.conf"
+else
+  echo "ERROR: RTP config file not found!"
+fi
 
 # Start Asterisk
 echo "Starting Asterisk..."
