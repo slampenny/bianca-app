@@ -740,6 +740,17 @@ resource "aws_security_group_rule" "asterisk_ari_from_bianca_app_sg" {
   description              = "ARI access from Bianca App security group"
 }
 
+# ADDITIONAL: Allow ARI from entire VPC (for debugging)
+resource "aws_security_group_rule" "asterisk_ari_from_vpc" {
+  type              = "ingress"
+  from_port         = var.asterisk_ari_http_port
+  to_port           = var.asterisk_ari_http_port
+  protocol          = "tcp"
+  security_group_id = aws_security_group.asterisk_ec2_sg.id
+  cidr_blocks       = ["172.31.0.0/16"]  # Entire VPC
+  description       = "ARI access from entire VPC"
+}
+
 # Also add explicit egress rule for the app
 resource "aws_security_group_rule" "app_to_asterisk_ari_explicit" {
   type              = "egress"
@@ -768,16 +779,6 @@ resource "aws_security_group_rule" "debug_all_from_private_to_public" {
   description = "DEBUG: Allow all TCP from private subnets"
 }
 
-# ADDITIONAL: Allow ARI from entire VPC (for debugging)
-resource "aws_security_group_rule" "asterisk_ari_from_vpc" {
-  type              = "ingress"
-  from_port         = var.asterisk_ari_http_port
-  to_port           = var.asterisk_ari_http_port
-  protocol          = "tcp"
-  security_group_id = aws_security_group.asterisk_ec2_sg.id
-  cidr_blocks       = ["172.31.0.0/16"]  # Entire VPC
-  description       = "ARI access from entire VPC"
-}
 
 # Allow app to receive RTP from Asterisk
 resource "aws_security_group_rule" "app_rtp_from_asterisk" {

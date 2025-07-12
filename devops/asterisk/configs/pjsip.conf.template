@@ -51,7 +51,6 @@ transport=transport-udp
 direct_media=no
 ; CRITICAL: Force private IP for RTP with internal app
 media_address=${PRIVATE_ADDRESS}
-bind_rtp_to_media_address=yes
 rtp_symmetric=no
 force_rport=no
 rewrite_contact=no
@@ -72,7 +71,6 @@ force_rport=yes
 rtp_symmetric=yes
 ; CRITICAL: Use external IP for Twilio
 media_address=${EXTERNAL_ADDRESS}
-bind_rtp_to_media_address=yes
 
 [twilio-identify]
 type=identify

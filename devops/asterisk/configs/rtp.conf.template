@@ -7,8 +7,7 @@
 rtpstart=${RTP_START_PORT}
 rtpend=${RTP_END_PORT}
 
-; CRITICAL: Bind RTP to the external IP address for Twilio
-rtpbindaddr=${EXTERNAL_ADDRESS}
+; REMOVED: rtpbindaddr=${EXTERNAL_ADDRESS} - this was preventing RTP port binding
 
 ; Other common options (defaults are usually fine unless specific issues arise):
 ; rtpchecksums=no        ; RTP checksums are rarely used and can consume CPU
