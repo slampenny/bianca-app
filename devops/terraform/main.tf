@@ -643,6 +643,15 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     description = "SIP TCP from Twilio & Bianca Client"
   }
 
+  # TEMPORARY: Allow all TCP to port 5061 for debugging
+  ingress {
+    from_port   = var.asterisk_sip_tcp_port
+    to_port     = var.asterisk_sip_tcp_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "TEMPORARY: Allow all TCP to port 5061 for debugging"
+  }
+
   # RTP Range from Twilio (external) - for Twilio calls
   ingress {
     from_port   = var.asterisk_rtp_start_port
