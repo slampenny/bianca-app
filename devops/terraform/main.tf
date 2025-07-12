@@ -1242,6 +1242,10 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
         
         { name = "AWS_SES_REGION", value = var.aws_region },
+        { name = "EMAIL_FROM", value = "support@myphonefriend.com" },
+        { name = "TWILIO_PHONENUMBER", value = "+19786256514" },  # Replace with your actual Twilio number
+        { name = "TWILIO_ACCOUNTSID", value = "TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED" },  # Replace with your actual Twilio SID
+        { name = "STRIPE_PUBLISHABLE_KEY", value = "pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef" },  # Replace with your actual Stripe publishable key
         { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
         { name = "RTP_LISTENER_HOST", value = "0.0.0.0" },
         
@@ -1260,11 +1264,8 @@ resource "aws_ecs_task_definition" "app_task" {
       secrets = [
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
         { name = "OPENAI_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:OPENAI_API_KEY::" },
-        { name = "TWILIO_PHONENUMBER", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_PHONENUMBER::" },
-        { name = "TWILIO_ACCOUNTSID", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_ACCOUNTSID::" },
         { name = "TWILIO_AUTHTOKEN", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_AUTHTOKEN::" },
         { name = "STRIPE_SECRET_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_SECRET_KEY::" },
-        { name = "STRIPE_PUBLISHABLE_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_PUBLISHABLE_KEY::" },
         { name = "ASTERISK_PASSWORD", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ARI_PASSWORD::" }
       ]
       logConfiguration = {
