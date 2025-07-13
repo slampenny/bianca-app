@@ -2,18 +2,17 @@
 type=transport
 protocol=udp
 bind=0.0.0.0:5060
-; Use external address ONLY for external signaling
+external_media_address=${EXTERNAL_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5060
-; REMOVED external_media_address - let Asterisk decide per endpoint
 
 [transport-tcp]
 type=transport
 protocol=tcp
 bind=0.0.0.0:5061
+external_media_address=${EXTERNAL_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5061
-; REMOVED external_media_address
 
 ;========================================
 ; WebSocket Transport (REQUIRED FOR ARI)
@@ -22,10 +21,22 @@ external_signaling_port=5061
 type=transport
 protocol=ws
 bind=0.0.0.0:8088
-; REMOVED external addresses for WebSocket
+; If you need external access to WebSocket
+external_media_address=${EXTERNAL_ADDRESS}
+external_signaling_address=${EXTERNAL_ADDRESS}
+
+; Optional: WebSocket Secure (WSS) transport
+;[transport-wss]
+;type=transport
+;protocol=wss
+;bind=0.0.0.0:8089
+;cert_file=/etc/asterisk/keys/asterisk.crt
+;priv_key_file=/etc/asterisk/keys/asterisk.key
+;external_media_address=${EXTERNAL_ADDRESS}
+;external_signaling_address=${EXTERNAL_ADDRESS}
 
 ;----------------------------------------
-; Bianca App SIP Client (INTERNAL)
+; Bianca App SIP Client
 ;----------------------------------------
 [bianca-auth]
 type=auth
@@ -37,9 +48,8 @@ password=${BIANCA_PASSWORD}
 type=aor
 max_contacts=10
 qualify_frequency=60
-remove_existing=yes
 
-[bianca]
+[bianca-client]
 type=endpoint
 context=bianca-app
 disallow=all
@@ -49,14 +59,28 @@ auth=bianca-auth
 aors=bianca-aor
 transport=transport-udp
 direct_media=no
-; CRITICAL: Force private IP for RTP with internal app
-media_address=${PRIVATE_ADDRESS}
-rtp_symmetric=no
-force_rport=no
-rewrite_contact=no
 
 ;----------------------------------------
-; Twilio SIP Trunk (EXTERNAL)
+; WebSocket Endpoint (if needed for WebRTC)
+;----------------------------------------
+; Uncomment if you need WebRTC support
+;[webrtc-endpoint]
+;type=endpoint
+;context=webrtc
+;disallow=all
+;allow=opus
+;allow=ulaw
+;transport=transport-ws
+;use_avpf=yes
+;media_encryption=dtls
+;dtls_verify=fingerprint
+;dtls_setup=actpass
+;ice_support=yes
+;media_use_received_transport=yes
+;rtcp_mux=yes
+
+;----------------------------------------
+; Twilio SIP Trunk
 ;----------------------------------------
 [twilio-trunk]
 type=endpoint
@@ -69,8 +93,6 @@ direct_media=no
 allow_subscribe=no
 force_rport=yes
 rtp_symmetric=yes
-; CRITICAL: Use external IP for Twilio
-media_address=${EXTERNAL_ADDRESS}
 
 [twilio-identify]
 type=identify

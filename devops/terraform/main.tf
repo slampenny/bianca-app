@@ -416,6 +416,12 @@ resource "aws_route_table" "private" {
     nat_gateway_id = aws_nat_gateway.main.id
   }
 
+  depends_on = [aws_nat_gateway.main]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
   tags = { Name = "bianca-private-rt" }
 }
 
