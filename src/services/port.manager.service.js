@@ -7,8 +7,8 @@ class PortManager extends EventEmitter {
     constructor() {
         super();
         
-        // Get port range from config, e.g., "10000-20000"
-        const [portStart, portEnd] = (config.app?.rtpPortRange || "16384-17384")
+        // Get port range from config, e.g., "20001-30000"
+        const [portStart, portEnd] = (config.app?.rtpPortRange || "20001-30000")
             .split('-').map(Number);
         
         this.RTP_PORT_START = portStart;

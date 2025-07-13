@@ -140,13 +140,13 @@ variable "asterisk_rtp_end_port" {
 variable "app_rtp_port_start" {
   description = "Start of RTP port range for the application"
   type        = number
-  default     = 16384
+  default     = 20001
 }
 
 variable "app_rtp_port_end" {
   description = "End of RTP port range for the application"
   type        = number
-  default     = 17384
+  default     = 30000
 }
 
 # --- MongoDB Variables ---
@@ -789,8 +789,8 @@ resource "aws_security_group_rule" "debug_all_from_private_to_public" {
 # Allow app to receive RTP from Asterisk
 resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   type              = "ingress"
-  from_port         = var.asterisk_rtp_start_port
-  to_port           = var.asterisk_rtp_end_port
+  from_port         = var.app_rtp_port_start
+  to_port           = var.app_rtp_port_end
   protocol          = "udp"
   security_group_id = aws_security_group.bianca_app_sg.id
   cidr_blocks       = ["172.31.100.0/24", "172.31.101.0/24"]  # Asterisk's public subnets
