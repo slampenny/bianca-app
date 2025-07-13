@@ -146,7 +146,7 @@ variable "app_rtp_port_start" {
 variable "app_rtp_port_end" {
   description = "End of RTP port range for the application"
   type        = number
-  default     = 16484
+  default     = 17384
 }
 
 # --- MongoDB Variables ---

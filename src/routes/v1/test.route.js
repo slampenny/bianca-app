@@ -459,6 +459,126 @@ router.get('/config', (req, res) => {
     });
 });
 
+/**
+ * @swagger
+ * /test/ari-connectivity:
+ *   get:
+ *     summary: Test ARI connectivity
+ *     description: Test connection to Asterisk ARI interface
+ *     tags: [Test - ARI]
+ *     responses:
+ *       "200":
+ *         description: ARI connectivity test results
+ */
+router.get('/ari-connectivity', async (req, res) => {
+    try {
+        const config = require('../../config/config');
+        const { url: ariUrl, username, password } = config.asterisk;
+        
+        const testResults = {
+            timestamp: new Date().toISOString(),
+            configuration: {
+                ariUrl,
+                username,
+                passwordConfigured: !!password
+            },
+            tests: {}
+        };
+
+        // Test 1: Basic network connectivity
+        try {
+            const urlObj = new URL(ariUrl);
+            const net = require('net');
+            
+            const testConnection = () => {
+                return new Promise((resolve, reject) => {
+                    const socket = new net.Socket();
+                    const timeout = setTimeout(() => {
+                        socket.destroy();
+                        reject(new Error('Connection timeout'));
+                    }, 5000);
+                    
+                    socket.on('connect', () => {
+                        clearTimeout(timeout);
+                        socket.destroy();
+                        resolve(true);
+                    });
+                    
+                    socket.on('error', (err) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    });
+                    
+                    socket.connect(parseInt(urlObj.port || 80), urlObj.hostname);
+                });
+            };
+            
+            await testConnection();
+            testResults.tests.networkConnectivity = {
+                status: 'success',
+                message: `TCP connection to ${urlObj.hostname}:${urlObj.port || 80} successful`
+            };
+        } catch (err) {
+            testResults.tests.networkConnectivity = {
+                status: 'failed',
+                error: err.message,
+                code: err.code
+            };
+        }
+
+        // Test 2: HTTP connectivity
+        try {
+            const response = await fetch(`${ariUrl}/ari/api-docs/resources.json`, {
+                headers: {
+                    'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
+                }
+            });
+            
+            if (response.ok) {
+                testResults.tests.httpConnectivity = {
+                    status: 'success',
+                    message: 'ARI HTTP endpoint responding correctly',
+                    statusCode: response.status
+                };
+            } else {
+                testResults.tests.httpConnectivity = {
+                    status: 'failed',
+                    error: `HTTP ${response.status}: ${response.statusText}`,
+                    statusCode: response.status
+                };
+            }
+        } catch (err) {
+            testResults.tests.httpConnectivity = {
+                status: 'failed',
+                error: err.message,
+                code: err.code
+            };
+        }
+
+        // Test 3: ARI client connection
+        try {
+            const { getAriClientInstance } = require('../../services/ari.client');
+            const ariClient = getAriClientInstance();
+            
+            testResults.tests.ariClient = {
+                status: ariClient.isConnected ? 'connected' : 'disconnected',
+                retryCount: ariClient.retryCount,
+                message: ariClient.isConnected ? 'ARI client is connected' : 'ARI client is not connected'
+            };
+        } catch (err) {
+            testResults.tests.ariClient = {
+                status: 'error',
+                error: err.message
+            };
+        }
+
+        res.json(testResults);
+        
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
 // ============================================
 // ESSENTIAL DEBUGGING ROUTES - AUDIO DEBUGGING
 // ============================================

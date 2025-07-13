@@ -345,15 +345,61 @@ class AsteriskAriClient extends EventEmitter {
         const { url: ariUrl, username, password } = config.asterisk;
         
         logger.info('[ARI] Waiting for Asterisk to be ready...');
+        logger.info(`[ARI] Using ARI URL: ${ariUrl}`);
+        logger.info(`[ARI] Using username: ${username}`);
+        
+        // First, let's test basic network connectivity
+        try {
+            const urlObj = new URL(ariUrl);
+            logger.info(`[ARI] Testing basic connectivity to ${urlObj.hostname}:${urlObj.port || 80}`);
+            
+            // Try a simple TCP connection test
+            const net = require('net');
+            const testConnection = () => {
+                return new Promise((resolve, reject) => {
+                    const socket = new net.Socket();
+                    const timeout = setTimeout(() => {
+                        socket.destroy();
+                        reject(new Error('Connection timeout'));
+                    }, 5000);
+                    
+                    socket.on('connect', () => {
+                        clearTimeout(timeout);
+                        socket.destroy();
+                        resolve(true);
+                    });
+                    
+                    socket.on('error', (err) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    });
+                    
+                    socket.connect(parseInt(urlObj.port || 80), urlObj.hostname);
+                });
+            };
+            
+            await testConnection();
+            logger.info(`[ARI] Basic network connectivity to ${urlObj.hostname}:${urlObj.port || 80} is working`);
+        } catch (err) {
+            logger.error(`[ARI] Network connectivity test failed: ${err.message}`);
+            logger.error(`[ARI] This suggests a network or firewall issue`);
+        }
         
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // Try to fetch the swagger documentation
-                const response = await fetch(`${ariUrl}/ari/api-docs/resources.json`, {
-                    headers: {
-                        'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
-                    }
-                });
+                const testUrl = `${ariUrl}/ari/api-docs/resources.json`;
+                logger.debug(`[ARI] Attempting to fetch: ${testUrl}`);
+                
+                const response = await withTimeout(
+                    fetch(testUrl, {
+                        headers: {
+                            'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
+                        }
+                    }),
+                    10000,
+                    'ARI readiness check'
+                );
                 
                 if (response.ok) {
                     logger.info(`[ARI] Asterisk is ready (attempt ${attempt}/${maxAttempts})`);
@@ -362,7 +408,16 @@ class AsteriskAriClient extends EventEmitter {
                 
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             } catch (err) {
-                logger.warn(`[ARI] Asterisk not ready yet (attempt ${attempt}/${maxAttempts}): ${err.message}`);
+                // More detailed error logging
+                if (err.code === 'ENOTFOUND') {
+                    logger.warn(`[ARI] DNS resolution failed (attempt ${attempt}/${maxAttempts}): ${err.message}`);
+                } else if (err.code === 'ECONNREFUSED') {
+                    logger.warn(`[ARI] Connection refused (attempt ${attempt}/${maxAttempts}): ${err.message}`);
+                } else if (err.code === 'ETIMEDOUT') {
+                    logger.warn(`[ARI] Connection timeout (attempt ${attempt}/${maxAttempts}): ${err.message}`);
+                } else {
+                    logger.warn(`[ARI] Asterisk not ready yet (attempt ${attempt}/${maxAttempts}): ${err.message}`);
+                }
                 
                 if (attempt < maxAttempts) {
                     await new Promise(resolve => setTimeout(resolve, delayMs));
