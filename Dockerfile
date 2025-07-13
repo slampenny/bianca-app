@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/node:18-buster
+FROM public.ecr.aws/docker/library/node:18-bullseye
 
 # Create app directory
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # Pre-download MongoDB binary
-RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-debian10-6.0.9.tgz && \
+RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-debian11-6.0.9.tgz && \
 tar -xvf mongodb.tgz && \
-mv mongodb-linux-x86_64-debian10-6.0.9/bin/* /usr/local/bin/ && \
-rm -rf mongodb-linux-x86_64-debian10-6.0.9 mongodb.tgz
+mv mongodb-linux-x86_64-debian11-6.0.9/bin/* /usr/local/bin/ && \
+rm -rf mongodb-linux-x86_64-debian11-6.0.9 mongodb.tgz
 
 # Make MongoDB binary executable and check version
 RUN chmod +x /usr/local/bin/mongod && /usr/local/bin/mongod --version
