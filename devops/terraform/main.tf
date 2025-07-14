@@ -561,6 +561,8 @@ resource "aws_security_group_rule" "alb_to_fargate_egress" {
   description              = "Allow ALB to reach Fargate tasks"
 }
 
+# General egress rule for ALB - already exists as inline rule
+
 resource "aws_security_group" "alb_sg" {
   name        = "alb-sg"
   description = "Security group for the Application Load Balancer"
@@ -586,12 +588,7 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # Egress rules moved to separate aws_security_group_rule resources
   tags = { Name = "alb-sg" }
 }
 
@@ -614,13 +611,16 @@ resource "aws_security_group" "bianca_app_sg" {
     security_groups = [aws_security_group.alb_sg.id]
   }
 
-  # Egress rules
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+  # RTP from Asterisk (public subnet)
+  ingress {
+    description = "RTP from Asterisk (public subnet)"
+    from_port   = var.app_rtp_port_start
+    to_port     = var.app_rtp_port_end
+    protocol    = "udp"
+    cidr_blocks = ["172.31.100.0/24", "172.31.101.0/24"]  # Asterisk's public subnets
   }
+
+  # Egress rules moved to separate aws_security_group_rule resources
 
   tags = { Name = "bianca-app-sg" }
 }
@@ -676,13 +676,37 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     description = "SSH access"
   }
 
-  # Egress rules
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+  # ARI access from Bianca App security group
+  ingress {
+    from_port       = var.asterisk_ari_http_port
+    to_port         = var.asterisk_ari_http_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bianca_app_sg.id]
+    description     = "ARI access from Bianca App security group"
   }
+
+  # ARI access from entire VPC (for debugging)
+  ingress {
+    from_port   = var.asterisk_ari_http_port
+    to_port     = var.asterisk_ari_http_port
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "ARI access from entire VPC"
+  }
+
+  # DEBUG: Allow all TCP from private subnets
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = [
+      "172.31.110.0/24",
+      "172.31.111.0/24"
+    ]
+    description = "DEBUG: Allow all TCP from private subnets"
+  }
+
+  # Egress rules moved to separate aws_security_group_rule resources
 
   tags = { Name = "asterisk-ec2-sg" }
 }
@@ -701,101 +725,22 @@ resource "aws_security_group" "mongodb_sg" {
     security_groups = [aws_security_group.bianca_app_sg.id]
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # Egress rules moved to separate aws_security_group_rule resources
   
   tags = { Name = "mongodb-sg" }
 }
 
 # RTP from private subnets (app) to Asterisk for internal RTP
-resource "aws_security_group_rule" "asterisk_rtp_from_private" {
-  type              = "ingress"
-  from_port         = var.asterisk_rtp_start_port
-  to_port           = var.asterisk_rtp_end_port
-  protocol          = "udp"
-  security_group_id = aws_security_group.asterisk_ec2_sg.id
-  cidr_blocks       = ["172.31.110.0/24", "172.31.111.0/24"]
-  description       = "RTP from private subnets (app)"
-}
+# This rule is now handled by the debug_all_from_private_to_public rule below
 
-# ARI HTTP from Bianca App to Asterisk (internal)
-resource "aws_security_group_rule" "asterisk_ari_from_private_subnets_debug" {
-  type              = "ingress"
-  from_port         = var.asterisk_ari_http_port
-  to_port           = var.asterisk_ari_http_port
-  protocol          = "tcp"
-  security_group_id = aws_security_group.asterisk_ec2_sg.id
-  cidr_blocks       = [
-    "172.31.110.0/24",  # private_a subnet
-    "172.31.111.0/24"   # private_b subnet
-  ]
-  description = "ARI access from Fargate private subnets (CIDR-based)"
-}
-
-resource "aws_security_group_rule" "asterisk_ari_from_bianca_app_sg" {
-  type                     = "ingress"
-  from_port                = var.asterisk_ari_http_port  # 8088
-  to_port                  = var.asterisk_ari_http_port  # 8088
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.asterisk_ec2_sg.id
-  source_security_group_id = aws_security_group.bianca_app_sg.id
-  description              = "ARI access from Bianca App security group"
-}
-
-# ADDITIONAL: Allow ARI from entire VPC (for debugging)
-resource "aws_security_group_rule" "asterisk_ari_from_vpc" {
-  type              = "ingress"
-  from_port         = var.asterisk_ari_http_port
-  to_port           = var.asterisk_ari_http_port
-  protocol          = "tcp"
-  security_group_id = aws_security_group.asterisk_ec2_sg.id
-  cidr_blocks       = ["172.31.0.0/16"]  # Entire VPC
-  description       = "ARI access from entire VPC"
-}
-
-# Also add explicit egress rule for the app
-resource "aws_security_group_rule" "app_to_asterisk_ari_explicit" {
-  type              = "egress"
-  from_port         = var.asterisk_ari_http_port
-  to_port           = var.asterisk_ari_http_port
-  protocol          = "tcp"
-  security_group_id = aws_security_group.bianca_app_sg.id
-  cidr_blocks       = [
-    "172.31.100.0/24",  # public_a subnet where Asterisk is
-    "172.31.101.0/24"   # public_b subnet 
-  ]
-  description = "Explicit egress to Asterisk ARI"
-}
-
-# For debugging, temporarily allow all traffic between subnets
-resource "aws_security_group_rule" "debug_all_from_private_to_public" {
-  type              = "ingress"
-  from_port         = 0
-  to_port           = 65535
-  protocol          = "tcp"
-  security_group_id = aws_security_group.asterisk_ec2_sg.id
-  cidr_blocks       = [
-    "172.31.110.0/24",
-    "172.31.111.0/24"
-  ]
-  description = "DEBUG: Allow all TCP from private subnets"
-}
+# ARI rules are already handled by inline rules in the security groups
 
 
-# Allow app to receive RTP from Asterisk
-resource "aws_security_group_rule" "app_rtp_from_asterisk" {
-  type              = "ingress"
-  from_port         = var.app_rtp_port_start
-  to_port           = var.app_rtp_port_end
-  protocol          = "udp"
-  security_group_id = aws_security_group.bianca_app_sg.id
-  cidr_blocks       = ["172.31.100.0/24", "172.31.101.0/24"]  # Asterisk's public subnets
-  description       = "RTP from Asterisk (public subnet)"
-}
+# RTP rule is handled as inline rule in the security group
+
+# General egress rule for App - already exists as inline rule
+
+# General egress rules already exist as inline rules in security groups
 
 # REMOVED the catch-all rules since they're in different subnets now
 
@@ -1210,15 +1155,7 @@ resource "aws_ecs_service" "mongodb_service" {
 }
 
 # Add this rule to allow MongoDB to reach EFS
-resource "aws_security_group_rule" "mongodb_to_efs_egress" {
-  type                     = "egress"
-  from_port                = 2049
-  to_port                  = 2049
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.mongodb_sg.id
-  source_security_group_id = aws_security_group.efs_sg.id
-  description              = "Allow MongoDB to reach EFS"
-}
+# MongoDB to EFS egress is now handled by the general egress rule in the MongoDB security group
 # UPDATED: Task definition with improved health check and startup
 # UPDATED: Task definition without MongoDB container
 resource "aws_ecs_task_definition" "app_task" {
