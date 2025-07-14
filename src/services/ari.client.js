@@ -1623,7 +1623,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         }
     }
 
-        sendAudioToChannel(asteriskChannelId, audioBase64Ulaw) {
+        async sendAudioToChannel(asteriskChannelId, audioBase64Ulaw) {
         if (!audioBase64Ulaw) {
             logger.warn(`[ARI Audio] Empty audio for ${asteriskChannelId}`);
             return;

@@ -551,15 +551,7 @@ resource "aws_vpc_endpoint" "s3" {
 ################################################################################
 
 # Add explicit ALB to Fargate egress rule
-resource "aws_security_group_rule" "alb_to_fargate_egress" {
-  type                     = "egress"
-  from_port                = var.container_port
-  to_port                  = var.container_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.alb_sg.id
-  source_security_group_id = aws_security_group.bianca_app_sg.id
-  description              = "Allow ALB to reach Fargate tasks"
-}
+# ALB to Fargate egress rule is handled as inline rule in the ALB security group
 
 # General egress rule for ALB - already exists as inline rule
 
@@ -588,7 +580,21 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Egress rules moved to separate aws_security_group_rule resources
+  # Egress rules
+  egress {
+    description     = "Allow ALB to reach Fargate tasks"
+    from_port       = var.container_port
+    to_port         = var.container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bianca_app_sg.id]
+  }
+  
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
   tags = { Name = "alb-sg" }
 }
 
@@ -602,13 +608,13 @@ resource "aws_security_group" "bianca_app_sg" {
     ignore_changes = [description, tags, tags_all]
   }
 
-  # ALB traffic (external)
+  # ALB traffic (external) - using CIDR to avoid circular dependency
   ingress {
-    description     = "Allow ALB traffic on App HTTP Port"
-    from_port       = var.container_port
-    to_port         = var.container_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    description = "Allow ALB traffic on App HTTP Port"
+    from_port   = var.container_port
+    to_port     = var.container_port
+    protocol    = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]  # VPC CIDR - ALB is in the VPC
   }
 
   # RTP from Asterisk (public subnet)
@@ -620,7 +626,13 @@ resource "aws_security_group" "bianca_app_sg" {
     cidr_blocks = ["172.31.100.0/24", "172.31.101.0/24"]  # Asterisk's public subnets
   }
 
-  # Egress rules moved to separate aws_security_group_rule resources
+  # Egress rules
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   tags = { Name = "bianca-app-sg" }
 }
@@ -706,7 +718,13 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     description = "DEBUG: Allow all TCP from private subnets"
   }
 
-  # Egress rules moved to separate aws_security_group_rule resources
+  # Egress rules
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   tags = { Name = "asterisk-ec2-sg" }
 }
@@ -725,7 +743,7 @@ resource "aws_security_group" "mongodb_sg" {
     security_groups = [aws_security_group.bianca_app_sg.id]
   }
 
-  # Egress rules moved to separate aws_security_group_rule resources
+  # No egress rules needed - MongoDB only communicates with app and EFS
   
   tags = { Name = "mongodb-sg" }
 }
