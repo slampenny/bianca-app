@@ -791,13 +791,26 @@ class AsteriskAriClient extends EventEmitter {
         
         logger.info(`[ARI Pipeline] READ stream is ready for ${parentId}`);
         
-        // Verify RTP listener is active
+        // Verify RTP listener is active (with retry for timing issues)
         const rtpListenerService = require('./rtp.listener.service');
-        const listenerStatus = rtpListenerService.getListenerStatus?.(callData.rtpReadPort);
+        let listenerStatus = null;
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (!listenerStatus && retryCount < maxRetries) {
+            listenerStatus = rtpListenerService.getListenerStatus?.(callData.rtpReadPort);
+            if (!listenerStatus && retryCount < maxRetries - 1) {
+                await this.delay(100); // Wait 100ms before retry
+                retryCount++;
+            } else {
+                break;
+            }
+        }
+        
         if (listenerStatus) {
             logger.info(`[ARI] RTP Listener confirmed active on port ${callData.rtpReadPort}`);
         } else {
-            logger.error(`[ARI] WARNING: No RTP listener found on port ${callData.rtpReadPort}!`);
+            logger.warn(`[ARI] RTP listener not found on port ${callData.rtpReadPort} after ${maxRetries} retries - this may be a timing issue`);
         }
         
         this.checkMediaPipelineReady(parentId);
@@ -918,16 +931,16 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         
         // Check RTP listener
         const rtpListener = require('./rtp.listener.service');
-        const listenerStatus = rtpListener.getFullStatus?.();
-        const ourListener = listenerStatus?.listeners?.find(l => l.port === callData.rtpReadPort);
+        const listenerStatus = rtpListener.getListenerStatus(callData.rtpReadPort);
         
-        if (ourListener) {
+        if (listenerStatus) {
             logger.info('[Audio Diagnose] RTP Listener:', {
-                port: ourListener.port,
-                packetsReceived: ourListener.packetsReceived,
-                bytesReceived: ourListener.bytesReceived,
-                packetsPerSecond: ourListener.packetsPerSecond,
-                source: ourListener.source
+                port: listenerStatus.port,
+                active: listenerStatus.active,
+                callId: listenerStatus.callId,
+                packetsReceived: listenerStatus.stats.packetsReceived,
+                packetsSent: listenerStatus.stats.packetsSent,
+                errors: listenerStatus.stats.errors
             });
         } else {
             logger.error('[Audio Diagnose] NO RTP LISTENER FOUND!');

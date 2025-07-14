@@ -254,6 +254,21 @@ function getListenerForCall(callId) {
     return activeListeners.get(callId);
 }
 
+function getListenerStatus(port) {
+    // Find listener by port number
+    for (const [callId, listener] of activeListeners.entries()) {
+        if (listener.port === port) {
+            return {
+                active: listener.isActive,
+                callId: listener.callId,
+                port: listener.port,
+                stats: listener.getStats()
+            };
+        }
+    }
+    return null;
+}
+
 function getAllActiveListeners() {
     const listeners = {};
     for (const [callId, listener] of activeListeners.entries()) {
@@ -297,6 +312,7 @@ module.exports = {
     startRtpListenerForCall,
     stopRtpListenerForCall,
     getListenerForCall,
+    getListenerStatus,
     getAllActiveListeners,
     stopAllListeners,
     healthCheck
