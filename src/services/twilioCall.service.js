@@ -154,7 +154,7 @@ class TwilioCallService {
       // Update conversation record
       this.updateConversationStatus(CallSid, 'in-progress');
       
-      return twimlString;+
+      return twimlString;
     } catch (error) {
       logger.error(`[Twilio Service] Error generating TwiML: ${error.message}`);
       
