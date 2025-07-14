@@ -447,7 +447,7 @@ router.get('/config', (req, res) => {
             rtpAsteriskHost: config.asterisk.rtpAsteriskHost,
         },
         rtpPorts: {
-            appPortRange: process.env.APP_RTP_PORT_RANGE || '20001-30000',
+                            appPortRange: process.env.APP_RTP_PORT_RANGE || '20002-30000',
         },
         environmentVariables: {
             NODE_ENV: process.env.NODE_ENV,
@@ -1727,7 +1727,7 @@ router.get('/security-group-analysis', async (req, res) => {
         result.analysis.expectedConfig = {
             fargateToEC2: 'Requires CIDR-based security group rules',
             securityGroupRule: 'source should be Asterisk private IP/32, not security group ID',
-            udpPorts: '20001-30000 for RTP traffic',
+            udpPorts: '20002-30000 for RTP traffic',
             direction: 'Asterisk → Fargate for audio input'
         };
 

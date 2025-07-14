@@ -12,7 +12,7 @@ console.log('Config.app.rtpPortRange:', config.app?.rtpPortRange);
 console.log('');
 
 // Parse the port range like the port manager does
-const [portStart, portEnd] = (config.app?.rtpPortRange || "20001-30000")
+const [portStart, portEnd] = (config.app?.rtpPortRange || "20002-30000")
     .split('-').map(Number);
 
 console.log('Parsed port range:');
