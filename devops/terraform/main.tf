@@ -140,7 +140,7 @@ variable "asterisk_rtp_end_port" {
 variable "app_rtp_port_start" {
   description = "Start of RTP port range for the application"
   type        = number
-  default     = 20001
+  default     = 20002
 }
 
 variable "app_rtp_port_end" {

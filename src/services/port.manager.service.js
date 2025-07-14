@@ -38,9 +38,10 @@ class PortManager extends EventEmitter {
      * Acquires a unique, available UDP port from the pool.
      * @param {string} callId - Identifier for the call (Asterisk channel ID or Twilio SID)
      * @param {object} metadata - Optional metadata about the port usage
+     * @param {number} retryCount - Internal retry counter to prevent infinite loops
      * @returns {number | null} The acquired port number, or null if none are available.
      */
-    acquirePort(callId, metadata = {}) {
+    acquirePort(callId, metadata = {}, retryCount = 0) {
         if (!callId) {
             logger.error('[PortManager] Cannot acquire port without callId');
             return null;
@@ -68,7 +69,15 @@ class PortManager extends EventEmitter {
         if (!this.isValidPort(port)) {
             logger.error(`[PortManager] Invalid port ${port} selected from pool`);
             this.availablePorts.delete(port); // Remove invalid port
-            return this.acquirePort(callId, metadata); // Try again
+            
+            // Prevent infinite loops
+            if (retryCount >= 10) {
+                logger.error(`[PortManager] Too many invalid ports encountered (${retryCount} retries). Reinitializing pool.`);
+                this.reinitializePool();
+                return null;
+            }
+            
+            return this.acquirePort(callId, metadata, retryCount + 1); // Try again
         }
         
         if (!this.availablePorts.delete(port)) {
@@ -107,6 +116,43 @@ class PortManager extends EventEmitter {
     }
     
     /**
+     * Cleans invalid ports from the available pool
+     */
+    cleanInvalidPortsFromPool() {
+        const invalidPorts = [];
+        for (const port of this.availablePorts) {
+            if (!this.isValidPort(port)) {
+                invalidPorts.push(port);
+            }
+        }
+        
+        for (const port of invalidPorts) {
+            this.availablePorts.delete(port);
+        }
+        
+        if (invalidPorts.length > 0) {
+            logger.warn(`[PortManager] Cleaned ${invalidPorts.length} invalid ports from pool: ${invalidPorts.join(', ')}`);
+        }
+    }
+    
+    /**
+     * Reinitializes the port pool if it gets corrupted
+     */
+    reinitializePool() {
+        logger.warn(`[PortManager] Reinitializing port pool due to corruption`);
+        
+        // Clear the available ports
+        this.availablePorts.clear();
+        
+        // Reinitialize with valid ports only
+        for (let i = this.RTP_PORT_START; i <= this.RTP_PORT_END; i += 2) {
+            this.availablePorts.add(i);
+        }
+        
+        logger.info(`[PortManager] Reinitialized with ${this.availablePorts.size} available ports in range ${this.RTP_PORT_START}-${this.RTP_PORT_END}`);
+    }
+    
+    /**
      * Releases a port, returning it to the pool of available ports.
      * @param {number} port - The port number to release
      * @param {string} callId - Optional callId for verification
@@ -127,7 +173,13 @@ class PortManager extends EventEmitter {
         }
         
         this.leasedPorts.delete(port);
-        this.availablePorts.add(port);
+        
+        // Only add valid ports back to the available pool
+        if (this.isValidPort(port)) {
+            this.availablePorts.add(port);
+        } else {
+            logger.warn(`[PortManager] Not adding invalid port ${port} back to available pool`);
+        }
         
         const leaseDuration = Date.now() - leaseInfo.timestamp;
         logger.info(`[PortManager] Released port ${port} from call ${leaseInfo.callId}. Lease duration: ${Math.round(leaseDuration / 1000)}s. Available: ${this.availablePorts.size}`);
