@@ -52,6 +52,10 @@ const envVarsSchema = Joi.object({
   STRIPE_PUBLISHABLE_KEY: Joi.string(),
   // **NEW:** Realtime API specific variables
   OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
+  OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
+  OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
+  OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
+  OPENAI_MODEL: Joi.string().default('gpt-4o'),
   WEBSOCKET_URL: Joi.string().default('wss://api.myphonefriend.com'), // URL your WebSocket server listens on
 }).unknown();
 
@@ -159,6 +163,10 @@ const baselineConfig = {
     apiKey: envVars.OPENAI_API_KEY,
     // **NEW:** Realtime model used for the live interaction via WebSocket
     realtimeModel: envVars.OPENAI_REALTIME_MODEL,
+    realtimeVoice: envVars.OPENAI_REALTIME_VOICE || 'alloy',
+    realtimeSessionConfig: envVars.OPENAI_REALTIME_SESSION_CONFIG || {},
+    idleTimeout: envVars.OPENAI_IDLE_TIMEOUT || 300000, // 5 minutes default
+    model: envVars.OPENAI_MODEL || 'gpt-4o',
     debugAudio: true, // Enable debug audio for testing
   },
   stripe: {

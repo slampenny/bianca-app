@@ -18,14 +18,19 @@ phases:
   build:
     commands:
       - echo Build started on $(date)
-      # Build the main application image
+      # Pull latest images for layer caching
+      - echo Pulling latest images for cache...
+      - docker pull $REPOSITORY_URI_APP:latest || echo "No previous image found"
+      - docker pull $REPOSITORY_URI_ASTERISK:latest || echo "No previous image found"
+      
+      # Build the main application image with cache
       - echo Building main application image...
-      - docker build -t $REPOSITORY_URI_APP:$IMAGE_TAG -f Dockerfile . # Assuming app Dockerfile is at the root
+      - docker build --cache-from $REPOSITORY_URI_APP:latest -t $REPOSITORY_URI_APP:$IMAGE_TAG -f Dockerfile .
       - docker tag $REPOSITORY_URI_APP:$IMAGE_TAG $REPOSITORY_URI_APP:latest
       
-      # Build the Asterisk image
+      # Build the Asterisk image with cache
       - echo Building Asterisk image...
-      - docker build -t $REPOSITORY_URI_ASTERISK:$IMAGE_TAG -f ./devops/asterisk/Dockerfile ./devops/asterisk
+      - docker build --cache-from $REPOSITORY_URI_ASTERISK:latest -t $REPOSITORY_URI_ASTERISK:$IMAGE_TAG -f ./devops/asterisk/Dockerfile ./devops/asterisk
       - docker tag $REPOSITORY_URI_ASTERISK:$IMAGE_TAG $REPOSITORY_URI_ASTERISK:latest
   post_build:
     commands:
@@ -64,3 +69,8 @@ artifacts:
         - imagedefinitions_asterisk.json
       # Optional: specify base-directory
       # base-directory: .
+
+cache:
+  paths:
+    - '/root/.docker/**/*'
+    - '/var/lib/docker/**/*'
