@@ -4,6 +4,7 @@ FROM public.ecr.aws/docker/library/node:18-bullseye
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
 WORKDIR /usr/src/bianca-app
 
+# Install system dependencies in a single layer to reduce image size
 RUN apt-get update && apt-get install -y \
   libssl-dev \
   ca-certificates \
@@ -13,18 +14,16 @@ RUN apt-get update && apt-get install -y \
   net-tools \
   awscli \
   ffmpeg \
-  # --- End added tools ---
-  # Clean up apt cache
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get clean
 
-# Pre-download MongoDB binary
+# Pre-download MongoDB binary and make executable in a single layer
 RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-debian11-6.0.9.tgz && \
-tar -xvf mongodb.tgz && \
-mv mongodb-linux-x86_64-debian11-6.0.9/bin/* /usr/local/bin/ && \
-rm -rf mongodb-linux-x86_64-debian11-6.0.9 mongodb.tgz
-
-# Make MongoDB binary executable and check version
-RUN chmod +x /usr/local/bin/mongod && /usr/local/bin/mongod --version
+    tar -xvf mongodb.tgz && \
+    mv mongodb-linux-x86_64-debian11-6.0.9/bin/* /usr/local/bin/ && \
+    chmod +x /usr/local/bin/mongod && \
+    /usr/local/bin/mongod --version && \
+    rm -rf mongodb-linux-x86_64-debian11-6.0.9 mongodb.tgz
 
 # Set environment variable for MongoMemoryServer
 ENV MONGOMS_SYSTEM_BINARY /usr/local/bin/mongod
@@ -34,8 +33,16 @@ COPY package.json yarn.lock ./
 USER node
 RUN yarn install --pure-lockfile
 
-# Bundle app source
-COPY --chown=node:node . .
+# Copy source code (this should be after dependencies to maximize caching)
+COPY --chown=node:node src/ ./src/
+COPY --chown=node:node devops/ ./devops/
+COPY --chown=node:node .env* ./
+COPY --chown=node:node .eslintrc.js ./
+COPY --chown=node:node .prettierrc ./
+COPY --chown=node:node jest.config.js ./
+COPY --chown=node:node nodemon.json ./
+COPY --chown=node:node tsconfig.json ./
+COPY --chown=node:node README.md ./
 
 # Expose the port the app runs on
 EXPOSE 3000
