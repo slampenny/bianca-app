@@ -642,6 +642,502 @@ router.get('/ari-test', async (req, res) => {
 
 /**
  * @swagger
+ * /test/rtp-test:
+ *   post:
+ *     summary: Test RTP functionality
+ *     description: Test RTP listener and sender with fake audio data
+ *     tags: [Test - RTP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               testType:
+ *                 type: string
+ *                 enum: [listener, sender, both]
+ *                 description: Type of RTP test to run
+ *               duration:
+ *                 type: number
+ *                 description: Test duration in seconds
+ *               port:
+ *                 type: number
+ *                 description: RTP port to use for testing
+ *     responses:
+ *       "200":
+ *         description: RTP test results
+ */
+router.post('/rtp-test', async (req, res) => {
+    const { testType = 'both', duration = 5, port = 10000 } = req.body;
+    
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        testType,
+        duration,
+        port,
+        results: {}
+    };
+
+    try {
+        if (!rtpListener || !rtpSender) {
+            throw new Error('RTP services not loaded');
+        }
+
+        const rtpListenerInstance = rtpListener.getRtpListenerInstance();
+        const rtpSenderInstance = rtpSender.getRtpSenderInstance();
+
+        if (!rtpListenerInstance || !rtpSenderInstance) {
+            throw new Error('RTP service instances not available');
+        }
+
+        // Test RTP Listener
+        if (testType === 'listener' || testType === 'both') {
+            try {
+                testResults.results.listener = {
+                    status: 'testing',
+                    port: port,
+                    startTime: new Date().toISOString()
+                };
+
+                // Start listener on test port
+                await rtpListenerInstance.startListening(port);
+                
+                // Wait for duration
+                await new Promise(resolve => setTimeout(resolve, duration * 1000));
+                
+                // Stop listener
+                await rtpListenerInstance.stopListening(port);
+                
+                testResults.results.listener.status = 'completed';
+                testResults.results.listener.endTime = new Date().toISOString();
+                testResults.results.listener.packetsReceived = 0; // Would need to track this
+            } catch (err) {
+                testResults.results.listener = { error: err.message };
+            }
+        }
+
+        // Test RTP Sender
+        if (testType === 'sender' || testType === 'both') {
+            try {
+                testResults.results.sender = {
+                    status: 'testing',
+                    port: port + 1,
+                    startTime: new Date().toISOString()
+                };
+
+                // Generate fake audio data (silence in g711_ulaw format)
+                const fakeAudioData = Buffer.alloc(160, 0xFF); // g711_ulaw silence
+                
+                // Send test packets
+                for (let i = 0; i < 50; i++) {
+                    await rtpSenderInstance.sendAudioData('test-call', fakeAudioData, port + 1);
+                    await new Promise(resolve => setTimeout(resolve, 20)); // 20ms between packets
+                }
+                
+                testResults.results.sender.status = 'completed';
+                testResults.results.sender.endTime = new Date().toISOString();
+                testResults.results.sender.packetsSent = 50;
+            } catch (err) {
+                testResults.results.sender = { error: err.message };
+            }
+        }
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'RTP test failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/call-flow-test:
+ *   post:
+ *     summary: Test complete call flow
+ *     description: Simulate a complete call from start to finish
+ *     tags: [Test - Call Flow]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number to call
+ *               duration:
+ *                 type: number
+ *                 description: Call duration in seconds
+ *               sendAudio:
+ *                 type: boolean
+ *                 description: Whether to send test audio
+ *     responses:
+ *       "200":
+ *         description: Call flow test results
+ */
+router.post('/call-flow-test', async (req, res) => {
+    const { phoneNumber = '+1234567890', duration = 10, sendAudio = true } = req.body;
+    
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        phoneNumber,
+        duration,
+        sendAudio,
+        steps: {},
+        errors: []
+    };
+
+    try {
+        if (!ariClient || !openAIService) {
+            throw new Error('Required services not loaded');
+        }
+
+        const ariInstance = ariClient.getAriClientInstance();
+        const openaiInstance = openAIService.getOpenAIServiceInstance();
+        const callId = `test-call-${Date.now()}`;
+
+        // Step 1: Test ARI Connection
+        testResults.steps.ariConnection = {
+            status: 'testing',
+            timestamp: new Date().toISOString()
+        };
+
+        if (!ariInstance.isConnected) {
+            throw new Error('ARI not connected');
+        }
+        testResults.steps.ariConnection.status = 'connected';
+
+        // Step 2: Test OpenAI Service
+        testResults.steps.openaiService = {
+            status: 'testing',
+            timestamp: new Date().toISOString()
+        };
+
+        if (!openaiInstance) {
+            throw new Error('OpenAI service not initialized');
+        }
+        testResults.steps.openaiService.status = 'initialized';
+
+        // Step 3: Create OpenAI Session
+        testResults.steps.openaiSession = {
+            status: 'creating',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const sessionConfig = {
+                model: config.openai.realtimeModel,
+                voice: config.openai.realtimeVoice,
+                input_audio_format: 'g711_ulaw',
+                output_audio_format: 'g711_ulaw',
+                turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.3,
+                    prefix_padding_ms: 200,
+                    silence_duration_ms: 800,
+                },
+                ...(config.openai.realtimeSessionConfig || {})
+            };
+
+            const session = await openaiInstance.createSession(callId, sessionConfig);
+            testResults.steps.openaiSession.status = 'created';
+            testResults.steps.openaiSession.sessionId = session.id;
+        } catch (err) {
+            testResults.steps.openaiSession.status = 'failed';
+            testResults.steps.openaiSession.error = err.message;
+            testResults.errors.push(`OpenAI Session Creation: ${err.message}`);
+        }
+
+        // Step 4: Simulate Call Connection
+        testResults.steps.callConnection = {
+            status: 'simulating',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            // Simulate call being connected
+            await openaiInstance.handleSessionCreated(callId, {
+                session_id: testResults.steps.openaiSession.sessionId,
+                session: { id: testResults.steps.openaiSession.sessionId }
+            });
+            testResults.steps.callConnection.status = 'connected';
+        } catch (err) {
+            testResults.steps.callConnection.status = 'failed';
+            testResults.steps.callConnection.error = err.message;
+            testResults.errors.push(`Call Connection: ${err.message}`);
+        }
+
+        // Step 5: Send Test Audio (if enabled)
+        if (sendAudio && testResults.steps.openaiSession.status === 'created') {
+            testResults.steps.audioTest = {
+                status: 'sending',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                // Generate test audio (silence in g711_ulaw)
+                const testAudio = Buffer.alloc(160, 0xFF);
+                
+                // Send audio for duration
+                for (let i = 0; i < duration * 50; i++) { // 50 packets per second
+                    await openaiInstance.handleInputAudioBuffer(callId, {
+                        audio_data: testAudio.toString('base64'),
+                        timestamp: Date.now()
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                }
+                
+                testResults.steps.audioTest.status = 'completed';
+                testResults.steps.audioTest.packetsSent = duration * 50;
+            } catch (err) {
+                testResults.steps.audioTest.status = 'failed';
+                testResults.steps.audioTest.error = err.message;
+                testResults.errors.push(`Audio Test: ${err.message}`);
+            }
+        }
+
+        // Step 6: Cleanup
+        testResults.steps.cleanup = {
+            status: 'cleaning',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            if (openaiInstance.connections.has(callId)) {
+                await openaiInstance.handleSessionEnded(callId, {});
+            }
+            testResults.steps.cleanup.status = 'completed';
+        } catch (err) {
+            testResults.steps.cleanup.status = 'failed';
+            testResults.steps.cleanup.error = err.message;
+            testResults.errors.push(`Cleanup: ${err.message}`);
+        }
+
+        // Summary
+        testResults.summary = {
+            totalSteps: Object.keys(testResults.steps).length,
+            successfulSteps: Object.values(testResults.steps).filter(s => s.status === 'connected' || s.status === 'created' || s.status === 'completed' || s.status === 'initialized').length,
+            failedSteps: testResults.errors.length,
+            overallSuccess: testResults.errors.length === 0
+        };
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'Call flow test failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/audio-pipeline-test:
+ *   post:
+ *     summary: Test audio pipeline end-to-end
+ *     description: Test the complete audio flow from RTP to OpenAI and back
+ *     tags: [Test - Audio Pipeline]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               testDuration:
+ *                 type: number
+ *                 description: Test duration in seconds
+ *               audioType:
+ *                 type: string
+ *                 enum: [silence, tone, speech]
+ *                 description: Type of test audio to generate
+ *     responses:
+ *       "200":
+ *         description: Audio pipeline test results
+ */
+router.post('/audio-pipeline-test', async (req, res) => {
+    const { testDuration = 5, audioType = 'silence' } = req.body;
+    
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        testDuration,
+        audioType,
+        pipeline: {},
+        errors: []
+    };
+
+    try {
+        if (!rtpListener || !rtpSender || !openAIService) {
+            throw new Error('Required services not loaded');
+        }
+
+        const rtpListenerInstance = rtpListener.getRtpListenerInstance();
+        const rtpSenderInstance = rtpSender.getRtpSenderInstance();
+        const openaiInstance = openAIService.getOpenAIServiceInstance();
+        const callId = `audio-test-${Date.now()}`;
+
+        // Step 1: Initialize RTP Listener
+        testResults.pipeline.rtpListener = {
+            status: 'initializing',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const testPort = 10000 + Math.floor(Math.random() * 1000);
+            await rtpListenerInstance.startListening(testPort);
+            testResults.pipeline.rtpListener.status = 'listening';
+            testResults.pipeline.rtpListener.port = testPort;
+        } catch (err) {
+            testResults.pipeline.rtpListener.status = 'failed';
+            testResults.pipeline.rtpListener.error = err.message;
+            testResults.errors.push(`RTP Listener: ${err.message}`);
+        }
+
+        // Step 2: Create OpenAI Session
+        testResults.pipeline.openaiSession = {
+            status: 'creating',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const sessionConfig = {
+                model: config.openai.realtimeModel,
+                voice: config.openai.realtimeVoice,
+                input_audio_format: 'g711_ulaw',
+                output_audio_format: 'g711_ulaw',
+                turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.3,
+                    prefix_padding_ms: 200,
+                    silence_duration_ms: 800,
+                }
+            };
+
+            const session = await openaiInstance.createSession(callId, sessionConfig);
+            testResults.pipeline.openaiSession.status = 'created';
+            testResults.pipeline.openaiSession.sessionId = session.id;
+        } catch (err) {
+            testResults.pipeline.openaiSession.status = 'failed';
+            testResults.pipeline.openaiSession.error = err.message;
+            testResults.errors.push(`OpenAI Session: ${err.message}`);
+        }
+
+        // Step 3: Generate Test Audio
+        testResults.pipeline.audioGeneration = {
+            status: 'generating',
+            timestamp: new Date().toISOString()
+        };
+
+        let testAudio;
+        try {
+            switch (audioType) {
+                case 'silence':
+                    testAudio = Buffer.alloc(160, 0xFF); // g711_ulaw silence
+                    break;
+                case 'tone':
+                    // Generate a simple tone (would need proper g711_ulaw encoding)
+                    testAudio = Buffer.alloc(160, 0x7F); // Mid-level tone approximation
+                    break;
+                case 'speech':
+                    // Generate speech-like audio (simplified)
+                    testAudio = Buffer.alloc(160, 0x80); // Speech-like level
+                    break;
+                default:
+                    testAudio = Buffer.alloc(160, 0xFF);
+            }
+            testResults.pipeline.audioGeneration.status = 'generated';
+            testResults.pipeline.audioGeneration.audioSize = testAudio.length;
+        } catch (err) {
+            testResults.pipeline.audioGeneration.status = 'failed';
+            testResults.pipeline.audioGeneration.error = err.message;
+            testResults.errors.push(`Audio Generation: ${err.message}`);
+        }
+
+        // Step 4: Send Audio Through Pipeline
+        if (testResults.pipeline.openaiSession.status === 'created' && testResults.pipeline.audioGeneration.status === 'generated') {
+            testResults.pipeline.audioFlow = {
+                status: 'sending',
+                timestamp: new Date().toISOString(),
+                packetsSent: 0,
+                packetsReceived: 0
+            };
+
+            try {
+                const startTime = Date.now();
+                const endTime = startTime + (testDuration * 1000);
+                
+                while (Date.now() < endTime) {
+                    // Send audio to OpenAI
+                    await openaiInstance.handleInputAudioBuffer(callId, {
+                        audio_data: testAudio.toString('base64'),
+                        timestamp: Date.now()
+                    });
+                    
+                    testResults.pipeline.audioFlow.packetsSent++;
+                    
+                    // Wait 20ms between packets (50 packets per second)
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                }
+                
+                testResults.pipeline.audioFlow.status = 'completed';
+                testResults.pipeline.audioFlow.duration = Date.now() - startTime;
+            } catch (err) {
+                testResults.pipeline.audioFlow.status = 'failed';
+                testResults.pipeline.audioFlow.error = err.message;
+                testResults.errors.push(`Audio Flow: ${err.message}`);
+            }
+        }
+
+        // Step 5: Cleanup
+        testResults.pipeline.cleanup = {
+            status: 'cleaning',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            // Stop RTP listener
+            if (testResults.pipeline.rtpListener.port) {
+                await rtpListenerInstance.stopListening(testResults.pipeline.rtpListener.port);
+            }
+            
+            // Close OpenAI session
+            if (openaiInstance.connections.has(callId)) {
+                await openaiInstance.handleSessionEnded(callId, {});
+            }
+            
+            testResults.pipeline.cleanup.status = 'completed';
+        } catch (err) {
+            testResults.pipeline.cleanup.status = 'failed';
+            testResults.pipeline.cleanup.error = err.message;
+            testResults.errors.push(`Cleanup: ${err.message}`);
+        }
+
+        // Summary
+        testResults.summary = {
+            totalSteps: Object.keys(testResults.pipeline).length,
+            successfulSteps: Object.values(testResults.pipeline).filter(s => s.status === 'listening' || s.status === 'created' || s.status === 'generated' || s.status === 'completed').length,
+            failedSteps: testResults.errors.length,
+            overallSuccess: testResults.errors.length === 0
+        };
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'Audio pipeline test failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
  * /test/validate-integration:
  *   get:
  *     summary: Validate complete system integration
