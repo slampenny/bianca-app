@@ -4,14 +4,23 @@ const faker = require('faker');
 const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
 const config = require('../config/config');
 
-const { orgOne, insertOrgs } = require('../../tests/fixtures/org.fixture');
-// Use only these two caregivers to be in the same org:
-const { caregiverOne, admin, hashedPassword, insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.fixture');
-const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = require('../../tests/fixtures/patient.fixture');
-const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = require('../../tests/fixtures/alert.fixture');
-const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = require('../../tests/fixtures/schedule.fixture');
-const { conversationOne, conversationTwo, insertConversations } = require('../../tests/fixtures/conversation.fixture');
-const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = require('../../tests/fixtures/paymentMethod.fixture');
+// Import test fixtures directly
+const orgFixture = require('../../tests/fixtures/org.fixture');
+const caregiverFixture = require('../../tests/fixtures/caregiver.fixture');
+const patientFixture = require('../../tests/fixtures/patient.fixture');
+const alertFixture = require('../../tests/fixtures/alert.fixture');
+const scheduleFixture = require('../../tests/fixtures/schedule.fixture');
+const conversationFixture = require('../../tests/fixtures/conversation.fixture');
+const paymentMethodFixture = require('../../tests/fixtures/paymentMethod.fixture');
+
+// Extract the needed exports
+const { orgOne, insertOrgs } = orgFixture;
+const { caregiverOne, admin, hashedPassword, insertCaregiversAndAddToOrg } = caregiverFixture;
+const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = patientFixture;
+const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = alertFixture;
+const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = scheduleFixture;
+const { conversationOne, conversationTwo, insertConversations } = conversationFixture;
+const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = paymentMethodFixture;
 
 async function seedDatabase() {
   try {

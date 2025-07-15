@@ -1106,6 +1106,127 @@ router.post('/audio-pipeline-test', async (req, res) => {
 
 /**
  * @swagger
+ * /test/startup-diagnosis:
+ *   get:
+ *     summary: Diagnose startup issues
+ *     description: Check what's preventing the app from starting properly
+ *     tags: [Test - Startup]
+ *     responses:
+ *       "200":
+ *         description: Startup diagnosis results
+ */
+router.get('/startup-diagnosis', async (req, res) => {
+    const diagnosis = {
+        timestamp: new Date().toISOString(),
+        startupChecks: {},
+        errors: []
+    };
+
+    try {
+        // 1. Check if server is running
+        diagnosis.startupChecks.serverRunning = {
+            status: 'checking',
+            port: process.env.PORT || 3000
+        };
+
+        // 2. Check environment variables
+        diagnosis.startupChecks.environment = {
+            NODE_ENV: process.env.NODE_ENV,
+            PORT: process.env.PORT,
+            MONGODB_URL: process.env.MONGODB_URL ? 'SET' : 'MISSING',
+            OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'SET' : 'MISSING',
+            ASTERISK_URL: process.env.ASTERISK_URL,
+            ASTERISK_USERNAME: process.env.ASTERISK_USERNAME ? 'SET' : 'MISSING',
+            ASTERISK_PASSWORD: process.env.ASTERISK_PASSWORD ? 'SET' : 'MISSING'
+        };
+
+        // 3. Check if config loads
+        try {
+            const config = require('../../config/config');
+            diagnosis.startupChecks.config = {
+                loaded: true,
+                env: config.env,
+                port: config.port,
+                mongoose: {
+                    url: config.mongoose?.url ? 'SET' : 'MISSING'
+                }
+            };
+        } catch (err) {
+            diagnosis.startupChecks.config = {
+                loaded: false,
+                error: err.message
+            };
+            diagnosis.errors.push(`Config loading failed: ${err.message}`);
+        }
+
+        // 4. Check if MongoDB can connect
+        try {
+            const mongoose = require('mongoose');
+            diagnosis.startupChecks.mongodb = {
+                mongooseLoaded: true,
+                connectionState: mongoose.connection.readyState,
+                connectionStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown'
+            };
+        } catch (err) {
+            diagnosis.startupChecks.mongodb = {
+                mongooseLoaded: false,
+                error: err.message
+            };
+            diagnosis.errors.push(`MongoDB check failed: ${err.message}`);
+        }
+
+        // 5. Check if services can be loaded
+        try {
+            const ariClient = require('../../services/ari.client');
+            diagnosis.startupChecks.ariClient = {
+                loaded: true,
+                canGetInstance: !!ariClient.getAriClientInstance
+            };
+        } catch (err) {
+            diagnosis.startupChecks.ariClient = {
+                loaded: false,
+                error: err.message
+            };
+            diagnosis.errors.push(`ARI client loading failed: ${err.message}`);
+        }
+
+        // 6. Check if email service can be loaded
+        try {
+            const emailService = require('../../services/email.service');
+            diagnosis.startupChecks.emailService = {
+                loaded: true,
+                canInitialize: !!emailService.initializeEmailTransport
+            };
+        } catch (err) {
+            diagnosis.startupChecks.emailService = {
+                loaded: false,
+                error: err.message
+            };
+            diagnosis.errors.push(`Email service loading failed: ${err.message}`);
+        }
+
+        // Summary
+        diagnosis.summary = {
+            totalChecks: 6,
+            passed: Object.values(diagnosis.startupChecks).filter(check => 
+                check.loaded !== false && check.status !== 'failed'
+            ).length,
+            failed: diagnosis.errors.length,
+            canStart: diagnosis.errors.length === 0
+        };
+
+        res.json(diagnosis);
+    } catch (err) {
+        res.status(500).json({
+            error: 'Startup diagnosis failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
  * /test/real-call-simulation:
  *   post:
  *     summary: Simulate a real call with proper initialization
