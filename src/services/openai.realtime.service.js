@@ -14,7 +14,7 @@ const CONSTANTS = {
   MAX_PENDING_CHUNKS: 100, // Maximum number of audio chunks to buffer
   RECONNECT_MAX_ATTEMPTS: 5, // Maximum number of reconnection attempts
   RECONNECT_BASE_DELAY: 1000, // Base delay for exponential backoff (milliseconds)
-  COMMIT_DEBOUNCE_DELAY: 500, // Increased to 500ms for better batching
+  COMMIT_DEBOUNCE_DELAY: 1000, // Increased to 1000ms for better batching and to avoid buffer too small errors
   CONNECTION_TIMEOUT: 15000, // WebSocket connection + handshake timeout (milliseconds)
   DEFAULT_SAMPLE_RATE: 24000, // OpenAI Realtime API uses 24kHz for PCM16
   ASTERISK_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
@@ -1332,16 +1332,21 @@ class OpenAIRealtimeService {
       );
 
       if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
-        logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId}`);
-        try {
-          await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-          currentConn.pendingCommit = true;
-        } catch (commitErr) {
-          logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
+        // Ensure we have at least 20 chunks (about 400ms of audio) before committing
+        if (currentConn.audioChunksSent >= 20) {
+          logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId} (chunks sent: ${currentConn.audioChunksSent})`);
+          try {
+            await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+            currentConn.pendingCommit = true;
+          } catch (commitErr) {
+            logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
+          }
+        } else {
+          logger.debug(`[OpenAI Realtime] Not enough audio chunks for commit (${currentConn.audioChunksSent}/20), waiting for more`);
         }
       } else {
         logger.debug(
-          `[OpenAI Realtime] Commit timer fired but conditions not met for ${callId} - ready: ${currentConn?.sessionReady}, pending: ${currentConn?.pendingCommit}`
+          `[OpenAI Realtime] Commit timer fired but conditions not met for ${callId} - ready: ${currentConn?.sessionReady}, pending: ${currentConn?.pendingCommit}, chunks: ${currentConn?.audioChunksSent}`
         );
       }
     }, CONSTANTS.COMMIT_DEBOUNCE_DELAY);
@@ -1411,12 +1416,17 @@ class OpenAIRealtimeService {
         
         conn.audioChunksSent++;
         
-        // Commit more frequently for better responsiveness
+        // Commit when we have enough audio data (at least 1 second worth)
         if (conn.audioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
             this.debounceCommit(callId);
         } else if (conn.audioChunksSent === 1) {
             // Start a timer for the first chunk to ensure we don't wait too long
-            this.debounceCommit(callId);
+            // But use a longer delay to accumulate more audio
+            setTimeout(() => {
+                if (conn.audioChunksSent > 0 && !conn.pendingCommit) {
+                    this.debounceCommit(callId);
+                }
+            }, 1000); // Wait 1 second to accumulate more audio
         }
         
     } catch (audioProcessingError) {
