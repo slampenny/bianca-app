@@ -202,8 +202,25 @@ class AsteriskAriClient extends EventEmitter {
 
     checkMediaPipelineReady(asteriskChannelId) {
         const callData = this.tracker.getCall(asteriskChannelId);
+        
+        // ADD DEBUG LOGGING
+        logger.info(`[ARI Pipeline] Checking media pipeline readiness for ${asteriskChannelId}:`, {
+            hasCallData: !!callData,
+            callState: callData?.state,
+            isReadStreamReady: callData?.isReadStreamReady,
+            isWriteStreamReady: callData?.isWriteStreamReady,
+            rtpReadPort: callData?.rtpReadPort,
+            rtpWritePort: callData?.rtpWritePort,
+            asteriskRtpEndpoint: callData?.asteriskRtpEndpoint
+        });
+        
         // Only proceed if we are in the pending state
         if (!callData || callData.state !== 'pending_media') {
+            logger.info(`[ARI Pipeline] Skipping media pipeline check for ${asteriskChannelId}:`, {
+                hasCallData: !!callData,
+                callState: callData?.state,
+                expectedState: 'pending_media'
+            });
             return;
         }
 
@@ -221,6 +238,7 @@ class AsteriskAriClient extends EventEmitter {
             setTimeout(() => {
                 // Check if OpenAI is ready before sending
                 if (openAIService.isConnectionReady(primarySid)) {
+                    logger.info(`[ARI Pipeline] OpenAI is ready, sending response.create for ${primarySid}`);
                     openAIService.sendResponseCreate(primarySid);
                 } else {
                     logger.info(`[ARI Pipeline] OpenAI not ready yet, sending silence to trigger connection`);
@@ -230,10 +248,16 @@ class AsteriskAriClient extends EventEmitter {
                     
                     // Try greeting again after a short delay
                     setTimeout(() => {
+                        logger.info(`[ARI Pipeline] Retrying response.create for ${primarySid}`);
                         openAIService.sendResponseCreate(primarySid);
                     }, 500);
                 }
             }, 100);
+        } else {
+            logger.info(`[ARI Pipeline] Media pipeline not ready yet for ${asteriskChannelId}:`, {
+                isReadStreamReady: callData.isReadStreamReady,
+                isWriteStreamReady: callData.isWriteStreamReady
+            });
         }
     }
     
@@ -1343,10 +1367,13 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
     }
 
     setupOpenAICallback() {
+        logger.info('[ARI] Setting up OpenAI notification callback');
         openAIService.setNotificationCallback((callbackId, type, data) => {
+            logger.info(`[ARI] OpenAI callback received: ${type} for ${callbackId}`);
             try {
                 switch (type) {
                     case 'audio_chunk':
+                        logger.info(`[ARI] Processing audio_chunk for ${callbackId}`);
                         this.handleOpenAIAudio(callbackId, data);
                         break;
                     case 'openai_session_ready':
@@ -1365,6 +1392,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                 logger.error(`[ARI] Error in OpenAI callback: ${err.message}`, err);
             }
         });
+        logger.info('[ARI] OpenAI notification callback setup completed');
     }
 
     handleOpenAIAudio(callId, data) {

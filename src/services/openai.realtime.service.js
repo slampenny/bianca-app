@@ -83,6 +83,9 @@ class OpenAIRealtimeService {
    * Looks up the Asterisk ID associated with the primary callId before calling back.
    */
   notify(callId, eventType, data = {}) {
+    // ADD DEBUG LOGGING
+    logger.info(`[OpenAI Realtime] Notify called: ${eventType} for ${callId} (callback exists: ${!!this.notifyCallback})`);
+    
     if (!this.notifyCallback) {
       logger.debug(`[OpenAI Realtime] No notify callback for ${eventType} (CallID: ${callId})`);
       return;
@@ -91,7 +94,9 @@ class OpenAIRealtimeService {
     // The callId is already the primary identifier (Twilio SID)
     // We need to pass it directly to the callback
     try {
+      logger.info(`[OpenAI Realtime] Calling notification callback: ${eventType} for ${callId}`);
       this.notifyCallback(callId, eventType, data);
+      logger.info(`[OpenAI Realtime] Notification callback completed: ${eventType} for ${callId}`);
     } catch (err) {
       logger.error(
         `[OpenAI Realtime] Error in notification callback for CallID ${callId} / Event ${eventType}: ${err.message}`
@@ -265,9 +270,15 @@ class OpenAIRealtimeService {
   }
 
   sendResponseCreate(callId) {
+    logger.info(`[OpenAI Realtime] sendResponseCreate called for ${callId}`);
+    
     const connection = this.connections.get(callId);
     if (!connection || !connection.webSocket || connection.webSocket.readyState !== WebSocket.OPEN) {
-      logger.warn(`[OpenAI Realtime] Cannot send response.create - no active connection for ${callId}`);
+      logger.warn(`[OpenAI Realtime] Cannot send response.create - no active connection for ${callId}`, {
+        hasConnection: !!connection,
+        hasWebSocket: !!connection?.webSocket,
+        webSocketState: connection?.webSocket?.readyState
+      });
       return;
     }
 
@@ -280,6 +291,7 @@ class OpenAIRealtimeService {
         },
       };
 
+      logger.info(`[OpenAI Realtime] Sending response.create for ${callId}:`, responseCreateEvent);
       connection.webSocket.send(JSON.stringify(responseCreateEvent));
       logger.info(`[OpenAI Realtime] Sent response.create for ${callId}`);
     } catch (err) {
