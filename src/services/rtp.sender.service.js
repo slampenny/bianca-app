@@ -31,7 +31,7 @@ class RtpSenderService extends EventEmitter {
         this.RTP_SEND_FORMAT = 'ulaw';
         this.SAMPLE_RATE = 8000;
         this.FRAME_SIZE_MS = 1; // Reduced to 1ms to handle very small audio chunks
-        this.SAMPLES_PER_FRAME = (this.SAMPLE_RATE * this.FRAME_SIZE_MS) / 1000;
+        this.SAMPLES_PER_FRAME = 1; // Send any amount of audio data, even 1 byte
         
         // Enhanced error tracking
         this.isShuttingDown = false;
