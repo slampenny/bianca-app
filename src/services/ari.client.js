@@ -1603,6 +1603,8 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
     }
     
     async initializeRtpSenderWithEndpoint(asteriskChannelId, rtpEndpoint) {
+        logger.info(`[RTP Sender] Starting initialization for ${asteriskChannelId} with endpoint:`, rtpEndpoint);
+        
         const callData = this.tracker.getCall(asteriskChannelId);
         if (!callData) {
             logger.error(`[RTP Sender] No call data found for ${asteriskChannelId}`);
@@ -1614,7 +1616,10 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         logger.info(`[RTP Sender] Initializing for ${callId} to ${rtpEndpoint.host}:${rtpEndpoint.port}`);
         
         try {
+            logger.info(`[RTP Sender] About to require rtp.sender.service`);
             const rtpSenderService = require('./rtp.sender.service');
+            logger.info(`[RTP Sender] Service loaded, calling initializeCall`);
+            
             await rtpSenderService.initializeCall(callId, {
                 asteriskChannelId,
                 rtpHost: rtpEndpoint.host,

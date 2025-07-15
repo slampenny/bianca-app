@@ -30,7 +30,7 @@ class RtpSenderService extends EventEmitter {
         this.RTP_PAYLOAD_TYPE_SLIN16_8K = 11;
         this.RTP_SEND_FORMAT = 'ulaw';
         this.SAMPLE_RATE = 8000;
-        this.FRAME_SIZE_MS = 5; // Reduced to 5ms for more responsive audio with small chunks
+        this.FRAME_SIZE_MS = 1; // Reduced to 1ms to handle very small audio chunks
         this.SAMPLES_PER_FRAME = (this.SAMPLE_RATE * this.FRAME_SIZE_MS) / 1000;
         
         // Enhanced error tracking
@@ -250,8 +250,9 @@ class RtpSenderService extends EventEmitter {
         if (!this.audioChunkCount[callId]) this.audioChunkCount[callId] = 0;
         this.audioChunkCount[callId]++;
         
-        if (this.audioChunkCount[callId] <= 20 || this.audioChunkCount[callId] % 50 === 0) {
-            logger.info(`[RTP Sender] Processing audio chunk #${this.audioChunkCount[callId]} for ${callId} (size: ${audioBase64Ulaw.length})`);
+        // Log every chunk for the first 10 to debug the small audio issue
+        if (this.audioChunkCount[callId] <= 10 || this.audioChunkCount[callId] % 50 === 0) {
+            logger.info(`[RTP Sender] Processing audio chunk #${this.audioChunkCount[callId]} for ${callId} (base64 size: ${audioBase64Ulaw.length})`);
         }
 
         try {
@@ -259,6 +260,11 @@ class RtpSenderService extends EventEmitter {
             if (ulawBuffer.length === 0) {
                 logger.warn(`[RTP Sender] Decoded audio buffer is empty for ${callId}`);
                 return;
+            }
+            
+            // Log decoded audio size for debugging
+            if (this.audioChunkCount[callId] <= 10) {
+                logger.info(`[RTP Sender] Decoded audio size for ${callId}: ${ulawBuffer.length} bytes (base64: ${audioBase64Ulaw.length})`);
             }
             
             let audioPayload;
