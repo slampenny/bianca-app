@@ -202,25 +202,8 @@ class AsteriskAriClient extends EventEmitter {
 
     checkMediaPipelineReady(asteriskChannelId) {
         const callData = this.tracker.getCall(asteriskChannelId);
-        
-        // ADD DEBUG LOGGING
-        logger.info(`[ARI Pipeline] Checking media pipeline readiness for ${asteriskChannelId}:`, {
-            hasCallData: !!callData,
-            callState: callData?.state,
-            isReadStreamReady: callData?.isReadStreamReady,
-            isWriteStreamReady: callData?.isWriteStreamReady,
-            rtpReadPort: callData?.rtpReadPort,
-            rtpWritePort: callData?.rtpWritePort,
-            asteriskRtpEndpoint: callData?.asteriskRtpEndpoint
-        });
-        
         // Only proceed if we are in the pending state
         if (!callData || callData.state !== 'pending_media') {
-            logger.info(`[ARI Pipeline] Skipping media pipeline check for ${asteriskChannelId}:`, {
-                hasCallData: !!callData,
-                callState: callData?.state,
-                expectedState: 'pending_media'
-            });
             return;
         }
 
@@ -238,7 +221,6 @@ class AsteriskAriClient extends EventEmitter {
             setTimeout(() => {
                 // Check if OpenAI is ready before sending
                 if (openAIService.isConnectionReady(primarySid)) {
-                    logger.info(`[ARI Pipeline] OpenAI is ready, sending response.create for ${primarySid}`);
                     openAIService.sendResponseCreate(primarySid);
                 } else {
                     logger.info(`[ARI Pipeline] OpenAI not ready yet, sending silence to trigger connection`);
@@ -248,16 +230,10 @@ class AsteriskAriClient extends EventEmitter {
                     
                     // Try greeting again after a short delay
                     setTimeout(() => {
-                        logger.info(`[ARI Pipeline] Retrying response.create for ${primarySid}`);
                         openAIService.sendResponseCreate(primarySid);
                     }, 500);
                 }
             }, 100);
-        } else {
-            logger.info(`[ARI Pipeline] Media pipeline not ready yet for ${asteriskChannelId}:`, {
-                isReadStreamReady: callData.isReadStreamReady,
-                isWriteStreamReady: callData.isWriteStreamReady
-            });
         }
     }
     
@@ -369,61 +345,15 @@ class AsteriskAriClient extends EventEmitter {
         const { url: ariUrl, username, password } = config.asterisk;
         
         logger.info('[ARI] Waiting for Asterisk to be ready...');
-        logger.info(`[ARI] Using ARI URL: ${ariUrl}`);
-        logger.info(`[ARI] Using username: ${username}`);
-        
-        // First, let's test basic network connectivity
-        try {
-            const urlObj = new URL(ariUrl);
-            logger.info(`[ARI] Testing basic connectivity to ${urlObj.hostname}:${urlObj.port || 80}`);
-            
-            // Try a simple TCP connection test
-            const net = require('net');
-            const testConnection = () => {
-                return new Promise((resolve, reject) => {
-                    const socket = new net.Socket();
-                    const timeout = setTimeout(() => {
-                        socket.destroy();
-                        reject(new Error('Connection timeout'));
-                    }, 5000);
-                    
-                    socket.on('connect', () => {
-                        clearTimeout(timeout);
-                        socket.destroy();
-                        resolve(true);
-                    });
-                    
-                    socket.on('error', (err) => {
-                        clearTimeout(timeout);
-                        reject(err);
-                    });
-                    
-                    socket.connect(parseInt(urlObj.port || 80), urlObj.hostname);
-                });
-            };
-            
-            await testConnection();
-            logger.info(`[ARI] Basic network connectivity to ${urlObj.hostname}:${urlObj.port || 80} is working`);
-        } catch (err) {
-            logger.error(`[ARI] Network connectivity test failed: ${err.message}`);
-            logger.error(`[ARI] This suggests a network or firewall issue`);
-        }
         
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // Try to fetch the swagger documentation
-                const testUrl = `${ariUrl}/ari/api-docs/resources.json`;
-                logger.debug(`[ARI] Attempting to fetch: ${testUrl}`);
-                
-                const response = await withTimeout(
-                    fetch(testUrl, {
-                        headers: {
-                            'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
-                        }
-                    }),
-                    10000,
-                    'ARI readiness check'
-                );
+                const response = await fetch(`${ariUrl}/ari/api-docs/resources.json`, {
+                    headers: {
+                        'Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
+                    }
+                });
                 
                 if (response.ok) {
                     logger.info(`[ARI] Asterisk is ready (attempt ${attempt}/${maxAttempts})`);
@@ -432,16 +362,7 @@ class AsteriskAriClient extends EventEmitter {
                 
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             } catch (err) {
-                // More detailed error logging
-                if (err.code === 'ENOTFOUND') {
-                    logger.warn(`[ARI] DNS resolution failed (attempt ${attempt}/${maxAttempts}): ${err.message}`);
-                } else if (err.code === 'ECONNREFUSED') {
-                    logger.warn(`[ARI] Connection refused (attempt ${attempt}/${maxAttempts}): ${err.message}`);
-                } else if (err.code === 'ETIMEDOUT') {
-                    logger.warn(`[ARI] Connection timeout (attempt ${attempt}/${maxAttempts}): ${err.message}`);
-                } else {
-                    logger.warn(`[ARI] Asterisk not ready yet (attempt ${attempt}/${maxAttempts}): ${err.message}`);
-                }
+                logger.warn(`[ARI] Asterisk not ready yet (attempt ${attempt}/${maxAttempts}): ${err.message}`);
                 
                 if (attempt < maxAttempts) {
                     await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -815,26 +736,13 @@ class AsteriskAriClient extends EventEmitter {
         
         logger.info(`[ARI Pipeline] READ stream is ready for ${parentId}`);
         
-        // Verify RTP listener is active (with retry for timing issues)
+        // Verify RTP listener is active
         const rtpListenerService = require('./rtp.listener.service');
-        let listenerStatus = null;
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        while (!listenerStatus && retryCount < maxRetries) {
-            listenerStatus = rtpListenerService.getListenerStatus?.(callData.rtpReadPort);
-            if (!listenerStatus && retryCount < maxRetries - 1) {
-                await this.delay(100); // Wait 100ms before retry
-                retryCount++;
-            } else {
-                break;
-            }
-        }
-        
+        const listenerStatus = rtpListenerService.getListenerStatus?.(callData.rtpReadPort);
         if (listenerStatus) {
             logger.info(`[ARI] RTP Listener confirmed active on port ${callData.rtpReadPort}`);
         } else {
-            logger.warn(`[ARI] RTP listener not found on port ${callData.rtpReadPort} after ${maxRetries} retries - this may be a timing issue`);
+            logger.error(`[ARI] WARNING: No RTP listener found on port ${callData.rtpReadPort}!`);
         }
         
         this.checkMediaPipelineReady(parentId);
@@ -955,16 +863,16 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         
         // Check RTP listener
         const rtpListener = require('./rtp.listener.service');
-        const listenerStatus = rtpListener.getListenerStatus(callData.rtpReadPort);
+        const listenerStatus = rtpListener.getFullStatus?.();
+        const ourListener = listenerStatus?.listeners?.find(l => l.port === callData.rtpReadPort);
         
-        if (listenerStatus) {
+        if (ourListener) {
             logger.info('[Audio Diagnose] RTP Listener:', {
-                port: listenerStatus.port,
-                active: listenerStatus.active,
-                callId: listenerStatus.callId,
-                packetsReceived: listenerStatus.stats.packetsReceived,
-                packetsSent: listenerStatus.stats.packetsSent,
-                errors: listenerStatus.stats.errors
+                port: ourListener.port,
+                packetsReceived: ourListener.packetsReceived,
+                bytesReceived: ourListener.bytesReceived,
+                packetsPerSecond: ourListener.packetsPerSecond,
+                source: ourListener.source
             });
         } else {
             logger.error('[Audio Diagnose] NO RTP LISTENER FOUND!');
@@ -1367,13 +1275,10 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
     }
 
     setupOpenAICallback() {
-        logger.info('[ARI] Setting up OpenAI notification callback');
         openAIService.setNotificationCallback((callbackId, type, data) => {
-            logger.info(`[ARI] OpenAI callback received: ${type} for ${callbackId}`);
             try {
                 switch (type) {
                     case 'audio_chunk':
-                        logger.info(`[ARI] Processing audio_chunk for ${callbackId}`);
                         this.handleOpenAIAudio(callbackId, data);
                         break;
                     case 'openai_session_ready':
@@ -1392,7 +1297,6 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                 logger.error(`[ARI] Error in OpenAI callback: ${err.message}`, err);
             }
         });
-        logger.info('[ARI] OpenAI notification callback setup completed');
     }
 
     handleOpenAIAudio(callId, data) {
@@ -1631,8 +1535,6 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
     }
     
     async initializeRtpSenderWithEndpoint(asteriskChannelId, rtpEndpoint) {
-        logger.info(`[RTP Sender] Starting initialization for ${asteriskChannelId} with endpoint:`, rtpEndpoint);
-        
         const callData = this.tracker.getCall(asteriskChannelId);
         if (!callData) {
             logger.error(`[RTP Sender] No call data found for ${asteriskChannelId}`);
@@ -1644,10 +1546,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         logger.info(`[RTP Sender] Initializing for ${callId} to ${rtpEndpoint.host}:${rtpEndpoint.port}`);
         
         try {
-            logger.info(`[RTP Sender] About to require rtp.sender.service`);
             const rtpSenderService = require('./rtp.sender.service');
-            logger.info(`[RTP Sender] Service loaded, calling initializeCall`);
-            
             await rtpSenderService.initializeCall(callId, {
                 asteriskChannelId,
                 rtpHost: rtpEndpoint.host,
@@ -1669,7 +1568,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         }
     }
 
-        async sendAudioToChannel(asteriskChannelId, audioBase64Ulaw) {
+        sendAudioToChannel(asteriskChannelId, audioBase64Ulaw) {
         if (!audioBase64Ulaw) {
             logger.warn(`[ARI Audio] Empty audio for ${asteriskChannelId}`);
             return;

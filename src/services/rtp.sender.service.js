@@ -30,8 +30,8 @@ class RtpSenderService extends EventEmitter {
         this.RTP_PAYLOAD_TYPE_SLIN16_8K = 11;
         this.RTP_SEND_FORMAT = 'ulaw';
         this.SAMPLE_RATE = 8000;
-        this.FRAME_SIZE_MS = 1; // Reduced to 1ms to handle very small audio chunks
-        this.SAMPLES_PER_FRAME = 1; // Send any amount of audio data, even 1 byte
+        this.FRAME_SIZE_MS = 20;
+        this.SAMPLES_PER_FRAME = (this.SAMPLE_RATE * this.FRAME_SIZE_MS) / 1000;
         
         // Enhanced error tracking
         this.isShuttingDown = false;
@@ -72,9 +72,6 @@ class RtpSenderService extends EventEmitter {
             rtpPort: config.rtpPort,
             format: config.format || this.RTP_SEND_FORMAT
         });
-        
-        // Add debugging to track initialization
-        logger.info(`[RTP Sender] Active calls before init: ${Array.from(this.activeCalls.keys()).join(', ')}`);
 
         try {
             // Validate RTP endpoint
@@ -131,7 +128,6 @@ class RtpSenderService extends EventEmitter {
             this.globalStats.activeCalls++;
 
             logger.info(`[RTP Sender] Call ${callId} initialized successfully. SSRC: ${ssrc}, Target: ${config.rtpHost}:${config.rtpPort}`);
-            logger.info(`[RTP Sender] Active calls after init: ${Array.from(this.activeCalls.keys()).join(', ')}`);
             
         } catch (err) {
             logger.error(`[RTP Sender] Failed to initialize call ${callId}: ${err.message}`, err);
@@ -164,20 +160,7 @@ class RtpSenderService extends EventEmitter {
     sendNextFrame(callId) {
         const buffer = this.audioBuffers.get(callId);
         if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
-            // Add debugging to see why frames aren't being sent
-            if (buffer && buffer.length > 0) {
-                logger.debug(`[RTP Sender] Not enough data for frame: ${buffer.length}/${this.SAMPLES_PER_FRAME} bytes for ${callId}`);
-            }
             return; // Not enough data to send a frame
-        }
-
-        // Log when we actually send frames
-        if (!this.framesSentCount) this.framesSentCount = {};
-        if (!this.framesSentCount[callId]) this.framesSentCount[callId] = 0;
-        this.framesSentCount[callId]++;
-        
-        if (this.framesSentCount[callId] <= 10 || this.framesSentCount[callId] % 100 === 0) {
-            logger.info(`[RTP Sender] Sending frame #${this.framesSentCount[callId]} for ${callId} (buffer: ${buffer.length} bytes)`);
         }
 
         const callConfig = this.activeCalls.get(callId);
@@ -233,9 +216,6 @@ class RtpSenderService extends EventEmitter {
         const callConfig = this.activeCalls.get(callId);
         if (!callConfig || !callConfig.initialized) {
             logger.warn(`[RTP Sender] Call ${callId} not initialized or missing config`);
-            // Add debugging to see what calls are available
-            const availableCalls = Array.from(this.activeCalls.keys());
-            logger.warn(`[RTP Sender] Available calls: ${availableCalls.join(', ')}`);
             return;
         }
 
@@ -250,9 +230,8 @@ class RtpSenderService extends EventEmitter {
         if (!this.audioChunkCount[callId]) this.audioChunkCount[callId] = 0;
         this.audioChunkCount[callId]++;
         
-        // Log every chunk for the first 10 to debug the small audio issue
-        if (this.audioChunkCount[callId] <= 10 || this.audioChunkCount[callId] % 50 === 0) {
-            logger.info(`[RTP Sender] Processing audio chunk #${this.audioChunkCount[callId]} for ${callId} (base64 size: ${audioBase64Ulaw.length})`);
+        if (this.audioChunkCount[callId] <= 20 || this.audioChunkCount[callId] % 50 === 0) {
+            logger.info(`[RTP Sender] Processing audio chunk #${this.audioChunkCount[callId]} for ${callId} (size: ${audioBase64Ulaw.length})`);
         }
 
         try {
@@ -260,11 +239,6 @@ class RtpSenderService extends EventEmitter {
             if (ulawBuffer.length === 0) {
                 logger.warn(`[RTP Sender] Decoded audio buffer is empty for ${callId}`);
                 return;
-            }
-            
-            // Log decoded audio size for debugging
-            if (this.audioChunkCount[callId] <= 10) {
-                logger.info(`[RTP Sender] Decoded audio size for ${callId}: ${ulawBuffer.length} bytes (base64: ${audioBase64Ulaw.length})`);
             }
             
             let audioPayload;
@@ -287,9 +261,9 @@ class RtpSenderService extends EventEmitter {
             existingBuffer = Buffer.concat([existingBuffer, audioPayload]);
             this.audioBuffers.set(callId, existingBuffer);
 
-            // Log buffer status more frequently for debugging
-            if (this.audioChunkCount[callId] <= 10 || this.audioChunkCount[callId] % 20 === 0) {
-                logger.info(`[RTP Sender] Buffer status for ${callId}: ${existingBuffer.length} bytes buffered (chunk: ${audioPayload.length} bytes, need: ${this.SAMPLES_PER_FRAME} bytes for frame)`);
+            // Log buffer status
+            if (this.audioChunkCount[callId] <= 5 || this.audioChunkCount[callId] % 50 === 0) {
+                logger.info(`[RTP Sender] Buffer status for ${callId}: ${existingBuffer.length} bytes buffered`);
             }
 
             this.updateStats(callId, 'audio_sent', { bytes: audioPayload.length });
