@@ -219,6 +219,429 @@ router.post('/create-caregiver', validate(caregiverValidation.createCaregiver), 
 
 /**
  * @swagger
+ * /test/diagnose:
+ *   get:
+ *     summary: Comprehensive system diagnosis
+ *     description: Runs all diagnostic checks to identify problems
+ *     tags: [Test - Diagnosis]
+ *     responses:
+ *       "200":
+ *         description: Complete diagnosis results
+ */
+router.get('/diagnose', async (req, res) => {
+    const diagnosis = {
+        timestamp: new Date().toISOString(),
+        summary: {},
+        details: {},
+        recommendations: []
+    };
+
+    try {
+        // 1. Environment Check
+        diagnosis.details.environment = {
+            nodeEnv: process.env.NODE_ENV,
+            port: process.env.PORT,
+            openaiApiKey: process.env.OPENAI_API_KEY ? 'SET' : 'MISSING',
+            openaiRealtimeModel: process.env.OPENAI_REALTIME_MODEL,
+            openaiRealtimeVoice: process.env.OPENAI_REALTIME_VOICE,
+            openaiModel: process.env.OPENAI_MODEL,
+            openaiIdleTimeout: process.env.OPENAI_IDLE_TIMEOUT,
+            websocketUrl: process.env.WEBSOCKET_URL
+        };
+
+        // 2. Config Validation
+        try {
+            const configCheck = {
+                openai: {
+                    apiKey: config.openai?.apiKey ? 'SET' : 'MISSING',
+                    realtimeModel: config.openai?.realtimeModel,
+                    realtimeVoice: config.openai?.realtimeVoice,
+                    realtimeSessionConfig: config.openai?.realtimeSessionConfig,
+                    idleTimeout: config.openai?.idleTimeout,
+                    model: config.openai?.model,
+                    debugAudio: config.openai?.debugAudio
+                }
+            };
+            diagnosis.details.config = configCheck;
+        } catch (err) {
+            diagnosis.details.config = { error: err.message };
+        }
+
+        // 3. Service Loading Check
+        diagnosis.details.services = {
+            ariClient: ariClient ? 'LOADED' : 'FAILED',
+            rtpListener: rtpListener ? 'LOADED' : 'FAILED',
+            rtpSender: rtpSender ? 'LOADED' : 'FAILED',
+            openAIService: openAIService ? 'LOADED' : 'FAILED',
+            channelTracker: channelTracker ? 'LOADED' : 'FAILED'
+        };
+
+        // 4. ARI Connection Test
+        if (ariClient) {
+            try {
+                const ariInstance = ariClient.getAriClientInstance();
+                diagnosis.details.ariConnection = {
+                    connected: ariInstance.isConnected,
+                    health: await ariInstance.healthCheck()
+                };
+            } catch (err) {
+                diagnosis.details.ariConnection = { error: err.message };
+            }
+        }
+
+        // 5. OpenAI Service Test
+        if (openAIService) {
+            try {
+                const openaiInstance = openAIService.getOpenAIServiceInstance();
+                diagnosis.details.openaiService = {
+                    initialized: !!openaiInstance,
+                    connections: openaiInstance ? openaiInstance.connections.size : 0
+                };
+            } catch (err) {
+                diagnosis.details.openaiService = { error: err.message };
+            }
+        }
+
+        // 6. File System Check
+        diagnosis.details.filesystem = {
+            configExists: fs.existsSync(path.join(__dirname, '../../config/config.js')),
+            servicesExist: {
+                ariClient: fs.existsSync(path.join(__dirname, '../../services/ari.client.js')),
+                rtpListener: fs.existsSync(path.join(__dirname, '../../services/rtp.listener.service.js')),
+                rtpSender: fs.existsSync(path.join(__dirname, '../../services/rtp.sender.service.js')),
+                openaiRealtime: fs.existsSync(path.join(__dirname, '../../services/openai.realtime.service.js'))
+            }
+        };
+
+        // 7. Generate Summary
+        const issues = [];
+        if (!process.env.OPENAI_API_KEY) issues.push('Missing OPENAI_API_KEY');
+        if (!config.openai?.apiKey) issues.push('Missing config.openai.apiKey');
+        if (!ariClient) issues.push('ARI Client failed to load');
+        if (!openAIService) issues.push('OpenAI Service failed to load');
+
+        diagnosis.summary = {
+            totalChecks: 7,
+            passed: 7 - issues.length,
+            failed: issues.length,
+            issues: issues
+        };
+
+        // 8. Generate Recommendations
+        if (issues.length > 0) {
+            diagnosis.recommendations = issues.map(issue => {
+                switch (issue) {
+                    case 'Missing OPENAI_API_KEY':
+                        return 'Set OPENAI_API_KEY environment variable';
+                    case 'Missing config.openai.apiKey':
+                        return 'Check config.js for proper OpenAI configuration';
+                    case 'ARI Client failed to load':
+                        return 'Check ari.client.js for syntax errors or missing dependencies';
+                    case 'OpenAI Service failed to load':
+                        return 'Check openai.realtime.service.js for syntax errors or missing dependencies';
+                    default:
+                        return `Investigate: ${issue}`;
+                }
+            });
+        }
+
+        res.json(diagnosis);
+    } catch (err) {
+        res.status(500).json({
+            error: 'Diagnosis failed',
+            message: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/config-check:
+ *   get:
+ *     summary: Check configuration validity
+ *     description: Validates all configuration settings
+ *     tags: [Test - Config]
+ *     responses:
+ *       "200":
+ *         description: Configuration check results
+ */
+router.get('/config-check', async (req, res) => {
+    const configCheck = {
+        timestamp: new Date().toISOString(),
+        environment: {},
+        config: {},
+        validation: {}
+    };
+
+    // Environment variables
+    configCheck.environment = {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: process.env.PORT,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'SET' : 'MISSING',
+        OPENAI_REALTIME_MODEL: process.env.OPENAI_REALTIME_MODEL,
+        OPENAI_REALTIME_VOICE: process.env.OPENAI_REALTIME_VOICE,
+        OPENAI_REALTIME_SESSION_CONFIG: process.env.OPENAI_REALTIME_SESSION_CONFIG,
+        OPENAI_IDLE_TIMEOUT: process.env.OPENAI_IDLE_TIMEOUT,
+        OPENAI_MODEL: process.env.OPENAI_MODEL,
+        WEBSOCKET_URL: process.env.WEBSOCKET_URL
+    };
+
+    // Config object
+    try {
+        configCheck.config = {
+            openai: {
+                apiKey: config.openai?.apiKey ? 'SET' : 'MISSING',
+                realtimeModel: config.openai?.realtimeModel,
+                realtimeVoice: config.openai?.realtimeVoice,
+                realtimeSessionConfig: config.openai?.realtimeSessionConfig,
+                idleTimeout: config.openai?.idleTimeout,
+                model: config.openai?.model,
+                debugAudio: config.openai?.debugAudio
+            }
+        };
+    } catch (err) {
+        configCheck.config = { error: err.message };
+    }
+
+    // Validation
+    const errors = [];
+    if (!process.env.OPENAI_API_KEY) errors.push('OPENAI_API_KEY not set');
+    if (!config.openai?.apiKey) errors.push('config.openai.apiKey not set');
+    if (!config.openai?.realtimeModel) errors.push('config.openai.realtimeModel not set');
+    if (!config.openai?.realtimeVoice) errors.push('config.openai.realtimeVoice not set');
+
+    configCheck.validation = {
+        isValid: errors.length === 0,
+        errors: errors
+    };
+
+    res.json(configCheck);
+});
+
+/**
+ * @swagger
+ * /test/service-status:
+ *   get:
+ *     summary: Check service status
+ *     description: Check if all services are loaded and functioning
+ *     tags: [Test - Services]
+ *     responses:
+ *       "200":
+ *         description: Service status results
+ */
+router.get('/service-status', async (req, res) => {
+    const serviceStatus = {
+        timestamp: new Date().toISOString(),
+        services: {},
+        connections: {},
+        health: {}
+    };
+
+    // Check service loading
+    serviceStatus.services = {
+        ariClient: {
+            loaded: !!ariClient,
+            error: ariClient ? null : 'Failed to load ari.client.js'
+        },
+        rtpListener: {
+            loaded: !!rtpListener,
+            error: rtpListener ? null : 'Failed to load rtp.listener.service.js'
+        },
+        rtpSender: {
+            loaded: !!rtpSender,
+            error: rtpSender ? null : 'Failed to load rtp.sender.service.js'
+        },
+        openAIService: {
+            loaded: !!openAIService,
+            error: openAIService ? null : 'Failed to load openai.realtime.service.js'
+        },
+        channelTracker: {
+            loaded: !!channelTracker,
+            error: channelTracker ? null : 'Failed to load channel.tracker.js'
+        }
+    };
+
+    // Check connections if services are loaded
+    if (ariClient) {
+        try {
+            const ariInstance = ariClient.getAriClientInstance();
+            serviceStatus.connections.ari = {
+                connected: ariInstance.isConnected,
+                health: await ariInstance.healthCheck()
+            };
+        } catch (err) {
+            serviceStatus.connections.ari = { error: err.message };
+        }
+    }
+
+    if (openAIService) {
+        try {
+            const openaiInstance = openAIService.getOpenAIServiceInstance();
+            serviceStatus.connections.openai = {
+                initialized: !!openaiInstance,
+                activeConnections: openaiInstance ? openaiInstance.connections.size : 0
+            };
+        } catch (err) {
+            serviceStatus.connections.openai = { error: err.message };
+        }
+    }
+
+    // Overall health
+    const failedServices = Object.values(serviceStatus.services).filter(s => !s.loaded).length;
+    serviceStatus.health = {
+        totalServices: 5,
+        loadedServices: 5 - failedServices,
+        failedServices: failedServices,
+        overallHealth: failedServices === 0 ? 'HEALTHY' : 'DEGRADED'
+    };
+
+    res.json(serviceStatus);
+});
+
+/**
+ * @swagger
+ * /test/openai-test:
+ *   post:
+ *     summary: Test OpenAI service functionality
+ *     description: Test the OpenAI realtime service with a simple message
+ *     tags: [Test - OpenAI]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 description: Test message to send
+ *               callId:
+ *                 type: string
+ *                 description: Test call ID
+ *     responses:
+ *       "200":
+ *         description: OpenAI test results
+ */
+router.post('/openai-test', async (req, res) => {
+    const { message = 'Hello, this is a test message', callId = 'test-call-' + Date.now() } = req.body;
+    
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        testMessage: message,
+        callId: callId,
+        results: {}
+    };
+
+    try {
+        if (!openAIService) {
+            throw new Error('OpenAI service not loaded');
+        }
+
+        const openaiInstance = openAIService.getOpenAIServiceInstance();
+        if (!openaiInstance) {
+            throw new Error('OpenAI service instance not available');
+        }
+
+        // Test service initialization
+        testResults.results.serviceInitialized = true;
+        testResults.results.activeConnections = openaiInstance.connections.size;
+
+        // Test configuration access
+        testResults.results.config = {
+            realtimeModel: config.openai?.realtimeModel,
+            realtimeVoice: config.openai?.realtimeVoice,
+            apiKey: config.openai?.apiKey ? 'SET' : 'MISSING'
+        };
+
+        // Test creating a session (without actually connecting)
+        try {
+            const sessionConfig = {
+                model: config.openai.realtimeModel,
+                voice: config.openai.realtimeVoice,
+                input_audio_format: 'g711_ulaw',
+                output_audio_format: 'g711_ulaw',
+                turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.3,
+                    prefix_padding_ms: 200,
+                    silence_duration_ms: 800,
+                },
+                ...(config.openai.realtimeSessionConfig || {})
+            };
+
+            testResults.results.sessionConfig = sessionConfig;
+            testResults.results.configValid = true;
+        } catch (err) {
+            testResults.results.configValid = false;
+            testResults.results.configError = err.message;
+        }
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'OpenAI test failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/ari-test:
+ *   get:
+ *     summary: Test ARI client functionality
+ *     description: Test the ARI client connection and basic operations
+ *     tags: [Test - ARI]
+ *     responses:
+ *       "200":
+ *         description: ARI test results
+ */
+router.get('/ari-test', async (req, res) => {
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        results: {}
+    };
+
+    try {
+        if (!ariClient) {
+            throw new Error('ARI client not loaded');
+        }
+
+        const ariInstance = ariClient.getAriClientInstance();
+        if (!ariInstance) {
+            throw new Error('ARI client instance not available');
+        }
+
+        // Test connection status
+        testResults.results.connected = ariInstance.isConnected;
+        
+        // Test health check
+        if (ariInstance.isConnected) {
+            testResults.results.health = await ariInstance.healthCheck();
+        }
+
+        // Test configuration
+        testResults.results.config = {
+            host: ariInstance.config?.host,
+            port: ariInstance.config?.port,
+            username: ariInstance.config?.username ? 'SET' : 'MISSING',
+            password: ariInstance.config?.password ? 'SET' : 'MISSING'
+        };
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'ARI test failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
  * /test/validate-integration:
  *   get:
  *     summary: Validate complete system integration
