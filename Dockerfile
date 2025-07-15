@@ -26,7 +26,7 @@ RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-de
     rm -rf mongodb-linux-x86_64-debian11-6.0.9 mongodb.tgz
 
 # Set environment variable for MongoMemoryServer
-ENV MONGOMS_SYSTEM_BINARY /usr/local/bin/mongod
+ENV MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod
 
 # Install app dependencies
 COPY package.json yarn.lock ./
@@ -41,7 +41,6 @@ COPY --chown=node:node .eslintrc.json ./
 COPY --chown=node:node .prettierrc.json ./
 COPY --chown=node:node jest.config.js ./
 COPY --chown=node:node nodemon.json ./
-COPY --chown=node:node README.md ./
 COPY --chown=node:node .editorconfig ./
 COPY --chown=node:node .eslintignore ./
 COPY --chown=node:node .gitattributes ./
@@ -51,7 +50,6 @@ COPY --chown=node:node .nvmrc ./
 COPY --chown=node:node LICENSE ./
 COPY --chown=node:node ecosystem.config.json ./
 COPY --chown=node:node docker-compose*.yml ./
-COPY --chown=node:node .travis.yml ./
 
 # Expose the port the app runs on
 EXPOSE 3000
