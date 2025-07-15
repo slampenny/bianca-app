@@ -2,7 +2,7 @@
 type=transport
 protocol=udp
 bind=0.0.0.0:5060
-external_media_address=${EXTERNAL_ADDRESS}
+external_media_address=${PRIVATE_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5060
 
@@ -10,7 +10,7 @@ external_signaling_port=5060
 type=transport
 protocol=tcp
 bind=0.0.0.0:5061
-external_media_address=${EXTERNAL_ADDRESS}
+external_media_address=${PRIVATE_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5061
 
@@ -22,7 +22,7 @@ type=transport
 protocol=ws
 bind=0.0.0.0:8088
 ; If you need external access to WebSocket
-external_media_address=${EXTERNAL_ADDRESS}
+external_media_address=${PRIVATE_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
 
 ; Optional: WebSocket Secure (WSS) transport
