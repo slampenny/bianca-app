@@ -1104,6 +1104,204 @@ router.post('/audio-pipeline-test', async (req, res) => {
     }
 });
 
+
+
+/**
+ * @swagger
+ * /test/mongodb-service-discovery:
+ *   get:
+ *     summary: Test MongoDB service discovery and connectivity
+ *     description: Test DNS resolution, service discovery, and direct connection to MongoDB
+ *     tags: [Test - MongoDB]
+ *     responses:
+ *       "200":
+ *         description: MongoDB service discovery test results
+ */
+router.get('/mongodb-service-discovery', async (req, res) => {
+    const results = {
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        dns: {},
+        serviceDiscovery: {},
+        connection: {},
+        error: null
+    };
+
+    try {
+        const dns = require('dns').promises;
+        const config = require('../../config/config');
+        
+        // Test DNS resolution
+        try {
+            const hostname = 'mongodb.myphonefriend.internal';
+            const addresses = await dns.resolve4(hostname);
+            results.dns = {
+                hostname,
+                resolved: true,
+                addresses,
+                firstAddress: addresses[0]
+            };
+        } catch (dnsError) {
+            results.dns = {
+                hostname: 'mongodb.myphonefriend.internal',
+                resolved: false,
+                error: dnsError.message,
+                code: dnsError.code
+            };
+        }
+
+        // Test service discovery
+        try {
+            const AWS = require('aws-sdk');
+            const servicediscovery = new AWS.ServiceDiscovery();
+            
+            // List services to see if MongoDB service exists
+            const services = await servicediscovery.listServices().promise();
+            const mongodbService = services.Services.find(s => s.Name === 'mongodb');
+            
+            if (mongodbService) {
+                // Get service instances
+                const instances = await servicediscovery.listInstances({
+                    ServiceId: mongodbService.Id
+                }).promise();
+                
+                results.serviceDiscovery = {
+                    serviceFound: true,
+                    serviceId: mongodbService.Id,
+                    serviceArn: mongodbService.Arn,
+                    instances: instances.Instances.map(instance => ({
+                        id: instance.Id,
+                        attributes: instance.Attributes
+                    }))
+                };
+            } else {
+                results.serviceDiscovery = {
+                    serviceFound: false,
+                    availableServices: services.Services.map(s => s.Name)
+                };
+            }
+        } catch (sdError) {
+            results.serviceDiscovery = {
+                error: sdError.message,
+                code: sdError.code
+            };
+        }
+
+        // Test direct connection
+        try {
+            const mongoose = require('mongoose');
+            const testUrl = config.mongoose.url;
+            
+            // Try to connect with a short timeout
+            const testConnection = mongoose.createConnection(testUrl, {
+                ...config.mongoose.options,
+                serverSelectionTimeoutMS: 5000,
+                connectTimeoutMS: 5000
+            });
+            
+            await testConnection.asPromise();
+            
+            results.connection = {
+                status: 'connected',
+                url: testUrl,
+                host: testConnection.host,
+                port: testConnection.port,
+                name: testConnection.name
+            };
+            
+            await testConnection.close();
+        } catch (connectError) {
+            results.connection = {
+                status: 'failed',
+                url: config.mongoose.url,
+                error: connectError.message,
+                code: connectError.code,
+                name: connectError.name
+            };
+        }
+
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({
+            error: 'MongoDB service discovery test failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/mongodb-connection:
+ *   get:
+ *     summary: Test MongoDB connection specifically
+ *     description: Detailed MongoDB connection test with connection URL and error details
+ *     tags: [Test - MongoDB]
+ *     responses:
+ *       "200":
+ *         description: MongoDB connection test results
+ */
+router.get('/mongodb-connection', async (req, res) => {
+    const results = {
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        config: {},
+        connection: {},
+        error: null
+    };
+
+    try {
+        // Get config details
+        const config = require('../../config/config');
+        results.config = {
+            url: config.mongoose.url,
+            options: config.mongoose.options
+        };
+
+        // Test connection
+        const mongoose = require('mongoose');
+        
+        if (mongoose.connection.readyState === 1) {
+            // Already connected
+            results.connection = {
+                status: 'connected',
+                host: mongoose.connection.host,
+                port: mongoose.connection.port,
+                name: mongoose.connection.name,
+                url: mongoose.connection.client?.s?.url
+            };
+        } else {
+            // Try to connect
+            try {
+                await mongoose.connect(config.mongoose.url, config.mongoose.options);
+                results.connection = {
+                    status: 'connected',
+                    host: mongoose.connection.host,
+                    port: mongoose.connection.port,
+                    name: mongoose.connection.name,
+                    url: mongoose.connection.client?.s?.url
+                };
+            } catch (connectError) {
+                results.connection = {
+                    status: 'failed',
+                    error: connectError.message,
+                    code: connectError.code,
+                    name: connectError.name
+                };
+                results.error = connectError.message;
+            }
+        }
+
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({
+            error: 'MongoDB connection test failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 /**
  * @swagger
  * /test/startup-diagnosis:
@@ -1162,10 +1360,17 @@ router.get('/startup-diagnosis', async (req, res) => {
         // 4. Check if MongoDB can connect
         try {
             const mongoose = require('mongoose');
+            const config = require('../../config/config');
+            
             diagnosis.startupChecks.mongodb = {
                 mongooseLoaded: true,
                 connectionState: mongoose.connection.readyState,
-                connectionStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown'
+                connectionStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
+                configuredUrl: config.mongoose.url,
+                actualHost: mongoose.connection.host || 'unknown',
+                actualPort: mongoose.connection.port || 'unknown',
+                actualName: mongoose.connection.name || 'unknown',
+                connectionUrl: mongoose.connection.client?.s?.url || 'unknown'
             };
         } catch (err) {
             diagnosis.startupChecks.mongodb = {

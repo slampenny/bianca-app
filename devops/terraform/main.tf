@@ -1111,7 +1111,7 @@ resource "aws_ecs_task_definition" "mongodb_task" {
     name      = "mongodb"
     image     = "public.ecr.aws/docker/library/mongo:7.0"
     essential = true
-    command   = ["sh", "-c", "mongod --bind_ip_all"]
+    command   = ["mongod", "--bind_ip_all", "--port", tostring(var.mongodb_port)]
     portMappings = [
       { containerPort = var.mongodb_port, protocol = "tcp" }
     ]
@@ -1120,7 +1120,9 @@ resource "aws_ecs_task_definition" "mongodb_task" {
     ]
     environment = [
       { name = "MONGODB_DIRECTORYPERDB", value = "true" },
-      { name = "MONGODB_JOURNAL_ENABLED", value = "true" }
+      { name = "MONGODB_JOURNAL_ENABLED", value = "true" },
+      { name = "MONGODB_PORT", value = tostring(var.mongodb_port) },
+      { name = "MONGODB_BIND_IP", value = "0.0.0.0" }
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -1130,14 +1132,13 @@ resource "aws_ecs_task_definition" "mongodb_task" {
         "awslogs-stream-prefix" = "mongo"
       }
     }
-    # Temporarily removed health check to debug MongoDB startup
-    # healthCheck = {
-    #   command     = ["CMD-SHELL", "timeout 10 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/27017' || exit 1"]
-    #   interval    = 30
-    #   timeout     = 15
-    #   retries     = 5
-    #   startPeriod = 60
-    # }
+    healthCheck = {
+      command     = ["CMD-SHELL", "mongosh --eval 'db.runCommand(\"ping\")' || exit 1"]
+      interval    = 30
+      timeout     = 15
+      retries     = 5
+      startPeriod = 60
+    }
   }])
   
   tags = { Name = "mongodb-service" }
