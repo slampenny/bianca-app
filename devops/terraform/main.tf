@@ -617,13 +617,13 @@ resource "aws_security_group" "bianca_app_sg" {
     cidr_blocks = ["172.31.0.0/16"]  # VPC CIDR - ALB is in the VPC
   }
 
-  # RTP from Asterisk (public subnet)
+  # RTP from Asterisk (specific private IP)
   ingress {
-    description = "RTP from Asterisk (public subnet)"
+    description = "RTP from Asterisk (specific private IP)"
     from_port   = var.app_rtp_port_start
     to_port     = var.app_rtp_port_end
     protocol    = "udp"
-    cidr_blocks = ["172.31.100.0/24", "172.31.101.0/24"]  # Asterisk's public subnets
+    cidr_blocks = ["${aws_instance.asterisk.private_ip}/32"]  # Asterisk's specific private IP
   }
 
   # Egress rules

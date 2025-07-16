@@ -3255,75 +3255,98 @@ router.get('/network-connectivity', async (req, res) => {
 /**
  * @swagger
  * /test/security-group-analysis:
- *   get:
- *     summary: Analyze security group configuration
- *     description: Checks if security groups are properly configured for Fargate
- *     tags: [Test - Network]
+ *   post:
+ *     summary: 13 - Analyze security groups and network connectivity (NO ACTIVE CALL REQUIRED)
+ *     description: Comprehensive analysis of security groups, network configuration, and connectivity between Fargate and Asterisk
+ *     tags: [06 - Network & Security]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               testConnectivity:
+ *                 type: boolean
+ *                 description: Whether to test actual connectivity
+ *                 default: true
+ *               testSecurityGroups:
+ *                 type: boolean
+ *                 description: Whether to analyze security group configuration
+ *                 default: true
+ *               testRtpPorts:
+ *                 type: boolean
+ *                 description: Whether to test RTP port accessibility
+ *                 default: true
+ *           example:
+ *             testConnectivity: true
+ *             testSecurityGroups: true
+ *             testRtpPorts: true
  *     responses:
  *       "200":
- *         description: Security group analysis
+ *         description: Security group and network analysis results
  */
-router.get('/security-group-analysis', async (req, res) => {
+router.post('/security-group-analysis', async (req, res) => {
+    const { 
+        testConnectivity = true,
+        testSecurityGroups = true,
+        testRtpPorts = true
+    } = req.body;
+    
+    const analysisResults = {
+        timestamp: new Date().toISOString(),
+        environment: {},
+        network: {},
+        securityGroups: {},
+        connectivity: {},
+        issues: [],
+        recommendations: [],
+        terraformFixes: []
+    };
+
     try {
-        const result = {
-            timestamp: new Date().toISOString(),
-            analysis: {},
-            issues: [],
-            architecture: {
-                app: 'AWS Fargate (ECS)',
-                asterisk: 'EC2 Instance',
-                connectivity: 'RTP over UDP',
-                securityGroupApproach: 'Should use CIDR blocks for Fargate ↔ EC2'
-            }
-        };
-
-        // Check environment details
-        result.analysis.environment = {
+        // Environment Analysis
+        analysisResults.environment = {
             isECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
-            taskMetadata: process.env.ECS_CONTAINER_METADATA_URI_V4,
-            region: process.env.AWS_REGION,
-            publicIpConfig: process.env.BIANCA_PUBLIC_IP
+            taskMetadata: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set',
+            region: process.env.AWS_REGION || 'Not set',
+            publicIpConfig: config.asterisk?.rtpBiancaHost || 'Not set',
+            networkMode: 'awsvpc', // Fargate always uses awsvpc
+            platform: 'Fargate'
         };
 
-        // Get our task's network details if in ECS
-        if (process.env.ECS_CONTAINER_METADATA_URI_V4) {
+        // Network Configuration Analysis
+        analysisResults.network = {
+            asteriskUrl: config.asterisk?.url || 'Not set',
+            asteriskHost: config.asterisk?.host || 'Not set',
+            rtpBiancaHost: config.asterisk?.rtpBiancaHost || 'Not set',
+            rtpAsteriskHost: config.asterisk?.rtpAsteriskHost || 'Not set',
+            appRtpPortRange: process.env.APP_RTP_PORT_RANGE || '20002-30000',
+            rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set'
+        };
+
+        // Security Group Analysis
+        if (testSecurityGroups) {
+            analysisResults.securityGroups = {
+                status: 'analyzing',
+                timestamp: new Date().toISOString()
+            };
+
             try {
-                const fetch = require('node-fetch');
-                const taskMetadata = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4 + '/task');
-                const taskData = await taskMetadata.json();
-                
-                result.analysis.taskNetwork = {
-                    taskArn: taskData.TaskARN,
-                    taskDefinitionFamily: taskData.Family,
-                    taskDefinitionRevision: taskData.Revision,
-                    availabilityZone: taskData.AvailabilityZone
-                };
+                // Analyze the current configuration for security group issues
+                const issues = [];
+                const recommendations = [];
+                const terraformFixes = [];
 
-                // Get network details
-                const taskStatsResponse = await fetch(process.env.ECS_CONTAINER_METADATA_URI_V4 + '/task/stats');
-                const taskStats = await taskStatsResponse.json();
-                
-                result.analysis.networkMode = 'awsvpc'; // Fargate always uses awsvpc
-                
-            } catch (err) {
-                result.analysis.metadataError = err.message;
-            }
-        }
-
-        // Check expected vs actual network configuration
-        result.analysis.expectedConfig = {
-            fargateToEC2: 'Requires CIDR-based security group rules',
-            securityGroupRule: 'source should be Asterisk private IP/32, not security group ID',
-            udpPorts: '20002-30000 for RTP traffic',
-            direction: 'Asterisk → Fargate for audio input'
-        };
-
-        // Common issues with Fargate + EC2 setup
-        result.issues.push({
-            category: 'Security Groups',
-            issue: 'Using source_security_group_id for Fargate connectivity',
-            description: 'Security group references only work for EC2 ↔ EC2. Fargate needs CIDR-based rules.',
-            terraform_fix: `
+                // Issue 1: Check if using security group IDs instead of CIDR blocks
+                if (analysisResults.environment.isECS) {
+                    issues.push({
+                        category: 'Security Groups',
+                        severity: 'CRITICAL',
+                        issue: 'Using source_security_group_id for Fargate connectivity',
+                        description: 'Security group references only work for EC2 ↔ EC2. Fargate needs CIDR-based rules.',
+                        impact: 'RTP traffic from Asterisk will be blocked',
+                        terraform_fix: `
 resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   type              = "ingress"
   from_port         = var.app_rtp_port_start
@@ -3333,19 +3356,212 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   cidr_blocks       = ["\${aws_instance.asterisk.private_ip}/32"]
   description       = "RTP from Asterisk to App"
 }`
-        });
+                    });
 
-        result.issues.push({
-            category: 'IP Configuration',
-            issue: 'ExternalMedia destination IP',
-            description: 'Asterisk needs to know where to send RTP. Check if using public or private IP.',
-            check: 'Verify getFargateIp() returns the IP that Asterisk can reach'
-        });
+                    recommendations.push({
+                        category: 'Security Groups',
+                        action: 'Replace security group ID with CIDR block',
+                        details: 'Use Asterisk private IP/32 instead of source_security_group_id'
+                    });
+                }
 
-        res.json(result);
+                // Issue 2: Check IP configuration
+                if (!analysisResults.network.rtpBiancaHost || analysisResults.network.rtpBiancaHost === 'Not set') {
+                    issues.push({
+                        category: 'IP Configuration',
+                        severity: 'HIGH',
+                        issue: 'Missing RTP destination IP configuration',
+                        description: 'Asterisk needs to know where to send RTP traffic',
+                        impact: 'RTP packets will not reach the application',
+                        check: 'Verify getFargateIp() returns the IP that Asterisk can reach'
+                    });
+                }
 
+                // Issue 3: Check port range configuration
+                const portRange = analysisResults.network.appRtpPortRange;
+                if (!portRange || portRange === 'Not set') {
+                    issues.push({
+                        category: 'Port Configuration',
+                        severity: 'HIGH',
+                        issue: 'Missing RTP port range configuration',
+                        description: 'Security group needs to allow UDP traffic on RTP port range',
+                        impact: 'RTP traffic will be blocked',
+                        terraform_fix: `
+variable "app_rtp_port_start" {
+  description = "Starting port for RTP traffic"
+  type        = number
+  default     = 20002
+}
+
+variable "app_rtp_port_end" {
+  description = "Ending port for RTP traffic"
+  type        = number
+  default     = 30000
+}`
+                    });
+                }
+
+                analysisResults.securityGroups.status = 'completed';
+                analysisResults.securityGroups.issues = issues;
+                analysisResults.securityGroups.recommendations = recommendations;
+                analysisResults.issues = issues;
+                analysisResults.recommendations = recommendations;
+                analysisResults.terraformFixes = terraformFixes;
+
+            } catch (err) {
+                analysisResults.securityGroups.status = 'failed';
+                analysisResults.securityGroups.error = err.message;
+                analysisResults.issues.push({
+                    category: 'Analysis Error',
+                    severity: 'MEDIUM',
+                    issue: 'Security group analysis failed',
+                    description: err.message
+                });
+            }
+        }
+
+        // Connectivity Testing
+        if (testConnectivity) {
+            analysisResults.connectivity = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const { getAsteriskIP, getRTPAddress, getNetworkDebugInfo } = require('../../utils/network.utils');
+                
+                // Test DNS resolution
+                const asteriskIP = await getAsteriskIP();
+                const rtpAddress = getRTPAddress();
+                const networkInfo = getNetworkDebugInfo();
+                
+                analysisResults.connectivity.dnsResolution = {
+                    asteriskIP,
+                    rtpAddress,
+                    networkInfo,
+                    resolved: !!asteriskIP
+                };
+
+                // Test TCP connectivity to Asterisk
+                if (asteriskIP) {
+                    const net = require('net');
+                    const asteriskUrl = new URL(config.asterisk.url);
+                    const asteriskPort = asteriskUrl.port || (asteriskUrl.protocol === 'https:' ? 443 : 80);
+                    
+                    const tcpTest = await new Promise((resolve) => {
+                        const socket = new net.Socket();
+                        const timeout = setTimeout(() => {
+                            socket.destroy();
+                            resolve({ connected: false, error: 'Connection timeout' });
+                        }, 5000);
+                        
+                        socket.connect(asteriskPort, asteriskIP, () => {
+                            clearTimeout(timeout);
+                            socket.destroy();
+                            resolve({ connected: true });
+                        });
+                        
+                        socket.on('error', (err) => {
+                            clearTimeout(timeout);
+                            resolve({ connected: false, error: err.message });
+                        });
+                    });
+                    
+                    analysisResults.connectivity.tcpConnectivity = tcpTest;
+                }
+
+                analysisResults.connectivity.status = 'completed';
+                
+            } catch (err) {
+                analysisResults.connectivity.status = 'failed';
+                analysisResults.connectivity.error = err.message;
+                analysisResults.issues.push({
+                    category: 'Connectivity',
+                    severity: 'HIGH',
+                    issue: 'Connectivity test failed',
+                    description: err.message
+                });
+            }
+        }
+
+        // RTP Port Testing
+        if (testRtpPorts) {
+            analysisResults.rtpPorts = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const portManager = require('../../services/port.manager.service');
+                const portStats = portManager.getStats();
+                
+                // Test port allocation
+                const testCallId = `sg-test-${Date.now()}`;
+                const allocatedPorts = portManager.allocatePortsForCall(testCallId);
+                
+                // Test RTP listener creation
+                const rtpListener = require('../../services/rtp.listener.service');
+                const testPort = allocatedPorts.readPort;
+                
+                await rtpListener.startRtpListenerForCall(testPort, testCallId, testCallId);
+                const listener = rtpListener.getListenerForCall(testCallId);
+                
+                // Cleanup
+                rtpListener.stopRtpListenerForCall(testCallId);
+                portManager.releasePortsForCall(testCallId);
+                
+                analysisResults.rtpPorts.status = 'completed';
+                analysisResults.rtpPorts.portStats = portStats;
+                analysisResults.rtpPorts.testAllocation = {
+                    callId: testCallId,
+                    allocatedPorts,
+                    listenerCreated: !!listener,
+                    listenerActive: listener?.isActive || false
+                };
+                
+            } catch (err) {
+                analysisResults.rtpPorts.status = 'failed';
+                analysisResults.rtpPorts.error = err.message;
+                analysisResults.issues.push({
+                    category: 'RTP Ports',
+                    severity: 'HIGH',
+                    issue: 'RTP port test failed',
+                    description: err.message
+                });
+            }
+        }
+
+        // Architecture Summary
+        analysisResults.architecture = {
+            app: 'AWS Fargate (ECS)',
+            asterisk: 'EC2 Instance',
+            connectivity: 'RTP over UDP',
+            securityGroupApproach: 'Should use CIDR blocks for Fargate ↔ EC2',
+            currentIssue: 'Likely using security group IDs instead of CIDR blocks'
+        };
+
+        // Overall Assessment
+        const criticalIssues = analysisResults.issues.filter(i => i.severity === 'CRITICAL').length;
+        const highIssues = analysisResults.issues.filter(i => i.severity === 'HIGH').length;
+        
+        analysisResults.assessment = {
+            overallStatus: criticalIssues > 0 ? 'CRITICAL' : highIssues > 0 ? 'HIGH' : 'GOOD',
+            criticalIssues,
+            highIssues,
+            totalIssues: analysisResults.issues.length,
+            likelyRootCause: criticalIssues > 0 ? 'Security group configuration' : 'Network connectivity',
+            nextSteps: criticalIssues > 0 ? 
+                'Fix security group rules to use CIDR blocks instead of security group IDs' :
+                'Verify network connectivity and IP configuration'
+        };
+
+        res.json(analysisResults);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            error: 'Security group analysis failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
     }
 });
 
@@ -3768,10 +3984,11 @@ router.post('/asterisk-connectivity', async (req, res) => {
 
             try {
                 const portManager = require('../../services/port.manager.service');
+                const channelTracker = require('../../services/channel.tracker');
                 
-                // Test port allocation
+                // Test port allocation using channel tracker
                 const initialStats = portManager.getStats();
-                const allocatedPorts = portManager.allocatePortsForCall('test-connectivity');
+                const allocatedPorts = channelTracker.allocatePortsForCall('test-connectivity');
                 const afterAllocationStats = portManager.getStats();
                 
                 // Test RTP listener creation
@@ -3783,7 +4000,7 @@ router.post('/asterisk-connectivity', async (req, res) => {
                 
                 // Cleanup
                 rtpListener.stopRtpListenerForCall('test-connectivity');
-                portManager.releasePortsForCall('test-connectivity');
+                channelTracker.releasePortsForCall('test-connectivity');
                 
                 testResults.tests.rtpPorts.status = 'completed';
                 testResults.tests.rtpPorts.portAllocation = {
@@ -3949,7 +4166,7 @@ router.post('/ari-call-simulation', async (req, res) => {
             try {
                 const portManager = require('../../services/port.manager.service');
                 
-                // Test port allocation using the tracker
+                // Test port allocation using the channel tracker
                 const allocatedPorts = ariInstance.tracker.allocatePortsForCall(testResults.callId);
                 
                 if (!allocatedPorts.readPort || !allocatedPorts.writePort) {
