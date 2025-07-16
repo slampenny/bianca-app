@@ -3442,7 +3442,7 @@ variable "app_rtp_port_end" {
                     resolved: !!asteriskIP
                 };
 
-                // Test TCP connectivity to Asterisk
+                // Test TCP connectivity to Asterisk (ARI/HTTP)
                 if (asteriskIP) {
                     const net = require('net');
                     const asteriskUrl = new URL(config.asterisk.url);
@@ -3468,6 +3468,68 @@ variable "app_rtp_port_end" {
                     });
                     
                     analysisResults.connectivity.tcpConnectivity = tcpTest;
+                }
+
+                // Test UDP connectivity for RTP (Asterisk → App)
+                if (asteriskIP) {
+                    const dgram = require('dgram');
+                    const testPort = 20002; // Use a test RTP port
+                    
+                    const udpTest = await new Promise((resolve) => {
+                        const server = dgram.createSocket('udp4');
+                        const timeout = setTimeout(() => {
+                            server.close();
+                            resolve({ 
+                                listening: false, 
+                                error: 'UDP server setup timeout',
+                                canReceiveFromAsterisk: false 
+                            });
+                        }, 5000);
+                        
+                        server.on('error', (err) => {
+                            clearTimeout(timeout);
+                            server.close();
+                            resolve({ 
+                                listening: false, 
+                                error: err.message,
+                                canReceiveFromAsterisk: false 
+                            });
+                        });
+                        
+                        server.on('listening', () => {
+                            clearTimeout(timeout);
+                            
+                            // Test if Asterisk can send UDP to us
+                            const testPacket = Buffer.from('test-rtp-packet');
+                            const client = dgram.createSocket('udp4');
+                            
+                            client.send(testPacket, testPort, asteriskIP, (err) => {
+                                client.close();
+                                if (err) {
+                                    server.close();
+                                    resolve({ 
+                                        listening: true, 
+                                        canReceiveFromAsterisk: false,
+                                        error: `Cannot send to Asterisk: ${err.message}`
+                                    });
+                                } else {
+                                    // Wait briefly for packet to arrive
+                                    setTimeout(() => {
+                                        server.close();
+                                        resolve({ 
+                                            listening: true, 
+                                            canReceiveFromAsterisk: true,
+                                            testPort: testPort
+                                        });
+                                    }, 1000);
+                                }
+                            });
+                        });
+                        
+                        server.bind(testPort, '0.0.0.0');
+                    });
+                    
+                    analysisResults.connectivity.udpConnectivity = udpTest;
                 }
 
                 analysisResults.connectivity.status = 'completed';
@@ -3994,13 +4056,47 @@ router.post('/asterisk-connectivity', async (req, res) => {
                 // Test RTP listener creation
                 const rtpListener = require('../../services/rtp.listener.service');
                 const testPort = allocatedPorts.readPort;
+                const testCallId = 'test-connectivity';
                 
-                await rtpListener.startRtpListenerForCall(testPort, 'test-connectivity', 'test-connectivity');
-                const listener = rtpListener.getListenerForCall('test-connectivity');
+                await rtpListener.startRtpListenerForCall(testPort, testCallId, testCallId);
+                const listener = rtpListener.getListenerForCall(testCallId);
+                
+                // Test if Asterisk can reach our RTP listener
+                const asteriskIP = testResults.tests.networkReachability?.asteriskIP;
+                let asteriskCanReachRtp = false;
+                
+                if (asteriskIP && listener?.isActive) {
+                    const dgram = require('dgram');
+                    const testPacket = Buffer.from('test-rtp-from-asterisk');
+                    
+                    try {
+                        const client = dgram.createSocket('udp4');
+                        await new Promise((resolve, reject) => {
+                            const timeout = setTimeout(() => {
+                                client.close();
+                                reject(new Error('UDP send timeout'));
+                            }, 3000);
+                            
+                            client.send(testPacket, testPort, asteriskIP, (err) => {
+                                clearTimeout(timeout);
+                                client.close();
+                                if (err) {
+                                    reject(err);
+                                } else {
+                                    resolve();
+                                }
+                            });
+                        });
+                        
+                        asteriskCanReachRtp = true;
+                    } catch (err) {
+                        logger.warn(`[Security Group Test] Asterisk cannot reach RTP port ${testPort}: ${err.message}`);
+                    }
+                }
                 
                 // Cleanup
-                rtpListener.stopRtpListenerForCall('test-connectivity');
-                channelTracker.releasePortsForCall('test-connectivity');
+                rtpListener.stopRtpListenerForCall(testCallId);
+                channelTracker.releasePortsForCall(testCallId);
                 
                 testResults.tests.rtpPorts.status = 'completed';
                 testResults.tests.rtpPorts.portAllocation = {
@@ -4011,7 +4107,9 @@ router.post('/asterisk-connectivity', async (req, res) => {
                 testResults.tests.rtpPorts.listenerTest = {
                     port: testPort,
                     created: !!listener,
-                    active: listener?.isActive || false
+                    active: listener?.isActive || false,
+                    asteriskCanReachRtp: asteriskCanReachRtp,
+                    testPort: testPort
                 };
                 
             } catch (err) {
