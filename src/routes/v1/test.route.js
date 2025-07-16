@@ -503,11 +503,11 @@ router.get('/service-status', async (req, res) => {
  * @swagger
  * /test/openai-test:
  *   post:
- *     summary: Test OpenAI service functionality
- *     description: Test the OpenAI realtime service with a simple message
+ *     summary: Test OpenAI service functionality (NO ACTIVE CALL REQUIRED)
+ *     description: Test the OpenAI realtime service configuration and connection. Safe to run anytime.
  *     tags: [Test - OpenAI]
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -516,9 +516,14 @@ router.get('/service-status', async (req, res) => {
  *               message:
  *                 type: string
  *                 description: Test message to send
+ *                 default: "Hello, this is a test message"
  *               callId:
  *                 type: string
  *                 description: Test call ID
+ *                 default: "test-call-123"
+ *           example:
+ *             message: "Hello, this is a test message"
+ *             callId: "test-call-123"
  *     responses:
  *       "200":
  *         description: OpenAI test results
@@ -757,11 +762,11 @@ router.post('/rtp-test', async (req, res) => {
  * @swagger
  * /test/call-flow-test:
  *   post:
- *     summary: Test complete call flow
- *     description: Simulate a complete call from start to finish
+ *     summary: Test complete call flow (NO ACTIVE CALL REQUIRED)
+ *     description: Simulate a complete call from start to finish. Safe to run anytime.
  *     tags: [Test - Call Flow]
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -770,12 +775,19 @@ router.post('/rtp-test', async (req, res) => {
  *               phoneNumber:
  *                 type: string
  *                 description: Phone number to call
+ *                 default: "+1234567890"
  *               duration:
  *                 type: number
  *                 description: Call duration in seconds
+ *                 default: 10
  *               sendAudio:
  *                 type: boolean
  *                 description: Whether to send test audio
+ *                 default: true
+ *           example:
+ *             phoneNumber: "+1234567890"
+ *             duration: 10
+ *             sendAudio: true
  *     responses:
  *       "200":
  *         description: Call flow test results
@@ -924,11 +936,11 @@ router.post('/call-flow-test', async (req, res) => {
  * @swagger
  * /test/audio-pipeline-test:
  *   post:
- *     summary: Test audio pipeline end-to-end
- *     description: Test the complete audio flow from RTP to OpenAI and back
+ *     summary: Test audio pipeline end-to-end (NO ACTIVE CALL REQUIRED)
+ *     description: Test the complete audio flow from RTP to OpenAI and back. Safe to run anytime.
  *     tags: [Test - Audio Pipeline]
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -937,10 +949,15 @@ router.post('/call-flow-test', async (req, res) => {
  *               testDuration:
  *                 type: number
  *                 description: Test duration in seconds
+ *                 default: 5
  *               audioType:
  *                 type: string
  *                 enum: [silence, tone, speech]
  *                 description: Type of test audio to generate
+ *                 default: "silence"
+ *           example:
+ *             testDuration: 5
+ *             audioType: "silence"
  *     responses:
  *       "200":
  *         description: Audio pipeline test results
@@ -1232,6 +1249,132 @@ router.get('/mongodb-service-discovery', async (req, res) => {
 
 /**
  * @swagger
+ * /test/routes-summary:
+ *   get:
+ *     summary: Get summary of all available test routes
+ *     description: Categorizes test routes by whether they require an active call or not
+ *     tags: [Test - Info]
+ *     responses:
+ *       "200":
+ *         description: Summary of test routes
+ */
+router.get('/routes-summary', async (req, res) => {
+    const summary = {
+        timestamp: new Date().toISOString(),
+        categories: {
+            diagnostic: {
+                description: "Safe to run anytime - no active call required",
+                routes: [
+                    {
+                        path: "/test/diagnose",
+                        method: "GET",
+                        description: "Comprehensive system diagnosis"
+                    },
+                    {
+                        path: "/test/config-check", 
+                        method: "GET",
+                        description: "Check configuration values"
+                    },
+                    {
+                        path: "/test/service-status",
+                        method: "GET", 
+                        description: "Check service initialization status"
+                    },
+                    {
+                        path: "/test/openai-test",
+                        method: "GET",
+                        description: "Test OpenAI API connection"
+                    },
+                    {
+                        path: "/test/ari-test",
+                        method: "GET",
+                        description: "Test Asterisk ARI connection"
+                    },
+                    {
+                        path: "/test/mongodb-connection",
+                        method: "GET",
+                        description: "Test MongoDB connection"
+                    },
+                    {
+                        path: "/test/mongodb-service-discovery",
+                        method: "GET",
+                        description: "Test MongoDB service discovery"
+                    },
+                    {
+                        path: "/test/startup-diagnosis",
+                        method: "GET",
+                        description: "Diagnose startup issues"
+                    }
+                ]
+            },
+            callSimulation: {
+                description: "Requires call simulation - may create temporary connections",
+                routes: [
+                    {
+                        path: "/test/call-flow-simulation",
+                        method: "POST",
+                        description: "Simulate complete call flow with audio",
+                        body: {
+                            callId: "test-call-123",
+                            conversationId: "test-conv-456",
+                            initialPrompt: "Hello, this is a test call.",
+                            testDuration: 5
+                        }
+                    },
+                    {
+                        path: "/test/real-call-simulation",
+                        method: "POST", 
+                        description: "Real call simulation with OpenAI realtime",
+                        body: {
+                            callId: "test-call-123",
+                            conversationId: "test-conv-456",
+                            initialPrompt: "Hello, this is a test call.",
+                            testDuration: 10
+                        }
+                    },
+                    {
+                        path: "/test/audio-pipeline-test",
+                        method: "POST",
+                        description: "Test audio pipeline specifically",
+                        body: {
+                            callId: "audio-test-123",
+                            testDuration: 5,
+                            audioChunks: 20
+                        }
+                    },
+                    {
+                        path: "/test/rtp-test",
+                        method: "POST",
+                        description: "Test RTP packet sending",
+                        body: {
+                            callId: "rtp-test-123",
+                            packetsToSend: 50,
+                            packetInterval: 20
+                        }
+                    }
+                ]
+            }
+        },
+        recommendations: {
+            firstSteps: [
+                "1. Start with /test/diagnose for overall system health",
+                "2. Use /test/openai-test to check OpenAI connectivity", 
+                "3. Use /test/mongodb-connection to verify database",
+                "4. Use /test/service-status to check all services"
+            ],
+            ifNoAudio: [
+                "1. Run /test/real-call-simulation to test audio pipeline",
+                "2. Check /test/startup-diagnosis for configuration issues",
+                "3. Use /test/audio-pipeline-test for detailed audio testing"
+            ]
+        }
+    };
+    
+    res.json(summary);
+});
+
+/**
+ * @swagger
  * /test/mongodb-connection:
  *   get:
  *     summary: Test MongoDB connection specifically
@@ -1434,11 +1577,11 @@ router.get('/startup-diagnosis', async (req, res) => {
  * @swagger
  * /test/real-call-simulation:
  *   post:
- *     summary: Simulate a real call with proper initialization
- *     description: Test the complete call flow using the actual initialize method
+ *     summary: Simulate a real call with proper initialization (NO ACTIVE CALL REQUIRED)
+ *     description: Test the complete call flow using the actual initialize method. Safe to run anytime.
  *     tags: [Test - Real Call]
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -1447,15 +1590,24 @@ router.get('/startup-diagnosis', async (req, res) => {
  *               callId:
  *                 type: string
  *                 description: Call ID to use for testing
+ *                 default: "test-call-123"
  *               conversationId:
  *                 type: string
  *                 description: Conversation ID
+ *                 default: "test-conv-456"
  *               initialPrompt:
  *                 type: string
  *                 description: Initial prompt for the AI
+ *                 default: "Hello, this is a test call. Please respond with a brief greeting."
  *               testDuration:
  *                 type: number
- *                 description: How long to run the test
+ *                 description: How long to run the test (seconds)
+ *                 default: 10
+ *           example:
+ *             callId: "test-call-123"
+ *             conversationId: "test-conv-456"
+ *             initialPrompt: "Hello, this is a test call. Please respond with a brief greeting."
+ *             testDuration: 10
  *     responses:
  *       "200":
  *         description: Real call simulation results
