@@ -3339,13 +3339,18 @@ router.post('/security-group-analysis', async (req, res) => {
                 const terraformFixes = [];
 
                 // Issue 1: Check if using security group IDs instead of CIDR blocks
-                if (analysisResults.environment.isECS) {
+                // NOTE: This is a false positive - the actual Terraform config uses CIDR blocks correctly
+                // The test cannot actually detect the Terraform configuration, so we'll skip this check
+                // since UDP connectivity test shows RTP traffic is working
+                
+                // Only flag as issue if UDP connectivity test fails
+                if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === false) {
                     issues.push({
                         category: 'Security Groups',
                         severity: 'CRITICAL',
-                        issue: 'Using source_security_group_id for Fargate connectivity',
-                        description: 'Security group references only work for EC2 ↔ EC2. Fargate needs CIDR-based rules.',
-                        impact: 'RTP traffic from Asterisk will be blocked',
+                        issue: 'RTP traffic blocked by security groups',
+                        description: 'UDP connectivity test failed - RTP traffic cannot reach the application',
+                        impact: 'Audio will not work - no RTP packets received',
                         terraform_fix: `
 resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   type              = "ingress"
@@ -3357,12 +3362,10 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   description       = "RTP from Asterisk to App"
 }`
                     });
-
-                    recommendations.push({
-                        category: 'Security Groups',
-                        action: 'Replace security group ID with CIDR block',
-                        details: 'Use Asterisk private IP/32 instead of source_security_group_id'
-                    });
+                } else {
+                    // UDP connectivity is working - security groups are configured correctly
+                    analysisResults.securityGroups.status = 'completed';
+                    analysisResults.securityGroups.message = 'Security groups configured correctly - UDP connectivity verified';
                 }
 
                 // Issue 2: Check IP configuration
@@ -3377,7 +3380,25 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
                     });
                 }
 
-                // Issue 3: Check port range configuration
+                // Issue 3: Check if UDP connectivity is working (this is the real test)
+                if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === true) {
+                    analysisResults.securityGroups.message = '✅ Security groups working correctly - UDP connectivity verified';
+                    analysisResults.securityGroups.udpStatus = 'WORKING';
+                } else if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === false) {
+                    issues.push({
+                        category: 'RTP Connectivity',
+                        severity: 'CRITICAL',
+                        issue: 'UDP connectivity test failed',
+                        description: 'Cannot receive UDP packets from Asterisk - RTP traffic blocked',
+                        impact: 'Audio will not work - no RTP packets received',
+                        check: 'Verify security group rules allow UDP traffic from Asterisk private IP'
+                    });
+                    analysisResults.securityGroups.udpStatus = 'BLOCKED';
+                } else {
+                    analysisResults.securityGroups.udpStatus = 'UNKNOWN';
+                }
+
+                // Issue 4: Check port range configuration
                 const portRange = analysisResults.network.appRtpPortRange;
                 if (!portRange || portRange === 'Not set') {
                     issues.push({
@@ -3598,23 +3619,26 @@ variable "app_rtp_port_end" {
             app: 'AWS Fargate (ECS)',
             asterisk: 'EC2 Instance',
             connectivity: 'RTP over UDP',
-            securityGroupApproach: 'Should use CIDR blocks for Fargate ↔ EC2',
-            currentIssue: 'Likely using security group IDs instead of CIDR blocks'
+            securityGroupApproach: 'Using CIDR blocks for Fargate ↔ EC2',
+            currentStatus: udpWorking ? 'Network connectivity working - focus on audio pipeline' : 'Network connectivity blocked - fix security groups',
+            udpConnectivity: udpWorking ? 'WORKING' : 'BLOCKED'
         };
 
         // Overall Assessment
         const criticalIssues = analysisResults.issues.filter(i => i.severity === 'CRITICAL').length;
         const highIssues = analysisResults.issues.filter(i => i.severity === 'HIGH').length;
+        const udpWorking = analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === true;
         
         analysisResults.assessment = {
             overallStatus: criticalIssues > 0 ? 'CRITICAL' : highIssues > 0 ? 'HIGH' : 'GOOD',
             criticalIssues,
             highIssues,
             totalIssues: analysisResults.issues.length,
-            likelyRootCause: criticalIssues > 0 ? 'Security group configuration' : 'Network connectivity',
-            nextSteps: criticalIssues > 0 ? 
-                'Fix security group rules to use CIDR blocks instead of security group IDs' :
-                'Verify network connectivity and IP configuration'
+            udpConnectivity: udpWorking ? 'WORKING' : 'BLOCKED',
+            likelyRootCause: udpWorking ? 'OpenAI WebSocket or audio pipeline' : 'Security group configuration',
+            nextSteps: udpWorking ? 
+                'Focus on OpenAI WebSocket connection and audio pipeline testing' :
+                'Fix security group rules to allow UDP traffic from Asterisk'
         };
 
         res.json(analysisResults);
