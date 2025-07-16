@@ -3826,5 +3826,298 @@ router.post('/asterisk-connectivity', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/ari-call-simulation:
+ *   post:
+ *     summary: 12 - Simulate complete ARI call flow (NO ACTIVE CALL REQUIRED)
+ *     description: Simulates a real call coming in through ARI, including port assignment, channel setup, and media pipeline initialization
+ *     tags: [04 - Call Simulation]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               simulateChannel:
+ *                 type: boolean
+ *                 description: Whether to simulate channel creation
+ *                 default: true
+ *               simulatePortAssignment:
+ *                 type: boolean
+ *                 description: Whether to test port assignment
+ *                 default: true
+ *               simulateMediaPipeline:
+ *                 type: boolean
+ *                 description: Whether to test media pipeline setup
+ *                 default: true
+ *               simulateRtpChannels:
+ *                 type: boolean
+ *                 description: Whether to simulate RTP channel creation
+ *                 default: true
+ *               testDuration:
+ *                 type: number
+ *                 description: How long to run the test (seconds)
+ *                 default: 10
+ *           example:
+ *             simulateChannel: true
+ *             simulatePortAssignment: true
+ *             simulateMediaPipeline: true
+ *             simulateRtpChannels: true
+ *             testDuration: 10
+ *     responses:
+ *       "200":
+ *         description: ARI call simulation results
+ */
+router.post('/ari-call-simulation', async (req, res) => {
+    const { 
+        simulateChannel = true,
+        simulatePortAssignment = true,
+        simulateMediaPipeline = true,
+        simulateRtpChannels = true,
+        testDuration = 10
+    } = req.body;
+    
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        callId: `ari-sim-${Date.now()}`,
+        twilioCallSid: `CA${Date.now()}`,
+        patientId: 'test-patient-123',
+        steps: {},
+        errors: [],
+        resources: {}
+    };
+
+    try {
+        if (!ariClient) {
+            throw new Error('ARI client not loaded');
+        }
+
+        const ariInstance = ariClient.getAriClientInstance();
+        if (!ariInstance) {
+            throw new Error('ARI client instance not available');
+        }
+
+        if (!ariInstance.isConnected) {
+            throw new Error('ARI not connected to Asterisk server');
+        }
+
+        // Step 1: Simulate Channel Creation
+        if (simulateChannel) {
+            testResults.steps.channelCreation = {
+                status: 'simulating',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                // Create a mock channel object that mimics Asterisk's channel structure
+                const mockChannel = {
+                    id: testResults.callId,
+                    name: `PJSIP/twilio-trunk-${Date.now()}@from-twilio`,
+                    answer: async () => {
+                        logger.info(`[ARI Sim] Mock channel ${testResults.callId} answered`);
+                        return Promise.resolve();
+                    },
+                    getChannelVar: async ({ variable }) => {
+                        if (variable === 'RAW_SIP_URI_FOR_ARI') {
+                            return { value: `sip:+1234567890@asterisk;callSid=${testResults.twilioCallSid};patientId=${testResults.patientId}` };
+                        }
+                        return { value: '' };
+                    }
+                };
+
+                testResults.resources.mockChannel = mockChannel;
+                testResults.steps.channelCreation.status = 'completed';
+                testResults.steps.channelCreation.channelId = mockChannel.id;
+                testResults.steps.channelCreation.channelName = mockChannel.name;
+                
+            } catch (err) {
+                testResults.steps.channelCreation.status = 'failed';
+                testResults.steps.channelCreation.error = err.message;
+                testResults.errors.push(`Channel Creation: ${err.message}`);
+            }
+        }
+
+        // Step 2: Test Port Assignment
+        if (simulatePortAssignment && testResults.steps.channelCreation?.status === 'completed') {
+            testResults.steps.portAssignment = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const portManager = require('../../services/port.manager.service');
+                
+                // Test port allocation using the tracker
+                const allocatedPorts = ariInstance.tracker.allocatePortsForCall(testResults.callId);
+                
+                if (!allocatedPorts.readPort || !allocatedPorts.writePort) {
+                    throw new Error('Failed to allocate RTP ports');
+                }
+
+                testResults.resources.allocatedPorts = allocatedPorts;
+                testResults.steps.portAssignment.status = 'completed';
+                testResults.steps.portAssignment.readPort = allocatedPorts.readPort;
+                testResults.steps.portAssignment.writePort = allocatedPorts.writePort;
+                testResults.steps.portAssignment.portStats = portManager.getStats();
+                
+            } catch (err) {
+                testResults.steps.portAssignment.status = 'failed';
+                testResults.steps.portAssignment.error = err.message;
+                testResults.errors.push(`Port Assignment: ${err.message}`);
+            }
+        }
+
+        // Step 3: Test Media Pipeline Setup
+        if (simulateMediaPipeline && testResults.steps.portAssignment?.status === 'completed') {
+            testResults.steps.mediaPipeline = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const mockChannel = testResults.resources.mockChannel;
+                
+                // Call the actual setupMediaPipeline method with our mock channel
+                const pipelineResult = await ariInstance.setupMediaPipeline(
+                    mockChannel,
+                    testResults.twilioCallSid,
+                    testResults.patientId
+                );
+
+                testResults.resources.pipelineResult = pipelineResult;
+                testResults.steps.mediaPipeline.status = 'completed';
+                testResults.steps.mediaPipeline.success = pipelineResult.success;
+                testResults.steps.mediaPipeline.bridgeId = pipelineResult.bridgeId;
+                testResults.steps.mediaPipeline.conversationId = pipelineResult.conversationId;
+                testResults.steps.mediaPipeline.readPort = pipelineResult.readPort;
+                testResults.steps.mediaPipeline.writePort = pipelineResult.writePort;
+                
+            } catch (err) {
+                testResults.steps.mediaPipeline.status = 'failed';
+                testResults.steps.mediaPipeline.error = err.message;
+                testResults.errors.push(`Media Pipeline: ${err.message}`);
+            }
+        }
+
+        // Step 4: Simulate RTP Channel Creation
+        if (simulateRtpChannels && testResults.steps.mediaPipeline?.status === 'completed') {
+            testResults.steps.rtpChannels = {
+                status: 'simulating',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const allocatedPorts = testResults.resources.allocatedPorts;
+                
+                // Create mock RTP channels
+                const mockInboundRtpChannel = {
+                    id: `UnicastRTP/inbound-${Date.now()}`,
+                    name: `UnicastRTP/127.0.0.1:${allocatedPorts.readPort}-${allocatedPorts.readPort + 1}`,
+                    answer: async () => Promise.resolve(),
+                    getChannelVar: async ({ variable }) => {
+                        const vars = {
+                            'UNICASTRTP_LOCAL_ADDRESS': '127.0.0.1',
+                            'UNICASTRTP_LOCAL_PORT': allocatedPorts.readPort.toString(),
+                            'UNICASTRTP_REMOTE_ADDRESS': '127.0.0.1',
+                            'UNICASTRTP_REMOTE_PORT': (allocatedPorts.readPort + 1).toString()
+                        };
+                        return { value: vars[variable] || '' };
+                    }
+                };
+
+                const mockOutboundRtpChannel = {
+                    id: `UnicastRTP/outbound-${Date.now()}`,
+                    name: `UnicastRTP/127.0.0.1:${allocatedPorts.writePort}-${allocatedPorts.writePort + 1}`,
+                    answer: async () => Promise.resolve(),
+                    getChannelVar: async ({ variable }) => {
+                        const vars = {
+                            'UNICASTRTP_LOCAL_ADDRESS': '127.0.0.1',
+                            'UNICASTRTP_LOCAL_PORT': allocatedPorts.writePort.toString(),
+                            'UNICASTRTP_REMOTE_ADDRESS': '127.0.0.1',
+                            'UNICASTRTP_REMOTE_PORT': (allocatedPorts.writePort + 1).toString()
+                        };
+                        return { value: vars[variable] || '' };
+                    }
+                };
+
+                testResults.resources.mockInboundRtpChannel = mockInboundRtpChannel;
+                testResults.resources.mockOutboundRtpChannel = mockOutboundRtpChannel;
+
+                // Simulate RTP channel processing
+                await ariInstance.handleStasisStartForUnicastRTP(mockInboundRtpChannel);
+                await ariInstance.handleStasisStartForUnicastRTP(mockOutboundRtpChannel);
+
+                testResults.steps.rtpChannels.status = 'completed';
+                testResults.steps.rtpChannels.inboundChannelId = mockInboundRtpChannel.id;
+                testResults.steps.rtpChannels.outboundChannelId = mockOutboundRtpChannel.id;
+                
+            } catch (err) {
+                testResults.steps.rtpChannels.status = 'failed';
+                testResults.steps.rtpChannels.error = err.message;
+                testResults.errors.push(`RTP Channels: ${err.message}`);
+            }
+        }
+
+        // Step 5: Test Call State and Resources
+        testResults.steps.callState = {
+            status: 'checking',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const callData = ariInstance.tracker.getCall(testResults.callId);
+            const channelTracker = require('../../services/channel.tracker');
+            const channelStats = channelTracker.getStats();
+            
+            testResults.steps.callState.status = 'completed';
+            testResults.steps.callState.callData = callData;
+            testResults.steps.callState.channelStats = channelStats;
+            testResults.steps.callState.allocatedPorts = ariInstance.tracker.getAllocatedPortsForCall(testResults.callId);
+            
+        } catch (err) {
+            testResults.steps.callState.status = 'failed';
+            testResults.steps.callState.error = err.message;
+            testResults.errors.push(`Call State: ${err.message}`);
+        }
+
+        // Step 6: Cleanup
+        testResults.steps.cleanup = {
+            status: 'cleaning',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            // Cleanup the simulated call
+            await ariInstance.cleanupChannel(testResults.callId, 'Test simulation cleanup');
+            
+            testResults.steps.cleanup.status = 'completed';
+            
+        } catch (err) {
+            testResults.steps.cleanup.status = 'failed';
+            testResults.steps.cleanup.error = err.message;
+            testResults.errors.push(`Cleanup: ${err.message}`);
+        }
+
+        // Summary
+        testResults.summary = {
+            totalSteps: Object.keys(testResults.steps).length,
+            successfulSteps: Object.values(testResults.steps).filter(s => s.status === 'completed').length,
+            failedSteps: testResults.errors.length,
+            overallSuccess: testResults.errors.length === 0,
+            resourcesCreated: Object.keys(testResults.resources).length
+        };
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'ARI call simulation failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // Export the router
 module.exports = router;
