@@ -221,9 +221,9 @@ router.post('/create-caregiver', validate(caregiverValidation.createCaregiver), 
  * @swagger
  * /test/diagnose:
  *   get:
- *     summary: Comprehensive system diagnosis
+ *     summary: 02 - Comprehensive system diagnosis
  *     description: Runs all diagnostic checks to identify problems
- *     tags: [Test - Diagnosis]
+ *     tags: [02 - System Health]
  *     responses:
  *       "200":
  *         description: Complete diagnosis results
@@ -423,9 +423,9 @@ router.get('/config-check', async (req, res) => {
  * @swagger
  * /test/service-status:
  *   get:
- *     summary: Check service status
+ *     summary: 03 - Check service status
  *     description: Check if all services are loaded and functioning
- *     tags: [Test - Services]
+ *     tags: [02 - System Health]
  *     responses:
  *       "200":
  *         description: Service status results
@@ -503,9 +503,9 @@ router.get('/service-status', async (req, res) => {
  * @swagger
  * /test/openai-test:
  *   post:
- *     summary: Test OpenAI service functionality (NO ACTIVE CALL REQUIRED)
+ *     summary: 04 - Test OpenAI service functionality (NO ACTIVE CALL REQUIRED)
  *     description: Test the OpenAI realtime service configuration and connection. Safe to run anytime.
- *     tags: [Test - OpenAI]
+ *     tags: [03 - Core Services]
  *     requestBody:
  *       required: false
  *       content:
@@ -596,9 +596,9 @@ router.post('/openai-test', async (req, res) => {
  * @swagger
  * /test/ari-test:
  *   get:
- *     summary: Test ARI client functionality
+ *     summary: 06 - Test ARI client functionality
  *     description: Test the ARI client connection and basic operations
- *     tags: [Test - ARI]
+ *     tags: [03 - Core Services]
  *     responses:
  *       "200":
  *         description: ARI test results
@@ -629,10 +629,8 @@ router.get('/ari-test', async (req, res) => {
 
         // Test configuration
         testResults.results.config = {
-            host: ariInstance.config?.host,
-            port: ariInstance.config?.port,
-            username: ariInstance.config?.username ? 'SET' : 'MISSING',
-            password: ariInstance.config?.password ? 'SET' : 'MISSING'
+            username: process.env.ASTERISK_USERNAME || 'myphonefriend',
+            password: process.env.ARI_PASSWORD ? 'SET' : 'MISSING'
         };
 
         res.json(testResults);
@@ -689,11 +687,9 @@ router.post('/rtp-test', async (req, res) => {
             throw new Error('RTP services not loaded');
         }
 
-        const rtpListenerInstance = rtpListener.getRtpListenerInstance();
-        const rtpSenderInstance = rtpSender.getRtpSenderInstance();
-
-        if (!rtpListenerInstance || !rtpSenderInstance) {
-            throw new Error('RTP service instances not available');
+        // RTP services use direct function calls, not getInstance methods
+        if (!rtpListener || !rtpSender) {
+            throw new Error('RTP services not loaded');
         }
 
         // Test RTP Listener
@@ -706,13 +702,14 @@ router.post('/rtp-test', async (req, res) => {
                 };
 
                 // Start listener on test port
-                await rtpListenerInstance.startListening(port);
+                const callId = `rtp-test-${Date.now()}`;
+                await rtpListener.startRtpListenerForCall(port, callId, callId);
                 
                 // Wait for duration
                 await new Promise(resolve => setTimeout(resolve, duration * 1000));
                 
                 // Stop listener
-                await rtpListenerInstance.stopListening(port);
+                rtpListener.stopRtpListenerForCall(callId);
                 
                 testResults.results.listener.status = 'completed';
                 testResults.results.listener.endTime = new Date().toISOString();
@@ -735,10 +732,19 @@ router.post('/rtp-test', async (req, res) => {
                 const fakeAudioData = Buffer.alloc(160, 0xFF); // g711_ulaw silence
                 
                 // Send test packets
+                const callId = `rtp-test-${Date.now()}`;
+                await rtpSender.initializeCall(callId, {
+                    rtpHost: '127.0.0.1',
+                    rtpPort: port + 1,
+                    format: 'ulaw'
+                });
+                
                 for (let i = 0; i < 50; i++) {
-                    await rtpSenderInstance.sendAudioData('test-call', fakeAudioData, port + 1);
+                    await rtpSender.sendAudio(callId, fakeAudioData.toString('base64'));
                     await new Promise(resolve => setTimeout(resolve, 20)); // 20ms between packets
                 }
+                
+                rtpSender.cleanupCall(callId);
                 
                 testResults.results.sender.status = 'completed';
                 testResults.results.sender.endTime = new Date().toISOString();
@@ -762,9 +768,9 @@ router.post('/rtp-test', async (req, res) => {
  * @swagger
  * /test/call-flow-test:
  *   post:
- *     summary: Test complete call flow (NO ACTIVE CALL REQUIRED)
+ *     summary: 09 - Test complete call flow (NO ACTIVE CALL REQUIRED)
  *     description: Simulate a complete call from start to finish. Safe to run anytime.
- *     tags: [Test - Call Flow]
+ *     tags: [04 - Call Simulation]
  *     requestBody:
  *       required: false
  *       content:
@@ -936,9 +942,9 @@ router.post('/call-flow-test', async (req, res) => {
  * @swagger
  * /test/audio-pipeline-test:
  *   post:
- *     summary: Test audio pipeline end-to-end (NO ACTIVE CALL REQUIRED)
+ *     summary: 11 - Test audio pipeline end-to-end (NO ACTIVE CALL REQUIRED)
  *     description: Test the complete audio flow from RTP to OpenAI and back. Safe to run anytime.
- *     tags: [Test - Audio Pipeline]
+ *     tags: [05 - Audio Testing]
  *     requestBody:
  *       required: false
  *       content:
@@ -978,8 +984,7 @@ router.post('/audio-pipeline-test', async (req, res) => {
             throw new Error('Required services not loaded');
         }
 
-        const rtpListenerInstance = rtpListener.getRtpListenerInstance();
-        const rtpSenderInstance = rtpSender.getRtpSenderInstance();
+        // RTP services don't have getInstance methods - they use direct function calls
         const openaiInstance = openAIService.getOpenAIServiceInstance();
         const callId = `audio-test-${Date.now()}`;
 
@@ -991,7 +996,7 @@ router.post('/audio-pipeline-test', async (req, res) => {
 
         try {
             const testPort = 10000 + Math.floor(Math.random() * 1000);
-            await rtpListenerInstance.startListening(testPort);
+            await rtpListener.startRtpListenerForCall(testPort, callId, callId);
             testResults.pipeline.rtpListener.status = 'listening';
             testResults.pipeline.rtpListener.port = testPort;
         } catch (err) {
@@ -1088,7 +1093,7 @@ router.post('/audio-pipeline-test', async (req, res) => {
         try {
             // Stop RTP listener
             if (testResults.pipeline.rtpListener.port) {
-                await rtpListenerInstance.stopListening(testResults.pipeline.rtpListener.port);
+                rtpListener.stopRtpListenerForCall(callId);
             }
             
             // Close OpenAI session
@@ -1127,9 +1132,9 @@ router.post('/audio-pipeline-test', async (req, res) => {
  * @swagger
  * /test/mongodb-service-discovery:
  *   get:
- *     summary: Test MongoDB service discovery and connectivity
+ *     summary: 08 - Test MongoDB service discovery and connectivity
  *     description: Test DNS resolution, service discovery, and direct connection to MongoDB
- *     tags: [Test - MongoDB]
+ *     tags: [03 - Core Services]
  *     responses:
  *       "200":
  *         description: MongoDB service discovery test results
@@ -1251,9 +1256,9 @@ router.get('/mongodb-service-discovery', async (req, res) => {
  * @swagger
  * /test/routes-summary:
  *   get:
- *     summary: Get summary of all available test routes
+ *     summary: 01 - Get summary of all available test routes
  *     description: Categorizes test routes by whether they require an active call or not
- *     tags: [Test - Info]
+ *     tags: [01 - Overview]
  *     responses:
  *       "200":
  *         description: Summary of test routes
@@ -1377,9 +1382,9 @@ router.get('/routes-summary', async (req, res) => {
  * @swagger
  * /test/mongodb-connection:
  *   get:
- *     summary: Test MongoDB connection specifically
+ *     summary: 05 - Test MongoDB connection specifically
  *     description: Detailed MongoDB connection test with connection URL and error details
- *     tags: [Test - MongoDB]
+ *     tags: [03 - Core Services]
  *     responses:
  *       "200":
  *         description: MongoDB connection test results
@@ -1449,9 +1454,9 @@ router.get('/mongodb-connection', async (req, res) => {
  * @swagger
  * /test/startup-diagnosis:
  *   get:
- *     summary: Diagnose startup issues
+ *     summary: 07 - Diagnose startup issues
  *     description: Check what's preventing the app from starting properly
- *     tags: [Test - Startup]
+ *     tags: [02 - System Health]
  *     responses:
  *       "200":
  *         description: Startup diagnosis results
@@ -1577,9 +1582,9 @@ router.get('/startup-diagnosis', async (req, res) => {
  * @swagger
  * /test/real-call-simulation:
  *   post:
- *     summary: Simulate a real call with proper initialization (NO ACTIVE CALL REQUIRED)
+ *     summary: 10 - Simulate a real call with proper initialization (NO ACTIVE CALL REQUIRED)
  *     description: Test the complete call flow using the actual initialize method. Safe to run anytime.
- *     tags: [Test - Real Call]
+ *     tags: [04 - Call Simulation]
  *     requestBody:
  *       required: false
  *       content:
