@@ -35,6 +35,7 @@ RUN yarn install --pure-lockfile
 
 # Copy source code (this should be after dependencies to maximize caching)
 COPY --chown=node:node src/ ./src/
+COPY --chown=node:node tests/ ./tests/
 COPY --chown=node:node devops/ ./devops/
 COPY --chown=node:node .env* ./
 COPY --chown=node:node .eslintrc.json ./

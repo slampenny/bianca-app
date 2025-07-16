@@ -4,7 +4,7 @@ const faker = require('faker');
 const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
 const config = require('../config/config');
 
-// Import test fixtures directly
+// Import test fixtures directly for production
 const orgFixture = require('../../tests/fixtures/org.fixture');
 const caregiverFixture = require('../../tests/fixtures/caregiver.fixture');
 const patientFixture = require('../../tests/fixtures/patient.fixture');
