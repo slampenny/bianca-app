@@ -1645,33 +1645,83 @@ router.post('/real-call-simulation', async (req, res) => {
             throw new Error('OpenAI service instance not available');
         }
 
-        // Step 1: Initialize the call
-        testResults.steps.initialization = {
-            status: 'initializing',
+        // Step 1: Test Asterisk Connectivity (NEW)
+        testResults.steps.asteriskConnectivity = {
+            status: 'testing',
             timestamp: new Date().toISOString()
         };
 
         try {
-            const initialized = await openaiInstance.initialize(
-                callId, // asteriskChannelId
-                callId, // callSid (using same as callId for test)
-                conversationId,
-                initialPrompt
-            );
-            
-            if (initialized) {
-                testResults.steps.initialization.status = 'success';
-                testResults.steps.initialization.connectionStatus = 'initialized';
-            } else {
-                throw new Error('Initialization returned false');
+            // Test ARI connection
+            if (!ariClient) {
+                throw new Error('ARI client not loaded');
             }
+
+            const ariInstance = ariClient.getAriClientInstance();
+            if (!ariInstance) {
+                throw new Error('ARI client instance not available');
+            }
+
+            const isConnected = ariInstance.isConnected;
+            if (!isConnected) {
+                throw new Error('ARI not connected to Asterisk server');
+            }
+
+            // Test network reachability
+            const { getAsteriskIP } = require('../../utils/network.utils');
+            const asteriskIP = await getAsteriskIP();
+            if (!asteriskIP) {
+                throw new Error('Cannot resolve Asterisk server IP');
+            }
+
+            testResults.steps.asteriskConnectivity.status = 'success';
+            testResults.steps.asteriskConnectivity.ariConnected = isConnected;
+            testResults.steps.asteriskConnectivity.asteriskIP = asteriskIP;
+            testResults.steps.asteriskConnectivity.connectionDetails = {
+                url: config.asterisk.url,
+                username: process.env.ASTERISK_USERNAME || config.asterisk.username || 'myphonefriend',
+                password: process.env.ARI_PASSWORD ? 'SET' : 'MISSING'
+            };
         } catch (err) {
-            testResults.steps.initialization.status = 'failed';
-            testResults.steps.initialization.error = err.message;
-            testResults.errors.push(`Initialization: ${err.message}`);
+            testResults.steps.asteriskConnectivity.status = 'failed';
+            testResults.steps.asteriskConnectivity.error = err.message;
+            testResults.errors.push(`Asterisk Connectivity: ${err.message}`);
         }
 
-        // Step 2: Check connection status
+        // Step 2: Initialize the call (only if Asterisk connectivity passed)
+        if (testResults.steps.asteriskConnectivity.status === 'success') {
+            testResults.steps.initialization = {
+                status: 'initializing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const initialized = await openaiInstance.initialize(
+                    callId, // asteriskChannelId
+                    callId, // callSid (using same as callId for test)
+                    conversationId,
+                    initialPrompt
+                );
+                
+                if (initialized) {
+                    testResults.steps.initialization.status = 'success';
+                    testResults.steps.initialization.connectionStatus = 'initialized';
+                } else {
+                    throw new Error('Initialization returned false');
+                }
+            } catch (err) {
+                testResults.steps.initialization.status = 'failed';
+                testResults.steps.initialization.error = err.message;
+                testResults.errors.push(`Initialization: ${err.message}`);
+            }
+        } else {
+            testResults.steps.initialization = {
+                status: 'skipped',
+                reason: 'Asterisk connectivity failed'
+            };
+        }
+
+        // Step 3: Check connection status
         if (testResults.steps.initialization.status === 'success') {
             testResults.steps.connectionStatus = {
                 status: 'checking',
@@ -1694,7 +1744,7 @@ router.post('/real-call-simulation', async (req, res) => {
             }
         }
 
-        // Step 3: Test audio sending (if connection is ready)
+        // Step 4: Test audio sending (if connection is ready)
         if (testResults.steps.connectionStatus?.isReady) {
             testResults.steps.audioTest = {
                 status: 'testing',
@@ -1721,7 +1771,7 @@ router.post('/real-call-simulation', async (req, res) => {
             }
         }
 
-        // Step 4: Cleanup
+        // Step 5: Cleanup
         testResults.steps.cleanup = {
             status: 'cleaning',
             timestamp: new Date().toISOString()
@@ -3565,6 +3615,213 @@ router.post('/email', async (req, res) => {
                 from: config.email?.from || 'Not configured',
                 sesRegion: config.email?.ses?.region || 'Not configured'
             }
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/asterisk-connectivity:
+ *   post:
+ *     summary: 11 - Test Asterisk server connectivity (NO ACTIVE CALL REQUIRED)
+ *     description: Comprehensive test of connectivity to Asterisk server including ARI, RTP, and network reachability
+ *     tags: [05 - Asterisk Connectivity]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               testRtpPorts:
+ *                 type: boolean
+ *                 description: Whether to test RTP port allocation
+ *                 default: true
+ *               testAriConnection:
+ *                 type: boolean
+ *                 description: Whether to test ARI connection
+ *                 default: true
+ *               testNetworkReachability:
+ *                 type: boolean
+ *                 description: Whether to test network connectivity
+ *                 default: true
+ *           example:
+ *             testRtpPorts: true
+ *             testAriConnection: true
+ *             testNetworkReachability: true
+ *     responses:
+ *       "200":
+ *         description: Asterisk connectivity test results
+ */
+router.post('/asterisk-connectivity', async (req, res) => {
+    const { 
+        testRtpPorts = true,
+        testAriConnection = true,
+        testNetworkReachability = true
+    } = req.body;
+    
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        tests: {},
+        summary: {},
+        errors: []
+    };
+
+    try {
+        // Test 1: Network Reachability
+        if (testNetworkReachability) {
+            testResults.tests.networkReachability = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const { getAsteriskIP, getRTPAddress, getNetworkDebugInfo } = require('../../utils/network.utils');
+                
+                // Test DNS resolution
+                const asteriskIP = await getAsteriskIP();
+                const rtpAddress = getRTPAddress();
+                const networkInfo = getNetworkDebugInfo();
+                
+                testResults.tests.networkReachability.status = 'completed';
+                testResults.tests.networkReachability.asteriskIP = asteriskIP;
+                testResults.tests.networkReachability.rtpAddress = rtpAddress;
+                testResults.tests.networkReachability.networkInfo = networkInfo;
+                testResults.tests.networkReachability.dnsResolved = !!asteriskIP;
+                
+                // Test TCP connectivity to Asterisk
+                const net = require('net');
+                const asteriskUrl = new URL(config.asterisk.url);
+                const asteriskPort = asteriskUrl.port || (asteriskUrl.protocol === 'https:' ? 443 : 80);
+                
+                const tcpTest = await new Promise((resolve) => {
+                    const socket = new net.Socket();
+                    const timeout = setTimeout(() => {
+                        socket.destroy();
+                        resolve({ connected: false, error: 'Connection timeout' });
+                    }, 5000);
+                    
+                    socket.connect(asteriskPort, asteriskIP, () => {
+                        clearTimeout(timeout);
+                        socket.destroy();
+                        resolve({ connected: true });
+                    });
+                    
+                    socket.on('error', (err) => {
+                        clearTimeout(timeout);
+                        resolve({ connected: false, error: err.message });
+                    });
+                });
+                
+                testResults.tests.networkReachability.tcpConnectivity = tcpTest;
+                
+            } catch (err) {
+                testResults.tests.networkReachability.status = 'failed';
+                testResults.tests.networkReachability.error = err.message;
+                testResults.errors.push(`Network Reachability: ${err.message}`);
+            }
+        }
+
+        // Test 2: ARI Connection
+        if (testAriConnection) {
+            testResults.tests.ariConnection = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                if (!ariClient) {
+                    throw new Error('ARI client not loaded');
+                }
+
+                const ariInstance = ariClient.getAriClientInstance();
+                if (!ariInstance) {
+                    throw new Error('ARI client instance not available');
+                }
+
+                // Test ARI connection status
+                const isConnected = ariInstance.isConnected;
+                const healthCheck = await ariInstance.healthCheck();
+                
+                testResults.tests.ariConnection.status = 'completed';
+                testResults.tests.ariConnection.isConnected = isConnected;
+                testResults.tests.ariConnection.healthCheck = healthCheck;
+                testResults.tests.ariConnection.connectionDetails = {
+                    url: config.asterisk.url,
+                    username: process.env.ASTERISK_USERNAME || config.asterisk.username || 'myphonefriend',
+                    password: process.env.ARI_PASSWORD ? 'SET' : 'MISSING'
+                };
+                
+            } catch (err) {
+                testResults.tests.ariConnection.status = 'failed';
+                testResults.tests.ariConnection.error = err.message;
+                testResults.errors.push(`ARI Connection: ${err.message}`);
+            }
+        }
+
+        // Test 3: RTP Port Management
+        if (testRtpPorts) {
+            testResults.tests.rtpPorts = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const portManager = require('../../services/port.manager.service');
+                
+                // Test port allocation
+                const initialStats = portManager.getStats();
+                const allocatedPorts = portManager.allocatePortsForCall('test-connectivity');
+                const afterAllocationStats = portManager.getStats();
+                
+                // Test RTP listener creation
+                const rtpListener = require('../../services/rtp.listener.service');
+                const testPort = allocatedPorts.readPort;
+                
+                await rtpListener.startRtpListenerForCall(testPort, 'test-connectivity', 'test-connectivity');
+                const listener = rtpListener.getListenerForCall('test-connectivity');
+                
+                // Cleanup
+                rtpListener.stopRtpListenerForCall('test-connectivity');
+                portManager.releasePortsForCall('test-connectivity');
+                
+                testResults.tests.rtpPorts.status = 'completed';
+                testResults.tests.rtpPorts.portAllocation = {
+                    initialStats,
+                    allocatedPorts,
+                    afterAllocationStats
+                };
+                testResults.tests.rtpPorts.listenerTest = {
+                    port: testPort,
+                    created: !!listener,
+                    active: listener?.isActive || false
+                };
+                
+            } catch (err) {
+                testResults.tests.rtpPorts.status = 'failed';
+                testResults.tests.rtpPorts.error = err.message;
+                testResults.errors.push(`RTP Ports: ${err.message}`);
+            }
+        }
+
+        // Summary
+        testResults.summary = {
+            totalTests: Object.keys(testResults.tests).length,
+            successfulTests: Object.values(testResults.tests).filter(t => t.status === 'completed').length,
+            failedTests: testResults.errors.length,
+            overallSuccess: testResults.errors.length === 0,
+            criticalIssues: testResults.errors.filter(err => 
+                err.includes('Network Reachability') || 
+                err.includes('ARI Connection')
+            ).length
+        };
+
+        res.json(testResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'Asterisk connectivity test failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
         });
     }
 });
