@@ -4477,5 +4477,422 @@ router.post('/ari-call-simulation', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/rtp-audio-flow:
+ *   post:
+ *     summary: Test RTP audio flow from OpenAI back to Asterisk
+ *     description: Verifies that audio from OpenAI is sent to the correct RTP port and IP address
+ *     tags: [Test - Audio Pipeline]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 description: Call ID to test (optional - will create test call if not provided)
+ *               duration:
+ *                 type: number
+ *                 default: 10
+ *                 description: How long to monitor RTP traffic (seconds)
+ *               simulateOpenAI:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Whether to simulate OpenAI audio response
+ *     responses:
+ *       "200":
+ *         description: RTP audio flow test results
+ */
+router.post('/rtp-audio-flow', async (req, res) => {
+    const { callId, duration = 10, simulateOpenAI = true } = req.body;
+    
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        callId: callId || `rtp-flow-test-${Date.now()}`,
+        duration,
+        simulateOpenAI,
+        steps: {},
+        rtpTraffic: {
+            packetsReceived: 0,
+            packets: [],
+            sourceIPs: new Set(),
+            sourcePorts: new Set(),
+            destinationPorts: new Set()
+        },
+        analysis: {},
+        errors: []
+    };
+
+    try {
+        // Step 1: Setup test call and allocate ports
+        testResults.steps.setup = {
+            status: 'setting up',
+            timestamp: new Date().toISOString()
+        };
+
+        const testCallId = testResults.callId;
+        
+        // Create call in tracker
+        channelTracker.addCall(testCallId, {
+            twilioCallSid: testCallId,
+            patientId: 'test-patient',
+            state: 'testing',
+            createdAt: new Date().toISOString()
+        });
+
+        // Allocate RTP ports
+        const allocatedPorts = channelTracker.allocatePortsForCall(testCallId);
+        
+        if (!allocatedPorts.readPort || !allocatedPorts.writePort) {
+            throw new Error(`Failed to allocate ports: readPort=${allocatedPorts.readPort}, writePort=${allocatedPorts.writePort}`);
+        }
+
+        testResults.steps.setup.status = 'completed';
+        testResults.steps.setup.allocatedPorts = allocatedPorts;
+        testResults.steps.setup.asteriskIP = config.asterisk?.host || 'asterisk.myphonefriend.internal';
+
+        // Step 2: Initialize RTP sender service
+        testResults.steps.rtpSender = {
+            status: 'initializing',
+            timestamp: new Date().toISOString()
+        };
+
+        const rtpSender = require('../../services/rtp.sender.service');
+        await rtpSender.initializeCall(testCallId, {
+            rtpHost: config.asterisk?.rtpAsteriskHost || config.asterisk?.host,
+            rtpPort: allocatedPorts.writePort,
+            format: 'ulaw'
+        });
+
+        testResults.steps.rtpSender.status = 'ready';
+
+        // Step 3: Simulate OpenAI audio response (if requested)
+        if (simulateOpenAI) {
+            testResults.steps.openaiSimulation = {
+                status: 'simulating',
+                timestamp: new Date().toISOString()
+            };
+
+            // Generate test audio (1 second of 440Hz tone in ulaw)
+            const sampleRate = 8000;
+            const numSamples = sampleRate;
+            const testPcm = Buffer.alloc(numSamples * 2);
+            
+            for (let i = 0; i < numSamples; i++) {
+                const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+                testPcm.writeInt16LE(Math.round(sample), i * 2);
+            }
+
+            // Convert to ulaw
+            const AudioUtils = require('../../api/audio.utils');
+            const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testPcm);
+
+            // Simulate OpenAI sending audio back
+            const openAIService = require('../../services/openai.realtime.service');
+            
+            // Create a mock connection for testing
+            const mockConnection = {
+                sessionReady: true,
+                webSocket: { readyState: 1 }, // OPEN
+                audioChunksReceived: 0,
+                audioChunksSent: 0
+            };
+            openAIService.connections.set(testCallId, mockConnection);
+
+            // Process the audio response (this should trigger RTP sending)
+            await openAIService.processAudioResponse(testCallId, testUlawBase64);
+
+            testResults.steps.openaiSimulation.status = 'completed';
+            testResults.steps.openaiSimulation.audioSent = {
+                pcmSamples: numSamples,
+                ulawBytes: Buffer.from(testUlawBase64, 'base64').length,
+                durationMs: (numSamples / sampleRate) * 1000
+            };
+        }
+
+        // Step 4: Monitor RTP traffic for the specified duration
+        testResults.steps.monitoring = {
+            status: 'monitoring',
+            timestamp: new Date().toISOString()
+        };
+
+        await new Promise(resolve => setTimeout(resolve, duration * 1000));
+
+        // Step 5: Analyze results
+        testResults.steps.analysis = {
+            status: 'analyzing',
+            timestamp: new Date().toISOString()
+        };
+
+        // Analyze RTP traffic
+        testResults.analysis = {
+            totalPackets: testResults.rtpTraffic.packetsReceived,
+            uniqueSourceIPs: Array.from(testResults.rtpTraffic.sourceIPs),
+            uniqueSourcePorts: Array.from(testResults.rtpTraffic.sourcePorts),
+            expectedDestinationPort: allocatedPorts.writePort,
+            expectedDestinationIP: config.asterisk?.rtpAsteriskHost || config.asterisk?.host,
+            
+            // Validation results
+            validation: {
+                packetsReceived: testResults.rtpTraffic.packetsReceived > 0,
+                correctDestinationPort: testResults.rtpTraffic.destinationPorts.has(allocatedPorts.writePort),
+                rtpFormatValid: testResults.rtpTraffic.packets.every(p => p.isRTP),
+                audioFlowWorking: testResults.rtpTraffic.packetsReceived > 0 && 
+                                testResults.rtpTraffic.destinationPorts.has(allocatedPorts.writePort)
+            }
+        };
+
+        // Step 6: Cleanup
+        testResults.steps.cleanup = {
+            status: 'cleaning up',
+            timestamp: new Date().toISOString()
+        };
+
+        rtpSender.cleanupCall(testCallId);
+        channelTracker.releasePortsForCall(testCallId);
+        channelTracker.removeCall(testCallId);
+        openAIService.connections.delete(testCallId);
+
+        testResults.steps.cleanup.status = 'completed';
+
+        // Final summary
+        testResults.summary = {
+            success: testResults.analysis.validation.audioFlowWorking,
+            message: testResults.analysis.validation.audioFlowWorking ? 
+                'RTP audio flow is working correctly' : 
+                'RTP audio flow has issues - check configuration',
+            recommendations: []
+        };
+
+        if (!testResults.analysis.validation.packetsReceived) {
+            testResults.summary.recommendations.push('No RTP packets received - check RTP sender configuration');
+        }
+        if (!testResults.analysis.validation.correctDestinationPort) {
+            testResults.summary.recommendations.push('RTP packets not sent to correct destination port');
+        }
+        if (!testResults.analysis.validation.rtpFormatValid) {
+            testResults.summary.recommendations.push('Some packets are not valid RTP format');
+        }
+
+        res.json(testResults);
+
+    } catch (err) {
+        // Cleanup on error
+        try {
+            const testCallId = testResults.callId;
+            const rtpSender = require('../../services/rtp.sender.service');
+            const openAIService = require('../../services/openai.realtime.service');
+            
+            rtpSender.cleanupCall(testCallId);
+            channelTracker.releasePortsForCall(testCallId);
+            channelTracker.removeCall(testCallId);
+            openAIService.connections.delete(testCallId);
+        } catch (cleanupErr) {
+            logger.error('Error during cleanup:', cleanupErr.message);
+        }
+
+        testResults.errors.push(err.message);
+        res.status(500).json({
+            error: 'RTP audio flow test failed',
+            message: err.message,
+            testResults
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/monitor-rtp-destination:
+ *   post:
+ *     summary: Monitor RTP traffic to specific destination
+ *     description: Listens on a specific port to verify RTP packets are being sent to the correct destination
+ *     tags: [Test - Audio Pipeline]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               port:
+ *                 type: number
+ *                 description: Port to monitor for RTP traffic
+ *               duration:
+ *                 type: number
+ *                 default: 10
+ *                 description: How long to monitor (seconds)
+ *               triggerAudio:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Whether to trigger test audio to verify flow
+ *     responses:
+ *       "200":
+ *         description: RTP destination monitoring results
+ */
+router.post('/monitor-rtp-destination', async (req, res) => {
+    const { port, duration = 10, triggerAudio = true } = req.body;
+    
+    if (!port || port < 1024 || port > 65535) {
+        return res.status(400).json({ error: 'Valid port number required (1024-65535)' });
+    }
+
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        port,
+        duration,
+        triggerAudio,
+        rtpTraffic: {
+            packetsReceived: 0,
+            packets: [],
+            sourceIPs: new Set(),
+            sourcePorts: new Set(),
+            destinations: new Set()
+        },
+        analysis: {},
+        errors: []
+    };
+
+    try {
+        // Create UDP socket to monitor RTP traffic
+        const dgram = require('dgram');
+        const monitorSocket = dgram.createSocket('udp4');
+        
+        // Track RTP packets
+        monitorSocket.on('message', (msg, rinfo) => {
+            testResults.rtpTraffic.packetsReceived++;
+            testResults.rtpTraffic.packets.push({
+                timestamp: new Date().toISOString(),
+                from: `${rinfo.address}:${rinfo.port}`,
+                size: msg.length,
+                isRTP: msg.length >= 12, // RTP header is 12 bytes
+                rtpHeader: msg.length >= 12 ? {
+                    version: (msg[0] >> 6) & 0x3,
+                    padding: (msg[0] >> 5) & 0x1,
+                    extension: (msg[0] >> 4) & 0x1,
+                    csrcCount: msg[0] & 0xF,
+                    marker: (msg[1] >> 7) & 0x1,
+                    payloadType: msg[1] & 0x7F,
+                    sequenceNumber: msg.readUInt16BE(2),
+                    timestamp: msg.readUInt32BE(4),
+                    ssrc: msg.readUInt32BE(8)
+                } : null
+            });
+            
+            testResults.rtpTraffic.sourceIPs.add(rinfo.address);
+            testResults.rtpTraffic.sourcePorts.add(rinfo.port);
+            testResults.rtpTraffic.destinations.add(`${rinfo.address}:${rinfo.port}`);
+        });
+
+        // Bind to the monitoring port
+        await new Promise((resolve, reject) => {
+            monitorSocket.bind(port, '0.0.0.0', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        testResults.monitoringStarted = true;
+        testResults.monitorAddress = monitorSocket.address();
+
+        // Trigger test audio if requested
+        if (triggerAudio) {
+            const testCallId = `monitor-test-${Date.now()}`;
+            
+            // Create call in tracker
+            channelTracker.addCall(testCallId, {
+                twilioCallSid: testCallId,
+                patientId: 'test-patient',
+                state: 'testing',
+                createdAt: new Date().toISOString()
+            });
+
+            // Allocate RTP ports
+            const allocatedPorts = channelTracker.allocatePortsForCall(testCallId);
+            
+            if (allocatedPorts.readPort && allocatedPorts.writePort) {
+                // Initialize RTP sender
+                const rtpSender = require('../../services/rtp.sender.service');
+                await rtpSender.initializeCall(testCallId, {
+                    rtpHost: config.asterisk?.rtpAsteriskHost || config.asterisk?.host,
+                    rtpPort: port, // Use the monitored port
+                    format: 'ulaw'
+                });
+
+                // Generate and send test audio
+                const sampleRate = 8000;
+                const numSamples = sampleRate;
+                const testPcm = Buffer.alloc(numSamples * 2);
+                
+                for (let i = 0; i < numSamples; i++) {
+                    const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+                    testPcm.writeInt16LE(Math.round(sample), i * 2);
+                }
+
+                const AudioUtils = require('../../api/audio.utils');
+                const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testPcm);
+
+                // Send test audio
+                await rtpSender.sendAudio(testCallId, testUlawBase64);
+
+                // Cleanup
+                rtpSender.cleanupCall(testCallId);
+                channelTracker.releasePortsForCall(testCallId);
+                channelTracker.removeCall(testCallId);
+            }
+        }
+
+        // Monitor for the specified duration
+        await new Promise(resolve => setTimeout(resolve, duration * 1000));
+
+        // Close socket
+        monitorSocket.close();
+
+        // Analyze results
+        testResults.analysis = {
+            totalPackets: testResults.rtpTraffic.packetsReceived,
+            uniqueSourceIPs: Array.from(testResults.rtpTraffic.sourceIPs),
+            uniqueSourcePorts: Array.from(testResults.rtpTraffic.sourcePorts),
+            uniqueDestinations: Array.from(testResults.rtpTraffic.destinations),
+            expectedDestination: `${config.asterisk?.rtpAsteriskHost || config.asterisk?.host}:${port}`,
+            
+            validation: {
+                packetsReceived: testResults.rtpTraffic.packetsReceived > 0,
+                rtpFormatValid: testResults.rtpTraffic.packets.every(p => p.isRTP),
+                correctDestination: testResults.rtpTraffic.destinations.has(`${config.asterisk?.rtpAsteriskHost || config.asterisk?.host}:${port}`),
+                audioFlowWorking: testResults.rtpTraffic.packetsReceived > 0
+            }
+        };
+
+        // Summary
+        testResults.summary = {
+            success: testResults.analysis.validation.audioFlowWorking,
+            message: testResults.analysis.validation.audioFlowWorking ? 
+                `RTP traffic detected on port ${port}` : 
+                `No RTP traffic detected on port ${port}`,
+            recommendations: []
+        };
+
+        if (!testResults.analysis.validation.packetsReceived) {
+            testResults.summary.recommendations.push('No RTP packets received - check if audio is being sent to this port');
+        }
+        if (!testResults.analysis.validation.rtpFormatValid) {
+            testResults.summary.recommendations.push('Some packets are not valid RTP format');
+        }
+
+        res.json(testResults);
+
+    } catch (err) {
+        testResults.errors.push(err.message);
+        res.status(500).json({
+            error: 'RTP destination monitoring failed',
+            message: err.message,
+            testResults
+        });
+    }
+});
+
 // Export the router
 module.exports = router;
