@@ -3586,7 +3586,20 @@ variable "app_rtp_port_end" {
                 
                 // Test port allocation using channel tracker
                 const testCallId = `sg-test-${Date.now()}`;
+                
+                // First, create a call in the tracker
+                channelTracker.addCall(testCallId, {
+                    twilioCallSid: testCallId,
+                    patientId: 'test-patient',
+                    state: 'testing',
+                    createdAt: new Date().toISOString()
+                });
+                
                 const allocatedPorts = channelTracker.allocatePortsForCall(testCallId);
+                
+                if (!allocatedPorts.readPort || !allocatedPorts.writePort) {
+                    throw new Error(`Failed to allocate ports: readPort=${allocatedPorts.readPort}, writePort=${allocatedPorts.writePort}`);
+                }
                 
                 // Test RTP listener creation
                 const rtpListener = require('../../services/rtp.listener.service');
@@ -3598,6 +3611,7 @@ variable "app_rtp_port_end" {
                 // Cleanup
                 rtpListener.stopRtpListenerForCall(testCallId);
                 channelTracker.releasePortsForCall(testCallId);
+                channelTracker.removeCall(testCallId);
                 
                 analysisResults.rtpPorts.status = 'completed';
                 analysisResults.rtpPorts.portStats = portStats;
