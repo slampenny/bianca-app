@@ -4075,14 +4075,14 @@ variable "app_rtp_port_end" {
                 }
                 
                 // Test RTP listener creation
-                const rtpListener = require('../../services/rtp.listener.service');
+                const rtpListenerService = require('../../services/rtp.listener.service');
                 const testPort = allocatedPorts.readPort;
                 
-                await rtpListener.startRtpListenerForCall(testPort, testCallId, testCallId);
-                const listener = rtpListener.getListenerForCall(testCallId);
+                await rtpListenerService.startRtpListenerForCall(testPort, testCallId, testCallId);
+                const listener = rtpListenerService.getListenerForCall(testCallId);
                 
                 // Cleanup
-                rtpListener.stopRtpListenerForCall(testCallId);
+                rtpListenerService.stopRtpListenerForCall(testCallId);
                 channelTracker.releasePortsForCall(testCallId);
                 channelTracker.removeCall(testCallId);
                 
@@ -4570,12 +4570,12 @@ router.post('/asterisk-connectivity', async (req, res) => {
                 const afterAllocationStats = portManager.getStats();
                 
                 // Test RTP listener creation
-                const rtpListener = require('../../services/rtp.listener.service');
+                const rtpListenerService2 = require('../../services/rtp.listener.service');
                 const testPort = allocatedPorts.readPort;
                 const testCallId = 'test-connectivity';
                 
-                await rtpListener.startRtpListenerForCall(testPort, testCallId, testCallId);
-                const listener = rtpListener.getListenerForCall(testCallId);
+                await rtpListenerService2.startRtpListenerForCall(testPort, testCallId, testCallId);
+                const listener = rtpListenerService2.getListenerForCall(testCallId);
                 
                 // Test if Asterisk can reach our RTP listener
                 const asteriskIP = testResults.tests.networkReachability?.asteriskIP;
@@ -4611,7 +4611,7 @@ router.post('/asterisk-connectivity', async (req, res) => {
                 }
                 
                 // Cleanup
-                rtpListener.stopRtpListenerForCall(testCallId);
+                rtpListenerService2.stopRtpListenerForCall(testCallId);
                 channelTracker.releasePortsForCall(testCallId);
                 
                 testResults.tests.rtpPorts.status = 'completed';
@@ -5093,14 +5093,14 @@ router.post('/rtp-audio-flow', async (req, res) => {
         };
 
         // Start RTP listener to capture packets
-        const rtpListener = require('../../services/rtp.listener.service');
-        await rtpListener.startRtpListenerForCall(allocatedPorts.readPort, testCallId, testCallId);
+        const rtpListenerService3 = require('../../services/rtp.listener.service');
+        await rtpListenerService3.startRtpListenerForCall(allocatedPorts.readPort, testCallId, testCallId);
         
         // Wait for the specified duration
         await new Promise(resolve => setTimeout(resolve, duration * 1000));
         
         // Get RTP listener stats
-        const listener = rtpListener.getListenerForCall(testCallId);
+        const listener = rtpListenerService3.getListenerForCall(testCallId);
         if (listener) {
             const stats = listener.getStats();
             testResults.rtpTraffic.packetsReceived = stats.packetsReceived;
@@ -5111,7 +5111,7 @@ router.post('/rtp-audio-flow', async (req, res) => {
         }
         
         // Stop the listener
-        rtpListener.stopRtpListenerForCall(testCallId);
+        rtpListenerService3.stopRtpListenerForCall(testCallId);
 
         // Step 5: Analyze results
         testResults.steps.analysis = {
@@ -5149,8 +5149,8 @@ router.post('/rtp-audio-flow', async (req, res) => {
         openAIService.connections.delete(testCallId);
         
         // Ensure RTP listener is stopped
-        const rtpListener = require('../../services/rtp.listener.service');
-        rtpListener.stopRtpListenerForCall(testCallId);
+        const rtpListenerService4 = require('../../services/rtp.listener.service');
+        rtpListenerService4.stopRtpListenerForCall(testCallId);
 
         testResults.steps.cleanup.status = 'completed';
 
