@@ -19,6 +19,10 @@ yarn-error.log
 # Code coverage
 coverage
 
+# Temporary files from curl commands and shell operations
+-[a-zA-Z0-9]
+-[a-zA-Z0-9]*
+test_results.json
 
 ./credentials/google.api.json
 devops/asterisk/recordings

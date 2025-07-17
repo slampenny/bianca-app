@@ -1211,7 +1211,17 @@ router.get('/mongodb-service-discovery', async (req, res) => {
                 connectTimeoutMS: 5000
             });
             
-            await testConnection.asPromise();
+            // Use the correct method for different mongoose versions
+            if (testConnection.asPromise) {
+                await testConnection.asPromise();
+            } else {
+                // Fallback for older mongoose versions
+                await new Promise((resolve, reject) => {
+                    testConnection.on('connected', resolve);
+                    testConnection.on('error', reject);
+                    setTimeout(() => reject(new Error('Connection timeout')), 5000);
+                });
+            }
             
             results.connection = {
                 status: 'connected',
@@ -1946,6 +1956,187 @@ router.get('/openai-connections', (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/openai-websocket-diagnostic:
+ *   post:
+ *     summary: Comprehensive OpenAI WebSocket diagnostic
+ *     description: Tests OpenAI WebSocket connection, session creation, and audio flow
+ *     tags: [Test - OpenAI]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               testDuration:
+ *                 type: number
+ *                 default: 10
+ *                 description: Duration to test the connection
+ *               sendTestAudio:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Whether to send test audio
+ *     responses:
+ *       "200":
+ *         description: OpenAI WebSocket diagnostic results
+ */
+router.post('/openai-websocket-diagnostic', async (req, res) => {
+    const { testDuration = 10, sendTestAudio = true } = req.body;
+    
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        callId: `websocket-diagnostic-${Date.now()}`,
+        testDuration,
+        sendTestAudio,
+        steps: {},
+        errors: [],
+        summary: {}
+    };
+
+    try {
+        if (!openAIService) {
+            throw new Error('OpenAI service not loaded');
+        }
+
+        const openaiInstance = openAIService.getOpenAIServiceInstance();
+        if (!openaiInstance) {
+            throw new Error('OpenAI service instance not available');
+        }
+
+        // Step 1: Test basic connection
+        diagnostic.steps.basicConnection = {
+            status: 'testing',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const sessionResult = await openaiInstance.testBasicConnectionAndSession(diagnostic.callId);
+            diagnostic.steps.basicConnection.status = 'success';
+            diagnostic.steps.basicConnection.sessionId = sessionResult.sessionId;
+            diagnostic.steps.basicConnection.sessionDetails = sessionResult.sessionDetails;
+        } catch (err) {
+            diagnostic.steps.basicConnection.status = 'failed';
+            diagnostic.steps.basicConnection.error = err.message;
+            diagnostic.errors.push(`Basic Connection: ${err.message}`);
+        }
+
+        // Step 2: Test real connection initialization
+        if (diagnostic.steps.basicConnection.status === 'success') {
+            diagnostic.steps.realConnection = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                // Initialize a real connection
+                await openaiInstance.initialize(
+                    `test-channel-${Date.now()}`,
+                    diagnostic.callId,
+                    `conv-${Date.now()}`,
+                    'This is a WebSocket diagnostic test. Please respond with a brief message.'
+                );
+
+                // Wait for connection to be ready
+                let attempts = 0;
+                const maxAttempts = 20; // 10 seconds
+                while (attempts < maxAttempts) {
+                    if (openaiInstance.isConnectionReady(diagnostic.callId)) {
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    attempts++;
+                }
+
+                const connection = openaiInstance.connections.get(diagnostic.callId);
+                diagnostic.steps.realConnection.status = 'completed';
+                diagnostic.steps.realConnection.connectionReady = openaiInstance.isConnectionReady(diagnostic.callId);
+                diagnostic.steps.realConnection.websocketState = connection?.webSocket?.readyState;
+                diagnostic.steps.realConnection.sessionReady = connection?.sessionReady;
+                diagnostic.steps.realConnection.status = connection?.status;
+
+                if (!openaiInstance.isConnectionReady(diagnostic.callId)) {
+                    diagnostic.errors.push('WebSocket connection not ready after 10 seconds');
+                }
+
+            } catch (err) {
+                diagnostic.steps.realConnection.status = 'failed';
+                diagnostic.steps.realConnection.error = err.message;
+                diagnostic.errors.push(`Real Connection: ${err.message}`);
+            }
+        }
+
+        // Step 3: Test audio sending (if requested and connection is ready)
+        if (sendTestAudio && diagnostic.steps.realConnection?.status === 'completed' && 
+            diagnostic.steps.realConnection?.connectionReady) {
+            
+            diagnostic.steps.audioTest = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                // Generate test audio (1 second of silence in ulaw)
+                const testAudio = Buffer.alloc(8000, 0xFF); // ulaw silence
+                const testAudioBase64 = testAudio.toString('base64');
+
+                // Send audio
+                await openaiInstance.sendAudioChunk(diagnostic.callId, testAudioBase64, true);
+                
+                // Wait for processing
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                const connection = openaiInstance.connections.get(diagnostic.callId);
+                diagnostic.steps.audioTest.status = 'completed';
+                diagnostic.steps.audioTest.audioChunksSent = connection?.audioChunksSent || 0;
+                diagnostic.steps.audioTest.audioChunksReceived = connection?.audioChunksReceived || 0;
+
+            } catch (err) {
+                diagnostic.steps.audioTest.status = 'failed';
+                diagnostic.steps.audioTest.error = err.message;
+                diagnostic.errors.push(`Audio Test: ${err.message}`);
+            }
+        }
+
+        // Step 4: Cleanup
+        diagnostic.steps.cleanup = {
+            status: 'cleaning',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            if (openaiInstance.connections.has(diagnostic.callId)) {
+                await openaiInstance.cleanup(diagnostic.callId);
+            }
+            diagnostic.steps.cleanup.status = 'completed';
+        } catch (err) {
+            diagnostic.steps.cleanup.status = 'failed';
+            diagnostic.steps.cleanup.error = err.message;
+            diagnostic.errors.push(`Cleanup: ${err.message}`);
+        }
+
+        // Summary
+        diagnostic.summary = {
+            totalSteps: Object.keys(diagnostic.steps).length,
+            successfulSteps: Object.values(diagnostic.steps).filter(s => s.status === 'success' || s.status === 'completed').length,
+            failedSteps: diagnostic.errors.length,
+            overallSuccess: diagnostic.errors.length === 0,
+            websocketIssue: diagnostic.steps.realConnection?.websocketState === 0 ? 'WebSocket stuck in CONNECTING state' : null,
+            connectionIssue: !diagnostic.steps.realConnection?.connectionReady ? 'Connection not ready after initialization' : null
+        };
+
+        res.json(diagnostic);
+
+    } catch (err) {
+        res.status(500).json({
+            error: 'OpenAI WebSocket diagnostic failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
     }
 });
 
@@ -3442,6 +3633,101 @@ router.get('/network-connectivity', async (req, res) => {
 /**
  * @swagger
  * /test/security-group-analysis:
+ *   get:
+ *     summary: 13 - Analyze security groups and network connectivity (GET version)
+ *     description: Quick security group analysis without connectivity tests
+ *     tags: [06 - Network & Security]
+ *     responses:
+ *       "200":
+ *         description: Security group analysis results
+ */
+router.get('/security-group-analysis', async (req, res) => {
+    const analysisResults = {
+        timestamp: new Date().toISOString(),
+        environment: {},
+        network: {},
+        securityGroups: {},
+        connectivity: {},
+        issues: [],
+        recommendations: [],
+        terraformFixes: []
+    };
+
+    try {
+        // Environment Analysis
+        analysisResults.environment = {
+            isECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
+            taskMetadata: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set',
+            region: process.env.AWS_REGION || 'Not set',
+            publicIpConfig: config.asterisk?.rtpBiancaHost || 'Not set',
+            networkMode: 'awsvpc', // Fargate always uses awsvpc
+            platform: 'Fargate'
+        };
+
+        // Network Configuration Analysis
+        analysisResults.network = {
+            asteriskUrl: config.asterisk?.url || 'Not set',
+            asteriskHost: config.asterisk?.host || 'Not set',
+            rtpBiancaHost: config.asterisk?.rtpBiancaHost || 'Not set',
+            rtpAsteriskHost: config.asterisk?.rtpAsteriskHost || 'Not set',
+            appRtpPortRange: process.env.APP_RTP_PORT_RANGE || '20002-30000',
+            rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set'
+        };
+
+        // Quick connectivity test
+        try {
+            const { getAsteriskIP } = require('../../utils/network.utils');
+            const asteriskIP = await getAsteriskIP();
+            
+            if (asteriskIP) {
+                const net = require('net');
+                const asteriskUrl = new URL(config.asterisk.url);
+                const asteriskPort = asteriskUrl.port || (asteriskUrl.protocol === 'https:' ? 443 : 80);
+                
+                const tcpTest = await new Promise((resolve) => {
+                    const socket = new net.Socket();
+                    const timeout = setTimeout(() => {
+                        socket.destroy();
+                        resolve({ connected: false, error: 'Connection timeout' });
+                    }, 5000);
+                    
+                    socket.connect(asteriskPort, asteriskIP, () => {
+                        clearTimeout(timeout);
+                        socket.destroy();
+                        resolve({ connected: true });
+                    });
+                    
+                    socket.on('error', (err) => {
+                        clearTimeout(timeout);
+                        resolve({ connected: false, error: err.message });
+                    });
+                });
+                
+                analysisResults.connectivity.tcpConnectivity = tcpTest;
+            }
+        } catch (err) {
+            analysisResults.connectivity.tcpConnectivity = { connected: false, error: err.message };
+        }
+
+        analysisResults.assessment = {
+            overallStatus: 'GOOD',
+            message: 'Security group analysis completed - run POST version for detailed connectivity tests',
+            recommendations: ['Use POST /test/security-group-analysis for detailed connectivity testing']
+        };
+
+        res.json(analysisResults);
+    } catch (err) {
+        res.status(500).json({
+            error: 'Security group analysis failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/security-group-analysis:
  *   post:
  *     summary: 13 - Analyze security groups and network connectivity (NO ACTIVE CALL REQUIRED)
  *     description: Comprehensive analysis of security groups, network configuration, and connectivity between Fargate and Asterisk
@@ -4806,7 +5092,26 @@ router.post('/rtp-audio-flow', async (req, res) => {
             timestamp: new Date().toISOString()
         };
 
+        // Start RTP listener to capture packets
+        const rtpListener = require('../../services/rtp.listener.service');
+        await rtpListener.startRtpListenerForCall(allocatedPorts.readPort, testCallId, testCallId);
+        
+        // Wait for the specified duration
         await new Promise(resolve => setTimeout(resolve, duration * 1000));
+        
+        // Get RTP listener stats
+        const listener = rtpListener.getListenerForCall(testCallId);
+        if (listener) {
+            const stats = listener.getStats();
+            testResults.rtpTraffic.packetsReceived = stats.packetsReceived;
+            testResults.rtpTraffic.packets = stats.packets || [];
+            testResults.rtpTraffic.sourceIPs = new Set(stats.sourceIPs || []);
+            testResults.rtpTraffic.sourcePorts = new Set(stats.sourcePorts || []);
+            testResults.rtpTraffic.destinationPorts = new Set(stats.destinationPorts || []);
+        }
+        
+        // Stop the listener
+        rtpListener.stopRtpListenerForCall(testCallId);
 
         // Step 5: Analyze results
         testResults.steps.analysis = {
@@ -4842,6 +5147,10 @@ router.post('/rtp-audio-flow', async (req, res) => {
         channelTracker.releasePortsForCall(testCallId);
         channelTracker.removeCall(testCallId);
         openAIService.connections.delete(testCallId);
+        
+        // Ensure RTP listener is stopped
+        const rtpListener = require('../../services/rtp.listener.service');
+        rtpListener.stopRtpListenerForCall(testCallId);
 
         testResults.steps.cleanup.status = 'completed';
 
