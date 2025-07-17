@@ -3304,6 +3304,8 @@ router.post('/security-group-analysis', async (req, res) => {
         terraformFixes: []
     };
 
+    let udpWorking = false;
+
     try {
         // Environment Analysis
         analysisResults.environment = {
@@ -3384,6 +3386,7 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
                 if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === true) {
                     analysisResults.securityGroups.message = '✅ Security groups working correctly - UDP connectivity verified';
                     analysisResults.securityGroups.udpStatus = 'WORKING';
+                    udpWorking = true;
                 } else if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === false) {
                     issues.push({
                         category: 'RTP Connectivity',
@@ -3627,7 +3630,6 @@ variable "app_rtp_port_end" {
         // Overall Assessment
         const criticalIssues = analysisResults.issues.filter(i => i.severity === 'CRITICAL').length;
         const highIssues = analysisResults.issues.filter(i => i.severity === 'HIGH').length;
-        const udpWorking = analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === true;
         
         analysisResults.assessment = {
             overallStatus: criticalIssues > 0 ? 'CRITICAL' : highIssues > 0 ? 'HIGH' : 'GOOD',
