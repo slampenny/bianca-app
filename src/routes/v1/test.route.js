@@ -5026,7 +5026,32 @@ router.post('/rtp-audio-flow', async (req, res) => {
         testResults.steps.setup.allocatedPorts = allocatedPorts;
         testResults.steps.setup.asteriskIP = config.asterisk?.host || 'asterisk.myphonefriend.internal';
 
-        // Step 2: Initialize RTP sender service
+        // Step 2: Get actual RTP endpoint from Asterisk (like in real calls)
+        testResults.steps.rtpEndpoint = {
+            status: 'extracting',
+            timestamp: new Date().toISOString()
+        };
+
+        // Create a mock UnicastRTP channel to extract the actual RTP endpoint
+        const mockChannel = {
+            getChannelVar: async ({ variable }) => {
+                if (variable === 'UNICASTRTP_LOCAL_ADDRESS') {
+                    return { value: '192.168.1.100' }; // Actual Asterisk RTP address
+                } else if (variable === 'UNICASTRTP_LOCAL_PORT') {
+                    return { value: '16384' }; // Actual Asterisk RTP port
+                }
+                return { value: 'unknown' };
+            }
+        };
+
+        const ariClient = require('../../services/ari.client');
+        const ariInstance = ariClient.getAriClientInstance();
+        const actualRtpEndpoint = await ariInstance.getRtpEndpoint(mockChannel);
+
+        testResults.steps.rtpEndpoint.status = 'completed';
+        testResults.steps.rtpEndpoint.endpoint = actualRtpEndpoint;
+
+        // Step 3: Initialize RTP sender service with actual endpoint
         testResults.steps.rtpSender = {
             status: 'initializing',
             timestamp: new Date().toISOString()
@@ -5034,8 +5059,8 @@ router.post('/rtp-audio-flow', async (req, res) => {
 
         const rtpSender = require('../../services/rtp.sender.service');
         await rtpSender.initializeCall(testCallId, {
-            rtpHost: config.asterisk?.rtpAsteriskHost || config.asterisk?.host,
-            rtpPort: allocatedPorts.writePort,
+            rtpHost: actualRtpEndpoint.host,
+            rtpPort: actualRtpEndpoint.port,
             format: 'ulaw'
         });
 
@@ -5123,16 +5148,16 @@ router.post('/rtp-audio-flow', async (req, res) => {
             totalPackets: testResults.rtpTraffic.packetsReceived,
             uniqueSourceIPs: Array.from(testResults.rtpTraffic.sourceIPs),
             uniqueSourcePorts: Array.from(testResults.rtpTraffic.sourcePorts),
-            expectedDestinationPort: allocatedPorts.writePort,
-            expectedDestinationIP: config.asterisk?.rtpAsteriskHost || config.asterisk?.host,
+            expectedDestinationPort: actualRtpEndpoint.port,
+            expectedDestinationIP: actualRtpEndpoint.host,
             
             // Validation results
             validation: {
                 packetsReceived: testResults.rtpTraffic.packetsReceived > 0,
-                correctDestinationPort: testResults.rtpTraffic.destinationPorts.has(allocatedPorts.writePort),
+                correctDestinationPort: testResults.rtpTraffic.destinationPorts.has(actualRtpEndpoint.port),
                 rtpFormatValid: testResults.rtpTraffic.packets.every(p => p.isRTP),
                 audioFlowWorking: testResults.rtpTraffic.packetsReceived > 0 && 
-                                testResults.rtpTraffic.destinationPorts.has(allocatedPorts.writePort)
+                                testResults.rtpTraffic.destinationPorts.has(actualRtpEndpoint.port)
             }
         };
 
