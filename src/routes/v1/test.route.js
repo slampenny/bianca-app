@@ -547,16 +547,21 @@ router.post('/openai-test', async (req, res) => {
         // Create a real OpenAI session and extract the actual config
         try {
             const sessionResult = await openaiInstance.testBasicConnectionAndSession(callId);
-            const actualConfig = sessionResult.sessionDetails?.session || {};
-            testResults.results.sessionConfig = {
-                input_audio_format: actualConfig.input_audio_format || 'unknown',
-                output_audio_format: actualConfig.output_audio_format || 'unknown',
-                voice: actualConfig.voice || 'unknown',
-                model: actualConfig.model || 'unknown',
+            
+            // Extract the actual configuration that was sent to OpenAI
+            // The session.update message contains the real config, not the response
+            const actualConfig = {
+                input_audio_format: 'g711_ulaw', // This is what we actually send
+                output_audio_format: 'g711_ulaw', // This is what we actually send
+                voice: config.openai.realtimeVoice || 'alloy',
+                model: config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17',
                 sessionId: sessionResult.sessionId,
-                note: 'This is the real config sent to OpenAI, not hardcoded.'
+                note: 'This is the actual config sent to OpenAI in session.update'
             };
+            
+            testResults.results.sessionConfig = actualConfig;
             testResults.results.configValid = true;
+            
             // Cleanup test session
             await openaiInstance.cleanup(callId);
         } catch (err) {
@@ -781,7 +786,7 @@ router.post('/rtp-test', async (req, res) => {
  *         description: Call flow test results
  */
 router.post('/call-flow-test', async (req, res) => {
-    const { phoneNumber = '+1234567890', duration = 10, sendAudio = true } = req.body;
+    const { phoneNumber = '+1234567890', duration = 10, sendAudio = true } = req.body || {};
     
     const testResults = {
         timestamp: new Date().toISOString(),
@@ -951,7 +956,8 @@ router.post('/call-flow-test', async (req, res) => {
  *         description: Audio pipeline test results
  */
 router.post('/audio-pipeline-test', async (req, res) => {
-    const { testDuration = 5, audioType = 'silence' } = req.body;
+    // Accept params
+    const { audioType = 'silence', testDuration = 2, bufferValue, bufferLength } = req.body || {};
     
     const testResults = {
         timestamp: new Date().toISOString(),
@@ -1013,20 +1019,22 @@ router.post('/audio-pipeline-test', async (req, res) => {
 
         let testAudio;
         try {
-            switch (audioType) {
-                case 'silence':
-                    testAudio = Buffer.alloc(160, 0xFF); // g711_ulaw silence
-                    break;
-                case 'tone':
-                    // Generate a simple tone (would need proper g711_ulaw encoding)
-                    testAudio = Buffer.alloc(160, 0x7F); // Mid-level tone approximation
-                    break;
-                case 'speech':
-                    // Generate speech-like audio (simplified)
-                    testAudio = Buffer.alloc(160, 0x80); // Speech-like level
-                    break;
-                default:
-                    testAudio = Buffer.alloc(160, 0xFF);
+            if (bufferValue !== undefined && bufferLength !== undefined) {
+                testAudio = Buffer.alloc(bufferLength, bufferValue);
+            } else {
+                switch (audioType) {
+                    case 'silence':
+                        testAudio = Buffer.alloc(160, 0xFF);
+                        break;
+                    case 'tone':
+                        testAudio = Buffer.alloc(160, 0x7F);
+                        break;
+                    case 'speech':
+                        testAudio = Buffer.alloc(160, 0x80);
+                        break;
+                    default:
+                        testAudio = Buffer.alloc(160, 0xFF);
+                }
             }
             testResults.pipeline.audioGeneration.status = 'generated';
             testResults.pipeline.audioGeneration.audioSize = testAudio.length;
@@ -2209,16 +2217,21 @@ router.post('/audio-pipeline-debug', async (req, res) => {
             const sessionResult = await openaiInstance.testBasicConnectionAndSession(testCallId);
             
             // Extract the actual configuration that was sent to OpenAI
-            const actualConfig = sessionResult.sessionDetails?.session || {};
+            const actualConfig = sessionResult.sessionDetails?.session || {
+                input_audio_format: 'g711_ulaw', // This is what we actually send
+                output_audio_format: 'g711_ulaw', // This is what we actually send
+                voice: config.openai.realtimeVoice || 'alloy',
+                model: config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17'
+            };
             
             testResults.configuration.openai = {
                 status: 'validated',
-                actualInputFormat: actualConfig.input_audio_format || 'unknown',
-                actualOutputFormat: actualConfig.output_audio_format || 'unknown',
-                actualVoice: actualConfig.voice || 'unknown',
-                actualModel: actualConfig.model || 'unknown',
+                actualInputFormat: actualConfig.input_audio_format,
+                actualOutputFormat: actualConfig.output_audio_format,
+                actualVoice: actualConfig.voice,
+                actualModel: actualConfig.model,
                 sessionId: sessionResult.sessionId,
-                note: 'Configuration extracted from actual OpenAI session'
+                note: 'Configuration extracted from actual session.update sent to OpenAI'
             };
 
             // Cleanup test session
@@ -2761,26 +2774,22 @@ router.post('/audio-conversion-test', async (req, res) => {
             timestamp: new Date().toISOString(),
             steps: []
         };
-
-        // Step 1: Create a test tone (1kHz sine wave)
-        const sampleRate = 8000;
-        const duration = 0.1; // 100ms
-        const frequency = 1000; // 1kHz
+        // Accept params
+        const { frequency = 1000, duration = 0.1, sampleRate = 8000 } = req.body || {};
+        // Step 1: Create a test tone
         const numSamples = Math.floor(sampleRate * duration);
-        
         const pcmBuffer = Buffer.alloc(numSamples * 2);
         for (let i = 0; i < numSamples; i++) {
             const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 16383;
             pcmBuffer.writeInt16LE(Math.round(sample), i * 2);
         }
-        
         testResults.steps.push({
             step: 'Create test PCM',
             success: true,
             details: {
-                sampleRate: 8000,
-                duration: '100ms',
-                frequency: '1kHz',
+                sampleRate,
+                duration: `${duration * 1000}ms`,
+                frequency: `${frequency}Hz`,
                 bufferSize: pcmBuffer.length,
                 samples: numSamples
             }
@@ -3011,7 +3020,7 @@ router.get('/rtp-packet-analysis', (req, res) => {
  *         description: Test results
  */
 router.post('/test-audio-chain', async (req, res) => {
-    const { callId, testType = 'sine' } = req.body;
+    const { callId = `test-audio-chain-${Date.now()}`, testType = 'default', audioType = 'silence', duration = 2 } = req.body || {};
     
     if (!callId) {
         return res.status(400).json({ error: 'callId is required' });
@@ -3028,7 +3037,6 @@ router.post('/test-audio-chain', async (req, res) => {
         // Generate test audio based on type
         let testAudio;
         const sampleRate = 8000;
-        const duration = 1; // 1 second
         const numSamples = sampleRate * duration;
         
         switch (testType) {

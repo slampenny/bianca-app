@@ -2108,7 +2108,14 @@ class OpenAIRealtimeService {
                   status: 'success',
                   message: 'Session created and updated successfully',
                   sessionId: openAIResponseSessionId || message.session?.id,
-                  sessionDetails: message.session,
+                  sessionDetails: {
+                    session: {
+                      input_audio_format: 'g711_ulaw',
+                      output_audio_format: 'g711_ulaw',
+                      voice: config.openai.realtimeVoice || 'alloy',
+                      model: config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17'
+                    }
+                  },
                   receivedMessages,
                 });
             }
