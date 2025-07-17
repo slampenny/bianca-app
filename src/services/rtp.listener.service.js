@@ -282,6 +282,50 @@ function healthCheck() {
     };
 }
 
+// Get listener status by port
+function getListenerStatus(port) {
+    for (const [callId, listener] of activeListeners.entries()) {
+        if (listener.port === port) {
+            return {
+                found: true,
+                callId,
+                port: listener.port,
+                active: listener.isActive,
+                stats: listener.getStats()
+            };
+        }
+    }
+    return {
+        found: false,
+        port,
+        message: `No RTP listener found on port ${port}`
+    };
+}
+
+// Get full status with all listeners
+function getFullStatus() {
+    const listeners = [];
+    for (const [callId, listener] of activeListeners.entries()) {
+        const stats = listener.getStats();
+        listeners.push({
+            callId,
+            port: listener.port,
+            active: listener.isActive,
+            packetsReceived: stats.packetsReceived,
+            packetsSent: stats.packetsSent,
+            invalidPackets: stats.invalidPackets,
+            errors: stats.errors,
+            uptime: stats.uptime,
+            source: `${callId} (${listener.port})`
+        });
+    }
+    
+    return {
+        totalListeners: activeListeners.size,
+        listeners
+    };
+}
+
 // Graceful shutdown
 process.once('SIGTERM', () => {
     logger.info('[RTP Listener] Received SIGTERM, stopping all listeners...');
@@ -299,5 +343,7 @@ module.exports = {
     getListenerForCall,
     getAllActiveListeners,
     stopAllListeners,
-    healthCheck
+    healthCheck,
+    getListenerStatus,
+    getFullStatus
 };

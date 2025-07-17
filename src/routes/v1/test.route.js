@@ -5913,5 +5913,182 @@ router.post('/udp-transmission-diagnostic', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/openai-audio-debug:
+ *   post:
+ *     summary: Debug OpenAI audio buffer issues
+ *     description: Test and diagnose OpenAI audio buffer problems
+ *     tags: [Test - Audio Debug]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 description: Call ID to test
+ *               testDuration:
+ *                 type: number
+ *                 default: 5
+ *                 description: Test duration in seconds
+ *               chunkSize:
+ *                 type: number
+ *                 default: 160
+ *                 description: Audio chunk size in bytes
+ *     responses:
+ *       "200":
+ *         description: Audio debug results
+ */
+router.post('/openai-audio-debug', async (req, res) => {
+    const { callId, testDuration = 5, chunkSize = 160 } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const debugResults = {
+        timestamp: new Date().toISOString(),
+        callId,
+        testDuration,
+        chunkSize,
+        steps: {},
+        errors: []
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const openaiInstance = openAIService.getOpenAIServiceInstance();
+        
+        // Step 1: Check connection status
+        debugResults.steps.connectionCheck = {
+            status: 'checking',
+            timestamp: new Date().toISOString()
+        };
+
+        const conn = openaiInstance.connections.get(callId);
+        if (!conn) {
+            debugResults.steps.connectionCheck.status = 'failed';
+            debugResults.steps.connectionCheck.error = 'No OpenAI connection found';
+            debugResults.errors.push('No OpenAI connection found');
+            return res.json(debugResults);
+        }
+
+        debugResults.steps.connectionCheck.status = 'completed';
+        debugResults.steps.connectionCheck.connection = {
+            sessionReady: conn.sessionReady,
+            webSocketState: conn.webSocket?.readyState,
+            status: conn.status,
+            audioChunksReceived: conn.audioChunksReceived || 0,
+            audioChunksSent: conn.audioChunksSent || 0,
+            pendingCommit: conn.pendingCommit || false
+        };
+
+        // Step 2: Generate test audio
+        debugResults.steps.audioGeneration = {
+            status: 'generating',
+            timestamp: new Date().toISOString()
+        };
+
+        // Generate test audio (silence in uLaw)
+        const testAudio = Buffer.alloc(chunkSize, 0xFF); // uLaw silence
+        const audioBase64 = testAudio.toString('base64');
+        
+        debugResults.steps.audioGeneration.status = 'completed';
+        debugResults.steps.audioGeneration.audio = {
+            originalSize: chunkSize,
+            base64Length: audioBase64.length,
+            durationMs: (chunkSize / 8) * 1000 // 8kHz, 1 byte per sample
+        };
+
+        // Step 3: Send audio chunks
+        debugResults.steps.audioSending = {
+            status: 'sending',
+            timestamp: new Date().toISOString()
+        };
+
+        const chunksToSend = Math.ceil((testDuration * 1000) / 20); // 20ms per chunk
+        const beforeStats = {
+            chunksReceived: conn.audioChunksReceived || 0,
+            chunksSent: conn.audioChunksSent || 0
+        };
+
+        for (let i = 0; i < chunksToSend; i++) {
+            try {
+                await openaiInstance.sendAudioChunk(callId, audioBase64, true); // bypass buffering
+                await new Promise(resolve => setTimeout(resolve, 20)); // 20ms delay
+            } catch (err) {
+                debugResults.errors.push(`Chunk ${i}: ${err.message}`);
+            }
+        }
+
+        const afterStats = {
+            chunksReceived: conn.audioChunksReceived || 0,
+            chunksSent: conn.audioChunksSent || 0
+        };
+
+        debugResults.steps.audioSending.status = 'completed';
+        debugResults.steps.audioSending.stats = {
+            chunksSent: chunksToSend,
+            chunksReceived: afterStats.chunksReceived - beforeStats.chunksReceived,
+            chunksSentToOpenAI: afterStats.chunksSent - beforeStats.chunksSent
+        };
+
+        // Step 4: Force commit
+        debugResults.steps.commit = {
+            status: 'committing',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            await openaiInstance.forceCommit(callId);
+            debugResults.steps.commit.status = 'completed';
+        } catch (err) {
+            debugResults.steps.commit.status = 'failed';
+            debugResults.steps.commit.error = err.message;
+            debugResults.errors.push(`Commit: ${err.message}`);
+        }
+
+        // Step 5: Final status
+        debugResults.steps.finalStatus = {
+            status: 'checking',
+            timestamp: new Date().toISOString()
+        };
+
+        const finalConn = openaiInstance.connections.get(callId);
+        debugResults.steps.finalStatus.status = 'completed';
+        debugResults.steps.finalStatus.connection = {
+            sessionReady: finalConn?.sessionReady,
+            webSocketState: finalConn?.webSocket?.readyState,
+            audioChunksReceived: finalConn?.audioChunksReceived || 0,
+            audioChunksSent: finalConn?.audioChunksSent || 0,
+            pendingCommit: finalConn?.pendingCommit || false
+        };
+
+        // Summary
+        debugResults.summary = {
+            totalSteps: Object.keys(debugResults.steps).length,
+            successfulSteps: Object.values(debugResults.steps).filter(s => s.status === 'completed').length,
+            failedSteps: debugResults.errors.length,
+            audioSent: {
+                chunks: chunksToSend,
+                totalBytes: chunksToSend * chunkSize,
+                totalDurationMs: chunksToSend * 20
+            }
+        };
+
+        res.json(debugResults);
+
+    } catch (err) {
+        res.status(500).json({
+            error: 'OpenAI audio debug failed',
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // Export the router
 module.exports = router;

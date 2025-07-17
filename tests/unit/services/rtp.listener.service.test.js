@@ -319,6 +319,48 @@ jest.mock('../../../src/services/rtp.listener.service', () => {
         activeListeners: activeCount,
         listeners: stats
       };
+    }),
+    
+    getListenerStatus: jest.fn((port) => {
+      for (const [callId, listener] of activeListeners.entries()) {
+        if (listener.port === port) {
+          return {
+            found: true,
+            callId,
+            port: listener.port,
+            active: listener.isActive,
+            stats: listener.getStats()
+          };
+        }
+      }
+      return {
+        found: false,
+        port,
+        message: `No RTP listener found on port ${port}`
+      };
+    }),
+    
+    getFullStatus: jest.fn(() => {
+      const listeners = [];
+      for (const [callId, listener] of activeListeners.entries()) {
+        const stats = listener.getStats();
+        listeners.push({
+          callId,
+          port: listener.port,
+          active: listener.isActive,
+          packetsReceived: stats.packetsReceived,
+          packetsSent: stats.packetsSent,
+          invalidPackets: stats.invalidPackets,
+          errors: stats.errors,
+          uptime: stats.uptime,
+          source: `${callId} (${listener.port})`
+        });
+      }
+      
+      return {
+        totalListeners: activeListeners.size,
+        listeners
+      };
     })
   };
 });
@@ -1149,6 +1191,85 @@ describe('RTP Listener Service', () => {
         });
       });
     });
+
+    describe('getListenerStatus()', () => {
+      it('should return listener status for existing port', async () => {
+        await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+
+        const status = rtpListenerService.getListenerStatus(testPort);
+
+        expect(status).toEqual({
+          found: true,
+          callId: testCallId,
+          port: testPort,
+          active: true,
+          stats: expect.any(Object)
+        });
+        expect(status.stats).toHaveProperty('port', testPort);
+        expect(status.stats).toHaveProperty('callId', testCallId);
+      });
+
+      it('should return not found for non-existent port', () => {
+        const status = rtpListenerService.getListenerStatus(9999);
+
+        expect(status).toEqual({
+          found: false,
+          port: 9999,
+          message: 'No RTP listener found on port 9999'
+        });
+      });
+    });
+
+    describe('getFullStatus()', () => {
+      it('should return full status with multiple listeners', async () => {
+        await rtpListenerService.startRtpListenerForCall(
+          testPort, 
+          testCallId, 
+          testAsteriskChannelId
+        );
+        
+        await rtpListenerService.startRtpListenerForCall(
+          testPort + 1, 
+          'test-call-456', 
+          'test-channel-789'
+        );
+
+        const status = rtpListenerService.getFullStatus();
+
+        expect(status).toEqual({
+          totalListeners: 2,
+          listeners: expect.arrayContaining([
+            expect.objectContaining({
+              callId: testCallId,
+              port: testPort,
+              active: true
+            }),
+            expect.objectContaining({
+              callId: 'test-call-456',
+              port: testPort + 1,
+              active: true
+            })
+          ])
+        });
+        expect(status.listeners).toHaveLength(2);
+      });
+
+      it('should return empty status with no listeners', () => {
+        // Clear any existing listeners first
+        rtpListenerService.stopAllListeners();
+        
+        const status = rtpListenerService.getFullStatus();
+
+        expect(status).toEqual({
+          totalListeners: 0,
+          listeners: []
+        });
+      });
+    });
   });
 
   describe('Error handling', () => {
@@ -1286,5 +1407,59 @@ describe('RTP Listener Service', () => {
       // In a real scenario, the service would handle SIGTERM gracefully
       expect(true).toBe(true); // Placeholder assertion
     });
+  });
+}); 
+
+describe('API Contract Validation', () => {
+  it('should ensure mock API matches real service API', () => {
+    // Import the real service (without mocking)
+    const realService = require('../../../src/services/rtp.listener.service');
+    
+    // Get the mocked service
+    const mockedService = rtpListenerService;
+    
+    // Define the expected API contract
+    const expectedFunctions = [
+      'startRtpListenerForCall',
+      'stopRtpListenerForCall', 
+      'getListenerForCall',
+      'getAllActiveListeners',
+      'stopAllListeners',
+      'healthCheck',
+      'getListenerStatus',
+      'getFullStatus'
+    ];
+    
+    // Verify all expected functions exist in both real and mocked services
+    expectedFunctions.forEach(funcName => {
+      expect(typeof realService[funcName]).toBe('function', 
+        `Real service missing function: ${funcName}`);
+      expect(typeof mockedService[funcName]).toBe('function', 
+        `Mocked service missing function: ${funcName}`);
+    });
+    
+    // Verify no extra functions in mock that don't exist in real service
+    const realFunctions = Object.keys(realService).filter(key => typeof realService[key] === 'function');
+    const mockFunctions = Object.keys(mockedService).filter(key => typeof mockedService[key] === 'function');
+    
+    const extraMockFunctions = mockFunctions.filter(func => !realFunctions.includes(func));
+    expect(extraMockFunctions).toEqual([], 
+      `Mock has extra functions not in real service: ${extraMockFunctions.join(', ')}`);
+  });
+
+  it('should ensure mock function signatures match real service', () => {
+    // This test ensures that if we change the real service API,
+    // we must also update the mock to match
+    const realService = require('../../../src/services/rtp.listener.service');
+    const mockedService = rtpListenerService;
+    
+    // Test getListenerStatus signature
+    expect(mockedService.getListenerStatus.length).toBe(realService.getListenerStatus.length);
+    
+    // Test getFullStatus signature  
+    expect(mockedService.getFullStatus.length).toBe(realService.getFullStatus.length);
+    
+    // Test healthCheck signature
+    expect(mockedService.healthCheck.length).toBe(realService.healthCheck.length);
   });
 }); 

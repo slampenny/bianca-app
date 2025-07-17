@@ -739,7 +739,7 @@ class AsteriskAriClient extends EventEmitter {
         // Verify RTP listener is active
         const rtpListenerService = require('./rtp.listener.service');
         const listenerStatus = rtpListenerService.getListenerStatus?.(callData.rtpReadPort);
-        if (listenerStatus) {
+        if (listenerStatus?.found) {
             logger.info(`[ARI] RTP Listener confirmed active on port ${callData.rtpReadPort}`);
         } else {
             logger.error(`[ARI] WARNING: No RTP listener found on port ${callData.rtpReadPort}!`);
