@@ -104,7 +104,7 @@ class RtpListener {
             
             if (audioBase64 && audioBase64.length > 0) {
                 logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId}`);
-                await openAIService.sendAudioChunk(this.callId, audioBase64);
+                await openAIService.sendAudioChunk(this.callId, audioBase64, true); // bypassBuffering = true for real audio
                 this.stats.packetsSent++;
             } else {
                 logger.warn(`[RTP Listener ${this.port}] Empty audio data for call ${this.callId}`);

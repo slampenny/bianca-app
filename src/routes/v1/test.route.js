@@ -6372,5 +6372,154 @@ router.post('/test-openai-audio-acceptance', async (req, res) => {
     }
 });
 
+router.post('/standalone-audio-diagnostic', async (req, res) => {
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        audioProcessing: {},
+        openaiConfiguration: {},
+        recommendations: []
+    };
+
+    try {
+        // Test 1: Audio conversion utilities
+        diagnostic.audioProcessing.conversionTest = {
+            status: 'testing'
+        };
+
+        try {
+            const AudioUtils = require('../../api/audio.utils');
+            
+            // Create test PCM audio (1 second of 440Hz tone at 8kHz)
+            const sampleRate = 8000;
+            const duration = 1;
+            const numSamples = sampleRate * duration;
+            
+            const testPcm = Buffer.alloc(numSamples * 2);
+            for (let i = 0; i < numSamples; i++) {
+                const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+                testPcm.writeInt16LE(Math.round(sample), i * 2);
+            }
+
+            // Convert to uLaw
+            const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testPcm);
+            const testUlawBuffer = Buffer.from(testUlawBase64, 'base64');
+            
+            // Convert back to PCM
+            const backToPcm = await AudioUtils.convertUlawToPcm(testUlawBuffer);
+
+            diagnostic.audioProcessing.conversionTest = {
+                status: 'success',
+                pcmSize: testPcm.length,
+                ulawSize: testUlawBuffer.length,
+                ulawBase64Size: testUlawBase64.length,
+                backToPcmSize: backToPcm.length,
+                conversionWorks: backToPcm.length === testPcm.length,
+                durationMs: (testPcm.length / 2 / 8).toFixed(2)
+            };
+        } catch (err) {
+            diagnostic.audioProcessing.conversionTest = {
+                status: 'failed',
+                error: err.message
+            };
+        }
+
+        // Test 2: OpenAI configuration
+        diagnostic.openaiConfiguration = {
+            status: 'checking'
+        };
+
+        try {
+            const config = require('../../config/config');
+            const openAIService = require('../../services/openai.realtime.service');
+            
+            diagnostic.openaiConfiguration = {
+                status: 'validated',
+                realtimeModel: config.openai.realtimeModel,
+                realtimeVoice: config.openai.realtimeVoice,
+                apiKeyConfigured: !!config.openai.apiKey,
+                apiKeyLength: config.openai.apiKey ? config.openai.apiKey.length : 0,
+                debugAudio: config.openai.debugAudio,
+                serviceAvailable: !!openAIService,
+                activeConnections: openAIService.connections ? openAIService.connections.size : 0
+            };
+        } catch (err) {
+            diagnostic.openaiConfiguration = {
+                status: 'failed',
+                error: err.message
+            };
+        }
+
+        // Test 3: Create a test OpenAI session
+        diagnostic.openaiConfiguration.sessionTest = {
+            status: 'testing'
+        };
+
+        try {
+            const openAIService = require('../../services/openai.realtime.service');
+            const testCallId = `standalone-test-${Date.now()}`;
+            
+            const sessionResult = await openAIService.testBasicConnectionAndSession(testCallId);
+            
+            diagnostic.openaiConfiguration.sessionTest = {
+                status: 'success',
+                sessionId: sessionResult.sessionId,
+                sessionDetails: sessionResult.sessionDetails,
+                inputFormat: sessionResult.sessionDetails?.session?.input_audio_format,
+                outputFormat: sessionResult.sessionDetails?.session?.output_audio_format
+            };
+
+            // Cleanup test session
+            await openAIService.cleanup(testCallId);
+        } catch (err) {
+            diagnostic.openaiConfiguration.sessionTest = {
+                status: 'failed',
+                error: err.message
+            };
+        }
+
+        // Generate recommendations
+        if (diagnostic.audioProcessing.conversionTest.status === 'failed') {
+            diagnostic.recommendations.push('Audio conversion utilities are not working - check AudioUtils implementation');
+        }
+
+        if (diagnostic.openaiConfiguration.status === 'failed') {
+            diagnostic.recommendations.push('OpenAI configuration is invalid - check config and API key');
+        }
+
+        if (diagnostic.openaiConfiguration.sessionTest.status === 'failed') {
+            diagnostic.recommendations.push('OpenAI session creation failed - check API key and network connectivity');
+        }
+
+        if (diagnostic.openaiConfiguration.sessionTest.status === 'success') {
+            const session = diagnostic.openaiConfiguration.sessionTest.sessionDetails?.session;
+            if (session?.input_audio_format !== 'g711_ulaw') {
+                diagnostic.recommendations.push(`OpenAI input format is ${session?.input_audio_format}, expected g711_ulaw`);
+            }
+            if (session?.output_audio_format !== 'g711_ulaw') {
+                diagnostic.recommendations.push(`OpenAI output format is ${session?.output_audio_format}, expected g711_ulaw`);
+            }
+        }
+
+        // Overall status
+        const hasErrors = diagnostic.audioProcessing.conversionTest.status === 'failed' ||
+                         diagnostic.openaiConfiguration.status === 'failed' ||
+                         diagnostic.openaiConfiguration.sessionTest.status === 'failed';
+        
+        diagnostic.success = !hasErrors;
+        diagnostic.summary = hasErrors ? 
+            'Audio pipeline has issues - check recommendations' : 
+            'Audio pipeline is working correctly';
+
+        res.json(diagnostic);
+
+    } catch (err) {
+        res.status(500).json({
+            error: 'Standalone audio diagnostic failed',
+            message: err.message,
+            diagnostic
+        });
+    }
+});
+
 // Export the router
 module.exports = router;
