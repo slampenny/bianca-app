@@ -6521,5 +6521,76 @@ router.post('/standalone-audio-diagnostic', async (req, res) => {
     }
 });
 
+router.post('/openai-audio-generation-diagnostic', async (req, res) => {
+    const { callId } = req.body || {};
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        callId,
+        openaiStatus: {},
+        audioGeneration: {},
+        recommendations: []
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const conn = openAIService.connections.get(callId);
+        
+        if (!conn) {
+            diagnostic.openaiStatus.status = 'not_found';
+            diagnostic.recommendations.push('Call not found in OpenAI service');
+            return res.json(diagnostic);
+        }
+
+        // Check OpenAI connection status
+        diagnostic.openaiStatus = {
+            sessionReady: conn.sessionReady,
+            webSocketState: conn.webSocket?.readyState,
+            status: conn.status,
+            audioChunksReceived: conn.audioChunksReceived,
+            audioChunksSent: conn.audioChunksSent,
+            pendingCommit: conn.pendingCommit,
+            lastActivity: conn.lastActivity
+        };
+
+        // Check if OpenAI is generating audio
+        diagnostic.audioGeneration = {
+            hasReceivedAudio: conn.audioChunksReceived > 0,
+            hasSentAudio: conn.audioChunksSent > 0,
+            pendingAudioCount: openAIService.pendingAudio.get(callId)?.length || 0,
+            hasOpenAIResponded: conn._openaiChunkCount > 0,
+            openaiChunkCount: conn._openaiChunkCount || 0,
+            timingStats: conn._timingStats || null
+        };
+
+        // Check if there are any pending commits
+        if (conn.pendingCommit) {
+            diagnostic.recommendations.push('OpenAI has pending commit - audio may be buffered');
+        }
+
+        if (conn.audioChunksReceived > 0 && conn.audioChunksSent === 0) {
+            diagnostic.recommendations.push('Audio received but not sent to OpenAI - check buffering');
+        }
+
+        if (conn.audioChunksSent > 0 && conn._openaiChunkCount === 0) {
+            diagnostic.recommendations.push('Audio sent to OpenAI but no response generated - check OpenAI session');
+        }
+
+        if (!conn.sessionReady) {
+            diagnostic.recommendations.push('OpenAI session not ready - audio may be buffered');
+        }
+
+        return res.json(diagnostic);
+
+    } catch (err) {
+        diagnostic.error = err.message;
+        return res.json(diagnostic);
+    }
+});
+
 // Export the router
 module.exports = router;

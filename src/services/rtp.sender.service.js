@@ -122,7 +122,7 @@ class RtpSenderService extends EventEmitter {
             });
 
             // Start packet sender timer for this call
-            this.startPacketSender(callId);
+            // No timer needed - we send audio immediately
 
             this.globalStats.totalCalls++;
             this.globalStats.activeCalls++;
@@ -256,14 +256,21 @@ class RtpSenderService extends EventEmitter {
                 audioPayload = ulawBuffer;
             }
 
-            // Add to buffer instead of sending immediately
-            let existingBuffer = this.audioBuffers.get(callId) || Buffer.alloc(0);
-            existingBuffer = Buffer.concat([existingBuffer, audioPayload]);
-            this.audioBuffers.set(callId, existingBuffer);
-
-            // Log buffer status
-            if (this.audioChunkCount[callId] <= 5 || this.audioChunkCount[callId] % 50 === 0) {
-                logger.info(`[RTP Sender] Buffer status for ${callId}: ${existingBuffer.length} bytes buffered`);
+            // Send audio immediately - no buffering
+            const timestamp = this.timestamps.get(callId) || 0;
+            
+            try {
+                const rtpPacket = this.createRtpPacket(callId, audioPayload, callConfig, timestamp);
+                if (rtpPacket) {
+                    this.sendRtpPacketSync(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort, callId);
+                    
+                    // Update timestamp for next packet
+                    const nextTimestamp = (timestamp + audioPayload.length) >>> 0;
+                    this.timestamps.set(callId, nextTimestamp);
+                }
+            } catch (err) {
+                logger.error(`[RTP Sender] Error sending audio for ${callId}: ${err.message}`);
+                this.updateStats(callId, 'error');
             }
 
             this.updateStats(callId, 'audio_sent', { bytes: audioPayload.length });
