@@ -6090,5 +6090,287 @@ router.post('/openai-audio-debug', async (req, res) => {
     }
 });
 
+router.post('/audio-data-diagnostic', async (req, res) => {
+    const { callId } = req.body || {};
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        callId,
+        audioDataAnalysis: {},
+        openaiConnection: {},
+        recommendations: []
+    };
+
+    try {
+        // Check OpenAI connection status
+        const openAIService = require('../../services/openai.realtime.service');
+        const conn = openAIService.connections.get(callId);
+        
+        if (!conn) {
+            diagnostic.openaiConnection.status = 'not_found';
+            diagnostic.recommendations.push('Call not found in OpenAI service');
+            return res.json(diagnostic);
+        }
+
+        diagnostic.openaiConnection = {
+            status: conn.status,
+            sessionReady: conn.sessionReady,
+            webSocketState: conn.webSocket?.readyState,
+            audioChunksReceived: conn.audioChunksReceived,
+            audioChunksSent: conn.audioChunksSent,
+            pendingCommit: conn.pendingCommit
+        };
+
+        // Get recent audio data from debug files if available
+        const fs = require('fs');
+        const path = require('path');
+        const debugDir = path.join(__dirname, '..', '..', 'debug_audio_calls', callId);
+        
+        if (fs.existsSync(debugDir)) {
+            const files = fs.readdirSync(debugDir);
+            const ulawFiles = files.filter(f => f.includes('ulaw'));
+            
+            diagnostic.audioDataAnalysis.debugFiles = {
+                directory: debugDir,
+                availableFiles: ulawFiles,
+                totalFiles: files.length
+            };
+
+            // Analyze the most recent ulaw file
+            const recentUlawFile = ulawFiles
+                .filter(f => f.includes('from_asterisk'))
+                .sort()
+                .pop();
+
+            if (recentUlawFile) {
+                const filePath = path.join(debugDir, recentUlawFile);
+                const audioData = fs.readFileSync(filePath);
+                
+                diagnostic.audioDataAnalysis.recentAudio = {
+                    filename: recentUlawFile,
+                    sizeBytes: audioData.length,
+                    sizeBase64: audioData.toString('base64').length,
+                    firstBytes: Array.from(audioData.slice(0, 20)).map(b => '0x' + b.toString(16).padStart(2, '0')),
+                    lastBytes: Array.from(audioData.slice(-20)).map(b => '0x' + b.toString(16).padStart(2, '0')),
+                    durationMs: (audioData.length / 8).toFixed(2), // 8kHz, 1 byte per sample
+                    isValidUlaw: true // We'll validate this
+                };
+
+                // Validate uLaw format
+                const AudioUtils = require('../../api/audio.utils');
+                try {
+                    const pcmData = await AudioUtils.convertUlawToPcm(audioData);
+                    diagnostic.audioDataAnalysis.recentAudio.isValidUlaw = true;
+                    diagnostic.audioDataAnalysis.recentAudio.pcmSize = pcmData.length;
+                    diagnostic.audioDataAnalysis.recentAudio.pcmDurationMs = (pcmData.length / 2 / 8).toFixed(2);
+                } catch (err) {
+                    diagnostic.audioDataAnalysis.recentAudio.isValidUlaw = false;
+                    diagnostic.audioDataAnalysis.recentAudio.ulawError = err.message;
+                }
+            }
+        }
+
+        // Test audio conversion chain
+        diagnostic.audioDataAnalysis.conversionTest = {
+            status: 'testing'
+        };
+
+        try {
+            const AudioUtils = require('../../api/audio.utils');
+            
+            // Create test uLaw data
+            const testPcm = Buffer.alloc(160 * 2); // 20ms at 8kHz
+            for (let i = 0; i < 160; i++) {
+                const sample = Math.sin(2 * Math.PI * 440 * i / 8000) * 16383;
+                testPcm.writeInt16LE(Math.round(sample), i * 2);
+            }
+
+            const testUlaw = await AudioUtils.convertPcmToUlaw(testPcm);
+            const testUlawBuffer = Buffer.from(testUlaw, 'base64');
+            const backToPcm = await AudioUtils.convertUlawToPcm(testUlawBuffer);
+
+            diagnostic.audioDataAnalysis.conversionTest = {
+                status: 'success',
+                testPcmSize: testPcm.length,
+                testUlawSize: testUlawBuffer.length,
+                testUlawBase64Size: testUlaw.length,
+                backToPcmSize: backToPcm.length,
+                conversionWorks: backToPcm.length === testPcm.length
+            };
+        } catch (err) {
+            diagnostic.audioDataAnalysis.conversionTest = {
+                status: 'failed',
+                error: err.message
+            };
+        }
+
+        // Check if the issue might be with the audio format
+        if (diagnostic.audioDataAnalysis.recentAudio && !diagnostic.audioDataAnalysis.recentAudio.isValidUlaw) {
+            diagnostic.recommendations.push('Audio data is not valid uLaw format - check RTP packet parsing');
+        }
+
+        if (diagnostic.openaiConnection.audioChunksSent === 0) {
+            diagnostic.recommendations.push('No audio chunks sent to OpenAI - check if audio is being received');
+        }
+
+        if (diagnostic.openaiConnection.pendingCommit) {
+            diagnostic.recommendations.push('Commit is pending - this might be causing the buffer issue');
+        }
+
+        // Check if we have enough audio data
+        if (diagnostic.audioDataAnalysis.recentAudio && diagnostic.audioDataAnalysis.recentAudio.durationMs < 100) {
+            diagnostic.recommendations.push('Audio duration is less than 100ms - OpenAI requires at least 100ms of audio');
+        }
+
+        res.json(diagnostic);
+
+    } catch (err) {
+        res.status(500).json({
+            error: 'Audio data diagnostic failed',
+            message: err.message,
+            diagnostic
+        });
+    }
+});
+
+router.post('/test-openai-audio-acceptance', async (req, res) => {
+    const { callId } = req.body || {};
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        callId,
+        testSteps: [],
+        success: false,
+        error: null
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const conn = openAIService.connections.get(callId);
+        
+        if (!conn || !conn.sessionReady) {
+            testResults.error = 'OpenAI connection not ready';
+            return res.json(testResults);
+        }
+
+        testResults.testSteps.push({
+            step: 'Connection check',
+            status: 'success',
+            details: {
+                sessionReady: conn.sessionReady,
+                webSocketState: conn.webSocket?.readyState,
+                audioChunksSent: conn.audioChunksSent
+            }
+        });
+
+        // Generate valid uLaw audio (1 second of 440Hz tone)
+        const AudioUtils = require('../../api/audio.utils');
+        const sampleRate = 8000;
+        const duration = 1; // 1 second
+        const numSamples = sampleRate * duration;
+        
+        const testPcm = Buffer.alloc(numSamples * 2);
+        for (let i = 0; i < numSamples; i++) {
+            const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+            testPcm.writeInt16LE(Math.round(sample), i * 2);
+        }
+
+        testResults.testSteps.push({
+            step: 'Generate test audio',
+            status: 'success',
+            details: {
+                pcmSize: testPcm.length,
+                durationMs: (testPcm.length / 2 / 8).toFixed(2),
+                frequency: '440Hz'
+            }
+        });
+
+        // Convert to uLaw
+        const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testPcm);
+        const testUlawBuffer = Buffer.from(testUlawBase64, 'base64');
+
+        testResults.testSteps.push({
+            step: 'Convert to uLaw',
+            status: 'success',
+            details: {
+                ulawSize: testUlawBuffer.length,
+                base64Size: testUlawBase64.length,
+                compressionRatio: (testUlawBuffer.length / testPcm.length).toFixed(2)
+            }
+        });
+
+        // Send to OpenAI in chunks
+        const chunkSize = 160; // 20ms chunks
+        let totalChunks = 0;
+        let totalBytes = 0;
+
+        for (let i = 0; i < testUlawBuffer.length; i += chunkSize) {
+            const chunk = testUlawBuffer.slice(i, i + chunkSize);
+            const chunkBase64 = chunk.toString('base64');
+            
+            await openAIService.sendAudioChunk(callId, chunkBase64, true);
+            totalChunks++;
+            totalBytes += chunk.length;
+            
+            // Small delay between chunks
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
+        testResults.testSteps.push({
+            step: 'Send audio chunks',
+            status: 'success',
+            details: {
+                chunksSent: totalChunks,
+                totalBytes,
+                chunkSize
+            }
+        });
+
+        // Force commit
+        const commitResult = await openAIService.forceCommit(callId);
+        
+        testResults.testSteps.push({
+            step: 'Commit audio buffer',
+            status: commitResult ? 'success' : 'failed',
+            details: {
+                commitResult,
+                finalAudioChunksSent: conn.audioChunksSent
+            }
+        });
+
+        // Wait a moment for any error responses
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check if we got any errors
+        const hasErrors = testResults.testSteps.some(step => step.status === 'failed');
+        testResults.success = !hasErrors;
+
+        if (testResults.success) {
+            testResults.summary = 'Successfully sent valid uLaw audio to OpenAI without errors';
+        } else {
+            testResults.summary = 'Failed to send audio to OpenAI - check the error details';
+        }
+
+        res.json(testResults);
+
+    } catch (err) {
+        testResults.error = err.message;
+        testResults.testSteps.push({
+            step: 'Error occurred',
+            status: 'failed',
+            details: { error: err.message }
+        });
+        res.json(testResults);
+    }
+});
+
 // Export the router
 module.exports = router;
