@@ -3364,10 +3364,15 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
   description       = "RTP from Asterisk to App"
 }`
                     });
-                } else {
+                    analysisResults.securityGroups.udpStatus = 'BLOCKED';
+                } else if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === true) {
                     // UDP connectivity is working - security groups are configured correctly
                     analysisResults.securityGroups.status = 'completed';
                     analysisResults.securityGroups.message = 'Security groups configured correctly - UDP connectivity verified';
+                    analysisResults.securityGroups.udpStatus = 'WORKING';
+                } else {
+                    // UDP test hasn't run yet or is unknown
+                    analysisResults.securityGroups.udpStatus = 'UNKNOWN';
                 }
 
                 // Issue 2: Check IP configuration
@@ -3383,11 +3388,7 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
                 }
 
                 // Issue 3: Check if UDP connectivity is working (this is the real test)
-                if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === true) {
-                    analysisResults.securityGroups.message = '✅ Security groups working correctly - UDP connectivity verified';
-                    analysisResults.securityGroups.udpStatus = 'WORKING';
-                    udpWorking = true;
-                } else if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === false) {
+                if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === false) {
                     issues.push({
                         category: 'RTP Connectivity',
                         severity: 'CRITICAL',
@@ -3396,9 +3397,6 @@ resource "aws_security_group_rule" "app_rtp_from_asterisk" {
                         impact: 'Audio will not work - no RTP packets received',
                         check: 'Verify security group rules allow UDP traffic from Asterisk private IP'
                     });
-                    analysisResults.securityGroups.udpStatus = 'BLOCKED';
-                } else {
-                    analysisResults.securityGroups.udpStatus = 'UNKNOWN';
                 }
 
                 // Issue 4: Check port range configuration
@@ -3558,6 +3556,11 @@ variable "app_rtp_port_end" {
 
                 analysisResults.connectivity.status = 'completed';
                 
+                // Update UDP working status based on connectivity test results
+                if (analysisResults.connectivity?.udpConnectivity?.canReceiveFromAsterisk === true) {
+                    udpWorking = true;
+                }
+                
             } catch (err) {
                 analysisResults.connectivity.status = 'failed';
                 analysisResults.connectivity.error = err.message;
@@ -3581,9 +3584,9 @@ variable "app_rtp_port_end" {
                 const portManager = require('../../services/port.manager.service');
                 const portStats = portManager.getStats();
                 
-                // Test port allocation
+                // Test port allocation using channel tracker
                 const testCallId = `sg-test-${Date.now()}`;
-                const allocatedPorts = portManager.allocatePortsForCall(testCallId);
+                const allocatedPorts = channelTracker.allocatePortsForCall(testCallId);
                 
                 // Test RTP listener creation
                 const rtpListener = require('../../services/rtp.listener.service');
@@ -3594,7 +3597,7 @@ variable "app_rtp_port_end" {
                 
                 // Cleanup
                 rtpListener.stopRtpListenerForCall(testCallId);
-                portManager.releasePortsForCall(testCallId);
+                channelTracker.releasePortsForCall(testCallId);
                 
                 analysisResults.rtpPorts.status = 'completed';
                 analysisResults.rtpPorts.portStats = portStats;
