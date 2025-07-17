@@ -1376,17 +1376,19 @@ class OpenAIRealtimeService {
     
     conn.audioChunksReceived++;
     
+    // Buffer audio if OpenAI is not ready, unless bypassBuffering is true
     if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
         if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
             const pending = this.pendingAudio.get(callId) || [];
             if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
                 pending.push(audioChunkBase64ULaw);
                 this.pendingAudio.set(callId, pending);
+                logger.debug(`[OpenAI Realtime] Buffered audio chunk for ${callId} (${pending.length}/${CONSTANTS.MAX_PENDING_CHUNKS})`);
             } else {
                 logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
             }
         }
-        return;
+        return; // Don't send to OpenAI yet
     }
     
     try {
