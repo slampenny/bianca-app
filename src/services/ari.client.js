@@ -1492,24 +1492,24 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
             const rtpHost = this.RTP_BIANCA_HOST;
             const rtpAsteriskSource = `${rtpHost}:${parentCallData.rtpWritePort}`;
             
-            logger.info(`[ARI] Creating WRITE ExternalMedia to ${rtpAsteriskSource}`);
+            logger.info(`[ARI] Creating READ ExternalMedia to ${rtpAsteriskSource}`);
             
             const unicastRtpChannel = await channel.externalMedia({
                 app: CONFIG.STASIS_APP_NAME,
                 external_host: rtpAsteriskSource,
                 format: CONFIG.RTP_SEND_FORMAT,
-                direction: 'write'
+                direction: 'read'
             });
             
-            logger.info(`[ARI] WRITE ExternalMedia requested, created channel ${unicastRtpChannel.id}`);
+            logger.info(`[ARI] READ ExternalMedia requested, created channel ${unicastRtpChannel.id}`);
             const asteriskRtpEndpoint = await this.getRtpEndpoint(unicastRtpChannel);
             
             this.tracker.updateCall(parentChannelId, { asteriskRtpEndpoint, unicastRtpChannel, unicastRtpChannelId: unicastRtpChannel.id });
             await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
             
         } catch (err) {
-            logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
-            await this.cleanupChannel(parentChannelId, `WRITE ExternalMedia setup failed: ${err.message}`);
+            logger.error(`[ARI] Failed to start READ ExternalMedia on playback ${channelId}: ${err.message}`, err);
+            await this.cleanupChannel(parentChannelId, `READ ExternalMedia setup failed: ${err.message}`);
         }
     }
 
