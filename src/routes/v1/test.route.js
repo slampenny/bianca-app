@@ -5390,5 +5390,251 @@ router.post('/monitor-rtp-destination', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/rtp-endpoint-diagnostic:
+ *   post:
+ *     summary: 15 - Comprehensive RTP endpoint and OpenAI connection diagnostic
+ *     description: Test RTP endpoint extraction, RTP sender initialization, and OpenAI WebSocket connection
+ *     tags: [04 - Audio Pipeline]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               testDuration:
+ *                 type: number
+ *                 default: 10
+ *                 description: Duration of the test in seconds
+ *               simulateRealCall:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Whether to simulate a real call setup
+ *     responses:
+ *       "200":
+ *         description: RTP endpoint diagnostic results
+ */
+router.post('/rtp-endpoint-diagnostic', async (req, res) => {
+    const { testDuration = 10, simulateRealCall = true } = req.body;
+    
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        testDuration,
+        simulateRealCall,
+        steps: {},
+        rtpEndpoints: {},
+        openaiStatus: {},
+        errors: [],
+        summary: {}
+    };
+
+    try {
+        // Step 1: Test RTP endpoint extraction from UnicastRTP channels
+        diagnostic.steps.rtpEndpointExtraction = {
+            status: 'testing',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            // Create a mock UnicastRTP channel for testing endpoint extraction
+            const mockChannel = {
+                getChannelVar: async ({ variable }) => {
+                    if (variable === 'UNICASTRTP_LOCAL_ADDRESS') {
+                        return { value: '192.168.1.100' };
+                    } else if (variable === 'UNICASTRTP_LOCAL_PORT') {
+                        return { value: '16384' };
+                    }
+                    return { value: 'unknown' };
+                }
+            };
+
+            // Test the getRtpEndpoint function
+            const ariClient = require('../../services/ari.client');
+            const ariInstance = ariClient.getAriClientInstance();
+            
+            if (!ariInstance) {
+                throw new Error('ARI client not available');
+            }
+
+            const extractedEndpoint = await ariInstance.getRtpEndpoint(mockChannel);
+            
+            diagnostic.rtpEndpoints.extracted = {
+                host: extractedEndpoint.host,
+                port: extractedEndpoint.port,
+                valid: extractedEndpoint.host !== 'unknown' && extractedEndpoint.port > 0
+            };
+
+            diagnostic.steps.rtpEndpointExtraction.status = 'completed';
+            diagnostic.steps.rtpEndpointExtraction.endpoint = extractedEndpoint;
+
+        } catch (err) {
+            diagnostic.steps.rtpEndpointExtraction.status = 'failed';
+            diagnostic.steps.rtpEndpointExtraction.error = err.message;
+            diagnostic.errors.push(`RTP Endpoint Extraction: ${err.message}`);
+        }
+
+        // Step 2: Test RTP sender initialization
+        if (diagnostic.steps.rtpEndpointExtraction.status === 'completed') {
+            diagnostic.steps.rtpSenderInit = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const testCallId = `rtp-diagnostic-${Date.now()}`;
+                const testEndpoint = diagnostic.rtpEndpoints.extracted;
+
+                // Create call in tracker
+                channelTracker.addCall(testCallId, {
+                    twilioCallSid: testCallId,
+                    patientId: 'test-patient',
+                    state: 'testing',
+                    createdAt: new Date().toISOString()
+                });
+
+                // Test RTP sender initialization
+                await ariInstance.initializeRtpSenderWithEndpoint(testCallId, testEndpoint);
+
+                diagnostic.steps.rtpSenderInit.status = 'completed';
+                diagnostic.steps.rtpSenderInit.callId = testCallId;
+                diagnostic.steps.rtpSenderInit.endpoint = testEndpoint;
+
+                // Cleanup
+                channelTracker.removeCall(testCallId);
+
+            } catch (err) {
+                diagnostic.steps.rtpSenderInit.status = 'failed';
+                diagnostic.steps.rtpSenderInit.error = err.message;
+                diagnostic.errors.push(`RTP Sender Init: ${err.message}`);
+            }
+        }
+
+        // Step 3: Test OpenAI WebSocket connection
+        diagnostic.steps.openaiConnection = {
+            status: 'testing',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const openAIService = require('../../services/openai.realtime.service');
+            const openaiInstance = openAIService.getOpenAIServiceInstance();
+
+            if (!openaiInstance) {
+                throw new Error('OpenAI service not available');
+            }
+
+            // Test basic connection
+            const testResult = await openaiInstance.testBasicConnectionAndSession(`diagnostic-${Date.now()}`);
+            
+            diagnostic.openaiStatus.basicConnection = {
+                status: 'success',
+                sessionId: testResult.sessionId,
+                sessionDetails: testResult.sessionDetails
+            };
+
+            diagnostic.steps.openaiConnection.status = 'completed';
+
+        } catch (err) {
+            diagnostic.steps.openaiConnection.status = 'failed';
+            diagnostic.steps.openaiConnection.error = err.message;
+            diagnostic.errors.push(`OpenAI Connection: ${err.message}`);
+        }
+
+        // Step 4: Test real call simulation if requested
+        if (simulateRealCall && diagnostic.steps.rtpEndpointExtraction.status === 'completed') {
+            diagnostic.steps.realCallSimulation = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const testCallId = `real-sim-${Date.now()}`;
+                
+                // Create call in tracker
+                channelTracker.addCall(testCallId, {
+                    twilioCallSid: testCallId,
+                    patientId: 'test-patient',
+                    state: 'testing',
+                    createdAt: new Date().toISOString()
+                });
+
+                // Allocate ports
+                const allocatedPorts = channelTracker.allocatePortsForCall(testCallId);
+                
+                if (!allocatedPorts.readPort || !allocatedPorts.writePort) {
+                    throw new Error('Failed to allocate RTP ports');
+                }
+
+                // Initialize OpenAI for this call
+                await openAIService.initialize(
+                    testCallId,
+                    testCallId,
+                    `conv-${testCallId}`,
+                    'This is a diagnostic test call.'
+                );
+
+                // Wait for OpenAI to be ready
+                let attempts = 0;
+                const maxAttempts = 20;
+                while (attempts < maxAttempts) {
+                    if (openAIService.isConnectionReady(testCallId)) {
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    attempts++;
+                }
+
+                const connection = openAIService.connections.get(testCallId);
+                diagnostic.openaiStatus.realCall = {
+                    connectionReady: openAIService.isConnectionReady(testCallId),
+                    websocketState: connection?.webSocket?.readyState,
+                    sessionReady: connection?.sessionReady,
+                    status: connection?.status
+                };
+
+                // Test audio sending
+                const testAudio = Buffer.alloc(160, 0xFF).toString('base64'); // 20ms of μ-law silence
+                await openAIService.sendAudioChunk(testCallId, testAudio);
+
+                diagnostic.steps.realCallSimulation.status = 'completed';
+                diagnostic.steps.realCallSimulation.callId = testCallId;
+                diagnostic.steps.realCallSimulation.allocatedPorts = allocatedPorts;
+
+                // Cleanup
+                await openAIService.disconnect(testCallId);
+                channelTracker.removeCall(testCallId);
+
+            } catch (err) {
+                diagnostic.steps.realCallSimulation.status = 'failed';
+                diagnostic.steps.realCallSimulation.error = err.message;
+                diagnostic.errors.push(`Real Call Simulation: ${err.message}`);
+            }
+        }
+
+        // Generate summary
+        diagnostic.summary = {
+            rtpEndpointExtraction: diagnostic.steps.rtpEndpointExtraction.status,
+            rtpSenderInit: diagnostic.steps.rtpSenderInit?.status || 'skipped',
+            openaiConnection: diagnostic.steps.openaiConnection.status,
+            realCallSimulation: diagnostic.steps.realCallSimulation?.status || 'skipped',
+            totalErrors: diagnostic.errors.length,
+            criticalIssues: diagnostic.errors.filter(err => 
+                err.includes('RTP') || err.includes('OpenAI')
+            ).length
+        };
+
+        res.json(diagnostic);
+
+    } catch (error) {
+        res.status(500).json({
+            error: 'RTP endpoint diagnostic failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // Export the router
 module.exports = router;
