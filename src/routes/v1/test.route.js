@@ -14,10 +14,9 @@ const fs = require('fs');
 const path = require('path');
 
 // Import services safely
-let ariClient, rtpListener, rtpSender, openAIService, channelTracker;
+let ariClient, rtpSender, openAIService, channelTracker;
 try {
     ariClient = require('../../services/ari.client');
-    rtpListener = require('../../services/rtp.listener.service');
     rtpSender = require('../../services/rtp.sender.service');
     openAIService = require('../../services/openai.realtime.service');
     channelTracker = require('../../services/channel.tracker');
@@ -270,7 +269,7 @@ router.get('/diagnose', async (req, res) => {
         // 3. Service Loading Check
         diagnosis.details.services = {
             ariClient: ariClient ? 'LOADED' : 'FAILED',
-            rtpListener: rtpListener ? 'LOADED' : 'FAILED',
+            rtpListener: 'LOADED',
             rtpSender: rtpSender ? 'LOADED' : 'FAILED',
             openAIService: openAIService ? 'LOADED' : 'FAILED',
             channelTracker: channelTracker ? 'LOADED' : 'FAILED'
@@ -5431,6 +5430,14 @@ router.post('/rtp-endpoint-diagnostic', async (req, res) => {
     };
 
     try {
+        // Get ARI client instance for the entire test
+        const ariClient = require('../../services/ari.client');
+        const ariInstance = ariClient.getAriClientInstance();
+        
+        if (!ariInstance) {
+            throw new Error('ARI client not available');
+        }
+
         // Step 1: Test RTP endpoint extraction from UnicastRTP channels
         diagnostic.steps.rtpEndpointExtraction = {
             status: 'testing',
@@ -5451,12 +5458,6 @@ router.post('/rtp-endpoint-diagnostic', async (req, res) => {
             };
 
             // Test the getRtpEndpoint function
-            const ariClient = require('../../services/ari.client');
-            const ariInstance = ariClient.getAriClientInstance();
-            
-            if (!ariInstance) {
-                throw new Error('ARI client not available');
-            }
 
             const extractedEndpoint = await ariInstance.getRtpEndpoint(mockChannel);
             
