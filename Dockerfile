@@ -1,10 +1,12 @@
-FROM public.ecr.aws/docker/library/node:18-bullseye
+# Multi-stage build for better caching and smaller final image
+# syntax=docker/dockerfile:1.4
+FROM public.ecr.aws/docker/library/node:18-bullseye AS base
 
 # Create app directory
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
 WORKDIR /usr/src/bianca-app
 
-# Install system dependencies in a single layer to reduce image size
+# Install system dependencies in a single layer
 RUN apt-get update && apt-get install -y \
   libssl-dev \
   ca-certificates \
@@ -17,7 +19,7 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get clean
 
-# Pre-download MongoDB binary and make executable in a single layer
+# Pre-download MongoDB binary
 RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-debian11-6.0.9.tgz && \
     tar -xvf mongodb.tgz && \
     mv mongodb-linux-x86_64-debian11-6.0.9/bin/* /usr/local/bin/ && \
@@ -28,32 +30,38 @@ RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-de
 # Set environment variable for MongoMemoryServer
 ENV MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod
 
-# Install app dependencies
-COPY package.json yarn.lock ./
+# Dependencies stage - this layer will be cached unless package.json changes
+FROM base AS dependencies
+COPY --chown=node:node package.json yarn.lock ./
 USER node
-RUN yarn install --pure-lockfile
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
+    yarn install --pure-lockfile --frozen-lockfile
 
-# Copy source code (this should be after dependencies to maximize caching)
+# Build stage - copy source and build if needed
+FROM dependencies AS build
+# Copy static config files (rarely change)
+COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json docker-compose*.yml ./
+
+# Copy source code
 COPY --chown=node:node src/ ./src/
 COPY --chown=node:node tests/ ./tests/
 COPY --chown=node:node devops/ ./devops/
-COPY --chown=node:node .env* ./
-COPY --chown=node:node .eslintrc.json ./
-COPY --chown=node:node .prettierrc.json ./
-COPY --chown=node:node jest.config.js ./
-COPY --chown=node:node nodemon.json ./
-COPY --chown=node:node .editorconfig ./
-COPY --chown=node:node .eslintignore ./
-COPY --chown=node:node .gitattributes ./
-COPY --chown=node:node .lintstagedrc.json ./
-COPY --chown=node:node .prettierignore ./
-COPY --chown=node:node .nvmrc ./
-COPY --chown=node:node LICENSE ./
-COPY --chown=node:node ecosystem.config.json ./
-COPY --chown=node:node docker-compose*.yml ./
+
+# Production stage - minimal final image
+FROM base AS production
+# Copy dependencies from build stage
+COPY --from=dependencies --chown=node:node /usr/src/bianca-app/node_modules ./node_modules
+# Copy built application
+COPY --from=build --chown=node:node /usr/src/bianca-app ./
+
+USER node
 
 # Expose the port the app runs on
 EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
 
 # Command to run your application
 CMD ["yarn", "start"]

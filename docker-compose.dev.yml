@@ -1,10 +1,18 @@
 # Remove the version: '3' line if you still have it - it's obsolete
 
+# Development override - enables hot reloading but disables Docker layer caching
 services:
   bianca-app:
-    build: .
-    container_name: bianca-app
-    command: yarn dev
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: build  # Use build stage for development
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/usr/src/bianca-app
+      - /usr/src/bianca-app/node_modules  # Exclude node_modules from volume mount
+    command: ["yarn", "dev"]  # Use development command with hot reloading
     ports:
       - "9229:9229"
     cap_add:

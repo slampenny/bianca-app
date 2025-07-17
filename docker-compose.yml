@@ -1,7 +1,11 @@
 
 services:
   bianca-app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - bianca-app:latest
     image: bianca-app
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/bianca-app
@@ -17,8 +21,9 @@ services:
         condition: service_started
       asterisk:
         condition: service_healthy
-    volumes:
-      - .:/usr/src/bianca-app
+    # Removed volume mount to enable Docker layer caching
+    # volumes:
+    #   - .:/usr/src/bianca-app
     networks:
       - node-network
   mongodb:

@@ -15,30 +15,54 @@ phases:
       - REPOSITORY_URI_APP=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_APP
       - REPOSITORY_URI_ASTERISK=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_ASTERISK
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)-$(date +%Y%m%d%H%M%S)
+      
+      # Create Docker buildx builder for better caching
+      - docker buildx create --use --name codebuild-builder || docker buildx use codebuild-builder
+      
+      # Pull latest images for layer caching (multiple tags for better cache hits)
+      - echo Pulling latest images for cache...
+      - docker pull $REPOSITORY_URI_APP:latest || echo "No previous image found"
+      - docker pull $REPOSITORY_URI_APP:cache || echo "No cache image found"
+      
+      # Create cache image from latest if it doesn't exist
+      - docker tag $REPOSITORY_URI_APP:latest $REPOSITORY_URI_APP:cache 2>/dev/null || echo "No latest image to use as cache"
+      
   build:
     commands:
       - echo Build started on $(date)
-      # Pull latest images for layer caching
-      - echo Pulling latest images for cache...
-      - docker pull $REPOSITORY_URI_APP:latest || echo "No previous image found"
-      - docker pull $REPOSITORY_URI_ASTERISK:latest || echo "No previous image found"
       
-      # Build the main application image with cache
-      - echo Building main application image...
-      - docker build --cache-from $REPOSITORY_URI_APP:latest -t $REPOSITORY_URI_APP:$IMAGE_TAG -f Dockerfile .
-      - docker tag $REPOSITORY_URI_APP:$IMAGE_TAG $REPOSITORY_URI_APP:latest
+      # Build the main application image with enhanced caching
+      - echo Building main application image with cache...
+      - |
+        docker build \
+          --cache-from $REPOSITORY_URI_APP:latest \
+          --cache-from $REPOSITORY_URI_APP:cache \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          -t $REPOSITORY_URI_APP:$IMAGE_TAG \
+          -t $REPOSITORY_URI_APP:latest \
+          -t $REPOSITORY_URI_APP:cache \
+          -f Dockerfile .
       
       # Build the Asterisk image with cache
       - echo Building Asterisk image...
-      - docker build --cache-from $REPOSITORY_URI_ASTERISK:latest -t $REPOSITORY_URI_ASTERISK:$IMAGE_TAG -f ./devops/asterisk/Dockerfile ./devops/asterisk
-      - docker tag $REPOSITORY_URI_ASTERISK:$IMAGE_TAG $REPOSITORY_URI_ASTERISK:latest
+      - docker pull $REPOSITORY_URI_ASTERISK:latest || echo "No previous Asterisk image found"
+      - |
+        docker build \
+          --cache-from $REPOSITORY_URI_ASTERISK:latest \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          -t $REPOSITORY_URI_ASTERISK:$IMAGE_TAG \
+          -t $REPOSITORY_URI_ASTERISK:latest \
+          -f ./devops/asterisk/Dockerfile ./devops/asterisk
+      
   post_build:
     commands:
       - echo Build completed on $(date)
-      # Push main application image
+      
+      # Push all tags for main application image
       - echo Pushing main application image...
       - docker push $REPOSITORY_URI_APP:$IMAGE_TAG
       - docker push $REPOSITORY_URI_APP:latest
+      - docker push $REPOSITORY_URI_APP:cache
       
       # Push Asterisk image
       - echo Pushing Asterisk image...
@@ -52,25 +76,20 @@ phases:
       - echo "[{\"name\":\"$ASTERISK_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_ASTERISK:$IMAGE_TAG\"}]" > imagedefinitions_asterisk.json
 
 artifacts:
-  # Primary artifact (can be empty or contain other build outputs if needed)
   files:
-    - imagedefinitions_app.json # This will go into BuildOutputApp if no secondary-artifacts defined for it
-    # Or, make primary artifact empty if all are secondary:
-    # - /dev/null 
-  # Define secondary artifacts to match CodePipeline's expected output artifact names
+    - imagedefinitions_app.json
   secondary-artifacts:
-    BuildOutputApp: # This name MUST match an outputArtifact name in CodePipeline Build stage
+    BuildOutputApp:
       files:
         - imagedefinitions_app.json
-      # Optional: specify base-directory if files are not in root
-      # base-directory: . 
-    BuildOutputAsterisk: # This name MUST match an outputArtifact name in CodePipeline Build stage
+    BuildOutputAsterisk:
       files:
         - imagedefinitions_asterisk.json
-      # Optional: specify base-directory
-      # base-directory: .
 
+# Enhanced cache configuration for better Docker layer caching
 cache:
   paths:
     - '/root/.docker/**/*'
     - '/var/lib/docker/**/*'
+    - '/tmp/.buildx-cache/**/*'
+    - '/var/lib/buildkit/**/*'
