@@ -5637,5 +5637,256 @@ router.post('/rtp-endpoint-diagnostic', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/udp-transmission-diagnostic:
+ *   post:
+ *     summary: 16 - UDP Transmission Diagnostic
+ *     description: Test RTP sender's UDP packet transmission to identify why packets aren't being sent
+ *     tags: [04 - Audio Pipeline]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               testDuration:
+ *                 type: number
+ *                 default: 10
+ *                 description: Duration of the test in seconds
+ *               targetHost:
+ *                 type: string
+ *                 default: "127.0.0.1"
+ *                 description: Target host for UDP transmission
+ *               targetPort:
+ *                 type: number
+ *                 default: 20000
+ *                 description: Target port for UDP transmission
+ *     responses:
+ *       "200":
+ *         description: UDP transmission diagnostic results
+ */
+router.post('/udp-transmission-diagnostic', async (req, res) => {
+    const { testDuration = 10, targetHost = '127.0.0.1', targetPort = 20000 } = req.body;
+    
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        testDuration,
+        targetHost,
+        targetPort,
+        steps: {},
+        udpTransmission: {},
+        rtpSenderStats: {},
+        errors: []
+    };
+
+    try {
+        // Step 1: Test basic UDP socket creation and binding
+        diagnostic.steps.udpSocketTest = {
+            status: 'testing',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const dgram = require('dgram');
+            const testSocket = dgram.createSocket('udp4');
+            
+            // Test socket creation
+            diagnostic.udpTransmission.socketCreated = true;
+            
+            // Test socket binding
+            await new Promise((resolve, reject) => {
+                testSocket.bind(0, '0.0.0.0', (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        const address = testSocket.address();
+                        diagnostic.udpTransmission.localAddress = address;
+                        resolve();
+                    }
+                });
+            });
+            
+            testSocket.close();
+            diagnostic.steps.udpSocketTest.status = 'completed';
+            
+        } catch (err) {
+            diagnostic.steps.udpSocketTest.status = 'failed';
+            diagnostic.steps.udpSocketTest.error = err.message;
+            diagnostic.errors.push(`UDP Socket Test: ${err.message}`);
+        }
+
+        // Step 2: Test RTP sender initialization with specific target
+        if (diagnostic.steps.udpSocketTest.status === 'completed') {
+            diagnostic.steps.rtpSenderInit = {
+                status: 'testing',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const testCallId = `udp-diagnostic-${Date.now()}`;
+                
+                // Create call in tracker
+                channelTracker.addCall(testCallId, {
+                    twilioCallSid: testCallId,
+                    patientId: 'test-patient',
+                    state: 'testing',
+                    createdAt: new Date().toISOString()
+                });
+
+                // Initialize RTP sender with specific target
+                const rtpSender = require('../../services/rtp.sender.service');
+                await rtpSender.initializeCall(testCallId, {
+                    rtpHost: targetHost,
+                    rtpPort: targetPort,
+                    format: 'ulaw'
+                });
+
+                diagnostic.rtpSenderStats.initialized = true;
+                diagnostic.rtpSenderStats.callId = testCallId;
+                diagnostic.rtpSenderStats.target = `${targetHost}:${targetPort}`;
+
+                // Get initial stats
+                const initialStats = rtpSender.getStatus();
+                diagnostic.rtpSenderStats.initialStats = initialStats;
+
+                diagnostic.steps.rtpSenderInit.status = 'completed';
+
+                // Step 3: Test audio sending and packet transmission
+                diagnostic.steps.audioTransmission = {
+                    status: 'testing',
+                    timestamp: new Date().toISOString()
+                };
+
+                // Generate test audio (1 second of 440Hz tone in ulaw)
+                const sampleRate = 8000;
+                const numSamples = sampleRate;
+                const testPcm = Buffer.alloc(numSamples * 2);
+                
+                for (let i = 0; i < numSamples; i++) {
+                    const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+                    testPcm.writeInt16LE(Math.round(sample), i * 2);
+                }
+
+                const AudioUtils = require('../../api/audio.utils');
+                const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testPcm);
+
+                // Send audio in chunks to trigger packet transmission
+                const chunkSize = 160; // 20ms of audio
+                const audioBuffer = Buffer.from(testUlawBase64, 'base64');
+                let totalChunks = 0;
+                let totalBytes = 0;
+
+                for (let i = 0; i < audioBuffer.length; i += chunkSize) {
+                    const chunk = audioBuffer.slice(i, i + chunkSize);
+                    const chunkBase64 = chunk.toString('base64');
+                    
+                    await rtpSender.sendAudio(testCallId, chunkBase64);
+                    totalChunks++;
+                    totalBytes += chunk.length;
+                    
+                    // Small delay to allow packet processing
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+
+                diagnostic.rtpSenderStats.audioSent = {
+                    totalChunks,
+                    totalBytes,
+                    audioDurationMs: (totalBytes / 8) * 1000 // ulaw is 8kHz
+                };
+
+                // Wait for packet transmission
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Get final stats
+                const finalStats = rtpSender.getStatus();
+                diagnostic.rtpSenderStats.finalStats = finalStats;
+
+                // Find our call in the stats
+                const callStats = finalStats.calls.find(c => c.callId === testCallId);
+                if (callStats) {
+                    diagnostic.rtpSenderStats.callStats = {
+                        packetsSent: callStats.stats.packetsSent,
+                        bytesSent: callStats.stats.bytesSent,
+                        errors: callStats.stats.errors,
+                        lastActivity: callStats.stats.lastActivity
+                    };
+                }
+
+                diagnostic.steps.audioTransmission.status = 'completed';
+
+                // Cleanup
+                rtpSender.cleanupCall(testCallId);
+                channelTracker.removeCall(testCallId);
+
+            } catch (err) {
+                diagnostic.steps.rtpSenderInit.status = 'failed';
+                diagnostic.steps.rtpSenderInit.error = err.message;
+                diagnostic.errors.push(`RTP Sender Init: ${err.message}`);
+            }
+        }
+
+        // Step 4: Test direct UDP transmission to verify network connectivity
+        diagnostic.steps.directUdpTest = {
+            status: 'testing',
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            const dgram = require('dgram');
+            const testSocket = dgram.createSocket('udp4');
+            
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    testSocket.close();
+                    reject(new Error('UDP send timeout'));
+                }, 5000);
+
+                testSocket.send(Buffer.from('test-packet'), targetPort, targetHost, (err) => {
+                    clearTimeout(timeout);
+                    testSocket.close();
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+
+            diagnostic.udpTransmission.directSendSuccess = true;
+            diagnostic.steps.directUdpTest.status = 'completed';
+
+        } catch (err) {
+            diagnostic.udpTransmission.directSendSuccess = false;
+            diagnostic.udpTransmission.directSendError = err.message;
+            diagnostic.steps.directUdpTest.status = 'failed';
+            diagnostic.steps.directUdpTest.error = err.message;
+            diagnostic.errors.push(`Direct UDP Test: ${err.message}`);
+        }
+
+        // Generate summary
+        diagnostic.summary = {
+            udpSocketTest: diagnostic.steps.udpSocketTest.status,
+            rtpSenderInit: diagnostic.steps.rtpSenderInit?.status || 'skipped',
+            audioTransmission: diagnostic.steps.audioTransmission?.status || 'skipped',
+            directUdpTest: diagnostic.steps.directUdpTest.status,
+            totalErrors: diagnostic.errors.length,
+            packetsSent: diagnostic.rtpSenderStats.callStats?.packetsSent || 0,
+            bytesSent: diagnostic.rtpSenderStats.callStats?.bytesSent || 0,
+            transmissionWorking: diagnostic.rtpSenderStats.callStats?.packetsSent > 0
+        };
+
+        res.json(diagnostic);
+
+    } catch (error) {
+        res.status(500).json({
+            error: 'UDP transmission diagnostic failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // Export the router
 module.exports = router;
