@@ -281,7 +281,7 @@ class OpenAIRealtimeService {
       };
 
       connection.webSocket.send(JSON.stringify(responseCreateEvent));
-      logger.info(`[OpenAI Realtime] Sent response.create for ${callId}`);
+      logger.info(`[OpenAI Realtime] Sent response.create for ${callId} with instructions: "${responseCreateEvent.response.instructions}"`);
     } catch (err) {
       logger.error(`[OpenAI Realtime] Error sending response.create for ${callId}: ${err.message}`);
     }
@@ -644,13 +644,13 @@ class OpenAIRealtimeService {
         // USE PCM16 instead of g711_ulaw for better quality and reliability
         input_audio_format: 'g711_ulaw', // Much better speech recognition
         output_audio_format: 'g711_ulaw', // Higher quality output
-        // Add turn detection for automatic response generation
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.3,
-          prefix_padding_ms: 200,
-          silence_duration_ms: 800, // Wait 1 second after speech stops
-        },
+        // Disable turn detection temporarily to test if that's blocking responses
+        // turn_detection: {
+        //   type: 'server_vad',
+        //   threshold: 0.3,
+        //   prefix_padding_ms: 200,
+        //   silence_duration_ms: 800, // Wait 1 second after speech stops
+        // },
         // Add input transcription to help with debugging
         input_audio_transcription: {
           model: 'whisper-1',

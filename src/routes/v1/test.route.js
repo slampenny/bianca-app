@@ -6971,5 +6971,77 @@ router.get('/audio/status', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /v1/test/send-text-to-openai:
+ *   post:
+ *     summary: Send a text message to OpenAI to test audio response generation
+ *     tags: [Audio Diagnostics]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 description: The call ID to send the message to
+ *               message:
+ *                 type: string
+ *                 description: The text message to send
+ *                 default: "Hello, can you hear me? Please respond with audio."
+ *     responses:
+ *       200:
+ *         description: Text message sent to OpenAI
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ */
+router.post('/send-text-to-openai', async (req, res) => {
+    const { callId, message = "Hello, can you hear me? Please respond with audio." } = req.body || {};
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const conn = openAIService.connections.get(callId);
+        
+        if (!conn) {
+            return res.status(404).json({ error: 'Call not found in OpenAI service' });
+        }
+
+        if (!conn.sessionReady) {
+            return res.status(400).json({ error: 'OpenAI session not ready' });
+        }
+
+        logger.info(`[Test Route] Sending text message to OpenAI for ${callId}: "${message}"`);
+        
+        // Send text message to OpenAI
+        await openAIService.sendTextMessage(callId, message, 'user');
+        
+        res.json({
+            success: true,
+            message: `Text message sent to OpenAI: "${message}"`,
+            callId,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (err) {
+        logger.error(`[Test Route] Error sending text to OpenAI: ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Export the router
 module.exports = router;
