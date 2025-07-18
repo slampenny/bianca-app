@@ -7043,5 +7043,242 @@ router.post('/send-text-to-openai', async (req, res) => {
     }
 });
 
+router.post('/test-audio-validation', async (req, res) => {
+    const { callId, audioBase64, testType } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const testResults = {
+        callId,
+        timestamp: new Date().toISOString(),
+        testType: testType || 'validation',
+        validation: null,
+        commitReadiness: null,
+        errors: []
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const openaiInstance = getOpenAIServiceInstance();
+
+        // Test 1: Audio validation
+        if (audioBase64) {
+            testResults.validation = openaiInstance.validateAudioChunk(audioBase64);
+        } else {
+            // Generate test audio if none provided
+            const AudioUtils = require('../../api/audio.utils');
+            let testAudio;
+            
+            switch (testType) {
+                case 'silence':
+                    testAudio = Buffer.alloc(160, 0xFF); // 20ms of silence
+                    break;
+                case 'tone':
+                    testAudio = Buffer.alloc(160, 0x7F); // 20ms of tone
+                    break;
+                case 'speech':
+                    testAudio = Buffer.alloc(160, 0x80); // 20ms of speech-like
+                    break;
+                default:
+                    testAudio = Buffer.alloc(160, 0xFF); // Default silence
+            }
+            
+            const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testAudio);
+            testResults.validation = openaiInstance.validateAudioChunk(testUlawBase64);
+            testResults.generatedAudio = {
+                originalSize: testAudio.length,
+                ulawBase64Length: testUlawBase64.length,
+                ulawSize: Buffer.from(testUlawBase64, 'base64').length
+            };
+        }
+
+        // Test 2: Commit readiness
+        testResults.commitReadiness = openaiInstance.checkCommitReadiness(callId);
+
+        // Test 3: Connection status
+        const conn = openaiInstance.connections.get(callId);
+        testResults.connectionStatus = {
+            exists: !!conn,
+            sessionReady: conn?.sessionReady || false,
+            webSocketState: conn?.webSocket?.readyState || 'no_websocket',
+            audioChunksReceived: conn?.audioChunksReceived || 0,
+            audioChunksSent: conn?.audioChunksSent || 0,
+            pendingCommit: conn?.pendingCommit || false
+        };
+
+        // Test 4: Send test audio if validation passed
+        if (testResults.validation.isValid && conn?.sessionReady) {
+            try {
+                const audioToSend = audioBase64 || testResults.generatedAudio?.ulawBase64;
+                if (audioToSend) {
+                    await openaiInstance.sendAudioChunk(callId, audioToSend, true);
+                    testResults.audioSent = {
+                        status: 'success',
+                        audioSize: Buffer.from(audioToSend, 'base64').length
+                    };
+                }
+            } catch (err) {
+                testResults.audioSent = {
+                    status: 'failed',
+                    error: err.message
+                };
+                testResults.errors.push(`Audio send failed: ${err.message}`);
+            }
+        }
+
+        testResults.success = testResults.errors.length === 0;
+
+    } catch (err) {
+        testResults.success = false;
+        testResults.errors.push(`Test failed: ${err.message}`);
+    }
+
+    res.json(testResults);
+});
+
+router.post('/diagnose-buffer-too-small', async (req, res) => {
+    const { callId } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const diagnostic = {
+        callId,
+        timestamp: new Date().toISOString(),
+        issue: 'buffer_too_small_error',
+        analysis: {},
+        recommendations: [],
+        errors: []
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const openaiInstance = getOpenAIServiceInstance();
+
+        // Get connection state
+        const conn = openaiInstance.connections.get(callId);
+        diagnostic.analysis.connectionState = {
+            exists: !!conn,
+            status: conn?.status || 'not_found',
+            sessionReady: conn?.sessionReady || false,
+            webSocketState: conn?.webSocket?.readyState || 'no_websocket',
+            sessionId: conn?.sessionId || null
+        };
+
+        if (!conn) {
+            diagnostic.recommendations.push('No OpenAI connection found - check if session was initialized');
+            diagnostic.analysis.issue = 'no_connection';
+            return res.json(diagnostic);
+        }
+
+        // Analyze audio flow
+        diagnostic.analysis.audioFlow = {
+            chunksReceived: conn.audioChunksReceived || 0,
+            chunksSent: conn.audioChunksSent || 0,
+            pendingCommit: conn.pendingCommit || false,
+            lastCommitTime: conn.lastCommitTime || 0,
+            timeSinceLastCommit: conn.lastCommitTime ? Date.now() - conn.lastCommitTime : null
+        };
+
+        // Check commit readiness
+        const commitReadiness = openaiInstance.checkCommitReadiness(callId);
+        diagnostic.analysis.commitReadiness = commitReadiness;
+
+        // Analyze potential causes
+        const issues = [];
+
+        if (conn.audioChunksSent === 0) {
+            issues.push('no_audio_sent');
+            diagnostic.recommendations.push('No audio chunks sent to OpenAI - check RTP listener and audio pipeline');
+        }
+
+        if (conn.audioChunksReceived === 0) {
+            issues.push('no_audio_received');
+            diagnostic.recommendations.push('No audio chunks received from RTP - check Asterisk RTP configuration');
+        }
+
+        if (conn.audioChunksReceived > 0 && conn.audioChunksSent === 0) {
+            issues.push('audio_not_sent_to_openai');
+            diagnostic.recommendations.push('Audio received but not sent to OpenAI - check session readiness and buffering');
+        }
+
+        if (commitReadiness.totalDuration < 100) {
+            issues.push('insufficient_audio_duration');
+            diagnostic.recommendations.push(`Insufficient audio duration: ${commitReadiness.totalDuration}ms (minimum 100ms)`);
+        }
+
+        if (!conn.sessionReady) {
+            issues.push('session_not_ready');
+            diagnostic.recommendations.push('OpenAI session not ready - check session initialization');
+        }
+
+        if (conn.webSocket?.readyState !== 1) { // 1 = OPEN
+            issues.push('websocket_not_open');
+            diagnostic.recommendations.push(`WebSocket not open (state: ${conn.webSocket?.readyState})`);
+        }
+
+        if (conn.pendingCommit) {
+            issues.push('commit_already_pending');
+            diagnostic.recommendations.push('Commit already pending - wait for current commit to complete');
+        }
+
+        diagnostic.analysis.issues = issues;
+        diagnostic.analysis.rootCause = issues.length > 0 ? issues[0] : 'unknown';
+
+        // Check RTP listener status
+        try {
+            const rtpListenerService = require('../../services/rtp.listener.service');
+            const listeners = rtpListenerService.getListeners();
+            const callListener = listeners.find(l => l.callId === callId);
+            
+            diagnostic.analysis.rtpListener = {
+                exists: !!callListener,
+                port: callListener?.port || null,
+                stats: callListener?.stats || null,
+                isListening: callListener?.isListening || false
+            };
+
+            if (!callListener) {
+                diagnostic.recommendations.push('No RTP listener found for this call - check if RTP listener was created');
+            } else if (!callListener.isListening) {
+                diagnostic.recommendations.push('RTP listener not listening - check if it was properly started');
+            }
+        } catch (err) {
+            diagnostic.analysis.rtpListener = { error: err.message };
+        }
+
+        // Check recent audio data
+        try {
+            const pendingAudio = openaiInstance.pendingAudio.get(callId) || [];
+            diagnostic.analysis.pendingAudio = {
+                count: pendingAudio.length,
+                totalSize: pendingAudio.reduce((sum, chunk) => sum + (chunk?.length || 0), 0)
+            };
+
+            if (pendingAudio.length > 0) {
+                // Validate first chunk
+                const firstChunk = pendingAudio[0];
+                const validation = openaiInstance.validateAudioChunk(firstChunk);
+                diagnostic.analysis.pendingAudio.firstChunkValidation = validation;
+                
+                if (!validation.isValid) {
+                    diagnostic.recommendations.push(`Invalid audio in pending buffer: ${validation.reason}`);
+                }
+            }
+        } catch (err) {
+            diagnostic.analysis.pendingAudio = { error: err.message };
+        }
+
+    } catch (err) {
+        diagnostic.errors.push(`Diagnostic failed: ${err.message}`);
+    }
+
+    diagnostic.success = diagnostic.errors.length === 0;
+    res.json(diagnostic);
+});
+
 // Export the router
 module.exports = router;

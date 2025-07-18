@@ -206,6 +206,7 @@ class RtpListener {
             ...this.stats,
             uptime: Date.now() - this.stats.startTime,
             active: this.isActive,
+            isListening: this.isActive && this.udpServer && !this.isShuttingDown,
             port: this.port,
             callId: this.callId
         };
@@ -258,6 +259,20 @@ function getAllActiveListeners() {
     const listeners = {};
     for (const [callId, listener] of activeListeners.entries()) {
         listeners[callId] = listener.getStats();
+    }
+    return listeners;
+}
+
+function getListeners() {
+    const listeners = [];
+    for (const [callId, listener] of activeListeners.entries()) {
+        listeners.push({
+            callId,
+            port: listener.port,
+            asteriskChannelId: listener.asteriskChannelId,
+            isListening: listener.isActive && listener.udpServer && !listener.isShuttingDown,
+            stats: listener.getStats()
+        });
     }
     return listeners;
 }
@@ -342,6 +357,7 @@ module.exports = {
     stopRtpListenerForCall,
     getListenerForCall,
     getAllActiveListeners,
+    getListeners,
     stopAllListeners,
     healthCheck,
     getListenerStatus,

@@ -20,7 +20,9 @@ const CONSTANTS = {
   ASTERISK_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
   OPENAI_PCM_OUTPUT_RATE: 24000, // Expected rate FROM OpenAI for pcm16 output
   TEST_CONNECTION_TIMEOUT: 20000, // Timeout for the standalone test connection method (milliseconds)
-  AUDIO_BATCH_SIZE: 50, // Send audio in batches of 10 chunks
+  AUDIO_BATCH_SIZE: 50, // Send audio in batches of 50 chunks
+  MIN_AUDIO_DURATION_MS: 100, // Minimum audio duration before committing (100ms)
+  MIN_AUDIO_BYTES: 800, // Minimum bytes for 100ms of uLaw audio at 8kHz (8000 * 0.1)
 };
 
 const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
@@ -67,6 +69,88 @@ class OpenAIRealtimeService {
     const expBackoff = Math.min(CONSTANTS.RECONNECT_BASE_DELAY * Math.pow(2, attempt), 30000);
     const jitter = expBackoff * 0.2 * (Math.random() * 2 - 1); // +/- 20% jitter
     return Math.floor(expBackoff + jitter);
+  }
+
+  /**
+   * Validate audio chunk before sending to OpenAI
+   * @param {string} audioBase64 - Base64 encoded uLaw audio
+   * @returns {Object} Validation result with isValid, size, duration, and reason
+   */
+  validateAudioChunk(audioBase64) {
+    if (!audioBase64 || typeof audioBase64 !== 'string' || audioBase64.length === 0) {
+      return { isValid: false, reason: 'Empty or invalid audio data' };
+    }
+
+    try {
+      const audioBuffer = Buffer.from(audioBase64, 'base64');
+      
+      if (audioBuffer.length === 0) {
+        return { isValid: false, reason: 'Decoded audio buffer is empty' };
+      }
+
+      // Check minimum size for meaningful audio
+      if (audioBuffer.length < 160) { // 20ms of uLaw at 8kHz
+        return { 
+          isValid: false, 
+          reason: `Audio too small: ${audioBuffer.length} bytes (minimum 160 bytes for 20ms)` 
+        };
+      }
+
+      // Validate uLaw format (basic check - uLaw bytes should be in valid range)
+      const invalidBytes = audioBuffer.filter(byte => byte < 0 || byte > 255).length;
+      if (invalidBytes > 0) {
+        return { 
+          isValid: false, 
+          reason: `Invalid uLaw bytes: ${invalidBytes} out of ${audioBuffer.length}` 
+        };
+      }
+
+      const durationMs = (audioBuffer.length / 8); // 8kHz, 1 byte per sample
+      
+      return {
+        isValid: true,
+        size: audioBuffer.length,
+        durationMs: Math.round(durationMs),
+        reason: 'Valid audio chunk'
+      };
+    } catch (err) {
+      return { isValid: false, reason: `Audio validation error: ${err.message}` };
+    }
+  }
+
+  /**
+   * Check if we have sufficient audio data to commit
+   * @param {string} callId - Call identifier
+   * @returns {Object} Commit readiness with canCommit, totalBytes, totalDuration, and reason
+   */
+  checkCommitReadiness(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn) {
+      return { canCommit: false, reason: 'No connection found' };
+    }
+
+    // Check if we have any audio chunks sent
+    if (conn.audioChunksSent === 0) {
+      return { canCommit: false, reason: 'No audio chunks sent yet' };
+    }
+
+    // Calculate total audio duration from chunks sent
+    // Each chunk is typically 20ms (160 bytes at 8kHz uLaw)
+    const estimatedDurationMs = conn.audioChunksSent * 20; // Rough estimate
+
+    if (estimatedDurationMs < CONSTANTS.MIN_AUDIO_DURATION_MS) {
+      return { 
+        canCommit: false, 
+        totalDuration: estimatedDurationMs,
+        reason: `Insufficient audio duration: ${estimatedDurationMs}ms (minimum ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms)` 
+      };
+    }
+
+    return {
+      canCommit: true,
+      totalDuration: estimatedDurationMs,
+      reason: 'Sufficient audio data for commit'
+    };
   }
 
   /**
@@ -1216,20 +1300,15 @@ class OpenAIRealtimeService {
     
     for (const chunkULawBase64 of chunksToProcess) {
         try {
-            if (!chunkULawBase64 || chunkULawBase64.length === 0) {
-                logger.warn(`[OpenAI Realtime] flushPendingAudio (${callId}): Encountered empty base64 uLaw chunk. Skipping.`);
+            // Validate audio chunk before sending
+            const validation = this.validateAudioChunk(chunkULawBase64);
+            if (!validation.isValid) {
+                logger.warn(`[OpenAI Realtime] flushPendingAudio (${callId}): Invalid audio chunk - ${validation.reason}. Skipping.`);
                 continue;
             }
             
             const ulawBuffer = Buffer.from(chunkULawBase64, 'base64');
             totalULawBytes += ulawBuffer.length;
-            
-            if (!ulawBuffer || ulawBuffer.length === 0) {
-                logger.warn(
-                    `[OpenAI Realtime] flushPendingAudio (${callId}): Decoded uLaw buffer is empty. Original base64 length: ${chunkULawBase64.length}. Skipping.`
-                );
-                continue;
-            }
             
             // Send directly as g711_ulaw - no conversion needed
             await this.sendJsonMessage(callId, {
@@ -1253,9 +1332,11 @@ class OpenAIRealtimeService {
     );
     
     if (successfullyProcessedAndSentCount > 0) {
-        if (conn.sessionReady && conn.webSocket?.readyState === WebSocket.OPEN && !conn.pendingCommit) {
+        // Check if we have sufficient audio data before committing
+        const commitReadiness = this.checkCommitReadiness(callId);
+        if (commitReadiness.canCommit && conn.sessionReady && conn.webSocket?.readyState === WebSocket.OPEN && !conn.pendingCommit) {
             logger.info(
-                `[OpenAI Realtime] flushPendingAudio (${callId}): Committing ${successfullyProcessedAndSentCount} appended audio chunks.`
+                `[OpenAI Realtime] flushPendingAudio (${callId}): Committing ${successfullyProcessedAndSentCount} appended audio chunks (${commitReadiness.totalDuration}ms of audio).`
             );
             try {
                 await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
@@ -1268,7 +1349,7 @@ class OpenAIRealtimeService {
             }
         } else {
             logger.warn(
-                `[OpenAI Realtime] flushPendingAudio (${callId}): Conditions not met for commit. sessionReady: ${conn.sessionReady}, wsState: ${conn.webSocket?.readyState}, pendingCommit: ${conn.pendingCommit}`
+                `[OpenAI Realtime] flushPendingAudio (${callId}): Conditions not met for commit. sessionReady: ${conn.sessionReady}, wsState: ${conn.webSocket?.readyState}, pendingCommit: ${conn.pendingCommit}, commitReadiness: ${commitReadiness.reason}`
             );
         }
     } else if (chunksToProcess.length > 0) {
@@ -1289,9 +1370,16 @@ class OpenAIRealtimeService {
       return false;
     }
 
+    // Check if we have sufficient audio data before forcing commit
+    const commitReadiness = this.checkCommitReadiness(callId);
+    if (!commitReadiness.canCommit) {
+      logger.warn(`[OpenAI Realtime] Force commit blocked - insufficient audio for ${callId}: ${commitReadiness.reason}`);
+      return false;
+    }
+
     try {
       await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-      logger.info(`[OpenAI Realtime] Force commit sent successfully for ${callId}`);
+      logger.info(`[OpenAI Realtime] Force commit sent successfully for ${callId} (${commitReadiness.totalDuration}ms of audio)`);
       conn.pendingCommit = true;
       return true;
     } catch (err) {
@@ -1301,7 +1389,7 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * IMPROVED: Smarter debounce commit logic with response trigger
+   * IMPROVED: Smarter debounce commit logic with validation
    */
   debounceCommit(callId) {
     const conn = this.connections.get(callId);
@@ -1335,12 +1423,18 @@ class OpenAIRealtimeService {
       );
 
       if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
-        logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId}`);
-        try {
-          await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-          currentConn.pendingCommit = true;
-        } catch (commitErr) {
-          logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
+        // Check if we have sufficient audio data before committing
+        const commitReadiness = this.checkCommitReadiness(callId);
+        if (commitReadiness.canCommit) {
+          logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId} (${commitReadiness.totalDuration}ms of audio)`);
+          try {
+            await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+            currentConn.pendingCommit = true;
+          } catch (commitErr) {
+            logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
+          }
+        } else {
+          logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient audio for ${callId}: ${commitReadiness.reason}`);
         }
       } else {
         logger.debug(
@@ -1353,14 +1447,13 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * IMPROVED: Send audio chunk with audio conversion for OpenAI
+   * IMPROVED: Send audio chunk with validation and better commit logic
    */
-  /**
-  * Send audio chunk with audio conversion for OpenAI
-  */
   async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
-    if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
-        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty base64 uLaw chunk. Skipping.`);
+    // Validate audio chunk first
+    const validation = this.validateAudioChunk(audioChunkBase64ULaw);
+    if (!validation.isValid) {
+        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Invalid audio chunk - ${validation.reason}`);
         return;
     }
     
@@ -1416,12 +1509,17 @@ class OpenAIRealtimeService {
         
         conn.audioChunksSent++;
         
-        // Commit more frequently for better responsiveness
-        if (conn.audioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
-            this.debounceCommit(callId);
-        } else if (conn.audioChunksSent === 1) {
-            // Start a timer for the first chunk to ensure we don't wait too long
-            this.debounceCommit(callId);
+        // Improved commit logic with validation
+        const commitReadiness = this.checkCommitReadiness(callId);
+        if (commitReadiness.canCommit) {
+            if (conn.audioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
+                this.debounceCommit(callId);
+            } else if (conn.audioChunksSent === 1) {
+                // Start a timer for the first chunk to ensure we don't wait too long
+                this.debounceCommit(callId);
+            }
+        } else {
+            logger.debug(`[OpenAI Realtime] Not ready to commit for ${callId}: ${commitReadiness.reason}`);
         }
         
     } catch (audioProcessingError) {
