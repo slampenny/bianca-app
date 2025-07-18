@@ -8311,5 +8311,205 @@ router.post('/analyze-audio-data', async (req, res) => {
      res.json(testResults);
  });
 
+ router.post('/diagnose-openai-response-generation', async (req, res) => {
+     const { callId } = req.body || {};
+     
+     if (!callId) {
+         return res.status(400).json({ error: 'callId is required' });
+     }
+
+     const diagnostic = {
+         timestamp: new Date().toISOString(),
+         callId,
+         openaiStatus: {},
+         responseGeneration: {},
+         recommendations: []
+     };
+
+     try {
+         const openAIService = require('../../services/openai.realtime.service');
+         const openaiInstance = openAIService.getOpenAIServiceInstance();
+         const conn = openaiInstance.connections.get(callId);
+         
+         if (!conn) {
+             diagnostic.openaiStatus.status = 'not_found';
+             diagnostic.recommendations.push('Call not found in OpenAI service');
+             return res.json(diagnostic);
+         }
+
+         // Check OpenAI connection status
+         diagnostic.openaiStatus = {
+             sessionReady: conn.sessionReady,
+             webSocketState: conn.webSocket?.readyState,
+             status: conn.status,
+             sessionId: conn.sessionId,
+             lastActivity: conn.lastActivity,
+             pendingCommit: conn.pendingCommit
+         };
+
+         // Check response generation status
+         diagnostic.responseGeneration = {
+             hasReceivedAudio: conn.audioChunksReceived > 0,
+             hasSentAudio: conn.audioChunksSent > 0,
+             validAudioChunksSent: conn.validAudioChunksSent || 0,
+             openaiChunkCount: conn._openaiChunkCount || 0,
+             hasOpenAIResponded: conn._openaiChunkCount > 0,
+             pendingAudioCount: openaiInstance.pendingAudio.get(callId)?.length || 0,
+             lastCommitTime: conn.lastCommitTime,
+             responseCreated: conn._responseCreated || false
+         };
+
+         // Check if response.create was sent
+         if (!conn._responseCreated) {
+             diagnostic.recommendations.push('response.create message was never sent - OpenAI won\'t generate responses');
+         }
+
+         if (conn.audioChunksReceived > 0 && conn.audioChunksSent === 0) {
+             diagnostic.recommendations.push('Audio received but not sent to OpenAI - check buffering and validation');
+         }
+
+         if (conn.audioChunksSent > 0 && conn._openaiChunkCount === 0) {
+             diagnostic.recommendations.push('Audio sent to OpenAI but no response generated - check session configuration');
+         }
+
+         if (!conn.sessionReady) {
+             diagnostic.recommendations.push('OpenAI session not ready - audio may be buffered');
+         }
+
+         return res.json(diagnostic);
+
+     } catch (err) {
+         diagnostic.error = err.message;
+         return res.json(diagnostic);
+     }
+ });
+
+ router.post('/force-openai-response', async (req, res) => {
+     const { callId, message = "Hello, please respond with audio." } = req.body || {};
+     
+     if (!callId) {
+         return res.status(400).json({ error: 'callId is required' });
+     }
+
+     const result = {
+         timestamp: new Date().toISOString(),
+         callId,
+         message,
+         steps: [],
+         success: false
+     };
+
+     try {
+         const openAIService = require('../../services/openai.realtime.service');
+         const openaiInstance = openAIService.getOpenAIServiceInstance();
+         const conn = openaiInstance.connections.get(callId);
+         
+         if (!conn) {
+             result.error = 'Call not found in OpenAI service';
+             return res.json(result);
+         }
+
+         if (!conn.sessionReady) {
+             result.error = 'OpenAI session not ready';
+             return res.json(result);
+         }
+
+         // Step 1: Send text message
+         result.steps.push({
+             step: 'Send text message',
+             status: 'sending',
+             details: { message }
+         });
+
+         await openaiInstance.sendTextMessage(callId, message, 'user');
+         
+         result.steps.push({
+             step: 'Send text message',
+             status: 'sent',
+             details: { message }
+         });
+
+         // Step 2: Force response.create if not already sent
+         if (!conn._responseCreated) {
+             result.steps.push({
+                 step: 'Send response.create',
+                 status: 'sending',
+                 details: { reason: 'Not previously sent' }
+             });
+
+             openaiInstance.sendResponseCreate(callId);
+             
+             result.steps.push({
+                 step: 'Send response.create',
+                 status: 'sent',
+                 details: { reason: 'Forced response creation' }
+             });
+         } else {
+             result.steps.push({
+                 step: 'Send response.create',
+                 status: 'skipped',
+                 details: { reason: 'Already sent previously' }
+             });
+         }
+
+         // Step 3: Wait for response
+         result.steps.push({
+             step: 'Wait for response',
+             status: 'waiting',
+             details: { timeout: '5 seconds' }
+         });
+
+         // Wait up to 5 seconds for a response
+         const startTime = Date.now();
+         const timeout = 5000;
+         
+         while (Date.now() - startTime < timeout) {
+             const currentConn = openaiInstance.connections.get(callId);
+             if (currentConn && currentConn._openaiChunkCount > 0) {
+                 result.steps.push({
+                     step: 'Wait for response',
+                     status: 'success',
+                     details: { 
+                         openaiChunkCount: currentConn._openaiChunkCount,
+                         duration: Date.now() - startTime
+                     }
+                 });
+                 result.success = true;
+                 break;
+             }
+             await new Promise(resolve => setTimeout(resolve, 100));
+         }
+
+         if (!result.success) {
+             result.steps.push({
+                 step: 'Wait for response',
+                 status: 'timeout',
+                 details: { 
+                     duration: Date.now() - startTime,
+                     openaiChunkCount: conn._openaiChunkCount || 0
+                 }
+             });
+         }
+
+         // Final status
+         const finalConn = openaiInstance.connections.get(callId);
+         result.finalStatus = {
+             openaiChunkCount: finalConn?._openaiChunkCount || 0,
+             responseCreated: finalConn?._responseCreated || false,
+             sessionReady: finalConn?.sessionReady || false
+         };
+
+     } catch (err) {
+         result.error = err.message;
+         result.steps.push({
+             step: 'Error occurred',
+             status: 'failed',
+             details: { error: err.message }
+         });
+     }
+
+     res.json(result);
+ });
+
  // Export the router
  module.exports = router;

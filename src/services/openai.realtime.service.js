@@ -396,6 +396,7 @@ class OpenAIRealtimeService {
       };
 
       connection.webSocket.send(JSON.stringify(responseCreateEvent));
+      connection._responseCreated = true; // Track that we sent response.create
       logger.info(`[OpenAI Realtime] Sent response.create for ${callId} with instructions: "${responseCreateEvent.response.instructions}"`);
     } catch (err) {
       logger.error(`[OpenAI Realtime] Error sending response.create for ${callId}: ${err.message}`);
@@ -722,6 +723,11 @@ class OpenAIRealtimeService {
 
         case 'response.created':
           logger.info(`[OpenAI Realtime] Response created for ${callId}`);
+          const conn = this.connections.get(callId);
+          if (conn) {
+            conn._responseCreated = true; // Mark that OpenAI acknowledged our response.create
+            logger.info(`[OpenAI Realtime] OpenAI acknowledged response.create for ${callId}`);
+          }
           break;
 
         case 'error':
@@ -828,7 +834,18 @@ class OpenAIRealtimeService {
       );
       return;
     }
-    // logger.debug(`[OpenAI Realtime] Processing response.audio.delta for ${callId}, data length: ${message.delta.length}`);
+    
+    const conn = this.connections.get(callId);
+    if (conn) {
+      if (!conn._openaiChunkCount) conn._openaiChunkCount = 0;
+      conn._openaiChunkCount++;
+      
+      // Log first few chunks for debugging
+      if (conn._openaiChunkCount <= 5 || conn._openaiChunkCount % 50 === 0) {
+        logger.info(`[OpenAI Realtime] Processing response.audio.delta #${conn._openaiChunkCount} for ${callId}, data length: ${message.delta.length}`);
+      }
+    }
+    
     await this.processAudioResponse(callId, message.delta);
   }
 
@@ -1173,6 +1190,12 @@ class OpenAIRealtimeService {
             originalSizeBytes: ulawBuffer.length,
             ulawSizeBytes: ulawBuffer.length
         });
+        
+        // Log first few notifications for debugging
+        if (conn && (!conn._notificationsLogged || conn._openaiChunkCount <= 5)) {
+            logger.info(`[OpenAI Realtime] Notified ARI of audio chunk #${conn._openaiChunkCount || 1} for ${callId} (size: ${ulawBuffer.length} bytes)`);
+            conn._notificationsLogged = true;
+        }
         
     } catch (err) {
         logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
