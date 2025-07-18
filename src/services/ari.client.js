@@ -214,25 +214,55 @@ class AsteriskAriClient extends EventEmitter {
             
             logger.info(`[ARI Pipeline] Triggering initial AI greeting for ${primarySid}`);
             
-            // Send a small amount of valid μ-law audio to ensure the connection is active
+            // Wait a bit longer to ensure OpenAI connection is fully established
             setTimeout(() => {
-                // Send 200ms of valid μ-law audio (not just silence)
-                // This is a comfort noise pattern that ensures audio flow
-                const comfortNoise = Buffer.alloc(1600); // 200ms at 8kHz
-                for (let i = 0; i < comfortNoise.length; i++) {
-                    // Generate low-level comfort noise in μ-law
-                    comfortNoise[i] = 0xFF + Math.floor(Math.random() * 4) - 2;
+                // Check if OpenAI connection is ready
+                if (!openAIService.isConnectionReady(primarySid)) {
+                    logger.info(`[ARI Pipeline] OpenAI not ready yet, waiting for connection...`);
+                    
+                    // Set up a retry mechanism
+                    let retries = 0;
+                    const maxRetries = 10;
+                    const retryInterval = setInterval(() => {
+                        retries++;
+                        if (openAIService.isConnectionReady(primarySid)) {
+                            clearInterval(retryInterval);
+                            logger.info(`[ARI Pipeline] OpenAI ready after ${retries} retries, sending comfort noise`);
+                            
+                            // Send comfort noise
+                            const comfortNoise = Buffer.alloc(1600); // 200ms at 8kHz
+                            for (let i = 0; i < comfortNoise.length; i++) {
+                                comfortNoise[i] = 0xFF + Math.floor(Math.random() * 4) - 2;
+                            }
+                            const comfortNoiseBase64 = comfortNoise.toString('base64');
+                            openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true);
+                            
+                            // Then trigger response.create
+                            setTimeout(() => {
+                                openAIService.sendResponseCreate(primarySid);
+                            }, 200);
+                        } else if (retries >= maxRetries) {
+                            clearInterval(retryInterval);
+                            logger.error(`[ARI Pipeline] OpenAI connection failed to establish after ${maxRetries} retries for ${primarySid}`);
+                        }
+                    }, 500); // Check every 500ms
+                } else {
+                    // OpenAI is ready, send comfort noise immediately
+                    logger.info(`[ARI Pipeline] OpenAI ready, sending comfort noise for ${primarySid}`);
+                    
+                    const comfortNoise = Buffer.alloc(1600); // 200ms at 8kHz
+                    for (let i = 0; i < comfortNoise.length; i++) {
+                        comfortNoise[i] = 0xFF + Math.floor(Math.random() * 4) - 2;
+                    }
+                    const comfortNoiseBase64 = comfortNoise.toString('base64');
+                    openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true);
+                    
+                    // Then trigger response.create
+                    setTimeout(() => {
+                        openAIService.sendResponseCreate(primarySid);
+                    }, 200);
                 }
-                const comfortNoiseBase64 = comfortNoise.toString('base64');
-                
-                logger.info(`[ARI Pipeline] Sending comfort noise to prime connection for ${primarySid}`);
-                openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true); // bypass buffering
-                
-                // Then send the response.create
-                setTimeout(() => {
-                    openAIService.sendResponseCreate(primarySid);
-                }, 100);
-            }, 100);
+            }, 1000); // Initial delay of 1 second
         }
     }
     

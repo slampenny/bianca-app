@@ -363,8 +363,18 @@ class OpenAIRealtimeService {
    */
   async sendResponseCreate(callId) {
     const connection = this.connections.get(callId);
-    if (!connection || !connection.webSocket || connection.webSocket.readyState !== WebSocket.OPEN) {
-      logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no active connection for ${callId}`);
+    if (!connection) {
+      logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no connection object for ${callId}`);
+      return;
+    }
+    
+    if (!connection.webSocket) {
+      logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no WebSocket for ${callId}`);
+      return;
+    }
+    
+    if (connection.webSocket.readyState !== WebSocket.OPEN) {
+      logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - WebSocket not open for ${callId} (state: ${connection.webSocket.readyState})`);
       return;
     }
 
@@ -811,8 +821,16 @@ class OpenAIRealtimeService {
         // Flush any pending audio
         await this.flushPendingAudio(callId);
 
-        // CRITICAL: Send response.create to trigger OpenAI to start generating responses
-        this.sendResponseCreate(callId);
+        // CRITICAL: Add a small delay to ensure connection is stable before sending response.create
+        setTimeout(() => {
+          // Double-check connection is still valid before sending
+          const currentConn = this.connections.get(callId);
+          if (currentConn && currentConn.webSocket && currentConn.webSocket.readyState === WebSocket.OPEN) {
+            this.sendResponseCreate(callId);
+          } else {
+            logger.error(`[OpenAI Realtime] Connection lost before response.create could be sent for ${callId}`);
+          }
+        }, 500); // 500ms delay
 
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
@@ -1546,19 +1564,34 @@ class OpenAIRealtimeService {
     
     conn.audioChunksReceived++;
     
-    // Buffer audio if OpenAI is not ready, unless bypassBuffering is true
-    if (!bypassBuffering && (!conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN)) {
-        if (conn.status !== 'closed' && conn.status !== 'error_terminal') {
+    // CRITICAL FIX: Check WebSocket state before attempting to send
+    if (!conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
+        if (!bypassBuffering && conn.status !== 'closed' && conn.status !== 'error_terminal') {
             const pending = this.pendingAudio.get(callId) || [];
             if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
                 pending.push(audioChunkBase64ULaw);
                 this.pendingAudio.set(callId, pending);
-                logger.debug(`[OpenAI Realtime] Buffered audio chunk for ${callId} (${pending.length}/${CONSTANTS.MAX_PENDING_CHUNKS})`);
+                logger.debug(`[OpenAI Realtime] WebSocket not open for ${callId}, buffered audio chunk (${pending.length}/${CONSTANTS.MAX_PENDING_CHUNKS})`);
             } else {
                 logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
             }
+        } else {
+            logger.warn(`[OpenAI Realtime] WebSocket not open for ${callId} and buffering disabled/terminal state`);
         }
-        return; // Don't send to OpenAI yet
+        return; // Don't try to send
+    }
+    
+    // Additional session ready check
+    if (!conn.sessionReady) {
+        if (!bypassBuffering) {
+            const pending = this.pendingAudio.get(callId) || [];
+            if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+                pending.push(audioChunkBase64ULaw);
+                this.pendingAudio.set(callId, pending);
+                logger.debug(`[OpenAI Realtime] Session not ready for ${callId}, buffered audio chunk`);
+            }
+        }
+        return;
     }
     
     try {
@@ -1607,6 +1640,15 @@ class OpenAIRealtimeService {
             `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
             audioProcessingError.stack
         );
+        
+        // If it's a WebSocket error, update connection status
+        if (audioProcessingError.message.includes('WebSocket not open')) {
+            this.updateConnectionStatus(callId, 'error');
+            // Trigger reconnection if not already in progress
+            if (!this.isReconnecting.get(callId)) {
+                this.handleConnectionError(callId, audioProcessingError);
+            }
+        }
         return;
     }
 }
@@ -1698,8 +1740,30 @@ class OpenAIRealtimeService {
       const idleTimeout = config.openai.idleTimeout || 300000; // 5 minutes default
 
       for (const [callId, conn] of this.connections.entries()) {
+        // Check for idle connections
         if (conn.lastActivity && now - conn.lastActivity > idleTimeout) {
           logger.warn(`[OpenAI Realtime] Connection ${callId} idle timeout. Cleaning up.`);
+          this.disconnect(callId);
+          continue;
+        }
+        
+        // Check for connections in error state that should be reconnected
+        if (conn.status === 'error' && !this.isReconnecting.get(callId)) {
+          logger.warn(`[OpenAI Realtime] Connection ${callId} in error state, triggering reconnect`);
+          this.handleConnectionError(callId, new Error('Connection in error state'));
+        }
+        
+        // Check for connections with closed WebSocket that should be reconnected
+        if (conn.webSocket && conn.webSocket.readyState === WebSocket.CLOSED && 
+            conn.status !== 'closed' && !this.isReconnecting.get(callId)) {
+          logger.warn(`[OpenAI Realtime] WebSocket closed for ${callId} but connection not cleaned up, triggering reconnect`);
+          this.handleConnectionError(callId, new Error('WebSocket closed unexpectedly'));
+        }
+        
+        // Check for connections that never became ready
+        if (conn.status === 'connected' && !conn.sessionReady && 
+            now - conn.startTime > 30000) { // 30 seconds to become ready
+          logger.error(`[OpenAI Realtime] Connection ${callId} failed to become ready after 30s`);
           this.disconnect(callId);
         }
       }
