@@ -15,7 +15,7 @@ class AudioDiagnosticService {
         try {
             // Import services dynamically to avoid circular dependencies
             const channelTracker = require('./channel.tracker');
-            const { getAriClientInstance } = require('./asterisk.ari.client');
+            const { getAriClientInstance } = require('./ari.client');
             const rtpListenerService = require('./rtp.listener.service');
             const rtpSenderService = require('./rtp.sender.service');
             const openAIService = require('./openai.realtime.service');
