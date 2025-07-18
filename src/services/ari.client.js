@@ -1290,6 +1290,24 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                     case 'openai_max_reconnect_failed':
                         this.handleOpenAIMaxReconnectFailed(callbackId);
                         break;
+                    case 'openai_api_error':
+                        this.handleOpenAIApiError(callbackId, data);
+                        break;
+                    case 'openai_message_processing_error':
+                        this.handleOpenAIMessageProcessingError(callbackId, data);
+                        break;
+                    case 'speech_started':
+                        logger.debug(`[ARI] Speech started for ${callbackId}`);
+                        break;
+                    case 'speech_stopped':
+                        logger.debug(`[ARI] Speech stopped for ${callbackId}`);
+                        break;
+                    case 'openai_text_delta':
+                        logger.debug(`[ARI] Text delta for ${callbackId}: ${data.text}`);
+                        break;
+                    case 'response_done':
+                        logger.debug(`[ARI] Response done for ${callbackId}`);
+                        break;
                     default:
                         logger.warn(`[ARI] Unknown OpenAI callback type: ${type}`);
                 }
@@ -1346,6 +1364,61 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         if (callData) {
             logger.error(`[ARI] OpenAI max reconnection attempts failed for ${callData.asteriskChannelId}`);
             this.cleanupChannel(callData.asteriskChannelId, "OpenAI connection failed");
+        }
+    }
+
+    handleOpenAIApiError(callbackId, data) {
+        const callData = this.findCallData(callbackId);
+        const errorCode = data?.code || 'UNKNOWN_CODE';
+        const errorMessage = data?.message || 'Unknown error';
+        
+        logger.error(`[ARI] OpenAI API error for ${callbackId}: ${errorCode} - ${errorMessage}`);
+        
+        if (callData) {
+            logger.error(`[ARI] OpenAI API error for channel ${callData.asteriskChannelId}: ${errorCode} - ${errorMessage}`);
+            
+            // Handle specific error types
+            if (errorCode === 'input_audio_buffer_commit_empty') {
+                logger.warn(`[ARI] Buffer too small error for ${callData.asteriskChannelId} - this should be handled by validation now`);
+                
+                // Log additional diagnostic information
+                const openAIService = require('./openai.realtime.service');
+                const openaiInstance = openAIService.getOpenAIServiceInstance();
+                const conn = openaiInstance.connections.get(callbackId);
+                
+                if (conn) {
+                    logger.warn(`[ARI] Diagnostic info for ${callData.asteriskChannelId}:`, {
+                        audioChunksReceived: conn.audioChunksReceived || 0,
+                        audioChunksSent: conn.audioChunksSent || 0,
+                        validAudioChunksSent: conn.validAudioChunksSent || 0,
+                        pendingCommit: conn.pendingCommit || false,
+                        sessionReady: conn.sessionReady || false
+                    });
+                }
+                
+                // Don't cleanup the call for this error - let the validation fixes handle it
+            } else if (errorCode === 'conversation_already_has_active_response') {
+                logger.warn(`[ARI] Conversation already has active response for ${callData.asteriskChannelId} - this is usually harmless`);
+                // Don't cleanup for this error either
+            } else if (errorCode === 'session_not_found' || errorCode === 'session_expired_error') {
+                logger.error(`[ARI] Session error for ${callData.asteriskChannelId} - OpenAI will handle reconnection`);
+                // OpenAI service will handle reconnection automatically
+            } else {
+                logger.error(`[ARI] Unhandled OpenAI API error for ${callData.asteriskChannelId}: ${errorCode} - ${errorMessage}`);
+                // For other errors, we might want to take action
+            }
+        }
+    }
+
+    handleOpenAIMessageProcessingError(callbackId, data) {
+        const callData = this.findCallData(callbackId);
+        const messageType = data?.messageType || 'unknown';
+        const error = data?.error || 'Unknown error';
+        
+        logger.error(`[ARI] OpenAI message processing error for ${callbackId}: ${messageType} - ${error}`);
+        
+        if (callData) {
+            logger.error(`[ARI] OpenAI message processing error for channel ${callData.asteriskChannelId}: ${messageType} - ${error}`);
         }
     }
 

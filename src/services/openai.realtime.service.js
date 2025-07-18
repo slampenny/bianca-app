@@ -88,11 +88,21 @@ class OpenAIRealtimeService {
         return { isValid: false, reason: 'Decoded audio buffer is empty' };
       }
 
-      // Check minimum size for meaningful audio
-      if (audioBuffer.length < 160) { // 20ms of uLaw at 8kHz
+      // Check minimum size for meaningful audio (20ms at 8kHz uLaw)
+      if (audioBuffer.length < 160) {
         return { 
           isValid: false, 
           reason: `Audio too small: ${audioBuffer.length} bytes (minimum 160 bytes for 20ms)` 
+        };
+      }
+
+      // Check for all-zero or all-same-value audio (likely silence or invalid)
+      const firstByte = audioBuffer[0];
+      const allSame = audioBuffer.every(byte => byte === firstByte);
+      if (allSame && (firstByte === 0 || firstByte === 0xFF)) {
+        return { 
+          isValid: false, 
+          reason: `Audio appears to be silence or invalid: all bytes are 0x${firstByte.toString(16)}` 
         };
       }
 
@@ -102,6 +112,18 @@ class OpenAIRealtimeService {
         return { 
           isValid: false, 
           reason: `Invalid uLaw bytes: ${invalidBytes} out of ${audioBuffer.length}` 
+        };
+      }
+
+      // Check for reasonable audio content (not all zeros or all 0xFF)
+      const zeroCount = audioBuffer.filter(byte => byte === 0).length;
+      const ffCount = audioBuffer.filter(byte => byte === 0xFF).length;
+      const totalBytes = audioBuffer.length;
+      
+      if (zeroCount > totalBytes * 0.95 || ffCount > totalBytes * 0.95) {
+        return { 
+          isValid: false, 
+          reason: `Audio appears to be mostly silence: ${zeroCount} zeros, ${ffCount} 0xFF bytes out of ${totalBytes}` 
         };
       }
 
@@ -134,9 +156,18 @@ class OpenAIRealtimeService {
       return { canCommit: false, reason: 'No audio chunks sent yet' };
     }
 
-    // Calculate total audio duration from chunks sent
+    // Check if we have any valid audio chunks sent (track this separately)
+    if (!conn.validAudioChunksSent) {
+      conn.validAudioChunksSent = 0;
+    }
+    
+    if (conn.validAudioChunksSent === 0) {
+      return { canCommit: false, reason: 'No valid audio chunks sent yet' };
+    }
+
+    // Calculate total audio duration from valid chunks sent
     // Each chunk is typically 20ms (160 bytes at 8kHz uLaw)
-    const estimatedDurationMs = conn.audioChunksSent * 20; // Rough estimate
+    const estimatedDurationMs = conn.validAudioChunksSent * 20; // Rough estimate
 
     if (estimatedDurationMs < CONSTANTS.MIN_AUDIO_DURATION_MS) {
       return { 
@@ -678,8 +709,10 @@ class OpenAIRealtimeService {
             conn.pendingCommit = false;
             conn.lastCommitTime = Date.now();
             const chunksProcessed = conn.audioChunksSent || 0;
+            const validChunksProcessed = conn.validAudioChunksSent || 0;
             conn.audioChunksSent = 0;
-            logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks`);
+            conn.validAudioChunksSent = 0;
+            logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid)`);
           }
           break;
 
@@ -769,6 +802,7 @@ class OpenAIRealtimeService {
       // Reset counters when session becomes ready
       conn.audioChunksReceived = 0;
       conn.audioChunksSent = 0;
+      conn.validAudioChunksSent = 0;
       logger.info(`[OpenAI Realtime] Session ready for ${callId}. Flushing pending audio.`);
 
       try {
@@ -1235,6 +1269,20 @@ class OpenAIRealtimeService {
     if (messageObj && messageObj._testWebSocket) delete messageObj._testWebSocket;
     if (messageObj && messageObj._testId) delete messageObj._testId;
 
+    // CRITICAL: Prevent commits when no valid audio has been sent
+    if (messageObj.type === 'input_audio_buffer.commit' && callId && conn) {
+      if (!conn.validAudioChunksSent || conn.validAudioChunksSent === 0) {
+        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - no valid audio chunks sent (${conn.validAudioChunksSent || 0} valid, ${conn.audioChunksSent || 0} total)`);
+        return Promise.resolve(true); // Resolve successfully but don't send
+      }
+    }
+
+    // CRITICAL: Prevent empty audio appends
+    if (messageObj.type === 'input_audio_buffer.append' && (!messageObj.audio || messageObj.audio.length === 0)) {
+      logger.warn(`[OpenAI Realtime] BLOCKED empty audio append for ${callId}`);
+      return Promise.resolve(true); // Resolve successfully but don't send
+    }
+
     if (!wsToSend || wsToSend.readyState !== WebSocket.OPEN) {
       logger.warn(`[OpenAI Realtime] Cannot send - WS not open for ${identifier}`);
       return Promise.reject(new Error(`WebSocket not open for ${identifier}`));
@@ -1317,6 +1365,13 @@ class OpenAIRealtimeService {
             });
             
             conn.audioChunksSent++;
+            
+            // Track valid audio chunks separately
+            if (!conn.validAudioChunksSent) {
+                conn.validAudioChunksSent = 0;
+            }
+            conn.validAudioChunksSent++;
+            
             successfullyProcessedAndSentCount++;
             
         } catch (audioProcessingError) {
@@ -1509,12 +1564,18 @@ class OpenAIRealtimeService {
         
         conn.audioChunksSent++;
         
+        // Track valid audio chunks separately
+        if (!conn.validAudioChunksSent) {
+            conn.validAudioChunksSent = 0;
+        }
+        conn.validAudioChunksSent++;
+        
         // Improved commit logic with validation
         const commitReadiness = this.checkCommitReadiness(callId);
         if (commitReadiness.canCommit) {
-            if (conn.audioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
+            if (conn.validAudioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
                 this.debounceCommit(callId);
-            } else if (conn.audioChunksSent === 1) {
+            } else if (conn.validAudioChunksSent === 1) {
                 // Start a timer for the first chunk to ensure we don't wait too long
                 this.debounceCommit(callId);
             }

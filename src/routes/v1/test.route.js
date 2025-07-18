@@ -7043,6 +7043,812 @@ router.post('/send-text-to-openai', async (req, res) => {
     }
 });
 
+router.post('/test-openai-audio-acceptance', async (req, res) => {
+    const { callId } = req.body || {};
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const testResults = {
+        timestamp: new Date().toISOString(),
+        callId,
+        testSteps: [],
+        success: false,
+        error: null
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const conn = openAIService.connections.get(callId);
+        
+        if (!conn || !conn.sessionReady) {
+            testResults.error = 'OpenAI connection not ready';
+            return res.json(testResults);
+        }
+
+        testResults.testSteps.push({
+            step: 'Connection check',
+            status: 'success',
+            details: {
+                sessionReady: conn.sessionReady,
+                webSocketState: conn.webSocket?.readyState,
+                audioChunksSent: conn.audioChunksSent
+            }
+        });
+
+        // Generate valid uLaw audio (1 second of 440Hz tone)
+        const AudioUtils = require('../../api/audio.utils');
+        const sampleRate = 8000;
+        const duration = 1; // 1 second
+        const numSamples = sampleRate * duration;
+        
+        const testPcm = Buffer.alloc(numSamples * 2);
+        for (let i = 0; i < numSamples; i++) {
+            const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+            testPcm.writeInt16LE(Math.round(sample), i * 2);
+        }
+
+        testResults.testSteps.push({
+            step: 'Generate test audio',
+            status: 'success',
+            details: {
+                pcmSize: testPcm.length,
+                durationMs: (testPcm.length / 2 / 8).toFixed(2),
+                frequency: '440Hz'
+            }
+        });
+
+        // Convert to uLaw
+        const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testPcm);
+        const testUlawBuffer = Buffer.from(testUlawBase64, 'base64');
+
+        testResults.testSteps.push({
+            step: 'Convert to uLaw',
+            status: 'success',
+            details: {
+                ulawSize: testUlawBuffer.length,
+                base64Size: testUlawBase64.length,
+                compressionRatio: (testUlawBuffer.length / testPcm.length).toFixed(2)
+            }
+        });
+
+        // Send to OpenAI in chunks
+        const chunkSize = 160; // 20ms chunks
+        let totalChunks = 0;
+        let totalBytes = 0;
+
+        for (let i = 0; i < testUlawBuffer.length; i += chunkSize) {
+            const chunk = testUlawBuffer.slice(i, i + chunkSize);
+            const chunkBase64 = chunk.toString('base64');
+            
+            await openAIService.sendAudioChunk(callId, chunkBase64, true);
+            totalChunks++;
+            totalBytes += chunk.length;
+            
+            // Small delay between chunks
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
+        testResults.testSteps.push({
+            step: 'Send audio chunks',
+            status: 'success',
+            details: {
+                chunksSent: totalChunks,
+                totalBytes,
+                chunkSize
+            }
+        });
+
+        // Force commit
+        const commitResult = await openAIService.forceCommit(callId);
+        
+        testResults.testSteps.push({
+            step: 'Commit audio buffer',
+            status: commitResult ? 'success' : 'failed',
+            details: {
+                commitResult,
+                finalAudioChunksSent: conn.audioChunksSent
+            }
+        });
+
+        // Wait a moment for any error responses
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check if we got any errors
+        const hasErrors = testResults.testSteps.some(step => step.status === 'failed');
+        testResults.success = !hasErrors;
+
+        if (testResults.success) {
+            testResults.summary = 'Successfully sent valid uLaw audio to OpenAI without errors';
+        } else {
+            testResults.summary = 'Failed to send audio to OpenAI - check the error details';
+        }
+
+        res.json(testResults);
+
+    } catch (err) {
+        testResults.error = err.message;
+        testResults.testSteps.push({
+            step: 'Error occurred',
+            status: 'failed',
+            details: { error: err.message }
+        });
+        res.json(testResults);
+    }
+});
+
+router.post('/standalone-audio-diagnostic', async (req, res) => {
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        audioProcessing: {},
+        openaiConfiguration: {},
+        recommendations: []
+    };
+
+    try {
+        // Test 1: Audio conversion utilities
+        diagnostic.audioProcessing.conversionTest = {
+            status: 'testing'
+        };
+
+        try {
+            const AudioUtils = require('../../api/audio.utils');
+            
+            // Create test PCM audio (1 second of 440Hz tone at 8kHz)
+            const sampleRate = 8000;
+            const duration = 1;
+            const numSamples = sampleRate * duration;
+            
+            const testPcm = Buffer.alloc(numSamples * 2);
+            for (let i = 0; i < numSamples; i++) {
+                const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 16383;
+                testPcm.writeInt16LE(Math.round(sample), i * 2);
+            }
+
+            // Convert to uLaw
+            const testUlawBase64 = await AudioUtils.convertPcmToUlaw(testPcm);
+            const testUlawBuffer = Buffer.from(testUlawBase64, 'base64');
+            
+            // Convert back to PCM
+            const backToPcm = await AudioUtils.convertUlawToPcm(testUlawBuffer);
+
+            diagnostic.audioProcessing.conversionTest = {
+                status: 'success',
+                pcmSize: testPcm.length,
+                ulawSize: testUlawBuffer.length,
+                ulawBase64Size: testUlawBase64.length,
+                backToPcmSize: backToPcm.length,
+                conversionWorks: backToPcm.length === testPcm.length,
+                durationMs: (testPcm.length / 2 / 8).toFixed(2)
+            };
+        } catch (err) {
+            diagnostic.audioProcessing.conversionTest = {
+                status: 'failed',
+                error: err.message
+            };
+        }
+
+        // Test 2: OpenAI configuration
+        diagnostic.openaiConfiguration = {
+            status: 'checking'
+        };
+
+        try {
+            const config = require('../../config/config');
+            const openAIService = require('../../services/openai.realtime.service');
+            
+            diagnostic.openaiConfiguration = {
+                status: 'validated',
+                realtimeModel: config.openai.realtimeModel,
+                realtimeVoice: config.openai.realtimeVoice,
+                apiKeyConfigured: !!config.openai.apiKey,
+                apiKeyLength: config.openai.apiKey ? config.openai.apiKey.length : 0,
+                debugAudio: config.openai.debugAudio,
+                serviceAvailable: !!openAIService,
+                activeConnections: openAIService.connections ? openAIService.connections.size : 0
+            };
+        } catch (err) {
+            diagnostic.openaiConfiguration = {
+                status: 'failed',
+                error: err.message
+            };
+        }
+
+        // Test 3: Create a test OpenAI session
+        diagnostic.openaiConfiguration.sessionTest = {
+            status: 'testing'
+        };
+
+        try {
+            const openAIService = require('../../services/openai.realtime.service');
+            const testCallId = `standalone-test-${Date.now()}`;
+            
+            const sessionResult = await openAIService.testBasicConnectionAndSession(testCallId);
+            
+            diagnostic.openaiConfiguration.sessionTest = {
+                status: 'success',
+                sessionId: sessionResult.sessionId,
+                sessionDetails: sessionResult.sessionDetails,
+                inputFormat: sessionResult.sessionDetails?.session?.input_audio_format,
+                outputFormat: sessionResult.sessionDetails?.session?.output_audio_format
+            };
+
+            // Cleanup test session
+            await openAIService.cleanup(testCallId);
+        } catch (err) {
+            diagnostic.openaiConfiguration.sessionTest = {
+                status: 'failed',
+                error: err.message
+            };
+        }
+
+        // Generate recommendations
+        if (diagnostic.audioProcessing.conversionTest.status === 'failed') {
+            diagnostic.recommendations.push('Audio conversion utilities are not working - check AudioUtils implementation');
+        }
+
+        if (diagnostic.openaiConfiguration.status === 'failed') {
+            diagnostic.recommendations.push('OpenAI configuration is invalid - check config and API key');
+        }
+
+        if (diagnostic.openaiConfiguration.sessionTest.status === 'failed') {
+            diagnostic.recommendations.push('OpenAI session creation failed - check API key and network connectivity');
+        }
+
+        if (diagnostic.openaiConfiguration.sessionTest.status === 'success') {
+            const session = diagnostic.openaiConfiguration.sessionTest.sessionDetails?.session;
+            if (session?.input_audio_format !== 'g711_ulaw') {
+                diagnostic.recommendations.push(`OpenAI input format is ${session?.input_audio_format}, expected g711_ulaw`);
+            }
+            if (session?.output_audio_format !== 'g711_ulaw') {
+                diagnostic.recommendations.push(`OpenAI output format is ${session?.output_audio_format}, expected g711_ulaw`);
+            }
+        }
+
+        // Overall status
+        const hasErrors = diagnostic.audioProcessing.conversionTest.status === 'failed' ||
+                         diagnostic.openaiConfiguration.status === 'failed' ||
+                         diagnostic.openaiConfiguration.sessionTest.status === 'failed';
+        
+        diagnostic.success = !hasErrors;
+        diagnostic.summary = hasErrors ? 
+            'Audio pipeline has issues - check recommendations' : 
+            'Audio pipeline is working correctly';
+
+        res.json(diagnostic);
+
+    } catch (err) {
+        res.status(500).json({
+            error: 'Standalone audio diagnostic failed',
+            message: err.message,
+            diagnostic
+        });
+    }
+});
+
+router.post('/openai-audio-generation-diagnostic', async (req, res) => {
+    const { callId } = req.body || {};
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const diagnostic = {
+        timestamp: new Date().toISOString(),
+        callId,
+        openaiStatus: {},
+        audioGeneration: {},
+        recommendations: []
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const conn = openAIService.connections.get(callId);
+        
+        if (!conn) {
+            diagnostic.openaiStatus.status = 'not_found';
+            diagnostic.recommendations.push('Call not found in OpenAI service');
+            return res.json(diagnostic);
+        }
+
+        // Check OpenAI connection status
+        diagnostic.openaiStatus = {
+            sessionReady: conn.sessionReady,
+            webSocketState: conn.webSocket?.readyState,
+            status: conn.status,
+            audioChunksReceived: conn.audioChunksReceived,
+            audioChunksSent: conn.audioChunksSent,
+            pendingCommit: conn.pendingCommit,
+            lastActivity: conn.lastActivity
+        };
+
+        // Check if OpenAI is generating audio
+        diagnostic.audioGeneration = {
+            hasReceivedAudio: conn.audioChunksReceived > 0,
+            hasSentAudio: conn.audioChunksSent > 0,
+            pendingAudioCount: openAIService.pendingAudio.get(callId)?.length || 0,
+            hasOpenAIResponded: conn._openaiChunkCount > 0,
+            openaiChunkCount: conn._openaiChunkCount || 0,
+            timingStats: conn._timingStats || null
+        };
+
+        // Check if there are any pending commits
+        if (conn.pendingCommit) {
+            diagnostic.recommendations.push('OpenAI has pending commit - audio may be buffered');
+        }
+
+        if (conn.audioChunksReceived > 0 && conn.audioChunksSent === 0) {
+            diagnostic.recommendations.push('Audio received but not sent to OpenAI - check buffering');
+        }
+
+        if (conn.audioChunksSent > 0 && conn._openaiChunkCount === 0) {
+            diagnostic.recommendations.push('Audio sent to OpenAI but no response generated - check OpenAI session');
+        }
+
+        if (!conn.sessionReady) {
+            diagnostic.recommendations.push('OpenAI session not ready - audio may be buffered');
+        }
+
+        return res.json(diagnostic);
+
+    } catch (err) {
+        diagnostic.error = err.message;
+        return res.json(diagnostic);
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/calls:
+ *   get:
+ *     summary: List all active calls for audio diagnosis
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: List of active calls with audio status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 activeCalls:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asteriskChannelId:
+ *                         type: string
+ *                       twilioCallSid:
+ *                         type: string
+ *                       patientId:
+ *                         type: string
+ *                       state:
+ *                         type: string
+ *                       duration:
+ *                         type: number
+ *                       isReadStreamReady:
+ *                         type: boolean
+ *                       isWriteStreamReady:
+ *                         type: boolean
+ *                       rtpReadPort:
+ *                         type: number
+ *                       rtpWritePort:
+ *                         type: number
+ *                 totalCalls:
+ *                   type: number
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/calls', async (req, res) => {
+    try {
+        const ariClient = require('../../services/asterisk.ari.service').getAriClientInstance();
+        const channelTracker = require('../../services/channel.tracker');
+        const activeCalls = [];
+        
+        // Get calls from channel tracker
+        for (const [channelId, callData] of channelTracker.calls.entries()) {
+            activeCalls.push({
+                asteriskChannelId: channelId,
+                twilioCallSid: callData.twilioCallSid,
+                patientId: callData.patientId,
+                state: callData.state,
+                duration: Math.round((Date.now() - callData.startTime) / 1000),
+                isReadStreamReady: callData.isReadStreamReady,
+                isWriteStreamReady: callData.isWriteStreamReady,
+                rtpReadPort: callData.rtpReadPort,
+                rtpWritePort: callData.rtpWritePort
+            });
+        }
+        
+        res.json({
+            success: true,
+            activeCalls,
+            totalCalls: activeCalls.length,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error listing calls: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/diagnose/{channelId}:
+ *   get:
+ *     summary: Diagnose audio flow for a specific call
+ *     tags: [Audio Diagnostics]
+ *     parameters:
+ *       - in: path
+ *         name: channelId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Asterisk channel ID to diagnose
+ *     responses:
+ *       200:
+ *         description: Audio diagnosis results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 channelId:
+ *                   type: string
+ *                 diagnosis:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/diagnose/:channelId', async (req, res) => {
+    try {
+        const { channelId } = req.params;
+        const audioDiagnostic = require('../../services/audio.diagnostic.service');
+        
+        logger.info(`[Debug Route] Running audio diagnosis for channel: ${channelId}`);
+        
+        const diagnosis = await audioDiagnostic.diagnoseAudioFlow(channelId);
+        
+        res.json({
+            success: true,
+            channelId,
+            diagnosis,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error diagnosing audio: ${error.message}`);
+        res.status(500).json({ 
+            error: error.message,
+            stack: error.stack 
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/diagnose-latest:
+ *   get:
+ *     summary: Diagnose the most recent active call
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: Diagnosis results for the latest call
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 latestCall:
+ *                   type: string
+ *                 diagnosis:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/diagnose-latest', async (req, res) => {
+    try {
+        const channelTracker = require('../../services/channel.tracker');
+        const audioDiagnostic = require('../../services/audio.diagnostic.service');
+        
+        // Find the most recent call
+        let latestCall = null;
+        let latestTime = 0;
+        
+        for (const [channelId, callData] of channelTracker.calls.entries()) {
+            if (callData.startTime > latestTime) {
+                latestTime = callData.startTime;
+                latestCall = channelId;
+            }
+        }
+        
+        if (!latestCall) {
+            return res.json({
+                success: false,
+                message: 'No active calls found'
+            });
+        }
+        
+        logger.info(`[Debug Route] Diagnosing latest call: ${latestCall}`);
+        
+        const diagnosis = await audioDiagnostic.diagnoseAudioFlow(latestCall);
+        
+        res.json({
+            success: true,
+            latestCall,
+            diagnosis,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error diagnosing latest call: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/listeners:
+ *   get:
+ *     summary: Get RTP listener status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: RTP listener status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 rtpListeners:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/listeners', async (req, res) => {
+    try {
+        const rtpListenerService = require('../../services/rtp.listener.service');
+        const status = rtpListenerService.getFullStatus();
+        
+        res.json({
+            success: true,
+            rtpListeners: status,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting RTP listeners: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/senders:
+ *   get:
+ *     summary: Get RTP sender status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: RTP sender status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 rtpSenders:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/senders', async (req, res) => {
+    try {
+        const rtpSenderService = require('../../services/rtp.sender.service');
+        const status = rtpSenderService.getStatus();
+        
+        res.json({
+            success: true,
+            rtpSenders: status,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting RTP senders: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/openai:
+ *   get:
+ *     summary: Get OpenAI connection status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: OpenAI connection status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 openAIConnections:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       callId:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       sessionReady:
+ *                         type: boolean
+ *                       audioChunksReceived:
+ *                         type: number
+ *                       audioChunksSent:
+ *                         type: number
+ *                       lastActivity:
+ *                         type: string
+ *                       conversationId:
+ *                         type: string
+ *                 totalConnections:
+ *                   type: number
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/openai', async (req, res) => {
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const connections = [];
+        
+        // Access OpenAI service connections
+        if (openAIService.connections) {
+            for (const [callId, conn] of openAIService.connections.entries()) {
+                connections.push({
+                    callId,
+                    status: conn.status,
+                    sessionReady: conn.sessionReady,
+                    audioChunksReceived: conn.audioChunksReceived || 0,
+                    audioChunksSent: conn.audioChunksSent || 0,
+                    lastActivity: conn.lastActivity,
+                    conversationId: conn.conversationId
+                });
+            }
+        }
+        
+        res.json({
+            success: true,
+            openAIConnections: connections,
+            totalConnections: connections.length,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting OpenAI status: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/status:
+ *   get:
+ *     summary: Get comprehensive audio status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: Comprehensive audio status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 calls:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/status', async (req, res) => {
+    try {
+        const audioDiagnostic = require('../../services/audio.diagnostic.service');
+        const status = await audioDiagnostic.getAllCallsStatus();
+        res.json(status);
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting comprehensive status: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/send-text-to-openai:
+ *   post:
+ *     summary: Send a text message to OpenAI to test audio response generation
+ *     tags: [Audio Diagnostics]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               callId:
+ *                 type: string
+ *                 description: The call ID to send the message to
+ *               message:
+ *                 type: string
+ *                 description: The text message to send
+ *                 default: "Hello, can you hear me? Please respond with audio."
+ *     responses:
+ *       200:
+ *         description: Text message sent to OpenAI
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ */
+router.post('/send-text-to-openai', async (req, res) => {
+    const { callId, message = "Hello, can you hear me? Please respond with audio." } = req.body || {};
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const conn = openAIService.connections.get(callId);
+        
+        if (!conn) {
+            return res.status(404).json({ error: 'Call not found in OpenAI service' });
+        }
+
+        if (!conn.sessionReady) {
+            return res.status(400).json({ error: 'OpenAI session not ready' });
+        }
+
+        logger.info(`[Test Route] Sending text message to OpenAI for ${callId}: "${message}"`);
+        
+        // Send text message to OpenAI
+        await openAIService.sendTextMessage(callId, message, 'user');
+        
+        res.json({
+            success: true,
+            message: `Text message sent to OpenAI: "${message}"`,
+            callId,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (err) {
+        logger.error(`[Test Route] Error sending text to OpenAI: ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/test-audio-validation', async (req, res) => {
     const { callId, audioBase64, testType } = req.body;
     
@@ -7280,5 +8086,230 @@ router.post('/diagnose-buffer-too-small', async (req, res) => {
     res.json(diagnostic);
 });
 
-// Export the router
-module.exports = router;
+router.post('/analyze-audio-data', async (req, res) => {
+    const { callId, audioBase64 } = req.body;
+    
+    if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+    }
+
+    const analysis = {
+        callId,
+        timestamp: new Date().toISOString(),
+        audioAnalysis: null,
+        connectionState: null,
+        recommendations: []
+    };
+
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const openaiInstance = getOpenAIServiceInstance();
+
+        // Get connection state
+        const conn = openaiInstance.connections.get(callId);
+        analysis.connectionState = {
+            exists: !!conn,
+            sessionReady: conn?.sessionReady || false,
+            audioChunksReceived: conn?.audioChunksReceived || 0,
+            audioChunksSent: conn?.audioChunksSent || 0,
+            validAudioChunksSent: conn?.validAudioChunksSent || 0,
+            pendingCommit: conn?.pendingCommit || false
+        };
+
+        // Analyze provided audio or get recent audio from pending buffer
+        if (audioBase64) {
+            analysis.audioAnalysis = analyzeAudioData(audioBase64);
+        } else {
+            // Get recent audio from pending buffer
+                         const pendingAudio = openaiInstance.pendingAudio.get(callId) || [];
+             if (pendingAudio.length > 0) {
+                 const recentAudio = pendingAudio[pendingAudio.length - 1];
+                 analysis.audioAnalysis = analyzeAudioData(recentAudio);
+                 analysis.audioAnalysis.source = 'pending_buffer';
+                 analysis.audioAnalysis.pendingBufferSize = pendingAudio.length;
+             } else {
+                 analysis.audioAnalysis = { error: 'No audio data available for analysis' };
+             }
+         }
+
+         // Generate recommendations
+         if (analysis.audioAnalysis.isValid === false) {
+             analysis.recommendations.push(`Audio validation failed: ${analysis.audioAnalysis.reason}`);
+         }
+
+         if (analysis.connectionState.validAudioChunksSent === 0) {
+             analysis.recommendations.push('No valid audio chunks sent to OpenAI - check RTP listener and audio validation');
+         }
+
+         if (analysis.connectionState.audioChunksReceived === 0) {
+             analysis.recommendations.push('No audio chunks received from RTP - check Asterisk configuration');
+         }
+
+         if (analysis.connectionState.audioChunksReceived > 0 && analysis.connectionState.validAudioChunksSent === 0) {
+             analysis.recommendations.push('Audio received but not valid - check audio format and validation logic');
+         }
+
+     } catch (err) {
+         analysis.error = err.message;
+     }
+
+     res.json(analysis);
+ });
+
+ function analyzeAudioData(audioBase64) {
+     if (!audioBase64 || typeof audioBase64 !== 'string' || audioBase64.length === 0) {
+         return { isValid: false, reason: 'Empty or invalid audio data' };
+     }
+
+     try {
+         const audioBuffer = Buffer.from(audioBase64, 'base64');
+         
+         if (audioBuffer.length === 0) {
+             return { isValid: false, reason: 'Decoded audio buffer is empty' };
+         }
+
+         // Basic stats
+         const stats = {
+             base64Length: audioBase64.length,
+             bufferSize: audioBuffer.length,
+             durationMs: Math.round(audioBuffer.length / 8), // 8kHz uLaw
+             isValid: true,
+             reason: 'Valid audio chunk'
+         };
+
+         // Check for all-zero or all-same-value audio
+         const firstByte = audioBuffer[0];
+         const allSame = audioBuffer.every(byte => byte === firstByte);
+         if (allSame) {
+             stats.isValid = false;
+             stats.reason = `All bytes are the same value: 0x${firstByte.toString(16)}`;
+             stats.allSameValue = firstByte;
+         }
+
+         // Check for mostly silence
+         const zeroCount = audioBuffer.filter(byte => byte === 0).length;
+         const ffCount = audioBuffer.filter(byte => byte === 0xFF).length;
+         const totalBytes = audioBuffer.length;
+         
+         stats.zeroCount = zeroCount;
+         stats.ffCount = ffCount;
+         stats.zeroPercentage = Math.round((zeroCount / totalBytes) * 100);
+         stats.ffPercentage = Math.round((ffCount / totalBytes) * 100);
+
+         if (zeroCount > totalBytes * 0.95) {
+             stats.isValid = false;
+             stats.reason = `Audio is mostly zeros (${stats.zeroPercentage}%)`;
+         } else if (ffCount > totalBytes * 0.95) {
+             stats.isValid = false;
+             stats.reason = `Audio is mostly 0xFF (${stats.ffPercentage}%)`;
+         }
+
+         // Sample analysis
+         const samples = audioBuffer.slice(0, Math.min(20, audioBuffer.length));
+         stats.sampleBytes = Array.from(samples).map(b => '0x' + b.toString(16).padStart(2, '0'));
+
+         return stats;
+
+     } catch (err) {
+         return { isValid: false, reason: `Audio analysis error: ${err.message}` };
+     }
+ }
+
+ router.post('/test-openai-error-handling', async (req, res) => {
+     const { callId, testErrorType } = req.body;
+     
+     if (!callId) {
+         return res.status(400).json({ error: 'callId is required' });
+     }
+
+     const testResults = {
+         callId,
+         timestamp: new Date().toISOString(),
+         testErrorType: testErrorType || 'buffer_too_small',
+         errorHandling: {},
+         connectionState: null,
+         success: false
+     };
+
+     try {
+         const openAIService = require('../../services/openai.realtime.service');
+         const openaiInstance = openAIService.getOpenAIServiceInstance();
+
+         // Get connection state
+         const conn = openaiInstance.connections.get(callId);
+         testResults.connectionState = {
+             exists: !!conn,
+             sessionReady: conn?.sessionReady || false,
+             audioChunksReceived: conn?.audioChunksReceived || 0,
+             audioChunksSent: conn?.audioChunksSent || 0,
+             validAudioChunksSent: conn?.validAudioChunksSent || 0,
+             pendingCommit: conn?.pendingCommit || false
+         };
+
+         if (!conn) {
+             testResults.errorHandling.error = 'No OpenAI connection found for this callId';
+             return res.json(testResults);
+         }
+
+         // Test different error scenarios
+         switch (testErrorType) {
+             case 'buffer_too_small':
+                 // Simulate the buffer too small error
+                 testResults.errorHandling.simulatedError = {
+                     type: 'error',
+                     error: {
+                         code: 'input_audio_buffer_commit_empty',
+                         message: 'Error committing input audio buffer: buffer too small. Expected at least 100ms of audio, but buffer only has 0.00ms of audio.'
+                     }
+                 };
+                 
+                 // Call the error handler directly
+                 await openaiInstance.handleApiError(callId, testResults.errorHandling.simulatedError);
+                 testResults.errorHandling.handled = true;
+                 break;
+
+             case 'conversation_already_has_active_response':
+                 testResults.errorHandling.simulatedError = {
+                     type: 'error',
+                     error: {
+                         code: 'conversation_already_has_active_response',
+                         message: 'Conversation already has an active response'
+                     }
+                 };
+                 
+                 await openaiInstance.handleApiError(callId, testResults.errorHandling.simulatedError);
+                 testResults.errorHandling.handled = true;
+                 break;
+
+             case 'session_expired':
+                 testResults.errorHandling.simulatedError = {
+                     type: 'error',
+                     error: {
+                         code: 'session_expired_error',
+                         message: 'Session has expired'
+                     }
+                 };
+                 
+                 await openaiInstance.handleApiError(callId, testResults.errorHandling.simulatedError);
+                 testResults.errorHandling.handled = true;
+                 break;
+
+             default:
+                 testResults.errorHandling.error = `Unknown test error type: ${testErrorType}`;
+         }
+
+         // Check if the error was properly handled
+         if (testResults.errorHandling.handled) {
+             testResults.success = true;
+             testResults.errorHandling.message = `Successfully tested ${testErrorType} error handling`;
+         }
+
+     } catch (err) {
+         testResults.errorHandling.error = `Test failed: ${err.message}`;
+     }
+
+     res.json(testResults);
+ });
+
+ // Export the router
+ module.exports = router;
