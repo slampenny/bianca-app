@@ -101,9 +101,6 @@ function withTimeout(promise, timeoutMs, operationName = 'Operation') {
     ]);
 }
 
-// --- REFACTOR 2: StateValidator class is no longer needed for this simpler model ---
-// class StateValidator { ... } // Removed
-
 // Enhanced resource manager
 class ResourceManager {
     constructor() {
@@ -217,22 +214,24 @@ class AsteriskAriClient extends EventEmitter {
             
             logger.info(`[ARI Pipeline] Triggering initial AI greeting for ${primarySid}`);
             
-            // Delay the greeting slightly to ensure OpenAI connection is ready
+            // Send a small amount of valid μ-law audio to ensure the connection is active
             setTimeout(() => {
-                // Check if OpenAI is ready before sending
-                if (openAIService.isConnectionReady(primarySid)) {
-                    openAIService.sendResponseCreate(primarySid);
-                } else {
-                    logger.info(`[ARI Pipeline] OpenAI not ready yet, sending silence to trigger connection`);
-                    // Send silence to ensure the connection is active
-                    const silenceBase64 = Buffer.alloc(160, 0xFF).toString('base64'); // 20ms of μ-law silence
-                    openAIService.sendAudioChunk(primarySid, silenceBase64);
-                    
-                    // Try greeting again after a short delay
-                    setTimeout(() => {
-                        openAIService.sendResponseCreate(primarySid);
-                    }, 500);
+                // Send 200ms of valid μ-law audio (not just silence)
+                // This is a comfort noise pattern that ensures audio flow
+                const comfortNoise = Buffer.alloc(1600); // 200ms at 8kHz
+                for (let i = 0; i < comfortNoise.length; i++) {
+                    // Generate low-level comfort noise in μ-law
+                    comfortNoise[i] = 0xFF + Math.floor(Math.random() * 4) - 2;
                 }
+                const comfortNoiseBase64 = comfortNoise.toString('base64');
+                
+                logger.info(`[ARI Pipeline] Sending comfort noise to prime connection for ${primarySid}`);
+                openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true); // bypass buffering
+                
+                // Then send the response.create
+                setTimeout(() => {
+                    openAIService.sendResponseCreate(primarySid);
+                }, 100);
             }, 100);
         }
     }

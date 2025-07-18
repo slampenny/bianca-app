@@ -72,7 +72,7 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Validate audio chunk before sending to OpenAI
+   * Validate audio chunk before sending to OpenAI - FIXED to be less strict
    * @param {string} audioBase64 - Base64 encoded uLaw audio
    * @returns {Object} Validation result with isValid, size, duration, and reason
    */
@@ -96,34 +96,13 @@ class OpenAIRealtimeService {
         };
       }
 
-      // Check for all-zero or all-same-value audio (likely silence or invalid)
-      const firstByte = audioBuffer[0];
-      const allSame = audioBuffer.every(byte => byte === firstByte);
-      if (allSame && (firstByte === 0 || firstByte === 0xFF)) {
+      // FIXED: Don't reject μ-law silence (0xFF) as it's valid
+      // Just check if ALL bytes are exactly 0 (which would be invalid)
+      const allZeros = audioBuffer.every(byte => byte === 0);
+      if (allZeros) {
         return { 
           isValid: false, 
-          reason: `Audio appears to be silence or invalid: all bytes are 0x${firstByte.toString(16)}` 
-        };
-      }
-
-      // Validate uLaw format (basic check - uLaw bytes should be in valid range)
-      const invalidBytes = audioBuffer.filter(byte => byte < 0 || byte > 255).length;
-      if (invalidBytes > 0) {
-        return { 
-          isValid: false, 
-          reason: `Invalid uLaw bytes: ${invalidBytes} out of ${audioBuffer.length}` 
-        };
-      }
-
-      // Check for reasonable audio content (not all zeros or all 0xFF)
-      const zeroCount = audioBuffer.filter(byte => byte === 0).length;
-      const ffCount = audioBuffer.filter(byte => byte === 0xFF).length;
-      const totalBytes = audioBuffer.length;
-      
-      if (zeroCount > totalBytes * 0.95 || ffCount > totalBytes * 0.95) {
-        return { 
-          isValid: false, 
-          reason: `Audio appears to be mostly silence: ${zeroCount} zeros, ${ffCount} 0xFF bytes out of ${totalBytes}` 
+          reason: 'Audio is all zeros - invalid μ-law data' 
         };
       }
 
@@ -379,10 +358,18 @@ class OpenAIRealtimeService {
     return ready;
   }
 
-  sendResponseCreate(callId) {
+  /**
+   * Send response.create to trigger OpenAI to generate responses - ENHANCED with diagnostics
+   */
+  async sendResponseCreate(callId) {
     const connection = this.connections.get(callId);
     if (!connection || !connection.webSocket || connection.webSocket.readyState !== WebSocket.OPEN) {
-      logger.warn(`[OpenAI Realtime] Cannot send response.create - no active connection for ${callId}`);
+      logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no active connection for ${callId}`);
+      return;
+    }
+
+    if (!connection.sessionReady) {
+      logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - session not ready for ${callId}`);
       return;
     }
 
@@ -396,10 +383,19 @@ class OpenAIRealtimeService {
       };
 
       connection.webSocket.send(JSON.stringify(responseCreateEvent));
-      connection._responseCreated = true; // Track that we sent response.create
-      logger.info(`[OpenAI Realtime] Sent response.create for ${callId} with instructions: "${responseCreateEvent.response.instructions}"`);
+      connection._responseCreated = true;
+      logger.info(`[OpenAI Realtime] SUCCESS: Sent response.create for ${callId}`);
+      
+      // Log diagnostic info
+      logger.info(`[OpenAI Realtime] Connection state for ${callId}:`, {
+        sessionReady: connection.sessionReady,
+        audioChunksReceived: connection.audioChunksReceived,
+        audioChunksSent: connection.audioChunksSent,
+        validAudioChunksSent: connection.validAudioChunksSent,
+        pendingCommit: connection.pendingCommit
+      });
     } catch (err) {
-      logger.error(`[OpenAI Realtime] Error sending response.create for ${callId}: ${err.message}`);
+      logger.error(`[OpenAI Realtime] CRITICAL: Error sending response.create for ${callId}: ${err.message}`);
     }
   }
 
@@ -723,9 +719,9 @@ class OpenAIRealtimeService {
 
         case 'response.created':
           logger.info(`[OpenAI Realtime] Response created for ${callId}`);
-          const conn = this.connections.get(callId);
-          if (conn) {
-            conn._responseCreated = true; // Mark that OpenAI acknowledged our response.create
+          const connResponse = this.connections.get(callId);
+          if (connResponse) {
+            connResponse._responseCreated = true; // Mark that OpenAI acknowledged our response.create
             logger.info(`[OpenAI Realtime] OpenAI acknowledged response.create for ${callId}`);
           }
           break;
@@ -767,13 +763,13 @@ class OpenAIRealtimeService {
         // USE PCM16 instead of g711_ulaw for better quality and reliability
         input_audio_format: 'g711_ulaw', // Much better speech recognition
         output_audio_format: 'g711_ulaw', // Higher quality output
-        // Disable turn detection temporarily to test if that's blocking responses
-        // turn_detection: {
-        //   type: 'server_vad',
-        //   threshold: 0.3,
-        //   prefix_padding_ms: 200,
-        //   silence_duration_ms: 800, // Wait 1 second after speech stops
-        // },
+        // Enable turn detection with adjusted parameters
+        turn_detection: {
+          type: 'server_vad',
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 1000,
+        },
         // Add input transcription to help with debugging
         input_audio_transcription: {
           model: 'whisper-1',
@@ -1650,6 +1646,43 @@ class OpenAIRealtimeService {
       await this.sendJsonMessage(callId, { type: 'conversation.item.create', item });
     } catch (err) {
       logger.error(`[OpenAI Realtime] Error sending text message: ${err.message}`, err);
+    }
+  }
+
+  /**
+   * Force response generation for testing - NEW METHOD
+   */
+  async forceResponseGeneration(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn || !conn.sessionReady) {
+      logger.error(`[OpenAI Realtime] Cannot force response - connection not ready for ${callId}`);
+      return false;
+    }
+
+    try {
+      // Send a user message first to establish context
+      await this.sendJsonMessage(callId, {
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: 'Hello' }]
+        }
+      });
+
+      // Then immediately request a response
+      await this.sendJsonMessage(callId, {
+        type: 'response.create',
+        response: {
+          modalities: ['text', 'audio']
+        }
+      });
+
+      logger.info(`[OpenAI Realtime] Forced response generation for ${callId}`);
+      return true;
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Error forcing response: ${err.message}`);
+      return false;
     }
   }
 
