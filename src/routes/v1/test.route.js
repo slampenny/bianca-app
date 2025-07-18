@@ -6592,5 +6592,384 @@ router.post('/openai-audio-generation-diagnostic', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /v1/test/audio/calls:
+ *   get:
+ *     summary: List all active calls for audio diagnosis
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: List of active calls with audio status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 activeCalls:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asteriskChannelId:
+ *                         type: string
+ *                       twilioCallSid:
+ *                         type: string
+ *                       patientId:
+ *                         type: string
+ *                       state:
+ *                         type: string
+ *                       duration:
+ *                         type: number
+ *                       isReadStreamReady:
+ *                         type: boolean
+ *                       isWriteStreamReady:
+ *                         type: boolean
+ *                       rtpReadPort:
+ *                         type: number
+ *                       rtpWritePort:
+ *                         type: number
+ *                 totalCalls:
+ *                   type: number
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/calls', async (req, res) => {
+    try {
+        const ariClient = require('../../services/asterisk.ari.service').getAriClientInstance();
+        const channelTracker = require('../../services/channel.tracker');
+        const activeCalls = [];
+        
+        // Get calls from channel tracker
+        for (const [channelId, callData] of channelTracker.calls.entries()) {
+            activeCalls.push({
+                asteriskChannelId: channelId,
+                twilioCallSid: callData.twilioCallSid,
+                patientId: callData.patientId,
+                state: callData.state,
+                duration: Math.round((Date.now() - callData.startTime) / 1000),
+                isReadStreamReady: callData.isReadStreamReady,
+                isWriteStreamReady: callData.isWriteStreamReady,
+                rtpReadPort: callData.rtpReadPort,
+                rtpWritePort: callData.rtpWritePort
+            });
+        }
+        
+        res.json({
+            success: true,
+            activeCalls,
+            totalCalls: activeCalls.length,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error listing calls: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/diagnose/{channelId}:
+ *   get:
+ *     summary: Diagnose audio flow for a specific call
+ *     tags: [Audio Diagnostics]
+ *     parameters:
+ *       - in: path
+ *         name: channelId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Asterisk channel ID to diagnose
+ *     responses:
+ *       200:
+ *         description: Audio diagnosis results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 channelId:
+ *                   type: string
+ *                 diagnosis:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/diagnose/:channelId', async (req, res) => {
+    try {
+        const { channelId } = req.params;
+        const audioDiagnostic = require('../../services/audio.diagnostic.service');
+        
+        logger.info(`[Debug Route] Running audio diagnosis for channel: ${channelId}`);
+        
+        const diagnosis = await audioDiagnostic.diagnoseAudioFlow(channelId);
+        
+        res.json({
+            success: true,
+            channelId,
+            diagnosis,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error diagnosing audio: ${error.message}`);
+        res.status(500).json({ 
+            error: error.message,
+            stack: error.stack 
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/diagnose-latest:
+ *   get:
+ *     summary: Diagnose the most recent active call
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: Diagnosis results for the latest call
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 latestCall:
+ *                   type: string
+ *                 diagnosis:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/diagnose-latest', async (req, res) => {
+    try {
+        const channelTracker = require('../../services/channel.tracker');
+        const audioDiagnostic = require('../../services/audio.diagnostic.service');
+        
+        // Find the most recent call
+        let latestCall = null;
+        let latestTime = 0;
+        
+        for (const [channelId, callData] of channelTracker.calls.entries()) {
+            if (callData.startTime > latestTime) {
+                latestTime = callData.startTime;
+                latestCall = channelId;
+            }
+        }
+        
+        if (!latestCall) {
+            return res.json({
+                success: false,
+                message: 'No active calls found'
+            });
+        }
+        
+        logger.info(`[Debug Route] Diagnosing latest call: ${latestCall}`);
+        
+        const diagnosis = await audioDiagnostic.diagnoseAudioFlow(latestCall);
+        
+        res.json({
+            success: true,
+            latestCall,
+            diagnosis,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error diagnosing latest call: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/listeners:
+ *   get:
+ *     summary: Get RTP listener status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: RTP listener status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 rtpListeners:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/listeners', async (req, res) => {
+    try {
+        const rtpListenerService = require('../../services/rtp.listener.service');
+        const status = rtpListenerService.getFullStatus();
+        
+        res.json({
+            success: true,
+            rtpListeners: status,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting RTP listeners: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/senders:
+ *   get:
+ *     summary: Get RTP sender status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: RTP sender status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 rtpSenders:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/senders', async (req, res) => {
+    try {
+        const rtpSenderService = require('../../services/rtp.sender.service');
+        const status = rtpSenderService.getStatus();
+        
+        res.json({
+            success: true,
+            rtpSenders: status,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting RTP senders: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/openai:
+ *   get:
+ *     summary: Get OpenAI connection status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: OpenAI connection status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 openAIConnections:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       callId:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       sessionReady:
+ *                         type: boolean
+ *                       audioChunksReceived:
+ *                         type: number
+ *                       audioChunksSent:
+ *                         type: number
+ *                       lastActivity:
+ *                         type: string
+ *                       conversationId:
+ *                         type: string
+ *                 totalConnections:
+ *                   type: number
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/openai', async (req, res) => {
+    try {
+        const openAIService = require('../../services/openai.realtime.service');
+        const connections = [];
+        
+        // Access OpenAI service connections
+        if (openAIService.connections) {
+            for (const [callId, conn] of openAIService.connections.entries()) {
+                connections.push({
+                    callId,
+                    status: conn.status,
+                    sessionReady: conn.sessionReady,
+                    audioChunksReceived: conn.audioChunksReceived || 0,
+                    audioChunksSent: conn.audioChunksSent || 0,
+                    lastActivity: conn.lastActivity,
+                    conversationId: conn.conversationId
+                });
+            }
+        }
+        
+        res.json({
+            success: true,
+            openAIConnections: connections,
+            totalConnections: connections.length,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting OpenAI status: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /v1/test/audio/status:
+ *   get:
+ *     summary: Get comprehensive audio status for all active calls
+ *     tags: [Audio Diagnostics]
+ *     responses:
+ *       200:
+ *         description: Comprehensive audio status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 calls:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/audio/status', async (req, res) => {
+    try {
+        const audioDiagnostic = require('../../services/audio.diagnostic.service');
+        const status = await audioDiagnostic.getAllCallsStatus();
+        res.json(status);
+    } catch (error) {
+        logger.error(`[Debug Route] Error getting comprehensive status: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Export the router
 module.exports = router;
