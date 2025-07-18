@@ -8511,5 +8511,75 @@ router.post('/analyze-audio-data', async (req, res) => {
      res.json(result);
  });
 
+ router.post('/diagnose-speech-detection', async (req, res) => {
+     const { callId } = req.body || {};
+     
+     if (!callId) {
+         return res.status(400).json({ error: 'callId is required' });
+     }
+
+     const diagnostic = {
+         timestamp: new Date().toISOString(),
+         callId,
+         speechDetection: {},
+         recommendations: []
+     };
+
+     try {
+         const openAIService = require('../../services/openai.realtime.service');
+         const openaiInstance = openAIService.getOpenAIServiceInstance();
+         const conn = openaiInstance.connections.get(callId);
+         
+         if (!conn) {
+             diagnostic.speechDetection.status = 'not_found';
+             diagnostic.recommendations.push('Call not found in OpenAI service');
+             return res.json(diagnostic);
+         }
+
+         // Check speech detection status
+         diagnostic.speechDetection = {
+             sessionReady: conn.sessionReady,
+             audioChunksReceived: conn.audioChunksReceived || 0,
+             audioChunksSent: conn.audioChunksSent || 0,
+             validAudioChunksSent: conn.validAudioChunksSent || 0,
+             pendingCommit: conn.pendingCommit || false,
+             lastCommitTime: conn.lastCommitTime || 0,
+             responseCreated: conn._responseCreated || false,
+             openaiChunkCount: conn._openaiChunkCount || 0,
+             pendingUserTranscript: conn.pendingUserTranscript || '',
+             pendingAssistantTranscript: conn.pendingAssistantTranscript || '',
+             lastUserSpeechTime: conn.lastUserSpeechTime || 0,
+             lastAssistantSpeechTime: conn.lastAssistantSpeechTime || 0
+         };
+
+         // Check for common speech detection issues
+         if (conn.audioChunksReceived > 0 && conn.audioChunksSent === 0) {
+             diagnostic.recommendations.push('Audio received but not sent to OpenAI - check audio validation');
+         }
+
+         if (conn.audioChunksSent > 0 && conn._openaiChunkCount === 0) {
+             diagnostic.recommendations.push('Audio sent to OpenAI but no response - check speech detection');
+         }
+
+         if (conn.pendingCommit) {
+             diagnostic.recommendations.push('Audio is pending commit - OpenAI waiting for more audio');
+         }
+
+         if (!conn._responseCreated) {
+             diagnostic.recommendations.push('response.create never sent - OpenAI won\'t respond');
+         }
+
+         if (conn.audioChunksSent > 0 && conn.lastCommitTime === 0) {
+             diagnostic.recommendations.push('Audio sent but never committed - check commit logic');
+         }
+
+         return res.json(diagnostic);
+
+     } catch (err) {
+         diagnostic.error = err.message;
+         return res.json(diagnostic);
+     }
+ });
+
  // Export the router
  module.exports = router;
