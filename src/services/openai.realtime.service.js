@@ -691,6 +691,9 @@ class OpenAIRealtimeService {
         // Flush any pending audio
         await this.flushPendingAudio(callId);
 
+        // CRITICAL: Send response.create to trigger OpenAI to start generating responses
+        this.sendResponseCreate(callId);
+
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
         logger.error(`[OpenAI Realtime] Error in session setup for ${callId}: ${err.message}`);
