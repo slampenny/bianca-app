@@ -1,4 +1,4 @@
-// src/services/rtp.sender.service.js - Complete version with timestamp fix
+// src/services/rtp.sender.service.js - FIXED VERSION
 
 const dgram = require('dgram');
 const { Buffer } = require('buffer');
@@ -7,7 +7,12 @@ const AudioUtils = require('../api/audio.utils');
 const EventEmitter = require('events');
 
 /**
- * RTP Sender Service - Enhanced version with timestamp continuity fix
+ * RTP Sender Service - FIXED VERSION
+ * Main issues fixed:
+ * 1. Audio was being sent immediately instead of using the packet timer
+ * 2. Packet timer was never started
+ * 3. Buffering mechanism wasn't working properly
+ * 4. No proper audio chunking for consistent timing
  */
 class RtpSenderService extends EventEmitter {
     constructor() {
@@ -19,8 +24,7 @@ class RtpSenderService extends EventEmitter {
         this.ssrcs = new Map(); // callId -> SSRC
         this.stats = new Map(); // callId -> statistics
         
-        // ADD: Track continuous timestamps and buffer audio
-        this.continuousTimestamps = new Map(); // callId -> last sent timestamp
+        // Audio buffering and timing
         this.audioBuffers = new Map(); // callId -> buffered audio
         this.packetTimers = new Map(); // callId -> interval timer
         
@@ -31,7 +35,7 @@ class RtpSenderService extends EventEmitter {
         this.RTP_SEND_FORMAT = 'ulaw';
         this.SAMPLE_RATE = 8000;
         this.FRAME_SIZE_MS = 20;
-        this.SAMPLES_PER_FRAME = (this.SAMPLE_RATE * this.FRAME_SIZE_MS) / 1000;
+        this.SAMPLES_PER_FRAME = (this.SAMPLE_RATE * this.FRAME_SIZE_MS) / 1000; // 160 samples for uLaw
         
         // Enhanced error tracking
         this.isShuttingDown = false;
@@ -43,11 +47,14 @@ class RtpSenderService extends EventEmitter {
             startTime: Date.now()
         };
         
-        logger.info('[RTP Sender] Service initialized with enhanced monitoring and timestamp continuity');
+        // Debug counters
+        this.debugCounters = new Map(); // callId -> { audioChunks, packetsSent }
+        
+        logger.info('[RTP Sender] Service initialized with fixed timing and buffering');
     }
 
     /**
-     * Enhanced initialization with better validation
+     * Initialize call and START the packet timer immediately
      */
     async initializeCall(callId, config) {
         if (!callId) {
@@ -92,17 +99,18 @@ class RtpSenderService extends EventEmitter {
             
             this.sequenceNumbers.set(callId, initialSequence);
             this.timestamps.set(callId, initialTimestamp);
-            this.continuousTimestamps.set(callId, initialTimestamp); // Initialize continuous timestamp
             this.ssrcs.set(callId, ssrc);
             this.stats.set(callId, {
                 packetsSent: 0,
                 bytesSent: 0,
                 errors: 0,
+                audioChunksReceived: 0,
                 lastActivity: Date.now()
             });
 
-            // Initialize audio buffer
+            // Initialize audio buffer and debug counters
             this.audioBuffers.set(callId, Buffer.alloc(0));
+            this.debugCounters.set(callId, { audioChunks: 0, packetsSent: 0 });
 
             // Create socket with enhanced error handling
             const socket = dgram.createSocket('udp4');
@@ -112,8 +120,6 @@ class RtpSenderService extends EventEmitter {
                 logger.error(`[RTP Sender] Socket error for ${callId}: ${err.message}`, err);
                 this.updateStats(callId, 'error');
                 this.globalStats.totalErrors++;
-                
-                // Don't auto-cleanup on socket errors, let the calling code handle it
                 this.emit('socket_error', { callId, error: err });
             });
 
@@ -121,13 +127,13 @@ class RtpSenderService extends EventEmitter {
                 logger.info(`[RTP Sender] Socket closed for ${callId}`);
             });
 
-            // Start packet sender timer for this call
-            // No timer needed - we send audio immediately
+            // CRITICAL FIX: Start the packet timer immediately
+            this.startPacketSender(callId);
 
             this.globalStats.totalCalls++;
             this.globalStats.activeCalls++;
 
-            logger.info(`[RTP Sender] Call ${callId} initialized successfully. SSRC: ${ssrc}, Target: ${config.rtpHost}:${config.rtpPort}`);
+            logger.info(`[RTP Sender] Call ${callId} initialized successfully. SSRC: ${ssrc}, Target: ${config.rtpHost}:${config.rtpPort}, Timer started`);
             
         } catch (err) {
             logger.error(`[RTP Sender] Failed to initialize call ${callId}: ${err.message}`, err);
@@ -137,7 +143,7 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Start packet sender timer for a specific call
+     * Start packet sender timer - FIXED to actually send packets
      */
     startPacketSender(callId) {
         // Clear any existing timer
@@ -151,22 +157,25 @@ class RtpSenderService extends EventEmitter {
         }, this.FRAME_SIZE_MS);
 
         this.packetTimers.set(callId, timer);
-        logger.debug(`[RTP Sender] Started packet sender timer for ${callId}`);
+        logger.info(`[RTP Sender] Started packet sender timer for ${callId} (${this.FRAME_SIZE_MS}ms intervals)`);
     }
 
     /**
-     * Send the next frame for a call
+     * Send the next frame - FIXED to properly handle buffered audio
      */
     sendNextFrame(callId) {
         const buffer = this.audioBuffers.get(callId);
-        if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
-            return; // Not enough data to send a frame
-        }
-
         const callConfig = this.activeCalls.get(callId);
         const socket = this.udpSockets.get(callId);
         
         if (!callConfig || !socket || !callConfig.initialized || this.isShuttingDown) {
+            return;
+        }
+
+        // Check if we have enough data for a frame
+        if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
+            // Not enough data - send silence frame to maintain timing
+            this.sendSilenceFrame(callId);
             return;
         }
 
@@ -177,8 +186,8 @@ class RtpSenderService extends EventEmitter {
         const remaining = buffer.slice(this.SAMPLES_PER_FRAME);
         this.audioBuffers.set(callId, remaining);
 
-        // Use continuous timestamp
-        const timestamp = this.continuousTimestamps.get(callId) || this.timestamps.get(callId);
+        // Get current timestamp
+        const timestamp = this.timestamps.get(callId);
 
         // Create and send RTP packet
         try {
@@ -186,12 +195,18 @@ class RtpSenderService extends EventEmitter {
             if (rtpPacket) {
                 this.sendRtpPacketSync(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort, callId);
                 
-                // Update continuous timestamp for next packet
+                // Update timestamp for next packet
                 const nextTimestamp = (timestamp + this.SAMPLES_PER_FRAME) >>> 0; // Ensure 32-bit unsigned
-                this.continuousTimestamps.set(callId, nextTimestamp);
-                
-                // Also update the regular timestamp for compatibility
                 this.timestamps.set(callId, nextTimestamp);
+                
+                // Update debug counter
+                const debug = this.debugCounters.get(callId);
+                if (debug) {
+                    debug.packetsSent++;
+                    if (debug.packetsSent <= 10 || debug.packetsSent % 50 === 0) {
+                        logger.info(`[RTP Sender] Sent packet #${debug.packetsSent} for ${callId} (buffer: ${remaining.length} bytes remaining)`);
+                    }
+                }
             }
         } catch (err) {
             logger.error(`[RTP Sender] Error sending frame for ${callId}: ${err.message}`);
@@ -200,7 +215,36 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Enhanced audio sending with buffering
+     * Send silence frame to maintain timing
+     */
+    sendSilenceFrame(callId) {
+        const callConfig = this.activeCalls.get(callId);
+        const socket = this.udpSockets.get(callId);
+        
+        if (!callConfig || !socket) return;
+
+        // Create silence frame (uLaw silence = 0xFF, PCM silence = 0x00)
+        const silenceValue = callConfig.format === 'slin' ? 0x00 : 0xFF;
+        const silenceFrame = Buffer.alloc(this.SAMPLES_PER_FRAME, silenceValue);
+        
+        const timestamp = this.timestamps.get(callId);
+        
+        try {
+            const rtpPacket = this.createRtpPacket(callId, silenceFrame, callConfig, timestamp);
+            if (rtpPacket) {
+                this.sendRtpPacketSync(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort, callId);
+                
+                // Update timestamp
+                const nextTimestamp = (timestamp + this.SAMPLES_PER_FRAME) >>> 0;
+                this.timestamps.set(callId, nextTimestamp);
+            }
+        } catch (err) {
+            logger.error(`[RTP Sender] Error sending silence frame for ${callId}: ${err.message}`);
+        }
+    }
+
+    /**
+     * FIXED: Buffer audio instead of sending immediately
      */
     async sendAudio(callId, audioBase64Ulaw) {
         if (this.isShuttingDown) {
@@ -219,19 +263,13 @@ class RtpSenderService extends EventEmitter {
             return;
         }
 
-        const socket = this.udpSockets.get(callId);
-        if (!socket) {
-            logger.error(`[RTP Sender] No UDP socket found for call ${callId}`);
-            return;
-        }
-
-        // ADD DEBUGGING
-        if (!this.audioChunkCount) this.audioChunkCount = {};
-        if (!this.audioChunkCount[callId]) this.audioChunkCount[callId] = 0;
-        this.audioChunkCount[callId]++;
-        
-        if (this.audioChunkCount[callId] <= 20 || this.audioChunkCount[callId] % 50 === 0) {
-            logger.info(`[RTP Sender] Processing audio chunk #${this.audioChunkCount[callId]} for ${callId} (size: ${audioBase64Ulaw.length})`);
+        // Update debug counter
+        const debug = this.debugCounters.get(callId);
+        if (debug) {
+            debug.audioChunks++;
+            if (debug.audioChunks <= 20 || debug.audioChunks % 100 === 0) {
+                logger.info(`[RTP Sender] Received audio chunk #${debug.audioChunks} for ${callId} (size: ${audioBase64Ulaw.length})`);
+            }
         }
 
         try {
@@ -256,24 +294,17 @@ class RtpSenderService extends EventEmitter {
                 audioPayload = ulawBuffer;
             }
 
-            // Send audio immediately - no buffering
-            const timestamp = this.timestamps.get(callId) || 0;
-            
-            try {
-                const rtpPacket = this.createRtpPacket(callId, audioPayload, callConfig, timestamp);
-                if (rtpPacket) {
-                    this.sendRtpPacketSync(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort, callId);
-                    
-                    // Update timestamp for next packet
-                    const nextTimestamp = (timestamp + audioPayload.length) >>> 0;
-                    this.timestamps.set(callId, nextTimestamp);
-                }
-            } catch (err) {
-                logger.error(`[RTP Sender] Error sending audio for ${callId}: ${err.message}`);
-                this.updateStats(callId, 'error');
+            // CRITICAL FIX: Buffer the audio instead of sending immediately
+            const currentBuffer = this.audioBuffers.get(callId) || Buffer.alloc(0);
+            const newBuffer = Buffer.concat([currentBuffer, audioPayload]);
+            this.audioBuffers.set(callId, newBuffer);
+
+            // Log buffer status
+            if (debug && (debug.audioChunks <= 20 || debug.audioChunks % 100 === 0)) {
+                logger.info(`[RTP Sender] Buffered ${audioPayload.length} bytes for ${callId}. Total buffer: ${newBuffer.length} bytes`);
             }
 
-            this.updateStats(callId, 'audio_sent', { bytes: audioPayload.length });
+            this.updateStats(callId, 'audio_received', { bytes: audioPayload.length });
             
         } catch (err) {
             logger.error(`[RTP Sender] Error processing audio for ${callId}: ${err.message}`, err);
@@ -282,7 +313,7 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Enhanced RTP packet creation with better validation
+     * Create RTP packet - same as before but with better logging
      */
     createRtpPacket(callId, audioData, callConfig, frameTimestamp) {
         let sequenceNumber = this.sequenceNumbers.get(callId);
@@ -333,18 +364,17 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Synchronous packet send
+     * Send RTP packet with better logging
      */
     sendRtpPacketSync(socket, rtpPacket, host, port, callId) {
-        // ADD THIS DEBUG LOG
-        if (!this.packetsSentCount) this.packetsSentCount = {};
-        if (!this.packetsSentCount[callId]) this.packetsSentCount[callId] = 0;
-        this.packetsSentCount[callId]++;
+        const debug = this.debugCounters.get(callId);
         
-        if (this.packetsSentCount[callId] <= 10 || this.packetsSentCount[callId] % 100 === 0) {
+        // Enhanced logging for first few packets
+        if (debug && (debug.packetsSent < 5 || debug.packetsSent % 100 === 0)) {
             const seq = rtpPacket.readUInt16BE(2);
             const ts = rtpPacket.readUInt32BE(4);
-            logger.info(`[RTP Sender] Sending RTP packet #${this.packetsSentCount[callId]} to ${host}:${port} for ${callId} (seq: ${seq}, ts: ${ts}, size: ${rtpPacket.length})`);
+            const ssrc = rtpPacket.readUInt32BE(8);
+            logger.info(`[RTP Sender] Sending RTP packet #${debug.packetsSent + 1} to ${host}:${port} for ${callId} (seq: ${seq}, ts: ${ts}, ssrc: ${ssrc}, size: ${rtpPacket.length})`);
         }
         
         socket.send(rtpPacket, 0, rtpPacket.length, port, host, (err) => {
@@ -360,7 +390,7 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Update statistics for a call
+     * Update statistics
      */
     updateStats(callId, event, data = {}) {
         const stats = this.stats.get(callId);
@@ -376,30 +406,29 @@ class RtpSenderService extends EventEmitter {
             case 'error':
                 stats.errors++;
                 break;
-            case 'audio_sent':
+            case 'audio_received':
+                stats.audioChunksReceived++;
                 stats.lastAudioSize = data.bytes || 0;
-                break;
-            case 'frames_sent':
-                stats.framesSent = (stats.framesSent || 0) + (data.count || 0);
                 break;
         }
     }
 
     /**
-     * Enhanced cleanup with better error handling
+     * Enhanced cleanup with timer stopping
      */
     cleanupCall(callId) {
         logger.info(`[RTP Sender] Cleaning up call ${callId}`);
         
-        // Stop packet timer
+        // CRITICAL: Stop packet timer
         if (this.packetTimers.has(callId)) {
             clearInterval(this.packetTimers.get(callId));
             this.packetTimers.delete(callId);
+            logger.info(`[RTP Sender] Stopped packet timer for ${callId}`);
         }
 
         // Clear audio buffer
         this.audioBuffers.delete(callId);
-        this.continuousTimestamps.delete(callId);
+        this.debugCounters.delete(callId);
         
         const socket = this.udpSockets.get(callId);
         if (socket) {
@@ -421,49 +450,42 @@ class RtpSenderService extends EventEmitter {
         this.ssrcs.delete(callId);
         this.stats.delete(callId);
         
-        // Clean up debugging data
-        if (this.audioChunkCount) delete this.audioChunkCount[callId];
-        if (this.packetsSentCount) delete this.packetsSentCount[callId];
-        
         this.globalStats.activeCalls = Math.max(0, this.globalStats.activeCalls - 1);
         
         logger.info(`[RTP Sender] Cleanup completed for ${callId}`);
     }
 
     /**
-     * Enhanced cleanup all with proper shutdown
+     * Enhanced cleanup all
      */
     cleanupAll() {
         logger.info(`[RTP Sender] Cleaning up all calls (${this.activeCalls.size} active)`);
         this.isShuttingDown = true;
         
         const callIds = [...this.activeCalls.keys()];
-        const cleanupPromises = callIds.map(callId => {
-            return new Promise(resolve => {
-                try {
-                    this.cleanupCall(callId);
-                    resolve();
-                } catch (err) {
-                    logger.error(`[RTP Sender] Error cleaning up ${callId}: ${err.message}`);
-                    resolve(); // Continue cleanup even if one fails
-                }
-            });
+        callIds.forEach(callId => {
+            try {
+                this.cleanupCall(callId);
+            } catch (err) {
+                logger.error(`[RTP Sender] Error cleaning up ${callId}: ${err.message}`);
+            }
         });
         
-        Promise.allSettled(cleanupPromises).then(() => {
-            this.globalStats.activeCalls = 0;
-            logger.info('[RTP Sender] All calls cleaned up');
-        });
+        this.globalStats.activeCalls = 0;
+        logger.info('[RTP Sender] All calls cleaned up');
     }
 
     /**
-     * Enhanced status with detailed information
+     * Enhanced status with buffer information
      */
     getStatus() {
         const callDetails = [];
         for (const [callId, config] of this.activeCalls.entries()) {
             const stats = this.stats.get(callId) || {};
             const bufferSize = this.audioBuffers.get(callId)?.length || 0;
+            const debug = this.debugCounters.get(callId) || {};
+            const hasTimer = this.packetTimers.has(callId);
+            
             callDetails.push({
                 callId,
                 rtpHost: config.rtpHost,
@@ -471,14 +493,16 @@ class RtpSenderService extends EventEmitter {
                 format: config.format,
                 ssrc: this.ssrcs.get(callId),
                 initialized: config.initialized,
+                hasTimer,
                 currentSequenceNumber: this.sequenceNumbers.get(callId),
                 currentTimestamp: this.timestamps.get(callId),
-                continuousTimestamp: this.continuousTimestamps.get(callId),
                 bufferSize,
+                debugCounters: debug,
                 stats: {
                     packetsSent: stats.packetsSent || 0,
                     bytesSent: stats.bytesSent || 0,
                     errors: stats.errors || 0,
+                    audioChunksReceived: stats.audioChunksReceived || 0,
                     lastActivity: stats.lastActivity
                 }
             });
