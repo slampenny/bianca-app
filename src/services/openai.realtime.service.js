@@ -719,6 +719,7 @@ class OpenAIRealtimeService {
             const validChunksProcessed = conn.validAudioChunksSent || 0;
             conn.audioChunksSent = 0;
             conn.validAudioChunksSent = 0;
+            conn.consecutiveBufferErrors = 0; // Reset error counter on successful commit
             logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid)`);
           }
           break;
@@ -1038,9 +1039,8 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Handle API errors
+   * Handle API errors - ENHANCED with recovery mechanisms
    */
-  // In OpenAIRealtimeService class
   async handleApiError(callId, message) {
     const errorMsg = message.error?.message || 'Unknown OpenAI API error';
     const errorCode = message.error?.code || 'UNKNOWN_CODE';
@@ -1057,7 +1057,47 @@ class OpenAIRealtimeService {
       );
       if (conn) {
         conn.pendingCommit = false; // The commit was processed (and failed), allow new attempts.
-        // conn.audioChunksSent = 0; // Reset as this batch failed.
+        
+        // CRITICAL: Track consecutive buffer errors
+        if (!conn.consecutiveBufferErrors) {
+          conn.consecutiveBufferErrors = 0;
+        }
+        conn.consecutiveBufferErrors++;
+        
+        // If we get too many consecutive buffer errors, the session is likely corrupted
+        if (conn.consecutiveBufferErrors >= 3) {
+          logger.error(`[OpenAI Realtime] Too many consecutive buffer errors (${conn.consecutiveBufferErrors}) for ${callId}. Session likely corrupted. Triggering reconnection.`);
+          
+          // Clear the audio buffer to prevent further errors
+          conn.audioChunksSent = 0;
+          conn.validAudioChunksSent = 0;
+          conn.lastCommitTime = 0;
+          
+          // Close the connection to force a reconnect
+          if (conn.webSocket) {
+            conn.webSocket.close(1001, 'Session corrupted - buffer errors');
+          }
+          
+          // The close handler will trigger reconnection
+          return;
+        }
+        
+        // Try to recover by clearing the buffer and starting fresh
+        logger.warn(`[OpenAI Realtime] Buffer error #${conn.consecutiveBufferErrors} for ${callId}. Attempting recovery by clearing buffer.`);
+        
+        // Send a clear buffer command
+        try {
+          await this.sendJsonMessage(callId, { type: 'input_audio_buffer.clear' });
+          logger.info(`[OpenAI Realtime] Sent buffer clear command for ${callId}`);
+          
+          // Reset counters
+          conn.audioChunksSent = 0;
+          conn.validAudioChunksSent = 0;
+          conn.lastCommitTime = Date.now();
+          
+        } catch (clearErr) {
+          logger.error(`[OpenAI Realtime] Failed to clear buffer for ${callId}: ${clearErr.message}`);
+        }
       }
     } else if (errorMsg.includes('Conversation already has an active response')) {
       logger.warn(
@@ -1081,8 +1121,12 @@ class OpenAIRealtimeService {
       );
       // This might be a critical configuration error.
       if (conn) conn.pendingCommit = false; // If related to a commit.
+    } else {
+      // For other errors, reset consecutive buffer error counter
+      if (conn) {
+        conn.consecutiveBufferErrors = 0;
+      }
     }
-    // Add more specific error code handling here as you discover them
 
     this.notify(callId, 'openai_api_error', { error: message.error, message: errorMsg, code: errorCode });
   }
@@ -1286,7 +1330,7 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Send JSON message
+   * Send JSON message - ENHANCED with tracking and error recovery
    */
   async sendJsonMessage(callId, messageObj) {
     let wsToSend = null;
@@ -1312,6 +1356,17 @@ class OpenAIRealtimeService {
         logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - no valid audio chunks sent (${conn.validAudioChunksSent || 0} valid, ${conn.audioChunksSent || 0} total)`);
         return Promise.resolve(true); // Resolve successfully but don't send
       }
+      
+      // Add a minimum time check since last commit to prevent rapid commits
+      const timeSinceLastCommit = Date.now() - (conn.lastCommitTime || 0);
+      if (timeSinceLastCommit < 100) { // Less than 100ms since last commit
+        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - too soon since last commit (${timeSinceLastCommit}ms)`);
+        return Promise.resolve(true);
+      }
+      
+      // Track that we're attempting a commit
+      conn.lastCommitAttemptTime = Date.now();
+      conn.pendingCommit = true;
     }
 
     // CRITICAL: Prevent empty audio appends
@@ -1341,9 +1396,31 @@ class OpenAIRealtimeService {
           if (error) {
             logger.error(`[OpenAI Realtime] Send error: ${error.message}`, error);
             if (conn) conn.lastActivity = Date.now();
+            
+            // If it's an audio append that failed, decrement the counter
+            if (messageObj.type === 'input_audio_buffer.append' && conn) {
+              conn.audioChunksSent = Math.max(0, conn.audioChunksSent - 1);
+              conn.validAudioChunksSent = Math.max(0, conn.validAudioChunksSent - 1);
+            }
+            
             reject(error);
           } else {
-            if (conn) conn.lastActivity = Date.now();
+            if (conn) {
+              conn.lastActivity = Date.now();
+              
+              // Track successful operations
+              if (messageObj.type === 'input_audio_buffer.append') {
+                // Successfully sent audio
+                conn.lastSuccessfulAppendTime = Date.now();
+                conn.consecutiveBufferErrors = 0; // Reset error counter on successful append
+              } else if (messageObj.type === 'input_audio_buffer.clear') {
+                // Successfully cleared buffer
+                logger.info(`[OpenAI Realtime] Buffer cleared successfully for ${callId}`);
+                conn.audioChunksSent = 0;
+                conn.validAudioChunksSent = 0;
+                conn.consecutiveBufferErrors = 0;
+              }
+            }
             resolve(true);
           }
         });
@@ -1510,20 +1587,38 @@ class OpenAIRealtimeService {
       const currentConn = this.connections.get(callId);
 
       logger.info(
-        `[OpenAI Realtime] checking commit conditions for ${callId} - ready first: ${currentConn?.webSocket?.readyState === WebSocket.OPEN
-        } ready 2nd: ${currentConn?.sessionReady}, pending: ${currentConn?.pendingCommit}`
+        `[OpenAI Realtime] Checking commit conditions for ${callId} - ready: ${currentConn?.webSocket?.readyState === WebSocket.OPEN
+        }, sessionReady: ${currentConn?.sessionReady}, pending: ${currentConn?.pendingCommit}`
       );
 
       if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
         // Check if we have sufficient audio data before committing
         const commitReadiness = this.checkCommitReadiness(callId);
         if (commitReadiness.canCommit) {
+          // Additional check: ensure we've successfully sent audio recently
+          const timeSinceLastAppend = Date.now() - (currentConn.lastSuccessfulAppendTime || 0);
+          if (timeSinceLastAppend > 5000) { // More than 5 seconds since last successful append
+            logger.warn(`[OpenAI Realtime] Commit timer fired but no recent audio appends for ${callId} (${timeSinceLastAppend}ms since last append)`);
+            
+            // Clear the buffer and reset counters
+            try {
+              await this.sendJsonMessage(callId, { type: 'input_audio_buffer.clear' });
+              currentConn.audioChunksSent = 0;
+              currentConn.validAudioChunksSent = 0;
+              logger.info(`[OpenAI Realtime] Cleared stale buffer for ${callId}`);
+            } catch (clearErr) {
+              logger.error(`[OpenAI Realtime] Failed to clear stale buffer: ${clearErr.message}`);
+            }
+            return;
+          }
+          
           logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId} (${commitReadiness.totalDuration}ms of audio)`);
           try {
             await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
             currentConn.pendingCommit = true;
           } catch (commitErr) {
             logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
+            currentConn.pendingCommit = false;
           }
         } else {
           logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient audio for ${callId}: ${commitReadiness.reason}`);
@@ -1724,6 +1819,51 @@ class OpenAIRealtimeService {
       return true;
     } catch (err) {
       logger.error(`[OpenAI Realtime] Error forcing response: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Recover from buffer errors by clearing and resetting the audio pipeline
+   */
+  async recoverFromBufferError(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn) {
+      logger.error(`[OpenAI Realtime] Cannot recover - no connection for ${callId}`);
+      return false;
+    }
+
+    logger.info(`[OpenAI Realtime] Attempting to recover from buffer error for ${callId}`);
+
+    try {
+      // Step 1: Clear the audio buffer
+      await this.sendJsonMessage(callId, { type: 'input_audio_buffer.clear' });
+      
+      // Step 2: Reset all counters
+      conn.audioChunksSent = 0;
+      conn.validAudioChunksSent = 0;
+      conn.pendingCommit = false;
+      conn.consecutiveBufferErrors = 0;
+      conn.lastCommitTime = Date.now();
+      
+      // Step 3: Clear any pending audio
+      const pendingAudio = this.pendingAudio.get(callId);
+      if (pendingAudio && pendingAudio.length > 0) {
+        logger.info(`[OpenAI Realtime] Clearing ${pendingAudio.length} pending audio chunks for ${callId}`);
+        this.pendingAudio.set(callId, []);
+      }
+      
+      // Step 4: Cancel any pending commit timers
+      if (this.commitTimers.has(callId)) {
+        clearTimeout(this.commitTimers.get(callId));
+        this.commitTimers.delete(callId);
+      }
+      
+      logger.info(`[OpenAI Realtime] Successfully recovered from buffer error for ${callId}`);
+      return true;
+      
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Failed to recover from buffer error for ${callId}: ${err.message}`);
       return false;
     }
   }
