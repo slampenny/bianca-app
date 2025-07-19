@@ -901,14 +901,18 @@ class OpenAIRealtimeService {
       this.clearConnectionTimeout(callId);
 
       conn.sessionReady = true;
+      // CRITICAL: Set session setup flag to prevent commits during setup
+      conn._sessionSetupInProgress = true;
+      
       // Reset counters when session becomes ready
       conn.audioChunksReceived = 0;
       conn.audioChunksSent = 0;
       conn.validAudioChunksSent = 0;
-      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Flushing pending audio.`);
+      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Waiting for session configuration to fully apply.`);
 
       try {
-        // CRITICAL: Add a delay to ensure session configuration is fully applied before sending audio
+        // CRITICAL: Wait longer for session configuration to be fully applied
+        // OpenAI needs time to process the session configuration before accepting audio
         setTimeout(async () => {
           // Double-check connection is still valid before flushing audio
           const currentConn = this.connections.get(callId);
@@ -918,18 +922,21 @@ class OpenAIRealtimeService {
           } else {
             logger.error(`[OpenAI Realtime] Connection lost before audio flush could be sent for ${callId}`);
           }
-        }, 1000); // 1 second delay to ensure session config is applied
+        }, 2000); // Increased to 2 seconds to ensure session config is fully applied
 
-        // CRITICAL: Add a small delay to ensure connection is stable before sending response.create
+        // CRITICAL: Add a longer delay before sending response.create to ensure audio pipeline is ready
         setTimeout(() => {
           // Double-check connection is still valid before sending
           const currentConn = this.connections.get(callId);
           if (currentConn && currentConn.webSocket && currentConn.webSocket.readyState === WebSocket.OPEN) {
             this.sendResponseCreate(callId);
+            // CRITICAL: Clear session setup flag after response.create is sent
+            currentConn._sessionSetupInProgress = false;
+            logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
           } else {
             logger.error(`[OpenAI Realtime] Connection lost before response.create could be sent for ${callId}`);
           }
-        }, 1500); // 1.5 second delay (after audio flush)
+        }, 3000); // Increased to 3 seconds (after audio flush)
 
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
@@ -1227,6 +1234,11 @@ class OpenAIRealtimeService {
       // For other errors, reset consecutive buffer error counter
       if (conn) {
         conn.consecutiveBufferErrors = 0;
+        // CRITICAL: Reset pending commit flag for any error to prevent stuck state
+        if (conn.pendingCommit) {
+          logger.warn(`[OpenAI Realtime] Resetting pending commit flag for ${callId} due to error: ${errorCode}`);
+          conn.pendingCommit = false;
+        }
       }
     }
 
@@ -1670,15 +1682,21 @@ class OpenAIRealtimeService {
       return;
     }
 
-    // Don't start new timer if we already have a pending commit
+    // CRITICAL: Don't start new timer if we already have a pending commit
     if (conn.pendingCommit) {
       logger.debug(`[OpenAI Realtime] DebounceCommit: Already have pending commit for ${callId}`);
       return;
     }
 
-    // Don't start new timer if one is already active (this prevents constant resetting)
+    // CRITICAL: Don't start new timer if one is already active (this prevents constant resetting)
     if (this.commitTimers.has(callId)) {
       logger.debug(`[OpenAI Realtime] DebounceCommit: Timer already active for ${callId}, skipping`);
+      return;
+    }
+
+    // CRITICAL: Additional guard to prevent commits during session setup
+    if (conn._sessionSetupInProgress) {
+      logger.debug(`[OpenAI Realtime] DebounceCommit: Session setup in progress for ${callId}, skipping`);
       return;
     }
 
@@ -1696,9 +1714,9 @@ class OpenAIRealtimeService {
         // Check if we have sufficient audio data before committing
         const commitReadiness = this.checkCommitReadiness(callId);
         if (commitReadiness.canCommit) {
-          // Additional check: ensure we've successfully sent audio recently
+          // CRITICAL: Additional check: ensure we've successfully sent audio recently
           const timeSinceLastAppend = Date.now() - (currentConn.lastSuccessfulAppendTime || 0);
-          logger.info(`[OpenAI Realtime] Commit timer fired for ${callId} - time since last append: ${timeSinceLastAppend}ms`);
+          logger.info(`[OpenAI Realtime] Commit timer fired for ${callId} - time since last append: ${timeSinceLastAppend}ms, valid chunks: ${currentConn.validAudioChunksSent}`);
           
           if (timeSinceLastAppend > 10000) { // More than 10 seconds since last successful append
             logger.warn(`[OpenAI Realtime] Commit timer fired but no recent audio appends for ${callId} (${timeSinceLastAppend}ms since last append)`);
@@ -1715,13 +1733,33 @@ class OpenAIRealtimeService {
             return;
           }
           
-          logger.info(`[OpenAI Realtime] Recent audio detected for ${callId} (${timeSinceLastAppend}ms since last append) - proceeding with commit`);
+          // CRITICAL: Ensure we have at least some valid audio chunks before committing
+          if (currentConn.validAudioChunksSent < 3) {
+            logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient valid chunks for ${callId} (${currentConn.validAudioChunksSent} < 3) - skipping commit`);
+            return;
+          }
+          
+          logger.info(`[OpenAI Realtime] Recent audio detected for ${callId} (${timeSinceLastAppend}ms since last append, ${currentConn.validAudioChunksSent} chunks) - proceeding with commit`);
           
           logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId} (${commitReadiness.totalDuration}ms of audio)`);
           try {
             await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
             currentConn.pendingCommit = true;
+            currentConn.commitStartTime = Date.now();
             logger.info(`[OpenAI Realtime] Commit sent successfully for ${callId}`);
+            
+            // CRITICAL: Set a timeout to reset pending commit if no response received
+            setTimeout(() => {
+              const currentConn = this.connections.get(callId);
+              if (currentConn && currentConn.pendingCommit) {
+                const timeSinceCommit = Date.now() - (currentConn.commitStartTime || 0);
+                if (timeSinceCommit > 10000) { // 10 second timeout
+                  logger.warn(`[OpenAI Realtime] Commit timeout for ${callId} (${timeSinceCommit}ms) - resetting pending commit flag`);
+                  currentConn.pendingCommit = false;
+                }
+              }
+            }, 10000); // 10 second timeout
+            
           } catch (commitErr) {
             logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
             currentConn.pendingCommit = false;
