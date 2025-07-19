@@ -938,11 +938,18 @@ class OpenAIRealtimeService {
         }, 2000); // Increased to 2 seconds to ensure session config is fully applied
 
         // CRITICAL: Add a longer delay before sending response.create to ensure audio pipeline is ready
-        setTimeout(() => {
+        setTimeout(async () => {
           // Double-check connection is still valid before sending
           const currentConn = this.connections.get(callId);
           if (currentConn && currentConn.webSocket && currentConn.webSocket.readyState === WebSocket.OPEN) {
-            this.sendResponseCreate(callId);
+            // CRITICAL: Make OpenAI speak immediately when session is ready
+            logger.info(`[OpenAI Realtime] Triggering immediate OpenAI response for ${callId}`);
+            try {
+              await this.sendResponseCreate(callId);
+            } catch (err) {
+              logger.error(`[OpenAI Realtime] Failed to send response.create for ${callId}: ${err.message}`);
+            }
+            
             // CRITICAL: Clear session setup flag after response.create is sent
             currentConn._sessionSetupInProgress = false;
             logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
@@ -1950,6 +1957,8 @@ class OpenAIRealtimeService {
           conn.totalAudioBytesSent = 0;
         }
         const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
+        
+        // Track all audio bytes including silence
         conn.totalAudioBytesSent += audioBytes.length;
         
         // CRITICAL FIX: Set the last successful append time
@@ -2039,6 +2048,16 @@ class OpenAIRealtimeService {
     const conn = this.connections.get(callId);
     if (!conn || !conn.sessionReady) {
       logger.error(`[OpenAI Realtime] Cannot force response - connection not ready for ${callId}`);
+      return false;
+    }
+    
+    // CRITICAL: Force OpenAI to generate a response
+    logger.info(`[OpenAI Realtime] Force response generation for ${callId}`);
+    try {
+      await this.sendResponseCreate(callId);
+      return true;
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Failed to force response generation for ${callId}: ${err.message}`);
       return false;
     }
 
