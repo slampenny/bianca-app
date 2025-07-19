@@ -96,19 +96,10 @@ class OpenAIRealtimeService {
       const firstBytes = audioBuffer.slice(0, Math.min(10, audioBuffer.length));
       logger.debug(`[OpenAI Realtime] Audio validation: ${audioBuffer.length} bytes, first bytes: [${Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
       
-      // Check if this is silence-only audio (0x7F is closer to silence in μ-law)
-      const silenceBytes = audioBuffer.filter(byte => byte === 0x7F).length;
-      const silencePercentage = (silenceBytes / audioBuffer.length * 100).toFixed(1);
-      
-      if (silencePercentage > 95) {
-        logger.warn(`[OpenAI Realtime] Audio validation: ${silencePercentage}% silence detected (${silenceBytes}/${audioBuffer.length} bytes are 0x7F)`);
-      }
-      
       return {
         isValid: true,
         size: audioBuffer.length,
         durationMs: Math.round(durationMs),
-        silencePercentage: parseFloat(silencePercentage),
         reason: 'Valid audio chunk (permissive validation)'
       };
     } catch (err) {
@@ -1752,10 +1743,8 @@ class OpenAIRealtimeService {
         try {
           const audioBytes = Buffer.from(chunk, 'base64');
           totalBytes += audioBytes.length;
-          // Check if chunk contains non-silence (not all 0x7F)
-          const silenceCount = audioBytes.filter(byte => byte === 0x7F).length;
-          silenceBytes += silenceCount;
-          const hasNonSilence = silenceCount < audioBytes.length;
+          // Just check if chunk has any data
+          const hasNonSilence = audioBytes.length > 0;
           if (hasNonSilence) {
             meaningfulChunks++;
           }
@@ -1785,11 +1774,7 @@ class OpenAIRealtimeService {
         return;
     }
     
-    // Skip sending if it's mostly silence (OpenAI will reject it anyway)
-    if (validation.silencePercentage > 95) {
-        logger.info(`[OpenAI Realtime] sendAudioChunk (${callId}): Skipping ${validation.silencePercentage}% silence chunk`);
-        return;
-    }
+
     
     const conn = this.connections.get(callId);
     if (!conn) {

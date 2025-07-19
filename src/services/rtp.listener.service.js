@@ -111,12 +111,8 @@ class RtpListener {
             // Convert to base64 for OpenAI (which expects base64-encoded μ-law)
             const audioBase64 = rtpPacket.payload.toString('base64');
             
-            // Debug: Check if the RTP payload is silence (0x7F is closer to silence in μ-law)
-            const silenceBytes = rtpPacket.payload.filter(byte => byte === 0x7F).length;
-            const silencePercentage = (silenceBytes / rtpPacket.payload.length * 100).toFixed(1);
-            
             if (audioBase64 && audioBase64.length > 0) {
-                logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes, ${silencePercentage}% silence)`);
+                logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
                 await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
                 this.stats.packetsSent++;
             } else {
