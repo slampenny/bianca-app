@@ -389,7 +389,7 @@ class OpenAIRealtimeService {
         type: 'response.create',
         response: {
           modalities: ['text', 'audio'],
-          instructions: 'Say "Hello! How can I help you today?"',
+          instructions: 'Please greet the caller warmly and ask how you can help them today.',
         },
       };
 
@@ -879,29 +879,22 @@ class OpenAIRealtimeService {
       type: 'session.update',
       session: {
         modalities: ['text', 'audio'],
-        instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant. Please respond naturally and conversationally.',
+        instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant.',
         voice: config.openai.realtimeVoice || 'alloy',
-        // Use g711_ulaw for compatibility
-        input_audio_format: 'g711_ulaw',
-        output_audio_format: 'g711_ulaw',
-        // Simplified turn detection to avoid conflicts
+        // USE PCM16 instead of g711_ulaw for better quality and reliability
+        input_audio_format: 'g711_ulaw', // Much better speech recognition
+        output_audio_format: 'g711_ulaw', // Higher quality output
+        // Enable turn detection with adjusted parameters
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.3,
-          prefix_padding_ms: 200,
-          silence_duration_ms: 800,
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 1000,
         },
         // Add input transcription to help with debugging
         input_audio_transcription: {
           model: 'whisper-1',
-        },
-        // Add response generation settings
-        response_format: {
-          type: 'text',
-        },
-        // Ensure responses can complete
-        max_tokens: 150,
-        temperature: 0.7,
+        }, 
         //...(config.openai.realtimeSessionConfig || {})
       },
     }; 
