@@ -132,23 +132,34 @@ class OpenAIRealtimeService {
       return { canCommit: false, reason: 'No valid audio chunks sent yet' };
     }
 
-    // Calculate total audio duration from valid chunks sent
-    // Each chunk is typically 20ms (160 bytes at 8kHz uLaw)
-    const estimatedDurationMs = conn.validAudioChunksSent * 20; // Rough estimate
+    // CRITICAL FIX: Calculate total audio duration more precisely
+    // Use actual audio bytes sent for more accurate duration calculation
+    // At 8kHz uLaw: 1 byte = 0.125ms (8000 samples/sec = 8000 bytes/sec)
+    let estimatedDurationMs;
+    if (conn.totalAudioBytesSent && conn.totalAudioBytesSent > 0) {
+      // Use actual bytes for precise calculation
+      estimatedDurationMs = (conn.totalAudioBytesSent / 8); // 8kHz, 1 byte per sample
+    } else {
+      // Fallback to chunk-based estimation
+      estimatedDurationMs = conn.validAudioChunksSent * 20; // Rough estimate
+    }
+    
+    const safetyMarginMs = 20; // Add 20ms safety margin
+    const adjustedDurationMs = estimatedDurationMs + safetyMarginMs;
 
-    if (estimatedDurationMs < CONSTANTS.MIN_AUDIO_DURATION_MS) {
-      logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: insufficient duration (${estimatedDurationMs}ms < ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms), chunks sent: ${conn.validAudioChunksSent}`);
+    if (adjustedDurationMs < CONSTANTS.MIN_AUDIO_DURATION_MS) {
+      logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: insufficient duration (${adjustedDurationMs}ms < ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms), chunks sent: ${conn.validAudioChunksSent}, raw estimate: ${estimatedDurationMs}ms, bytes: ${conn.totalAudioBytesSent || 0}`);
       return { 
         canCommit: false, 
-        totalDuration: estimatedDurationMs,
-        reason: `Insufficient audio duration: ${estimatedDurationMs}ms (minimum ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms)` 
+        totalDuration: adjustedDurationMs,
+        reason: `Insufficient audio duration: ${adjustedDurationMs}ms (minimum ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms)` 
       };
     }
 
-    logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: ready to commit (${estimatedDurationMs}ms, ${conn.validAudioChunksSent} chunks)`);
+    logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: ready to commit (${adjustedDurationMs}ms, ${conn.validAudioChunksSent} chunks, raw estimate: ${estimatedDurationMs}ms, bytes: ${conn.totalAudioBytesSent || 0})`);
     return {
       canCommit: true,
-      totalDuration: estimatedDurationMs,
+      totalDuration: adjustedDurationMs,
       reason: 'Sufficient audio data for commit'
     };
   }
@@ -781,10 +792,12 @@ class OpenAIRealtimeService {
             conn.lastCommitTime = Date.now();
             const chunksProcessed = conn.audioChunksSent || 0;
             const validChunksProcessed = conn.validAudioChunksSent || 0;
+            const bytesProcessed = conn.totalAudioBytesSent || 0;
             conn.audioChunksSent = 0;
             conn.validAudioChunksSent = 0;
+            conn.totalAudioBytesSent = 0; // Reset audio bytes counter
             conn.consecutiveBufferErrors = 0; // Reset error counter on successful commit
-            logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid)`);
+            logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid, ${bytesProcessed} bytes)`);
             
             // CRITICAL FIX: Send response.create after successful commit to trigger OpenAI response
             // BUT only if we have meaningful audio (not just silence)
@@ -1734,8 +1747,9 @@ class OpenAIRealtimeService {
           }
           
           // CRITICAL: Ensure we have at least some valid audio chunks before committing
-          if (currentConn.validAudioChunksSent < 3) {
-            logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient valid chunks for ${callId} (${currentConn.validAudioChunksSent} < 3) - skipping commit`);
+          // With 20ms per chunk, we need at least 6 chunks to get 120ms (100ms + safety margin)
+          if (currentConn.validAudioChunksSent < 6) {
+            logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient valid chunks for ${callId} (${currentConn.validAudioChunksSent} < 6) - skipping commit`);
             return;
           }
           
@@ -1930,6 +1944,13 @@ class OpenAIRealtimeService {
             conn.validAudioChunksSent = 0;
         }
         conn.validAudioChunksSent++;
+        
+        // CRITICAL FIX: Track actual audio bytes sent for more precise duration calculation
+        if (!conn.totalAudioBytesSent) {
+          conn.totalAudioBytesSent = 0;
+        }
+        const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
+        conn.totalAudioBytesSent += audioBytes.length;
         
         // CRITICAL FIX: Set the last successful append time
         conn.lastSuccessfulAppendTime = Date.now();
