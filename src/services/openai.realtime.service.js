@@ -518,18 +518,48 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Handle connection errors consistently
+   * Handle connection errors consistently with enhanced recovery
    */
   handleConnectionError(callId, error) {
     this.clearConnectionTimeout(callId);
     this.updateConnectionStatus(callId, 'error');
 
-    if (!this.isReconnecting.get(callId)) {
+    // Enhanced error classification and recovery
+    const errorMessage = error.message || error.toString();
+    let shouldReconnect = true;
+    let recoveryAction = 'reconnect';
+
+    // Classify errors for appropriate recovery
+    if (errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
+      logger.warn(`[OpenAI Realtime] Network connectivity issue for ${callId}: ${errorMessage}`);
+      recoveryAction = 'network_retry';
+    } else if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+      logger.error(`[OpenAI Realtime] Authentication error for ${callId}: ${errorMessage}`);
+      shouldReconnect = false; // Don't retry auth errors
+      recoveryAction = 'auth_failure';
+    } else if (errorMessage.includes('rate limit') || errorMessage.includes('quota')) {
+      logger.warn(`[OpenAI Realtime] Rate limit/quota issue for ${callId}: ${errorMessage}`);
+      recoveryAction = 'rate_limit_retry';
+    } else {
+      logger.error(`[OpenAI Realtime] General connection error for ${callId}: ${errorMessage}`);
+      recoveryAction = 'general_retry';
+    }
+
+    this.notify(callId, 'openai_connection_error', { 
+      error: errorMessage, 
+      recoveryAction,
+      shouldReconnect 
+    });
+
+    if (shouldReconnect && !this.isReconnecting.get(callId)) {
       this.isReconnecting.set(callId, true);
       const attempts = this.reconnectAttempts.get(callId) || 0;
       const delay = this.calculateBackoffDelay(attempts);
-      logger.info(`[OpenAI Realtime] Will attempt reconnect after error for ${callId} in ${delay}ms`);
+      logger.info(`[OpenAI Realtime] Will attempt ${recoveryAction} for ${callId} in ${delay}ms`);
       setTimeout(() => this.attemptReconnect(callId), delay);
+    } else if (!shouldReconnect) {
+      logger.error(`[OpenAI Realtime] Non-recoverable error for ${callId}, cleaning up`);
+      this.cleanup(callId);
     }
   }
 
@@ -559,6 +589,10 @@ class OpenAIRealtimeService {
       return;
     }
 
+    // Store pending audio before resetting state
+    const pendingAudio = this.pendingAudio.get(callId) || [];
+    const hadPendingAudio = pendingAudio.length > 0;
+
     // Reset connection state for fresh attempt
     conn.status = 'reconnecting';
     conn.webSocket = null;
@@ -574,6 +608,25 @@ class OpenAIRealtimeService {
       this.isReconnecting.set(callId, false);
       logger.info(`[OpenAI Realtime] Reconnect #${attempts + 1} successful for ${callId}`);
       this.notify(callId, 'openai_reconnected', { attempts: attempts + 1 });
+
+      // ENHANCED RECOVERY: Flush any buffered audio after successful reconnection
+      if (hadPendingAudio) {
+        logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} buffered audio chunks after reconnection for ${callId}`);
+        setTimeout(async () => {
+          try {
+            await this.flushPendingAudio(callId);
+            // After flushing, automatically trigger response generation if we have audio
+            const currentConn = this.connections.get(callId);
+            if (currentConn && currentConn.validAudioChunksSent > 0) {
+              logger.info(`[OpenAI Realtime] Auto-triggering response generation after recovery for ${callId}`);
+              await this.sendResponseCreate(callId);
+            }
+          } catch (flushErr) {
+            logger.error(`[OpenAI Realtime] Error flushing audio after reconnection for ${callId}: ${flushErr.message}`);
+          }
+        }, 1000); // Small delay to ensure session is fully ready
+      }
+
     } catch (err) {
       logger.error(`[OpenAI Realtime] Reconnect #${attempts + 1} failed for ${callId}: ${err.message}`);
       const delay = this.calculateBackoffDelay(attempts + 1);
@@ -599,13 +652,27 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Validate connection health
+   * Validate connection health with enhanced monitoring
    */
   async checkConnectionHealth(callId) {
     const conn = this.connections.get(callId);
     if (!conn) return false;
 
-    return conn.webSocket?.readyState === WebSocket.OPEN && conn.sessionReady && conn.status === 'connected';
+    const isHealthy = conn.webSocket?.readyState === WebSocket.OPEN && conn.sessionReady && conn.status === 'connected';
+    
+    // Enhanced health monitoring
+    if (!isHealthy) {
+      const timeSinceLastActivity = Date.now() - conn.lastActivity;
+      const maxInactivityTime = 30000; // 30 seconds
+      
+      if (timeSinceLastActivity > maxInactivityTime && conn.status === 'connected') {
+        logger.warn(`[OpenAI Realtime] Connection ${callId} appears stuck (${timeSinceLastActivity}ms since last activity). Triggering recovery.`);
+        this.handleConnectionError(callId, new Error('Connection timeout - no activity'));
+        return false;
+      }
+    }
+
+    return isHealthy;
   }
 
   /**
@@ -709,6 +776,28 @@ class OpenAIRealtimeService {
             conn.validAudioChunksSent = 0;
             conn.consecutiveBufferErrors = 0; // Reset error counter on successful commit
             logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid)`);
+            
+            // CRITICAL FIX: Send response.create after successful commit to trigger OpenAI response
+            // BUT only if we have meaningful audio (not just silence)
+            setTimeout(async () => {
+              try {
+                // Check if we already have an active response to avoid duplicates
+                if (!conn._responseCreated) {
+                  // Check if we have meaningful audio by looking at recent chunks
+                  const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
+                  if (hasMeaningfulAudio) {
+                    logger.info(`[OpenAI Realtime] Triggering response generation after commit for ${callId} (meaningful audio detected)`);
+                    await this.sendResponseCreate(callId);
+                  } else {
+                    logger.debug(`[OpenAI Realtime] Skipping response.create for ${callId} - only silence detected`);
+                  }
+                } else {
+                  logger.debug(`[OpenAI Realtime] Skipping response.create for ${callId} - response already active`);
+                }
+              } catch (responseErr) {
+                logger.error(`[OpenAI Realtime] Failed to send response.create after commit for ${callId}: ${responseErr.message}`);
+              }
+            }, 100); // Small delay to ensure commit is fully processed
           }
           break;
 
@@ -916,6 +1005,10 @@ class OpenAIRealtimeService {
       await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
       conn.pendingAssistantTranscript = '';
     }
+
+    // Reset response flag so new commits can trigger new responses
+    conn._responseCreated = false;
+    logger.info(`[OpenAI Realtime] Reset response flag for ${callId} - ready for new responses`);
 
     this.notify(callId, 'response_done', {});
   }
@@ -1194,9 +1287,8 @@ class OpenAIRealtimeService {
             conn._audioStatsLogged = true;
         }
         
-        if (useDebugMode) {
-            await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawBuffer);
-        }
+        // ALWAYS record the raw uLaw for analysis (not just when debug mode is enabled)
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawBuffer);
         
         // Calculate minimal processing time
         const totalTime = Number(process.hrtime.bigint() - startTime) / 1000000; // Convert to ms
@@ -1622,6 +1714,48 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Check if recent audio chunks contain meaningful audio (not just silence)
+   */
+  checkForMeaningfulAudio(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn || !conn._recentAudioChunks) {
+      return false;
+    }
+    
+    // Check the last few chunks for non-silence
+    const recentChunks = conn._recentAudioChunks.slice(-5); // Last 5 chunks
+    let meaningfulChunks = 0;
+    let totalBytes = 0;
+    let silenceBytes = 0;
+    
+    for (const chunk of recentChunks) {
+      if (chunk && chunk.length > 0) {
+        try {
+          const audioBytes = Buffer.from(chunk, 'base64');
+          totalBytes += audioBytes.length;
+          // Check if chunk contains non-silence (not all 0xFF)
+          const silenceCount = audioBytes.filter(byte => byte === 0xFF).length;
+          silenceBytes += silenceCount;
+          const hasNonSilence = silenceCount < audioBytes.length;
+          if (hasNonSilence) {
+            meaningfulChunks++;
+          }
+        } catch (err) {
+          // If we can't decode, assume it might be meaningful
+          meaningfulChunks++;
+        }
+      }
+    }
+    
+    // Consider meaningful if at least 2 out of 5 recent chunks have non-silence
+    const hasMeaningfulAudio = meaningfulChunks >= 2;
+    const silencePercentage = totalBytes > 0 ? (silenceBytes / totalBytes * 100).toFixed(1) : 0;
+    logger.debug(`[OpenAI Realtime] Audio analysis for ${callId}: ${meaningfulChunks}/5 chunks have meaningful audio, ${silencePercentage}% silence`);
+    
+    return hasMeaningfulAudio;
+  }
+
+  /**
    * IMPROVED: Send audio chunk with validation and better commit logic
    */
   async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
@@ -1646,6 +1780,28 @@ class OpenAIRealtimeService {
     }
     
     conn.audioChunksReceived++;
+    
+    // Track recent audio chunks for meaningful audio detection
+    if (!conn._recentAudioChunks) {
+      conn._recentAudioChunks = [];
+    }
+    conn._recentAudioChunks.push(audioChunkBase64ULaw);
+    // Keep only last 10 chunks to avoid memory bloat
+    if (conn._recentAudioChunks.length > 10) {
+      conn._recentAudioChunks.shift();
+    }
+    
+    // Log audio analysis periodically to help debug silence issues
+    if (conn.audioChunksReceived % 50 === 0) {
+      const meaningfulAudio = this.checkForMeaningfulAudio(callId);
+      logger.info(`[OpenAI Realtime] Audio analysis for ${callId} (chunk ${conn.audioChunksReceived}): meaningful=${meaningfulAudio}, recent_chunks=${conn._recentAudioChunks.length}`);
+    }
+    
+    // ALWAYS initialize debug files for recording (not just when debug mode is enabled)
+    if (!conn._debugFilesInitialized) {
+      this.initializeContinuousDebugFiles(callId);
+      conn._debugFilesInitialized = true;
+    }
     
     // CRITICAL FIX: Check WebSocket state before attempting to send
     if (!conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
@@ -1681,11 +1837,9 @@ class OpenAIRealtimeService {
         // Since we're using g711_ulaw format, just send it directly!
         // No conversion needed - OpenAI accepts g711_ulaw natively
         
-        if (useDebugMode) {
-            // Still log the raw uLaw for debugging if needed
-            const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-            await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
-        }
+        // ALWAYS record the raw uLaw for analysis (not just when debug mode is enabled)
+        const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
         
         // Log progress every 100 chunks
         if (conn.audioChunksReceived % 100 === 0) {
@@ -1812,6 +1966,46 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Force response generation even with silence (for testing)
+   */
+  async forceResponseGenerationWithSilence(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn || !conn.sessionReady) {
+      logger.error(`[OpenAI Realtime] Cannot force response - connection not ready for ${callId}`);
+      return false;
+    }
+
+    try {
+      // Temporarily override the response flag to force a new response
+      conn._responseCreated = false;
+      
+      // Send a user message first to establish context
+      await this.sendJsonMessage(callId, {
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: 'Hello, can you hear me?' }]
+        }
+      });
+
+      // Then immediately request a response
+      await this.sendJsonMessage(callId, {
+        type: 'response.create',
+        response: {
+          modalities: ['text', 'audio']
+        }
+      });
+
+      logger.info(`[OpenAI Realtime] Forced response generation with silence for ${callId}`);
+      return true;
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Error forcing response with silence: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
    * Recover from buffer errors by clearing and resetting the audio pipeline
    */
   async recoverFromBufferError(callId) {
@@ -1854,6 +2048,143 @@ class OpenAIRealtimeService {
       logger.error(`[OpenAI Realtime] Failed to recover from buffer error for ${callId}: ${err.message}`);
       return false;
     }
+  }
+
+  /**
+   * Force recovery when OpenAI stops responding - can be called externally
+   */
+  async forceRecovery(callId, reason = 'External recovery request') {
+    const conn = this.connections.get(callId);
+    if (!conn) {
+      logger.error(`[OpenAI Realtime] Cannot force recovery - no connection for ${callId}`);
+      return false;
+    }
+
+    logger.warn(`[OpenAI Realtime] Force recovery triggered for ${callId}: ${reason}`);
+
+    try {
+      // First try to clear any pending state
+      if (conn.pendingCommit) {
+        conn.pendingCommit = false;
+        logger.info(`[OpenAI Realtime] Cleared pending commit for ${callId}`);
+      }
+
+      // Try to clear the audio buffer
+      try {
+        await this.sendJsonMessage(callId, { type: 'input_audio_buffer.clear' });
+        logger.info(`[OpenAI Realtime] Cleared audio buffer for ${callId}`);
+      } catch (clearErr) {
+        logger.warn(`[OpenAI Realtime] Could not clear buffer for ${callId}: ${clearErr.message}`);
+      }
+
+      // Reset counters
+      conn.audioChunksSent = 0;
+      conn.validAudioChunksSent = 0;
+      conn.lastCommitTime = Date.now();
+      conn.consecutiveBufferErrors = 0;
+
+      // If the connection is in a bad state, trigger reconnection
+      if (conn.status === 'error' || !conn.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
+        logger.info(`[OpenAI Realtime] Connection state requires reconnection for ${callId}. Triggering reconnect.`);
+        if (!this.isReconnecting.get(callId)) {
+          this.isReconnecting.set(callId, true);
+          this.handleConnectionError(callId, new Error(`Force recovery: ${reason}`));
+        }
+      } else {
+        // Connection looks healthy, try to flush any buffered audio
+        const pendingAudio = this.pendingAudio.get(callId) || [];
+        if (pendingAudio.length > 0) {
+          logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} buffered audio chunks after force recovery for ${callId}`);
+          await this.flushPendingAudio(callId);
+          
+          // Try to generate a response if we have audio
+          if (conn.validAudioChunksSent > 0) {
+            logger.info(`[OpenAI Realtime] Auto-triggering response generation after force recovery for ${callId}`);
+            await this.sendResponseCreate(callId);
+          }
+        }
+      }
+
+      this.notify(callId, 'openai_force_recovery', { reason });
+      logger.info(`[OpenAI Realtime] Force recovery completed for ${callId}`);
+      return true;
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Force recovery failed for ${callId}: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Get connection status for a specific call
+   */
+  async getConnectionStatus(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn) {
+      return {
+        exists: false,
+        message: 'Connection not found',
+      };
+    }
+
+    const pendingAudio = this.pendingAudio.get(callId) || [];
+    const isReconnecting = this.isReconnecting.get(callId) || false;
+    const reconnectAttempts = this.reconnectAttempts.get(callId) || 0;
+
+    return {
+      exists: true,
+      callId,
+      status: conn.status,
+      sessionReady: conn.sessionReady,
+      webSocketState: conn.webSocket ? conn.webSocket.readyState : 'NO_WEBSOCKET',
+      lastActivity: conn.lastActivity,
+      startTime: conn.startTime,
+      audioChunksReceived: conn.audioChunksReceived,
+      audioChunksSent: conn.audioChunksSent,
+      validAudioChunksSent: conn.validAudioChunksSent || 0,
+      pendingCommit: conn.pendingCommit,
+      consecutiveBufferErrors: conn.consecutiveBufferErrors || 0,
+      pendingAudioChunks: pendingAudio.length,
+      isReconnecting,
+      reconnectAttempts,
+      conversationId: conn.conversationId,
+      asteriskChannelId: conn.asteriskChannelId,
+      callSid: conn.callSid,
+    };
+  }
+
+  /**
+   * Get status of all active connections
+   */
+  async getAllConnectionStatus() {
+    const connections = [];
+    
+    for (const [callId, conn] of this.connections.entries()) {
+      const pendingAudio = this.pendingAudio.get(callId) || [];
+      const isReconnecting = this.isReconnecting.get(callId) || false;
+      const reconnectAttempts = this.reconnectAttempts.get(callId) || 0;
+
+      connections.push({
+        callId,
+        status: conn.status,
+        sessionReady: conn.sessionReady,
+        webSocketState: conn.webSocket ? conn.webSocket.readyState : 'NO_WEBSOCKET',
+        lastActivity: conn.lastActivity,
+        startTime: conn.startTime,
+        audioChunksReceived: conn.audioChunksReceived,
+        audioChunksSent: conn.audioChunksSent,
+        validAudioChunksSent: conn.validAudioChunksSent || 0,
+        pendingCommit: conn.pendingCommit,
+        consecutiveBufferErrors: conn.consecutiveBufferErrors || 0,
+        pendingAudioChunks: pendingAudio.length,
+        isReconnecting,
+        reconnectAttempts,
+        conversationId: conn.conversationId,
+        asteriskChannelId: conn.asteriskChannelId,
+        callSid: conn.callSid,
+      });
+    }
+
+    return connections;
   }
 
   /**
@@ -2088,6 +2419,13 @@ class OpenAIRealtimeService {
     const filepath = path.join(DEBUG_AUDIO_LOCAL_DIR, callId, filename);
     try {
       fs.appendFileSync(filepath, buffer);
+      
+      // Log periodically to confirm recording is working
+      const stats = fs.statSync(filepath);
+      if (stats.size % (1024 * 1024) < buffer.length) { // Log every ~1MB
+        const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+        logger.info(`[AUDIO DEBUG] Recording ${filename} for ${callId}: ${sizeMB} MB`);
+      }
     } catch (err) {
       logger.error(`[AUDIO DEBUG] Failed to append to ${filename}: ${err.message}`);
     }
@@ -2288,31 +2626,45 @@ class OpenAIRealtimeService {
         }
       }
 
-      // Upload debug audio if it exists (existing functionality)
-      if (conn?._debugFilesInitialized) {
-        logger.info(`[OpenAI Call End] Uploading debug audio for ${callId}...`);
-        try {
-          const uploadedFiles = await this.uploadDebugAudioToS3(callId);
+      // Upload debug audio for every call (enhanced functionality)
+      logger.info(`[OpenAI Call End] Attempting debug audio upload for ${callId}...`);
+      
+      // Log call statistics before upload
+      if (conn) {
+        const stats = {
+          audioChunksReceived: conn.audioChunksReceived || 0,
+          audioChunksSent: conn.audioChunksSent || 0,
+          validAudioChunksSent: conn.validAudioChunksSent || 0,
+          lastCommitTime: conn.lastCommitTime ? new Date(conn.lastCommitTime).toISOString() : 'never',
+          sessionReady: conn.sessionReady || false,
+          debugFilesInitialized: conn._debugFilesInitialized || false
+        };
+        logger.info(`[OpenAI Call End] Call statistics for ${callId}:`, stats);
+      }
+      
+      try {
+        const uploadedFiles = await this.uploadDebugAudioToS3(callId);
 
-          // Save debug audio URLs to conversation if available
-          if (uploadedFiles.length > 0 && conversationId) {
-            try {
-              const { Conversation } = require('../models');
-              await Conversation.findByIdAndUpdate(conversationId, {
-                debugAudioUrls: uploadedFiles.map(file => ({
-                  description: file.description,
-                  url: file.url,
-                  key: file.key
-                }))
-              });
-              logger.info(`[OpenAI Call End] Saved ${uploadedFiles.length} debug audio URLs to conversation ${conversationId}`);
-            } catch (updateErr) {
-              logger.error(`[OpenAI Call End] Failed to save debug audio URLs: ${updateErr.message}`);
-            }
+        // Save debug audio URLs to conversation if available
+        if (uploadedFiles.length > 0 && conversationId) {
+          try {
+            const { Conversation } = require('../models');
+            await Conversation.findByIdAndUpdate(conversationId, {
+              debugAudioUrls: uploadedFiles.map(file => ({
+                description: file.description,
+                url: file.url,
+                key: file.key
+              }))
+            });
+            logger.info(`[OpenAI Call End] Saved ${uploadedFiles.length} debug audio URLs to conversation ${conversationId}`);
+          } catch (updateErr) {
+            logger.error(`[OpenAI Call End] Failed to save debug audio URLs: ${updateErr.message}`);
           }
-        } catch (audioErr) {
-          logger.error(`[OpenAI Call End] Error uploading debug audio: ${audioErr.message}`);
+        } else if (uploadedFiles.length === 0) {
+          logger.info(`[OpenAI Call End] No debug audio files found to upload for ${callId}`);
         }
+      } catch (audioErr) {
+        logger.error(`[OpenAI Call End] Error uploading debug audio: ${audioErr.message}`);
       }
 
       // Finalize conversation with summary generation
