@@ -97,13 +97,26 @@ class RtpListener {
             this.stats.invalidPackets++;
             return;
         }
+        
+        // Check if this is μ-law audio (payload type 0)
+        if (rtpPacket.payloadType !== 0) {
+            logger.warn(`[RTP Listener ${this.port}] Unexpected payload type ${rtpPacket.payloadType} for call ${this.callId} (expected 0 for μ-law)`);
+            this.stats.invalidPackets++;
+            return;
+        }
 
         // Process the audio payload
         try {
+            // The RTP payload is already raw μ-law bytes from Asterisk
+            // Convert to base64 for OpenAI (which expects base64-encoded μ-law)
             const audioBase64 = rtpPacket.payload.toString('base64');
             
+            // Debug: Check if the RTP payload is silence
+            const silenceBytes = rtpPacket.payload.filter(byte => byte === 0xFF).length;
+            const silencePercentage = (silenceBytes / rtpPacket.payload.length * 100).toFixed(1);
+            
             if (audioBase64 && audioBase64.length > 0) {
-                logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId}`);
+                logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes, ${silencePercentage}% silence)`);
                 await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
                 this.stats.packetsSent++;
             } else {

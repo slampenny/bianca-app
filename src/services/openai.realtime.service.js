@@ -96,10 +96,19 @@ class OpenAIRealtimeService {
       const firstBytes = audioBuffer.slice(0, Math.min(10, audioBuffer.length));
       logger.debug(`[OpenAI Realtime] Audio validation: ${audioBuffer.length} bytes, first bytes: [${Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
       
+      // Check if this is silence-only audio (all 0xFF in μ-law)
+      const silenceBytes = audioBuffer.filter(byte => byte === 0xFF).length;
+      const silencePercentage = (silenceBytes / audioBuffer.length * 100).toFixed(1);
+      
+      if (silencePercentage > 95) {
+        logger.warn(`[OpenAI Realtime] Audio validation: ${silencePercentage}% silence detected (${silenceBytes}/${audioBuffer.length} bytes are 0xFF)`);
+      }
+      
       return {
         isValid: true,
         size: audioBuffer.length,
         durationMs: Math.round(durationMs),
+        silencePercentage: parseFloat(silencePercentage),
         reason: 'Valid audio chunk (permissive validation)'
       };
     } catch (err) {
@@ -1773,6 +1782,12 @@ class OpenAIRealtimeService {
     const validation = this.validateAudioChunk(audioChunkBase64ULaw);
     if (!validation.isValid) {
         logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Invalid audio chunk - ${validation.reason}`);
+        return;
+    }
+    
+    // Skip sending if it's mostly silence (OpenAI will reject it anyway)
+    if (validation.silencePercentage > 95) {
+        logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Skipping ${validation.silencePercentage}% silence chunk`);
         return;
     }
     
