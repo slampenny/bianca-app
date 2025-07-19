@@ -1664,10 +1664,10 @@ class OpenAIRealtimeService {
       return;
     }
 
-    // Clear existing timer
+    // Don't start new timer if one is already active (this prevents constant resetting)
     if (this.commitTimers.has(callId)) {
-      clearTimeout(this.commitTimers.get(callId));
-      logger.debug(`[OpenAI Realtime] Cleared existing commit timer for ${callId}`);
+      logger.debug(`[OpenAI Realtime] DebounceCommit: Timer already active for ${callId}, skipping`);
+      return;
     }
 
     logger.debug(`[OpenAI Realtime] Setting commit timer (${CONSTANTS.COMMIT_DEBOUNCE_DELAY}ms) for ${callId}`);
@@ -1686,6 +1686,8 @@ class OpenAIRealtimeService {
         if (commitReadiness.canCommit) {
           // Additional check: ensure we've successfully sent audio recently
           const timeSinceLastAppend = Date.now() - (currentConn.lastSuccessfulAppendTime || 0);
+          logger.info(`[OpenAI Realtime] Commit timer fired for ${callId} - time since last append: ${timeSinceLastAppend}ms`);
+          
           if (timeSinceLastAppend > 10000) { // More than 10 seconds since last successful append
             logger.warn(`[OpenAI Realtime] Commit timer fired but no recent audio appends for ${callId} (${timeSinceLastAppend}ms since last append)`);
             
@@ -1700,6 +1702,8 @@ class OpenAIRealtimeService {
             }
             return;
           }
+          
+          logger.info(`[OpenAI Realtime] Recent audio detected for ${callId} (${timeSinceLastAppend}ms since last append) - proceeding with commit`);
           
           logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId} (${commitReadiness.totalDuration}ms of audio)`);
           try {
