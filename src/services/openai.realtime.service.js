@@ -137,6 +137,7 @@ class OpenAIRealtimeService {
     const estimatedDurationMs = conn.validAudioChunksSent * 20; // Rough estimate
 
     if (estimatedDurationMs < CONSTANTS.MIN_AUDIO_DURATION_MS) {
+      logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: insufficient duration (${estimatedDurationMs}ms < ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms), chunks sent: ${conn.validAudioChunksSent}`);
       return { 
         canCommit: false, 
         totalDuration: estimatedDurationMs,
@@ -144,6 +145,7 @@ class OpenAIRealtimeService {
       };
     }
 
+    logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: ready to commit (${estimatedDurationMs}ms, ${conn.validAudioChunksSent} chunks)`);
     return {
       canCommit: true,
       totalDuration: estimatedDurationMs,
@@ -1684,7 +1686,7 @@ class OpenAIRealtimeService {
         if (commitReadiness.canCommit) {
           // Additional check: ensure we've successfully sent audio recently
           const timeSinceLastAppend = Date.now() - (currentConn.lastSuccessfulAppendTime || 0);
-          if (timeSinceLastAppend > 5000) { // More than 5 seconds since last successful append
+          if (timeSinceLastAppend > 10000) { // More than 10 seconds since last successful append
             logger.warn(`[OpenAI Realtime] Commit timer fired but no recent audio appends for ${callId} (${timeSinceLastAppend}ms since last append)`);
             
             // Clear the buffer and reset counters
@@ -1703,6 +1705,7 @@ class OpenAIRealtimeService {
           try {
             await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
             currentConn.pendingCommit = true;
+            logger.info(`[OpenAI Realtime] Commit sent successfully for ${callId}`);
           } catch (commitErr) {
             logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
             currentConn.pendingCommit = false;
@@ -1865,6 +1868,17 @@ class OpenAIRealtimeService {
             conn.validAudioChunksSent = 0;
         }
         conn.validAudioChunksSent++;
+        
+        // CRITICAL FIX: Set the last successful append time
+        conn.lastSuccessfulAppendTime = Date.now();
+        
+        // Log audio sending progress
+        if (conn.validAudioChunksSent <= 5 || conn.validAudioChunksSent % 20 === 0) {
+            logger.info(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} sent to OpenAI for ${callId} (${audioChunkBase64ULaw.length} bytes)`);
+        }
+        
+        // Log every chunk for debugging the buffer issue
+        logger.debug(`[OpenAI Realtime] Audio append successful for ${callId}: chunk #${conn.validAudioChunksSent}, total sent: ${conn.audioChunksSent}`);
         
         // Improved commit logic with validation
         const commitReadiness = this.checkCommitReadiness(callId);
