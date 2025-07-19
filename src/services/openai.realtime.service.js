@@ -876,8 +876,10 @@ class OpenAIRealtimeService {
     }; 
 
     logger.info(`[OpenAI Realtime] Sending session.update for ${callId}`);
+    logger.debug(`[OpenAI Realtime] Session config for ${callId}: ${JSON.stringify(sessionConfig)}`);
     try {
       await this.sendJsonMessage(callId, sessionConfig);
+      logger.info(`[OpenAI Realtime] Session.update sent successfully for ${callId}`);
     } catch (sendError) {
       logger.error(`[OpenAI Realtime] Failed to send session.update for ${callId}: ${sendError.message}`);
       this.cleanup(callId);
@@ -892,6 +894,7 @@ class OpenAIRealtimeService {
     if (!conn) return;
 
     logger.info(`[OpenAI Realtime] Session UPDATED for ${callId}`);
+    logger.debug(`[OpenAI Realtime] Session update response for ${callId}: ${JSON.stringify(message)}`);
 
     if (!conn.sessionReady) {
       // Clear the connection timeout since handshake is complete
@@ -905,8 +908,17 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Session ready for ${callId}. Flushing pending audio.`);
 
       try {
-        // Flush any pending audio
-        await this.flushPendingAudio(callId);
+        // CRITICAL: Add a delay to ensure session configuration is fully applied before sending audio
+        setTimeout(async () => {
+          // Double-check connection is still valid before flushing audio
+          const currentConn = this.connections.get(callId);
+          if (currentConn && currentConn.webSocket && currentConn.webSocket.readyState === WebSocket.OPEN) {
+            logger.info(`[OpenAI Realtime] Flushing pending audio for ${callId} after session configuration delay`);
+            await this.flushPendingAudio(callId);
+          } else {
+            logger.error(`[OpenAI Realtime] Connection lost before audio flush could be sent for ${callId}`);
+          }
+        }, 1000); // 1 second delay to ensure session config is applied
 
         // CRITICAL: Add a small delay to ensure connection is stable before sending response.create
         setTimeout(() => {
@@ -917,7 +929,7 @@ class OpenAIRealtimeService {
           } else {
             logger.error(`[OpenAI Realtime] Connection lost before response.create could be sent for ${callId}`);
           }
-        }, 500); // 500ms delay
+        }, 1500); // 1.5 second delay (after audio flush)
 
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
@@ -1858,6 +1870,14 @@ class OpenAIRealtimeService {
         // Log progress every 100 chunks
         if (conn.audioChunksReceived % 100 === 0) {
             logger.info(`[AUDIO DEBUG] Sent ${conn.audioChunksReceived} uLaw chunks directly to OpenAI for ${callId}`);
+        }
+        
+        logger.debug(`[OpenAI Realtime] SENDING: type=input_audio_buffer.append, audio_length=${audioChunkBase64ULaw.length}`);
+        
+        // Debug: Check if the audio data looks valid
+        if (conn.validAudioChunksSent <= 3) {
+          const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
+          logger.debug(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} for ${callId}: base64_length=${audioChunkBase64ULaw.length}, raw_bytes=${audioBytes.length}, first_byte=0x${audioBytes[0]?.toString(16)}, last_byte=0x${audioBytes[audioBytes.length-1]?.toString(16)}`);
         }
         
         await this.sendJsonMessage(callId, {
