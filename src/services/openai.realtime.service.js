@@ -389,15 +389,26 @@ class OpenAIRealtimeService {
         type: 'response.create',
         response: {
           modalities: ['text', 'audio'],
-          instructions: 'Please greet the caller warmly and ask how you can help them today.',
+          instructions: 'Say "Hello! How can I help you today?"',
         },
       };
 
       const messageStr = JSON.stringify(responseCreateEvent);
       connection.webSocket.send(messageStr);
       connection._responseCreated = true;
+      connection._responseStartTime = Date.now(); // Track when response was created
       logger.info(`[OpenAI Realtime] SUCCESS: Sent response.create for ${callId}`);
       logger.debug(`[OpenAI Realtime] Response.create payload: ${messageStr}`);
+      
+      // Add timeout to reset response flag if it gets stuck
+      setTimeout(() => {
+        const currentConn = this.connections.get(callId);
+        if (currentConn && currentConn._responseCreated && currentConn._responseStartTime === connection._responseStartTime) {
+          logger.warn(`[OpenAI Realtime] Response timeout for ${callId} - resetting response flag`);
+          currentConn._responseCreated = false;
+          currentConn._responseStartTime = null;
+        }
+      }, 10000); // 10 second timeout
       
       // Log diagnostic info
       logger.info(`[OpenAI Realtime] Connection state for ${callId}:`, {
@@ -868,22 +879,29 @@ class OpenAIRealtimeService {
       type: 'session.update',
       session: {
         modalities: ['text', 'audio'],
-        instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant.',
+        instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant. Please respond naturally and conversationally.',
         voice: config.openai.realtimeVoice || 'alloy',
-        // USE PCM16 instead of g711_ulaw for better quality and reliability
-        input_audio_format: 'g711_ulaw', // Much better speech recognition
-        output_audio_format: 'g711_ulaw', // Higher quality output
-        // Enable turn detection with adjusted parameters
+        // Use g711_ulaw for compatibility
+        input_audio_format: 'g711_ulaw',
+        output_audio_format: 'g711_ulaw',
+        // Simplified turn detection to avoid conflicts
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 1000,
+          threshold: 0.3,
+          prefix_padding_ms: 200,
+          silence_duration_ms: 800,
         },
         // Add input transcription to help with debugging
         input_audio_transcription: {
           model: 'whisper-1',
-        }, 
+        },
+        // Add response generation settings
+        response_format: {
+          type: 'text',
+        },
+        // Ensure responses can complete
+        max_tokens: 150,
+        temperature: 0.7,
         //...(config.openai.realtimeSessionConfig || {})
       },
     }; 
@@ -1056,6 +1074,7 @@ class OpenAIRealtimeService {
 
     // Reset response flag so new commits can trigger new responses
     conn._responseCreated = false;
+    conn._responseStartTime = null; // Clear timeout tracking
     logger.info(`[OpenAI Realtime] Reset response flag for ${callId} - ready for new responses`);
 
     this.notify(callId, 'response_done', {});
