@@ -121,7 +121,9 @@ const uploadDebugAudio = catchAsync(async (req, res) => {
   logger.info(`[OpenAI Controller] Manual debug audio upload requested for call ${callId}`);
 
   try {
-    const uploadedFiles = await openaiService.uploadDebugAudioToS3(callId);
+    // Get the connection object to include call statistics
+    const conn = openaiService.connections.get(callId);
+    const uploadedFiles = await openaiService.uploadDebugAudioToS3(callId, conn);
     
     if (uploadedFiles.length > 0) {
       res.status(httpStatus.OK).json({

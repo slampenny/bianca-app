@@ -380,9 +380,11 @@ class OpenAIRealtimeService {
         },
       };
 
-      connection.webSocket.send(JSON.stringify(responseCreateEvent));
+      const messageStr = JSON.stringify(responseCreateEvent);
+      connection.webSocket.send(messageStr);
       connection._responseCreated = true;
       logger.info(`[OpenAI Realtime] SUCCESS: Sent response.create for ${callId}`);
+      logger.debug(`[OpenAI Realtime] Response.create payload: ${messageStr}`);
       
       // Log diagnostic info
       logger.info(`[OpenAI Realtime] Connection state for ${callId}:`, {
@@ -703,6 +705,11 @@ class OpenAIRealtimeService {
       }${message.type === 'conversation.item.created' ? `, item_type=${message.item?.type}, role=${message.item?.role}` : ''
       }`
     );
+    
+    // Enhanced debugging for response-related messages
+    if (message.type.startsWith('response.')) {
+      logger.debug(`[OpenAI Realtime] Full response message for ${callId}: ${JSON.stringify(message)}`);
+    }
 
     try {
       switch (message.type) {
@@ -2466,32 +2473,35 @@ class OpenAIRealtimeService {
    * Upload continuous audio files to S3 after call ends
    */
   /**
-   * Upload continuous audio files to S3 after call ends - FIXED VERSION
+   * Upload continuous audio files to S3 after call ends - ENHANCED VERSION
    * Only uploads 2 files: one combined file from Asterisk and one from OpenAI
+   * Now includes timestamps and better organization
    */
-  async uploadDebugAudioToS3(callId) {
+  async uploadDebugAudioToS3(callId, conn = null) {
     const S3Service = require('./s3.service');
 
     try {
       const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const dateFolder = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
-      // Only upload the TWO main continuous files
+      // Enhanced S3 key structure with timestamps and better organization
       const filesToUpload = [
         {
           source: 'continuous_from_asterisk_ulaw.ulaw',
           format: 'mulaw',
           sampleRate: 8000,
           channels: 1,
-          s3Key: `debug-audio/${callId}/caller_to_openai_8khz.wav`,
+          s3Key: `debug-audio/${dateFolder}/${callId}_${timestamp}/caller_to_openai_8khz.wav`,
           description: 'Complete audio from caller to OpenAI (8kHz)',
         },
         {
-          source: 'continuous_from_openai_pcm24k.raw',
-          format: 's16le',
-          sampleRate: 24000,
+          source: 'continuous_from_openai_ulaw.ulaw',
+          format: 'mulaw',
+          sampleRate: 8000,
           channels: 1,
-          s3Key: `debug-audio/${callId}/openai_to_caller_24khz.wav`,
-          description: 'Complete audio from OpenAI to caller (24kHz)',
+          s3Key: `debug-audio/${dateFolder}/${callId}_${timestamp}/openai_to_caller_8khz.wav`,
+          description: 'Complete audio from OpenAI to caller (8kHz uLaw)',
         },
       ];
 
@@ -2534,15 +2544,25 @@ class OpenAIRealtimeService {
             });
           });
 
-          // Upload to S3
+          // Upload to S3 with enhanced metadata
           const fileContent = fs.readFileSync(wavFile);
           const uploadResult = await S3Service.uploadFile(fileContent, file.s3Key, 'audio/wav', {
             callId: callId,
+            uploadTimestamp: timestamp,
+            uploadDate: dateFolder,
             originalFormat: file.format,
             sampleRate: file.sampleRate.toString(),
             direction: file.source.includes('asterisk') ? 'inbound' : 'outbound',
             originalSize: stats.size.toString(),
             convertedSize: fileContent.length.toString(),
+            description: file.description,
+            // Add call statistics if available
+            ...(conn && {
+              audioChunksReceived: (conn.audioChunksReceived || 0).toString(),
+              audioChunksSent: (conn.audioChunksSent || 0).toString(),
+              validAudioChunksSent: (conn.validAudioChunksSent || 0).toString(),
+              sessionReady: (conn.sessionReady || false).toString(),
+            })
           });
 
           // Get presigned URL for easy download
@@ -2565,9 +2585,49 @@ class OpenAIRealtimeService {
         }
       }
 
+      // Create and upload a summary file with call information
+      if (uploadedFiles.length > 0) {
+        const summaryData = {
+          callId: callId,
+          uploadTimestamp: timestamp,
+          uploadDate: dateFolder,
+          callStatistics: conn ? {
+            audioChunksReceived: conn.audioChunksReceived || 0,
+            audioChunksSent: conn.audioChunksSent || 0,
+            validAudioChunksSent: conn.validAudioChunksSent || 0,
+            lastCommitTime: conn.lastCommitTime ? new Date(conn.lastCommitTime).toISOString() : null,
+            sessionReady: conn.sessionReady || false,
+            debugFilesInitialized: conn._debugFilesInitialized || false,
+            conversationId: conn.conversationId || null
+          } : null,
+          uploadedFiles: uploadedFiles.map(file => ({
+            description: file.description,
+            sizeMB: (file.originalSize / 1024 / 1024).toFixed(2),
+            url: file.url,
+            key: file.key
+          }))
+        };
+
+        const summaryKey = `debug-audio/${dateFolder}/${callId}_${timestamp}/call_summary.json`;
+        const summaryContent = JSON.stringify(summaryData, null, 2);
+        
+        try {
+          await S3Service.uploadFile(Buffer.from(summaryContent), summaryKey, 'application/json', {
+            callId: callId,
+            uploadTimestamp: timestamp,
+            uploadDate: dateFolder,
+            type: 'call_summary'
+          });
+          logger.info(`[AUDIO DEBUG] Uploaded call summary to ${summaryKey}`);
+        } catch (summaryErr) {
+          logger.error(`[AUDIO DEBUG] Failed to upload call summary: ${summaryErr.message}`);
+        }
+      }
+
       // Log the download URLs in a clean format
       if (uploadedFiles.length > 0) {
         logger.info(`[AUDIO DEBUG] ===== DEBUG AUDIO READY FOR CALL ${callId} =====`);
+        logger.info(`[AUDIO DEBUG] Upload Date: ${dateFolder} | Timestamp: ${timestamp}`);
         uploadedFiles.forEach((file) => {
           const sizeMB = (file.originalSize / 1024 / 1024).toFixed(2);
           logger.info(`[AUDIO DEBUG] ${file.description}`);
@@ -2643,7 +2703,7 @@ class OpenAIRealtimeService {
       }
       
       try {
-        const uploadedFiles = await this.uploadDebugAudioToS3(callId);
+        const uploadedFiles = await this.uploadDebugAudioToS3(callId, conn);
 
         // Save debug audio URLs to conversation if available
         if (uploadedFiles.length > 0 && conversationId) {
