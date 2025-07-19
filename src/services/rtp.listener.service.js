@@ -111,8 +111,8 @@ class RtpListener {
             // Convert to base64 for OpenAI (which expects base64-encoded μ-law)
             const audioBase64 = rtpPacket.payload.toString('base64');
             
-            // Debug: Check if the RTP payload is silence
-            const silenceBytes = rtpPacket.payload.filter(byte => byte === 0xFF).length;
+            // Debug: Check if the RTP payload is silence (0x7F is closer to silence in μ-law)
+            const silenceBytes = rtpPacket.payload.filter(byte => byte === 0x7F).length;
             const silencePercentage = (silenceBytes / rtpPacket.payload.length * 100).toFixed(1);
             
             if (audioBase64 && audioBase64.length > 0) {

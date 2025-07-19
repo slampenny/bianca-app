@@ -96,12 +96,12 @@ class OpenAIRealtimeService {
       const firstBytes = audioBuffer.slice(0, Math.min(10, audioBuffer.length));
       logger.debug(`[OpenAI Realtime] Audio validation: ${audioBuffer.length} bytes, first bytes: [${Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
       
-      // Check if this is silence-only audio (all 0xFF in μ-law)
-      const silenceBytes = audioBuffer.filter(byte => byte === 0xFF).length;
+      // Check if this is silence-only audio (0x7F is closer to silence in μ-law)
+      const silenceBytes = audioBuffer.filter(byte => byte === 0x7F).length;
       const silencePercentage = (silenceBytes / audioBuffer.length * 100).toFixed(1);
       
       if (silencePercentage > 95) {
-        logger.warn(`[OpenAI Realtime] Audio validation: ${silencePercentage}% silence detected (${silenceBytes}/${audioBuffer.length} bytes are 0xFF)`);
+        logger.warn(`[OpenAI Realtime] Audio validation: ${silencePercentage}% silence detected (${silenceBytes}/${audioBuffer.length} bytes are 0x7F)`);
       }
       
       return {
@@ -1752,8 +1752,8 @@ class OpenAIRealtimeService {
         try {
           const audioBytes = Buffer.from(chunk, 'base64');
           totalBytes += audioBytes.length;
-          // Check if chunk contains non-silence (not all 0xFF)
-          const silenceCount = audioBytes.filter(byte => byte === 0xFF).length;
+          // Check if chunk contains non-silence (not all 0x7F)
+          const silenceCount = audioBytes.filter(byte => byte === 0x7F).length;
           silenceBytes += silenceCount;
           const hasNonSilence = silenceCount < audioBytes.length;
           if (hasNonSilence) {
@@ -1787,7 +1787,7 @@ class OpenAIRealtimeService {
     
     // Skip sending if it's mostly silence (OpenAI will reject it anyway)
     if (validation.silencePercentage > 95) {
-        logger.debug(`[OpenAI Realtime] sendAudioChunk (${callId}): Skipping ${validation.silencePercentage}% silence chunk`);
+        logger.info(`[OpenAI Realtime] sendAudioChunk (${callId}): Skipping ${validation.silencePercentage}% silence chunk`);
         return;
     }
     
