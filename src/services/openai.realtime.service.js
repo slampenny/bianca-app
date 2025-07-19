@@ -44,7 +44,110 @@ async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
   // Additional session ready check
   if (!conn.sessionReady) {
       if (!bypassBuffering) {
-          const pending = this.pendingAudio// src/services/openai.realtime.service.js
+          const pending = this.pendingAudio.get(callId) || [];
+          if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+              pending.push(audioChunkBase64ULaw);
+              this.pendingAudio.set(callId, pending);
+              logger.debug(`[OpenAI Realtime] Session not ready for ${callId}, buffered audio chunk`);
+          }
+      }
+      return;
+  }
+  
+  try {
+      // CRITICAL: Check if we need to convert to PCM16
+      let audioToSend = audioChunkBase64ULaw;
+      const usePCM16 = config.openai?.usePCM16 || false; // Add config option
+      
+      if (usePCM16 || conn._forcePCM16) {
+          // Convert uLaw to PCM16 for OpenAI
+          const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+          const pcmBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+          audioToSend = pcmBuffer.toString('base64');
+          
+          if (conn.audioChunksSent < 5) {
+              logger.info(`[OpenAI Realtime] Converting uLaw to PCM16 for ${callId} (chunk #${conn.audioChunksSent + 1})`);
+          }
+      }
+      
+      // Log the actual audio data being sent (first few chunks)
+      if (conn.audioChunksSent < 5 || conn.audioChunksSent % 100 === 0) {
+          const audioBuffer = Buffer.from(audioToSend, 'base64');
+          logger.info(`[OpenAI Realtime] Sending audio chunk #${conn.audioChunksSent + 1} for ${callId}:`, {
+              format: usePCM16 || conn._forcePCM16 ? 'pcm16' : 'g711_ulaw',
+              base64Length: audioToSend.length,
+              decodedLength: audioBuffer.length,
+              durationMs: validation.durationMs,
+              firstBytes: audioBuffer.slice(0, 10).toString('hex')
+          });
+      }
+      
+      if (useDebugMode) {
+          // Still log the raw uLaw for debugging if needed
+          const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
+          await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
+      }
+      
+      // Log progress every 100 chunks
+      if (conn.audioChunksReceived % 100 === 0) {
+          logger.info(`[AUDIO DEBUG] Sent ${conn.audioChunksReceived} chunks to OpenAI for ${callId}`);
+      }
+      
+      const sendResult = await this.sendJsonMessage(callId, {
+          type: 'input_audio_buffer.append',
+          audio: audioToSend,
+      });
+      
+      if (!sendResult) {
+          logger.error(`[OpenAI Realtime] Failed to send audio chunk for ${callId}`);
+          return;
+      }
+      
+      conn.audioChunksSent++;
+      
+      // Track valid audio chunks separately
+      if (!conn.validAudioChunksSent) {
+          conn.validAudioChunksSent = 0;
+      }
+      conn.validAudioChunksSent++;
+      
+      // Log successful append
+      if (conn.audioChunksSent <= 5 || conn.audioChunksSent % 50 === 0) {
+          logger.info(`[OpenAI Realtime] Successfully sent audio chunk #${conn.audioChunksSent} for ${callId} (valid: ${conn.validAudioChunksSent})`);
+      }
+      
+      // Improved commit logic with validation
+      const commitReadiness = this.checkCommitReadiness(callId);
+      if (commitReadiness.canCommit) {
+          if (conn.validAudioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
+              logger.info(`[OpenAI Realtime] Reached batch size (${conn.validAudioChunksSent}), scheduling commit for ${callId}`);
+              this.debounceCommit(callId);
+          } else if (conn.validAudioChunksSent === 1) {
+              // Start a timer for the first chunk to ensure we don't wait too long
+              logger.info(`[OpenAI Realtime] First audio chunk sent, scheduling commit timer for ${callId}`);
+              this.debounceCommit(callId);
+          }
+      } else {
+          logger.debug(`[OpenAI Realtime] Not ready to commit for ${callId}: ${commitReadiness.reason}`);
+      }
+      
+  } catch (audioProcessingError) {
+      logger.error(
+          `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
+          audioProcessingError.stack
+      );
+      
+      // If it's a WebSocket error, update connection status
+      if (audioProcessingError.message.includes('WebSocket not open')) {
+          this.updateConnectionStatus(callId, 'error');
+          // Trigger reconnection if not already in progress
+          if (!this.isReconnecting.get(callId)) {
+              this.handleConnectionError(callId, audioProcessingError);
+          }
+      }
+      return;
+  }
+}// src/services/openai.realtime.service.js
 
 const WebSocket = require('ws');
 const { Buffer } = require('buffer');
@@ -821,6 +924,16 @@ async handleSessionCreated(callId, message) {
   logger.info(`[OpenAI Realtime] Session CREATED for ${callId}, Session ID: ${message.session.id}`);
   conn.sessionId = message.session.id;
 
+  // Check if we should use PCM16 instead of g711_ulaw
+  const usePCM16 = config.openai?.usePCM16 || false;
+  const inputFormat = usePCM16 ? 'pcm16' : 'g711_ulaw';
+  const outputFormat = usePCM16 ? 'pcm16' : 'g711_ulaw';
+  
+  // If using PCM16, flag the connection so sendAudioChunk knows to convert
+  if (usePCM16) {
+    conn._forcePCM16 = true;
+  }
+
   // Send session.update immediately (like test method)
   const sessionConfig = {
     type: 'session.update',
@@ -828,9 +941,9 @@ async handleSessionCreated(callId, message) {
       modalities: ['text', 'audio'],
       instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant.',
       voice: config.openai.realtimeVoice || 'alloy',
-      // CRITICAL: Make sure we're using the correct audio format
-      input_audio_format: 'g711_ulaw',
-      output_audio_format: 'g711_ulaw',
+      // Use the determined audio format
+      input_audio_format: inputFormat,
+      output_audio_format: outputFormat,
       // Enable turn detection with adjusted parameters
       turn_detection: {
         type: 'server_vad',
@@ -842,13 +955,10 @@ async handleSessionCreated(callId, message) {
       input_audio_transcription: {
         model: 'whisper-1',
       },
-      // Ensure we're using the correct sample rate
-      input_audio_sample_rate: 8000,
-      output_audio_sample_rate: 8000,
     },
   }; 
 
-  logger.info(`[OpenAI Realtime] Sending session.update for ${callId} with audio format: g711_ulaw @ 8kHz`);
+  logger.info(`[OpenAI Realtime] Sending session.update for ${callId} with audio format: ${inputFormat} @ 8kHz`);
   try {
     await this.sendJsonMessage(callId, sessionConfig);
   } catch (sendError) {
@@ -1122,6 +1232,26 @@ async handleApiError(callId, message) {
         conn.consecutiveBufferErrors = 0;
       }
       conn.consecutiveBufferErrors++;
+      
+      // If we get buffer errors with g711_ulaw, try switching to PCM16
+      if (conn.consecutiveBufferErrors === 2 && !conn._forcePCM16) {
+        logger.warn(`[OpenAI Realtime] g711_ulaw seems to be failing for ${callId}. Switching to PCM16 format.`);
+        conn._forcePCM16 = true;
+        
+        // Update the session to use PCM16
+        try {
+          await this.sendJsonMessage(callId, {
+            type: 'session.update',
+            session: {
+              input_audio_format: 'pcm16',
+              output_audio_format: 'pcm16'
+            }
+          });
+          logger.info(`[OpenAI Realtime] Switched to PCM16 format for ${callId}`);
+        } catch (updateErr) {
+          logger.error(`[OpenAI Realtime] Failed to update session format: ${updateErr.message}`);
+        }
+      }
       
       // If we get too many consecutive buffer errors, the session is likely corrupted
       if (conn.consecutiveBufferErrors >= 3) {
