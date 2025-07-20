@@ -1316,6 +1316,8 @@ class OpenAIRealtimeService {
  * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
  */
   async processAudioResponse(callId, audioBase64) {
+    logger.info(`[OpenAI Realtime] processAudioResponse ENTERED for ${callId} with audio length: ${audioBase64?.length || 0}`);
+    
     if (!audioBase64) {
         logger.warn(`[OpenAI Realtime] processAudioResponse: Empty audio for ${callId}`);
         return;
@@ -1386,6 +1388,7 @@ class OpenAIRealtimeService {
         }
         
         // CRITICAL: Send to RTP immediately - direct pass-through
+        logger.info(`[OpenAI Realtime] About to notify ARI for ${callId} with audio chunk size: ${ulawBuffer.length} bytes`);
         this.notify(callId, 'audio_chunk', { 
             audio: audioBase64, // Already base64 uLaw from OpenAI
             processingTimeMs: totalTime,
