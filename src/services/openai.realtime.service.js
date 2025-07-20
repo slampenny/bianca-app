@@ -974,6 +974,7 @@ class OpenAIRealtimeService {
   async handleResponseAudioDelta(callId, message) {
     // <<<< NEW HANDLER
     logger.info(`[OpenAI Realtime] handleResponseAudioDelta CALLED for ${callId} with message type: ${message.type}`);
+    logger.info(`[OpenAI Realtime] Message delta check for ${callId}: delta exists=${!!message.delta}, type=${typeof message.delta}, length=${message.delta?.length}`);
     
     if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
       logger.warn(
@@ -981,6 +982,8 @@ class OpenAIRealtimeService {
       );
       return;
     }
+    
+    logger.info(`[OpenAI Realtime] Validation passed for ${callId}, calling processAudioResponse with delta length: ${message.delta.length}`);
     
     const conn = this.connections.get(callId);
     if (conn) {
