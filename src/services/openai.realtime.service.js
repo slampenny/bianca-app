@@ -389,7 +389,7 @@ class OpenAIRealtimeService {
         type: 'response.create',
         response: {
           modalities: ['text', 'audio'],
-          instructions: 'Please greet the caller warmly and ask how you can help them today.',
+          instructions: 'Say "Hello, how can I help you?"',
         },
       };
 
@@ -884,13 +884,6 @@ class OpenAIRealtimeService {
         // USE PCM16 instead of g711_ulaw for better quality and reliability
         input_audio_format: 'g711_ulaw', // Much better speech recognition
         output_audio_format: 'g711_ulaw', // Higher quality output
-        // Enable turn detection with adjusted parameters
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 1000,
-        },
         // Add input transcription to help with debugging
         input_audio_transcription: {
           model: 'whisper-1',
