@@ -138,14 +138,23 @@ class TwilioCallService {
       const sipUri = `sip:${sipUser}@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};patientId=${encodeURIComponent(patientId)}`;
 
       // Connect to Asterisk SIP endpoint with patientId as a parameter
-      // Pass the URI *string* to .sip()
-      twiml.dial({
+      // Add media stream configuration for proper bidirectional audio flow
+      const dial = twiml.dial({
         callerId: config.twilio.phone, // Use configured Twilio number
         record: 'record-from-answer',
         timeLimit: 1800, // Example: 30 mins
-        timeout: 20 // Example: Ring Asterisk for 20 secs
-        // Removed 'answerOnBridge: true' as it might not be needed here, the SIP side answers
-      }).sip(sipUri); // Pass the constructed STRING here
+        timeout: 20, // Example: Ring Asterisk for 20 secs
+        answerOnBridge: true, // Ensure audio flows properly
+        // Add media stream configuration
+        mediaStream: {
+          track: 'both_tracks', // Enable both inbound and outbound audio
+          format: 'mulaw', // Use μ-law format to match Asterisk
+          sampleRate: 8000 // 8kHz sample rate to match Asterisk
+        }
+      });
+      
+      // Add the SIP endpoint
+      dial.sip(sipUri);
       
       // Log the complete TwiML for debugging
       const twimlString = twiml.toString();
