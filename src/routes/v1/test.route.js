@@ -354,6 +354,727 @@ router.get('/diagnose', async (req, res) => {
     }
 });
 
+// Add these to your test.routes.js file
+
+// ============================================
+// AUDIO DIAGNOSTIC TEST ROUTES
+// ============================================
+
+/**
+ * @swagger
+ * /test/network-info:
+ *   get:
+ *     summary: Get network configuration and DNS resolution info
+ *     description: Shows container network interfaces, DNS resolution tests, and environment configuration
+ *     tags: [Test - Audio Diagnostics]
+ *     responses:
+ *       "200":
+ *         description: Network configuration information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 timestamp:
+ *                   type: string
+ *                 hostname:
+ *                   type: string
+ *                 networkInterfaces:
+ *                   type: array
+ *                 dnsResolution:
+ *                   type: object
+ *                 environment:
+ *                   type: object
+ *                 asteriskConnectivity:
+ *                   type: object
+ *                 analysis:
+ *                   type: object
+ */
+router.get('/network-info', async (req, res) => {
+    const os = require('os');
+    
+    try {
+        // Get network interfaces
+        const networkInterfaces = os.networkInterfaces();
+        const addresses = [];
+        
+        for (const [name, interfaces] of Object.entries(networkInterfaces)) {
+            for (const iface of interfaces) {
+                if (!iface.internal) {
+                    addresses.push({
+                        interface: name,
+                        family: iface.family,
+                        address: iface.address,
+                        netmask: iface.netmask
+                    });
+                }
+            }
+        }
+        
+        // Test DNS resolution
+        const dnsTests = {};
+        
+        try {
+            const asteriskDns = await dns.resolve4('asterisk.myphonefriend.internal');
+            dnsTests.asterisk = { success: true, addresses: asteriskDns };
+        } catch (err) {
+            dnsTests.asterisk = { success: false, error: err.message };
+        }
+        
+        try {
+            const mongodbDns = await dns.resolve4('mongodb.myphonefriend.internal');
+            dnsTests.mongodb = { success: true, addresses: mongodbDns };
+        } catch (err) {
+            dnsTests.mongodb = { success: false, error: err.message };
+        }
+        
+        try {
+            const biancaAppDns = await dns.resolve4('bianca-app.myphonefriend.internal');
+            dnsTests.biancaApp = { success: true, addresses: biancaAppDns };
+        } catch (err) {
+            dnsTests.biancaApp = { success: false, error: err.message };
+        }
+        
+        // Get environment
+        const environment = {
+            NETWORK_MODE: process.env.NETWORK_MODE,
+            USE_PRIVATE_NETWORK_FOR_RTP: process.env.USE_PRIVATE_NETWORK_FOR_RTP,
+            ASTERISK_URL: process.env.ASTERISK_URL,
+            ASTERISK_PRIVATE_IP: process.env.ASTERISK_PRIVATE_IP,
+            ASTERISK_RTP_HOST: process.env.ASTERISK_RTP_HOST,
+            RTP_BIANCA_HOST: process.env.RTP_BIANCA_HOST,
+            APP_RTP_PORT_RANGE: process.env.APP_RTP_PORT_RANGE,
+            CONTAINER_IP: addresses.find(a => a.family === 'IPv4')?.address
+        };
+        
+        // Test Asterisk connectivity
+        let asteriskConnectivity = { status: 'unknown' };
+        if (ariClient) {
+            try {
+                const instance = ariClient.getAriClientInstance();
+                asteriskConnectivity = {
+                    isConnected: instance.isConnected,
+                    asteriskHost: process.env.ASTERISK_URL
+                };
+            } catch (err) {
+                asteriskConnectivity = { error: err.message };
+            }
+        }
+        
+        res.json({
+            timestamp: new Date().toISOString(),
+            hostname: os.hostname(),
+            networkInterfaces: addresses,
+            dnsResolution: dnsTests,
+            environment,
+            asteriskConnectivity,
+            
+            analysis: {
+                containerHasPrivateIP: addresses.some(a => 
+                    a.address.startsWith('172.31.') && 
+                    (a.address.startsWith('172.31.110.') || a.address.startsWith('172.31.111.'))
+                ),
+                dnsWorking: Object.values(dnsTests).some(t => t.success),
+                networkModeCorrect: environment.NETWORK_MODE === 'HYBRID',
+                rtpConfigCorrect: environment.USE_PRIVATE_NETWORK_FOR_RTP === 'true'
+            }
+        });
+        
+    } catch (err) {
+        res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+/**
+ * @swagger
+ * /test/active-calls:
+ *   get:
+ *     summary: Get all active calls
+ *     description: Lists all active calls tracked by the ARI client
+ *     tags: [Test - Audio Diagnostics]
+ *     responses:
+ *       "200":
+ *         description: List of active calls
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 activeCalls:
+ *                   type: number
+ *                 calls:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       asteriskChannelId:
+ *                         type: string
+ *                       twilioCallSid:
+ *                         type: string
+ *                       state:
+ *                         type: string
+ *                       isReadStreamReady:
+ *                         type: boolean
+ *                       isWriteStreamReady:
+ *                         type: boolean
+ *                       rtpPorts:
+ *                         type: object
+ */
+router.get('/active-calls', async (req, res) => {
+    if (!ariClient) {
+        return res.status(503).json({ error: 'ARI client not available' });
+    }
+    
+    try {
+        const instance = ariClient.getAriClientInstance();
+        const calls = [];
+        
+        if (instance.tracker && instance.tracker.calls) {
+            for (const [callId, callData] of instance.tracker.calls.entries()) {
+                calls.push({
+                    asteriskChannelId: callId,
+                    twilioCallSid: callData.twilioCallSid,
+                    state: callData.state,
+                    isReadStreamReady: callData.isReadStreamReady,
+                    isWriteStreamReady: callData.isWriteStreamReady,
+                    rtpPorts: {
+                        read: callData.rtpReadPort,
+                        write: callData.rtpWritePort
+                    }
+                });
+            }
+        }
+        
+        res.json({
+            activeCalls: calls.length,
+            calls
+        });
+        
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /test/rtp-sender-all:
+ *   get:
+ *     summary: Get all RTP sender instances
+ *     description: Shows all active RTP sender configurations
+ *     tags: [Test - Audio Diagnostics]
+ *     responses:
+ *       "200":
+ *         description: RTP sender status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 activeCallsCount:
+ *                   type: number
+ *                 calls:
+ *                   type: array
+ */
+router.get('/rtp-sender-all', (req, res) => {
+    if (!rtpSender) {
+        return res.status(503).json({ error: 'RTP sender service not available' });
+    }
+    
+    const status = rtpSender.getStatus();
+    res.json({
+        activeCallsCount: status.activeCallsCount,
+        calls: status.calls.map(call => ({
+            callId: call.callId,
+            rtpTarget: `${call.rtpHost}:${call.rtpPort}`,
+            initialized: call.initialized,
+            hasTimer: call.hasTimer,
+            packetsSent: call.stats?.packetsSent || 0,
+            audioChunksReceived: call.stats?.audioChunksReceived || 0
+        }))
+    });
+});
+
+/**
+ * @swagger
+ * /test/complete-audio-diagnostic/{callId}:
+ *   get:
+ *     summary: Complete audio flow diagnostic for a specific call
+ *     description: Comprehensive diagnostic showing all components of the audio pipeline
+ *     tags: [Test - Audio Diagnostics]
+ *     parameters:
+ *       - in: path
+ *         name: callId
+ *         required: true
+ *         description: Call ID (Asterisk channel ID or Twilio Call SID)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: Complete diagnostic report
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 timestamp:
+ *                   type: string
+ *                 requestedCallId:
+ *                   type: string
+ *                 networkConfiguration:
+ *                   type: object
+ *                 ariCallData:
+ *                   type: object
+ *                 openAI:
+ *                   type: object
+ *                 rtpSender:
+ *                   type: object
+ *                 rtpListeners:
+ *                   type: array
+ *                 callFlowAnalysis:
+ *                   type: object
+ *                 recommendations:
+ *                   type: array
+ */
+router.get('/complete-audio-diagnostic/:callId', async (req, res) => {
+    const { callId } = req.params;
+    
+    if (!ariClient || !openAIService || !rtpSender) {
+        return res.status(503).json({ 
+            error: 'Required services not available',
+            services: {
+                ariClient: !!ariClient,
+                openAIService: !!openAIService,
+                rtpSender: !!rtpSender
+            }
+        });
+    }
+    
+    try {
+        // 1. Get ARI client and call data
+        const ariInstance = ariClient.getAriClientInstance();
+        const callData = ariInstance.tracker.getCall(callId) || 
+                        ariInstance.tracker.findCallByTwilioCallSid(callId);
+        
+        // 2. Get OpenAI connection status
+        const openAIStatus = await openAIService.getConnectionStatus(callId);
+        
+        // Also check with both possible IDs
+        const openAIStatusAlt = callData ? 
+            await openAIService.getConnectionStatus(callData.twilioCallSid || callData.asteriskChannelId) : 
+            null;
+        
+        // 3. Get RTP sender status
+        const rtpSenderStatus = rtpSender.getStatus();
+        
+        // Find RTP sender by any matching ID
+        const rtpCall = rtpSenderStatus.calls.find(c => 
+            c.callId === callId || 
+            c.callId === callData?.twilioCallSid || 
+            c.callId === callData?.asteriskChannelId
+        );
+        
+        // 4. Get RTP listener status (if available)
+        let listenerStatus = { listeners: [] };
+        try {
+            const rtpListener = require('../../services/rtp.listener.service');
+            listenerStatus = rtpListener.getFullStatus();
+        } catch (err) {
+            logger.warn('RTP listener service not available');
+        }
+        
+        // Find listener for this call
+        const relevantListeners = callData ? 
+            listenerStatus.listeners.filter(l => 
+                l.port === callData.rtpReadPort || 
+                l.port === callData.rtpWritePort ||
+                l.callId === callId ||
+                l.callId === callData.twilioCallSid
+            ) : [];
+        
+        // 5. Network configuration
+        const networkConfig = {
+            NETWORK_MODE: process.env.NETWORK_MODE,
+            USE_PRIVATE_NETWORK_FOR_RTP: process.env.USE_PRIVATE_NETWORK_FOR_RTP,
+            ASTERISK_URL: process.env.ASTERISK_URL,
+            ASTERISK_PRIVATE_IP: process.env.ASTERISK_PRIVATE_IP,
+            ASTERISK_RTP_HOST: process.env.ASTERISK_RTP_HOST,
+            RTP_BIANCA_HOST: process.env.RTP_BIANCA_HOST,
+            APP_RTP_PORT_RANGE: process.env.APP_RTP_PORT_RANGE
+        };
+        
+        // 6. Call flow analysis
+        const callFlowAnalysis = analyzeCallFlow(callData, openAIStatus, rtpCall, relevantListeners);
+        
+        // 7. Generate diagnostic report
+        const diagnosticReport = {
+            timestamp: new Date().toISOString(),
+            requestedCallId: callId,
+            networkConfiguration: networkConfig,
+            
+            ariCallData: callData ? {
+                found: true,
+                asteriskChannelId: callData.asteriskChannelId,
+                twilioCallSid: callData.twilioCallSid,
+                state: callData.state,
+                rtpPorts: {
+                    read: callData.rtpReadPort,
+                    write: callData.rtpWritePort
+                },
+                asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
+                pipelineStatus: {
+                    isReadStreamReady: callData.isReadStreamReady,
+                    isWriteStreamReady: callData.isWriteStreamReady
+                },
+                channels: {
+                    hasMainChannel: !!callData.mainChannel,
+                    hasSnoopChannel: !!callData.snoopChannel,
+                    hasInboundRtpChannel: !!callData.inboundRtpChannel,
+                    hasOutboundRtpChannel: !!callData.outboundRtpChannel
+                }
+            } : { found: false },
+            
+            openAI: {
+                primaryCheck: openAIStatus,
+                alternateCheck: openAIStatusAlt,
+                analysis: {
+                    isConnected: openAIStatus?.exists && openAIStatus?.sessionReady,
+                    audioChunksSent: openAIStatus?.audioChunksSent || 0,
+                    validAudioChunksSent: openAIStatus?.validAudioChunksSent || 0
+                }
+            },
+            
+            rtpSender: rtpCall ? {
+                found: true,
+                callId: rtpCall.callId,
+                target: `${rtpCall.rtpHost}:${rtpCall.rtpPort}`,
+                initialized: rtpCall.initialized,
+                hasTimer: rtpCall.hasTimer,
+                bufferSize: rtpCall.bufferSize,
+                stats: rtpCall.stats,
+                debugCounters: rtpCall.debugCounters
+            } : { found: false },
+            
+            rtpListeners: relevantListeners.map(l => ({
+                port: l.port,
+                callId: l.callId,
+                packetsReceived: l.packetsReceived,
+                bytesReceived: l.bytesReceived,
+                packetsPerSecond: l.packetsPerSecond,
+                source: l.source
+            })),
+            
+            callFlowAnalysis,
+            
+            recommendations: generateRecommendations(callFlowAnalysis)
+        };
+        
+        // Format response
+        res.json(diagnosticReport);
+        
+    } catch (err) {
+        res.status(500).json({
+            error: err.message,
+            stack: err.stack
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/force-audio-test/{callId}:
+ *   post:
+ *     summary: Force test audio flow for a specific call
+ *     description: Attempts to force initialize RTP sender and send test audio
+ *     tags: [Test - Audio Diagnostics]
+ *     parameters:
+ *       - in: path
+ *         name: callId
+ *         required: true
+ *         description: Call ID (Asterisk channel ID or Twilio Call SID)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: Test results
+ *       "404":
+ *         description: Call not found
+ */
+router.post('/force-audio-test/:callId', async (req, res) => {
+    const { callId } = req.params;
+    
+    if (!ariClient || !openAIService || !rtpSender) {
+        return res.status(503).json({ error: 'Required services not available' });
+    }
+    
+    try {
+        const ariInstance = ariClient.getAriClientInstance();
+        
+        // Find the call
+        const callData = ariInstance.tracker.getCall(callId) || 
+                        ariInstance.tracker.findCallByTwilioCallSid(callId);
+        
+        if (!callData) {
+            return res.status(404).json({ error: 'Call not found' });
+        }
+        
+        const results = {
+            callFound: true,
+            asteriskChannelId: callData.asteriskChannelId,
+            twilioCallSid: callData.twilioCallSid,
+            tests: {}
+        };
+        
+        // Test 1: Check RTP sender initialization
+        const rtpStatus = rtpSender.getStatus();
+        const rtpCall = rtpStatus.calls.find(c => 
+            c.callId === callData.twilioCallSid || 
+            c.callId === callData.asteriskChannelId ||
+            c.callId === callId
+        );
+        
+        results.tests.rtpSenderFound = !!rtpCall;
+        results.tests.rtpSenderDetails = rtpCall || null;
+        
+        // Test 2: Force initialize RTP sender if not found
+        if (!rtpCall && callData.asteriskRtpEndpoint) {
+            try {
+                await rtpSender.initializeCall(
+                    callData.twilioCallSid || callId, 
+                    {
+                        asteriskChannelId: callData.asteriskChannelId,
+                        rtpHost: callData.asteriskRtpEndpoint.host,
+                        rtpPort: callData.asteriskRtpEndpoint.port,
+                        format: 'ulaw'
+                    }
+                );
+                results.tests.rtpSenderForceInitialized = true;
+            } catch (err) {
+                results.tests.rtpSenderInitError = err.message;
+            }
+        }
+        
+        // Test 3: Send test audio
+        try {
+            // Generate 1 second of comfort noise in uLaw
+            const testAudio = Buffer.alloc(8000, 0xFF);
+            const testAudioBase64 = testAudio.toString('base64');
+            
+            // Try sending with multiple possible IDs
+            const idsToTry = [
+                callData.twilioCallSid,
+                callData.asteriskChannelId,
+                callId
+            ].filter(id => id);
+            
+            for (const id of idsToTry) {
+                try {
+                    await rtpSender.sendAudio(id, testAudioBase64);
+                    results.tests.audioSentWith = id;
+                    break;
+                } catch (err) {
+                    results.tests[`audioSendError_${id}`] = err.message;
+                }
+            }
+        } catch (err) {
+            results.tests.audioSendGeneralError = err.message;
+        }
+        
+        // Test 4: Check OpenAI connection
+        const openAIStatus = await openAIService.getConnectionStatus(
+            callData.twilioCallSid || callId
+        );
+        results.tests.openAIConnected = openAIStatus?.exists && openAIStatus?.sessionReady;
+        results.tests.openAIStatus = openAIStatus;
+        
+        // Test 5: Force OpenAI to speak
+        if (results.tests.openAIConnected) {
+            try {
+                await openAIService.sendResponseCreate(
+                    callData.twilioCallSid || callId
+                );
+                results.tests.openAIResponseTriggered = true;
+            } catch (err) {
+                results.tests.openAITriggerError = err.message;
+            }
+        }
+        
+        // Get final RTP status
+        const finalRtpStatus = rtpSender.getStatus();
+        results.finalRtpSenderStatus = finalRtpStatus.calls.find(c => 
+            c.callId === callData.twilioCallSid || 
+            c.callId === callData.asteriskChannelId ||
+            c.callId === callId
+        );
+        
+        res.json(results);
+        
+    } catch (err) {
+        res.status(500).json({ 
+            error: err.message,
+            stack: err.stack 
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/trigger-openai-response/{callId}:
+ *   post:
+ *     summary: Manually trigger OpenAI to generate a response
+ *     description: Forces OpenAI to generate and send audio for a specific call
+ *     tags: [Test - Audio Diagnostics]
+ *     parameters:
+ *       - in: path
+ *         name: callId
+ *         required: true
+ *         description: Call ID (Asterisk channel ID or Twilio Call SID)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       "200":
+ *         description: Trigger result
+ */
+router.post('/trigger-openai-response/:callId', async (req, res) => {
+    const { callId } = req.params;
+    
+    if (!openAIService || !ariClient) {
+        return res.status(503).json({ error: 'Required services not available' });
+    }
+    
+    try {
+        // Try to trigger response with both possible IDs
+        const result1 = await openAIService.forceResponseGeneration(callId);
+        
+        // Also try with the Twilio SID if we have it
+        const ariInstance = ariClient.getAriClientInstance();
+        const callData = ariInstance.tracker.findCallByTwilioCallSid(callId) || 
+                        ariInstance.tracker.getCall(callId);
+        
+        let result2 = false;
+        if (callData && callData.twilioCallSid && callData.twilioCallSid !== callId) {
+            result2 = await openAIService.forceResponseGeneration(callData.twilioCallSid);
+        }
+        
+        res.json({
+            success: result1 || result2,
+            primaryId: { id: callId, success: result1 },
+            alternateId: callData?.twilioCallSid ? 
+                { id: callData.twilioCallSid, success: result2 } : 
+                null
+        });
+        
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
+    }
+});
+
+// Helper functions
+function analyzeCallFlow(callData, openAIStatus, rtpCall, listeners) {
+    const issues = [];
+    const status = {
+        overallHealth: 'unknown',
+        audioFlowDirection: {
+            userToOpenAI: 'unknown',
+            openAIToUser: 'unknown'
+        }
+    };
+    
+    if (!callData) {
+        issues.push('CRITICAL: No call data found in ARI tracker');
+        status.overallHealth = 'failed';
+        return { issues, status };
+    }
+    
+    // Check user -> OpenAI flow
+    const readListener = listeners.find(l => l.port === callData.rtpReadPort);
+    if (!readListener) {
+        issues.push(`No RTP listener on port ${callData.rtpReadPort} for user audio`);
+        status.audioFlowDirection.userToOpenAI = 'broken';
+    } else if (readListener.packetsReceived === 0) {
+        issues.push('RTP listener exists but receiving no packets from Asterisk');
+        status.audioFlowDirection.userToOpenAI = 'no_data';
+    } else {
+        status.audioFlowDirection.userToOpenAI = 'working';
+    }
+    
+    // Check OpenAI connection
+    if (!openAIStatus?.exists || !openAIStatus?.sessionReady) {
+        issues.push('OpenAI connection not ready');
+    } else if (openAIStatus.audioChunksReceived === 0) {
+        issues.push('OpenAI connected but not receiving audio');
+    }
+    
+    // Check OpenAI -> user flow
+    if (!rtpCall) {
+        issues.push('CRITICAL: No RTP sender found for this call');
+        status.audioFlowDirection.openAIToUser = 'broken';
+    } else if (!rtpCall.initialized) {
+        issues.push('RTP sender exists but not initialized');
+        status.audioFlowDirection.openAIToUser = 'not_initialized';
+    } else if (!rtpCall.hasTimer) {
+        issues.push('RTP sender initialized but packet timer not running');
+        status.audioFlowDirection.openAIToUser = 'timer_missing';
+    } else if (rtpCall.stats.packetsSent === 0) {
+        issues.push('RTP sender running but no packets sent');
+        status.audioFlowDirection.openAIToUser = 'no_packets';
+    } else {
+        status.audioFlowDirection.openAIToUser = 'working';
+    }
+    
+    // Check call ID consistency
+    if (callData.twilioCallSid && rtpCall && rtpCall.callId !== callData.twilioCallSid) {
+        issues.push(`Call ID mismatch: RTP using ${rtpCall.callId}, should be ${callData.twilioCallSid}`);
+    }
+    
+    // Overall health
+    if (issues.length === 0) {
+        status.overallHealth = 'healthy';
+    } else if (issues.some(i => i.includes('CRITICAL'))) {
+        status.overallHealth = 'critical';
+    } else {
+        status.overallHealth = 'degraded';
+    }
+    
+    return { issues, status };
+}
+
+function generateRecommendations(analysis) {
+    const recommendations = [];
+    
+    if (analysis.issues.includes('CRITICAL: No call data found in ARI tracker')) {
+        recommendations.push('Call not found. Check if the call ID is correct or if the call has ended.');
+    }
+    
+    if (analysis.issues.some(i => i.includes('No RTP listener'))) {
+        recommendations.push('RTP listener not started. Check port allocation and listener service.');
+    }
+    
+    if (analysis.issues.some(i => i.includes('No RTP sender found'))) {
+        recommendations.push('RTP sender not initialized. Check if ExternalMedia setup completed successfully.');
+    }
+    
+    if (analysis.issues.some(i => i.includes('Call ID mismatch'))) {
+        recommendations.push('Fix call ID usage - ensure OpenAI and RTP sender use the same ID (Twilio SID).');
+    }
+    
+    if (analysis.issues.some(i => i.includes('timer not running'))) {
+        recommendations.push('RTP packet timer not started. Check RTP sender initialization.');
+    }
+    
+    if (analysis.status.audioFlowDirection.userToOpenAI === 'no_data') {
+        recommendations.push('Check Asterisk snoop channel and ExternalMedia configuration.');
+    }
+    
+    if (analysis.status.audioFlowDirection.openAIToUser === 'no_packets') {
+        recommendations.push('OpenAI audio not being sent. Check notification callback and audio buffering.');
+    }
+    
+    return recommendations;
+}
+
 /**
  * @swagger
  * /test/config-check:
