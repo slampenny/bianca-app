@@ -1536,11 +1536,11 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
             snoopBridgeId: snoopBridge.id
         });
         
-        // Step 6: Create ExternalMedia for Asterisk to send audio TO your app
+        // Step 6: Create ExternalMedia for Asterisk to send audio TO your app (READ direction)
         const rtpHost = this.RTP_BIANCA_HOST; 
         const rtpDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
         
-        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpDest} (Asterisk → App)`);
+        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpDest} (Asterisk → App, READ)`);
         
         const rtpChannel = await channel.externalMedia({
             app: CONFIG.STASIS_APP_NAME,
@@ -1551,7 +1551,21 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         
         logger.info(`[ARI] ExternalMedia created: ${rtpChannel.id} (${rtpChannel.name})`);
         
-        // The UnicastRTP channel will enter Stasis and we'll handle it there
+        // Step 7: Create ExternalMedia for your app to send audio TO Asterisk (WRITE direction)
+        const rtpWriteDest = `${rtpHost}:${parentCallData.rtpWritePort}`;
+        
+        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpWriteDest} (App → Asterisk, WRITE)`);
+        
+        const rtpWriteChannel = await channel.externalMedia({
+            app: CONFIG.STASIS_APP_NAME,
+            external_host: rtpWriteDest,
+            format: CONFIG.RTP_SEND_FORMAT,
+            direction: 'write' // Your app sends audio TO Asterisk
+        });
+        
+        logger.info(`[ARI] ExternalMedia WRITE created: ${rtpWriteChannel.id} (${rtpWriteChannel.name})`);
+        
+        // Both UnicastRTP channels will enter Stasis and we'll handle them there
         
     } catch (err) {
         logger.error(`[ARI] Failed to setup snoop channel: ${err.message}`, err);
