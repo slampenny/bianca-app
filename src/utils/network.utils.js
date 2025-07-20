@@ -186,6 +186,12 @@ async function getFargateIp(forceRefresh = false) {
 
 // New function to get the appropriate IP for RTP communication
 async function getRTPAddress(forceRefresh = false) {
+    // First, check if RTP_BIANCA_HOST is explicitly set (highest priority)
+    if (process.env.RTP_BIANCA_HOST) {
+        logger.info(`[Network Utils] Using RTP_BIANCA_HOST for RTP: ${process.env.RTP_BIANCA_HOST}`);
+        return process.env.RTP_BIANCA_HOST;
+    }
+    
     const networkMode = process.env.NETWORK_MODE;
     const usePrivateRTP = process.env.USE_PRIVATE_NETWORK_FOR_RTP === 'true';
     
