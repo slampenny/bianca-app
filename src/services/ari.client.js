@@ -1121,7 +1121,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
             
             logger.info(`[ARI Pipeline] Allocated ports - READ: ${readPort}, WRITE: ${writePort}`);
 
-            // Step 2: Start RTP listeners on BOTH ports
+            // Step 2: Start RTP listener for receiving audio from Asterisk
             const rtpListenerService = require('./rtp.listener.service');
             
             // Listener for READ (from Asterisk)
@@ -1210,7 +1210,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                 const rtpListenerService = require('./rtp.listener.service');
                 rtpListenerService.stopRtpListenerForCall(twilioCallSid || asteriskChannelId);
             } catch (cleanupErr) {
-                logger.error(`[ARI Pipeline] Error stopping RTP listener during cleanup: ${cleanupErr.message}`);
+                logger.error(`[ARI Pipeline] Error stopping RTP listeners during cleanup: ${cleanupErr.message}`);
             }
             
             if (mainBridge?.id) {
@@ -1536,19 +1536,17 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
             snoopBridgeId: snoopBridge.id
         });
         
-        // Step 6: Create ExternalMedia with BOTH direction
-        // IMPORTANT: When using 'read' direction, Asterisk RECEIVES RTP, not sends it
-        // We need to use 'both' and let the UnicastRTP channel handle the actual sending
+        // Step 6: Create ExternalMedia for Asterisk to send audio TO your app
         const rtpHost = this.RTP_BIANCA_HOST; 
-        const rtpReadDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
+        const rtpDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
         
-        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpReadDest}`);
+        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpDest} (Asterisk → App)`);
         
         const rtpChannel = await channel.externalMedia({
             app: CONFIG.STASIS_APP_NAME,
-            external_host: rtpReadDest,
+            external_host: rtpDest,
             format: CONFIG.RTP_SEND_FORMAT,
-            direction: 'read' // Use 'both' instead of 'read'
+            direction: 'read' // Asterisk sends audio TO your app
         });
         
         logger.info(`[ARI] ExternalMedia created: ${rtpChannel.id} (${rtpChannel.name})`);
@@ -1590,24 +1588,17 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
             await this.client.bridges.addChannel({ bridgeId: parentCallData.mainBridgeId, channel: channelId });
             logger.info(`[ARI] Added playback channel ${channelId} to bridge`);
 
-            // USE DYNAMIC PORT INSTEAD OF STATIC CONFIG
-            const rtpHost = this.RTP_BIANCA_HOST;
-            const rtpAsteriskSource = `${rtpHost}:${parentCallData.rtpWritePort}`;
+            // The playback channel is now ready to receive audio from the RTP Sender
+            // Asterisk will automatically create an outbound RTP channel when needed
+            logger.info(`[ARI] Playback channel ${channelId} is ready to receive audio from RTP Sender`);
             
-            logger.info(`[ARI] Creating WRITE ExternalMedia to ${rtpAsteriskSource}`);
-            
-            const unicastRtpChannel = await channel.externalMedia({
-                app: CONFIG.STASIS_APP_NAME,
-                external_host: rtpAsteriskSource,
-                format: CONFIG.RTP_SEND_FORMAT,
-                direction: 'write'
+            // Update tracking to indicate playback channel is ready
+            this.tracker.updateCall(parentChannelId, { 
+                playbackChannelReady: true
             });
             
-            logger.info(`[ARI] WRITE ExternalMedia requested, created channel ${unicastRtpChannel.id}`);
-            const asteriskRtpEndpoint = await this.getRtpEndpoint(unicastRtpChannel);
-            
-            this.tracker.updateCall(parentChannelId, { asteriskRtpEndpoint, unicastRtpChannel, unicastRtpChannelId: unicastRtpChannel.id });
-            await this.initializeRtpSenderWithEndpoint(parentChannelId, asteriskRtpEndpoint);
+            // Check if media pipeline is complete
+            this.checkMediaPipelineReady(parentChannelId);
             
         } catch (err) {
             logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
