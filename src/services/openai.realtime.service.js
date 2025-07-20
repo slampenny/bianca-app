@@ -750,6 +750,7 @@ class OpenAIRealtimeService {
           break;
 
         case 'response.audio.delta':
+          logger.info(`[OpenAI Realtime] Switch case 'response.audio.delta' hit for ${callId}`);
           await this.handleResponseAudioDelta(callId, message);
           break;
 
@@ -972,6 +973,8 @@ class OpenAIRealtimeService {
 
   async handleResponseAudioDelta(callId, message) {
     // <<<< NEW HANDLER
+    logger.info(`[OpenAI Realtime] handleResponseAudioDelta CALLED for ${callId} with message type: ${message.type}`);
+    
     if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
       logger.warn(
         `[OpenAI Realtime] Received 'response.audio.delta' for ${callId} but 'message.delta' (audio data) is missing or empty.`
