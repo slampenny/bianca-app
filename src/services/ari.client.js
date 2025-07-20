@@ -722,15 +722,15 @@ class AsteriskAriClient extends EventEmitter {
         await channel.answer();
         logger.info(`[ARI] Answered inbound RTP channel ${channel.id}`);
         
-        // CRITICAL: Add the RTP channel to the snoop bridge
-        if (callData.snoopBridgeId) {
+        // CRITICAL: Add the RTP channel to the main bridge (not snoop bridge)
+        if (callData.mainBridgeId) {
             await this.client.bridges.addChannel({
-                bridgeId: callData.snoopBridgeId,
+                bridgeId: callData.mainBridgeId,
                 channel: channel.id
             });
-            logger.info(`[ARI] Added inbound RTP channel ${channel.id} to snoop bridge ${callData.snoopBridgeId}`);
+            logger.info(`[ARI] Added inbound RTP channel ${channel.id} to main bridge ${callData.mainBridgeId}`);
         } else {
-            logger.error(`[ARI] No snoop bridge found for call ${parentId}!`);
+            logger.error(`[ARI] No main bridge found for call ${parentId}!`);
         }
         
         // Get and log the RTP endpoint info for debugging
