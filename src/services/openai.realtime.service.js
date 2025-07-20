@@ -404,11 +404,47 @@ class OpenAIRealtimeService {
       setTimeout(() => {
         const currentConn = this.connections.get(callId);
         if (currentConn && currentConn._responseCreated && currentConn._responseStartTime === connection._responseStartTime) {
-          logger.warn(`[OpenAI Realtime] Response timeout for ${callId} - resetting response flag`);
+          logger.warn(`[OpenAI Realtime] Response timeout for ${callId} - resetting response flag after 10 seconds`);
           currentConn._responseCreated = false;
           currentConn._responseStartTime = null;
+          
+          // Force a new response generation after timeout
+          setTimeout(async () => {
+            try {
+              logger.info(`[OpenAI Realtime] Attempting to generate new response after timeout for ${callId}`);
+              await this.sendResponseCreate(callId);
+            } catch (err) {
+              logger.error(`[OpenAI Realtime] Failed to generate new response after timeout for ${callId}: ${err.message}`);
+            }
+          }, 1000);
         }
       }, 10000); // 10 second timeout
+      
+      // Add a more aggressive timeout check every 5 seconds
+      const aggressiveTimeout = setInterval(() => {
+        const currentConn = this.connections.get(callId);
+        if (currentConn && currentConn._responseCreated && currentConn._responseStartTime) {
+          const responseAge = Date.now() - currentConn._responseStartTime;
+          if (responseAge > 15000) { // 15 seconds
+            logger.warn(`[OpenAI Realtime] Aggressive timeout for ${callId} - response stuck for ${responseAge}ms, forcing reset`);
+            currentConn._responseCreated = false;
+            currentConn._responseStartTime = null;
+            clearInterval(aggressiveTimeout);
+            
+            // Force a new response generation
+            setTimeout(async () => {
+              try {
+                logger.info(`[OpenAI Realtime] Attempting to generate new response after aggressive timeout for ${callId}`);
+                await this.sendResponseCreate(callId);
+              } catch (err) {
+                logger.error(`[OpenAI Realtime] Failed to generate new response after aggressive timeout for ${callId}: ${err.message}`);
+              }
+            }, 1000);
+          }
+        } else {
+          clearInterval(aggressiveTimeout);
+        }
+      }, 5000);
       
       // Log diagnostic info
       logger.info(`[OpenAI Realtime] Connection state for ${callId}:`, {
@@ -760,6 +796,7 @@ class OpenAIRealtimeService {
 
         case 'response.done':
           logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
+          logger.info(`[OpenAI Realtime] Response lifecycle for ${callId}: done at ${new Date().toISOString()}`);
           await this.handleResponseDone(callId);
           break;
 
@@ -845,6 +882,7 @@ class OpenAIRealtimeService {
           if (connResponse) {
             connResponse._responseCreated = true; // Mark that OpenAI acknowledged our response.create
             logger.info(`[OpenAI Realtime] OpenAI acknowledged response.create for ${callId}`);
+            logger.info(`[OpenAI Realtime] Response lifecycle for ${callId}: created at ${new Date().toISOString()}`);
           }
           break;
 
