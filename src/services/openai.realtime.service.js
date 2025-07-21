@@ -92,9 +92,9 @@ class OpenAIRealtimeService {
       // This will help us see if the issue is with validation or something else
       const durationMs = (audioBuffer.length / 8); // 8kHz, 1 byte per sample
       
-      // Log the first few bytes for debugging
-      const firstBytes = audioBuffer.slice(0, Math.min(10, audioBuffer.length));
-      logger.debug(`[OpenAI Realtime] Audio validation: ${audioBuffer.length} bytes, first bytes: [${Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
+      // Only log validation errors, not successful validations
+      // const firstBytes = audioBuffer.slice(0, Math.min(10, audioBuffer.length));
+      // logger.debug(`[OpenAI Realtime] Audio validation: ${audioBuffer.length} bytes, first bytes: [${Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
       
       return {
         isValid: true,
@@ -148,7 +148,10 @@ class OpenAIRealtimeService {
     const adjustedDurationMs = estimatedDurationMs + safetyMarginMs;
 
     if (adjustedDurationMs < CONSTANTS.MIN_AUDIO_DURATION_MS) {
-      logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: insufficient duration (${adjustedDurationMs}ms < ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms), chunks sent: ${conn.validAudioChunksSent}, raw estimate: ${estimatedDurationMs}ms, bytes: ${conn.totalAudioBytesSent || 0}`);
+      // Only log every 50th check to reduce noise
+      if (conn.validAudioChunksSent % 50 === 0) {
+        logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: insufficient duration (${adjustedDurationMs}ms < ${CONSTANTS.MIN_AUDIO_DURATION_MS}ms), chunks sent: ${conn.validAudioChunksSent}, raw estimate: ${estimatedDurationMs}ms, bytes: ${conn.totalAudioBytesSent || 0}`);
+      }
       return { 
         canCommit: false, 
         totalDuration: adjustedDurationMs,
@@ -156,7 +159,10 @@ class OpenAIRealtimeService {
       };
     }
 
-    logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: ready to commit (${adjustedDurationMs}ms, ${conn.validAudioChunksSent} chunks, raw estimate: ${estimatedDurationMs}ms, bytes: ${conn.totalAudioBytesSent || 0})`);
+    // Only log every 50th check to reduce noise
+    if (conn.validAudioChunksSent % 50 === 0) {
+      logger.debug(`[OpenAI Realtime] Commit readiness check for ${callId}: ready to commit (${adjustedDurationMs}ms, ${conn.validAudioChunksSent} chunks, raw estimate: ${estimatedDurationMs}ms, bytes: ${conn.totalAudioBytesSent || 0})`);
+    }
     return {
       canCommit: true,
       totalDuration: adjustedDurationMs,
@@ -1762,7 +1768,12 @@ class OpenAIRealtimeService {
 
     // CRITICAL: Don't start new timer if one is already active (this prevents constant resetting)
     if (this.commitTimers.has(callId)) {
-      logger.debug(`[OpenAI Realtime] DebounceCommit: Timer already active for ${callId}, skipping`);
+              // Only log every 100th skip to reduce noise
+        if (!conn._debounceSkipCount) conn._debounceSkipCount = 0;
+        conn._debounceSkipCount++;
+        if (conn._debounceSkipCount % 100 === 0) {
+          logger.debug(`[OpenAI Realtime] DebounceCommit: Timer already active for ${callId}, skipping (${conn._debounceSkipCount} times)`);
+        }
       return;
     }
 
@@ -1983,7 +1994,10 @@ class OpenAIRealtimeService {
             logger.info(`[AUDIO DEBUG] Sent ${conn.audioChunksReceived} uLaw chunks directly to OpenAI for ${callId}`);
         }
         
-        logger.debug(`[OpenAI Realtime] SENDING: type=input_audio_buffer.append, audio_length=${audioChunkBase64ULaw.length}`);
+        // Only log every 100th send to reduce noise
+        if (conn.audioChunksSent % 100 === 0) {
+            logger.debug(`[OpenAI Realtime] SENDING: type=input_audio_buffer.append, audio_length=${audioChunkBase64ULaw.length}`);
+        }
         
         // Debug: Check if the audio data looks valid
         if (conn.validAudioChunksSent <= 3) {
@@ -2022,7 +2036,10 @@ class OpenAIRealtimeService {
         }
         
         // Log every chunk for debugging the buffer issue
-        logger.debug(`[OpenAI Realtime] Audio append successful for ${callId}: chunk #${conn.validAudioChunksSent}, total sent: ${conn.audioChunksSent}`);
+        // Only log every 50th successful append to reduce noise
+        if (conn.validAudioChunksSent % 50 === 0) {
+            logger.debug(`[OpenAI Realtime] Audio append successful for ${callId}: chunk #${conn.validAudioChunksSent}, total sent: ${conn.audioChunksSent}`);
+        }
         
         // Improved commit logic with validation
         const commitReadiness = this.checkCommitReadiness(callId);

@@ -112,7 +112,10 @@ class RtpListener {
             const audioBase64 = rtpPacket.payload.toString('base64');
             
             if (audioBase64 && audioBase64.length > 0) {
-                logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
+                // Only log every 100th packet to reduce noise
+                if (this.stats.packetsSent % 100 === 0) {
+                    logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
+                }
                 await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
                 this.stats.packetsSent++;
             } else {

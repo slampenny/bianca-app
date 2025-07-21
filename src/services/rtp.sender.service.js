@@ -299,8 +299,8 @@ class RtpSenderService extends EventEmitter {
             const newBuffer = Buffer.concat([currentBuffer, audioPayload]);
             this.audioBuffers.set(callId, newBuffer);
 
-            // Log buffer status
-            if (debug && (debug.audioChunks <= 20 || debug.audioChunks % 100 === 0)) {
+            // Only log every 100th chunk to reduce noise
+            if (debug && debug.audioChunks % 100 === 0) {
                 logger.info(`[RTP Sender] Buffered ${audioPayload.length} bytes for ${callId}. Total buffer: ${newBuffer.length} bytes`);
             }
 
