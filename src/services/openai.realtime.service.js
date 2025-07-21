@@ -921,6 +921,10 @@ class OpenAIRealtimeService {
           logger.info(`[OpenAI Realtime] Audio buffer cleared for ${callId}`);
           break;
 
+        case 'input_audio_buffer.appended':
+          logger.info(`[OpenAI Realtime] Audio buffer append acknowledged for ${callId}`);
+          break;
+
         case 'response.created':
           logger.info(`[OpenAI Realtime] Response created for ${callId}`);
           const connResponse = this.connections.get(callId);
@@ -940,7 +944,7 @@ class OpenAIRealtimeService {
           break;
 
         default:
-          logger.debug(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId}`);
+          logger.info(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId} - full message: ${JSON.stringify(message)}`);
       }
     } catch (err) {
       logger.error(`[OpenAI Realtime] Error processing message type ${message?.type} for ${callId}: ${err.message}`, err);
@@ -1005,10 +1009,17 @@ class OpenAIRealtimeService {
       // CRITICAL: Set session setup flag to prevent commits during setup
       conn._sessionSetupInProgress = true;
       
-      // Reset counters when session becomes ready
-      conn.audioChunksReceived = 0;
-      conn.audioChunksSent = 0;
-      conn.validAudioChunksSent = 0;
+          // Reset counters when session becomes ready
+    conn.audioChunksReceived = 0;
+    conn.audioChunksSent = 0;
+    conn.validAudioChunksSent = 0;
+    
+    // Clear any pending audio buffer (should be empty, but safety check)
+    const pendingAudio = this.pendingAudio.get(callId);
+    if (pendingAudio && pendingAudio.length > 0) {
+      logger.info(`[OpenAI Realtime] Clearing pending audio buffer for ${callId} (${pendingAudio.length} chunks)`);
+      this.pendingAudio.set(callId, []);
+    }
       logger.info(`[OpenAI Realtime] Session ready for ${callId}. Waiting for session configuration to fully apply.`);
 
       try {
@@ -1611,6 +1622,12 @@ class OpenAIRealtimeService {
 
     // CRITICAL: Prevent commits when no valid audio has been sent
     if (messageObj.type === 'input_audio_buffer.commit' && callId && conn) {
+      // CRITICAL: Check if session is fully ready before allowing commits
+      if (!conn.sessionReady || conn._sessionSetupInProgress) {
+        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - session not ready (ready: ${conn.sessionReady}, setupInProgress: ${conn._sessionSetupInProgress})`);
+        return Promise.resolve(true); // Resolve successfully but don't send
+      }
+      
       if (!conn.validAudioChunksSent || conn.validAudioChunksSent === 0) {
         logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - no valid audio chunks sent (${conn.validAudioChunksSent || 0} valid, ${conn.audioChunksSent || 0} total)`);
         return Promise.resolve(true); // Resolve successfully but don't send
@@ -1633,6 +1650,27 @@ class OpenAIRealtimeService {
       logger.warn(`[OpenAI Realtime] BLOCKED empty audio append for ${callId}`);
       return Promise.resolve(true); // Resolve successfully but don't send
     }
+    
+    // CRITICAL: Buffer audio appends when session isn't ready
+    if (messageObj.type === 'input_audio_buffer.append' && callId && conn && (!conn.sessionReady || conn._sessionSetupInProgress)) {
+      logger.info(`[OpenAI Realtime] BUFFERING audio append for ${callId} - session not ready (ready: ${conn.sessionReady}, setupInProgress: ${conn._sessionSetupInProgress})`);
+      
+      // Use the existing pendingAudio system instead of creating a new one
+      const pending = this.pendingAudio.get(callId) || [];
+      if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+        // Extract the audio data from the message object
+        const audioData = messageObj.audio;
+        if (audioData) {
+          pending.push(audioData);
+          this.pendingAudio.set(callId, pending);
+          logger.debug(`[OpenAI Realtime] Added audio chunk to pending buffer for ${callId} (buffer size: ${pending.length})`);
+        }
+      } else {
+        logger.warn(`[OpenAI Realtime] Pending audio buffer full for ${callId}. Dropping chunk.`);
+      }
+      
+      return Promise.resolve(true); // Resolve successfully but don't send yet
+    }
 
     if (!wsToSend || wsToSend.readyState !== WebSocket.OPEN) {
       logger.warn(`[OpenAI Realtime] Cannot send - WS not open for ${identifier}`);
@@ -1644,7 +1682,13 @@ class OpenAIRealtimeService {
 
       // Reduce logging verbosity for audio append messages
       if (messageObj.type === 'input_audio_buffer.append') {
-        logger.debug(`[OpenAI Realtime] SENDING: type=${messageObj.type}, audio_length=${messageObj.audio?.length || 0}`);
+        // Only log every 100th audio append to reduce noise
+        const conn = this.connections.get(callId);
+        if (!conn || !conn.validAudioChunksSent || conn.validAudioChunksSent % 100 === 0) {
+          logger.debug(`[OpenAI Realtime] SENDING: type=${messageObj.type}, audio_length=${messageObj.audio?.length || 0}`);
+        }
+      } else if (messageObj.type === 'input_audio_buffer.commit') {
+        logger.info(`[OpenAI Realtime] SENDING: type=${messageObj.type} - attempting commit`);
       } else {
         // Log all other message types normally
         logger.info(`[OpenAI Realtime] SENDING: type=${messageObj.type}`);
@@ -1672,6 +1716,12 @@ class OpenAIRealtimeService {
                 // Successfully sent audio
                 conn.lastSuccessfulAppendTime = Date.now();
                 conn.consecutiveBufferErrors = 0; // Reset error counter on successful append
+                // Only log every 100th successful append to reduce noise
+                if (!conn.validAudioChunksSent || conn.validAudioChunksSent % 100 === 0) {
+                  logger.debug(`[OpenAI Realtime] ✅ Audio append sent successfully for ${callId} (chunk ${conn.audioChunksSent || 0})`);
+                }
+              } else if (messageObj.type === 'input_audio_buffer.commit') {
+                logger.info(`[OpenAI Realtime] ✅ Commit message sent successfully for ${callId}`);
               } else if (messageObj.type === 'input_audio_buffer.clear') {
                 // Successfully cleared buffer
                 logger.info(`[OpenAI Realtime] Buffer cleared successfully for ${callId}`);
@@ -1689,6 +1739,8 @@ class OpenAIRealtimeService {
       return Promise.reject(err);
     }
   }
+
+
 
   /**
    * Flush pending audio - FIXED VERSION with audio conversion
@@ -1858,7 +1910,7 @@ class OpenAIRealtimeService {
 
       logger.info(
         `[OpenAI Realtime] Checking commit conditions for ${callId} - ready: ${currentConn?.webSocket?.readyState === WebSocket.OPEN
-        }, sessionReady: ${currentConn?.sessionReady}, pending: ${currentConn?.pendingCommit}`
+        }, sessionReady: ${currentConn?.sessionReady}, setupInProgress: ${currentConn?._sessionSetupInProgress}, pending: ${currentConn?.pendingCommit}`
       );
 
       if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
@@ -2076,21 +2128,34 @@ class OpenAIRealtimeService {
             logger.info(`[AUDIO DEBUG] Sent ${conn.audioChunksReceived} uLaw chunks directly to OpenAI for ${callId}`);
         }
         
-        // Only log every 100th send to reduce noise
-        if (conn.audioChunksSent % 100 === 0) {
-            logger.debug(`[OpenAI Realtime] SENDING: type=input_audio_buffer.append, audio_length=${audioChunkBase64ULaw.length}`);
-        }
+
         
         // Debug: Check if the audio data looks valid
         if (conn.validAudioChunksSent <= 3) {
           const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
           logger.debug(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} for ${callId}: base64_length=${audioChunkBase64ULaw.length}, raw_bytes=${audioBytes.length}, first_byte=0x${audioBytes[0]?.toString(16)}, last_byte=0x${audioBytes[audioBytes.length-1]?.toString(16)}`);
+          
+          // CRITICAL: Check if this looks like valid uLaw data
+          const isULaw = audioBytes.every(byte => byte >= 0 && byte <= 255);
+          const hasVariation = audioBytes.some(byte => byte !== audioBytes[0]);
+          logger.info(`[OpenAI Realtime] Audio format check for ${callId}: isULaw=${isULaw}, hasVariation=${hasVariation}, sample_values=[${audioBytes.slice(0, 5).map(b => '0x' + b.toString(16)).join(', ')}]`);
         }
+        
+        // CRITICAL: Track when we send audio appends to detect silent failures
+        const appendStartTime = Date.now();
         
         await this.sendJsonMessage(callId, {
             type: 'input_audio_buffer.append',
             audio: audioChunkBase64ULaw,
         });
+        
+        // CRITICAL: Check if we're getting acknowledgments within a reasonable time
+        setTimeout(() => {
+          const timeSinceAppend = Date.now() - appendStartTime;
+          if (timeSinceAppend > 5000) { // 5 seconds
+            logger.warn(`[OpenAI Realtime] No acknowledgment received for audio append to ${callId} after ${timeSinceAppend}ms - possible silent failure`);
+          }
+        }, 5000);
         
         conn.audioChunksSent++;
         
@@ -2112,16 +2177,12 @@ class OpenAIRealtimeService {
         // CRITICAL FIX: Set the last successful append time
         conn.lastSuccessfulAppendTime = Date.now();
         
-        // Log audio sending progress
-        if (conn.validAudioChunksSent <= 10 || conn.validAudioChunksSent % 10 === 0) {
+        // Log audio sending progress (reduced frequency)
+        if (conn.validAudioChunksSent <= 5 || conn.validAudioChunksSent % 50 === 0) {
             logger.info(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} sent to OpenAI for ${callId} (${audioChunkBase64ULaw.length} bytes)`);
         }
         
-        // Log every chunk for debugging the buffer issue
-        // Only log every 50th successful append to reduce noise
-        if (conn.validAudioChunksSent % 50 === 0) {
-            logger.debug(`[OpenAI Realtime] Audio append successful for ${callId}: chunk #${conn.validAudioChunksSent}, total sent: ${conn.audioChunksSent}`);
-        }
+
         
         // Improved commit logic with validation
         const commitReadiness = this.checkCommitReadiness(callId);
