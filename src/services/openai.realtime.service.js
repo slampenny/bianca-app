@@ -183,7 +183,7 @@ class OpenAIRealtimeService {
       estimatedDurationMs = conn.validAudioChunksSent * 20; // Rough estimate
     }
     
-    const safetyMarginMs = 20; // Add 20ms safety margin
+    const safetyMarginMs = 50; // Increase safety margin to 50ms
     const adjustedDurationMs = estimatedDurationMs + safetyMarginMs;
 
     if (adjustedDurationMs < CONSTANTS.MIN_AUDIO_DURATION_MS) {
@@ -1862,8 +1862,17 @@ class OpenAIRealtimeService {
       );
 
       if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
-        // Check if we have sufficient audio data before committing
+        // CRITICAL: Check if we have sufficient audio data before committing
         const commitReadiness = this.checkCommitReadiness(callId);
+        
+        // Add very clear logging about buffer state when timer fires
+        logger.info(`[OpenAI Realtime] 🔍 COMMIT TIMER FIRED for ${callId} - Buffer State Check:`);
+        logger.info(`[OpenAI Realtime] 🔍   - Valid chunks sent: ${currentConn.validAudioChunksSent}`);
+        logger.info(`[OpenAI Realtime] 🔍   - Total audio bytes: ${currentConn.totalAudioBytesSent || 0}`);
+        logger.info(`[OpenAI Realtime] 🔍   - Estimated duration: ${commitReadiness.totalDuration || 0}ms`);
+        logger.info(`[OpenAI Realtime] 🔍   - Can commit: ${commitReadiness.canCommit}`);
+        logger.info(`[OpenAI Realtime] 🔍   - Reason: ${commitReadiness.reason}`);
+        
         if (commitReadiness.canCommit) {
           // CRITICAL: Additional check: ensure we've successfully sent audio recently
           const timeSinceLastAppend = Date.now() - (currentConn.lastSuccessfulAppendTime || 0);
@@ -1885,9 +1894,9 @@ class OpenAIRealtimeService {
           }
           
           // CRITICAL: Ensure we have at least some valid audio chunks before committing
-          // With 20ms per chunk, we need at least 6 chunks to get 120ms (100ms + safety margin)
-          if (currentConn.validAudioChunksSent < 6) {
-            logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient valid chunks for ${callId} (${currentConn.validAudioChunksSent} < 6) - skipping commit`);
+          // With 20ms per chunk, we need at least 10 chunks to get 200ms (100ms + safety margin)
+          if (currentConn.validAudioChunksSent < 10) {
+            logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient valid chunks for ${callId} (${currentConn.validAudioChunksSent} < 10) - skipping commit`);
             return;
           }
           
@@ -1917,7 +1926,12 @@ class OpenAIRealtimeService {
             currentConn.pendingCommit = false;
           }
         } else {
-          logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient audio for ${callId}: ${commitReadiness.reason}`);
+          logger.error(`[OpenAI Realtime] 🚨🚨🚨 COMMIT TIMER FIRED BUT BUFFER INSUFFICIENT for ${callId} 🚨🚨🚨`);
+          logger.error(`[OpenAI Realtime] 🚨   - Valid chunks sent: ${currentConn.validAudioChunksSent} (need at least 10)`);
+          logger.error(`[OpenAI Realtime] 🚨   - Total audio bytes: ${currentConn.totalAudioBytesSent || 0}`);
+          logger.error(`[OpenAI Realtime] 🚨   - Estimated duration: ${commitReadiness.totalDuration || 0}ms (need at least 100ms)`);
+          logger.error(`[OpenAI Realtime] 🚨   - Reason: ${commitReadiness.reason}`);
+          logger.error(`[OpenAI Realtime] 🚨   - This indicates audio pipeline issues - chunks not being sent or buffer being cleared`);
         }
       } else {
         logger.debug(
@@ -2099,7 +2113,7 @@ class OpenAIRealtimeService {
         conn.lastSuccessfulAppendTime = Date.now();
         
         // Log audio sending progress
-        if (conn.validAudioChunksSent <= 5 || conn.validAudioChunksSent % 20 === 0) {
+        if (conn.validAudioChunksSent <= 10 || conn.validAudioChunksSent % 10 === 0) {
             logger.info(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} sent to OpenAI for ${callId} (${audioChunkBase64ULaw.length} bytes)`);
         }
         
@@ -2112,12 +2126,14 @@ class OpenAIRealtimeService {
         // Improved commit logic with validation
         const commitReadiness = this.checkCommitReadiness(callId);
         if (commitReadiness.canCommit) {
-            if (conn.validAudioChunksSent >= CONSTANTS.AUDIO_BATCH_SIZE) {
+            // CRITICAL: Only commit if we have enough chunks to avoid buffer too small errors
+            if (conn.validAudioChunksSent >= 10) {
                 this.debounceCommit(callId);
-            } else if (conn.validAudioChunksSent === 1) {
-                // Start a timer for the first chunk to ensure we don't wait too long
+            } else if (conn.validAudioChunksSent >= 5) {
+                // Start a timer for moderate chunks to ensure we don't wait too long
                 this.debounceCommit(callId);
             }
+            // Don't start commit timer for very few chunks (less than 5)
         } else {
             logger.debug(`[OpenAI Realtime] Not ready to commit for ${callId}: ${commitReadiness.reason}`);
         }
