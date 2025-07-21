@@ -8,6 +8,7 @@ class ChannelTracker {
         this.calls = new Map(); // Key: asteriskChannelId (main channel), Value: call state object
         // Map AudioSocket UUID back to main Asterisk Channel ID (if using AudioSocket)
         this.uuidToChannelId = new Map();
+        this.cleanupInProgress = new Set(); // Track calls currently being cleaned up
         
         // Listen to port manager events
         this.setupPortManagerListeners();
@@ -299,6 +300,12 @@ class ChannelTracker {
      * @returns {object} - Cleanup result with success status and errors
      */
     async cleanupCall(asteriskChannelId, reason = "Unknown") {
+        // Prevent multiple simultaneous cleanups for the same call
+        if (this.cleanupInProgress.has(asteriskChannelId)) {
+            logger.warn(`[Tracker] Cleanup already in progress for ${asteriskChannelId}. Skipping duplicate cleanup request. Reason: ${reason}`);
+            return { success: false, errors: ['Cleanup already in progress'] };
+        }
+        
         const callData = this.calls.get(asteriskChannelId);
         
         if (!callData) {
@@ -306,10 +313,13 @@ class ChannelTracker {
             return { success: false, errors: ['Call not found'] };
         }
         
-        logger.info(`[Tracker] Starting comprehensive cleanup for ${asteriskChannelId}. Reason: ${reason}`);
+        // Mark cleanup as in progress
+        this.cleanupInProgress.add(asteriskChannelId);
         
         const cleanupErrors = [];
         const primarySid = callData.twilioCallSid || asteriskChannelId;
+        
+        logger.info(`[Tracker] Starting comprehensive cleanup for ${asteriskChannelId}. Reason: ${reason}`);
         
         try {
             // Step 1: Cleanup RTP listeners
@@ -416,6 +426,9 @@ class ChannelTracker {
                 callId: asteriskChannelId,
                 primarySid
             };
+        } finally {
+            // Always remove the cleanup flag, regardless of success or failure
+            this.cleanupInProgress.delete(asteriskChannelId);
         }
     }
     

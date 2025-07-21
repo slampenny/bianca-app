@@ -32,6 +32,7 @@ class PortManager extends EventEmitter {
         }
         
         logger.info(`[PortManager] Initialized with ${this.availablePorts.size} available ports in range ${this.RTP_PORT_START}-${this.RTP_PORT_END}`);
+        logger.info(`[PortManager] 🚀 DEPLOYMENT VERIFICATION: New simplified port allocation system is ACTIVE! Starting from port ${this.RTP_PORT_START}`);
     }
     
     /**
@@ -99,6 +100,7 @@ class PortManager extends EventEmitter {
         this.leasedPorts.set(port, leaseInfo);
         
         logger.info(`[PortManager] Acquired port ${port} for call ${callId} (${metadata.direction || 'unknown'}). Available: ${this.availablePorts.size}, Leased: ${this.leasedPorts.size}`);
+        logger.info(`[PortManager] 🎯 PORT ALLOCATION: ${callId} got port ${port} (direction: ${metadata.direction || 'unknown'})`);
         this.emit('port-acquired', { port, callId, leaseInfo });
         
         return port;
