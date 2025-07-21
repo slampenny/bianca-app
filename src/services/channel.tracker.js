@@ -554,6 +554,23 @@ class ChannelTracker {
         
         return null;
     }
+    
+    /**
+     * Find call data by UnicastRTP channel ID
+     * @param {string} unicastRtpChannelId
+     * @returns {object | null} - Returns { asteriskChannelId, ...callData } or null
+     */
+    findCallByUnicastRtpChannelId(unicastRtpChannelId) {
+        if (!unicastRtpChannelId) return null;
+        
+        for (const [asteriskId, data] of this.calls.entries()) {
+            if (data.unicastRtpChannelId === unicastRtpChannelId) {
+                return { asteriskChannelId: asteriskId, ...data };
+            }
+        }
+        
+        return null;
+    }
 
     /**
      * Debugging helper to log current state.
