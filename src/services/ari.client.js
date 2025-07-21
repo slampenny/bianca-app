@@ -649,13 +649,31 @@ class AsteriskAriClient extends EventEmitter {
 
         const { parentId, callData } = parentCallData;
         
-        // This UnicastRTP channel is for the READ stream (user->app)
-        if (!callData.inboundRtpChannelId) {
-             await this.handleInboundRtpChannel(channel, parentId, callData);
-        } 
-        // This UnicastRTP channel is for the WRITE stream (app->user)
-        else if (!callData.outboundRtpChannelId) {
-             await this.handleOutboundRtpChannel(channel, parentId, callData);
+        // Determine if this is inbound or outbound based on channel name and existing channels
+        const channelName = channel.name || '';
+        const isOutboundChannel = channelName.includes(this.RTP_BIANCA_HOST);
+        
+        logger.info(`[ARI] Channel ${channel.id} analysis: name="${channelName}", isOutbound=${isOutboundChannel}, existingInbound=${!!callData.inboundRtpChannelId}, existingOutbound=${!!callData.outboundRtpChannelId}`);
+        
+        // Route based on channel type and existing channels
+        if (isOutboundChannel || callData.inboundRtpChannelId) {
+            // This is the outbound channel (WRITE stream - app->user)
+            if (!callData.outboundRtpChannelId) {
+                logger.info(`[ARI] Routing channel ${channel.id} to OUTBOUND handler`);
+                await this.handleOutboundRtpChannel(channel, parentId, callData);
+            } else {
+                logger.warn(`[ARI] Duplicate outbound RTP channel ${channel.id} - hanging up`);
+                await this.safeHangup(channel, 'Duplicate Outbound RTP');
+            }
+        } else {
+            // This is the inbound channel (READ stream - user->app)
+            if (!callData.inboundRtpChannelId) {
+                logger.info(`[ARI] Routing channel ${channel.id} to INBOUND handler`);
+                await this.handleInboundRtpChannel(channel, parentId, callData);
+            } else {
+                logger.warn(`[ARI] Duplicate inbound RTP channel ${channel.id} - hanging up`);
+                await this.safeHangup(channel, 'Duplicate Inbound RTP');
+            }
         }
     }
 

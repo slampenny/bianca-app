@@ -986,7 +986,7 @@ class OpenAIRealtimeService {
           }
         }, 2000); // Increased to 2 seconds to ensure session config is fully applied
 
-        // CRITICAL: Add a longer delay before sending response.create to ensure audio pipeline is ready
+        // CRITICAL: Add a shorter delay before sending response.create to ensure audio pipeline is ready
         setTimeout(async () => {
           // Double-check connection is still valid before sending
           const currentConn = this.connections.get(callId);
@@ -1004,12 +1004,30 @@ class OpenAIRealtimeService {
             logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
           } else {
             logger.error(`[OpenAI Realtime] Connection lost before response.create could be sent for ${callId}`);
+            // Clear the flag even if connection is lost to prevent permanent blocking
+            if (currentConn) {
+              currentConn._sessionSetupInProgress = false;
+            }
           }
-        }, 3000); // Increased to 3 seconds (after audio flush)
+        }, 1000); // Reduced to 1 second to allow commits sooner
+
+        // CRITICAL: Add a safety timeout to clear the session setup flag if something goes wrong
+        setTimeout(() => {
+          const currentConn = this.connections.get(callId);
+          if (currentConn && currentConn._sessionSetupInProgress) {
+            logger.warn(`[OpenAI Realtime] Safety timeout: clearing session setup flag for ${callId} after 5 seconds`);
+            currentConn._sessionSetupInProgress = false;
+          }
+        }, 5000); // 5 second safety timeout
 
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
         logger.error(`[OpenAI Realtime] Error in session setup for ${callId}: ${err.message}`);
+        // Clear the flag on error to prevent permanent blocking
+        const currentConn = this.connections.get(callId);
+        if (currentConn) {
+          currentConn._sessionSetupInProgress = false;
+        }
         this.cleanup(callId);
       }
     }
