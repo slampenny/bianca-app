@@ -232,6 +232,32 @@ class PortManager extends EventEmitter {
     }
     
     /**
+     * Release external ports by call ID (ports registered from Asterisk)
+     * @param {string} callId
+     * @returns {Array} Array of released external port numbers
+     */
+    releaseExternalPortsForCall(callId) {
+        if (!callId) return [];
+        
+        const releasedPorts = [];
+        
+        // Find all external ports leased by this call
+        for (const [port, leaseInfo] of this.leasedPorts.entries()) {
+            if (leaseInfo.callId === callId && leaseInfo.metadata?.source === 'asterisk') {
+                if (this.releasePort(port)) {
+                    releasedPorts.push(port);
+                }
+            }
+        }
+        
+        if (releasedPorts.length > 0) {
+            logger.info(`[PortManager] Released ${releasedPorts.length} external ports for call ${callId}: ${releasedPorts.join(', ')}`);
+        }
+        
+        return releasedPorts;
+    }
+    
+    /**
      * Find port by call ID
      * @param {string} callId
      * @returns {number | null}
@@ -308,6 +334,46 @@ class PortManager extends EventEmitter {
      */
     isPortLeased(port) {
         return this.leasedPorts.has(port);
+    }
+    
+    /**
+     * Register an external port (e.g., from Asterisk) to prevent conflicts
+     * @param {number} port - The port number to register
+     * @param {string} callId - Identifier for the call
+     * @param {object} metadata - Optional metadata about the port usage
+     * @returns {boolean} True if successfully registered, false if already leased
+     */
+    registerExternalPort(port, callId, metadata = {}) {
+        if (!port || !callId) {
+            logger.error('[PortManager] Cannot register external port without port and callId');
+            return false;
+        }
+        
+        // Check if port is already leased
+        if (this.isPortLeased(port)) {
+            const existingLease = this.getLeaseInfo(port);
+            logger.warn(`[PortManager] Cannot register external port ${port} - already leased by ${existingLease.callId}`);
+            return false;
+        }
+        
+        // Remove from available ports if it was there
+        this.availablePorts.delete(port);
+        
+        const leaseInfo = {
+            callId,
+            timestamp: Date.now(),
+            metadata: {
+                ...metadata,
+                asteriskChannelId: metadata.asteriskChannelId || callId,
+                twilioCallSid: metadata.twilioCallSid,
+                direction: metadata.direction || 'external',
+                source: 'asterisk' // Mark as external port from Asterisk
+            }
+        };
+        
+        this.leasedPorts.set(port, leaseInfo);
+        logger.info(`[PortManager] Registered external port ${port} for call ${callId} (${metadata.direction || 'external'})`);
+        return true;
     }
     
     /**

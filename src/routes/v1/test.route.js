@@ -9302,5 +9302,368 @@ router.post('/analyze-audio-data', async (req, res) => {
      }
  });
 
+ /**
+  * Diagnostic endpoint to fix RTP sender initialization issues
+  */
+ router.post('/fix-rtp-sender/:callId', async (req, res) => {
+     const { callId } = req.params;
+     
+     const results = {
+         callId,
+         timestamp: new Date().toISOString(),
+         steps: {},
+         fixes: [],
+         errors: []
+     };
+     
+     try {
+         const ariInstance = ariClient.getAriClientInstance();
+         const rtpSender = require('../../services/rtp.sender.service');
+         
+         // Step 1: Find the call
+         results.steps.findCall = {
+             status: 'searching',
+             timestamp: new Date().toISOString()
+         };
+         
+         const callData = ariInstance.tracker.getCall(callId) || 
+                         ariInstance.tracker.findCallByTwilioCallSid(callId);
+         
+         if (!callData) {
+             results.steps.findCall.status = 'failed';
+             results.steps.findCall.error = 'Call not found';
+             results.errors.push('Call not found in tracker');
+             return res.status(404).json(results);
+         }
+         
+         results.steps.findCall.status = 'found';
+         results.steps.findCall.callData = {
+             asteriskChannelId: callData.asteriskChannelId,
+             twilioCallSid: callData.twilioCallSid,
+             state: callData.state,
+             asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
+             isReadStreamReady: callData.isReadStreamReady,
+             isWriteStreamReady: callData.isWriteStreamReady
+         };
+         
+         // Step 2: Check current RTP sender status
+         results.steps.checkRtpSender = {
+             status: 'checking',
+             timestamp: new Date().toISOString()
+         };
+         
+         const rtpStatus = rtpSender.getStatus();
+         const rtpCall = rtpStatus.calls.find(c => 
+             c.callId === callData.twilioCallSid || 
+             c.callId === callData.asteriskChannelId ||
+             c.callId === callId
+         );
+         
+         results.steps.checkRtpSender.status = 'completed';
+         results.steps.checkRtpSender.found = !!rtpCall;
+         results.steps.checkRtpSender.details = rtpCall || null;
+         
+         // Step 3: Fix RTP sender if needed
+         if (!rtpCall) {
+             results.steps.fixRtpSender = {
+                 status: 'fixing',
+                 timestamp: new Date().toISOString()
+             };
+             
+             if (!callData.asteriskRtpEndpoint) {
+                 results.steps.fixRtpSender.status = 'failed';
+                 results.steps.fixRtpSender.error = 'No asteriskRtpEndpoint found';
+                 results.errors.push('No asteriskRtpEndpoint found in call data');
+             } else {
+                 try {
+                     // Use Twilio SID as primary identifier
+                     const primaryCallId = callData.twilioCallSid || callId;
+                     
+                     await rtpSender.initializeCall(primaryCallId, {
+                         asteriskChannelId: callData.asteriskChannelId,
+                         rtpHost: callData.asteriskRtpEndpoint.host,
+                         rtpPort: callData.asteriskRtpEndpoint.port,
+                         format: 'ulaw'
+                     });
+                     
+                     results.steps.fixRtpSender.status = 'completed';
+                     results.fixes.push('RTP sender initialized successfully');
+                     
+                     // Update call state
+                     ariInstance.tracker.updateCall(callData.asteriskChannelId, { 
+                         isWriteStreamReady: true 
+                     });
+                     
+                 } catch (err) {
+                     results.steps.fixRtpSender.status = 'failed';
+                     results.steps.fixRtpSender.error = err.message;
+                     results.errors.push(`RTP sender initialization failed: ${err.message}`);
+                 }
+             }
+         } else {
+             results.steps.fixRtpSender = {
+                 status: 'skipped',
+                 reason: 'RTP sender already exists'
+             };
+         }
+         
+         // Step 4: Verify fix
+         results.steps.verifyFix = {
+             status: 'verifying',
+             timestamp: new Date().toISOString()
+         };
+         
+         const updatedRtpStatus = rtpSender.getStatus();
+         const updatedRtpCall = updatedRtpStatus.calls.find(c => 
+             c.callId === callData.twilioCallSid || 
+             c.callId === callData.asteriskChannelId ||
+             c.callId === callId
+         );
+         
+         results.steps.verifyFix.status = 'completed';
+         results.steps.verifyFix.found = !!updatedRtpCall;
+         results.steps.verifyFix.details = updatedRtpCall || null;
+         
+         // Step 5: Test audio flow if RTP sender is now working
+         if (updatedRtpCall && updatedRtpCall.initialized) {
+             results.steps.testAudioFlow = {
+                 status: 'testing',
+                 timestamp: new Date().toISOString()
+             };
+             
+             try {
+                 // Send a small test audio chunk
+                 const testAudio = Buffer.alloc(160, 0xFF).toString('base64'); // uLaw silence
+                 await rtpSender.sendAudio(updatedRtpCall.callId, testAudio);
+                 
+                 results.steps.testAudioFlow.status = 'completed';
+                 results.steps.testAudioFlow.result = 'Audio sent successfully';
+                 results.fixes.push('Audio flow test passed');
+                 
+             } catch (err) {
+                 results.steps.testAudioFlow.status = 'failed';
+                 results.steps.testAudioFlow.error = err.message;
+                 results.errors.push(`Audio flow test failed: ${err.message}`);
+             }
+         } else {
+             results.steps.testAudioFlow = {
+                 status: 'skipped',
+                 reason: 'RTP sender not properly initialized'
+             };
+         }
+         
+         // Overall result
+         results.success = results.errors.length === 0;
+         results.summary = {
+             callFound: true,
+             rtpSenderFixed: results.fixes.includes('RTP sender initialized successfully'),
+             audioFlowWorking: results.fixes.includes('Audio flow test passed'),
+             totalFixes: results.fixes.length,
+             totalErrors: results.errors.length
+         };
+         
+         res.json(results);
+         
+     } catch (err) {
+         results.success = false;
+         results.errors.push(`Unexpected error: ${err.message}`);
+         res.status(500).json(results);
+     }
+ });
+
+ /**
+  * Comprehensive audio pipeline diagnostic for specific calls
+  */
+ router.post('/audio-pipeline-diagnostic/:callId', async (req, res) => {
+     const { callId } = req.params;
+     
+     const diagnostic = {
+         callId,
+         timestamp: new Date().toISOString(),
+         callData: null,
+         openaiStatus: null,
+         rtpSenderStatus: null,
+         rtpListenerStatus: null,
+         audioFlow: {
+             asteriskToOpenAI: 'unknown',
+             openAIToAsterisk: 'unknown'
+         },
+         issues: [],
+         recommendations: [],
+         fixes: []
+     };
+     
+     try {
+         const ariInstance = ariClient.getAriClientInstance();
+         const rtpSender = require('../../services/rtp.sender.service');
+         const rtpListener = require('../../services/rtp.listener.service');
+         const openAIService = require('../../services/openai.realtime.service');
+         
+         // Step 1: Find call data
+         const callData = ariInstance.tracker.getCall(callId) || 
+                         ariInstance.tracker.findCallByTwilioCallSid(callId);
+         
+         if (!callData) {
+             diagnostic.issues.push('Call not found in tracker');
+             return res.status(404).json(diagnostic);
+         }
+         
+         diagnostic.callData = {
+             asteriskChannelId: callData.asteriskChannelId,
+             twilioCallSid: callData.twilioCallSid,
+             state: callData.state,
+             asteriskRtpEndpoint: callData.asteriskRtpEndpoint,
+             rtpReadPort: callData.rtpReadPort,
+             rtpWritePort: callData.rtpWritePort,
+             isReadStreamReady: callData.isReadStreamReady,
+             isWriteStreamReady: callData.isWriteStreamReady
+         };
+         
+         // Step 2: Check OpenAI status
+         const openaiConn = openAIService.connections.get(callData.twilioCallSid || callId);
+         if (openaiConn) {
+             diagnostic.openaiStatus = {
+                 sessionReady: openaiConn.sessionReady,
+                 webSocketState: openaiConn.webSocket?.readyState,
+                 status: openaiConn.status,
+                 audioChunksReceived: openaiConn.audioChunksReceived || 0,
+                 audioChunksSent: openaiConn.audioChunksSent || 0,
+                 validAudioChunksSent: openaiConn.validAudioChunksSent || 0,
+                 pendingCommit: openaiConn.pendingCommit || false,
+                 lastCommitTime: openaiConn.lastCommitTime || 0,
+                 consecutiveBufferErrors: openaiConn.consecutiveBufferErrors || 0,
+                 totalAudioBytesSent: openaiConn.totalAudioBytesSent || 0,
+                 lastSuccessfulAppendTime: openaiConn.lastSuccessfulAppendTime || 0
+             };
+             
+             // Check for OpenAI issues
+             if (openaiConn.consecutiveBufferErrors > 0) {
+                 diagnostic.issues.push(`OpenAI has ${openaiConn.consecutiveBufferErrors} consecutive buffer errors`);
+             }
+             
+             if (openaiConn.audioChunksReceived > 0 && openaiConn.audioChunksSent === 0) {
+                 diagnostic.issues.push('Audio received but not sent to OpenAI - validation failing');
+             }
+             
+             if (openaiConn.audioChunksSent > 0 && openaiConn.validAudioChunksSent === 0) {
+                 diagnostic.issues.push('Audio sent to OpenAI but no valid chunks - audio format issue');
+             }
+         } else {
+             diagnostic.issues.push('No OpenAI connection found');
+         }
+         
+         // Step 3: Check RTP sender status
+         const rtpStatus = rtpSender.getStatus();
+         const rtpCall = rtpStatus.calls.find(c => 
+             c.callId === callData.twilioCallSid || 
+             c.callId === callData.asteriskChannelId ||
+             c.callId === callId
+         );
+         
+         if (rtpCall) {
+             diagnostic.rtpSenderStatus = {
+                 callId: rtpCall.callId,
+                 initialized: rtpCall.initialized,
+                 hasTimer: rtpCall.hasTimer,
+                 target: `${rtpCall.rtpHost}:${rtpCall.rtpPort}`,
+                 format: rtpCall.format,
+                 bufferSize: rtpCall.bufferSize,
+                 packetsSent: rtpCall.stats?.packetsSent || 0,
+                 audioChunksReceived: rtpCall.debugCounters?.audioChunks || 0,
+                 errors: rtpCall.stats?.errors || 0
+             };
+             
+             // Check RTP sender issues
+             if (!rtpCall.initialized) {
+                 diagnostic.issues.push('RTP sender not initialized');
+             }
+             
+             if (!rtpCall.hasTimer) {
+                 diagnostic.issues.push('RTP sender timer not running');
+             }
+             
+             if (rtpCall.stats?.errors > 0) {
+                 diagnostic.issues.push(`RTP sender has ${rtpCall.stats.errors} errors`);
+             }
+             
+             // Check if targeting correct endpoint
+             if (callData.asteriskRtpEndpoint) {
+                 const isCorrectTarget = (
+                     rtpCall.rtpHost === callData.asteriskRtpEndpoint.host &&
+                     rtpCall.rtpPort === callData.asteriskRtpEndpoint.port
+                 );
+                 
+                 if (!isCorrectTarget) {
+                     diagnostic.issues.push('RTP sender targeting wrong endpoint');
+                     diagnostic.audioFlow.openAIToAsterisk = 'broken';
+                 } else {
+                     diagnostic.audioFlow.openAIToAsterisk = 'working';
+                 }
+             }
+         } else {
+             diagnostic.issues.push('No RTP sender found');
+             diagnostic.audioFlow.openAIToAsterisk = 'broken';
+         }
+         
+         // Step 4: Check RTP listener status
+         if (callData.rtpReadPort) {
+             const listenerStatus = rtpListener.getListenerStatus?.(callData.rtpReadPort);
+             if (listenerStatus) {
+                 diagnostic.rtpListenerStatus = {
+                     port: listenerStatus.port,
+                     packetsReceived: listenerStatus.packetsReceived || 0,
+                     bytesReceived: listenerStatus.bytesReceived || 0,
+                     packetsPerSecond: listenerStatus.packetsPerSecond || 0,
+                     source: listenerStatus.source
+                 };
+                 
+                 if (listenerStatus.packetsReceived === 0) {
+                     diagnostic.issues.push('RTP listener not receiving packets');
+                     diagnostic.audioFlow.asteriskToOpenAI = 'broken';
+                 } else {
+                     diagnostic.audioFlow.asteriskToOpenAI = 'working';
+                 }
+             } else {
+                 diagnostic.issues.push('RTP listener not found');
+                 diagnostic.audioFlow.asteriskToOpenAI = 'broken';
+             }
+         }
+         
+         // Step 5: Generate recommendations and fixes
+         if (diagnostic.issues.includes('No RTP sender found') && callData.asteriskRtpEndpoint) {
+             diagnostic.recommendations.push('Initialize RTP sender with asteriskRtpEndpoint');
+             diagnostic.fixes.push('POST /fix-rtp-sender/' + callId);
+         }
+         
+         if (diagnostic.issues.includes('OpenAI has consecutive buffer errors')) {
+             diagnostic.recommendations.push('Clear OpenAI audio buffer and reset connection');
+         }
+         
+         if (diagnostic.issues.includes('Audio received but not sent to OpenAI')) {
+             diagnostic.recommendations.push('Check audio validation and format');
+         }
+         
+         if (diagnostic.issues.includes('RTP sender targeting wrong endpoint')) {
+             diagnostic.recommendations.push('Reinitialize RTP sender with correct endpoint');
+         }
+         
+         // Overall status
+         diagnostic.success = diagnostic.issues.length === 0;
+         diagnostic.summary = {
+             totalIssues: diagnostic.issues.length,
+             totalRecommendations: diagnostic.recommendations.length,
+             totalFixes: diagnostic.fixes.length,
+             audioFlowStatus: diagnostic.audioFlow
+         };
+         
+         res.json(diagnostic);
+         
+     } catch (err) {
+         diagnostic.success = false;
+         diagnostic.issues.push(`Unexpected error: ${err.message}`);
+         res.status(500).json(diagnostic);
+     }
+ });
+
  // Export the router
  module.exports = router;

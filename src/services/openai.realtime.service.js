@@ -72,7 +72,7 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Validate audio chunk before sending to OpenAI - TEMPORARILY PERMISSIVE for debugging
+   * Validate audio chunk before sending to OpenAI - ENHANCED with better error detection
    * @param {string} audioBase64 - Base64 encoded uLaw audio
    * @returns {Object} Validation result with isValid, size, duration, and reason
    */
@@ -88,19 +88,58 @@ class OpenAIRealtimeService {
         return { isValid: false, reason: 'Decoded audio buffer is empty' };
       }
 
-      // TEMPORARILY: Accept any non-empty audio buffer for debugging
-      // This will help us see if the issue is with validation or something else
+      // ENHANCED: Check for reasonable audio buffer size
+      // At 8kHz, 1 byte per sample, 20ms = 160 bytes
+      const minBytes = 80;  // 10ms minimum
+      const maxBytes = 3200; // 400ms maximum
+      
+      if (audioBuffer.length < minBytes) {
+        return { 
+          isValid: false, 
+          reason: `Audio buffer too small: ${audioBuffer.length} bytes (minimum ${minBytes})` 
+        };
+      }
+      
+      if (audioBuffer.length > maxBytes) {
+        return { 
+          isValid: false, 
+          reason: `Audio buffer too large: ${audioBuffer.length} bytes (maximum ${maxBytes})` 
+        };
+      }
+
+      // ENHANCED: Check for valid uLaw audio data
+      // uLaw values should be in range 0x00-0xFF
+      let validBytes = 0;
+      let totalBytes = audioBuffer.length;
+      
+      for (let i = 0; i < Math.min(100, totalBytes); i++) { // Check first 100 bytes
+        const byte = audioBuffer[i];
+        if (byte >= 0 && byte <= 255) {
+          validBytes++;
+        }
+      }
+      
+      const validPercentage = (validBytes / Math.min(100, totalBytes)) * 100;
+      if (validPercentage < 90) {
+        return { 
+          isValid: false, 
+          reason: `Invalid audio data: only ${validPercentage.toFixed(1)}% valid bytes` 
+        };
+      }
+
       const durationMs = (audioBuffer.length / 8); // 8kHz, 1 byte per sample
       
-      // Only log validation errors, not successful validations
-      // const firstBytes = audioBuffer.slice(0, Math.min(10, audioBuffer.length));
-      // logger.debug(`[OpenAI Realtime] Audio validation: ${audioBuffer.length} bytes, first bytes: [${Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
+      // Log validation details for debugging (but only occasionally)
+      if (Math.random() < 0.01) { // 1% of the time
+        const firstBytes = audioBuffer.slice(0, Math.min(5, audioBuffer.length));
+        logger.debug(`[OpenAI Realtime] Audio validation: ${audioBuffer.length} bytes (${durationMs.toFixed(1)}ms), first bytes: [${Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
+      }
       
       return {
         isValid: true,
         size: audioBuffer.length,
         durationMs: Math.round(durationMs),
-        reason: 'Valid audio chunk (permissive validation)'
+        reason: 'Valid audio chunk'
       };
     } catch (err) {
       return { isValid: false, reason: `Audio validation error: ${err.message}` };
@@ -1295,7 +1334,18 @@ class OpenAIRealtimeService {
           // Reset counters
           conn.audioChunksSent = 0;
           conn.validAudioChunksSent = 0;
+          conn.totalAudioBytesSent = 0;
           conn.lastCommitTime = Date.now();
+          
+          // CRITICAL FIX: Also reset the last successful append time to prevent stale commits
+          conn.lastSuccessfulAppendTime = 0;
+          
+          // CRITICAL FIX: Clear any pending commit timers
+          if (this.commitTimers.has(callId)) {
+            clearTimeout(this.commitTimers.get(callId));
+            this.commitTimers.delete(callId);
+            logger.info(`[OpenAI Realtime] Cleared pending commit timer for ${callId}`);
+          }
           
         } catch (clearErr) {
           logger.error(`[OpenAI Realtime] Failed to clear buffer for ${callId}: ${clearErr.message}`);

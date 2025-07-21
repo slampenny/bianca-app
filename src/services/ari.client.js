@@ -1130,14 +1130,14 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         let mainBridge = null;
 
         try {
-            // Step 1: Allocate TWO unique ports for this call via the tracker
+            // Step 1: Allocate only READ port for receiving audio from Asterisk
             const { readPort, writePort } = this.tracker.allocatePortsForCall(asteriskChannelId);
             
-            if (!readPort || !writePort) {
-                throw new Error('Failed to allocate RTP ports for media pipeline');
+            if (!readPort) {
+                throw new Error('Failed to allocate RTP read port for media pipeline');
             }
             
-            logger.info(`[ARI Pipeline] Allocated ports - READ: ${readPort}, WRITE: ${writePort}`);
+            logger.info(`[ARI Pipeline] Allocated read port - READ: ${readPort} (write will use Asterisk's RTP endpoint)`);
 
             // Step 2: Start RTP listener for receiving audio from Asterisk
             const rtpListenerService = require('./rtp.listener.service');
@@ -1212,7 +1212,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                 asteriskChannelId,
                 twilioCallSid,
                 readPort,
-                writePort,
+                writePort: null, // No write port - will use Asterisk's RTP endpoint
                 bridgeId: mainBridge.id,
                 conversationId: dbConversationId
             };
@@ -1671,6 +1671,26 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
             
             const endpoint = { host: addressVar.value, port: parseInt(portVar.value) };
             logger.info(`[ARI] Got Asterisk RTP endpoint for sending: ${endpoint.host}:${endpoint.port}`);
+            
+            // Register this port in the port manager to prevent conflicts
+            const portManager = require('./port.manager.service');
+            const callData = this.findParentCallForRtpChannel(unicastRtpChannel);
+            if (callData) {
+                const callId = callData.twilioCallSid || callData.asteriskChannelId;
+                const registered = portManager.registerExternalPort(endpoint.port, callId, {
+                    asteriskChannelId: callData.asteriskChannelId,
+                    twilioCallSid: callData.twilioCallSid,
+                    direction: 'write',
+                    source: 'asterisk'
+                });
+                
+                if (registered) {
+                    logger.info(`[ARI] Registered Asterisk port ${endpoint.port} in port manager for call ${callId}`);
+                } else {
+                    logger.warn(`[ARI] Failed to register Asterisk port ${endpoint.port} - may be in conflict`);
+                }
+            }
+            
             return endpoint;
             
         } catch (err) {
@@ -1691,6 +1711,19 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         logger.info(`[RTP Sender] Initializing for ${callId} to ${rtpEndpoint.host}:${rtpEndpoint.port}`);
         
         try {
+            // Ensure the Asterisk port is registered in port manager
+            const portManager = require('./port.manager.service');
+            const registered = portManager.registerExternalPort(rtpEndpoint.port, callId, {
+                asteriskChannelId,
+                twilioCallSid: callData.twilioCallSid,
+                direction: 'write',
+                source: 'asterisk'
+            });
+            
+            if (!registered) {
+                logger.warn(`[RTP Sender] Asterisk port ${rtpEndpoint.port} already registered by another call`);
+            }
+            
             const rtpSenderService = require('./rtp.sender.service');
             await rtpSenderService.initializeCall(callId, {
                 asteriskChannelId,
@@ -1746,49 +1779,14 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         const resources = this.tracker.getResources(asteriskChannelId);
         if (!resources) {
             logger.warn(`[Cleanup] No resources found for ${asteriskChannelId}, already cleaned up.`);
-            return;
+            return { success: true, errors: [] };
         }
-        
-        // Determine the primary identifier for external services
-        const primarySid = resources.twilioCallSid || resources.asteriskChannelId || asteriskChannelId;
         
         // Track cleanup errors but continue with other cleanup steps
         const cleanupErrors = [];
         
         try {
-            // Step 1: Stop and cleanup RTP listeners (BOTH read and write)
-            if (resources.rtpReadPort || resources.rtpWritePort) {
-                try {
-                    const rtpListenerService = require('./rtp.listener.service');
-                    rtpListenerService.stopRtpListenerForCall(primarySid);
-                    rtpListenerService.stopRtpListenerForCall(`${primarySid}-write`);
-                    logger.info(`[Cleanup] Stopped RTP listeners for ${primarySid}`);
-                } catch (err) {
-                    logger.error(`[Cleanup] Error stopping RTP listeners: ${err.message}`);
-                    cleanupErrors.push(`RTP listeners: ${err.message}`);
-                }
-            }
-            
-            // Step 2: Cleanup RTP sender service
-            try {
-                const rtpSenderService = require('./rtp.sender.service');
-                rtpSenderService.cleanupCall(primarySid);
-                logger.info(`[Cleanup] Cleaned up RTP sender for ${primarySid}`);
-            } catch (err) {
-                logger.warn(`[Cleanup] Error cleaning up RTP sender: ${err.message}`);
-                cleanupErrors.push(`RTP sender: ${err.message}`);
-            }
-            
-            // Step 3: Disconnect OpenAI service
-            try {
-                await openAIService.disconnect(primarySid);
-                logger.info(`[Cleanup] Disconnected OpenAI service for ${primarySid}`);
-            } catch (err) {
-                logger.warn(`[Cleanup] Error disconnecting OpenAI: ${err.message}`);
-                cleanupErrors.push(`OpenAI disconnect: ${err.message}`);
-            }
-            
-            // Step 4: Stop any active recordings
+            // Step 1: Stop any active recordings
             if (resources.recordingName) {
                 try {
                     await this.client.recordings.stop({ recordingName: resources.recordingName });
@@ -1801,7 +1799,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                 }
             }
             
-            // Step 5: Cleanup all channels in order (auxiliary first, then main)
+            // Step 2: Cleanup all channels in order (auxiliary first, then main)
             const channelsToCleanup = [
                 { channel: resources.snoopChannel, channelId: resources.snoopChannelId, type: 'Snoop' },
                 { channel: resources.playbackChannel, channelId: resources.playbackChannelId, type: 'Playback' },
@@ -1827,7 +1825,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                 }
             }
             
-            // Step 6: Cleanup bridges
+            // Step 3: Cleanup bridges
             const bridgesToCleanup = [
                 { bridge: resources.snoopBridge, bridgeId: resources.snoopBridgeId, type: 'Snoop' },
                 { bridge: resources.mainBridge, bridgeId: resources.mainBridgeId, type: 'Main' }
@@ -1848,52 +1846,41 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
                 }
             }
             
-            // Step 7: Update conversation record in database
-            if (resources.conversationId) {
-                try {
-                    const Conversation = require('../models').Conversation;
-                    await Conversation.findByIdAndUpdate(
-                        resources.conversationId,
-                        {
-                            status: 'completed',
-                            endTime: new Date(),
-                            cleanupReason: reason,
-                            cleanupErrors: cleanupErrors.length > 0 ? cleanupErrors : undefined
-                        }
-                    );
-                    logger.info(`[Cleanup] Updated conversation record ${resources.conversationId}`);
-                } catch (err) {
-                    logger.error(`[Cleanup] Error updating conversation record: ${err.message}`);
-                    cleanupErrors.push(`Conversation update: ${err.message}`);
-                }
-            }
+            // Step 4: Use centralized cleanup in tracker (handles RTP, OpenAI, ports, etc.)
+            const trackerCleanupResult = await this.tracker.cleanupCall(asteriskChannelId, reason);
             
-            // Step 8: Remove from tracker (this will also release ports automatically)
-            this.tracker.removeCall(asteriskChannelId);
-            logger.info(`[Cleanup] Removed call from tracker and released ports for ${asteriskChannelId}`);
+            // Combine errors
+            const allErrors = [...cleanupErrors, ...trackerCleanupResult.errors];
             
             // Log summary
-            if (cleanupErrors.length > 0) {
-                logger.warn(`[Cleanup] Completed with ${cleanupErrors.length} errors for ${asteriskChannelId}: ${cleanupErrors.join(', ')}`);
+            if (allErrors.length > 0) {
+                logger.warn(`[Cleanup] Completed with ${allErrors.length} errors for ${asteriskChannelId}: ${allErrors.join(', ')}`);
             } else {
                 logger.info(`[Cleanup] Successfully completed all cleanup for ${asteriskChannelId}`);
             }
             
             return {
-                success: cleanupErrors.length === 0,
-                errors: cleanupErrors
+                success: allErrors.length === 0,
+                errors: allErrors
             };
             
         } catch (err) {
             logger.error(`[Cleanup] Unexpected error during cleanup for ${asteriskChannelId}: ${err.message}`, err);
-            // Even on error, try to remove from tracker to release ports
+            
+            // Even on error, try to use centralized cleanup
             try {
-                this.tracker.removeCall(asteriskChannelId);
-                logger.info(`[Cleanup] Emergency removal from tracker completed for ${asteriskChannelId}`);
+                const trackerCleanupResult = await this.tracker.cleanupCall(asteriskChannelId, `${reason} (emergency)`);
+                return {
+                    success: false,
+                    errors: [`Unexpected error: ${err.message}`, ...trackerCleanupResult.errors]
+                };
             } catch (trackerErr) {
-                logger.error(`[Cleanup] Failed to remove from tracker: ${trackerErr.message}`);
+                logger.error(`[Cleanup] Failed to use centralized cleanup: ${trackerErr.message}`);
+                return {
+                    success: false,
+                    errors: [`Unexpected error: ${err.message}`, `Centralized cleanup failed: ${trackerErr.message}`]
+                };
             }
-            throw err;
         }
     }
 
@@ -1956,29 +1943,10 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         }
     }
 
+    // DEPRECATED: Use centralized cleanup in channel tracker instead
     async cleanupExternalServices(primarySid, resources) {
-        try {
-            const rtpSenderService = require('./rtp.sender.service');
-            rtpSenderService.cleanupCall(primarySid);
-        } catch (err) {
-            logger.warn(`[Cleanup] Error cleaning up RTP sender: ${err.message}`);
-        }
-        
-        if (resources.rtp_ssrc) {
-            try {
-                rtpListenerService.removeSsrcMapping(resources.rtp_ssrc);
-                logger.info(`[Cleanup] Removed SSRC mapping for ${resources.rtp_ssrc}`);
-            } catch (err) {
-                logger.warn(`[Cleanup] Error removing SSRC mapping: ${err.message}`);
-            }
-        }
-        
-        try {
-            await openAIService.disconnect(primarySid);
-            logger.info(`[Cleanup] Disconnected OpenAI service`);
-        } catch (err) {
-            logger.warn(`[Cleanup] Error disconnecting OpenAI: ${err.message}`);
-        }
+        logger.warn(`[Cleanup] cleanupExternalServices is deprecated - use centralized cleanup instead`);
+        // This method is kept for backward compatibility but cleanup is now handled by channel tracker
     }
 
     async stopRecording(resources) {
@@ -2091,7 +2059,7 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         
         return {
             readPort: callData.rtpReadPort,
-            writePort: callData.rtpWritePort
+            writePort: null // No write port - will use Asterisk's RTP endpoint
         };
     }
 }

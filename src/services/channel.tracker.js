@@ -124,15 +124,15 @@ class ChannelTracker {
             return { readPort: null, writePort: null };
         }
 
-        // Check if ports are already allocated
-        if (callData.rtpReadPort && callData.rtpWritePort) {
-            logger.info(`[Tracker] Ports already allocated for ${asteriskChannelId}: read=${callData.rtpReadPort}, write=${callData.rtpWritePort}`);
-            return { readPort: callData.rtpReadPort, writePort: callData.rtpWritePort };
+        // Check if read port is already allocated
+        if (callData.rtpReadPort) {
+            logger.info(`[Tracker] Read port already allocated for ${asteriskChannelId}: read=${callData.rtpReadPort}`);
+            return { readPort: callData.rtpReadPort, writePort: null };
         }
 
         const primarySid = callData.twilioCallSid || asteriskChannelId;
         
-        // Allocate read port
+        // Allocate only read port (for receiving audio from Asterisk)
         const readPort = portManager.acquirePort(`${primarySid}-read`, {
             asteriskChannelId,
             twilioCallSid: callData.twilioCallSid,
@@ -145,28 +145,14 @@ class ChannelTracker {
             return { readPort: null, writePort: null };
         }
 
-        // Allocate write port
-        const writePort = portManager.acquirePort(`${primarySid}-write`, {
-            asteriskChannelId,
-            twilioCallSid: callData.twilioCallSid,
-            patientId: callData.patientId,
-            direction: 'write'
-        });
-
-        if (!writePort) {
-            logger.error(`[Tracker] Failed to allocate write port for ${asteriskChannelId}, releasing read port`);
-            portManager.releasePort(readPort, `${primarySid}-read`);
-            return { readPort: null, writePort: null };
-        }
-
-        // Update call data with allocated ports
+        // Update call data with allocated read port only
         this.updateCall(asteriskChannelId, {
             rtpReadPort: readPort,
-            rtpWritePort: writePort
+            rtpWritePort: null // No write port needed - we'll use Asterisk's RTP endpoint directly
         });
 
-        logger.info(`[Tracker] Allocated ports for ${asteriskChannelId}: read=${readPort}, write=${writePort}`);
-        return { readPort, writePort };
+        logger.info(`[Tracker] Allocated read port for ${asteriskChannelId}: read=${readPort} (write port will use Asterisk's RTP endpoint)`);
+        return { readPort, writePort: null };
     }
 
     /**
@@ -184,7 +170,7 @@ class ChannelTracker {
         const primarySid = callData.twilioCallSid || asteriskChannelId;
         let releasedCount = 0;
 
-        // Release read port
+        // Release read port only
         if (callData.rtpReadPort) {
             if (portManager.releasePort(callData.rtpReadPort, `${primarySid}-read`)) {
                 releasedCount++;
@@ -192,17 +178,13 @@ class ChannelTracker {
             }
         }
 
-        // Release write port
-        if (callData.rtpWritePort) {
-            if (portManager.releasePort(callData.rtpWritePort, `${primarySid}-write`)) {
-                releasedCount++;
-                logger.info(`[Tracker] Released write port ${callData.rtpWritePort} for ${asteriskChannelId}`);
-            }
-        }
-
         // Also check for any other ports that might be associated with this call
         const additionalPorts = portManager.releaseAllPortsForCall(primarySid);
         releasedCount += additionalPorts.length;
+        
+        // Release external ports (from Asterisk) as well
+        const externalPorts = portManager.releaseExternalPortsForCall(primarySid);
+        releasedCount += externalPorts.length;
 
         if (releasedCount > 0) {
             // Clear port fields from call data
@@ -211,7 +193,7 @@ class ChannelTracker {
                 rtpWritePort: null
             });
             
-            logger.info(`[Tracker] Released ${releasedCount} total ports for call ${asteriskChannelId}`);
+            logger.info(`[Tracker] Released ${releasedCount} total ports for call ${asteriskChannelId} (including ${externalPorts.length} external ports)`);
         }
 
         return releasedCount > 0;
@@ -310,6 +292,133 @@ class ChannelTracker {
         return this.uuidToChannelId.get(cleanUuid);
     }
 
+    /**
+     * Comprehensive cleanup for a call - centralizes all cleanup logic
+     * @param {string} asteriskChannelId - The main Asterisk Channel ID.
+     * @param {string} reason - Reason for cleanup (for logging)
+     * @returns {object} - Cleanup result with success status and errors
+     */
+    async cleanupCall(asteriskChannelId, reason = "Unknown") {
+        const callData = this.calls.get(asteriskChannelId);
+        
+        if (!callData) {
+            logger.warn(`[Tracker] Attempted to cleanup non-existent channel ID: ${asteriskChannelId}`);
+            return { success: false, errors: ['Call not found'] };
+        }
+        
+        logger.info(`[Tracker] Starting comprehensive cleanup for ${asteriskChannelId}. Reason: ${reason}`);
+        
+        const cleanupErrors = [];
+        const primarySid = callData.twilioCallSid || asteriskChannelId;
+        
+        try {
+            // Step 1: Cleanup RTP listeners
+            if (callData.rtpReadPort) {
+                try {
+                    const rtpListenerService = require('./rtp.listener.service');
+                    rtpListenerService.stopRtpListenerForCall(primarySid);
+                    logger.info(`[Tracker] Stopped RTP listener for ${primarySid}`);
+                } catch (err) {
+                    logger.warn(`[Tracker] Error stopping RTP listener: ${err.message}`);
+                    cleanupErrors.push(`RTP listener: ${err.message}`);
+                }
+            }
+            
+            // Step 2: Cleanup RTP sender service
+            try {
+                const rtpSenderService = require('./rtp.sender.service');
+                rtpSenderService.cleanupCall(primarySid);
+                logger.info(`[Tracker] Cleaned up RTP sender for ${primarySid}`);
+            } catch (err) {
+                logger.warn(`[Tracker] Error cleaning up RTP sender: ${err.message}`);
+                cleanupErrors.push(`RTP sender: ${err.message}`);
+            }
+            
+            // Step 3: Disconnect OpenAI service
+            try {
+                const openAIService = require('./openai.realtime.service');
+                await openAIService.disconnect(primarySid);
+                logger.info(`[Tracker] Disconnected OpenAI service for ${primarySid}`);
+            } catch (err) {
+                logger.warn(`[Tracker] Error disconnecting OpenAI: ${err.message}`);
+                cleanupErrors.push(`OpenAI disconnect: ${err.message}`);
+            }
+            
+            // Step 4: Release all ports (including external ports)
+            this.releasePortsForCall(asteriskChannelId);
+            
+            // Step 5: Clean up AudioSocket UUID mapping if it exists
+            if (callData.audioSocketUuid) {
+                if(this.uuidToChannelId.get(callData.audioSocketUuid) === asteriskChannelId) {
+                    this.uuidToChannelId.delete(callData.audioSocketUuid);
+                    logger.debug(`[Tracker] Removed AudioSocket UUID mapping for ${callData.audioSocketUuid}`);
+                }
+            }
+            
+            // Step 6: Update conversation record in database
+            if (callData.conversationId) {
+                try {
+                    const Conversation = require('../models').Conversation;
+                    await Conversation.findByIdAndUpdate(
+                        callData.conversationId,
+                        {
+                            status: 'completed',
+                            endTime: new Date(),
+                            cleanupReason: reason,
+                            cleanupErrors: cleanupErrors.length > 0 ? cleanupErrors : undefined
+                        }
+                    );
+                    logger.info(`[Tracker] Updated conversation record ${callData.conversationId}`);
+                } catch (err) {
+                    logger.error(`[Tracker] Error updating conversation record: ${err.message}`);
+                    cleanupErrors.push(`Conversation update: ${err.message}`);
+                }
+            }
+            
+            // Step 7: Remove from tracker
+            const deleted = this.calls.delete(asteriskChannelId);
+            
+            if (deleted) {
+                logger.info(`[Tracker] Successfully cleaned up and removed call: ${asteriskChannelId}`);
+                this.logState();
+            }
+            
+            // Log summary
+            if (cleanupErrors.length > 0) {
+                logger.warn(`[Tracker] Cleanup completed with ${cleanupErrors.length} errors for ${asteriskChannelId}: ${cleanupErrors.join(', ')}`);
+            } else {
+                logger.info(`[Tracker] Successfully completed all cleanup for ${asteriskChannelId}`);
+            }
+            
+            return {
+                success: cleanupErrors.length === 0,
+                errors: cleanupErrors,
+                callId: asteriskChannelId,
+                primarySid
+            };
+            
+        } catch (err) {
+            logger.error(`[Tracker] Unexpected error during cleanup for ${asteriskChannelId}: ${err.message}`, err);
+            cleanupErrors.push(`Unexpected error: ${err.message}`);
+            
+            // Even on error, try to remove from tracker
+            try {
+                this.calls.delete(asteriskChannelId);
+                logger.info(`[Tracker] Emergency removal from tracker completed for ${asteriskChannelId}`);
+            } catch (trackerErr) {
+                logger.error(`[Tracker] Failed to remove from tracker: ${trackerErr.message}`);
+                cleanupErrors.push(`Tracker removal: ${trackerErr.message}`);
+            }
+            
+            return {
+                success: false,
+                errors: cleanupErrors,
+                callId: asteriskChannelId,
+                primarySid
+            };
+        }
+    }
+    
     /**
      * Removes a call and its associated mappings from the tracker.
      * @param {string} asteriskChannelId - The main Asterisk Channel ID.
@@ -417,18 +526,32 @@ class ChannelTracker {
     }
     
     /**
-     * Find call data by RTP port (checks both read and write ports)
+     * Find call data by RTP port (checks both read and write ports, plus external ports)
      * @param {number} rtpPort
      * @returns {object | null} - Returns { asteriskChannelId, ...callData } or null
      */
     findCallByRtpPort(rtpPort) {
         if (!rtpPort) return null;
+        
+        // First check explicit ports in call data
         for (const [asteriskId, data] of this.calls.entries()) {
             // Check both explicit read and write ports
             if (data.rtpReadPort === rtpPort || data.rtpWritePort === rtpPort) {
                 return { asteriskChannelId: asteriskId, ...data };
             }
         }
+        
+        // Then check external ports in port manager
+        const portManager = require('./port.manager.service');
+        const portInfo = portManager.getCallByPort(rtpPort);
+        if (portInfo && portInfo.metadata?.source === 'asterisk') {
+            // Find the call data for this external port
+            const callData = this.getCallByPrimaryId(portInfo.callId);
+            if (callData) {
+                return { asteriskChannelId: callData.asteriskChannelId, ...callData };
+            }
+        }
+        
         return null;
     }
 
