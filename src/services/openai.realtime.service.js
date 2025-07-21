@@ -842,6 +842,10 @@ class OpenAIRealtimeService {
         case 'response.done':
           logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
           logger.info(`[OpenAI Realtime] Response lifecycle for ${callId}: done at ${new Date().toISOString()}`);
+          if (conn) {
+            conn._responseCreated = false; // Reset flag to allow new commits
+            logger.info(`[OpenAI Realtime] Reset response flag for ${callId} - commits now allowed`);
+          }
           await this.handleResponseDone(callId);
           break;
 
@@ -919,6 +923,10 @@ class OpenAIRealtimeService {
 
         case 'input_audio_buffer.cleared':
           logger.info(`[OpenAI Realtime] Audio buffer cleared for ${callId}`);
+          if (conn) {
+            conn._bufferClearedTime = Date.now();
+            logger.info(`[OpenAI Realtime] Tracked buffer clear time for ${callId} - commits blocked for 2 seconds`);
+          }
           break;
 
         case 'input_audio_buffer.appended':
@@ -1628,6 +1636,24 @@ class OpenAIRealtimeService {
         return Promise.resolve(true); // Resolve successfully but don't send
       }
       
+      // CRITICAL: Don't commit when OpenAI is generating a response UNLESS we have meaningful audio (interruption)
+      if (conn._responseCreated) {
+        // Check if this is an interruption (meaningful audio during response)
+        const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
+        if (hasMeaningfulAudio) {
+          logger.info(`[OpenAI Realtime] ALLOWING interrupt commit for ${callId} - user is speaking over Bianca`);
+        } else {
+          logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - OpenAI is generating response but no meaningful audio detected`);
+          return Promise.resolve(true); // Resolve successfully but don't send
+        }
+      }
+
+      // CRITICAL: Don't commit if buffer was recently cleared (prevents race conditions)
+      if (conn._bufferClearedTime && (Date.now() - conn._bufferClearedTime) < 2000) {
+        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - buffer was cleared ${Date.now() - conn._bufferClearedTime}ms ago, waiting for more audio`);
+        return Promise.resolve(true); // Resolve successfully but don't send
+      }
+      
       if (!conn.validAudioChunksSent || conn.validAudioChunksSent === 0) {
         logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - no valid audio chunks sent (${conn.validAudioChunksSent || 0} valid, ${conn.audioChunksSent || 0} total)`);
         return Promise.resolve(true); // Resolve successfully but don't send
@@ -1910,7 +1936,7 @@ class OpenAIRealtimeService {
 
       logger.info(
         `[OpenAI Realtime] Checking commit conditions for ${callId} - ready: ${currentConn?.webSocket?.readyState === WebSocket.OPEN
-        }, sessionReady: ${currentConn?.sessionReady}, setupInProgress: ${currentConn?._sessionSetupInProgress}, pending: ${currentConn?.pendingCommit}`
+        }, sessionReady: ${currentConn?.sessionReady}, setupInProgress: ${currentConn?._sessionSetupInProgress}, pending: ${currentConn?.pendingCommit}, responseActive: ${currentConn?._responseCreated}`
       );
 
       if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
@@ -1949,6 +1975,24 @@ class OpenAIRealtimeService {
           // With 20ms per chunk, we need at least 10 chunks to get 200ms (100ms + safety margin)
           if (currentConn.validAudioChunksSent < 10) {
             logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient valid chunks for ${callId} (${currentConn.validAudioChunksSent} < 10) - skipping commit`);
+            return;
+          }
+          
+          // CRITICAL: Don't commit when OpenAI is generating a response UNLESS we have meaningful audio (interruption)
+          if (currentConn._responseCreated) {
+            // Check if this is an interruption (meaningful audio during response)
+            const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
+            if (hasMeaningfulAudio) {
+              logger.info(`[OpenAI Realtime] ALLOWING interrupt commit timer for ${callId} - user is speaking over Bianca`);
+            } else {
+              logger.warn(`[OpenAI Realtime] Commit timer fired but response active for ${callId} - skipping commit until response is done`);
+              return;
+            }
+          }
+
+          // CRITICAL: Don't commit if buffer was recently cleared (prevents race conditions)
+          if (currentConn._bufferClearedTime && (Date.now() - currentConn._bufferClearedTime) < 2000) {
+            logger.warn(`[OpenAI Realtime] Commit timer fired but buffer was cleared ${Date.now() - currentConn._bufferClearedTime}ms ago for ${callId} - waiting for more audio`);
             return;
           }
           
