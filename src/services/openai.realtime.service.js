@@ -440,7 +440,7 @@ class OpenAIRealtimeService {
 
       const messageStr = JSON.stringify(responseCreateEvent);
       connection.webSocket.send(messageStr);
-      connection._responseCreated = true;
+      // Don't set _responseCreated for initial greeting - allow commits
       connection._responseStartTime = Date.now(); // Track when response was created
       logger.info(`[OpenAI Realtime] SUCCESS: Sent response.create for ${callId}`);
       logger.debug(`[OpenAI Realtime] Response.create payload: ${messageStr}`);
@@ -1017,6 +1017,10 @@ class OpenAIRealtimeService {
       // CRITICAL: Set session setup flag to prevent commits during setup
       conn._sessionSetupInProgress = true;
       
+      // CRITICAL: Clear session setup flag immediately when session is updated
+      conn._sessionSetupInProgress = false;
+      logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
+      
           // Reset counters when session becomes ready
     conn.audioChunksReceived = 0;
     conn.audioChunksSent = 0;
@@ -1028,64 +1032,21 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Clearing pending audio buffer for ${callId} (${pendingAudio.length} chunks)`);
       this.pendingAudio.set(callId, []);
     }
-      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Waiting for session configuration to fully apply.`);
+      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Sending initial greeting.`);
 
       try {
-        // CRITICAL: Wait longer for session configuration to be fully applied
-        // OpenAI needs time to process the session configuration before accepting audio
-        setTimeout(async () => {
-          // Double-check connection is still valid before flushing audio
-          const currentConn = this.connections.get(callId);
-          if (currentConn && currentConn.webSocket && currentConn.webSocket.readyState === WebSocket.OPEN) {
-            logger.info(`[OpenAI Realtime] Flushing pending audio for ${callId} after session configuration delay`);
-            await this.flushPendingAudio(callId);
-          } else {
-            logger.error(`[OpenAI Realtime] Connection lost before audio flush could be sent for ${callId}`);
-          }
-        }, 2000); // Increased to 2 seconds to ensure session config is fully applied
-
-        // CRITICAL: Add a shorter delay before sending response.create to ensure audio pipeline is ready
-        setTimeout(async () => {
-          // Double-check connection is still valid before sending
-          const currentConn = this.connections.get(callId);
-          if (currentConn && currentConn.webSocket && currentConn.webSocket.readyState === WebSocket.OPEN) {
-            // CRITICAL: Make OpenAI speak immediately when session is ready
-            logger.info(`[OpenAI Realtime] Triggering immediate OpenAI response for ${callId}`);
-            try {
-              await this.sendResponseCreate(callId);
-            } catch (err) {
-              logger.error(`[OpenAI Realtime] Failed to send response.create for ${callId}: ${err.message}`);
-            }
-            
-            // CRITICAL: Clear session setup flag after response.create is sent
-            currentConn._sessionSetupInProgress = false;
-            logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
-          } else {
-            logger.error(`[OpenAI Realtime] Connection lost before response.create could be sent for ${callId}`);
-            // Clear the flag even if connection is lost to prevent permanent blocking
-            if (currentConn) {
-              currentConn._sessionSetupInProgress = false;
-            }
-          }
-        }, 1000); // Reduced to 1 second to allow commits sooner
-
-        // CRITICAL: Add a safety timeout to clear the session setup flag if something goes wrong
-        setTimeout(() => {
-          const currentConn = this.connections.get(callId);
-          if (currentConn && currentConn._sessionSetupInProgress) {
-            logger.warn(`[OpenAI Realtime] Safety timeout: clearing session setup flag for ${callId} after 5 seconds`);
-            currentConn._sessionSetupInProgress = false;
-          }
-        }, 5000); // 5 second safety timeout
+        // CRITICAL: Make OpenAI speak immediately when session is ready
+        logger.info(`[OpenAI Realtime] Triggering immediate OpenAI response for ${callId}`);
+        try {
+          await this.sendResponseCreate(callId);
+          logger.info(`[OpenAI Realtime] response.create sent successfully for ${callId}`);
+        } catch (err) {
+          logger.error(`[OpenAI Realtime] Failed to send response.create for ${callId}: ${err.message}`);
+        }
 
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
         logger.error(`[OpenAI Realtime] Error in session setup for ${callId}: ${err.message}`);
-        // Clear the flag on error to prevent permanent blocking
-        const currentConn = this.connections.get(callId);
-        if (currentConn) {
-          currentConn._sessionSetupInProgress = false;
-        }
         this.cleanup(callId);
       }
     }
