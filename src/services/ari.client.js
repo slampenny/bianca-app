@@ -1555,10 +1555,12 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         });
         
         // Step 6: Create ExternalMedia for Asterisk to send audio TO your app (READ direction)
-        const rtpHost = this.RTP_BIANCA_HOST; 
-        const rtpDest = `${rtpHost}:${parentCallData.rtpReadPort}`;
+        // Resolve hostname to IP to avoid DNS caching issues in Asterisk
+        const rtpHost = this.RTP_BIANCA_HOST;
+        const rtpIp = await this.resolveHostnameToIP(rtpHost);
+        const rtpDest = `${rtpIp}:${parentCallData.rtpReadPort}`;
         
-        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpDest} (Asterisk → App, READ)`);
+        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpDest} (${rtpHost} → ${rtpIp}, READ)`);
         
         const rtpChannel = await channel.externalMedia({
             app: CONFIG.STASIS_APP_NAME,
@@ -1570,9 +1572,9 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         logger.info(`[ARI] ExternalMedia created: ${rtpChannel.id} (${rtpChannel.name})`);
         
         // Step 7: Create ExternalMedia for your app to send audio TO Asterisk (WRITE direction)
-        const rtpWriteDest = `${rtpHost}:${parentCallData.rtpWritePort}`;
+        const rtpWriteDest = `${rtpIp}:${parentCallData.rtpWritePort}`;
         
-        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpWriteDest} (App → Asterisk, WRITE)`);
+        logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP to ${rtpWriteDest} (${rtpHost} → ${rtpIp}, WRITE)`);
         
         const rtpWriteChannel = await channel.externalMedia({
             app: CONFIG.STASIS_APP_NAME,
@@ -1635,6 +1637,24 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         } catch (err) {
             logger.error(`[ARI] Failed to start WRITE ExternalMedia on playback ${channelId}: ${err.message}`, err);
             await this.cleanupChannel(parentChannelId, `WRITE ExternalMedia setup failed: ${err.message}`);
+        }
+    }
+
+    // Resolve hostname to IP address to avoid DNS caching issues in Asterisk
+    async resolveHostnameToIP(hostname) {
+        try {
+            const dns = require('dns').promises;
+            const addresses = await dns.resolve4(hostname);
+            if (addresses && addresses.length > 0) {
+                logger.info(`[ARI] Resolved ${hostname} to IP: ${addresses[0]}`);
+                return addresses[0];
+            } else {
+                throw new Error(`No IP addresses found for hostname: ${hostname}`);
+            }
+        } catch (err) {
+            logger.error(`[ARI] Failed to resolve hostname ${hostname}: ${err.message}`);
+            // Fallback to hostname if DNS resolution fails
+            return hostname;
         }
     }
 

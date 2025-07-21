@@ -84,6 +84,12 @@ class RtpListener {
 
     async handleMessage(msg, rinfo) {
         this.stats.packetsReceived++;
+        
+        // Log first few packets to confirm we're receiving data
+        if (this.stats.packetsReceived <= 5) {
+            logger.info(`[RTP Listener ${this.port}] Received packet #${this.stats.packetsReceived} from ${rinfo.address}:${rinfo.port} (${msg.length} bytes) for call ${this.callId}`);
+        }
+        
         this.logStatsIfNeeded();
         
         if (msg.length > MAX_PACKET_SIZE) {
