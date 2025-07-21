@@ -651,7 +651,14 @@ class AsteriskAriClient extends EventEmitter {
         
         // Determine if this is inbound or outbound based on channel name and existing channels
         const channelName = channel.name || '';
-        const isOutboundChannel = channelName.includes(this.RTP_BIANCA_HOST);
+        
+        // FIXED: Better channel detection logic
+        // Inbound channels have a port number in the name (e.g., "UnicastRTP/172.31.110.183:20002-...")
+        // Outbound channels don't have a port number (e.g., "UnicastRTP/172.31.110.183-...")
+        const hasPortInName = channelName.match(/:\d+-/);
+        const isOutboundChannel = !hasPortInName;
+        
+        logger.info(`[ARI] Channel ${channel.id} detection: name="${channelName}", hasPortInName=${!!hasPortInName}, isOutbound=${isOutboundChannel}`);
         
         logger.info(`[ARI] Channel ${channel.id} analysis: name="${channelName}", isOutbound=${isOutboundChannel}, existingInbound=${!!callData.inboundRtpChannelId}, existingOutbound=${!!callData.outboundRtpChannelId}`);
         
@@ -716,8 +723,11 @@ class AsteriskAriClient extends EventEmitter {
         }
         
         // Method 3: For outbound RTP channels, look for calls expecting an outbound channel
-        if (channelName.includes(this.RTP_BIANCA_HOST)) {
-            logger.info(`[ARI] Detected outbound RTP channel ${channel.id} for host ${this.RTP_BIANCA_HOST}`);
+        const hasPortInName = channelName.match(/:\d+-/);
+        const isOutboundChannel = !hasPortInName;
+        
+        if (isOutboundChannel) {
+            logger.info(`[ARI] Detected outbound RTP channel ${channel.id} (no port in name)`);
             
             // Find a call that's expecting an outbound RTP channel
             for (const [callId, data] of this.tracker.calls.entries()) {
