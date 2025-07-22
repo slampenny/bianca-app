@@ -2150,15 +2150,81 @@ class OpenAIRealtimeService {
         
 
         
-        // Debug: Check if the audio data looks valid
+        // CRITICAL: Validate audio before sending to OpenAI
+        const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
+        
+        // Check if this is valid uLaw data
+        const isULaw = audioBytes.every(byte => byte >= 0 && byte <= 255);
+        const hasVariation = audioBytes.some(byte => byte !== audioBytes[0]);
+        
+        // CRITICAL FIX: Filter out silent audio (all 255 values in uLaw = silence)
+        const silenceThreshold = 0.95; // 95% of bytes are 255 (silence)
+        const silenceCount = audioBytes.filter(byte => byte === 255).length;
+        const silenceRatio = silenceCount / audioBytes.length;
+        const isSilent = silenceRatio > silenceThreshold;
+        
         if (conn.validAudioChunksSent <= 3) {
-          const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
           logger.debug(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} for ${callId}: base64_length=${audioChunkBase64ULaw.length}, raw_bytes=${audioBytes.length}, first_byte=0x${audioBytes[0]?.toString(16)}, last_byte=0x${audioBytes[audioBytes.length-1]?.toString(16)}`);
+          logger.info(`[OpenAI Realtime] Audio format check for ${callId}: isULaw=${isULaw}, hasVariation=${hasVariation}, silenceRatio=${silenceRatio.toFixed(2)}, isSilent=${isSilent}, sample_values=[${audioBytes.slice(0, 5).map(b => '0x' + b.toString(16)).join(', ')}]`);
+        }
+        
+        // CRITICAL: Handle silent audio intelligently for normal conversation
+        if (isSilent) {
+          logger.debug(`[OpenAI Realtime] Buffering silent audio chunk for ${callId} (silence ratio: ${silenceRatio.toFixed(2)})`);
+          conn.audioChunksReceived++;
           
-          // CRITICAL: Check if this looks like valid uLaw data
-          const isULaw = audioBytes.every(byte => byte >= 0 && byte <= 255);
-          const hasVariation = audioBytes.some(byte => byte !== audioBytes[0]);
-          logger.info(`[OpenAI Realtime] Audio format check for ${callId}: isULaw=${isULaw}, hasVariation=${hasVariation}, sample_values=[${audioBytes.slice(0, 5).map(b => '0x' + b.toString(16)).join(', ')}]`);
+          // Store silent audio in a buffer for later processing
+          if (!conn.silentAudioBuffer) {
+            conn.silentAudioBuffer = [];
+          }
+          conn.silentAudioBuffer.push(audioChunkBase64ULaw);
+          
+          // If we have accumulated enough silent audio, send it as a small amount of silence
+          if (conn.silentAudioBuffer.length >= 3) { // ~60ms of silence
+            const combinedSilentAudio = Buffer.concat(conn.silentAudioBuffer.map(chunk => Buffer.from(chunk, 'base64')));
+            const combinedBase64 = combinedSilentAudio.toString('base64');
+            
+            logger.debug(`[OpenAI Realtime] Sending accumulated silent audio for ${callId} (${conn.silentAudioBuffer.length} chunks)`);
+            
+            // Send the accumulated silent audio
+            await this.sendJsonMessage(callId, {
+                type: 'input_audio_buffer.append',
+                audio: combinedBase64,
+            });
+            
+            // Clear the silent buffer
+            conn.silentAudioBuffer = [];
+            
+            // Update tracking
+            conn.audioChunksSent++;
+            conn.validAudioChunksSent++;
+            conn.totalAudioBytesSent += combinedSilentAudio.length;
+            conn.lastSuccessfulAppendTime = Date.now();
+          }
+          
+          return; // Don't send individual silent chunks
+        }
+        
+        // If we have accumulated silent audio and now get meaningful audio, send the silent audio first
+        if (conn.silentAudioBuffer && conn.silentAudioBuffer.length > 0) {
+          const combinedSilentAudio = Buffer.concat(conn.silentAudioBuffer.map(chunk => Buffer.from(chunk, 'base64')));
+          const combinedBase64 = combinedSilentAudio.toString('base64');
+          
+          logger.debug(`[OpenAI Realtime] Sending accumulated silent audio before meaningful audio for ${callId}`);
+          
+          // Send the accumulated silent audio first
+          await this.sendJsonMessage(callId, {
+              type: 'input_audio_buffer.append',
+              audio: combinedBase64,
+          });
+          
+          // Clear the silent buffer
+          conn.silentAudioBuffer = [];
+          
+          // Update tracking
+          conn.audioChunksSent++;
+          conn.validAudioChunksSent++;
+          conn.totalAudioBytesSent += combinedSilentAudio.length;
         }
         
             // CRITICAL: Track when we send audio appends to detect silent failures
@@ -2197,7 +2263,6 @@ class OpenAIRealtimeService {
         if (!conn.totalAudioBytesSent) {
           conn.totalAudioBytesSent = 0;
         }
-        const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
         
         // Track all audio bytes including silence
         conn.totalAudioBytesSent += audioBytes.length;
