@@ -845,17 +845,36 @@ class AsteriskAriClient extends EventEmitter {
             await channel.answer();
             logger.info(`[ARI] Answered inbound RTP channel ${channel.id}`);
             
-            // CRITICAL FIX: Wait for snoop bridge to exist, then add to it
-            if (callData.snoopBridgeId) {
-                // Snoop bridge already exists, add directly
+            // Wait a bit for snoop bridge to be created
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Get the latest call data to check if snoop bridge was created
+            const latestCallData = this.tracker.getCall(parentId);
+            
+            // Try up to 10 times to wait for snoop bridge
+            let attempts = 0;
+            while (!latestCallData.snoopBridgeId && attempts < 10) {
+                logger.info(`[ARI] Waiting for snoop bridge... attempt ${attempts + 1}`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                const updatedData = this.tracker.getCall(parentId);
+                if (updatedData.snoopBridgeId) {
+                    latestCallData.snoopBridgeId = updatedData.snoopBridgeId;
+                    break;
+                }
+                attempts++;
+            }
+            
+            // Now add to the correct bridge
+            if (latestCallData.snoopBridgeId) {
+                // Snoop bridge exists, add directly
                 await this.client.bridges.addChannel({
-                    bridgeId: callData.snoopBridgeId,
+                    bridgeId: latestCallData.snoopBridgeId,
                     channel: channel.id
                 });
-                logger.info(`[ARI] Added inbound RTP channel ${channel.id} to snoop bridge ${callData.snoopBridgeId}`);
+                logger.info(`[ARI] Added inbound RTP channel ${channel.id} directly to snoop bridge ${latestCallData.snoopBridgeId}`);
             } else {
-                // Snoop bridge doesn't exist yet, add to main bridge temporarily
-                // and set a flag to move it later
+                // Snoop bridge still doesn't exist, add to main bridge temporarily
+                logger.warn(`[ARI] Snoop bridge not found after waiting, adding to main bridge temporarily`);
                 if (callData.mainBridgeId) {
                     await this.client.bridges.addChannel({
                         bridgeId: callData.mainBridgeId,
@@ -865,8 +884,38 @@ class AsteriskAriClient extends EventEmitter {
                     
                     // Set flag to move this channel when snoop bridge is ready
                     this.tracker.updateCall(parentId, { 
-                        pendingInboundRtpChannelMove: true 
+                        pendingInboundRtpChannelMove: true,
+                        inboundRtpChannelNeedsMove: channel.id
                     });
+                    
+                    // Schedule another check in 1 second
+                    setTimeout(async () => {
+                        const finalData = this.tracker.getCall(parentId);
+                        if (finalData && finalData.snoopBridgeId && finalData.pendingInboundRtpChannelMove) {
+                            try {
+                                logger.info(`[ARI] Late move: Moving inbound RTP ${channel.id} to snoop bridge`);
+                                
+                                await this.client.bridges.removeChannel({
+                                    bridgeId: finalData.mainBridgeId,
+                                    channel: channel.id
+                                });
+                                
+                                await this.client.bridges.addChannel({
+                                    bridgeId: finalData.snoopBridgeId,
+                                    channel: channel.id
+                                });
+                                
+                                logger.info(`[ARI] Late move: Successfully moved inbound RTP to snoop bridge`);
+                                
+                                this.tracker.updateCall(parentId, {
+                                    pendingInboundRtpChannelMove: false,
+                                    inboundRtpChannelNeedsMove: null
+                                });
+                            } catch (err) {
+                                logger.error(`[ARI] Late move failed: ${err.message}`);
+                            }
+                        }
+                    }, 1000);
                 }
             }
             
@@ -896,6 +945,16 @@ class AsteriskAriClient extends EventEmitter {
             });
             
             logger.info(`[ARI Pipeline] READ stream is ready for ${parentId}`);
+            
+            // Verify RTP listener is active
+            const rtpListenerService = require('./rtp.listener.service');
+            const listenerStatus = rtpListenerService.getListenerStatus?.(callData.rtpReadPort);
+            if (listenerStatus?.found) {
+                logger.info(`[ARI] RTP Listener confirmed active on port ${callData.rtpReadPort}`);
+            } else {
+                logger.error(`[ARI] WARNING: No RTP listener found on port ${callData.rtpReadPort}!`);
+            }
+            
             this.checkMediaPipelineReady(parentId);
             
         } catch (err) {
