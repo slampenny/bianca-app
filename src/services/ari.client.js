@@ -774,15 +774,16 @@ class AsteriskAriClient extends EventEmitter {
         await channel.answer();
         logger.info(`[ARI] Answered inbound RTP channel ${channel.id}`);
         
-        // CRITICAL: Add the RTP channel to the main bridge (not snoop bridge)
-        if (callData.mainBridgeId) {
+        // CRITICAL: Add the inbound RTP channel to the SNOOP bridge (not main bridge)
+        // This prevents feedback loops - inbound channel should not be in main bridge
+        if (callData.snoopBridgeId) {
             await this.client.bridges.addChannel({
-                bridgeId: callData.mainBridgeId,
+                bridgeId: callData.snoopBridgeId,
                 channel: channel.id
             });
-            logger.info(`[ARI] Added inbound RTP channel ${channel.id} to main bridge ${callData.mainBridgeId}`);
+            logger.info(`[ARI] Added inbound RTP channel ${channel.id} to snoop bridge ${callData.snoopBridgeId}`);
         } else {
-            logger.error(`[ARI] No main bridge found for call ${parentId}!`);
+            logger.error(`[ARI] No snoop bridge found for call ${parentId}!`);
         }
         
         // Get and log the RTP endpoint info for debugging
@@ -864,13 +865,16 @@ async handleOutboundRtpChannel(channel, parentId, callData) {
         
         logger.info(`[ARI] Asterisk RTP endpoint for WRITE: ${asteriskRtpEndpoint.host}:${asteriskRtpEndpoint.port}`);
         
-        // Add to main bridge
+        // CRITICAL: Add outbound RTP channel to main bridge for audio routing to phone
+        // This channel receives audio from our app and routes it to the user's phone
         if (callData.mainBridgeId) {
             await this.client.bridges.addChannel({
                 bridgeId: callData.mainBridgeId,
                 channel: channel.id
             });
-            logger.info(`[ARI] Added outbound RTP channel ${channel.id} to main bridge`);
+            logger.info(`[ARI] Added outbound RTP channel ${channel.id} to main bridge ${callData.mainBridgeId} for audio routing`);
+        } else {
+            logger.error(`[ARI] No main bridge found for call ${parentId}!`);
         }
         
         // Update tracking
