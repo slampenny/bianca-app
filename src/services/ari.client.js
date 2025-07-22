@@ -197,17 +197,88 @@ class AsteriskAriClient extends EventEmitter {
         }
     }
 
+    async fixBridgeMembership(asteriskChannelId) {
+        const callData = this.tracker.getCall(asteriskChannelId);
+        if (!callData) {
+            logger.error('[Bridge Fix] No call data found');
+            return false;
+        }
+        
+        logger.info('[Bridge Fix] Checking and fixing bridge membership for ' + asteriskChannelId);
+        
+        try {
+            // Check if we have both bridges and the inbound RTP channel
+            if (!callData.mainBridgeId || !callData.snoopBridgeId || !callData.inboundRtpChannelId) {
+                logger.warn('[Bridge Fix] Missing required components:', {
+                    mainBridge: !!callData.mainBridgeId,
+                    snoopBridge: !!callData.snoopBridgeId,
+                    inboundRtp: !!callData.inboundRtpChannelId
+                });
+                return false;
+            }
+            
+            // Get current bridge memberships
+            const [mainBridge, snoopBridge] = await Promise.all([
+                this.client.bridges.get({ bridgeId: callData.mainBridgeId }),
+                this.client.bridges.get({ bridgeId: callData.snoopBridgeId })
+            ]);
+            
+            // Check if inbound RTP is in the wrong bridge
+            if (mainBridge.channels.includes(callData.inboundRtpChannelId)) {
+                logger.info('[Bridge Fix] Found inbound RTP channel in MAIN bridge - moving to SNOOP bridge');
+                
+                // Remove from main bridge
+                await this.client.bridges.removeChannel({
+                    bridgeId: callData.mainBridgeId,
+                    channel: callData.inboundRtpChannelId
+                });
+                logger.info('[Bridge Fix] Removed inbound RTP from main bridge');
+                
+                // Add to snoop bridge
+                await this.client.bridges.addChannel({
+                    bridgeId: callData.snoopBridgeId,
+                    channel: callData.inboundRtpChannelId
+                });
+                logger.info('[Bridge Fix] Added inbound RTP to snoop bridge');
+                
+                // Clear any pending move flags
+                this.tracker.updateCall(asteriskChannelId, {
+                    pendingInboundRtpChannelMove: false,
+                    inboundRtpChannelNeedsMove: null
+                });
+                
+                return true;
+            } else if (snoopBridge.channels.includes(callData.inboundRtpChannelId)) {
+                logger.info('[Bridge Fix] Inbound RTP channel already in correct bridge (snoop)');
+                return true;
+            } else {
+                logger.error('[Bridge Fix] Inbound RTP channel not found in any bridge!');
+                return false;
+            }
+            
+        } catch (err) {
+            logger.error('[Bridge Fix] Error fixing bridge membership:', err.message);
+            return false;
+        }
+    }
+
     checkMediaPipelineReady(asteriskChannelId) {
         const callData = this.tracker.getCall(asteriskChannelId);
         // Only proceed if we are in the pending state
         if (!callData || callData.state !== 'pending_media') {
             return;
         }
-
+    
         // Check if both read (user->app) and write (app->user) streams are ready
         if (callData.isReadStreamReady && callData.isWriteStreamReady) {
             logger.info(`[ARI Pipeline] Bidirectional media pipeline is now active for ${asteriskChannelId}`);
             this.updateCallState(asteriskChannelId, 'pipeline_active');
+            
+            // FIX BRIDGE MEMBERSHIP BEFORE PROCEEDING
+            setTimeout(async () => {
+                await this.fixBridgeMembership(asteriskChannelId);
+                await this.verifyAudioFlow(asteriskChannelId);
+            }, 500);
             
             // Trigger the initial greeting from the AI
             const primarySid = callData.twilioCallSid || asteriskChannelId;
