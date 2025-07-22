@@ -2163,7 +2163,6 @@ class OpenAIRealtimeService {
         
             // CRITICAL: Track when we send audio appends to detect silent failures
     const appendStartTime = Date.now();
-    const conn = this.connections.get(callId);
     if (conn) {
       conn.lastAppendTime = appendStartTime;
       conn.appendCount = (conn.appendCount || 0) + 1;
