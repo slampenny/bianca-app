@@ -141,3 +141,10 @@ Thumbs.db
 .terraform/
 crash.log
 *.tfplan
+
+# Playwright
+playwright-report/
+playwright/.cache/
+*.trace
+*.webm
+*.mp4

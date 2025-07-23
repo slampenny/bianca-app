@@ -31,7 +31,7 @@ function PaymentMethodsScreen() {
 
   if (!org || !org.id) {
     return (
-      <View style={styles.screenContainer}>
+      <View style={styles.screenContainer} testID="payment-methods-container">
         <Text style={styles.emptyText}>No organization data available.</Text>
       </View>
     )
@@ -39,7 +39,7 @@ function PaymentMethodsScreen() {
 
   if (!jwt) {
     return (
-      <View style={styles.screenContainer}>
+      <View style={styles.screenContainer} testID="payment-methods-container">
         <Text style={styles.emptyText}>Authorization token not available.</Text>
       </View>
     )
@@ -50,7 +50,7 @@ function PaymentMethodsScreen() {
   const paymentPageUrl = `${Config.paymentMethodGatewayUrl}/${orgId}/${jwt}`
 
   return (
-    <View style={styles.screenContainer}>
+    <View style={styles.screenContainer} testID="payment-methods-container">
       {Platform.OS === "web" ? (
         <iframe
           src={paymentPageUrl}
@@ -61,11 +61,13 @@ function PaymentMethodsScreen() {
             minHeight: 400, // fallback for web
           }}
           title="Payment Method"
+          data-testid="payment-methods-iframe"
         />
       ) : (
         <WebView
           source={{ uri: paymentPageUrl }}
           style={styles.webview}
+          testID="payment-methods-webview"
           // Add error handling for WebView if needed
           // onError={(syntheticEvent) => {
           //   const { nativeEvent } = syntheticEvent;
@@ -78,7 +80,7 @@ function PaymentMethodsScreen() {
 }
 
 // ================================================
-//         ExpandableInvoice (No changes needed here)
+//         ExpandableInvoice Component
 // ================================================
 function ExpandableInvoice({ invoice }: { invoice: any }) {
   const [expanded, setExpanded] = useState(false)
@@ -93,15 +95,19 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
   }).format(invoice.totalAmount)
 
   return (
-    <View style={styles.invoiceContainer}>
-      <Pressable onPress={() => setExpanded((prev) => !prev)} style={styles.invoiceHeader}>
+    <View style={styles.invoiceContainer} testID={`invoice-container-${invoice.id}`}>
+      <Pressable 
+        onPress={() => setExpanded((prev) => !prev)} 
+        style={styles.invoiceHeader}
+        testID={`invoice-header-${invoice.id}`}
+      >
         <Text style={styles.invoiceHeaderText}>
           {formattedDate} - {formattedAmount}
         </Text>
         <Text style={styles.expandIcon}>{expanded ? "▲" : "▼"}</Text>
       </Pressable>
       {expanded && (
-        <View style={styles.invoiceDetails}>
+        <View style={styles.invoiceDetails} testID={`invoice-details-${invoice.id}`}>
           <Text style={styles.detailText}>Invoice Number: {invoice.invoiceNumber}</Text>
           <Text style={styles.detailText}>Status: {invoice.status}</Text>
           <Text style={styles.detailText}>
@@ -128,14 +134,14 @@ function BillingInfoScreen() {
   // Although the parent checks authorization, keep these basic checks
   if (!currentUser) {
     return (
-      <View style={styles.screenContainer}>
+      <View style={styles.screenContainer} testID="billing-info-container">
         <Text style={styles.emptyText}>No user data available.</Text>
       </View>
     )
   }
   if (!org || !org.id) {
     return (
-      <View style={styles.screenContainer}>
+      <View style={styles.screenContainer} testID="billing-info-container">
         <Text style={styles.emptyText}>No organization data available.</Text>
       </View>
     )
@@ -160,8 +166,8 @@ function BillingInfoScreen() {
 
   if (invoicesLoading) {
     return (
-      <View style={[styles.screenContainer, styles.centered]}>
-        <ActivityIndicator size="large" color="#3498db" />
+      <View style={[styles.screenContainer, styles.centered]} testID="billing-info-container">
+        <ActivityIndicator size="large" color="#3498db" testID="billing-loading-indicator" />
       </View>
     )
   }
@@ -169,23 +175,24 @@ function BillingInfoScreen() {
   if (invoicesError) {
     // Check specific error before assuming !invoices means error
     return (
-      <View style={styles.screenContainer}>
+      <View style={styles.screenContainer} testID="billing-info-container">
         <Text style={styles.emptyText}>Error loading invoices.</Text>
       </View>
     )
   }
 
   return (
-    <View style={styles.screenContainer}>
-      <Text style={styles.billingHeader}>Current Plan: {currentPlan}</Text>
-      <Text style={styles.billingHeader}>Next Billing Date: {nextBillingDate}</Text>
+    <View style={styles.screenContainer} testID="billing-info-container">
+      <Text style={styles.billingHeader} testID="current-plan-text">Current Plan: {currentPlan}</Text>
+      <Text style={styles.billingHeader} testID="next-billing-date-text">Next Billing Date: {nextBillingDate}</Text>
       <Text style={styles.sectionTitle}>Past Invoices:</Text>
       <FlatList
         data={invoices}
         keyExtractor={(invoice) => invoice.id.toString()}
         renderItem={({ item }) => <ExpandableInvoice invoice={item} />}
         contentContainerStyle={{ paddingBottom: 20 }}
-        ListEmptyComponent={<Text style={styles.emptyText}>No invoices available.</Text>}
+        testID="invoices-list"
+        ListEmptyComponent={<Text style={styles.emptyText} testID="no-invoices-text">No invoices available.</Text>}
       />
     </View>
   )
@@ -206,7 +213,7 @@ export function PaymentInfoScreen() {
   if (!currentUser) {
     // Show a loading indicator or a generic message while user data is loading
     return (
-      <View style={[styles.screenContainer, styles.centered]}>
+      <View style={[styles.screenContainer, styles.centered]} testID="payment-info-container">
         <ActivityIndicator size="large" color="#3498db" />
         <Text style={styles.emptyText}>Loading user information...</Text>
       </View>
@@ -221,9 +228,9 @@ export function PaymentInfoScreen() {
   if (!isAuthorized) {
     // User is NOT authorized - Show the message
     return (
-      <View style={styles.messageContainer}>
-        <Text style={styles.messageTitle}>Access Restricted</Text>
-        <Text style={styles.messageText}>
+      <View style={styles.messageContainer} testID="payment-info-container">
+        <Text style={styles.messageTitle} testID="access-restricted-title">Access Restricted</Text>
+        <Text style={styles.messageText} testID="access-restricted-message">
           You do not have the necessary permissions to view or manage payment information.
         </Text>
         <Text style={styles.messageText}>
@@ -235,18 +242,33 @@ export function PaymentInfoScreen() {
 
   // *** 5. User IS authorized - Render the Tab Navigator ***
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: colors.palette.biancaButtonSelected,
-        tabBarInactiveTintColor: colors.palette.neutral600,
-        tabBarLabelStyle: { fontSize: 16, fontWeight: "600" },
-        tabBarStyle: { backgroundColor: colors.palette.neutral100 },
-        tabBarIndicatorStyle: { backgroundColor: colors.palette.biancaButtonSelected },
-      }}
-    >
-      <Tab.Screen name="Payment Methods" component={PaymentMethodsScreen} />
-      <Tab.Screen name="Billing Info" component={BillingInfoScreen} />
-    </Tab.Navigator>
+    <View testID="payment-info-container">
+      <Tab.Navigator
+        screenOptions={{
+          tabBarActiveTintColor: colors.palette.biancaButtonSelected,
+          tabBarInactiveTintColor: colors.palette.neutral600,
+          tabBarLabelStyle: { fontSize: 16, fontWeight: "600" },
+          tabBarStyle: { backgroundColor: colors.palette.neutral100 },
+          tabBarIndicatorStyle: { backgroundColor: colors.palette.biancaButtonSelected },
+        }}
+        testID="payment-tabs-navigator"
+      >
+        <Tab.Screen 
+          name="Payment Methods" 
+          component={PaymentMethodsScreen}
+          options={{
+            tabBarTestID: "payment-methods-tab"
+          }}
+        />
+        <Tab.Screen 
+          name="Billing Info" 
+          component={BillingInfoScreen}
+          options={{
+            tabBarTestID: "billing-info-tab"
+          }}
+        />
+      </Tab.Navigator>
+    </View>
   )
 }
 

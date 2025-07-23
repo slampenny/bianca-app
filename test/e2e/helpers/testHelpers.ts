@@ -17,6 +17,9 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
   console.log(`Attempting to login with email: ${email}`)
   
+  // Wait for login form to be visible
+  await page.waitForSelector('[data-testid="email-input"]', { timeout: 10000 })
+  
   // Fill in login form
   await page.getByTestId('email-input').fill(email)
   await page.getByTestId('password-input').fill(password)
@@ -64,6 +67,9 @@ export async function loginUserViaUI(page: Page, email: string, password: string
 
 export async function createPatientViaUI(page: Page, name: string, email: string, phone: string): Promise<void> {
   console.log(`Creating patient: ${name} (${email})`)
+  
+  // Wait for add patient button to be enabled (indicating user role is loaded)
+  await page.waitForSelector('[data-testid="add-patient-button"]:not([disabled])', { timeout: 10000 })
   
   await page.getByTestId('add-patient-button').click()
   
@@ -202,7 +208,7 @@ export async function goToAlertTab(page: Page): Promise<void> {
 
 export async function goToPaymentTab(page: Page): Promise<void> {
   await page.getByTestId('tab-payment').click()
-  await page.waitForSelector('[data-testid="payment-header"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="payment-info-container"]', { timeout: 10000 })
 }
 
 export async function createAlertViaUI(page: Page, message: string, importance: string, alertType: string, patientName?: string) {
@@ -385,7 +391,24 @@ export const test = base.extend<{}>({
   page: async ({ page }, use) => {
     // Inject AsyncStorage mock before navigating
     await page.addInitScript(asyncStorageMockScript)
+    
+    // Clear storage first, then navigate
     await page.goto('/')
+    await page.evaluate(() => {
+      if ((window as any).AsyncStorage) {
+        (window as any).AsyncStorage.clear()
+      }
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+    
+    // Reload to ensure clean state
+    await page.reload()
+    
+    // Wait for login screen
+    await page.waitForSelector('[data-testid="email-input"]', { timeout: 15000 })
+    console.log('Successfully loaded login screen')
+    
     await use(page)
   },
 })
