@@ -497,7 +497,6 @@ class OpenAIRealtimeService {
         type: 'response.create',
         response: {
           modalities: ['text', 'audio'],
-          instructions: 'Say "Hello, how can I help you?"',
         },
       };
 
@@ -960,22 +959,8 @@ class OpenAIRealtimeService {
             conn.consecutiveBufferErrors = 0; // Reset error counter on successful commit
             logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid, ${bytesProcessed} bytes)`);
             
-            // CRITICAL FIX: Send response.create after successful commit to trigger OpenAI response
-            // Allow AI to interrupt user when they're speaking
-            setTimeout(async () => {
-              try {
-                // Check if we have meaningful audio by looking at recent chunks
-                const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
-                if (hasMeaningfulAudio) {
-                  logger.info(`[OpenAI Realtime] Triggering response generation after commit for ${callId} (meaningful audio detected)`);
-                  await this.sendResponseCreate(callId);
-                } else {
-                  logger.debug(`[OpenAI Realtime] Skipping response.create for ${callId} - only silence detected`);
-                }
-              } catch (responseErr) {
-                logger.error(`[OpenAI Realtime] Failed to send response.create after commit for ${callId}: ${responseErr.message}`);
-              }
-            }, 100); // Small delay to ensure commit is fully processed
+            // Don't automatically trigger response generation - wait for user to speak first
+            logger.debug(`[OpenAI Realtime] Audio buffer committed for ${callId} - waiting for user input`);
           }
           break;
 
@@ -1121,18 +1106,11 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Clearing pending audio buffer for ${callId} (${pendingAudio.length} chunks)`);
       this.pendingAudio.set(callId, []);
     }
-      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Sending initial greeting.`);
+      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Waiting for user input.`);
 
       try {
-        // CRITICAL: Make OpenAI speak immediately when session is ready
-        logger.info(`[OpenAI Realtime] Triggering immediate OpenAI response for ${callId}`);
-        try {
-          await this.sendResponseCreate(callId);
-          logger.info(`[OpenAI Realtime] response.create sent successfully for ${callId}`);
-        } catch (err) {
-          logger.error(`[OpenAI Realtime] Failed to send response.create for ${callId}: ${err.message}`);
-        }
-
+        // Don't make OpenAI speak immediately - wait for user to speak first
+        logger.info(`[OpenAI Realtime] Session ready for ${callId} - waiting for user input`);
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
         logger.error(`[OpenAI Realtime] Error in session setup for ${callId}: ${err.message}`);

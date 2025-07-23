@@ -212,10 +212,10 @@ class AsteriskAriClient extends EventEmitter {
                 await this.verifyAudioFlow(asteriskChannelId);
             }, 500);
             
-            // Trigger the initial greeting from the AI
+            // Don't trigger initial greeting - wait for user to speak first
             const primarySid = callData.twilioCallSid || asteriskChannelId;
             
-            logger.info(`[ARI Pipeline] Triggering initial AI greeting for ${primarySid}`);
+            logger.info(`[ARI Pipeline] Audio pipeline ready for ${primarySid} - waiting for user input`);
             
             // Wait a bit longer to ensure OpenAI connection is fully established
             setTimeout(() => {
