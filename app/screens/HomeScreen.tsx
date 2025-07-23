@@ -90,7 +90,6 @@ export function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle} testID="home-header">Welcome, {currentUser ? currentUser.name : "Guest"}</Text>
-        <Text style={styles.headerTitle} testID="home-welcome-header">{currentUser ? currentUser.name : "Guest"}</Text>
       </View>
 
       {/* Patient List */}
