@@ -898,21 +898,16 @@ class OpenAIRealtimeService {
             logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid, ${bytesProcessed} bytes)`);
             
             // CRITICAL FIX: Send response.create after successful commit to trigger OpenAI response
-            // BUT only if we have meaningful audio (not just silence)
+            // Allow AI to interrupt user when they're speaking
             setTimeout(async () => {
               try {
-                // Check if we already have an active response to avoid duplicates
-                if (!conn._responseCreated) {
-                  // Check if we have meaningful audio by looking at recent chunks
-                  const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
-                  if (hasMeaningfulAudio) {
-                    logger.info(`[OpenAI Realtime] Triggering response generation after commit for ${callId} (meaningful audio detected)`);
-                    await this.sendResponseCreate(callId);
-                  } else {
-                    logger.debug(`[OpenAI Realtime] Skipping response.create for ${callId} - only silence detected`);
-                  }
+                // Check if we have meaningful audio by looking at recent chunks
+                const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
+                if (hasMeaningfulAudio) {
+                  logger.info(`[OpenAI Realtime] Triggering response generation after commit for ${callId} (meaningful audio detected)`);
+                  await this.sendResponseCreate(callId);
                 } else {
-                  logger.debug(`[OpenAI Realtime] Skipping response.create for ${callId} - response already active`);
+                  logger.debug(`[OpenAI Realtime] Skipping response.create for ${callId} - only silence detected`);
                 }
               } catch (responseErr) {
                 logger.error(`[OpenAI Realtime] Failed to send response.create after commit for ${callId}: ${responseErr.message}`);
