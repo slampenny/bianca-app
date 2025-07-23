@@ -232,7 +232,7 @@ class AsteriskAriClient extends EventEmitter {
                             clearInterval(retryInterval);
                             logger.info(`[ARI Pipeline] OpenAI ready after ${retries} retries, sending comfort noise`);
                             
-                            // Send comfort noise
+                            // Send comfort noise to establish audio pipeline
                             const comfortNoise = Buffer.alloc(1600); // 200ms at 8kHz
                             for (let i = 0; i < comfortNoise.length; i++) {
                                 comfortNoise[i] = 0xFF + Math.floor(Math.random() * 4) - 2;
@@ -240,10 +240,8 @@ class AsteriskAriClient extends EventEmitter {
                             const comfortNoiseBase64 = comfortNoise.toString('base64');
                             openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true);
                             
-                            // Then trigger response.create
-                            setTimeout(() => {
-                                openAIService.sendResponseCreate(primarySid);
-                            }, 200);
+                            // Don't trigger response.create automatically - wait for user to speak
+                            logger.info(`[ARI Pipeline] Audio pipeline ready for ${primarySid} - waiting for user input`);
                         } else if (retries >= maxRetries) {
                             clearInterval(retryInterval);
                             logger.error(`[ARI Pipeline] OpenAI connection failed to establish after ${maxRetries} retries for ${primarySid}`);
@@ -260,10 +258,8 @@ class AsteriskAriClient extends EventEmitter {
                     const comfortNoiseBase64 = comfortNoise.toString('base64');
                     openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true);
                     
-                    // Then trigger response.create
-                    setTimeout(() => {
-                        openAIService.sendResponseCreate(primarySid);
-                    }, 200);
+                    // Don't trigger response.create automatically - wait for user to speak
+                    logger.info(`[ARI Pipeline] Audio pipeline ready for ${primarySid} - waiting for user input`);
                 }
             }, 1000); // Initial delay of 1 second
         }

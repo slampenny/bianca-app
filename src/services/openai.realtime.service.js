@@ -14,7 +14,7 @@ const CONSTANTS = {
   MAX_PENDING_CHUNKS: 100, // Maximum number of audio chunks to buffer
   RECONNECT_MAX_ATTEMPTS: 5, // Maximum number of reconnection attempts
   RECONNECT_BASE_DELAY: 1000, // Base delay for exponential backoff (milliseconds)
-  COMMIT_DEBOUNCE_DELAY: 500, // Increased to 500ms for better batching
+  COMMIT_DEBOUNCE_DELAY: 200, // Reduced to 200ms for faster response
   CONNECTION_TIMEOUT: 15000, // WebSocket connection + handshake timeout (milliseconds)
   DEFAULT_SAMPLE_RATE: 24000, // OpenAI Realtime API uses 24kHz for PCM16
   ASTERISK_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
@@ -1974,7 +1974,8 @@ class OpenAIRealtimeService {
         
         // SIMPLIFIED: Simple commit logic - commit every 20 chunks (~400ms of audio)
         // OR immediately if AI is generating response (interruption)
-        if (conn.validAudioChunksSent % 20 === 0 || conn._responseCreated) {
+        // OR immediately if user is speaking (for faster AI response)
+        if (conn.validAudioChunksSent % 20 === 0 || conn._responseCreated || conn.validAudioChunksSent % 5 === 0) {
             this.debounceCommit(callId);
         }
         
