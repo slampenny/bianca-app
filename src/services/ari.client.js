@@ -640,50 +640,53 @@ class AsteriskAriClient extends EventEmitter {
         };
     }
 
-    async handleStasisStartForUnicastRTP(channel) {
-        logger.info(`[ARI] Processing UnicastRTP channel: ${channel.id}`);
+    // Update your handleStasisStartForUnicastRTP method with better detection logic:
+async handleStasisStartForUnicastRTP(channel) {
+    logger.info(`[ARI] Processing UnicastRTP channel: ${channel.id}`);
 
-        const parentCallData = this.findParentCallForRtpChannel(channel);
-        if (!parentCallData) {
-            logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}. Hanging up.`);
-            await this.safeHangup(channel, 'Orphaned UnicastRTP');
-            return;
-        }
+    const parentCallData = this.findParentCallForRtpChannel(channel);
+    if (!parentCallData) {
+        logger.warn(`[ARI] No parent call found for RTP channel ${channel.id}. Hanging up.`);
+        await this.safeHangup(channel, 'Orphaned UnicastRTP');
+        return;
+    }
 
-        const { parentId, callData } = parentCallData;
-        
-        // Determine if this is inbound or outbound based on channel name and existing channels
-        const channelName = channel.name || '';
-        
-        // FIXED: Better channel detection logic
-        const hasPortInName = channelName.match(/:\d+-/);
-        const isOutboundChannel = !hasPortInName;
-        
-        logger.info(`[ARI] Channel ${channel.id} detection: name="${channelName}", hasPortInName=${!!hasPortInName}, isOutbound=${isOutboundChannel}`);
-        
-        logger.info(`[ARI] Channel ${channel.id} analysis: name="${channelName}", isOutbound=${isOutboundChannel}, existingInbound=${!!callData.inboundRtpChannelId}, existingOutbound=${!!callData.outboundRtpChannelId}`);
-        
-        // Route based on channel type and existing channels
-        if (isOutboundChannel || callData.inboundRtpChannelId) {
-            // This is the outbound channel (WRITE stream - app->user)
-            if (!callData.outboundRtpChannelId) {
-                logger.info(`[ARI] Routing channel ${channel.id} to OUTBOUND handler`);
-                await this.handleOutboundRtpChannel(channel, parentId, callData);
-            } else {
-                logger.warn(`[ARI] Duplicate outbound RTP channel ${channel.id} - hanging up`);
-                await this.safeHangup(channel, 'Duplicate Outbound RTP');
-            }
+    const { parentId, callData } = parentCallData;
+    
+    // Determine if this is inbound or outbound based on channel name and existing channels
+    const channelName = channel.name || '';
+    
+    // FIXED: Better channel detection logic
+    // Port 0 indicates this is an outbound channel (Asterisk will allocate the actual port)
+    const portMatch = channelName.match(/:(\d+)-/);
+    const port = portMatch ? parseInt(portMatch[1]) : null;
+    const isOutboundChannel = port === 0 || !portMatch;
+    
+    logger.info(`[ARI] Channel ${channel.id} detection: name="${channelName}", port=${port}, isOutbound=${isOutboundChannel}`);
+    
+    logger.info(`[ARI] Channel ${channel.id} analysis: name="${channelName}", isOutbound=${isOutboundChannel}, existingInbound=${!!callData.inboundRtpChannelId}, existingOutbound=${!!callData.outboundRtpChannelId}`);
+    
+    // Route based on channel type and existing channels
+    if (isOutboundChannel) {
+        // This is the outbound channel (WRITE stream - app->user)
+        if (!callData.outboundRtpChannelId) {
+            logger.info(`[ARI] Routing channel ${channel.id} to OUTBOUND handler`);
+            await this.handleOutboundRtpChannel(channel, parentId, callData);
         } else {
-            // This is the inbound channel (READ stream - user->app)
-            if (!callData.inboundRtpChannelId) {
-                logger.info(`[ARI] Routing channel ${channel.id} to INBOUND handler`);
-                await this.handleInboundRtpChannel(channel, parentId, callData);
-            } else {
-                logger.warn(`[ARI] Duplicate inbound RTP channel ${channel.id} - hanging up`);
-                await this.safeHangup(channel, 'Duplicate Inbound RTP');
-            }
+            logger.warn(`[ARI] Duplicate outbound RTP channel ${channel.id} - hanging up`);
+            await this.safeHangup(channel, 'Duplicate Outbound RTP');
+        }
+    } else {
+        // This is the inbound channel (READ stream - user->app)
+        if (!callData.inboundRtpChannelId) {
+            logger.info(`[ARI] Routing channel ${channel.id} to INBOUND handler`);
+            await this.handleInboundRtpChannel(channel, parentId, callData);
+        } else {
+            logger.warn(`[ARI] Duplicate inbound RTP channel ${channel.id} - hanging up`);
+            await this.safeHangup(channel, 'Duplicate Inbound RTP');
         }
     }
+}
 
     findParentCallForRtpChannel(channel) {
         const channelName = channel.name || '';
