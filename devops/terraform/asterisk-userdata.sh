@@ -94,6 +94,8 @@ docker run -d \
   -e PRIVATE_ADDRESS=$PRIVATE_IP \
   -e ARI_PASSWORD=$ARI_PASSWORD \
   -e BIANCA_PASSWORD=$BIANCA_PASSWORD \
+  -e RTP_START_PORT=${rtp_start_port} \
+  -e RTP_END_PORT=${rtp_end_port} \
   -v /var/log/asterisk-docker:/var/log/asterisk \
   730335291008.dkr.ecr.${region}.amazonaws.com/bianca-app-asterisk:latest
 

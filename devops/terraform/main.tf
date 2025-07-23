@@ -617,13 +617,13 @@ resource "aws_security_group" "bianca_app_sg" {
     cidr_blocks = ["172.31.0.0/16"]  # VPC CIDR - ALB is in the VPC
   }
 
-  # RTP from Asterisk (specific private IP)
+  # RTP from Asterisk (private subnet CIDR)
   ingress {
-    description = "RTP from Asterisk (specific private IP)"
+    description = "RTP from Asterisk (private subnet CIDR)"
     from_port   = var.app_rtp_port_start
     to_port     = var.app_rtp_port_end
     protocol    = "udp"
-    cidr_blocks = ["${aws_instance.asterisk.private_ip}/32"]  # Asterisk's specific private IP
+    cidr_blocks = ["172.31.100.0/24"]  # Asterisk's private subnet CIDR
   }
 
   # Egress rules
@@ -677,6 +677,15 @@ resource "aws_security_group" "asterisk_ec2_sg" {
     protocol    = "udp"
     cidr_blocks = var.twilio_ip_ranges
     description = "RTP UDP from Twilio"
+  }
+
+  # RTP Range from VPC (internal) - for backend to Asterisk communication
+  ingress {
+    from_port   = var.asterisk_rtp_start_port
+    to_port     = var.asterisk_rtp_end_port
+    protocol    = "udp"
+    cidr_blocks = ["172.31.0.0/16"]
+    description = "RTP UDP from VPC (Backend to Asterisk)"
   }
 
   # SSH Access (optional)

@@ -1599,75 +1599,24 @@ class OpenAIRealtimeService {
     if (messageObj && messageObj._testWebSocket) delete messageObj._testWebSocket;
     if (messageObj && messageObj._testId) delete messageObj._testId;
 
-    // CRITICAL: Prevent commits when no valid audio has been sent
-    if (messageObj.type === 'input_audio_buffer.commit' && callId && conn) {
-      // CRITICAL: Check if session is fully ready before allowing commits
-      if (!conn.sessionReady || conn._sessionSetupInProgress) {
-        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - session not ready (ready: ${conn.sessionReady}, setupInProgress: ${conn._sessionSetupInProgress})`);
-        return Promise.resolve(true); // Resolve successfully but don't send
-      }
-      
-      // CRITICAL: Don't commit when OpenAI is generating a response UNLESS we have meaningful audio (interruption)
-      if (conn._responseCreated) {
-        // Check if this is an interruption (meaningful audio during response)
-        const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
-        if (hasMeaningfulAudio) {
-          logger.info(`[OpenAI Realtime] ALLOWING interrupt commit for ${callId} - user is speaking over Bianca`);
-        } else {
-          logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - OpenAI is generating response but no meaningful audio detected`);
-          return Promise.resolve(true); // Resolve successfully but don't send
-        }
-      }
-
-      // CRITICAL: Don't commit if buffer was recently cleared (prevents race conditions)
-      if (conn._bufferClearedTime && (Date.now() - conn._bufferClearedTime) < 2000) {
-        const clearedBy = conn._bufferClearedByOpenAI ? 'OpenAI' : 'us';
-        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - buffer was cleared by ${clearedBy} ${Date.now() - conn._bufferClearedTime}ms ago, waiting for more audio`);
-        return Promise.resolve(true); // Resolve successfully but don't send
-      }
-      
-      if (!conn.validAudioChunksSent || conn.validAudioChunksSent === 0) {
-        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - no valid audio chunks sent (${conn.validAudioChunksSent || 0} valid, ${conn.audioChunksSent || 0} total)`);
-        return Promise.resolve(true); // Resolve successfully but don't send
-      }
-      
-      // Add a minimum time check since last commit to prevent rapid commits
-      const timeSinceLastCommit = Date.now() - (conn.lastCommitTime || 0);
-      if (timeSinceLastCommit < 100) { // Less than 100ms since last commit
-        logger.warn(`[OpenAI Realtime] BLOCKED commit for ${callId} - too soon since last commit (${timeSinceLastCommit}ms)`);
-        return Promise.resolve(true);
-      }
-      
-      // Track that we're attempting a commit
-      conn.lastCommitAttemptTime = Date.now();
-      conn.pendingCommit = true;
-    }
-
-    // CRITICAL: Prevent empty audio appends
+    // SIMPLIFIED: Basic validation only
     if (messageObj.type === 'input_audio_buffer.append' && (!messageObj.audio || messageObj.audio.length === 0)) {
-      logger.warn(`[OpenAI Realtime] BLOCKED empty audio append for ${callId}`);
-      return Promise.resolve(true); // Resolve successfully but don't send
+      logger.warn(`[OpenAI Realtime] Empty audio append for ${callId}`);
+      return Promise.resolve(true);
     }
     
-    // CRITICAL: Buffer audio appends when session isn't ready
+    // Buffer audio appends when session isn't ready
     if (messageObj.type === 'input_audio_buffer.append' && callId && conn && (!conn.sessionReady || conn._sessionSetupInProgress)) {
-      logger.info(`[OpenAI Realtime] BUFFERING audio append for ${callId} - session not ready (ready: ${conn.sessionReady}, setupInProgress: ${conn._sessionSetupInProgress})`);
-      
-      // Use the existing pendingAudio system instead of creating a new one
       const pending = this.pendingAudio.get(callId) || [];
       if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-        // Extract the audio data from the message object
         const audioData = messageObj.audio;
         if (audioData) {
           pending.push(audioData);
           this.pendingAudio.set(callId, pending);
-          logger.debug(`[OpenAI Realtime] Added audio chunk to pending buffer for ${callId} (buffer size: ${pending.length})`);
+          logger.debug(`[OpenAI Realtime] Buffered audio chunk for ${callId} (buffer size: ${pending.length})`);
         }
-      } else {
-        logger.warn(`[OpenAI Realtime] Pending audio buffer full for ${callId}. Dropping chunk.`);
       }
-      
-      return Promise.resolve(true); // Resolve successfully but don't send yet
+      return Promise.resolve(true);
     }
 
     if (!wsToSend || wsToSend.readyState !== WebSocket.OPEN) {
@@ -1872,35 +1821,18 @@ class OpenAIRealtimeService {
   /**
    * IMPROVED: Smarter debounce commit logic with validation
    */
+  /**
+   * SIMPLIFIED: Simple commit logic with minimal conditions
+   */
   debounceCommit(callId) {
     const conn = this.connections.get(callId);
     if (!conn?.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-      logger.warn(
-        `[OpenAI Realtime] DebounceCommit: Not ready for ${callId} - sessionReady: ${conn?.sessionReady}, ws state: ${conn?.webSocket?.readyState}`
-      );
+      logger.debug(`[OpenAI Realtime] DebounceCommit: Not ready for ${callId}`);
       return;
     }
 
-    // CRITICAL: Don't start new timer if we already have a pending commit
-    if (conn.pendingCommit) {
-      logger.debug(`[OpenAI Realtime] DebounceCommit: Already have pending commit for ${callId}`);
-      return;
-    }
-
-    // CRITICAL: Don't start new timer if one is already active (this prevents constant resetting)
+    // Don't start new timer if one is already active
     if (this.commitTimers.has(callId)) {
-              // Only log every 100th skip to reduce noise
-        if (!conn._debounceSkipCount) conn._debounceSkipCount = 0;
-        conn._debounceSkipCount++;
-        if (conn._debounceSkipCount % 100 === 0) {
-          logger.debug(`[OpenAI Realtime] DebounceCommit: Timer already active for ${callId}, skipping (${conn._debounceSkipCount} times)`);
-        }
-      return;
-    }
-
-    // CRITICAL: Additional guard to prevent commits during session setup
-    if (conn._sessionSetupInProgress) {
-      logger.debug(`[OpenAI Realtime] DebounceCommit: Session setup in progress for ${callId}, skipping`);
       return;
     }
 
@@ -1909,106 +1841,14 @@ class OpenAIRealtimeService {
       this.commitTimers.delete(callId);
       const currentConn = this.connections.get(callId);
 
-      logger.info(
-        `[OpenAI Realtime] Checking commit conditions for ${callId} - ready: ${currentConn?.webSocket?.readyState === WebSocket.OPEN
-        }, sessionReady: ${currentConn?.sessionReady}, setupInProgress: ${currentConn?._sessionSetupInProgress}, pending: ${currentConn?.pendingCommit}, responseActive: ${currentConn?._responseCreated}`
-      );
-
-      if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady && !currentConn.pendingCommit) {
-        // CRITICAL: Check if we have sufficient audio data before committing
-        const commitReadiness = this.checkCommitReadiness(callId);
-        
-        // Add very clear logging about buffer state when timer fires
-        logger.info(`[OpenAI Realtime] 🔍 COMMIT TIMER FIRED for ${callId} - Buffer State Check:`);
-        logger.info(`[OpenAI Realtime] 🔍   - Valid chunks sent: ${currentConn.validAudioChunksSent}`);
-        logger.info(`[OpenAI Realtime] 🔍   - Total audio bytes: ${currentConn.totalAudioBytesSent || 0}`);
-        logger.info(`[OpenAI Realtime] 🔍   - Estimated duration: ${commitReadiness.totalDuration || 0}ms`);
-        logger.info(`[OpenAI Realtime] 🔍   - Can commit: ${commitReadiness.canCommit}`);
-        logger.info(`[OpenAI Realtime] 🔍   - Reason: ${commitReadiness.reason}`);
-        
-        if (commitReadiness.canCommit) {
-          // CRITICAL: Additional check: ensure we've successfully sent audio recently
-          const timeSinceLastAppend = Date.now() - (currentConn.lastSuccessfulAppendTime || 0);
-          logger.info(`[OpenAI Realtime] Commit timer fired for ${callId} - time since last append: ${timeSinceLastAppend}ms, valid chunks: ${currentConn.validAudioChunksSent}`);
-          
-          if (timeSinceLastAppend > 10000) { // More than 10 seconds since last successful append
-            logger.warn(`[OpenAI Realtime] Commit timer fired but no recent audio appends for ${callId} (${timeSinceLastAppend}ms since last append)`);
-            
-            // Clear the buffer and reset counters
-            try {
-              await this.sendJsonMessage(callId, { type: 'input_audio_buffer.clear' });
-              currentConn.audioChunksSent = 0;
-              currentConn.validAudioChunksSent = 0;
-              logger.info(`[OpenAI Realtime] Cleared stale buffer for ${callId}`);
-            } catch (clearErr) {
-              logger.error(`[OpenAI Realtime] Failed to clear stale buffer: ${clearErr.message}`);
-            }
-            return;
-          }
-          
-          // CRITICAL: Ensure we have at least some valid audio chunks before committing
-          // With 20ms per chunk, we need at least 10 chunks to get 200ms (100ms + safety margin)
-          if (currentConn.validAudioChunksSent < 10) {
-            logger.warn(`[OpenAI Realtime] Commit timer fired but insufficient valid chunks for ${callId} (${currentConn.validAudioChunksSent} < 10) - skipping commit`);
-            return;
-          }
-          
-          // CRITICAL: Don't commit when OpenAI is generating a response UNLESS we have meaningful audio (interruption)
-          if (currentConn._responseCreated) {
-            // Check if this is an interruption (meaningful audio during response)
-            const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
-            if (hasMeaningfulAudio) {
-              logger.info(`[OpenAI Realtime] ALLOWING interrupt commit timer for ${callId} - user is speaking over Bianca`);
-            } else {
-              logger.warn(`[OpenAI Realtime] Commit timer fired but response active for ${callId} - skipping commit until response is done`);
-              return;
-            }
-          }
-
-          // CRITICAL: Don't commit if buffer was recently cleared (prevents race conditions)
-          if (currentConn._bufferClearedTime && (Date.now() - currentConn._bufferClearedTime) < 2000) {
-            const clearedBy = currentConn._bufferClearedByOpenAI ? 'OpenAI' : 'us';
-            logger.warn(`[OpenAI Realtime] Commit timer fired but buffer was cleared by ${clearedBy} ${Date.now() - currentConn._bufferClearedTime}ms ago for ${callId} - waiting for more audio`);
-            return;
-          }
-          
-          logger.info(`[OpenAI Realtime] Recent audio detected for ${callId} (${timeSinceLastAppend}ms since last append, ${currentConn.validAudioChunksSent} chunks) - proceeding with commit`);
-          
-          logger.info(`[OpenAI Realtime] Sending debounced commit for ${callId} (${commitReadiness.totalDuration}ms of audio)`);
-          try {
-            await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-            currentConn.pendingCommit = true;
-            currentConn.commitStartTime = Date.now();
-            logger.info(`[OpenAI Realtime] Commit sent successfully for ${callId}`);
-            
-            // CRITICAL: Set a timeout to reset pending commit if no response received
-            setTimeout(() => {
-              const currentConn = this.connections.get(callId);
-              if (currentConn && currentConn.pendingCommit) {
-                const timeSinceCommit = Date.now() - (currentConn.commitStartTime || 0);
-                if (timeSinceCommit > 10000) { // 10 second timeout
-                  logger.warn(`[OpenAI Realtime] Commit timeout for ${callId} (${timeSinceCommit}ms) - resetting pending commit flag`);
-                  currentConn.pendingCommit = false;
-                }
-              }
-            }, 10000); // 10 second timeout
-            
-          } catch (commitErr) {
-            logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
-            currentConn.pendingCommit = false;
-          }
-        } else {
-          logger.error(`[OpenAI Realtime] 🚨🚨🚨 COMMIT TIMER FIRED BUT BUFFER INSUFFICIENT for ${callId} 🚨🚨🚨`);
-          logger.error(`[OpenAI Realtime] 🚨   - Valid chunks sent: ${currentConn.validAudioChunksSent} (need at least 10)`);
-          logger.error(`[OpenAI Realtime] 🚨   - Total audio bytes: ${currentConn.totalAudioBytesSent || 0}`);
-          logger.error(`[OpenAI Realtime] 🚨   - Estimated duration: ${commitReadiness.totalDuration || 0}ms (need at least 100ms)`);
-          logger.error(`[OpenAI Realtime] 🚨   - Reason: ${commitReadiness.reason}`);
-          logger.error(`[OpenAI Realtime] 🚨   - This indicates audio pipeline issues - chunks not being sent or buffer being cleared`);
+      if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
+        logger.info(`[OpenAI Realtime] Sending commit for ${callId} (${currentConn.validAudioChunksSent || 0} chunks)`);
+        try {
+          await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+          logger.info(`[OpenAI Realtime] Commit sent successfully for ${callId}`);
+        } catch (commitErr) {
+          logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
         }
-      } else {
-        logger.debug(
-          `[OpenAI Realtime] Commit timer fired but conditions not met for ${callId} - ready: ${currentConn?.sessionReady}, pending: ${currentConn?.pendingCommit}`
-        );
       }
     }, CONSTANTS.COMMIT_DEBOUNCE_DELAY);
 
@@ -2056,17 +1896,14 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * IMPROVED: Send audio chunk with validation and better commit logic
+   * SIMPLIFIED: Send audio chunk immediately with minimal buffering
    */
   async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
-    // Validate audio chunk first
-    const validation = this.validateAudioChunk(audioChunkBase64ULaw);
-    if (!validation.isValid) {
-        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Invalid audio chunk - ${validation.reason}`);
+    // Basic validation
+    if (!audioChunkBase64ULaw || audioChunkBase64ULaw.length === 0) {
+        logger.warn(`[OpenAI Realtime] sendAudioChunk (${callId}): Empty audio chunk`);
         return;
     }
-    
-
     
     const conn = this.connections.get(callId);
     if (!conn) {
@@ -2074,38 +1911,15 @@ class OpenAIRealtimeService {
         return;
     }
     
-    const useDebugMode = config.openai?.debugAudio !== false;
-    
-    if (useDebugMode && !conn._debugFilesInitialized) {
+    // Initialize debug files if needed
+    if (!conn._debugFilesInitialized) {
         this.initializeContinuousDebugFiles(callId);
         conn._debugFilesInitialized = true;
     }
     
     conn.audioChunksReceived++;
     
-    // Track recent audio chunks for meaningful audio detection
-    if (!conn._recentAudioChunks) {
-      conn._recentAudioChunks = [];
-    }
-    conn._recentAudioChunks.push(audioChunkBase64ULaw);
-    // Keep only last 10 chunks to avoid memory bloat
-    if (conn._recentAudioChunks.length > 10) {
-      conn._recentAudioChunks.shift();
-    }
-    
-    // Log audio analysis periodically to help debug silence issues
-    if (conn.audioChunksReceived % 50 === 0) {
-      const meaningfulAudio = this.checkForMeaningfulAudio(callId);
-      logger.info(`[OpenAI Realtime] Audio analysis for ${callId} (chunk ${conn.audioChunksReceived}): meaningful=${meaningfulAudio}, recent_chunks=${conn._recentAudioChunks.length}`);
-    }
-    
-    // ALWAYS initialize debug files for recording (not just when debug mode is enabled)
-    if (!conn._debugFilesInitialized) {
-      this.initializeContinuousDebugFiles(callId);
-      conn._debugFilesInitialized = true;
-    }
-    
-    // CRITICAL FIX: Check WebSocket state before attempting to send
+    // SIMPLIFIED: Only buffer if WebSocket is not open and session not ready
     if (!conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
         if (!bypassBuffering && conn.status !== 'closed' && conn.status !== 'error_terminal') {
             const pending = this.pendingAudio.get(callId) || [];
@@ -2113,16 +1927,11 @@ class OpenAIRealtimeService {
                 pending.push(audioChunkBase64ULaw);
                 this.pendingAudio.set(callId, pending);
                 logger.debug(`[OpenAI Realtime] WebSocket not open for ${callId}, buffered audio chunk (${pending.length}/${CONSTANTS.MAX_PENDING_CHUNKS})`);
-            } else {
-                logger.warn(`[OpenAI Realtime] Audio buffer full for ${callId}. Dropping uLaw chunk.`);
             }
-        } else {
-            logger.warn(`[OpenAI Realtime] WebSocket not open for ${callId} and buffering disabled/terminal state`);
         }
-        return; // Don't try to send
+        return;
     }
     
-    // Additional session ready check
     if (!conn.sessionReady) {
         if (!bypassBuffering) {
             const pending = this.pendingAudio.get(callId) || [];
@@ -2136,160 +1945,30 @@ class OpenAIRealtimeService {
     }
     
     try {
-        // Since we're using g711_ulaw format, just send it directly!
-        // No conversion needed - OpenAI accepts g711_ulaw natively
-        
-        // ALWAYS record the raw uLaw for analysis (not just when debug mode is enabled)
+        // Record audio for debugging
         const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
         await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
         
-        // Log progress every 100 chunks
-        if (conn.audioChunksReceived % 100 === 0) {
-            logger.info(`[AUDIO DEBUG] Sent ${conn.audioChunksReceived} uLaw chunks directly to OpenAI for ${callId}`);
-        }
+        // SIMPLIFIED: Send audio immediately without complex filtering
+        await this.sendJsonMessage(callId, {
+            type: 'input_audio_buffer.append',
+            audio: audioChunkBase64ULaw,
+        });
         
-
-        
-        // CRITICAL: Validate audio before sending to OpenAI
-        const audioBytes = Buffer.from(audioChunkBase64ULaw, 'base64');
-        
-        // Check if this is valid uLaw data
-        const isULaw = audioBytes.every(byte => byte >= 0 && byte <= 255);
-        const hasVariation = audioBytes.some(byte => byte !== audioBytes[0]);
-        
-        // CRITICAL FIX: Filter out silent audio (all 255 values in uLaw = silence)
-        const silenceThreshold = 0.95; // 95% of bytes are 255 (silence)
-        const silenceCount = audioBytes.filter(byte => byte === 255).length;
-        const silenceRatio = silenceCount / audioBytes.length;
-        const isSilent = silenceRatio > silenceThreshold;
-        
-        if (conn.validAudioChunksSent <= 3) {
-          logger.debug(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} for ${callId}: base64_length=${audioChunkBase64ULaw.length}, raw_bytes=${audioBytes.length}, first_byte=0x${audioBytes[0]?.toString(16)}, last_byte=0x${audioBytes[audioBytes.length-1]?.toString(16)}`);
-          logger.info(`[OpenAI Realtime] Audio format check for ${callId}: isULaw=${isULaw}, hasVariation=${hasVariation}, silenceRatio=${silenceRatio.toFixed(2)}, isSilent=${isSilent}, sample_values=[${audioBytes.slice(0, 5).map(b => '0x' + b.toString(16)).join(', ')}]`);
-        }
-        
-        // CRITICAL: Handle silent audio intelligently for normal conversation
-        if (isSilent) {
-          logger.debug(`[OpenAI Realtime] Buffering silent audio chunk for ${callId} (silence ratio: ${silenceRatio.toFixed(2)})`);
-          conn.audioChunksReceived++;
-          
-          // Store silent audio in a buffer for later processing
-          if (!conn.silentAudioBuffer) {
-            conn.silentAudioBuffer = [];
-          }
-          conn.silentAudioBuffer.push(audioChunkBase64ULaw);
-          
-          // If we have accumulated enough silent audio, send it as a small amount of silence
-          if (conn.silentAudioBuffer.length >= 3) { // ~60ms of silence
-            const combinedSilentAudio = Buffer.concat(conn.silentAudioBuffer.map(chunk => Buffer.from(chunk, 'base64')));
-            const combinedBase64 = combinedSilentAudio.toString('base64');
-            
-            logger.debug(`[OpenAI Realtime] Sending accumulated silent audio for ${callId} (${conn.silentAudioBuffer.length} chunks)`);
-            
-            // Send the accumulated silent audio
-            await this.sendJsonMessage(callId, {
-                type: 'input_audio_buffer.append',
-                audio: combinedBase64,
-            });
-            
-            // Clear the silent buffer
-            conn.silentAudioBuffer = [];
-            
-            // Update tracking
-            conn.audioChunksSent++;
-            conn.validAudioChunksSent++;
-            conn.totalAudioBytesSent += combinedSilentAudio.length;
-            conn.lastSuccessfulAppendTime = Date.now();
-          }
-          
-          return; // Don't send individual silent chunks
-        }
-        
-        // If we have accumulated silent audio and now get meaningful audio, send the silent audio first
-        if (conn.silentAudioBuffer && conn.silentAudioBuffer.length > 0) {
-          const combinedSilentAudio = Buffer.concat(conn.silentAudioBuffer.map(chunk => Buffer.from(chunk, 'base64')));
-          const combinedBase64 = combinedSilentAudio.toString('base64');
-          
-          logger.debug(`[OpenAI Realtime] Sending accumulated silent audio before meaningful audio for ${callId}`);
-          
-          // Send the accumulated silent audio first
-          await this.sendJsonMessage(callId, {
-              type: 'input_audio_buffer.append',
-              audio: combinedBase64,
-          });
-          
-          // Clear the silent buffer
-          conn.silentAudioBuffer = [];
-          
-          // Update tracking
-          conn.audioChunksSent++;
-          conn.validAudioChunksSent++;
-          conn.totalAudioBytesSent += combinedSilentAudio.length;
-        }
-        
-            // CRITICAL: Track when we send audio appends to detect silent failures
-    const appendStartTime = Date.now();
-    if (conn) {
-      conn.lastAppendTime = appendStartTime;
-      conn.appendCount = (conn.appendCount || 0) + 1;
-    }
-
-    await this.sendJsonMessage(callId, {
-        type: 'input_audio_buffer.append',
-        audio: audioChunkBase64ULaw,
-    });
-
-    // CRITICAL: Check if we're getting acknowledgments within a reasonable time
-    setTimeout(() => {
-      const timeSinceAppend = Date.now() - appendStartTime;
-      const currentConn = this.connections.get(callId);
-      if (timeSinceAppend > 5000) { // 5 seconds
-        logger.warn(`[OpenAI Realtime] No acknowledgment received for audio append to ${callId} after ${timeSinceAppend}ms - possible silent failure`);
-        if (currentConn) {
-          logger.warn(`[OpenAI Realtime] Connection state for ${callId}: sessionReady=${currentConn.sessionReady}, webSocketState=${currentConn.webSocket?.readyState}, appendCount=${currentConn.appendCount}, ackCount=${currentConn.acknowledgmentCount || 0}`);
-        }
-      }
-    }, 5000);
-        
+        // Update tracking
         conn.audioChunksSent++;
-        
-        // Track valid audio chunks separately
-        if (!conn.validAudioChunksSent) {
-            conn.validAudioChunksSent = 0;
-        }
-        conn.validAudioChunksSent++;
-        
-        // CRITICAL FIX: Track actual audio bytes sent for more precise duration calculation
-        if (!conn.totalAudioBytesSent) {
-          conn.totalAudioBytesSent = 0;
-        }
-        
-        // Track all audio bytes including silence
-        conn.totalAudioBytesSent += audioBytes.length;
-        
-        // CRITICAL FIX: Set the last successful append time
+        conn.validAudioChunksSent = (conn.validAudioChunksSent || 0) + 1;
+        conn.totalAudioBytesSent = (conn.totalAudioBytesSent || 0) + ulawBuffer.length;
         conn.lastSuccessfulAppendTime = Date.now();
         
-        // Log audio sending progress (reduced frequency)
-        if (conn.validAudioChunksSent <= 5 || conn.validAudioChunksSent % 50 === 0) {
-            logger.info(`[OpenAI Realtime] Audio chunk #${conn.validAudioChunksSent} sent to OpenAI for ${callId} (${audioChunkBase64ULaw.length} bytes)`);
+        // Log progress every 100 chunks
+        if (conn.validAudioChunksSent % 100 === 0) {
+            logger.info(`[OpenAI Realtime] Sent ${conn.validAudioChunksSent} audio chunks to OpenAI for ${callId}`);
         }
         
-
-        
-        // Improved commit logic with validation
-        const commitReadiness = this.checkCommitReadiness(callId);
-        if (commitReadiness.canCommit) {
-            // CRITICAL: Only commit if we have enough chunks to avoid buffer too small errors
-            if (conn.validAudioChunksSent >= 10) {
-                this.debounceCommit(callId);
-            } else if (conn.validAudioChunksSent >= 5) {
-                // Start a timer for moderate chunks to ensure we don't wait too long
-                this.debounceCommit(callId);
-            }
-            // Don't start commit timer for very few chunks (less than 5)
-        } else {
-            logger.debug(`[OpenAI Realtime] Not ready to commit for ${callId}: ${commitReadiness.reason}`);
+        // SIMPLIFIED: Simple commit logic - commit every 20 chunks (~400ms of audio)
+        if (conn.validAudioChunksSent % 20 === 0) {
+            this.debounceCommit(callId);
         }
         
     } catch (audioProcessingError) {
@@ -2298,10 +1977,8 @@ class OpenAIRealtimeService {
             audioProcessingError.stack
         );
         
-        // If it's a WebSocket error, update connection status
         if (audioProcessingError.message.includes('WebSocket not open')) {
             this.updateConnectionStatus(callId, 'error');
-            // Trigger reconnection if not already in progress
             if (!this.isReconnecting.get(callId)) {
                 this.handleConnectionError(callId, audioProcessingError);
             }
