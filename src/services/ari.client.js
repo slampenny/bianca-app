@@ -1184,7 +1184,7 @@ class AsteriskAriClient extends EventEmitter {
                 }
             }
             
-            // Step 7: Create ExternalMedia for READ direction ONLY
+            // Step 7: Create ExternalMedia for READ direction
             const rtpHost = this.RTP_BIANCA_HOST;
             const rtpIp = await this.resolveHostnameToIP(rtpHost);
             const rtpDest = `${rtpIp}:${parentCallData.rtpReadPort}`;
@@ -1200,7 +1200,20 @@ class AsteriskAriClient extends EventEmitter {
             
             logger.info(`[ARI] ExternalMedia READ created: ${rtpChannel.id} (${rtpChannel.name})`);
             
-            // DO NOT create a WRITE ExternalMedia on snoop - that goes on playback channel
+            // Step 8: Create ExternalMedia for WRITE direction
+            // Use port 0 to let Asterisk allocate a port
+            const rtpWriteDest = `${rtpIp}:0`;
+            
+            logger.info(`[ARI] Creating ExternalMedia on snoop ${channelId} for RTP WRITE`);
+            
+            const rtpWriteChannel = await channel.externalMedia({
+                app: CONFIG.STASIS_APP_NAME,
+                external_host: rtpWriteDest,
+                format: CONFIG.RTP_SEND_FORMAT,
+                direction: 'write'
+            });
+            
+            logger.info(`[ARI] ExternalMedia WRITE created: ${rtpWriteChannel.id} (${rtpWriteChannel.name})`);
             
         } catch (err) {
             logger.error(`[ARI] Failed to setup snoop channel: ${err.message}`, err);
@@ -1208,75 +1221,57 @@ class AsteriskAriClient extends EventEmitter {
         }
     }
 
-    // --- REFACTOR 9: Simplify playback handler ---
-    async handleStasisStartForPlayback(channel, channelName, event) {
-        const channelId = channel.id;
-        const isLeg2 = channelName.includes(';2');
+    // And simplify the playback handler to NOT create ExternalMedia:
+async handleStasisStartForPlayback(channel, channelName, event) {
+    const channelId = channel.id;
+    const isLeg2 = channelName.includes(';2');
 
-        if (!isLeg2) {
-            logger.info(`[ARI] Ignoring playback leg 1: ${channelId}`);
-            return;
-        }
-
-        logger.info(`[ARI] StasisStart for Playback channel leg 2: ${channelId}`);
-        const match = channelName.match(/^Local\/playback-([^@]+)@/);
-        const parentChannelId = match?.[1];
-        
-        if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
-            logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}. Hanging up.`);
-            return this.safeHangup(channel, 'Orphaned playback channel');
-        }
-        
-        const parentCallData = this.tracker.getCall(parentChannelId);
-
-        try {
-            // Update tracking first
-            this.tracker.updateCall(parentChannelId, { 
-                playbackChannel: channel, 
-                playbackChannelId: channelId 
-            });
-            
-            // Answer the channel
-            await channel.answer();
-            logger.info(`[ARI] Answered playback channel ${channelId}`);
-            
-            // CRITICAL: Add to main bridge so audio can flow to the phone
-            await this.client.bridges.addChannel({ 
-                bridgeId: parentCallData.mainBridgeId, 
-                channel: channelId 
-            });
-            logger.info(`[ARI] Added playback channel ${channelId} to main bridge ${parentCallData.mainBridgeId}`);
-
-            // Create ExternalMedia for WRITE direction on playback channel
-            const rtpHost = this.RTP_BIANCA_HOST;
-            const rtpIp = await this.resolveHostnameToIP(rtpHost);
-            
-            // Use a dummy port - Asterisk will allocate its own
-            const rtpDest = `${rtpIp}:0`;
-            
-            logger.info(`[ARI] Creating ExternalMedia on playback ${channelId} for RTP WRITE`);
-            
-            const rtpChannel = await channel.externalMedia({
-                app: CONFIG.STASIS_APP_NAME,
-                external_host: rtpDest,
-                format: CONFIG.RTP_SEND_FORMAT,
-                direction: 'write'
-            });
-            
-            logger.info(`[ARI] ExternalMedia WRITE created on playback: ${rtpChannel.id} (${rtpChannel.name})`);
-            
-            // Update tracking to indicate playback channel is ready
-            this.tracker.updateCall(parentChannelId, { 
-                playbackChannelReady: true
-            });
-            
-            // The outbound RTP channel will be created automatically by Asterisk
-            
-        } catch (err) {
-            logger.error(`[ARI] Failed to setup playback channel ${channelId}: ${err.message}`, err);
-            await this.cleanupChannel(parentChannelId, `Playback setup failed: ${err.message}`);
-        }
+    if (!isLeg2) {
+        logger.info(`[ARI] Ignoring playback leg 1: ${channelId}`);
+        return;
     }
+
+    logger.info(`[ARI] StasisStart for Playback channel leg 2: ${channelId}`);
+    const match = channelName.match(/^Local\/playback-([^@]+)@/);
+    const parentChannelId = match?.[1];
+    
+    if (!parentChannelId || !this.tracker.getCall(parentChannelId)) {
+        logger.error(`[ARI] Parent call ${parentChannelId} not found for playback ${channelId}. Hanging up.`);
+        return this.safeHangup(channel, 'Orphaned playback channel');
+    }
+    
+    const parentCallData = this.tracker.getCall(parentChannelId);
+
+    try {
+        // Update tracking first
+        this.tracker.updateCall(parentChannelId, { 
+            playbackChannel: channel, 
+            playbackChannelId: channelId 
+        });
+        
+        // Answer the channel
+        await channel.answer();
+        logger.info(`[ARI] Answered playback channel ${channelId}`);
+        
+        // CRITICAL: Add to main bridge so audio can flow to the phone
+        await this.client.bridges.addChannel({ 
+            bridgeId: parentCallData.mainBridgeId, 
+            channel: channelId 
+        });
+        logger.info(`[ARI] Added playback channel ${channelId} to main bridge ${parentCallData.mainBridgeId}`);
+
+        // The WRITE ExternalMedia is created on the snoop channel, not here
+        
+        // Update tracking to indicate playback channel is ready
+        this.tracker.updateCall(parentChannelId, { 
+            playbackChannelReady: true
+        });
+        
+    } catch (err) {
+        logger.error(`[ARI] Failed to setup playback channel ${channelId}: ${err.message}`, err);
+        await this.cleanupChannel(parentChannelId, `Playback setup failed: ${err.message}`);
+    }
+}
 
     // Resolve hostname to IP address to avoid DNS caching issues in Asterisk
     async resolveHostnameToIP(hostname) {
