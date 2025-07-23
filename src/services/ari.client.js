@@ -230,36 +230,15 @@ class AsteriskAriClient extends EventEmitter {
                         retries++;
                         if (openAIService.isConnectionReady(primarySid)) {
                             clearInterval(retryInterval);
-                            logger.info(`[ARI Pipeline] OpenAI ready after ${retries} retries, sending comfort noise`);
-                            
-                            // Send comfort noise to establish audio pipeline
-                            const comfortNoise = Buffer.alloc(1600); // 200ms at 8kHz
-                            for (let i = 0; i < comfortNoise.length; i++) {
-                                comfortNoise[i] = 0xFF + Math.floor(Math.random() * 4) - 2;
-                            }
-                            const comfortNoiseBase64 = comfortNoise.toString('base64');
-                            openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true);
-                            
-                            // Don't trigger response.create automatically - wait for user to speak
-                            logger.info(`[ARI Pipeline] Audio pipeline ready for ${primarySid} - waiting for user input`);
+                            logger.info(`[ARI Pipeline] OpenAI ready after ${retries} retries - waiting for user input`);
                         } else if (retries >= maxRetries) {
                             clearInterval(retryInterval);
                             logger.error(`[ARI Pipeline] OpenAI connection failed to establish after ${maxRetries} retries for ${primarySid}`);
                         }
                     }, 500); // Check every 500ms
                 } else {
-                    // OpenAI is ready, send comfort noise immediately
-                    logger.info(`[ARI Pipeline] OpenAI ready, sending comfort noise for ${primarySid}`);
-                    
-                    const comfortNoise = Buffer.alloc(1600); // 200ms at 8kHz
-                    for (let i = 0; i < comfortNoise.length; i++) {
-                        comfortNoise[i] = 0xFF + Math.floor(Math.random() * 4) - 2;
-                    }
-                    const comfortNoiseBase64 = comfortNoise.toString('base64');
-                    openAIService.sendAudioChunk(primarySid, comfortNoiseBase64, true);
-                    
-                    // Don't trigger response.create automatically - wait for user to speak
-                    logger.info(`[ARI Pipeline] Audio pipeline ready for ${primarySid} - waiting for user input`);
+                    // OpenAI is ready - don't send comfort noise, let natural audio flow
+                    logger.info(`[ARI Pipeline] OpenAI ready for ${primarySid} - waiting for user input`);
                 }
             }, 1000); // Initial delay of 1 second
         }

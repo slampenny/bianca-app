@@ -1109,26 +1109,13 @@ class OpenAIRealtimeService {
       const pendingAudio = this.pendingAudio.get(callId);
       if (pendingAudio && pendingAudio.length > 0) {
         logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} pending audio chunks for ${callId} (includes user's initial speech)`);
+        logger.info(`[OpenAI Realtime] First chunk size: ${pendingAudio[0]?.length || 0} bytes`);
         await this.flushPendingAudio(callId);
       } else {
         logger.info(`[OpenAI Realtime] No pending audio to flush for ${callId}`);
       }
       
-      // Add initial silence AFTER flushing to establish clean audio pipeline
-      try {
-        const initialSilence = this.createInitialSilence();
-        logger.info(`[OpenAI Realtime] Adding ${CONSTANTS.INITIAL_SILENCE_MS}ms initial silence for ${callId}`);
-        await this.sendJsonMessage(callId, {
-          type: 'input_audio_buffer.append',
-          audio: initialSilence,
-        });
-        
-        // Small delay to ensure audio pipeline is established
-        await new Promise(resolve => setTimeout(resolve, 100));
-        logger.info(`[OpenAI Realtime] Audio pipeline established for ${callId}`);
-      } catch (silenceError) {
-        logger.warn(`[OpenAI Realtime] Failed to add initial silence for ${callId}: ${silenceError.message}`);
-      }
+      logger.info(`[OpenAI Realtime] Audio pipeline ready for ${callId} - waiting for user input`);
       logger.info(`[OpenAI Realtime] Session ready for ${callId}. Waiting for user input.`);
 
       try {
