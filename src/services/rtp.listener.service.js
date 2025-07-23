@@ -88,6 +88,12 @@ class RtpListener {
         // Log first few packets to confirm we're receiving data
         if (this.stats.packetsReceived <= 5) {
             logger.info(`[RTP Listener ${this.port}] Received packet #${this.stats.packetsReceived} from ${rinfo.address}:${rinfo.port} (${msg.length} bytes) for call ${this.callId}`);
+            
+            // CRITICAL: Log the first packet timestamp to track when audio starts
+            if (this.stats.packetsReceived === 1) {
+                this.stats.firstPacketTime = Date.now();
+                logger.info(`[RTP Listener ${this.port}] FIRST PACKET received at ${this.stats.firstPacketTime} for call ${this.callId}`);
+            }
         }
         
         this.logStatsIfNeeded();
@@ -129,6 +135,11 @@ class RtpListener {
                 } else if (this.stats.packetsSent % 100 === 0) {
                     logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
                 }
+                // CRITICAL: Track when we start sending audio to OpenAI
+                if (this.stats.packetsSent === 0) {
+                    logger.info(`[RTP Listener ${this.port}] Sending FIRST audio chunk to OpenAI for call ${this.callId}`);
+                }
+                
                 await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
                 this.stats.packetsSent++;
             } else {

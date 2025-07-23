@@ -132,13 +132,13 @@ class TwilioCallService {
       const sipUri = `sip:${sipUser}@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};patientId=${encodeURIComponent(patientId)}`;
 
       // Connect to Asterisk SIP endpoint with patientId as a parameter
-      // Add media stream configuration for proper bidirectional audio flow
+      // CRITICAL FIX: Remove answerOnBridge to prevent initial audio cutoff
       const dial = twiml.dial({
         callerId: config.twilio.phone, // Use configured Twilio number
         record: 'record-from-answer',
         timeLimit: 1800, // Example: 30 mins
         timeout: 20, // Example: Ring Asterisk for 20 secs
-        answerOnBridge: true, // Ensure audio flows properly
+        // answerOnBridge: true, // REMOVED: This was causing initial audio cutoff
         // Add media stream configuration
         mediaStream: {
           track: 'both_tracks', // Enable both inbound and outbound audio

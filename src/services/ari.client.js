@@ -566,6 +566,22 @@ class AsteriskAriClient extends EventEmitter {
             
             logger.info(`[ARI] Answered main channel: ${channelId}`);
 
+            // CRITICAL FIX: Start recording IMMEDIATELY to capture initial "hello"
+            const immediateRecordingName = `immediate-recording-${channelId.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+            try {
+                await channel.record({ 
+                    name: immediateRecordingName, 
+                    format: 'wav', 
+                    maxDurationSeconds: 3600, 
+                    beep: false, 
+                    ifExists: 'overwrite' 
+                });
+                this.tracker.updateCall(channelId, { immediateRecordingName });
+                logger.info(`[ARI] Started IMMEDIATE recording ${immediateRecordingName} on channel ${channelId}`);
+            } catch (recordingErr) {
+                logger.error(`[ARI] Immediate recording failed: ${recordingErr.message}`);
+            }
+
             const { twilioCallSid, patientId } = await this.extractCallParameters(channel, event);
             
             if (!twilioCallSid || !patientId) {

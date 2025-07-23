@@ -2003,28 +2003,30 @@ class OpenAIRealtimeService {
         conn.consecutiveSilenceChunks = 0;
     }
     
-    // SIMPLIFIED: Only buffer if WebSocket is not open and session not ready
-    if (!conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-        if (!bypassBuffering && conn.status !== 'closed' && conn.status !== 'error_terminal') {
-            const pending = this.pendingAudio.get(callId) || [];
-            if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-                pending.push(audioChunkBase64ULaw);
-                this.pendingAudio.set(callId, pending);
-                logger.debug(`[OpenAI Realtime] WebSocket not open for ${callId}, buffered audio chunk (${pending.length}/${CONSTANTS.MAX_PENDING_CHUNKS})`);
+    // CRITICAL FIX: ALWAYS buffer first, then check if we can send immediately
+    // This ensures your "hello" is never lost, even if it arrives before setup is complete
+    const shouldBuffer = !bypassBuffering && conn.status !== 'closed' && conn.status !== 'error_terminal';
+    const canSendImmediately = conn.webSocket && conn.webSocket.readyState === WebSocket.OPEN && conn.sessionReady;
+    
+    if (shouldBuffer) {
+        const pending = this.pendingAudio.get(callId) || [];
+        if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
+            pending.push(audioChunkBase64ULaw);
+            this.pendingAudio.set(callId, pending);
+            
+            // Log buffering with more detail
+            if (pending.length <= 5) {
+                logger.info(`[OpenAI Realtime] Buffered audio chunk #${pending.length} for ${callId} (WebSocket: ${!!conn.webSocket}, Session: ${conn.sessionReady})`);
+            } else if (pending.length % 10 === 0) {
+                logger.debug(`[OpenAI Realtime] Buffered ${pending.length} audio chunks for ${callId}`);
             }
+        } else {
+            logger.warn(`[OpenAI Realtime] Buffer full for ${callId}, dropping audio chunk`);
         }
-        return;
     }
     
-    if (!conn.sessionReady) {
-        if (!bypassBuffering) {
-            const pending = this.pendingAudio.get(callId) || [];
-            if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-                pending.push(audioChunkBase64ULaw);
-                this.pendingAudio.set(callId, pending);
-                logger.debug(`[OpenAI Realtime] Session not ready for ${callId}, buffered audio chunk`);
-            }
-        }
+    // If we can't send immediately, just buffer and return
+    if (!canSendImmediately) {
         return;
     }
     
