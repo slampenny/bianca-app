@@ -988,7 +988,7 @@ class OpenAIRealtimeService {
         instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant.',
         voice: config.openai.realtimeVoice || 'alloy',
         // USE PCM16 instead of g711_ulaw for better quality and reliability
-        input_audio_format: 'g711_ulaw', // Much better speech recognition
+        input_audio_format: 'pcm16', // Much better speech recognition
         output_audio_format: 'g711_ulaw', // Higher quality output
         // Add input transcription to help with debugging
         input_audio_transcription: {
@@ -1955,10 +1955,15 @@ class OpenAIRealtimeService {
         const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
         await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
         
-        // SIMPLIFIED: Send audio immediately without complex filtering
+        // CONVERT uLaw to PCM16 for better speech recognition
+        const AudioUtils = require('../api/audio.utils');
+        const pcmBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
+        const pcmBase64 = pcmBuffer.toString('base64');
+        
+        // Send PCM16 audio to OpenAI
         await this.sendJsonMessage(callId, {
             type: 'input_audio_buffer.append',
-            audio: audioChunkBase64ULaw,
+            audio: pcmBase64,
         });
         
         // Update tracking
@@ -1972,10 +1977,9 @@ class OpenAIRealtimeService {
             logger.info(`[OpenAI Realtime] Sent ${conn.validAudioChunksSent} audio chunks to OpenAI for ${callId}`);
         }
         
-        // SIMPLIFIED: Simple commit logic - commit every 20 chunks (~400ms of audio)
+        // SIMPLIFIED: Simple commit logic - commit every 50 chunks (~1000ms of audio)
         // OR immediately if AI is generating response (interruption)
-        // OR immediately if user is speaking (for faster AI response)
-        if (conn.validAudioChunksSent % 20 === 0 || conn._responseCreated || conn.validAudioChunksSent % 5 === 0) {
+        if (conn.validAudioChunksSent % 50 === 0 || conn._responseCreated) {
             this.debounceCommit(callId);
         }
         
