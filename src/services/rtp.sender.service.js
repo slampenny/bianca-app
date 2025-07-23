@@ -175,8 +175,7 @@ class RtpSenderService extends EventEmitter {
 
         // Check if we have enough data for a frame
         if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
-            // Not enough data - send silence frame to maintain timing
-            this.sendSilenceFrame(callId);
+            // Not enough data - wait for more audio instead of sending silence
             return;
         }
 
@@ -215,34 +214,7 @@ class RtpSenderService extends EventEmitter {
         }
     }
 
-    /**
-     * Send silence frame to maintain timing
-     */
-    sendSilenceFrame(callId) {
-        const callConfig = this.activeCalls.get(callId);
-        const socket = this.udpSockets.get(callId);
-        
-        if (!callConfig || !socket) return;
 
-        // Create silence frame (uLaw silence = 0x7F, PCM silence = 0x00)
-        const silenceValue = callConfig.format === 'slin' ? 0x00 : 0x7F;
-        const silenceFrame = Buffer.alloc(this.SAMPLES_PER_FRAME, silenceValue);
-        
-        const timestamp = this.timestamps.get(callId);
-        
-        try {
-            const rtpPacket = this.createRtpPacket(callId, silenceFrame, callConfig, timestamp);
-            if (rtpPacket) {
-                this.sendRtpPacketSync(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort, callId);
-                
-                // Update timestamp
-                const nextTimestamp = (timestamp + this.SAMPLES_PER_FRAME) >>> 0;
-                this.timestamps.set(callId, nextTimestamp);
-            }
-        } catch (err) {
-            logger.error(`[RTP Sender] Error sending silence frame for ${callId}: ${err.message}`);
-        }
-    }
 
     /**
      * FIXED: Buffer audio instead of sending immediately

@@ -118,8 +118,15 @@ class RtpListener {
             const audioBase64 = rtpPacket.payload.toString('base64');
             
             if (audioBase64 && audioBase64.length > 0) {
-                // Only log every 100th packet to reduce noise
-                if (this.stats.packetsSent % 100 === 0) {
+                // Log first few packets to debug static burst
+                if (this.stats.packetsSent < 10) {
+                    logger.info(`[RTP Listener ${this.port}] Packet #${this.stats.packetsSent + 1}: ${audioBase64.length} base64 bytes (${rtpPacket.payload.length} raw μ-law bytes) for call ${this.callId}`);
+                    
+                    // Check if this looks like silence or static
+                    const isSilence = this.isAudioSilence(rtpPacket.payload);
+                    const isStatic = this.isStaticBurst(rtpPacket.payload);
+                    logger.info(`[RTP Listener ${this.port}] Packet analysis: silence=${isSilence}, static=${isStatic}`);
+                } else if (this.stats.packetsSent % 100 === 0) {
                     logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
                 }
                 await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
@@ -195,6 +202,54 @@ class RtpListener {
         } catch (err) {
             logger.debug(`[RTP Listener ${this.port}] Error parsing RTP packet: ${err.message}`);
             return null;
+        }
+    }
+
+    /**
+     * Check if audio buffer is silence
+     * @param {Buffer} audioBuffer - Raw audio buffer
+     * @returns {boolean} True if audio is silence
+     */
+    isAudioSilence(audioBuffer) {
+        try {
+            const silenceValue = 0x7F; // uLaw silence
+            const tolerance = 2; // Allow small variations
+            
+            for (let i = 0; i < audioBuffer.length; i++) {
+                if (Math.abs(audioBuffer[i] - silenceValue) > tolerance) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if audio buffer looks like a static burst
+     * @param {Buffer} audioBuffer - Raw audio buffer
+     * @returns {boolean} True if audio looks like static
+     */
+    isStaticBurst(audioBuffer) {
+        try {
+            // Static typically has high-frequency noise patterns
+            // Look for rapid changes in amplitude
+            let changes = 0;
+            const threshold = 10; // Minimum change to count as significant
+            
+            for (let i = 1; i < audioBuffer.length; i++) {
+                const diff = Math.abs(audioBuffer[i] - audioBuffer[i-1]);
+                if (diff > threshold) {
+                    changes++;
+                }
+            }
+            
+            // If more than 30% of samples have significant changes, it might be static
+            const changeRatio = changes / audioBuffer.length;
+            return changeRatio > 0.3;
+        } catch (err) {
+            return false;
         }
     }
 
