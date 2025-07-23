@@ -222,9 +222,10 @@ async function seedDatabase() {
       schedules: [],
     };
     
-    // Insert the specific test patients for caregiverOne (fake@example.org)
-    const [patient1, patient2] = await insertPatientsAndAddToCaregiver(caregiverOneRecord, [agnesAlphabet, barnabyButton]);
-    console.log('Inserted test patients:', patient1.name, patient2.name);
+    // Insert the specific test patients - Agnes for admin, Barnaby for caregiverOne
+    const [patient1] = await insertPatientsAndAddToCaregiver(adminRecord, [agnesAlphabet]);
+    const [patient2] = await insertPatientsAndAddToCaregiver(caregiverOneRecord, [barnabyButton]);
+    console.log('Inserted test patients:', patient1.name, 'for admin and', patient2.name, 'for caregiverOne');
     
     // Create additional patients for testing with predictable names
     const patientThree = {
