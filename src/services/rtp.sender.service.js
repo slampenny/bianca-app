@@ -36,6 +36,7 @@ class RtpSenderService extends EventEmitter {
         this.SAMPLE_RATE = 8000;
         this.FRAME_SIZE_MS = 20;
         this.SAMPLES_PER_FRAME = (this.SAMPLE_RATE * this.FRAME_SIZE_MS) / 1000; // 160 samples for uLaw
+        this.PACKET_INTERVAL_MS = 20; // Send packets every 20ms for consistent timing
         
         // Enhanced error tracking
         this.isShuttingDown = false;
@@ -151,13 +152,13 @@ class RtpSenderService extends EventEmitter {
             clearInterval(this.packetTimers.get(callId));
         }
 
-        // Create new timer for this call
+        // Create new timer for this call with consistent timing
         const timer = setInterval(() => {
             this.sendNextFrame(callId);
-        }, this.FRAME_SIZE_MS);
+        }, this.PACKET_INTERVAL_MS);
 
         this.packetTimers.set(callId, timer);
-        logger.info(`[RTP Sender] Started packet sender timer for ${callId} (${this.FRAME_SIZE_MS}ms intervals)`);
+        logger.info(`[RTP Sender] Started packet sender timer for ${callId} (${this.PACKET_INTERVAL_MS}ms intervals)`);
     }
 
     /**
@@ -223,8 +224,8 @@ class RtpSenderService extends EventEmitter {
         
         if (!callConfig || !socket) return;
 
-        // Create silence frame (uLaw silence = 0xFF, PCM silence = 0x00)
-        const silenceValue = callConfig.format === 'slin' ? 0x00 : 0xFF;
+        // Create silence frame (uLaw silence = 0x7F, PCM silence = 0x00)
+        const silenceValue = callConfig.format === 'slin' ? 0x00 : 0x7F;
         const silenceFrame = Buffer.alloc(this.SAMPLES_PER_FRAME, silenceValue);
         
         const timestamp = this.timestamps.get(callId);

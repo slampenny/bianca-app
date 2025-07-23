@@ -125,12 +125,6 @@ class TwilioCallService {
 
       // For human answer, connect to Asterisk SIP endpoint
       
-      // Initial greeting
-      twiml.say({
-        voice: 'alice',
-        language: 'en-US'
-      }, "Hello.");
-      
       const asteriskUrl = new URL('http://sip.myphonefriend.com:5061');
       const sipHost = asteriskUrl.hostname;
       const sipPort = config.asterisk.externalPort || 5061;

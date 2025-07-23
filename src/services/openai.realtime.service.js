@@ -11,18 +11,21 @@ const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw
  * Constants for configuration
  */
 const CONSTANTS = {
-  MAX_PENDING_CHUNKS: 100, // Maximum number of audio chunks to buffer
+  MAX_PENDING_CHUNKS: 150, // Increased buffer size to handle audio bursts
   RECONNECT_MAX_ATTEMPTS: 5, // Maximum number of reconnection attempts
   RECONNECT_BASE_DELAY: 1000, // Base delay for exponential backoff (milliseconds)
-  COMMIT_DEBOUNCE_DELAY: 300, // Increased to 300ms for smoother audio
+  COMMIT_DEBOUNCE_DELAY: 200, // Reduced to 200ms for more responsive audio
   CONNECTION_TIMEOUT: 15000, // WebSocket connection + handshake timeout (milliseconds)
   DEFAULT_SAMPLE_RATE: 24000, // OpenAI Realtime API uses 24kHz for PCM16
   ASTERISK_SAMPLE_RATE: 8000, // Rate of audio FOR Asterisk (uLaw)
   OPENAI_PCM_OUTPUT_RATE: 24000, // Expected rate FROM OpenAI for pcm16 output
   TEST_CONNECTION_TIMEOUT: 20000, // Timeout for the standalone test connection method (milliseconds)
-  AUDIO_BATCH_SIZE: 50, // Send audio in batches of 50 chunks
-  MIN_AUDIO_DURATION_MS: 100, // Minimum audio duration before committing (100ms)
-  MIN_AUDIO_BYTES: 800, // Minimum bytes for 100ms of uLaw audio at 8kHz (8000 * 0.1)
+  AUDIO_BATCH_SIZE: 30, // Reduced batch size for more frequent commits
+  MIN_AUDIO_DURATION_MS: 50, // Reduced minimum duration for faster response
+  MIN_AUDIO_BYTES: 400, // Reduced minimum bytes for 50ms of uLaw audio at 8kHz
+  INITIAL_SILENCE_MS: 500, // Add 500ms of silence at start to prevent static burst
+  AUDIO_QUALITY_CHECK_INTERVAL: 5000, // Check audio quality every 5 seconds
+  MAX_CONSECUTIVE_SILENCE_CHUNKS: 50, // Maximum consecutive silence chunks before warning
 };
 
 const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
@@ -69,6 +72,66 @@ class OpenAIRealtimeService {
     const expBackoff = Math.min(CONSTANTS.RECONNECT_BASE_DELAY * Math.pow(2, attempt), 30000);
     const jitter = expBackoff * 0.2 * (Math.random() * 2 - 1); // +/- 20% jitter
     return Math.floor(expBackoff + jitter);
+  }
+
+  /**
+   * Create initial silence buffer to prevent static burst
+   * @param {number} durationMs - Duration in milliseconds
+   * @returns {string} Base64 encoded silence
+   */
+  createInitialSilence(durationMs = CONSTANTS.INITIAL_SILENCE_MS) {
+    const samples = Math.floor((durationMs / 1000) * 8000); // 8kHz sample rate
+    const silenceBuffer = Buffer.alloc(samples, 0x7F); // uLaw silence is 0x7F
+    return silenceBuffer.toString('base64');
+  }
+
+  /**
+   * Check if audio chunk is silence
+   * @param {string} audioBase64 - Base64 encoded uLaw audio
+   * @returns {boolean} True if audio is silence
+   */
+  isAudioSilence(audioBase64) {
+    try {
+      const audioBuffer = Buffer.from(audioBase64, 'base64');
+      const silenceValue = 0x7F; // uLaw silence
+      const tolerance = 2; // Allow small variations
+      
+      for (let i = 0; i < audioBuffer.length; i++) {
+        if (Math.abs(audioBuffer[i] - silenceValue) > tolerance) {
+          return false;
+        }
+      }
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /**
+   * Monitor audio quality and detect issues
+   * @param {string} callId - Call identifier
+   */
+  monitorAudioQuality(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn) return;
+
+    const now = Date.now();
+    const callDuration = now - conn.startTime;
+    
+    // Check for issues around 30-second mark
+    if (callDuration > 25000 && callDuration < 35000) {
+      const audioChunksPerSecond = conn.audioChunksReceived / (callDuration / 1000);
+      const expectedChunksPerSecond = 50; // At 8kHz, 20ms chunks = 50 chunks/second
+      
+      if (audioChunksPerSecond < expectedChunksPerSecond * 0.8) {
+        logger.warn(`[OpenAI Realtime] Audio quality issue detected for ${callId} at ${Math.round(callDuration/1000)}s: ${audioChunksPerSecond.toFixed(1)} chunks/sec (expected ~${expectedChunksPerSecond})`);
+      }
+    }
+    
+    // Check for excessive silence
+    if (conn.consecutiveSilenceChunks > CONSTANTS.MAX_CONSECUTIVE_SILENCE_CHUNKS) {
+      logger.warn(`[OpenAI Realtime] Audio quality warning for ${callId}: ${conn.consecutiveSilenceChunks} consecutive silence chunks`);
+    }
   }
 
   /**
@@ -1031,6 +1094,18 @@ class OpenAIRealtimeService {
       // CRITICAL: Set session setup flag to prevent commits during setup
       conn._sessionSetupInProgress = true;
       
+      // Add initial silence to prevent static burst
+      try {
+        const initialSilence = this.createInitialSilence();
+        logger.info(`[OpenAI Realtime] Adding ${CONSTANTS.INITIAL_SILENCE_MS}ms initial silence for ${callId}`);
+        await this.sendJsonMessage(callId, {
+          type: 'input_audio_buffer.append',
+          audio: initialSilence,
+        });
+      } catch (silenceError) {
+        logger.warn(`[OpenAI Realtime] Failed to add initial silence for ${callId}: ${silenceError.message}`);
+      }
+      
       // CRITICAL: Clear session setup flag immediately when session is updated
       conn._sessionSetupInProgress = false;
       logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
@@ -1902,7 +1977,7 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * SIMPLIFIED: Send audio chunk immediately with minimal buffering
+   * ENHANCED: Send audio chunk with improved buffering and quality monitoring
    */
   async sendAudioChunk(callId, audioChunkBase64ULaw, bypassBuffering = false) {
     // Basic validation
@@ -1924,6 +1999,16 @@ class OpenAIRealtimeService {
     }
     
     conn.audioChunksReceived++;
+    
+    // Track consecutive silence chunks to detect audio issues
+    if (this.isAudioSilence(audioChunkBase64ULaw)) {
+        conn.consecutiveSilenceChunks = (conn.consecutiveSilenceChunks || 0) + 1;
+        if (conn.consecutiveSilenceChunks > CONSTANTS.MAX_CONSECUTIVE_SILENCE_CHUNKS) {
+            logger.warn(`[OpenAI Realtime] Excessive silence detected for ${callId}: ${conn.consecutiveSilenceChunks} consecutive chunks`);
+        }
+    } else {
+        conn.consecutiveSilenceChunks = 0;
+    }
     
     // SIMPLIFIED: Only buffer if WebSocket is not open and session not ready
     if (!conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
@@ -1972,9 +2057,22 @@ class OpenAIRealtimeService {
             logger.info(`[OpenAI Realtime] Sent ${conn.validAudioChunksSent} audio chunks to OpenAI for ${callId}`);
         }
         
-        // SIMPLIFIED: Simple commit logic - commit every 25 chunks (~500ms of audio)
+        // Monitor audio quality periodically
+        if (conn.validAudioChunksSent % 50 === 0) {
+            this.monitorAudioQuality(callId);
+        }
+        
+        // ENHANCED: More responsive commit logic
+        // Commit every 15 chunks (~300ms of audio) for faster response
         // OR immediately if AI is generating response (interruption)
-        if (conn.validAudioChunksSent % 25 === 0 || conn._responseCreated) {
+        // OR if we have meaningful audio and haven't committed recently
+        const shouldCommit = (
+            conn.validAudioChunksSent % 15 === 0 || 
+            conn._responseCreated ||
+            (conn.lastCommitTime && (Date.now() - conn.lastCommitTime) > 1000) // Force commit every second
+        );
+        
+        if (shouldCommit) {
             this.debounceCommit(callId);
         }
         
