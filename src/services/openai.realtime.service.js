@@ -1605,6 +1605,17 @@ class OpenAIRealtimeService {
       return Promise.resolve(true);
     }
     
+    // INTERRUPTION LOGIC: Allow commits when AI is generating response if user is speaking
+    if (messageObj.type === 'input_audio_buffer.commit' && callId && conn && conn._responseCreated) {
+      const hasMeaningfulAudio = this.checkForMeaningfulAudio(callId);
+      if (hasMeaningfulAudio) {
+        logger.info(`[OpenAI Realtime] ALLOWING interrupt commit for ${callId} - user is speaking over AI`);
+      } else {
+        logger.debug(`[OpenAI Realtime] Blocking commit for ${callId} - AI is generating response but no meaningful audio`);
+        return Promise.resolve(true);
+      }
+    }
+    
     // Buffer audio appends when session isn't ready
     if (messageObj.type === 'input_audio_buffer.append' && callId && conn && (!conn.sessionReady || conn._sessionSetupInProgress)) {
       const pending = this.pendingAudio.get(callId) || [];
@@ -1967,7 +1978,8 @@ class OpenAIRealtimeService {
         }
         
         // SIMPLIFIED: Simple commit logic - commit every 20 chunks (~400ms of audio)
-        if (conn.validAudioChunksSent % 20 === 0) {
+        // OR immediately if AI is generating response (interruption)
+        if (conn.validAudioChunksSent % 20 === 0 || conn._responseCreated) {
             this.debounceCommit(callId);
         }
         
