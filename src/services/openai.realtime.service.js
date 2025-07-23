@@ -23,7 +23,7 @@ const CONSTANTS = {
   AUDIO_BATCH_SIZE: 30, // Reduced batch size for more frequent commits
   MIN_AUDIO_DURATION_MS: 50, // Reduced minimum duration for faster response
   MIN_AUDIO_BYTES: 400, // Reduced minimum bytes for 50ms of uLaw audio at 8kHz
-  INITIAL_SILENCE_MS: 500, // Add 500ms of silence at start to prevent static burst
+  INITIAL_SILENCE_MS: 200, // Add 200ms of silence at start to prevent static burst
   AUDIO_QUALITY_CHECK_INTERVAL: 5000, // Check audio quality every 5 seconds
   MAX_CONSECUTIVE_SILENCE_CHUNKS: 50, // Maximum consecutive silence chunks before warning
 };
@@ -379,6 +379,7 @@ class OpenAIRealtimeService {
       // Track timing for each speaker
       lastUserSpeechTime: null,
       lastAssistantSpeechTime: null,
+      _userHasSpoken: false, // Track if user has spoken to trigger first response
     });
     this.reconnectAttempts.set(callId, 0);
     this.isReconnecting.set(callId, false);
@@ -924,8 +925,11 @@ class OpenAIRealtimeService {
         case 'input_audio_buffer.speech_started':
           logger.info(`[OpenAI Realtime] Speech started detected for ${callId}`);
 
-          // User started speaking - but DON'T save assistant message yet
-          // The assistant might still be speaking!
+          // Only trigger AI response on the very first speech of the conversation
+          if (conn && !conn._userHasSpoken) {
+            conn._userHasSpoken = true;
+            logger.info(`[OpenAI Realtime] First user speech detected for ${callId} - will trigger AI response after speech ends`);
+          }
 
           this.notify(callId, 'speech_started', {});
           break;
@@ -940,6 +944,19 @@ class OpenAIRealtimeService {
           if (conn?.pendingUserTranscript) {
             await this.saveCompleteMessage(callId, 'user', conn.pendingUserTranscript);
             conn.pendingUserTranscript = '';
+          }
+
+          // Trigger AI response when user finishes speaking (natural conversation flow)
+          if (conn && conn._userHasSpoken) {
+            logger.info(`[OpenAI Realtime] User finished speaking for ${callId} - triggering AI response`);
+            setTimeout(async () => {
+              try {
+                await this.sendResponseCreate(callId);
+                logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
+              } catch (err) {
+                logger.error(`[OpenAI Realtime] Failed to trigger AI response after user finished speaking for ${callId}: ${err.message}`);
+              }
+            }, 300); // Small delay to ensure speech processing is complete
           }
 
           this.notify(callId, 'speech_stopped', {});
@@ -959,8 +976,8 @@ class OpenAIRealtimeService {
             conn.consecutiveBufferErrors = 0; // Reset error counter on successful commit
             logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid, ${bytesProcessed} bytes)`);
             
-            // Don't automatically trigger response generation - wait for user to speak first
-            logger.debug(`[OpenAI Realtime] Audio buffer committed for ${callId} - waiting for user input`);
+            // Don't automatically trigger responses - let speech detection handle it naturally
+            logger.debug(`[OpenAI Realtime] Audio buffer committed for ${callId} - waiting for natural conversation flow`);
           }
           break;
 
@@ -1079,7 +1096,25 @@ class OpenAIRealtimeService {
       // CRITICAL: Set session setup flag to prevent commits during setup
       conn._sessionSetupInProgress = true;
       
-      // Add initial silence to prevent static burst
+      // CRITICAL: Clear session setup flag immediately when session is updated
+      conn._sessionSetupInProgress = false;
+      logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
+      
+      // Reset counters when session becomes ready
+      conn.audioChunksReceived = 0;
+      conn.audioChunksSent = 0;
+      conn.validAudioChunksSent = 0;
+      
+      // Flush pending audio to OpenAI (this includes the user's "hello")
+      const pendingAudio = this.pendingAudio.get(callId);
+      if (pendingAudio && pendingAudio.length > 0) {
+        logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} pending audio chunks for ${callId} (includes user's initial speech)`);
+        await this.flushPendingAudio(callId);
+      } else {
+        logger.info(`[OpenAI Realtime] No pending audio to flush for ${callId}`);
+      }
+      
+      // Add initial silence AFTER flushing to establish clean audio pipeline
       try {
         const initialSilence = this.createInitialSilence();
         logger.info(`[OpenAI Realtime] Adding ${CONSTANTS.INITIAL_SILENCE_MS}ms initial silence for ${callId}`);
@@ -1087,25 +1122,13 @@ class OpenAIRealtimeService {
           type: 'input_audio_buffer.append',
           audio: initialSilence,
         });
+        
+        // Small delay to ensure audio pipeline is established
+        await new Promise(resolve => setTimeout(resolve, 100));
+        logger.info(`[OpenAI Realtime] Audio pipeline established for ${callId}`);
       } catch (silenceError) {
         logger.warn(`[OpenAI Realtime] Failed to add initial silence for ${callId}: ${silenceError.message}`);
       }
-      
-      // CRITICAL: Clear session setup flag immediately when session is updated
-      conn._sessionSetupInProgress = false;
-      logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
-      
-          // Reset counters when session becomes ready
-    conn.audioChunksReceived = 0;
-    conn.audioChunksSent = 0;
-    conn.validAudioChunksSent = 0;
-    
-    // Clear any pending audio buffer (should be empty, but safety check)
-    const pendingAudio = this.pendingAudio.get(callId);
-    if (pendingAudio && pendingAudio.length > 0) {
-      logger.info(`[OpenAI Realtime] Clearing pending audio buffer for ${callId} (${pendingAudio.length} chunks)`);
-      this.pendingAudio.set(callId, []);
-    }
       logger.info(`[OpenAI Realtime] Session ready for ${callId}. Waiting for user input.`);
 
       try {
