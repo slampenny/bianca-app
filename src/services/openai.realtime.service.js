@@ -988,7 +988,7 @@ class OpenAIRealtimeService {
         instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant.',
         voice: config.openai.realtimeVoice || 'alloy',
         // USE PCM16 instead of g711_ulaw for better quality and reliability
-        input_audio_format: 'pcm16', // Much better speech recognition
+        input_audio_format: 'g711_ulaw', // Much better speech recognition
         output_audio_format: 'g711_ulaw', // Higher quality output
         // Add input transcription to help with debugging
         input_audio_transcription: {
@@ -1955,15 +1955,10 @@ class OpenAIRealtimeService {
         const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
         await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
         
-        // CONVERT uLaw to PCM16 for better speech recognition
-        const AudioUtils = require('../api/audio.utils');
-        const pcmBuffer = await AudioUtils.convertUlawToPcm(ulawBuffer);
-        const pcmBase64 = pcmBuffer.toString('base64');
-        
-        // Send PCM16 audio to OpenAI
+        // SIMPLIFIED: Send uLaw audio directly to OpenAI
         await this.sendJsonMessage(callId, {
             type: 'input_audio_buffer.append',
-            audio: pcmBase64,
+            audio: audioChunkBase64ULaw,
         });
         
         // Update tracking
