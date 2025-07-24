@@ -97,6 +97,82 @@ router.post('/seed', testController.testSeed);
 
 /**
  * @swagger
+ * /test/conversations:
+ *   get:
+ *     summary: Test route to check conversations without authentication
+ *     description: This is for debugging conversation display issues
+ *     tags: [Test]
+ *     parameters:
+ *       - in: query
+ *         name: patientId
+ *         schema:
+ *           type: string
+ *         description: Patient ID to filter conversations
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: number
+ *         description: Number of conversations to return
+ *     responses:
+ *       "200":
+ *         description: Conversations data
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.get('/conversations', async (req, res) => {
+  try {
+    const { patientId, limit = 20 } = req.query;
+    const { Conversation, Patient } = require('../../models');
+    
+    let filter = {};
+    if (patientId) {
+      filter.patientId = patientId;
+    }
+    
+    const conversations = await Conversation.find(filter)
+      .populate('patientId', 'name')
+      .populate('messages')
+      .sort({ startTime: -1 })
+      .limit(parseInt(limit))
+      .lean();
+    
+    // Get all patients for reference
+    const patients = await Patient.find({}, 'name _id').lean();
+    
+    res.json({
+      success: true,
+      totalConversations: conversations.length,
+      conversations: conversations.map(conv => ({
+        id: conv._id,
+        patientId: conv.patientId?._id,
+        patientName: conv.patientId?.name,
+        callSid: conv.callSid,
+        status: conv.status,
+        callType: conv.callType,
+        startTime: conv.startTime,
+        endTime: conv.endTime,
+        duration: conv.duration,
+        messageCount: conv.messages?.length || 0,
+        hasHistory: !!conv.history,
+        history: conv.history,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt
+      })),
+      allPatients: patients.map(p => ({ id: p._id, name: p.name })),
+      filter: filter
+    });
+  } catch (error) {
+    logger.error('Error in test conversations route:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+/**
+ * @swagger
  * /test/call:
  *   post:
  *     summary: Test the call with twilio feature
