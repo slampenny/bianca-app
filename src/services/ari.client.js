@@ -581,6 +581,9 @@ class AsteriskAriClient extends EventEmitter {
             // CRITICAL: Start RTP listener immediately to capture your "hello"
             await this.startRtpListenerImmediately(channelId, twilioCallSid);
             
+            // CRITICAL: Start OpenAI session immediately - no more buffering delays!
+            await this.startOpenAISessionImmediately(channelId, twilioCallSid, patientId);
+            
             await this.setupMediaPipeline(channel, twilioCallSid, patientId);
             
         } catch (err) {
@@ -2013,11 +2016,13 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             logger.info(`[ARI Pipeline] Built enhanced prompt for patient ${patientId} (${callType} call)`);
 
             
-            // Step 4: Create conversation record in database
-            const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId, callType);
+            // Step 4: Conversation record already created during immediate OpenAI initialization
+            // Get the conversation ID from the tracker
+            const existingCallData = this.tracker.getCall(asteriskChannelId);
+            const dbConversationId = existingCallData?.conversationId;
 
-            // Step 5: Initialize OpenAI service for this call
-            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, enhancedPrompt);
+            // Step 5: OpenAI service already initialized immediately - no need to initialize again
+            logger.info(`[ARI Pipeline] OpenAI service already initialized immediately for ${asteriskChannelId}`);
 
             // Step 6: Create the main bridge for mixing audio
             mainBridge = await this.client.bridges.create({
@@ -2232,6 +2237,44 @@ async handleStasisStartForPlayback(channel, channelName, event) {
         } catch (err) {
             logger.error(`[ARI] Error starting immediate RTP listener for ${asteriskChannelId}: ${err.message}`);
             throw err;
+        }
+    }
+
+    async startOpenAISessionImmediately(asteriskChannelId, twilioCallSid, patientId) {
+        logger.info(`[ARI] Starting OpenAI session immediately for ${asteriskChannelId} - no buffering delays!`);
+        try {
+            const openAIService = require('./openai.realtime.service');
+            const conversationService = require('./conversation.service');
+            
+            // Get call type for proper prompt
+            const callData = this.tracker.getCall(asteriskChannelId);
+            const callType = callData?.callType || 'wellness-check';
+            
+            // Build the initial prompt
+            const initialPrompt = await conversationService.buildEnhancedPrompt(callType, patientId);
+            
+            // Create conversation record
+            const conversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId);
+            
+            // Store conversation ID in tracker for later use
+            this.tracker.updateCall(asteriskChannelId, { conversationId });
+            
+            // Initialize OpenAI session immediately
+            const success = await openAIService.initialize(
+                asteriskChannelId,
+                twilioCallSid,
+                conversationId,
+                initialPrompt
+            );
+            
+            if (success) {
+                logger.info(`[ARI] OpenAI session started immediately for ${asteriskChannelId} - audio will flow directly to OpenAI`);
+            } else {
+                logger.error(`[ARI] Failed to start OpenAI session immediately for ${asteriskChannelId}`);
+            }
+        } catch (err) {
+            logger.error(`[ARI] Error starting immediate OpenAI session for ${asteriskChannelId}: ${err.message}`);
+            // Don't throw - let the call continue even if OpenAI fails
         }
     }
 
