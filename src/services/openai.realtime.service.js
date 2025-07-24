@@ -1100,8 +1100,8 @@ class OpenAIRealtimeService {
       conn._sessionSetupInProgress = false;
       logger.info(`[OpenAI Realtime] Session setup complete for ${callId} - commits now allowed`);
       
-      // Reset counters when session becomes ready
-      conn.audioChunksReceived = 0;
+      // Reset send counters when session becomes ready (but preserve receive tracking)
+      // Keep audioChunksReceived and firstAudioReceivedTime to maintain timing info
       conn.audioChunksSent = 0;
       conn.validAudioChunksSent = 0;
       
@@ -1782,7 +1782,7 @@ class OpenAIRealtimeService {
         return;
     }
     
-    logger.info(`[OpenAI Realtime] Flushing ${chunksULawBase64.length} pending uLaw audio chunks for ${callId}.`);
+    logger.info(`[OpenAI Realtime] Flushing ${chunksULawBase64.length} pending uLaw audio chunks for ${callId} (this includes your "hello" if it was buffered).`);
     
     const chunksToProcess = [...chunksULawBase64];
     this.pendingAudio.set(callId, []);
@@ -1993,6 +1993,12 @@ class OpenAIRealtimeService {
     
     conn.audioChunksReceived++;
     
+    // CRITICAL FIX: Track when first audio was received (even if just buffered)
+    if (!conn.firstAudioReceivedTime) {
+        conn.firstAudioReceivedTime = Date.now();
+        logger.info(`[OpenAI Realtime] First audio received for ${callId} at ${conn.firstAudioReceivedTime} (chunk #${conn.audioChunksReceived})`);
+    }
+    
     // Track consecutive silence chunks to detect audio issues
     if (this.isAudioSilence(audioChunkBase64ULaw)) {
         conn.consecutiveSilenceChunks = (conn.consecutiveSilenceChunks || 0) + 1;
@@ -2014,9 +2020,10 @@ class OpenAIRealtimeService {
             pending.push(audioChunkBase64ULaw);
             this.pendingAudio.set(callId, pending);
             
-            // Log buffering with more detail
-            if (pending.length <= 5) {
-                logger.info(`[OpenAI Realtime] Buffered audio chunk #${pending.length} for ${callId} (WebSocket: ${!!conn.webSocket}, Session: ${conn.sessionReady})`);
+            // CRITICAL: Enhanced logging for first few chunks (your "hello")
+            if (pending.length <= 10) {
+                const isSilence = this.isAudioSilence(audioChunkBase64ULaw);
+                logger.info(`[OpenAI Realtime] Buffered audio chunk #${pending.length} for ${callId} (${audioChunkBase64ULaw.length} bytes, silence: ${isSilence}, WebSocket: ${!!conn.webSocket}, Session: ${conn.sessionReady})`);
             } else if (pending.length % 10 === 0) {
                 logger.debug(`[OpenAI Realtime] Buffered ${pending.length} audio chunks for ${callId}`);
             }
@@ -2047,12 +2054,6 @@ class OpenAIRealtimeService {
         conn.totalAudioBytesSent = (conn.totalAudioBytesSent || 0) + ulawBuffer.length;
         conn.lastSuccessfulAppendTime = Date.now();
         
-        // CRITICAL FIX: Track when first audio was received for fallback commit
-        if (!conn.firstAudioReceivedTime) {
-            conn.firstAudioReceivedTime = Date.now();
-            logger.info(`[OpenAI Realtime] First audio received for ${callId} at ${conn.firstAudioReceivedTime}`);
-        }
-        
         // Log progress every 100 chunks
         if (conn.validAudioChunksSent % 100 === 0) {
             logger.info(`[OpenAI Realtime] Sent ${conn.validAudioChunksSent} audio chunks to OpenAI for ${callId}`);
@@ -2063,28 +2064,28 @@ class OpenAIRealtimeService {
             this.monitorAudioQuality(callId);
         }
         
-        // CRITICAL FIX: Much more responsive commit logic for initial speech
-        // Commit immediately for first few chunks to catch "hello"
-        // Then commit every 8 chunks (~160ms) for faster response
+        // CRITICAL FIX: More conservative commit logic to ensure "hello" is fully captured
+        // Wait longer before first commit to ensure complete speech
+        // Then commit every 12 chunks (~240ms) for natural conversation flow
         // OR immediately if AI is generating response (interruption)
         // OR if we have meaningful audio and haven't committed recently
-        // OR fallback: force commit if no commit within 1 second of first audio
+        // OR fallback: force commit if no commit within 2 seconds of first audio
         const timeSinceFirstAudio = conn.firstAudioReceivedTime ? (Date.now() - conn.firstAudioReceivedTime) : 0;
         const shouldCommit = (
-            conn.validAudioChunksSent <= 3 || // CRITICAL: Commit first 3 chunks immediately
-            conn.validAudioChunksSent % 8 === 0 || // More frequent commits (was 15)
+            conn.validAudioChunksSent >= 8 || // CRITICAL: Wait for 8 chunks (~160ms) before first commit
+            conn.validAudioChunksSent % 12 === 0 || // Less frequent commits (was 8)
             conn._responseCreated ||
-            (conn.lastCommitTime && (Date.now() - conn.lastCommitTime) > 500) || // Force commit every 500ms (was 1000ms)
-            (timeSinceFirstAudio > 1000 && !conn.lastCommitTime) // FALLBACK: Force commit if no commit within 1 second of first audio
+            (conn.lastCommitTime && (Date.now() - conn.lastCommitTime) > 800) || // Force commit every 800ms (was 500ms)
+            (timeSinceFirstAudio > 2000 && !conn.lastCommitTime) // FALLBACK: Force commit if no commit within 2 seconds of first audio
         );
         
         if (shouldCommit) {
             // Log commit triggers for debugging
-            if (conn.validAudioChunksSent <= 5) {
-                logger.info(`[OpenAI Realtime] Triggering commit for ${callId} after ${conn.validAudioChunksSent} chunks (first few chunks)`);
-            } else if (conn.validAudioChunksSent % 8 === 0) {
+            if (conn.validAudioChunksSent >= 8 && conn.validAudioChunksSent <= 12) {
+                logger.info(`[OpenAI Realtime] Triggering commit for ${callId} after ${conn.validAudioChunksSent} chunks (first speech detected)`);
+            } else if (conn.validAudioChunksSent % 12 === 0) {
                 logger.debug(`[OpenAI Realtime] Triggering commit for ${callId} after ${conn.validAudioChunksSent} chunks (regular interval)`);
-            } else if (timeSinceFirstAudio > 1000 && !conn.lastCommitTime) {
+            } else if (timeSinceFirstAudio > 2000 && !conn.lastCommitTime) {
                 logger.info(`[OpenAI Realtime] Triggering FALLBACK commit for ${callId} after ${timeSinceFirstAudio}ms without any commit`);
             }
             this.debounceCommit(callId);

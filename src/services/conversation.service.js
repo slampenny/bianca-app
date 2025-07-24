@@ -148,7 +148,7 @@ Note: You maintain memory of old conversations as mentioned in your chat setting
 
     // Add call type specific context
     if (callType === 'wellness-check') {
-      enhancedPrompt += `\n\nCall Context: This is a wellness check call you initiated. Start by introducing yourself and ask about their general well-being, but keep it conversational and friendly as per your personality.`;
+      enhancedPrompt += `\n\nCall Context: This is a wellness check call you initiated. Wait for the person to speak first, then introduce yourself and ask about their general well-being. Keep it conversational and friendly as per your personality.`;
     } else {
       enhancedPrompt += `\n\nCall Context: The patient called you. Listen to understand what they need and provide appropriate support while maintaining your warm, friendly personality.`;
     }
