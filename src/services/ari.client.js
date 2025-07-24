@@ -577,6 +577,10 @@ class AsteriskAriClient extends EventEmitter {
             }
 
             this.tracker.updateCall(channelId, { twilioCallSid, patientId });
+            
+            // CRITICAL: Start RTP listener immediately to capture your "hello"
+            await this.startRtpListenerImmediately(channelId, twilioCallSid);
+            
             await this.setupMediaPipeline(channel, twilioCallSid, patientId);
             
         } catch (err) {
@@ -1995,26 +1999,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
         let mainBridge = null;
 
         try {
-            // Step 1: Allocate only READ port for receiving audio from Asterisk
-            const { readPort, writePort } = this.tracker.allocatePortsForCall(asteriskChannelId);
-            
-            if (!readPort) {
-                throw new Error('Failed to allocate RTP read port for media pipeline');
-            }
-            
-            logger.info(`[ARI Pipeline] Allocated read port - READ: ${readPort} (write will use Asterisk's RTP endpoint)`);
-
-            // Step 2: Start RTP listener for receiving audio from Asterisk
-            const rtpListenerService = require('./rtp.listener.service');
-            
-            // Listener for READ (from Asterisk)
-            await rtpListenerService.startRtpListenerForCall(
-                readPort,
-                twilioCallSid || asteriskChannelId,
-                asteriskChannelId
-            );
-
-            // Step 3: Update call tracking - ports are already set by allocatePortsForCall
+            // Step 1: RTP listener already started immediately - just update state
             this.tracker.updateCall(asteriskChannelId, {
                 state: 'setting_up_media'
             });
@@ -2072,11 +2057,12 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             logger.info(`[ARI Pipeline] Media pipeline setup completed for ${asteriskChannelId}`);
             
             // Return success indicators
+            const callData = this.tracker.getCall(asteriskChannelId);
             return {
                 success: true,
                 asteriskChannelId,
                 twilioCallSid,
-                readPort,
+                readPort: callData?.rtpReadPort || null,
                 writePort: null, // No write port - will use Asterisk's RTP endpoint
                 bridgeId: mainBridge.id,
                 conversationId: dbConversationId
@@ -2210,6 +2196,43 @@ async handleStasisStartForPlayback(channel, channelName, event) {
                 logger.error(`[ARI] Error in OpenAI callback: ${err.message}`, err);
             }
         });
+    }
+
+    // CRITICAL: Start RTP listener immediately to capture your "hello"
+    async startRtpListenerImmediately(asteriskChannelId, twilioCallSid) {
+        const callData = this.tracker.getCall(asteriskChannelId);
+        if (!callData) {
+            logger.error(`[ARI] Cannot start RTP listener for unknown call: ${asteriskChannelId}`);
+            return;
+        }
+
+        logger.info(`[ARI] Starting RTP listener immediately for ${asteriskChannelId} - your "hello" will be captured as soon as it arrives`);
+        
+        try {
+            // Allocate port immediately
+            const { readPort, writePort } = this.tracker.allocatePortsForCall(asteriskChannelId);
+            
+            if (!readPort) {
+                throw new Error('Failed to allocate RTP read port for immediate listener');
+            }
+            
+            logger.info(`[ARI] Allocated read port immediately - READ: ${readPort} for ${asteriskChannelId}`);
+
+            // Start RTP listener immediately
+            const rtpListenerService = require('./rtp.listener.service');
+            
+            await rtpListenerService.startRtpListenerForCall(
+                readPort,
+                twilioCallSid || asteriskChannelId,
+                asteriskChannelId
+            );
+
+            logger.info(`[ARI] RTP listener started immediately for ${asteriskChannelId} on port ${readPort}`);
+            
+        } catch (err) {
+            logger.error(`[ARI] Error starting immediate RTP listener for ${asteriskChannelId}: ${err.message}`);
+            throw err;
+        }
     }
 
     handleOpenAIAudio(callId, data) {
