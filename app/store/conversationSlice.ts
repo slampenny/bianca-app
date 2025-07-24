@@ -74,6 +74,31 @@ export const conversationSlice = createSlice({
         state.conversations.push(payload)
       },
     )
+    builder.addMatcher(
+      conversationApi.endpoints.getConversationsByPatient.matchFulfilled,
+      (state, { payload }) => {
+        console.log('[ConversationSlice] getConversationsByPatient fulfilled:', {
+          page: payload.page,
+          totalResults: payload.totalResults,
+          resultsCount: payload.results?.length || 0
+        });
+        
+        // For the first page, replace all conversations
+        if (payload.page === 1) {
+          state.conversations = payload.results || [];
+          console.log('[ConversationSlice] Set first page conversations:', payload.results?.map(c => ({ id: c.id, startTime: c.startTime })));
+        } else {
+          // For subsequent pages, append to existing conversations
+          state.conversations = [...state.conversations, ...(payload.results || [])];
+          console.log('[ConversationSlice] Appended page conversations, total:', state.conversations.length);
+        }
+        
+        // Set the first conversation as the current one if we have conversations
+        if (state.conversations.length > 0) {
+          state.conversation = state.conversations[0];
+        }
+      },
+    )
     // builder.addMatcher(conversationApi.endpoints.updateConversation.matchFulfilled, (state, { payload }) => {
     //   state.conversation = payload;
 

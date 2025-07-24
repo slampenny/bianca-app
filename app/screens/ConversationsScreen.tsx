@@ -1,17 +1,20 @@
 import React, { useEffect, useState, useCallback } from "react"
 import { View, Text, StyleSheet, ActivityIndicator, FlatList, Pressable, RefreshControl } from "react-native"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { useGetConversationsByPatientQuery } from "../services/api/conversationApi"
 import { getPatient } from "../store/patientSlice"
+import { getConversations, clearConversations, getConversation, setConversation } from "../store/conversationSlice"
 import { Conversation, Message, ConversationPages } from "../services/api/api.types"
 import { colors } from "app/theme/colors"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
+  const conversations = useSelector(getConversations)
+  const currentConversation = useSelector(getConversation)
+  const dispatch = useDispatch()
   const [expandedConversations, setExpandedConversations] = useState<Set<string>>(new Set())
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
-  const [allConversations, setAllConversations] = useState<Conversation[]>([])
   const [hasMore, setHasMore] = useState(true)
 
   const {
@@ -29,40 +32,63 @@ export function ConversationsScreen() {
     { skip: !patient?.id },
   )
 
-  // Handle paginated data
+  // Handle pagination state
   useEffect(() => {
     if (conversationsData) {
-      if (page === 1) {
-        // First page, replace all conversations
-        setAllConversations(conversationsData.results)
-      } else {
-        // Subsequent pages, append to existing conversations
-        setAllConversations(prev => [...prev, ...conversationsData.results])
-      }
+      console.log(`[ConversationsScreen] Received conversations data:`, {
+        page: conversationsData.page,
+        totalPages: conversationsData.totalPages,
+        totalResults: conversationsData.totalResults,
+        resultsCount: conversationsData.results?.length || 0,
+        conversationIds: conversationsData.results?.map(c => c.id) || []
+      });
+      
       setHasMore(conversationsData.page < conversationsData.totalPages)
     }
-  }, [conversationsData, page])
+  }, [conversationsData])
 
   useEffect(() => {
     if (patient?.id) {
       setPage(1)
-      setAllConversations([])
       setHasMore(true)
+      dispatch(clearConversations())
       refetch()
     }
-  }, [patient?.id, refetch])
+  }, [patient?.id, refetch, dispatch])
+
+  // Debug logging for Redux state
+  useEffect(() => {
+    console.log(`[ConversationsScreen] Redux conversations state:`, {
+      conversationsCount: conversations.length,
+      conversationIds: conversations.map(c => ({ id: c.id, startTime: c.startTime })),
+      currentConversationId: currentConversation?.id
+    });
+  }, [conversations, currentConversation]);
 
   const loadMoreConversations = useCallback(() => {
+    console.log(`[ConversationsScreen] loadMoreConversations called:`, {
+      hasMore,
+      isLoading,
+      currentPage: page,
+      currentConversationsCount: conversations.length
+    });
+    
     if (hasMore && !isLoading) {
+      console.log(`[ConversationsScreen] Loading page ${page + 1}`);
       setPage(prev => prev + 1)
+    } else {
+      console.log(`[ConversationsScreen] Cannot load more:`, {
+        hasMore,
+        isLoading
+      });
     }
-  }, [hasMore, isLoading])
+  }, [hasMore, isLoading, page, conversations.length])
 
   const onRefresh = async () => {
     setRefreshing(true)
     setPage(1)
-    setAllConversations([])
     setHasMore(true)
+    dispatch(clearConversations())
     await refetch()
     setRefreshing(false)
   }
@@ -73,6 +99,11 @@ export function ConversationsScreen() {
       newExpanded.delete(conversationId)
     } else {
       newExpanded.add(conversationId)
+      // Set this conversation as the current one in Redux
+      const conversation = conversations.find(c => c.id === conversationId)
+      if (conversation) {
+        dispatch(setConversation(conversation))
+      }
     }
     setExpandedConversations(newExpanded)
   }
@@ -186,7 +217,7 @@ export function ConversationsScreen() {
   )
 
   // Conversations are already sorted by the backend (startTime:desc)
-  const conversations = allConversations
+  const conversationsToRender = conversations
 
   return (
     <View style={styles.container}>
@@ -205,7 +236,7 @@ export function ConversationsScreen() {
       {/* Conversations List */}
       {!isLoading && !error && (
         <FlatList
-          data={conversations}
+          data={conversationsToRender}
           keyExtractor={(item, index) => item.id ? String(item.id) : String(index)}
           renderItem={renderConversation}
           ListEmptyComponent={renderEmpty}

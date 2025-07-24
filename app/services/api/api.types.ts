@@ -148,6 +148,8 @@ export interface Conversation {
   startTime: string
   endTime: string
   duration: number
+  status?: string
+  callType?: string
 }
 
 // api.types.ts

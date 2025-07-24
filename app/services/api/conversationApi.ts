@@ -53,6 +53,16 @@ export const conversationApi = createApi({
           ...(sortBy && { sortBy }),
         },
       }),
+      transformResponse: (response: ConversationPages) => {
+        console.log('[ConversationApi] Raw API response:', {
+          page: response.page,
+          totalPages: response.totalPages,
+          totalResults: response.totalResults,
+          resultsCount: response.results?.length || 0,
+          conversationIds: response.results?.map(c => ({ id: c.id, status: c.status, startTime: c.startTime })) || []
+        });
+        return response;
+      },
     }),
     deleteConversation: builder.mutation<{ success: boolean }, { conversationId: string }>({
       query: ({ conversationId }) => ({
