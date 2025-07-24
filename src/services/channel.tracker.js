@@ -66,7 +66,6 @@ class ChannelTracker {
             mainBridge: null,
             mainBridgeId: null,
             conversationId: null, // Mongoose DB conversation _id
-            recordingName: null, // Main bridge recording name
             rtpListener: null, // Reference to the dedicated RTP listener instance
 
             // --- Flag-Based State Properties ---

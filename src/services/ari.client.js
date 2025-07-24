@@ -1564,18 +1564,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
         // This method is kept for backward compatibility but cleanup is now handled by channel tracker
     }
 
-    async stopRecording(resources) {
-        if (resources.recordingName) {
-            try {
-                await this.client.recordings.stop({ recordingName: resources.recordingName });
-                logger.info(`[Cleanup] Stopped recording ${resources.recordingName}`);
-            } catch (err) {
-                if (!err.message?.includes('404')) {
-                    logger.warn(`[Cleanup] Error stopping recording: ${err.message}`);
-                }
-            }
-        }
-    }
+    // REMOVED: stopRecording method - app handles recording and S3 upload
 
     async cleanupChannels(resources) {
         const channelsToCleanup = [
@@ -2068,9 +2057,8 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             
             logger.info(`[ARI Pipeline] Added main channel to bridge`);
 
-            // CRITICAL FIX: Start recording IMMEDIATELY after bridge creation
-            // This captures your "hello" as soon as possible
-            await this.startRecording(mainBridge, asteriskChannelId);
+            // REMOVED: No need for Asterisk recording - app handles recording and S3 upload
+            logger.info(`[ARI Pipeline] Bridge recording skipped - app handles recording and S3 upload`);
 
             // Step 9: Setup OpenAI callback handlers
             this.setupOpenAICallback();
@@ -2179,24 +2167,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
         }
     }
 
-    async startRecording(bridge, asteriskChannelId) {
-        const recordingName = `recording-${asteriskChannelId.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        
-        try {
-            await bridge.record({ 
-                name: recordingName, 
-                format: 'wav', 
-                maxDurationSeconds: 3600, 
-                beep: false, 
-                ifExists: 'overwrite' 
-            });
-            
-            this.tracker.updateCall(asteriskChannelId, { recordingName });
-            logger.info(`[ARI Pipeline] Started recording ${recordingName}`);
-        } catch (err) {
-            logger.error(`[ARI Pipeline] Recording failed: ${err.message}`);
-        }
-    }
+    // REMOVED: startRecording method - app handles recording and S3 upload
 
     setupOpenAICallback() {
         openAIService.setNotificationCallback((callbackId, type, data) => {
