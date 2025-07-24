@@ -566,21 +566,9 @@ class AsteriskAriClient extends EventEmitter {
             
             logger.info(`[ARI] Answered main channel: ${channelId}`);
 
-            // CRITICAL FIX: Start recording IMMEDIATELY to capture initial "hello"
-            const immediateRecordingName = `immediate-recording-${channelId.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-            try {
-                await channel.record({ 
-                    name: immediateRecordingName, 
-                    format: 'wav', 
-                    maxDurationSeconds: 3600, 
-                    beep: false, 
-                    ifExists: 'overwrite' 
-                });
-                this.tracker.updateCall(channelId, { immediateRecordingName });
-                logger.info(`[ARI] Started IMMEDIATE recording ${immediateRecordingName} on channel ${channelId}`);
-            } catch (recordingErr) {
-                logger.error(`[ARI] Immediate recording failed: ${recordingErr.message}`);
-            }
+            // CRITICAL FIX: Don't record on channel - will record on bridge instead
+            // This prevents the "Channel currently recording" error
+            logger.info(`[ARI] Channel ${channelId} answered - will start recording on bridge later`);
 
             const { twilioCallSid, patientId } = await this.extractCallParameters(channel, event);
             
@@ -2080,7 +2068,8 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             
             logger.info(`[ARI Pipeline] Added main channel to bridge`);
 
-            // Step 8: Start recording on the bridge
+            // CRITICAL FIX: Start recording IMMEDIATELY after bridge creation
+            // This captures your "hello" as soon as possible
             await this.startRecording(mainBridge, asteriskChannelId);
 
             // Step 9: Setup OpenAI callback handlers
