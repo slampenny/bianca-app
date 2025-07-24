@@ -26,7 +26,8 @@ const CONSTANTS = {
   INITIAL_SILENCE_MS: 200, // Add 200ms of silence at start to prevent static burst
   AUDIO_QUALITY_CHECK_INTERVAL: 5000, // Check audio quality every 5 seconds
   MAX_CONSECUTIVE_SILENCE_CHUNKS: 50, // Maximum consecutive silence chunks before warning
-  SPEECH_END_SILENCE_MS: 500, // Silence duration to detect end of speech
+  SPEECH_END_SILENCE_MS: 1500, // Increased silence duration to detect end of speech (was 500ms)
+  MIN_SPEECH_DURATION_MS: 1000, // Minimum speech duration before considering silence as "end"
 };
 
 const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
@@ -385,6 +386,7 @@ class OpenAIRealtimeService {
       // CRITICAL: Speech end detection variables
       lastSpeechTime: null, // When we last heard speech
       hasHeardSpeech: false, // Whether we've heard any speech yet
+      firstSpeechTime: null, // When speech started for current utterance
     });
     this.reconnectAttempts.set(callId, 0);
     this.isReconnecting.set(callId, false);
@@ -1924,7 +1926,12 @@ class OpenAIRealtimeService {
           try {
             await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
             currentConn.lastCommitTime = Date.now(); // Track when commit was sent
-            logger.info(`[OpenAI Realtime] Commit sent successfully for ${callId} at ${currentConn.lastCommitTime}`);
+            
+            // Reset speech tracking for next utterance
+            currentConn.firstSpeechTime = null;
+            currentConn.hasHeardSpeech = false;
+            
+            logger.info(`[OpenAI Realtime] Commit sent successfully for ${callId} at ${currentConn.lastCommitTime} - speech tracking reset`);
           } catch (commitErr) {
             logger.error(`[OpenAI Realtime] Failed to send commit: ${commitErr.message}`);
           }
@@ -2078,14 +2085,21 @@ class OpenAIRealtimeService {
             this.monitorAudioQuality(callId);
         }
         
-        // CRITICAL FIX: Commit when speech ends (silence after speech)
-        // This mimics natural conversation - speak, pause, respond
+        // ENHANCED: Smart speech-end detection with minimum speech duration
+        // This prevents AI from jumping in during brief pauses in longer speech
         const timeSinceFirstAudio = conn.firstAudioReceivedTime ? (Date.now() - conn.firstAudioReceivedTime) : 0;
         const timeSinceLastSpeech = conn.lastSpeechTime ? (Date.now() - conn.lastSpeechTime) : 0;
+        const speechDuration = conn.lastSpeechTime && conn.firstSpeechTime ? 
+            (conn.lastSpeechTime - conn.firstSpeechTime) : 0;
         
         // Track if we've heard speech recently
         const isSilence = this.isAudioSilence(audioChunkBase64ULaw);
         if (!isSilence) {
+            // First speech of this utterance
+            if (!conn.firstSpeechTime) {
+                conn.firstSpeechTime = Date.now();
+                logger.debug(`[OpenAI Realtime] Speech started for ${callId} (chunk #${conn.validAudioChunksSent})`);
+            }
             conn.lastSpeechTime = Date.now();
             conn.hasHeardSpeech = true;
             
@@ -2095,20 +2109,21 @@ class OpenAIRealtimeService {
             }
         }
         
-        // Commit conditions:
-        // 1. We've heard speech AND we've had silence for SPEECH_END_SILENCE_MS (speech ended)
+        // Smart commit conditions:
+        // 1. We've heard speech AND we've had silence for SPEECH_END_SILENCE_MS AND speech was long enough
         // 2. AI is generating response (interruption)
         // 3. Fallback: force commit if no commit within 3 seconds of first audio
+        const hasLongEnoughSpeech = speechDuration >= CONSTANTS.MIN_SPEECH_DURATION_MS;
         const shouldCommit = (
-            (conn.hasHeardSpeech && timeSinceLastSpeech > CONSTANTS.SPEECH_END_SILENCE_MS) || // Speech ended
+            (conn.hasHeardSpeech && timeSinceLastSpeech > CONSTANTS.SPEECH_END_SILENCE_MS && hasLongEnoughSpeech) || // Speech ended (long enough)
             conn._responseCreated || // AI is responding
             (timeSinceFirstAudio > 3000 && !conn.lastCommitTime) // FALLBACK: 3 second timeout
         );
         
         if (shouldCommit) {
             // Log commit triggers for debugging
-            if (conn.hasHeardSpeech && timeSinceLastSpeech > CONSTANTS.SPEECH_END_SILENCE_MS) {
-                logger.info(`[OpenAI Realtime] Triggering commit for ${callId} - speech ended (${timeSinceLastSpeech}ms silence after ${conn.validAudioChunksSent} chunks)`);
+            if (conn.hasHeardSpeech && timeSinceLastSpeech > CONSTANTS.SPEECH_END_SILENCE_MS && hasLongEnoughSpeech) {
+                logger.info(`[OpenAI Realtime] Triggering commit for ${callId} - speech ended (${timeSinceLastSpeech}ms silence after ${speechDuration}ms speech, ${conn.validAudioChunksSent} chunks)`);
             } else if (conn._responseCreated) {
                 logger.info(`[OpenAI Realtime] Triggering commit for ${callId} - AI is responding (interruption)`);
             } else if (timeSinceFirstAudio > 3000 && !conn.lastCommitTime) {
