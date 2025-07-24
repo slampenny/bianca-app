@@ -2936,44 +2936,88 @@ router.post('/openai-websocket-diagnostic', async (req, res) => {
     }
 });
 
-// /**
-//  * @swagger
-//  * /test/rtp-debug:
-//  *   get:
-//  *     summary: Debug RTP configuration and network
-//  *     description: Shows current RTP configuration, ports, and network details
-//  *     tags: [Test - RTP]
-//  *     responses:
-//  *       "200":
-//  *         description: RTP debug information
-//  */
-// router.get('/rtp-debug', async (req, res) => {
-//     try {
-//         const portManager = require('../../services/port.manager.service');
-        
-//         let publicIp = 'Not available';
-//         let ipError = null;
-        
-//         try {
-//             publicIp = await getFargateIp();
-//         } catch (err) {
-//             publicIp = 'Error getting IP';
-//             ipError = err.message;
-//         }
-        
-//         const activeListeners = rtpListener.getAllActiveListeners();
-        
-//         res.json({
-//             network: {
-//                 publicIp: publicIp,
-//                 ipError: ipError,
-//                 isRunningInECS: !!process.env.ECS_CONTAINER_METADATA_URI_V4,
-//                 ecsMetadataUri: process.env.ECS_CONTAINER_METADATA_URI_V4 || 'Not set'
-//             },
-//             portManager: portManager.getStats(),
-//             activeListeners,
-//             config: {
-//                 appRtpPortRange: process.env.APP_RTP_PORT_RANGE || '20001-30000',
+/**
+ * @swagger
+ * /test/conversation/{conversationId}:
+ *   get:
+ *     summary: Test route to check a specific conversation
+ *     description: This is for debugging a specific conversation
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Conversation ID to check
+ *     responses:
+ *       "200":
+ *         description: Conversation data
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.get('/conversation/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { Conversation, Patient } = require('../../models');
+    
+    const conversation = await Conversation.findById(conversationId)
+      .populate('patientId', 'name')
+      .populate('messages')
+      .lean();
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Conversation not found'
+      });
+    }
+    
+    // Also check if this conversation would be returned by the patient conversations endpoint
+    const patientConversations = await Conversation.find({ patientId: conversation.patientId })
+      .sort({ startTime: -1 })
+      .limit(20)
+      .lean();
+    
+    const conversationIndex = patientConversations.findIndex(c => c._id.toString() === conversationId);
+    
+    res.json({
+      success: true,
+      conversation: {
+        id: conversation._id,
+        patientId: conversation.patientId?._id,
+        patientName: conversation.patientId?.name,
+        callSid: conversation.callSid,
+        status: conversation.status,
+        callType: conversation.callType,
+        startTime: conversation.startTime,
+        endTime: conversation.endTime,
+        duration: conversation.duration,
+        messageCount: conversation.messages?.length || 0,
+        hasHistory: !!conversation.history,
+        history: conversation.history,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt
+      },
+      patientConversationsCount: patientConversations.length,
+      conversationIndexInPatientList: conversationIndex,
+      wouldBeInFirstPage: conversationIndex < 10,
+      patientConversations: patientConversations.slice(0, 5).map(c => ({
+        id: c._id,
+        status: c.status,
+        startTime: c.startTime,
+        endTime: c.endTime
+      }))
+    });
+  } catch (error) {
+    logger.error('Error in test conversation route:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
 //                 rtpListenerHost: process.env.RTP_LISTENER_HOST || 'Not set',
 //                 asteriskUrl: config.asterisk.url,
 //                 asteriskPublicIp: config.asterisk.publicIp || 'Not set'

@@ -18,7 +18,14 @@ router.use(
     explorer: true,
     swaggerOptions: {
       url: '/v1/docs/swagger.json',
+      persistAuthorization: true,
     },
+    customSiteTitle: 'Bianca API Documentation',
+    customCss: '.swagger-ui .topbar { display: none }',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.1.0/swagger-ui-bundle.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.1.0/swagger-ui-standalone-preset.min.js',
+    ],
   })
 );
 

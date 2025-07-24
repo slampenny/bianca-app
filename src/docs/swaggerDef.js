@@ -10,6 +10,14 @@ const swaggerDef = {
     version,
   },
   components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Enter your JWT token in the format: Bearer <token>'
+      }
+    },
     schemas: {
       Alert: m2s(Alert),
       Caregiver: m2s(Caregiver, { omitFields: ['password', 'isEmailVerified'] }),
@@ -73,6 +81,11 @@ const swaggerDef = {
       url: config.apiUrl,
     },
   ],
+  security: [
+    {
+      bearerAuth: []
+    }
+  ]
 };
 
 module.exports = swaggerDef;

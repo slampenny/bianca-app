@@ -57,11 +57,22 @@ const getConversationsByPatient = async (patientId) => {
  */
 const queryConversationsByPatient = async (patientId, options) => {
   const filter = { patientId };
-  return await Conversation.paginate(filter, {
+  
+  // Debug logging
+  logger.info(`[Conversation Service] Querying conversations for patient ${patientId} with filter:`, filter);
+  logger.info(`[Conversation Service] Options:`, options);
+  
+  const result = await Conversation.paginate(filter, {
     ...options,
     populate: 'messages',
     sortBy: options.sortBy || 'startTime:desc',
   });
+  
+  // Debug logging
+  logger.info(`[Conversation Service] Found ${result.totalResults} total conversations, returning ${result.results.length} for page ${result.page}`);
+  logger.info(`[Conversation Service] Conversation IDs:`, result.results.map(c => ({ id: c._id, status: c.status, startTime: c.startTime })));
+  
+  return result;
 };
 
 // ===== NEW ENHANCED METHODS =====
