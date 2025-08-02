@@ -218,7 +218,7 @@ variable "github_branch" {
   type        = string
   default     = "main"
 }
-
+  
 variable "github_app_connection_arn" {
   description = "ARN of the AWS CodeStar connection to GitHub."
   type        = string
