@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native"
+import { View, ScrollView, StyleSheet } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import { Picker } from "@react-native-picker/picker"
 import ScheduleComponent from "../components/Schedule"
@@ -12,7 +12,8 @@ import { getSchedules, setSchedule, getSchedule } from "../store/scheduleSlice"
 import { LoadingScreen } from "./LoadingScreen"
 import { Schedule } from "app/services/api"
 import { getPatient } from "app/store/patientSlice"
-import { colors } from "app/theme/colors"
+import { colors, spacing } from "app/theme"
+import { Text, Button, Card } from "app/components"
 
 export const SchedulesScreen = () => {
   const dispatch = useDispatch()
@@ -62,63 +63,71 @@ export const SchedulesScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>Schedule Details</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Schedule Details</Text>
+      </View>
+
+      {/* Schedule Selector Card */}
       {schedules && schedules.length > 0 ? (
-        <View style={styles.pickerContainer}>
-          <Text style={styles.label}>Select a schedule:</Text>
-          <Picker
-            selectedValue={selectedSchedule.id}
-            onValueChange={(itemValue) => {
-              const selected = schedules.find((schedule) => schedule.id === itemValue)
-              if (selected) {
-                dispatch(setSchedule(selected))
-              }
-            }}
-            style={styles.picker}
-          >
-            {schedules.map((schedule, index) => (
-              <Picker.Item key={schedule.id} label={`Schedule ${index + 1}`} value={schedule.id} />
-            ))}
-          </Picker>
-        </View>
+        <Card
+          style={styles.selectorCard}
+          heading="Select a schedule:"
+          headingStyle={styles.cardHeading}
+          ContentComponent={
+            <Picker
+              selectedValue={selectedSchedule.id}
+              onValueChange={(itemValue) => {
+                const selected = schedules.find((schedule) => schedule.id === itemValue)
+                if (selected) {
+                  dispatch(setSchedule(selected))
+                }
+              }}
+              style={styles.picker}
+            >
+              {schedules.map((schedule, index) => (
+                <Picker.Item key={schedule.id} label={`Schedule ${index + 1}`} value={schedule.id} />
+              ))}
+            </Picker>
+          }
+        />
       ) : (
-        <Text style={styles.noSchedulesText}>No schedules available. Please create a new one.</Text>
+        <Card
+          style={styles.emptyStateCard}
+          content="No schedules available. Please create a new one."
+          contentStyle={styles.emptyStateText}
+        />
       )}
-      <ScheduleComponent
-        initialSchedule={selectedSchedule}
-        onScheduleChange={handleScheduleChange}
+
+      {/* Schedule Configuration Card */}
+      <Card
+        style={styles.scheduleCard}
+        heading="Schedule Configuration"
+        headingStyle={styles.cardHeading}
+        ContentComponent={
+          <ScheduleComponent
+            initialSchedule={selectedSchedule}
+            onScheduleChange={handleScheduleChange}
+          />
+        }
       />
+
+      {/* Action Buttons */}
       <View style={styles.buttonContainer}>
-        <Pressable
-          style={({ pressed }) => [
-            {
-              backgroundColor: pressed ? colors.palette.biancaButtonUnselected : colors.palette.biancaButtonSelected,
-              padding: 10,
-              justifyContent: "center",
-              alignItems: "center",
-              width: "45%",
-            },
-            styles.button,
-          ]}
+        <Button
+          text="Save Schedule"
           onPress={handleSave}
-        >
-          <Text style={styles.buttonText}>Save</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            {
-              backgroundColor: pressed ? colors.palette.angry100 : colors.palette.angry500,
-              padding: 10,
-              justifyContent: "center",
-              alignItems: "center",
-              width: "45%",
-            },
-            styles.button,
-          ]}
+          style={[styles.button, styles.saveButton]}
+          textStyle={styles.buttonText}
+          preset="default"
+        />
+        <Button
+          text="Delete Schedule"
           onPress={handleDelete}
-        >
-          <Text style={styles.buttonText}>Delete</Text>
-        </Pressable>
+          style={[styles.button, styles.deleteButton]}
+          textStyle={styles.buttonText}
+          preset="default"
+        />
       </View>
     </ScrollView>
   )
@@ -126,49 +135,61 @@ export const SchedulesScreen = () => {
 
 const styles = StyleSheet.create({
   button: {
-    padding: 10, // Add padding to increase the size of the buttons
-    width: "45%", // Adjust the width of the buttons
+    flex: 1,
+    marginHorizontal: spacing.xs,
   },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 20,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.xs,
   },
   buttonText: {
     color: colors.palette.neutral100,
     fontSize: 16,
+    fontWeight: "600",
+  },
+  cardHeading: {
+    color: colors.palette.biancaHeader,
+    fontSize: 18,
+    fontWeight: "600",
   },
   container: {
     backgroundColor: colors.palette.biancaBackground,
     flex: 1,
-    padding: 20,
+    padding: spacing.md,
+  },
+  deleteButton: {
+    backgroundColor: colors.palette.angry500,
+  },
+  emptyStateCard: {
+    marginBottom: spacing.md,
+  },
+  emptyStateText: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+    textAlign: "center",
   },
   header: {
+    marginBottom: spacing.lg,
+  },
+  headerTitle: {
     color: colors.palette.biancaHeader,
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 20,
-  },
-  label: {
-    color: colors.palette.neutral600,
-    fontSize: 18,
-    marginBottom: 5,
-  },
-  noSchedulesText: {
-    color: colors.palette.neutral600,
-    fontSize: 18,
-    marginBottom: 20,
   },
   picker: {
     backgroundColor: colors.palette.neutral100,
+    borderRadius: 8,
     height: 50,
   },
-  pickerContainer: {
-    borderColor: colors.palette.biancaBorder,
-    borderRadius: 5,
-    borderWidth: 1,
-    marginBottom: 20,
-    overflow: "hidden",
-    padding: 10,
+  saveButton: {
+    backgroundColor: colors.palette.biancaButtonSelected,
+  },
+  scheduleCard: {
+    marginBottom: spacing.md,
+  },
+  selectorCard: {
+    marginBottom: spacing.md,
   },
 })

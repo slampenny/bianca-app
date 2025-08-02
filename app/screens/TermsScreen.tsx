@@ -1,7 +1,8 @@
 import React from "react"
-import { ScrollView, StyleSheet, View, Pressable, Text, TouchableWithoutFeedback } from "react-native"
+import { StyleSheet } from "react-native"
 import { useNavigation } from "@react-navigation/native"
-import { colors } from "app/theme/colors"
+import { colors, spacing, typography } from "app/theme"
+import { Screen, Header, Text } from "app/components"
 import Markdown from 'react-native-markdown-display'
 
 const TERMS_MD = `
@@ -102,73 +103,76 @@ export const TermsScreen = () => {
   const navigation = useNavigation()
   
   return (
-    <TouchableWithoutFeedback>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>{'< Back'}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Terms of Service</Text>
-        </View>
-        <Markdown style={markdownStyles}>{TERMS_MD}</Markdown>
-      </ScrollView>
-    </TouchableWithoutFeedback>
+    <Screen
+      preset="scroll"
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      backgroundColor={colors.palette.biancaBackground}
+      safeAreaEdges={["top"]}
+    >
+      <Header
+        title="Terms of Service"
+        leftIcon="back"
+        onLeftPress={() => navigation.goBack()}
+        backgroundColor={colors.palette.biancaBackground}
+        titleStyle={styles.headerTitle}
+      />
+      <Markdown style={markdownStyles}>{TERMS_MD}</Markdown>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: colors.palette.biancaBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.palette.biancaBorder,
-  },
-  backButton: {
-    marginRight: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    backgroundColor: colors.palette.primary100,
-  },
-  backButtonText: {
-    color: colors.palette.primary500,
-    fontWeight: 'bold',
-    fontSize: 16,
+  contentContainer: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
+    fontSize: 24,
+    fontWeight: "bold",
+    color: colors.palette.biancaHeader,
   },
 })
 
 const markdownStyles = {
   body: {
-    color: colors.text,
+    color: colors.palette.neutral800,
     fontSize: 16,
     lineHeight: 24,
+    fontFamily: typography.primary.normal,
   },
   heading2: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
+    color: colors.palette.biancaHeader,
+    fontSize: 22,
+    fontWeight: "bold",
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    fontFamily: typography.primary.bold,
+  },
+  heading3: {
+    color: colors.palette.biancaHeader,
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    fontFamily: typography.primary.medium,
   },
   paragraph: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
+    color: colors.palette.neutral700,
   },
   list_item: {
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+    color: colors.palette.neutral700,
+  },
+  strong: {
+    color: colors.palette.biancaHeader,
+    fontWeight: "bold",
+  },
+  bullet_list: {
+    marginBottom: spacing.md,
   },
 } 
