@@ -85,11 +85,11 @@ class RtpListener {
     async handleMessage(msg, rinfo) {
         this.stats.packetsReceived++;
         
-        // Log first few packets to confirm we're receiving data
-        if (this.stats.packetsReceived <= 5) {
-            logger.info(`[RTP Listener ${this.port}] Received packet #${this.stats.packetsReceived} from ${rinfo.address}:${rinfo.port} (${msg.length} bytes) for call ${this.callId}`);
+        // ENHANCED LOGGING for first few packets to debug voice detection
+        if (this.stats.packetsReceived <= 10) {
+            logger.info(`[RTP Listener ${this.port}] Packet #${this.stats.packetsReceived} from ${rinfo.address}:${rinfo.port} (${msg.length} bytes) for call ${this.callId}`);
             
-            // CRITICAL: Log the first packet timestamp to track when audio starts
+            // CRITICAL: Log the first packet timestamp
             if (this.stats.packetsReceived === 1) {
                 this.stats.firstPacketTime = Date.now();
                 logger.info(`[RTP Listener ${this.port}] FIRST PACKET received at ${this.stats.firstPacketTime} for call ${this.callId}`);
@@ -99,48 +99,49 @@ class RtpListener {
         this.logStatsIfNeeded();
         
         if (msg.length > MAX_PACKET_SIZE) {
-            logger.warn(`[RTP Listener ${this.port}] Oversized packet from ${rinfo.address}:${rinfo.port}: ${msg.length} bytes`);
+            logger.warn(`[RTP Listener ${this.port}] Oversized packet: ${msg.length} bytes`);
             this.stats.invalidPackets++;
             return;
         }
-
+    
         const rtpPacket = this.parseRtpPacket(msg);
         if (!rtpPacket) {
             this.stats.invalidPackets++;
             return;
         }
         
-        // Check if this is μ-law audio (payload type 0)
+        // Check payload type
         if (rtpPacket.payloadType !== 0) {
-            logger.warn(`[RTP Listener ${this.port}] Unexpected payload type ${rtpPacket.payloadType} for call ${this.callId} (expected 0 for μ-law)`);
+            logger.warn(`[RTP Listener ${this.port}] Unexpected payload type ${rtpPacket.payloadType} (expected 0 for μ-law)`);
             this.stats.invalidPackets++;
             return;
         }
-
-        // Process the audio payload
+    
         try {
-            // The RTP payload is already raw μ-law bytes from Asterisk
-            // Convert to base64 for OpenAI (which expects base64-encoded μ-law)
             const audioBase64 = rtpPacket.payload.toString('base64');
             
             if (audioBase64 && audioBase64.length > 0) {
-                // Log first few packets to debug static burst
-                if (this.stats.packetsSent < 10) {
-                    logger.info(`[RTP Listener ${this.port}] Packet #${this.stats.packetsSent + 1}: ${audioBase64.length} base64 bytes (${rtpPacket.payload.length} raw μ-law bytes) for call ${this.callId}`);
-                    
-                    // Check if this looks like silence or static
+                // ENHANCED DIAGNOSTICS for first few packets
+                if (this.stats.packetsSent < 20) {
                     const isSilence = this.isAudioSilence(rtpPacket.payload);
                     const isStatic = this.isStaticBurst(rtpPacket.payload);
-                    logger.info(`[RTP Listener ${this.port}] Packet analysis: silence=${isSilence}, static=${isStatic}`);
-                } else if (this.stats.packetsSent % 100 === 0) {
-                    logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
+                    
+                    // Log audio characteristics
+                    logger.info(`[RTP Listener ${this.port}] Packet #${this.stats.packetsSent + 1} ANALYSIS:`, {
+                        rawBytes: rtpPacket.payload.length,
+                        base64Length: audioBase64.length,
+                        isSilence,
+                        isStatic,
+                        firstFewBytes: Array.from(rtpPacket.payload.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')
+                    });
                 }
-                // CRITICAL: Track when we start sending audio to OpenAI
+                
+                // Track when we start sending audio to OpenAI
                 if (this.stats.packetsSent === 0) {
                     logger.info(`[RTP Listener ${this.port}] Sending FIRST audio chunk to OpenAI for call ${this.callId}`);
                 }
                 
-                await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
+                await openAIService.sendAudioChunk(this.callId, audioBase64);
                 this.stats.packetsSent++;
             } else {
                 logger.warn(`[RTP Listener ${this.port}] Empty audio data for call ${this.callId}`);
