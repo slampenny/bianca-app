@@ -11,23 +11,23 @@ const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw
  * Constants for configuration
  */
 const CONSTANTS = {
-  MAX_PENDING_CHUNKS: 100, // REDUCED from 300 - less buffering delay
+  MAX_PENDING_CHUNKS: 200, // Increased back from 100
   RECONNECT_MAX_ATTEMPTS: 5,
   RECONNECT_BASE_DELAY: 1000,
-  COMMIT_DEBOUNCE_DELAY: 50, // CRITICAL: Reduced from 200ms to 50ms for faster response
+  COMMIT_DEBOUNCE_DELAY: 100, // Conservative: 100ms instead of 50ms
   CONNECTION_TIMEOUT: 15000,
   DEFAULT_SAMPLE_RATE: 24000,
   ASTERISK_SAMPLE_RATE: 8000,
   OPENAI_PCM_OUTPUT_RATE: 24000,
   TEST_CONNECTION_TIMEOUT: 20000,
-  AUDIO_BATCH_SIZE: 10, // REDUCED from 30 - smaller batches for less delay
-  MIN_AUDIO_DURATION_MS: 20, // REDUCED from 50ms - faster commits
-  MIN_AUDIO_BYTES: 160, // REDUCED from 400 - faster commits (20ms at 8kHz)
-  INITIAL_SILENCE_MS: 50, // REDUCED from 200ms - less startup delay
+  AUDIO_BATCH_SIZE: 20, // Conservative: 20 instead of 10
+  MIN_AUDIO_DURATION_MS: 40, // Conservative: 40ms instead of 20ms
+  MIN_AUDIO_BYTES: 320, // Conservative: 320 bytes instead of 160
+  INITIAL_SILENCE_MS: 100, // Conservative: 100ms instead of 50ms
   AUDIO_QUALITY_CHECK_INTERVAL: 5000,
   MAX_CONSECUTIVE_SILENCE_CHUNKS: 50,
-  SPEECH_END_SILENCE_MS: 800, // REDUCED from 1500ms - faster speech detection
-  MIN_SPEECH_DURATION_MS: 500, // REDUCED from 1000ms - faster response
+  SPEECH_END_SILENCE_MS: 1200, // Conservative: 1200ms instead of 800ms
+  MIN_SPEECH_DURATION_MS: 800, // Conservative: 800ms instead of 500ms
 };
 
 const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
@@ -1479,26 +1479,20 @@ class OpenAIRealtimeService {
   /**
    * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
    */
-  /**
- * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
- */
   async processAudioResponse(callId, audioBase64) {
     if (!audioBase64) return;
     
     try {
-        // DIRECT PASS-THROUGH for lowest latency
+        // Simple direct pass-through
         const ulawBuffer = Buffer.from(audioBase64, 'base64');
         if (ulawBuffer.length === 0) return;
         
-        // Record for debugging (non-blocking)
-        setImmediate(() => {
-            this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawBuffer);
-        });
+        // Record for debugging
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawBuffer);
         
-        // IMMEDIATE notification - no delays
+        // Send to RTP immediately
         this.notify(callId, 'audio_chunk', { 
             audio: audioBase64,
-            processingTimeMs: 0, // Minimal processing
             originalSizeBytes: ulawBuffer.length,
             ulawSizeBytes: ulawBuffer.length
         });
@@ -1842,11 +1836,8 @@ class OpenAIRealtimeService {
         return;
     }
 
-    // CRITICAL: Much more aggressive timing for better responsiveness
-    const isFirstFewChunks = (conn.validAudioChunksSent || 0) <= 3;
-    const debounceDelay = isFirstFewChunks ? 25 : 50; // Much faster: 25ms for first chunks, 50ms for rest
-    
-    logger.debug(`[OpenAI Realtime] Setting commit timer (${debounceDelay}ms) for ${callId}`);
+    // CONSERVATIVE timing - prioritize audio quality over speed
+    const debounceDelay = CONSTANTS.COMMIT_DEBOUNCE_DELAY; // 100ms
     
     const timer = setTimeout(async () => {
         this.commitTimers.delete(callId);
@@ -1859,7 +1850,7 @@ class OpenAIRealtimeService {
                 currentConn.firstSpeechTime = null;
                 currentConn.hasHeardSpeech = false;
                 
-                logger.debug(`[OpenAI Realtime] Fast commit sent for ${callId}`);
+                logger.info(`[OpenAI Realtime] Commit sent for ${callId}`);
             } catch (commitErr) {
                 logger.error(`[OpenAI Realtime] Commit failed: ${commitErr.message}`);
             }
@@ -1930,30 +1921,24 @@ class OpenAIRealtimeService {
     
     conn.audioChunksReceived++;
     
-    // CRITICAL FIX: Track when first audio was received (even if just buffered)
+    // Track when first audio was received
     if (!conn.firstAudioReceivedTime) {
         conn.firstAudioReceivedTime = Date.now();
         logger.info(`[OpenAI Realtime] First audio received for ${callId} at ${conn.firstAudioReceivedTime} (chunk #${conn.audioChunksReceived})`);
     }
     
-    // Track consecutive silence chunks to detect audio issues
+    // Track consecutive silence chunks
     if (this.isAudioSilence(audioChunkBase64ULaw)) {
         conn.consecutiveSilenceChunks = (conn.consecutiveSilenceChunks || 0) + 1;
-        if (conn.consecutiveSilenceChunks > CONSTANTS.MAX_CONSECUTIVE_SILENCE_CHUNKS) {
-            logger.warn(`[OpenAI Realtime] Excessive silence detected for ${callId}: ${conn.consecutiveSilenceChunks} consecutive chunks`);
-        }
     } else {
         conn.consecutiveSilenceChunks = 0;
     }
     
-    // OPTIMIZED: Check if we can send immediately first (session starts immediately now)
+    // Check if we can send immediately
     const canSendImmediately = conn.webSocket && conn.webSocket.readyState === WebSocket.OPEN && conn.sessionReady;
     
-    if (canSendImmediately) {
-        // Session is ready - send immediately, no buffering needed
-        logger.debug(`[OpenAI Realtime] Session ready for ${callId} - sending audio immediately`);
-    } else {
-        // Session not ready yet - buffer for safety
+    if (!canSendImmediately) {
+        // Session not ready - buffer audio
         const shouldBuffer = !bypassBuffering && conn.status !== 'closed' && conn.status !== 'error_terminal';
         
         if (shouldBuffer) {
@@ -1962,39 +1947,26 @@ class OpenAIRealtimeService {
                 pending.push(audioChunkBase64ULaw);
                 this.pendingAudio.set(callId, pending);
                 
-                // CRITICAL: Enhanced logging for first few chunks (your "hello")
-                if (pending.length <= 20) {
-                    const isSilence = this.isAudioSilence(audioChunkBase64ULaw);
-                    logger.info(`[OpenAI Realtime] Buffered audio chunk #${pending.length} for ${callId} (${audioChunkBase64ULaw.length} bytes, silence: ${isSilence}, WebSocket: ${!!conn.webSocket}, Session: ${conn.sessionReady})`);
-                } else if (pending.length % 20 === 0) {
-                    logger.debug(`[OpenAI Realtime] Buffered ${pending.length} audio chunks for ${callId}`);
+                if (pending.length <= 10) {
+                    logger.info(`[OpenAI Realtime] Buffered audio chunk #${pending.length} for ${callId}`);
                 }
             } else {
                 logger.warn(`[OpenAI Realtime] Buffer full for ${callId}, dropping audio chunk`);
             }
         }
-        
-        // If we can't send immediately, just buffer and return
         return;
     }
     
     try {
-        // Record audio for debugging (non-blocking)
+        // Record audio for debugging
         const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-        setImmediate(() => {
-            this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
-        });
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
         
-        // SIMPLIFIED: Send uLaw audio directly to OpenAI
+        // Send uLaw audio directly to OpenAI
         await this.sendJsonMessage(callId, {
             type: 'input_audio_buffer.append',
             audio: audioChunkBase64ULaw,
         });
-        
-        // Log when audio is actually sent to OpenAI (reduced frequency)
-        if (conn.validAudioChunksSent <= 5) {
-            logger.info(`[OpenAI Realtime] Sent audio chunk #${conn.validAudioChunksSent} to OpenAI for ${callId} (${audioChunkBase64ULaw.length} bytes)`);
-        }
         
         // Update tracking
         conn.audioChunksSent++;
@@ -2002,80 +1974,47 @@ class OpenAIRealtimeService {
         conn.totalAudioBytesSent = (conn.totalAudioBytesSent || 0) + ulawBuffer.length;
         conn.lastSuccessfulAppendTime = Date.now();
         
-        // Log progress every 200 chunks (reduced from 100)
-        if (conn.validAudioChunksSent % 200 === 0) {
-            logger.info(`[OpenAI Realtime] Sent ${conn.validAudioChunksSent} audio chunks to OpenAI for ${callId}`);
+        // Log progress occasionally
+        if (conn.validAudioChunksSent <= 10 || conn.validAudioChunksSent % 100 === 0) {
+            logger.info(`[OpenAI Realtime] Sent audio chunk #${conn.validAudioChunksSent} to OpenAI for ${callId}`);
         }
         
-        // Monitor audio quality periodically
-        if (conn.validAudioChunksSent % 100 === 0) {
-            this.monitorAudioQuality(callId);
-        }
-        
-        // ENHANCED: Smart speech-end detection with MUCH faster timing
+        // CONSERVATIVE speech detection
         const timeSinceFirstAudio = conn.firstAudioReceivedTime ? (Date.now() - conn.firstAudioReceivedTime) : 0;
         const timeSinceLastSpeech = conn.lastSpeechTime ? (Date.now() - conn.lastSpeechTime) : 0;
         const speechDuration = conn.lastSpeechTime && conn.firstSpeechTime ? 
             (conn.lastSpeechTime - conn.firstSpeechTime) : 0;
         
-        // Track if we've heard speech recently with FASTER detection
+        // Track speech
         const isSilence = this.isAudioSilence(audioChunkBase64ULaw);
         if (!isSilence) {
-            // First speech of this utterance
             if (!conn.firstSpeechTime) {
                 conn.firstSpeechTime = Date.now();
-                logger.debug(`[OpenAI Realtime] Speech started for ${callId} (chunk #${conn.validAudioChunksSent})`);
             }
             conn.lastSpeechTime = Date.now();
             conn.hasHeardSpeech = true;
-            
-            // Log speech detection for debugging (first few only)
-            if (conn.validAudioChunksSent <= 5) {
-                logger.debug(`[OpenAI Realtime] Speech detected for ${callId} (chunk #${conn.validAudioChunksSent})`);
-            }
         }
         
-        // CRITICAL: Much more aggressive commit conditions for better responsiveness
+        // CONSERVATIVE commit conditions - only the essential ones
         const hasMinimumSpeech = speechDuration >= CONSTANTS.MIN_SPEECH_DURATION_MS;
         const shouldCommit = (
-            // 1. Normal speech end detection (much faster now)
+            // 1. Normal speech end detection
             (conn.hasHeardSpeech && timeSinceLastSpeech > CONSTANTS.SPEECH_END_SILENCE_MS && hasMinimumSpeech) ||
             
-            // 2. AI is responding (interruption scenario)
+            // 2. AI is responding (interruption)
             conn._responseCreated ||
             
-            // 3. FASTER fallback: 1 second timeout instead of 3 seconds
-            (timeSinceFirstAudio > 1000 && !conn.lastCommitTime) ||
-            
-            // 4. NEW: Chunk-based fallback for very short speech
-            (conn.validAudioChunksSent >= 8 && !conn.lastCommitTime && conn.hasHeardSpeech) ||
-            
-            // 5. NEW: Force commit if we have significant audio buffered
-            (conn.validAudioChunksSent >= 15 && (Date.now() - (conn.lastCommitTime || 0)) > 500)
+            // 3. Fallback: 2 second timeout (conservative)
+            (timeSinceFirstAudio > 2000 && !conn.lastCommitTime)
         );
         
         if (shouldCommit) {
-            // Log commit triggers for debugging
-            if (conn.hasHeardSpeech && timeSinceLastSpeech > CONSTANTS.SPEECH_END_SILENCE_MS && hasMinimumSpeech) {
-                logger.info(`[OpenAI Realtime] FAST commit trigger: speech ended (${timeSinceLastSpeech}ms silence after ${speechDuration}ms speech, ${conn.validAudioChunksSent} chunks)`);
-            } else if (conn._responseCreated) {
-                logger.info(`[OpenAI Realtime] FAST commit trigger: AI responding (interruption)`);
-            } else if (timeSinceFirstAudio > 1000 && !conn.lastCommitTime) {
-                logger.info(`[OpenAI Realtime] FAST commit trigger: 1-second fallback timeout`);
-            } else if (conn.validAudioChunksSent >= 8 && !conn.lastCommitTime && conn.hasHeardSpeech) {
-                logger.info(`[OpenAI Realtime] FAST commit trigger: chunk-based fallback (${conn.validAudioChunksSent} chunks)`);
-            } else if (conn.validAudioChunksSent >= 15) {
-                logger.info(`[OpenAI Realtime] FAST commit trigger: audio buffer force commit (${conn.validAudioChunksSent} chunks)`);
-            }
-            
+            logger.info(`[OpenAI Realtime] Commit trigger for ${callId}: chunks=${conn.validAudioChunksSent}, speech=${speechDuration}ms, silence=${timeSinceLastSpeech}ms`);
             this.debounceCommit(callId);
         }
         
     } catch (audioProcessingError) {
-        logger.error(
-            `[OpenAI Realtime] sendAudioChunk (${callId}): Audio processing error: ${audioProcessingError.message}`,
-            audioProcessingError.stack
-        );
+        logger.error(`[OpenAI Realtime] Audio processing error for ${callId}: ${audioProcessingError.message}`);
         
         if (audioProcessingError.message.includes('WebSocket not open')) {
             this.updateConnectionStatus(callId, 'error');
@@ -2083,7 +2022,6 @@ class OpenAIRealtimeService {
                 this.handleConnectionError(callId, audioProcessingError);
             }
         }
-        return;
     }
 }
 

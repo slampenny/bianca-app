@@ -34,9 +34,9 @@ class RtpSenderService extends EventEmitter {
         this.RTP_PAYLOAD_TYPE_SLIN16_8K = 11;
         this.RTP_SEND_FORMAT = 'ulaw';
         this.SAMPLE_RATE = 8000;
-        this.FRAME_SIZE_MS = 20; // Keep at 20ms for standard RTP timing
-        this.SAMPLES_PER_FRAME = 160; // 8000 * 0.02 = 160 samples for uLaw
-        this.PACKET_INTERVAL_MS = 20; // Keep at 20ms - this is correct
+        this.FRAME_SIZE_MS = 20;
+        this.SAMPLES_PER_FRAME = 160;
+        this.PACKET_INTERVAL_MS = 20;
         
         // CRITICAL FIX: Reduce audio buffer sizes for lower latency
         this.MAX_BUFFER_SIZE_BYTES = 1600; // Max 100ms of audio (160 * 10 frames)
@@ -177,21 +177,8 @@ class RtpSenderService extends EventEmitter {
             return;
         }
 
-        // CRITICAL: Check if we have enough data for a frame
+        // Simple check - if no data, wait for more
         if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
-            // Not enough data - but don't wait too long
-            // If buffer is getting old, send what we have
-            const bufferAge = Date.now() - (callConfig.lastAudioReceived || 0);
-            if (buffer && buffer.length > 0 && bufferAge > 40) { // 40ms max buffer age
-                // Send partial frame padded with silence
-                const frameData = Buffer.alloc(this.SAMPLES_PER_FRAME, 0x7F); // uLaw silence
-                buffer.copy(frameData, 0, 0, Math.min(buffer.length, this.SAMPLES_PER_FRAME));
-                
-                // Clear the buffer
-                this.audioBuffers.set(callId, Buffer.alloc(0));
-                
-                this.sendFrameData(callId, frameData, callConfig, socket);
-            }
             return;
         }
 
@@ -202,7 +189,31 @@ class RtpSenderService extends EventEmitter {
         const remaining = buffer.slice(this.SAMPLES_PER_FRAME);
         this.audioBuffers.set(callId, remaining);
 
-        this.sendFrameData(callId, frameData, callConfig, socket);
+        // Send the frame
+        try {
+            const timestamp = this.timestamps.get(callId);
+            const rtpPacket = this.createRtpPacket(callId, frameData, callConfig, timestamp);
+            
+            if (rtpPacket) {
+                this.sendRtpPacketSync(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort, callId);
+                
+                // Update timestamp for next packet
+                const nextTimestamp = (timestamp + this.SAMPLES_PER_FRAME) >>> 0;
+                this.timestamps.set(callId, nextTimestamp);
+                
+                // Update debug counter
+                const debug = this.debugCounters.get(callId);
+                if (debug) {
+                    debug.packetsSent++;
+                    if (debug.packetsSent <= 10 || debug.packetsSent % 100 === 0) {
+                        logger.info(`[RTP Sender] Sent packet #${debug.packetsSent} for ${callId} (buffer: ${remaining.length} bytes)`);
+                    }
+                }
+            }
+        } catch (err) {
+            logger.error(`[RTP Sender] Error sending frame for ${callId}: ${err.message}`);
+            this.updateStats(callId, 'error');
+        }
     }
 
     sendFrameData(callId, frameData, callConfig, socket) {
@@ -244,7 +255,6 @@ class RtpSenderService extends EventEmitter {
 
         const callConfig = this.activeCalls.get(callId);
         if (!callConfig || !callConfig.initialized) {
-            logger.warn(`[RTP Sender] Call ${callId} not initialized`);
             return;
         }
 
@@ -253,9 +263,6 @@ class RtpSenderService extends EventEmitter {
             if (ulawBuffer.length === 0) {
                 return;
             }
-            
-            // Track when audio was received
-            callConfig.lastAudioReceived = Date.now();
             
             let audioPayload;
             const targetFormat = callConfig.format || this.RTP_SEND_FORMAT;
@@ -266,27 +273,10 @@ class RtpSenderService extends EventEmitter {
                 audioPayload = ulawBuffer;
             }
 
-            // CRITICAL: Smart buffer management to prevent latency buildup
+            // SIMPLE buffering - just append, no fancy overflow management
             const currentBuffer = this.audioBuffers.get(callId) || Buffer.alloc(0);
-            
-            // If buffer is getting too large, drop oldest data to prevent latency
-            let bufferToUse = currentBuffer;
-            if (currentBuffer.length > this.MAX_BUFFER_SIZE_BYTES) {
-                logger.warn(`[RTP Sender] Buffer overflow for ${callId}, dropping ${currentBuffer.length - this.TARGET_BUFFER_SIZE_BYTES} bytes`);
-                bufferToUse = currentBuffer.slice(currentBuffer.length - this.TARGET_BUFFER_SIZE_BYTES);
-            }
-            
-            const newBuffer = Buffer.concat([bufferToUse, audioPayload]);
+            const newBuffer = Buffer.concat([currentBuffer, audioPayload]);
             this.audioBuffers.set(callId, newBuffer);
-
-            // Update debug counter
-            const debug = this.debugCounters.get(callId);
-            if (debug) {
-                debug.audioChunks++;
-                if (debug.audioChunks % 200 === 0) { // Reduced logging frequency
-                    logger.info(`[RTP Sender] Buffered ${audioPayload.length} bytes for ${callId}. Total buffer: ${newBuffer.length} bytes`);
-                }
-            }
 
             this.updateStats(callId, 'audio_received', { bytes: audioPayload.length });
             
