@@ -2,7 +2,7 @@ import React from "react"
 import { StyleSheet } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { colors, spacing, typography } from "app/theme"
-import { Screen, Header, Text } from "app/components"
+import { Screen, Header, Card, Text } from "app/components"
 import Markdown from 'react-native-markdown-display'
 
 const PRIVACY_MD = `
@@ -116,7 +116,13 @@ export const PrivacyScreen = () => {
         backgroundColor={colors.palette.biancaBackground}
         titleStyle={styles.headerTitle}
       />
-      <Markdown style={markdownStyles}>{PRIVACY_MD}</Markdown>
+      <Card
+        style={styles.contentCard}
+        contentStyle={styles.cardContentStyle}
+        ContentComponent={
+          <Markdown style={markdownStyles}>{PRIVACY_MD}</Markdown>
+        }
+      />
     </Screen>
   )
 }
@@ -133,6 +139,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     color: colors.palette.biancaHeader,
+  },
+  contentCard: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.palette.biancaBorder,
+    shadowColor: colors.palette.neutral800,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardContentStyle: {
+    padding: spacing.lg,
   },
 })
 
