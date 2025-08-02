@@ -2237,116 +2237,28 @@ class OpenAIRealtimeService {
   }
 
   async diagnoseVoiceDetection(callId) {
-    try {
-        const conn = this.connections.get(callId);
-        if (!conn) {
-            logger.error(`[VOICE DIAGNOSIS] No connection found for ${callId}`);
-            return {
-                error: 'No connection found',
-                rtpListenerWorking: false,
-                audioReachingOpenAI: false,
-                turnDetectionWorking: false,
-                currentlyUserSpeaking: false,
-                currentlyAISpeaking: false
-            };
-        }
-        
-        logger.info(`[VOICE DIAGNOSIS] ===== VOICE DETECTION CHECK FOR ${callId} =====`);
-        
-        let rtpListenerWorking = false;
-        let packetsReceived = 0;
-        let packetsSent = 0;
-        
-        try {
-            // Safe RTP listener check
-            const rtpListener = require('./rtp.listener.service');
-            
-            // Check if the service has the method we need
-            if (typeof rtpListener.getListenerForCall === 'function') {
-                const listener = rtpListener.getListenerForCall(callId);
-                
-                if (listener && typeof listener === 'object') {
-                    // Check if listener has getStats method
-                    if (typeof listener.getStats === 'function') {
-                        try {
-                            const stats = listener.getStats();
-                            if (stats && typeof stats === 'object') {
-                                packetsReceived = stats.packetsReceived || 0;
-                                packetsSent = stats.packetsSent || 0;
-                                rtpListenerWorking = packetsReceived > 0;
-                                
-                                logger.info(`[VOICE DIAGNOSIS] RTP Listener Stats:`, {
-                                    port: listener.port || 'unknown',
-                                    packetsReceived,
-                                    packetsSent,
-                                    invalidPackets: stats.invalidPackets || 0,
-                                    errors: stats.errors || 0,
-                                    isActive: stats.active || false
-                                });
-                            } else {
-                                logger.warn(`[VOICE DIAGNOSIS] Listener getStats() returned invalid data`);
-                            }
-                        } catch (statsErr) {
-                            logger.error(`[VOICE DIAGNOSIS] Error calling getStats(): ${statsErr.message}`);
-                        }
-                    } else {
-                        logger.warn(`[VOICE DIAGNOSIS] Listener object missing getStats method`);
-                    }
-                } else {
-                    logger.warn(`[VOICE DIAGNOSIS] No listener found for call ${callId}`);
-                }
-            } else {
-                logger.warn(`[VOICE DIAGNOSIS] RTP listener service missing getListenerForCall method`);
-            }
-        } catch (rtpErr) {
-            logger.error(`[VOICE DIAGNOSIS] Error accessing RTP listener: ${rtpErr.message}`);
-        }
-        
-        // Safe OpenAI connection check
-        const audioReachingOpenAI = (conn.validAudioChunksSent || 0) > 0;
-        const turnDetectionWorking = !!(conn._lastUserSpeechStart || conn._lastUserSpeechEnd);
-        
-        logger.info(`[VOICE DIAGNOSIS] OpenAI Connection State:`, {
-            sessionReady: conn.sessionReady || false,
-            audioChunksReceived: conn.audioChunksReceived || 0,
-            audioChunksSent: conn.audioChunksSent || 0,
-            validAudioChunksSent: conn.validAudioChunksSent || 0,
-            userIsSpeaking: conn._userIsSpeaking || false,
-            aiIsSpeaking: conn._aiIsSpeaking || false,
-            lastCommitTime: conn.lastCommitTime ? new Date(conn.lastCommitTime).toISOString() : 'never'
-        });
-        
-        logger.info(`[VOICE DIAGNOSIS] Summary:`, {
-            rtpListenerWorking,
-            packetsReceived,
-            packetsSent,
-            audioReachingOpenAI,
-            turnDetectionWorking
-        });
-        
-        logger.info(`[VOICE DIAGNOSIS] ===============================================`);
-        
-        return {
-            rtpListenerWorking,
-            audioReachingOpenAI,
-            turnDetectionWorking,
-            currentlyUserSpeaking: conn._userIsSpeaking || false,
-            currentlyAISpeaking: conn._aiIsSpeaking || false,
-            packetsReceived,
-            packetsSent
-        };
-        
-    } catch (err) {
-        logger.error(`[VOICE DIAGNOSIS] Critical error in diagnosis: ${err.message}`, err);
-        return {
-            error: err.message,
-            rtpListenerWorking: false,
-            audioReachingOpenAI: false,
-            turnDetectionWorking: false,
-            currentlyUserSpeaking: false,
-            currentlyAISpeaking: false
-        };
+    const conn = this.connections.get(callId);
+    if (!conn) {
+        logger.error(`[VOICE DIAGNOSIS] No connection found for ${callId}`);
+        return { error: 'No connection found' };
     }
+    
+    logger.info(`[VOICE DIAGNOSIS] ===== SIMPLE CHECK FOR ${callId} =====`);
+    
+    // Just check basic OpenAI connection stuff - NO RTP STATS
+    logger.info(`[VOICE DIAGNOSIS] OpenAI Connection:`, {
+        sessionReady: conn.sessionReady || false,
+        audioChunksReceived: conn.audioChunksReceived || 0,
+        audioChunksSent: conn.audioChunksSent || 0,
+        validAudioChunksSent: conn.validAudioChunksSent || 0
+    });
+    
+    logger.info(`[VOICE DIAGNOSIS] ===============================================`);
+    
+    return {
+        audioReachingOpenAI: (conn.validAudioChunksSent || 0) > 0,
+        sessionReady: conn.sessionReady || false
+    };
 }
 
 
