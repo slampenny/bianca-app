@@ -1,8 +1,8 @@
 import React from "react"
-import { StyleSheet } from "react-native"
+import { StyleSheet, View, ScrollView } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { colors, spacing, typography } from "app/theme"
-import { Screen, Header, Card, Text } from "app/components"
+import { Text } from "app/components"
 import Markdown from 'react-native-markdown-display'
 
 const PRIVACY_MD = `
@@ -102,38 +102,28 @@ export const PrivacyScreen = () => {
   const navigation = useNavigation()
   
   return (
-    <Screen
-      preset="scroll"
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      backgroundColor={colors.palette.biancaBackground}
-      safeAreaEdges={["top"]}
-    >
-      <Header
-        title="Privacy Policy"
-        leftIcon="back"
-        onLeftPress={() => navigation.goBack()}
-        backgroundColor={colors.palette.biancaBackground}
-        titleStyle={styles.headerTitle}
-      />
-      <Card
-        style={styles.contentCard}
-        contentStyle={styles.cardContentStyle}
-        ContentComponent={
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.contentCard}>
           <Markdown style={markdownStyles}>{PRIVACY_MD}</Markdown>
-        }
-      />
-    </Screen>
+        </View>
+      </ScrollView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: colors.palette.biancaBackground,
+    flex: 1,
+    height: '100%',
+    width: '100%',
+  },
+  scrollView: {
     flex: 1,
   },
   contentContainer: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
+    padding: 20,
   },
   headerTitle: {
     fontSize: 24,
@@ -150,8 +140,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  cardContentStyle: {
     padding: spacing.lg,
   },
 })

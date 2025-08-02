@@ -1,8 +1,8 @@
 import React from "react"
-import { StyleSheet } from "react-native"
+import { StyleSheet, View, ScrollView, TouchableWithoutFeedback } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { colors, spacing, typography } from "app/theme"
-import { Screen, Header, Card, Text } from "app/components"
+import { Text } from "app/components"
 import Markdown from 'react-native-markdown-display'
 
 const TERMS_MD = `
@@ -103,33 +103,19 @@ export const TermsScreen = () => {
   const navigation = useNavigation()
   
   return (
-    <Screen
-      preset="scroll"
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      backgroundColor={colors.palette.biancaBackground}
-      safeAreaEdges={["top"]}
-    >
-      <Header
-        title="Terms of Service"
-        leftIcon="back"
-        onLeftPress={() => navigation.goBack()}
-        backgroundColor={colors.palette.biancaBackground}
-        titleStyle={styles.headerTitle}
-      />
-      <Card
-        style={styles.contentCard}
-        contentStyle={styles.cardContentStyle}
-        ContentComponent={
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.contentCard}>
           <Markdown style={markdownStyles}>{TERMS_MD}</Markdown>
-        }
-      />
-    </Screen>
+        </View>
+      </ScrollView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: colors.palette.biancaBackground,
     flex: 1,
   },
   contentContainer: {
@@ -151,8 +137,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  cardContentStyle: {
     padding: spacing.lg,
   },
 })

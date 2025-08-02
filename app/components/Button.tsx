@@ -216,22 +216,55 @@ const $viewPresets = {
     $baseViewStyle,
     { backgroundColor: colors.palette.neutral800 },
   ] as StyleProp<ViewStyle>,
+
+  primary: [
+    $baseViewStyle,
+    { 
+      backgroundColor: colors.palette.biancaButtonSelected,
+      borderWidth: 0,
+    },
+  ] as StyleProp<ViewStyle>,
+
+  success: [
+    $baseViewStyle,
+    { 
+      backgroundColor: colors.palette.biancaSuccess,
+      borderWidth: 0,
+    },
+  ] as StyleProp<ViewStyle>,
+
+  danger: [
+    $baseViewStyle,
+    { 
+      backgroundColor: colors.palette.angry500,
+      borderWidth: 0,
+    },
+  ] as StyleProp<ViewStyle>,
 }
 
 const $textPresets: Record<Presets, StyleProp<TextStyle>> = {
   default: $baseTextStyle,
   filled: $baseTextStyle,
   reversed: [$baseTextStyle, { color: colors.palette.neutral100 }],
+  primary: [$baseTextStyle, { color: colors.palette.neutral100 }],
+  success: [$baseTextStyle, { color: colors.palette.neutral100 }],
+  danger: [$baseTextStyle, { color: colors.palette.neutral100 }],
 }
 
 const $pressedViewPresets: Record<Presets, StyleProp<ViewStyle>> = {
   default: { backgroundColor: colors.palette.neutral200 },
   filled: { backgroundColor: colors.palette.neutral400 },
   reversed: { backgroundColor: colors.palette.neutral700 },
+  primary: { opacity: 0.8 },
+  success: { opacity: 0.8 },
+  danger: { opacity: 0.8 },
 }
 
 const $pressedTextPresets: Record<Presets, StyleProp<TextStyle>> = {
   default: { opacity: 0.9 },
   filled: { opacity: 0.9 },
   reversed: { opacity: 0.9 },
+  primary: { opacity: 0.9 },
+  success: { opacity: 0.9 },
+  danger: { opacity: 0.9 },
 }

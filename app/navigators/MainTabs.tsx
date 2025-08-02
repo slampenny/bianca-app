@@ -15,6 +15,8 @@ import {
   PaymentInfoScreen,
   ProfileScreen,
   LogoutScreen,
+  PrivacyScreen,
+  TermsScreen,
 } from "app/screens"
 import { DrawerParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
@@ -40,6 +42,8 @@ function HomeStack() {
       <Stack.Screen name="Schedule" component={SchedulesScreen} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: "Privacy Policy" }} />
+      <Stack.Screen name="Terms" component={TermsScreen} options={{ title: "Terms of Service" }} />
       <Stack.Screen name="Logout" component={LogoutScreen} />
     </Stack.Navigator>
   )
@@ -49,11 +53,14 @@ function ProfileStack() {
   return (
     <Stack.Navigator
       screenOptions={{
+        headerShown: true,
         headerRight: () =>
           <ProfileButton/>
       }}
     >
       <Stack.Screen name="Profile" component={CaregiverScreen} />
+      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: "Privacy Policy" }} />
+      <Stack.Screen name="Terms" component={TermsScreen} options={{ title: "Terms of Service" }} />
     </Stack.Navigator>
   )
 }

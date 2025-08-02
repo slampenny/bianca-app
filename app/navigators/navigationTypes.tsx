@@ -22,10 +22,14 @@ export type HomeStackParamList = {
   Patient: undefined
   Schedule: undefined
   Conversations: undefined
+  Privacy: undefined
+  Terms: undefined
 }
 
 export type ProfileStackParamList = {
   Profile: undefined
+  Privacy: undefined
+  Terms: undefined
 }
 
 export type AlertStackParamList = {

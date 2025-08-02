@@ -103,22 +103,22 @@ export function HomeScreen() {
       />
 
       {/* Footer (Add Patient) with Tooltip */}
-      <View style={{ alignItems: "center" }}>
-        <Pressable
-          onPressIn={() => { if (shouldDisableButton) setShowTooltip(true) }}
-          onPressOut={() => setShowTooltip(false)}
-          onHoverIn={() => { if (shouldDisableButton && Platform.OS === "web") setShowTooltip(true) }}
-          onHoverOut={() => { if (shouldDisableButton && Platform.OS === "web") setShowTooltip(false) }}
+      <View style={styles.addButtonContainer}>
+        <View
+          onTouchStart={() => { if (shouldDisableButton) setShowTooltip(true) }}
+          onTouchEnd={() => setShowTooltip(false)}
+          onMouseEnter={() => { if (shouldDisableButton && Platform.OS === "web") setShowTooltip(true) }}
+          onMouseLeave={() => { if (shouldDisableButton && Platform.OS === "web") setShowTooltip(false) }}
         >
           <Button
             text="Add Patient"
-            style={[styles.addButton, shouldDisableButton && styles.addButtonDisabled]}
-            textStyle={styles.addButtonText}
+            preset="primary"
             onPress={shouldDisableButton ? undefined : handleAddPatient}
             testID="add-patient-button"
             disabled={shouldDisableButton}
+            style={styles.addButton}
           />
-        </Pressable>
+        </View>
         {shouldDisableButton && showTooltip && (
           <View style={styles.tooltip} testID="add-patient-tooltip">
             <Text style={styles.tooltipText}>{tooltipMessage}</Text>
@@ -131,14 +131,11 @@ export function HomeScreen() {
 
 const styles = StyleSheet.create({
   addButton: {
-    alignItems: "center",
-    backgroundColor: colors.palette.biancaSuccess,
-    paddingVertical: 16,
+    marginHorizontal: 16,
   },
-  addButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 18,
-    fontWeight: "600",
+  addButtonContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
   avatar: {
     backgroundColor: colors.palette.neutral300,
@@ -210,9 +207,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 16,
   },
-  addButtonDisabled: {
-    backgroundColor: colors.palette.neutral400,
-  },
+
   tooltip: {
     position: "absolute",
     bottom: 60,

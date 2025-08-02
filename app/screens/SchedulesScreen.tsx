@@ -117,16 +117,14 @@ export const SchedulesScreen = () => {
         <Button
           text="Save Schedule"
           onPress={handleSave}
-          style={[styles.button, styles.saveButton]}
-          textStyle={styles.buttonText}
-          preset="default"
+          style={styles.button}
+          preset="primary"
         />
         <Button
           text="Delete Schedule"
           onPress={handleDelete}
-          style={[styles.button, styles.deleteButton]}
-          textStyle={styles.buttonText}
-          preset="default"
+          style={styles.button}
+          preset="danger"
         />
       </View>
     </ScrollView>
@@ -144,11 +142,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingHorizontal: spacing.xs,
   },
-  buttonText: {
-    color: colors.palette.neutral100,
-    fontSize: 16,
-    fontWeight: "600",
-  },
+
   cardHeading: {
     color: colors.palette.biancaHeader,
     fontSize: 18,
@@ -183,9 +177,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 50,
   },
-  saveButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
-  },
+
   scheduleCard: {
     marginBottom: spacing.md,
   },
