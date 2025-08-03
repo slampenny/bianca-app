@@ -102,6 +102,7 @@ export interface Patient {
   avatar: string
   email: string
   phone: string
+  preferredLanguage?: string
   org: string | null
   caregivers: string[]
   schedules: Schedule[]

@@ -7,6 +7,8 @@ import {
   TouchableWithoutFeedback,
   View,
   Keyboard, // Added Keyboard
+  Modal,
+  FlatList,
 } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
@@ -24,6 +26,7 @@ import {
 import { LoadingScreen } from "./LoadingScreen"
 import { colors } from "app/theme/colors"
 import { Button, TextField } from "app/components"
+import { LANGUAGE_OPTIONS, getLanguageByCode, DEFAULT_LANGUAGE, LanguageOption } from "../constants/languages"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
@@ -56,6 +59,8 @@ function PatientScreen() {
   const [phone, setPhone] = useState("")
   const [avatar, setAvatar] = useState("")
   const [avatarBlob, setAvatarBlob] = useState<Blob | undefined>(undefined)
+  const [preferredLanguage, setPreferredLanguage] = useState(DEFAULT_LANGUAGE)
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false)
   const [emailError, setEmailError] = useState("")
   const [phoneError, setPhoneError] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -91,6 +96,7 @@ function PatientScreen() {
       setEmail(patient.email)
       setPhone(patient.phone)
       setAvatar(patient.avatar || defaultAvatarUrl) // Ensure default if avatar is null/empty
+      setPreferredLanguage(patient.preferredLanguage || DEFAULT_LANGUAGE)
       // Reset errors and success message when patient changes
       setEmailError("")
       setPhoneError("")
@@ -104,6 +110,7 @@ function PatientScreen() {
       setEmail("")
       setPhone("")
       setAvatar(defaultAvatarUrl)
+      setPreferredLanguage(DEFAULT_LANGUAGE)
       setEmailError("")
       setPhoneError("")
       setApiError("")
@@ -226,6 +233,7 @@ function PatientScreen() {
             name,
             email,
             phone,
+            preferredLanguage,
             avatar: patient.avatar, // Start with the current avatar
           },
         }
@@ -271,6 +279,7 @@ function PatientScreen() {
             name,
             email,
             phone,
+            preferredLanguage,
             // Send undefined for avatar if not set, to match type expectations
             avatar: undefined, // Or defaultAvatarUrl - depends on backend logic
           },
@@ -417,6 +426,21 @@ function PatientScreen() {
             style={styles.input}
           />
 
+          {/* Language Picker Field */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.fieldLabel}>Preferred Language</Text>
+            <Pressable
+              style={styles.languagePicker}
+              onPress={() => setShowLanguagePicker(true)}
+              testID="language-picker-button"
+            >
+              <Text style={styles.languagePickerText}>
+                {getLanguageByCode(preferredLanguage).label} ({getLanguageByCode(preferredLanguage).nativeName})
+              </Text>
+              <Text style={styles.languagePickerArrow}>▼</Text>
+            </Pressable>
+          </View>
+
           {/* --- Action Buttons --- */}
           <Button
             text={patient && patient.id ? "UPDATE PATIENT" : "CREATE PATIENT"}
@@ -484,6 +508,61 @@ function PatientScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Language Picker Modal */}
+      <Modal
+        visible={showLanguagePicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLanguagePicker(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowLanguagePicker(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Select Language</Text>
+                <FlatList
+                  data={LANGUAGE_OPTIONS}
+                  keyExtractor={(item) => item.code}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={[
+                        styles.languageOption,
+                        item.code === preferredLanguage && styles.languageOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setPreferredLanguage(item.code)
+                        setShowLanguagePicker(false)
+                      }}
+                      testID={`language-option-${item.code}`}
+                    >
+                      <Text style={[
+                        styles.languageOptionText,
+                        item.code === preferredLanguage && styles.languageOptionTextSelected,
+                      ]}>
+                        {item.label}
+                      </Text>
+                      <Text style={[
+                        styles.languageOptionNative,
+                        item.code === preferredLanguage && styles.languageOptionNativeSelected,
+                      ]}>
+                        {item.nativeName}
+                      </Text>
+                    </Pressable>
+                  )}
+                  style={styles.languageList}
+                />
+                <Button
+                  text="Cancel"
+                  onPress={() => setShowLanguagePicker(false)}
+                  style={styles.modalCancelButton}
+                  preset="default"
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* Caregiver Assignment Modal */}
       {patient && patient.id && (
@@ -589,11 +668,100 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     backgroundColor: colors.palette.biancaSuccessBackground, // Light green background
-
     padding: 10,
     borderRadius: 4,
     borderWidth: 1,
     borderColor: colors.palette.overlay20,
+  },
+
+  // Language picker styles
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader,
+    marginBottom: 8,
+  },
+  languagePicker: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    height: 50,
+    borderColor: colors.palette.neutral300,
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 15,
+    backgroundColor: colors.palette.neutral200,
+  },
+  languagePickerText: {
+    fontSize: 16,
+    color: colors.palette.biancaHeader,
+    flex: 1,
+  },
+  languagePickerArrow: {
+    fontSize: 12,
+    color: colors.palette.neutral500,
+    marginLeft: 10,
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 12,
+    padding: 20,
+    maxHeight: "80%",
+    width: "100%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  languageList: {
+    maxHeight: 300,
+  },
+  languageOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginBottom: 5,
+    backgroundColor: colors.palette.neutral200,
+  },
+  languageOptionSelected: {
+    backgroundColor: colors.palette.biancaButtonSelected,
+  },
+  languageOptionText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.palette.biancaHeader,
+    flex: 1,
+  },
+  languageOptionTextSelected: {
+    color: colors.palette.neutral100,
+  },
+  languageOptionNative: {
+    fontSize: 14,
+    color: colors.palette.neutral600,
+    marginLeft: 10,
+  },
+  languageOptionNativeSelected: {
+    color: colors.palette.neutral200,
+  },
+  modalCancelButton: {
+    marginTop: 15,
+    backgroundColor: colors.palette.neutral300,
   },
 })
 
