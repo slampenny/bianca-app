@@ -121,13 +121,32 @@ const getConversationHistory = async (patientId, limit = 5) => {
 };
 
 /**
+ * Get language name from language code
+ */
+const getLanguageName = (languageCode) => {
+  const languageMap = {
+    'en': 'English',
+    'es': 'Spanish (Español)',
+    'fr': 'French (Français)',
+    'de': 'German (Deutsch)',
+    'zh': 'Chinese (中文)',
+    'ja': 'Japanese (日本語)',
+    'pt': 'Portuguese (Português)',
+    'it': 'Italian (Italiano)',
+    'ru': 'Russian (Русский)',
+    'ar': 'Arabic (العربية)',
+  };
+  return languageMap[languageCode] || 'English';
+};
+
+/**
  * Build enhanced prompt using your existing Bianca system prompt + patient context
  */
 const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
   try {
     // Get patient info
     const patient = await Patient.findById(patientId)
-      .select('name preferredName medicalConditions allergies currentMedications age')
+      .select('name preferredName medicalConditions allergies currentMedications age preferredLanguage')
       .lean();
 
     if (!patient) {
@@ -147,6 +166,21 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
 
     if (patient.age) {
       enhancedPrompt += `\n- Age: ${patient.age}`;
+    }
+
+    // Add language instruction based on patient's preferred language
+    const preferredLanguage = patient.preferredLanguage || 'en';
+    const languageName = getLanguageName(preferredLanguage);
+    
+    if (preferredLanguage !== 'en') {
+      enhancedPrompt += `\n\nIMPORTANT LANGUAGE INSTRUCTION:
+- The patient's preferred language is: ${languageName}
+- You MUST communicate exclusively in ${languageName} throughout this entire conversation
+- Do not switch to English unless the patient explicitly asks you to
+- Use natural, conversational ${languageName} appropriate for the patient's age and context
+- Remember that your responses should be culturally appropriate for ${languageName} speakers`;
+    } else {
+      enhancedPrompt += `\n\nLanguage: Communicate in English as usual.`;
     }
 
     // Add conversation history context if available

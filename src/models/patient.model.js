@@ -57,6 +57,15 @@ const patientSchema = mongoose.Schema(
       // General notes about the patient for context
       // Can include things like "prefers morning calls", "loves talking about grandchildren", etc.
     },
+    
+    preferredLanguage: {
+      type: String,
+      default: 'en',
+      enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar'],
+      // Patient's preferred language for conversations
+      // en=English, es=Spanish, fr=French, de=German, zh=Chinese, ja=Japanese, 
+      // pt=Portuguese, it=Italian, ru=Russian, ar=Arabic
+    },
     isEmailVerified: {
       type: Boolean,
       default: false,

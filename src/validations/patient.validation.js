@@ -16,6 +16,7 @@ const createPatient = {
         }
         return value;
       }),
+    preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar').optional(),
     caregivers: Joi.array().optional(),
     schedules: Joi.array()
       .items(
@@ -72,6 +73,7 @@ const updatePatient = {
           }
           return value;
         }),
+      preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar').optional(),
       isEmailVerified: Joi.boolean().optional(),
       caregivers: Joi.array().optional(),
       schedules: Joi.array()
