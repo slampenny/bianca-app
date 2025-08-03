@@ -11,7 +11,7 @@ interface CaregiverInvitedScreenProps {
   route: CaregiverInvitedScreenRouteProp
 }
 
-export const CaregiverInvitedScreen: React.FC<CaregiverInvitedScreenProps> = ({ route }) => {
+export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const { caregiver } = route.params
 

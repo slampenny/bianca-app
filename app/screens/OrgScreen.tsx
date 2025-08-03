@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { Text, TextInput, ScrollView, Pressable, StyleSheet, View } from "react-native"
+import { Text, TextInput, ScrollView, Pressable, StyleSheet, View, Image } from "react-native"
 import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { useUpdateOrgMutation } from "../services/api/orgApi"
@@ -10,6 +10,7 @@ import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
 import { clearCaregiver } from "../store/caregiverSlice"
+import { AvatarPicker } from "../components/AvatarPicker"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
@@ -20,6 +21,8 @@ export function OrgScreen() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  const [logo, setLogo] = useState<string | null>(null)
+  const [logoBlob, setLogoBlob] = useState<Blob | null>(null)
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
 
@@ -34,6 +37,7 @@ export function OrgScreen() {
       setName(currentOrg.name)
       setEmail(currentOrg.email)
       setPhone(currentOrg.phone)
+      setLogo(currentOrg.logo || null)
       setIsLoading(false)
     }
   }, [currentOrg])
@@ -47,6 +51,7 @@ export function OrgScreen() {
           name,
           email,
           phone,
+          logo,
         },
       })
     }
@@ -83,6 +88,26 @@ export function OrgScreen() {
         </Text>
       )}
       <View style={styles.formCard}>
+        {/* Logo Section */}
+        <View style={styles.logoSection}>
+          <Text style={styles.sectionTitle}>Organization Logo</Text>
+          {canEditOrg ? (
+            <AvatarPicker
+              initialAvatar={logo}
+              onAvatarChanged={({ uri, blob }) => {
+                setLogo(uri)
+                if (blob) setLogoBlob(blob)
+              }}
+            />
+          ) : logo ? (
+            <Image source={{ uri: logo }} style={styles.logoPreview} />
+          ) : (
+            <View style={styles.noLogoContainer}>
+              <Text style={styles.noLogoText}>No logo set</Text>
+            </View>
+          )}
+        </View>
+
         <TextInput
           style={[styles.input, !canEditOrg && styles.readonlyInput]}
           placeholder="Name"
@@ -211,5 +236,40 @@ const styles = StyleSheet.create({
     color: colors.palette.neutral100,
     fontSize: 18,
     fontWeight: "600",
+  },
+  logoSection: {
+    alignItems: "center",
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.palette.neutral300,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader,
+    marginBottom: 15,
+  },
+  logoPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: colors.palette.neutral200,
+  },
+  noLogoContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: colors.palette.neutral200,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.palette.neutral300,
+    borderStyle: "dashed",
+  },
+  noLogoText: {
+    color: colors.palette.neutral600,
+    fontSize: 12,
+    textAlign: "center",
   },
 })

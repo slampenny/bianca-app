@@ -78,6 +78,7 @@ export interface Org {
   stripeCustomerId: string
   name: string
   avatar: string
+  logo?: string
   email: string
   phone: string
   isEmailVerified: boolean

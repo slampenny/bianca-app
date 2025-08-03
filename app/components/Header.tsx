@@ -6,6 +6,7 @@ import {
   TouchableOpacityProps,
   View,
   ViewStyle,
+  Image,
 } from "react-native"
 import { isRTL, translate } from "../i18n"
 import { colors, spacing } from "../theme"

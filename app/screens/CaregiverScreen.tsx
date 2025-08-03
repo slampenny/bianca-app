@@ -40,6 +40,14 @@ function CaregiverScreen() {
   const caregiver = useSelector(getCaregiver)
   const currentOrg = useSelector(getOrg)
   const currentUser = useSelector(getCurrentUser)
+  
+  // Debug logging
+  console.log('CaregiverScreen Debug:', {
+    caregiver: caregiver?.id,
+    currentOrg: currentOrg?.id,
+    currentUser: currentUser?.id,
+    isInviteMode: !caregiver
+  })
 
   // Mutations for editing/deleting
   const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
@@ -298,17 +306,24 @@ function CaregiverScreen() {
         }
       } catch (error: any) {
         console.error('Invite error:', error)
+        console.error('Invite error details:', {
+          message: error?.message,
+          data: error?.data,
+          status: error?.status,
+          originalStatus: error?.originalStatus
+        })
+        
         if (error?.data?.message === "Caregiver already invited") {
-          setSuccessMessage("This email is already invited.")
-          setTimeout(() => {
-            setSuccessMessage("")
-          }, 2000)
+          setErrorMessage("This email is already invited.")
+        } else if (error?.data?.message) {
+          setErrorMessage(`Error: ${error.data.message}`)
         } else {
-          setSuccessMessage("An error occurred while sending the invite.")
-          setTimeout(() => {
-            setSuccessMessage("")
-          }, 5000)
+          setErrorMessage("An error occurred while sending the invite.")
         }
+        
+        setTimeout(() => {
+          setErrorMessage("")
+        }, 5000)
       }
     }
   }
@@ -319,7 +334,8 @@ function CaregiverScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={handleCancelDelete}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {(updateError || deleteError || inviteError) && (
           <Text style={styles.error}>
             {updateError && "data" in updateError
@@ -526,18 +542,19 @@ function CaregiverScreen() {
             </View>
           </Animated.View>
         )}
-      </ScrollView>
+        </ScrollView>
 
-      {/* Patient Reassignment Modal */}
-      {currentOrg && (
-        <PatientReassignmentModal
-          patients={patientsToReassign}
-          isVisible={showReassignmentModal}
-          onClose={handleReassignmentCancel}
-          onComplete={handleReassignmentComplete}
-          orgId={currentOrg.id!}
-        />
-      )}
+        {/* Patient Reassignment Modal */}
+        {currentOrg && (
+          <PatientReassignmentModal
+            patients={patientsToReassign}
+            isVisible={showReassignmentModal}
+            onClose={handleReassignmentCancel}
+            onComplete={handleReassignmentComplete}
+            orgId={currentOrg.id!}
+          />
+        )}
+      </View>
     </TouchableWithoutFeedback>
   )
 }
@@ -561,6 +578,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
+  scrollView: { flex: 1 },
   contentContainer: { padding: 20 },
   deleteButton: { backgroundColor: colors.palette.angry500 },
   error: { color: colors.palette.biancaError, marginBottom: 10, textAlign: "center" },

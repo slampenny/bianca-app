@@ -18,14 +18,25 @@ export function CaregiversScreen() {
 
   useSyncOrgCaregivers()
 
-  // Check if user is authorized to view caregivers (orgAdmin role)
-  const isAuthorized = currentUser?.role === 'orgAdmin'
+  // Everyone should be able to view caregivers (backend handles filtering)
+  const isAuthorized = true
 
-  const orgCaregivers = caregivers.filter((cg: Caregiver) => {
-    if (currentUser?.org) {
-      return cg.org === currentUser.org
-    }
-    return true
+  // Debug logging
+  console.log('CaregiversScreen Debug:', {
+    currentUser: currentUser?.id,
+    currentUserRole: currentUser?.role,
+    currentUserOrg: currentUser?.org,
+    totalCaregivers: caregivers.length,
+    caregiverIds: caregivers.map(c => c.id),
+    caregiverRoles: caregivers.map(c => ({ id: c.id, role: c.role }))
+  })
+
+  // Just display what the backend returns (no frontend filtering)
+  const orgCaregivers = caregivers
+
+  console.log('Displaying caregivers:', {
+    orgCaregiversCount: orgCaregivers.length,
+    includes_current_user: orgCaregivers.some(c => c.id === currentUser?.id)
   })
 
   const handleCaregiverPress = (caregiver: Caregiver) => {
@@ -83,14 +94,14 @@ export function CaregiversScreen() {
 
   const ListEmpty = () => <Text style={styles.noCaregiversText}>No caregivers found</Text>
 
-  // Show not authorized message for non-admin users
+  // Show not authorized message (this should rarely happen now)
   if (!isAuthorized) {
     return (
       <View style={styles.container}>
         <View style={styles.notAuthorizedContainer}>
           <Text style={styles.notAuthorizedTitle}>Not Authorized</Text>
           <Text style={styles.notAuthorizedText}>
-            You don't have permission to view caregivers. Only organization administrators can access this feature.
+            You don't have permission to view caregivers. Please contact your administrator.
           </Text>
         </View>
       </View>

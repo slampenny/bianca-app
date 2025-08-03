@@ -2,6 +2,7 @@ import React from "react"
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { createStackNavigator } from "@react-navigation/stack"
 import { Ionicons } from "@expo/vector-icons"
+import { View, Image } from "react-native"
 import {
   HomeScreen,
   PatientScreen,
@@ -21,20 +22,58 @@ import {
 import { DrawerParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
 import { useSelector } from "react-redux"
-import { getCurrentUser } from "app/store/authSlice"
+import { getOrg } from "app/store/orgSlice"
 import { selectUnreadAlertCount } from "app/store/alertSlice"
+import { Header } from "app/components/Header"
+import { Icon } from "app/components/Icon"
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator<DrawerParamList>()
+
+// Custom header component that includes org logo
+function CustomHeader({ route, navigation, options }: any) {
+  const currentOrg = useSelector(getOrg)
+  
+  // Create logo component for left side
+  const LogoComponent = currentOrg?.logo ? (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Image
+        source={{ uri: currentOrg.logo }}
+        style={{ width: 32, height: 32, marginRight: 8 }}
+        resizeMode="contain"
+      />
+      {navigation.canGoBack() && (
+        <Icon
+          icon="caretLeft"
+          size={24}
+          onPress={navigation.goBack}
+          style={{ marginLeft: 4 }}
+        />
+      )}
+    </View>
+  ) : navigation.canGoBack() ? (
+    <Icon
+      icon="caretLeft"
+      size={24}
+      onPress={navigation.goBack}
+    />
+  ) : undefined
+  
+  return (
+    <Header
+      title={options.title || route.name}
+      LeftActionComponent={LogoComponent}
+      RightActionComponent={<ProfileButton />}
+    />
+  )
+}
 
 function HomeStack() {
   return (
     <Stack.Navigator
       screenOptions={({ route, navigation }) => ({
         headerShown: true,
-        headerTitle: route.name,
-        // No left button since we're not using a drawer/hamburger
-        headerRight: () => <ProfileButton />,
+        header: (props) => <CustomHeader {...props} />,
       })}
     >
       <Stack.Screen name="Home" component={HomeScreen} />
@@ -49,29 +88,14 @@ function HomeStack() {
   )
 }
 
-function ProfileStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: true,
-        headerRight: () =>
-          <ProfileButton/>
-      }}
-    >
-      <Stack.Screen name="Profile" component={CaregiverScreen} />
-      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: "Privacy Policy" }} />
-      <Stack.Screen name="Terms" component={TermsScreen} options={{ title: "Terms of Service" }} />
-    </Stack.Navigator>
-  )
-}
 
 function AlertStack() {
   return (
     <Stack.Navigator
-      screenOptions={{
+      screenOptions={({ route, navigation }) => ({
         headerShown: true,
-        headerRight: () => <ProfileButton />,
-      }}
+        header: (props) => <CustomHeader {...props} />,
+      })}
     >
       <Stack.Screen name="Alert" component={AlertScreen} />
     </Stack.Navigator>
@@ -81,15 +105,17 @@ function AlertStack() {
 function OrgStack() {
   return (
     <Stack.Navigator
-      screenOptions={{
+      screenOptions={({ route, navigation }) => ({
         headerShown: true,
-        headerRight: () => <ProfileButton />,
-      }}
+        header: (props) => <CustomHeader {...props} />,
+      })}
     >
       <Stack.Screen name="Org" component={OrgScreen} />
       <Stack.Screen name="Caregivers" component={CaregiversScreen} />
       <Stack.Screen name="Caregiver" component={CaregiverScreen} />
-      <Stack.Screen name="CaregiverInvited" component={CaregiverInvitedScreen} />
+      <Stack.Screen name="CaregiverInvited">
+        {(props) => <CaregiverInvitedScreen {...(props as any)} />}
+      </Stack.Screen>
     </Stack.Navigator>
   )
 }
@@ -97,23 +123,17 @@ function OrgStack() {
 function PaymentStack() {
   return (
     <Stack.Navigator
-      screenOptions={{
+      screenOptions={({ route, navigation }) => ({
         headerShown: true,
-        headerRight: () => <ProfileButton />,
-      }}
+        header: (props) => <CustomHeader {...props} />,
+      })}
     >
       <Stack.Screen name="Payment" component={PaymentInfoScreen} />
     </Stack.Navigator>
   )
 }
 
-function LogoutStack() {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen name="Logout" component={LogoutScreen} />
-    </Stack.Navigator>
-  )
-}
+
 
 export default function MainTabNavigator() {
   const unreadAlertCount = useSelector(selectUnreadAlertCount) // Get unread alert count
@@ -139,7 +159,7 @@ export default function MainTabNavigator() {
             iconName = focused ? "alert-circle" : "alert-circle-outline"
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />
+          return <Ionicons name={iconName as any} size={size} color={color} />
         },
       })}
     >
@@ -172,7 +192,7 @@ export default function MainTabNavigator() {
         component={AlertStack}
         options={{
           tabBarLabel: "Alerts",
-          tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : null,
+          tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
           tabBarTestID: "tab-alert",
         }}
       />
