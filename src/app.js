@@ -117,6 +117,8 @@ const corsOptions = {
     'http://app.myphonefriend.com',
     'https://www.myphonefriend.com',
     'http://www.myphonefriend.com',
+    'https://myphonefriend.com',
+    'http://myphonefriend.com',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:8080'
