@@ -10,7 +10,7 @@ import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
 import { clearCaregiver } from "../store/caregiverSlice"
-import { AvatarPicker } from "../components/AvatarPicker"
+import AvatarPicker from "../components/AvatarPicker"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
