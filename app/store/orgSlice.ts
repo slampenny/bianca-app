@@ -25,9 +25,19 @@ export const orgSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      state.org = payload.org as Org
-    })
+    builder
+      .addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
+        state.org = payload.org as Org
+      })
+      // Listen for any action that ends with '/updateOrg/fulfilled'
+      .addMatcher(
+        (action) => action.type.endsWith('/updateOrg/fulfilled'),
+        (state, action: any) => {
+          if (action.payload?.org) {
+            state.org = action.payload.org as Org
+          }
+        }
+      )
   },
 })
 

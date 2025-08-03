@@ -36,7 +36,7 @@ function CustomHeader({ route, navigation, options }: any) {
   
   // Create logo component for left side
   const LogoComponent = currentOrg?.logo ? (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 12 }}>
       <Image
         source={{ uri: currentOrg.logo }}
         style={{ width: 32, height: 32, marginRight: 8 }}

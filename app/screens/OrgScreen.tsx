@@ -47,7 +47,6 @@ export function OrgScreen() {
       await updateOrg({
         orgId: currentOrg.id,
         org: {
-          ...currentOrg,
           name,
           email,
           phone,
