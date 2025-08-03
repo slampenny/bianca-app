@@ -1,3 +1,46 @@
+;========================================
+; PJSIP Configuration - Optimized for Audio Quality
+;========================================
+
+;========================================
+; Global Settings
+;========================================
+[global]
+type=global
+; Maximum number of simultaneous calls
+max_forwards=70
+; User agent string
+user_agent=Bianca-AI-PBX
+; Keep alive interval for TCP/TLS connections
+keep_alive_interval=90
+; Contact expiration check interval
+contact_expiration_check_interval=30
+; Debug logging (set to no in production)
+debug=no
+; Disable multi-domain support for simplicity
+disable_multi_domain=yes
+
+;========================================
+; System Settings
+;========================================
+[system]
+type=system
+; Number of worker threads
+threadpool_initial_size=0
+threadpool_auto_increment=5
+threadpool_idle_timeout=60
+threadpool_max_size=50
+; Timer settings
+timer_t1=500
+timer_b=32000
+; Compact SIP headers
+compact_headers=yes
+
+;========================================
+; Transport Configurations
+;========================================
+
+; UDP Transport
 [transport-udp]
 type=transport
 protocol=udp
@@ -5,7 +48,13 @@ bind=0.0.0.0:5060
 external_media_address=${PRIVATE_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5060
+; Symmetric RTP for NAT traversal
+symmetric_rtp=yes
+; QoS settings
+tos=184
+cos=5
 
+; TCP Transport
 [transport-tcp]
 type=transport
 protocol=tcp
@@ -13,6 +62,12 @@ bind=0.0.0.0:5061
 external_media_address=${PRIVATE_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
 external_signaling_port=5061
+; TCP specific settings
+tcp_nodelay=yes
+tcp_keepalive=yes
+tcp_keepalive_time=60
+tcp_keepalive_interval=30
+tcp_keepalive_probes=5
 
 ;========================================
 ; WebSocket Transport (REQUIRED FOR ARI)
@@ -24,6 +79,8 @@ bind=0.0.0.0:8088
 ; If you need external access to WebSocket
 external_media_address=${PRIVATE_ADDRESS}
 external_signaling_address=${EXTERNAL_ADDRESS}
+; WebSocket specific settings
+websocket_write_timeout=100
 
 ; Optional: WebSocket Secure (WSS) transport
 ;[transport-wss]
@@ -35,9 +92,25 @@ external_signaling_address=${EXTERNAL_ADDRESS}
 ;external_media_address=${EXTERNAL_ADDRESS}
 ;external_signaling_address=${EXTERNAL_ADDRESS}
 
-;----------------------------------------
+;========================================
+; RTP Settings (Global)
+;========================================
+[rtp_settings]
+type=global
+; RTP port range
+rtp_port_start=10000
+rtp_port_end=20000
+; RTCP settings
+rtcp_mux=no
+use_ptime=yes
+; ICE support for NAT traversal
+ice_support=yes
+; STUN server (optional, for NAT traversal)
+;stun_server=stun.l.google.com:19302
+
+;========================================
 ; Bianca App SIP Client
-;----------------------------------------
+;========================================
 [bianca-auth]
 type=auth
 auth_type=userpass
@@ -48,6 +121,11 @@ password=${BIANCA_PASSWORD}
 type=aor
 max_contacts=10
 qualify_frequency=60
+qualify_timeout=3.0
+authenticate_qualify=no
+; Remove unavailable contacts
+remove_existing=yes
+remove_unavailable=yes
 
 [bianca-client]
 type=endpoint
@@ -60,28 +138,89 @@ aors=bianca-aor
 transport=transport-udp
 direct_media=no
 
-;----------------------------------------
-; WebSocket Endpoint (if needed for WebRTC)
-;----------------------------------------
-; Uncomment if you need WebRTC support
-;[webrtc-endpoint]
+; Media settings
+media_address=${PRIVATE_ADDRESS}
+media_use_received_transport=yes
+rtp_symmetric=yes
+force_rport=yes
+rewrite_contact=yes
+
+; Audio quality settings
+use_ptime=yes
+rtp_timeout=60
+rtp_timeout_hold=300
+
+; Jitter buffer configuration
+jitterbuffer=fixed
+jitterbuffer_max_size=200
+jitterbuffer_resync_threshold=1000
+jitterbuffer_impl=fixed
+
+; QoS settings
+tos_audio=ef
+cos_audio=5
+
+; Comfort noise
+comfort_noise=yes
+
+; DTMF settings
+dtmf_mode=rfc4733
+
+; T.38 settings (disable if not using fax)
+t38_udptl=no
+fax_detect=no
+
+; Call features
+trust_id_inbound=yes
+send_pai=yes
+send_rpid=yes
+
+; NAT settings
+rtp_keepalive=30
+nat=yes
+
+;========================================
+; WebRTC Endpoint (if needed)
+;========================================
+;[webrtc-template](!)
 ;type=endpoint
+;transport=transport-ws
 ;context=webrtc
 ;disallow=all
 ;allow=opus
 ;allow=ulaw
-;transport=transport-ws
+;allow=vp8
+;allow=h264
+;direct_media=no
+;force_rport=yes
+;ice_support=yes
 ;use_avpf=yes
 ;media_encryption=dtls
+;dtls_auto_generate_cert=yes
 ;dtls_verify=fingerprint
 ;dtls_setup=actpass
-;ice_support=yes
-;media_use_received_transport=yes
 ;rtcp_mux=yes
+;use_ptime=yes
+;rtp_timeout=60
 
-;----------------------------------------
-; Twilio SIP Trunk
-;----------------------------------------
+;[webrtc-endpoint](webrtc-template)
+;auth=webrtc-auth
+;aors=webrtc-aor
+
+;[webrtc-auth]
+;type=auth
+;auth_type=userpass
+;username=webrtc
+;password=${WEBRTC_PASSWORD}
+
+;[webrtc-aor]
+;type=aor
+;max_contacts=5
+;remove_existing=yes
+
+;========================================
+; Twilio SIP Trunk - OPTIMIZED
+;========================================
 [twilio-trunk]
 type=endpoint
 transport=transport-tcp
@@ -94,9 +233,64 @@ allow_subscribe=no
 force_rport=yes
 rtp_symmetric=yes
 
+; Media settings
+media_address=${PRIVATE_ADDRESS}
+media_use_received_transport=yes
+rtp_keepalive=30
+
+; Audio quality optimizations
+rtp_timeout=60
+rtp_timeout_hold=300
+tos_audio=ef
+cos_audio=5
+
+; Jitter buffer for incoming audio
+jitterbuffer=fixed
+jitterbuffer_max_size=200
+jitterbuffer_resync_threshold=1000
+jitterbuffer_impl=fixed
+
+; Comfort noise generation
+comfort_noise=yes
+
+; DTMF configuration
+dtmf_mode=rfc4733
+rtp_keepalive=30
+
+; T.38 fax support (disable if not needed)
+t38_udptl=no
+fax_detect=no
+
+; Trust settings for caller ID
+trust_id_inbound=yes
+trust_id_outbound=yes
+send_rpid=yes
+send_pai=yes
+rpid_immediate=yes
+
+; Session timers
+timers=accept
+timers_min_se=90
+timers_sess_expires=1800
+
+; Call limit (0 = unlimited)
+call_limit=0
+
+; Language settings
+language=en
+
+; Recording settings (if needed)
+one_touch_recording=no
+record_on_feature=automixmon
+record_off_feature=automixmon
+
+; Emergency calling
+emergency=no
+
 [twilio-identify]
 type=identify
 endpoint=twilio-trunk
+; Twilio IP ranges (North America)
 match=54.172.60.0/23
 match=34.203.250.0/23
 match=34.216.110.128/25
@@ -107,10 +301,39 @@ match=54.65.63.192/26
 match=54.169.127.128/26
 match=54.252.254.64/26
 match=177.71.206.192/26
+; Additional Twilio IPs (add your region's IPs)
+match=34.210.35.32/27
+match=34.212.162.32/27
+match=18.235.151.0/24
+match=3.122.53.64/26
+match=52.60.61.0/24
 
-;----------------------------------------
-; Catch-all endpoint for scanners
-;----------------------------------------
+;========================================
+; ACL for Twilio (Access Control List)
+;========================================
+[twilio-acl]
+type=acl
+deny=0.0.0.0/0.0.0.0
+; Allow Twilio IPs
+permit=54.172.60.0/23
+permit=34.203.250.0/23
+permit=34.216.110.128/25
+permit=54.244.51.0/24
+permit=54.171.127.192/26
+permit=35.156.191.128/26
+permit=54.65.63.192/26
+permit=54.169.127.128/26
+permit=54.252.254.64/26
+permit=177.71.206.192/26
+; Allow local network (adjust as needed)
+permit=10.0.0.0/8
+permit=172.16.0.0/12
+permit=192.168.0.0/16
+permit=127.0.0.1/32
+
+;========================================
+; Catch-all endpoint for scanners/attacks
+;========================================
 [unauth-identify]
 type=identify
 endpoint=unauth-endpoint
@@ -133,3 +356,54 @@ disallow=all
 transport=transport-udp
 auth=unauth-auth
 aors=unauth-aor
+; Minimal settings for security
+device_state_busy_at=0
+call_limit=0
+direct_media=no
+
+;========================================
+; Templates (for easier management)
+;========================================
+[endpoint-template](!)
+type=endpoint
+disallow=all
+allow=ulaw
+allow=alaw
+direct_media=no
+force_rport=yes
+rewrite_contact=yes
+rtp_symmetric=yes
+use_ptime=yes
+rtp_timeout=60
+comfort_noise=yes
+tos_audio=ef
+cos_audio=5
+dtmf_mode=rfc4733
+
+[auth-template](!)
+type=auth
+auth_type=userpass
+
+[aor-template](!)
+type=aor
+qualify_frequency=60
+authenticate_qualify=no
+max_contacts=1
+
+;========================================
+; Additional Endpoints (Examples)
+;========================================
+; You can add more endpoints using templates:
+;
+;[user1](endpoint-template)
+;auth=user1-auth
+;aors=user1-aor
+;context=users
+;callerid="User One" <1001>
+;
+;[user1-auth](auth-template)
+;username=user1
+;password=user1pass
+;
+;[user1-aor](aor-template)
+;mailboxes=1001@default
