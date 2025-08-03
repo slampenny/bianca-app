@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react"
 import {
   View,
   StyleSheet,
-  Text,
-  Pressable,
   FlatList,
   ActivityIndicator,
   Platform,
@@ -16,10 +14,118 @@ import { getOrg } from "../store/orgSlice"
 import { useGetInvoicesByOrgQuery } from "../services/api/paymentApi"
 import { WebView } from "react-native-webview"
 import Config from "../config"
-import { colors } from "app/theme/colors"
+import { colors, spacing } from "app/theme"
+import { Text, Card, ListItem, Button, Icon } from "app/components"
 
 // --- Define the required roles ---
 const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
+
+// --- Helper functions ---
+const getInvoiceStatusInfo = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'paid':
+      return { color: colors.palette.accent500, icon: 'check' as const, label: 'Paid' }
+    case 'pending':
+      return { color: colors.palette.secondary300, icon: 'view' as const, label: 'Pending' }
+    case 'overdue':
+      return { color: colors.palette.angry500, icon: 'x' as const, label: 'Overdue' }
+    case 'processing':
+      return { color: colors.palette.secondary500, icon: 'more' as const, label: 'Processing' }
+    default:
+      return { color: colors.palette.neutral500, icon: 'more' as const, label: status || 'Unknown' }
+  }
+}
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount)
+}
+
+const formatDate = (dateString: string, options?: Intl.DateTimeFormatOptions) => {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...options,
+  })
+}
+
+// ================================================
+//         Invoice Components
+// ================================================
+
+// Status Badge Component
+function InvoiceStatusBadge({ status }: { status: string }) {
+  const statusInfo = getInvoiceStatusInfo(status)
+  
+  return (
+    <View style={[styles.statusBadge, { backgroundColor: `${statusInfo.color}15` }]}>
+      <Icon 
+        icon={statusInfo.icon} 
+        size={12} 
+        color={statusInfo.color} 
+        style={styles.statusIcon}
+      />
+      <Text 
+        style={[styles.statusText, { color: statusInfo.color }]}
+        size="xs"
+      >
+        {statusInfo.label}
+      </Text>
+    </View>
+  )
+}
+
+// Latest Invoice Card Component
+function LatestInvoiceCard({ invoice }: { invoice: any }) {
+  if (!invoice) return null
+  
+  return (
+    <Card
+      preset="default"
+      style={styles.latestInvoiceCard}
+      heading="Latest Invoice"
+      HeadingComponent={
+        <View style={styles.latestInvoiceHeader}>
+          <Text preset="subheading" style={styles.latestInvoiceTitle}>
+            Latest Invoice
+          </Text>
+          <InvoiceStatusBadge status={invoice.status} />
+        </View>
+      }
+      ContentComponent={
+        <View style={styles.latestInvoiceContent}>
+          <View style={styles.invoiceRow}>
+            <Text style={styles.invoiceLabel}>Amount:</Text>
+            <Text preset="bold" style={styles.invoiceAmount}>
+              {formatCurrency(invoice.totalAmount)}
+            </Text>
+          </View>
+          <View style={styles.invoiceRow}>
+            <Text style={styles.invoiceLabel}>Invoice Number:</Text>
+            <Text style={styles.invoiceValue}>{invoice.invoiceNumber}</Text>
+          </View>
+          <View style={styles.invoiceRow}>
+            <Text style={styles.invoiceLabel}>Issue Date:</Text>
+            <Text style={styles.invoiceValue}>{formatDate(invoice.issueDate)}</Text>
+          </View>
+          <View style={styles.invoiceRow}>
+            <Text style={styles.invoiceLabel}>Due Date:</Text>
+            <Text style={styles.invoiceValue}>{formatDate(invoice.dueDate)}</Text>
+          </View>
+          {invoice.notes && (
+            <View style={styles.invoiceNotesContainer}>
+              <Text style={styles.invoiceLabel}>Notes:</Text>
+              <Text style={styles.invoiceNotes}>{invoice.notes}</Text>
+            </View>
+          )}
+        </View>
+      }
+    />
+  )
+}
 
 // ================================================
 //         PaymentMethodsScreen (No changes needed here)
@@ -84,42 +190,68 @@ function PaymentMethodsScreen() {
 // ================================================
 function ExpandableInvoice({ invoice }: { invoice: any }) {
   const [expanded, setExpanded] = useState(false)
-  const formattedDate = new Date(invoice.issueDate).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-  const formattedAmount = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(invoice.totalAmount)
-
+  
   return (
-    <View style={styles.invoiceContainer} testID={`invoice-container-${invoice.id}`}>
-      <Pressable 
-        onPress={() => setExpanded((prev) => !prev)} 
-        style={styles.invoiceHeader}
-        testID={`invoice-header-${invoice.id}`}
-      >
-        <Text style={styles.invoiceHeaderText}>
-          {formattedDate} - {formattedAmount}
-        </Text>
-        <Text style={styles.expandIcon}>{expanded ? "▲" : "▼"}</Text>
-      </Pressable>
+    <ListItem
+      testID={`invoice-container-${invoice.id}`}
+      onPress={() => setExpanded((prev) => !prev)}
+      style={styles.invoiceListItem}
+      LeftComponent={
+        <View style={styles.invoiceLeftContent}>
+          <Text preset="bold" style={styles.invoiceHistoryDate}>
+            {formatDate(invoice.issueDate)}
+          </Text>
+          <Text preset="bold" style={styles.invoiceHistoryAmount}>
+            {formatCurrency(invoice.totalAmount)}
+          </Text>
+        </View>
+      }
+      RightComponent={
+        <View style={styles.invoiceRightContent}>
+          <InvoiceStatusBadge status={invoice.status} />
+          <Icon 
+            icon={expanded ? "caretLeft" : "caretRight"} 
+            size={16} 
+            color={colors.palette.neutral500}
+            style={styles.expandIcon}
+          />
+        </View>
+      }
+      bottomSeparator={expanded}
+    >
       {expanded && (
-        <View style={styles.invoiceDetails} testID={`invoice-details-${invoice.id}`}>
-          <Text style={styles.detailText}>Invoice Number: {invoice.invoiceNumber}</Text>
-          <Text style={styles.detailText}>Status: {invoice.status}</Text>
-          <Text style={styles.detailText}>
-            Issue Date: {new Date(invoice.issueDate).toLocaleString()}
-          </Text>
-          <Text style={styles.detailText}>
-            Due Date: {new Date(invoice.dueDate).toLocaleString()}
-          </Text>
-          {invoice.notes && <Text style={styles.detailText}>Notes: {invoice.notes}</Text>}
+        <View style={styles.invoiceExpandedDetails} testID={`invoice-details-${invoice.id}`}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Invoice Number:</Text>
+            <Text style={styles.detailValue}>{invoice.invoiceNumber}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Issue Date:</Text>
+            <Text style={styles.detailValue}>{formatDate(invoice.issueDate, { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric' 
+            })}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Due Date:</Text>
+            <Text style={styles.detailValue}>{formatDate(invoice.dueDate, { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric' 
+            })}</Text>
+          </View>
+          {invoice.notes && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Notes:</Text>
+              <Text style={styles.detailValue}>{invoice.notes}</Text>
+            </View>
+          )}
         </View>
       )}
-    </View>
+    </ListItem>
   )
 }
 
@@ -127,6 +259,8 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
 //         BillingInfoScreen (No changes needed here, but keep user check for safety)
 // ================================================
 function BillingInfoScreen() {
+  const [showInvoiceHistory, setShowInvoiceHistory] = useState(false)
+  
   // Keep this check as a safety measure in case this screen is somehow accessed directly
   const currentUser = useSelector(getCurrentUser)
   const org = useSelector(getOrg)
@@ -154,9 +288,11 @@ function BillingInfoScreen() {
     isLoading: invoicesLoading,
   } = useGetInvoicesByOrgQuery(queryParam, { skip: !org })
 
-  // Hardcoded data - consider fetching this from org or user data if available
-  const currentPlan = org.planName || "Unknown Plan" // Example: Get plan from org
-  const nextBillingDate = org.nextBillingDate || "N/A" // Example: Get next billing date
+  // Plan information - these fields don't exist in Org model yet, using fallbacks
+  const currentPlan = (org as any).planName || "Basic Plan" // TODO: Add planName field to Org model
+  const nextBillingDate = (org as any).nextBillingDate 
+    ? formatDate((org as any).nextBillingDate)
+    : "Contact Support" // TODO: Add nextBillingDate field to Org model
 
   useEffect(() => {
     if (invoicesError) {
@@ -167,7 +303,7 @@ function BillingInfoScreen() {
   if (invoicesLoading) {
     return (
       <View style={[styles.screenContainer, styles.centered]} testID="billing-info-container">
-        <ActivityIndicator size="large" color="#3498db" testID="billing-loading-indicator" />
+        <ActivityIndicator size="large" color={colors.palette.secondary500} testID="billing-loading-indicator" />
       </View>
     )
   }
@@ -181,19 +317,100 @@ function BillingInfoScreen() {
     )
   }
 
+  // Sort invoices by date (most recent first) and get the latest one
+  const sortedInvoices = invoices ? [...invoices].sort((a, b) => 
+    new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()
+  ) : []
+  
+  const latestInvoice = sortedInvoices[0]
+  const previousInvoices = sortedInvoices.slice(1)
+
   return (
     <View style={styles.screenContainer} testID="billing-info-container">
-      <Text style={styles.billingHeader} testID="current-plan-text">Current Plan: {currentPlan}</Text>
-      <Text style={styles.billingHeader} testID="next-billing-date-text">Next Billing Date: {nextBillingDate}</Text>
-      <Text style={styles.sectionTitle}>Past Invoices:</Text>
-      <FlatList
-        data={invoices}
-        keyExtractor={(invoice) => invoice.id.toString()}
-        renderItem={({ item }) => <ExpandableInvoice invoice={item} />}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        testID="invoices-list"
-        ListEmptyComponent={<Text style={styles.emptyText} testID="no-invoices-text">No invoices available.</Text>}
+      {/* Plan Information */}
+      <Card 
+        preset="default" 
+        style={styles.planInfoCard}
+        ContentComponent={
+          <View style={styles.planInfoContent}>
+            <View style={styles.planInfoRow}>
+              <Text style={styles.planInfoLabel}>Current Plan:</Text>
+              <Text preset="bold" style={styles.planInfoValue}>{currentPlan}</Text>
+            </View>
+            <View style={styles.planInfoRow}>
+              <Text style={styles.planInfoLabel}>Next Billing Date:</Text>
+              <Text preset="bold" style={styles.planInfoValue}>{nextBillingDate}</Text>
+            </View>
+          </View>
+        }
       />
+
+      {/* Latest Invoice */}
+      {latestInvoice && (
+        <LatestInvoiceCard invoice={latestInvoice} />
+      )}
+
+      {/* Invoice History Section */}
+      {previousInvoices.length > 0 && (
+        <View style={styles.invoiceHistorySection}>
+          <View style={styles.invoiceHistoryHeader}>
+            <Text preset="subheading" style={styles.invoiceHistoryTitle}>
+              Invoice History ({previousInvoices.length})
+            </Text>
+            <Button
+              preset="default"
+              style={styles.toggleHistoryButton}
+              onPress={() => setShowInvoiceHistory(!showInvoiceHistory)}
+              testID="toggle-invoice-history"
+            >
+              <Text size="sm" style={styles.toggleHistoryText}>
+                {showInvoiceHistory ? 'Hide' : 'Show'} History
+              </Text>
+              <Icon 
+                icon={showInvoiceHistory ? "caretLeft" : "caretRight"} 
+                size={14} 
+                color={colors.palette.neutral600}
+                style={styles.toggleHistoryIcon}
+              />
+            </Button>
+          </View>
+          
+          {showInvoiceHistory && (
+            <FlatList
+              data={previousInvoices}
+              keyExtractor={(invoice) => invoice.id.toString()}
+              renderItem={({ item }) => <ExpandableInvoice invoice={item} />}
+              contentContainerStyle={styles.invoiceHistoryList}
+              testID="invoices-history-list"
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+      )}
+
+      {/* Empty State */}
+      {!latestInvoice && (
+        <Card
+          preset="default"
+          style={styles.emptyInvoiceCard}
+          ContentComponent={
+            <View style={styles.emptyInvoiceContent}>
+              <Icon 
+                icon="view" 
+                size={48} 
+                color={colors.palette.neutral400}
+                style={styles.emptyInvoiceIcon}
+              />
+              <Text preset="subheading" style={styles.emptyInvoiceTitle}>
+                No Invoices Yet
+              </Text>
+              <Text style={styles.emptyInvoiceMessage} testID="no-invoices-text">
+                Your invoices will appear here once billing begins.
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   )
 }
@@ -272,24 +489,13 @@ export function PaymentInfoScreen() {
   )
 }
 
-// --- Styles (Combined and added message styles) ---
+// --- Styles (Updated for new design) ---
 const styles = StyleSheet.create({
-  billingHeader: {
-    color: colors.palette.biancaHeader,
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 10,
-  },
+  // General styles
   centered: {
-    // Utility style for centering content
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  detailText: {
-    color: colors.palette.biancaHeader,
-    fontSize: 14,
-    marginVertical: 3, // Increased vertical margin
   },
   emptyText: {
     color: colors.palette.neutral600,
@@ -297,83 +503,239 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: "center",
   },
-  expandIcon: {
-    color: colors.palette.biancaButtonSelected,
-    fontSize: 16,
+  screenContainer: {
+    flex: 1,
+    padding: spacing.md,
+    backgroundColor: colors.palette.neutral200,
   },
-  invoiceContainer: {
-    backgroundColor: colors.palette.neutral100,
-    borderColor: colors.palette.neutral300,
-    borderRadius: 8,
+  webview: {
+    flex: 1,
     borderWidth: 1,
-    elevation: 2,
-    marginBottom: 10,
-    overflow: "hidden",
-    shadowColor: colors.palette.neutral900,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
+    borderColor: colors.palette.neutral400,
   },
-  invoiceDetails: {
-    borderTopColor: colors.palette.biancaBackground,
-    borderTopWidth: 1,
-    padding: 12,
-  },
-  invoiceHeader: {
-    paddingVertical: 14, // Increased padding
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: colors.palette.neutral200, // Lighter header bg
-  },
-  invoiceHeaderText: {
-    color: colors.palette.biancaHeader,
-    fontSize: 16,
-    fontWeight: "600",
-  },
+
+  // Message/Error styles
   messageContainer: {
-    // Used for the access restricted message
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 30,
+    padding: spacing.xl,
     backgroundColor: colors.palette.neutral200,
   },
   messageText: {
     color: colors.palette.neutral700,
     fontSize: 16,
     lineHeight: 22,
-    marginBottom: 10,
+    marginBottom: spacing.sm,
     textAlign: "center",
   },
   messageTitle: {
     color: colors.palette.angry500,
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 15,
+    marginBottom: spacing.md,
     textAlign: "center",
   },
-  screenContainer: {
-    // Used by sub-screens
-    flex: 1,
-    padding: 15, // Slightly reduced padding
-    backgroundColor: colors.palette.neutral200,
+
+  // Status Badge styles
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: 12,
+    alignSelf: "flex-start",
   },
-  sectionTitle: {
-    fontSize: 17, // Slightly larger
+  statusIcon: {
+    marginRight: spacing.xxs,
+  },
+  statusText: {
+    fontSize: 12,
     fontWeight: "600",
-    color: colors.palette.neutral700,
-    marginTop: 20,
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.palette.neutral300,
-    paddingBottom: 5,
   },
-  webview: {
+
+  // Plan Info Card styles
+  planInfoCard: {
+    marginBottom: spacing.md,
+  },
+  planInfoContent: {
+    gap: spacing.sm,
+  },
+  planInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  planInfoLabel: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+  },
+  planInfoValue: {
+    color: colors.palette.neutral800,
+    fontSize: 16,
+  },
+
+  // Latest Invoice Card styles
+  latestInvoiceCard: {
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.palette.secondary200,
+  },
+  latestInvoiceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  latestInvoiceTitle: {
+    color: colors.palette.neutral800,
+  },
+  latestInvoiceContent: {
+    gap: spacing.xs,
+  },
+  invoiceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.xxs,
+  },
+  invoiceLabel: {
+    color: colors.palette.neutral600,
+    fontSize: 14,
+  },
+  invoiceValue: {
+    color: colors.palette.neutral800,
+    fontSize: 14,
+  },
+  invoiceAmount: {
+    color: colors.palette.secondary500,
+    fontSize: 18,
+  },
+  invoiceNotesContainer: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
+  },
+  invoiceNotes: {
+    color: colors.palette.neutral700,
+    fontSize: 14,
+    marginTop: spacing.xxs,
+    fontStyle: "italic",
+  },
+
+  // Invoice History styles
+  invoiceHistorySection: {
+    marginBottom: spacing.md,
+  },
+  invoiceHistoryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  invoiceHistoryTitle: {
+    color: colors.palette.neutral800,
+  },
+  toggleHistoryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral300,
+  },
+  toggleHistoryText: {
+    color: colors.palette.neutral600,
+    marginRight: spacing.xxs,
+  },
+  toggleHistoryIcon: {
+    marginLeft: spacing.xxs,
+  },
+  invoiceHistoryList: {
+    paddingBottom: spacing.sm,
+  },
+
+  // Invoice ListItem styles
+  invoiceListItem: {
+    marginBottom: spacing.xs,
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral300,
+  },
+  invoiceLeftContent: {
     flex: 1,
-    borderWidth: 1, // Add border to see boundaries if needed
-    borderColor: colors.palette.neutral400,
+    gap: spacing.xxs,
+  },
+  invoiceHistoryDate: {
+    color: colors.palette.neutral800,
+    fontSize: 16,
+  },
+  invoiceHistoryAmount: {
+    color: colors.palette.secondary500,
+    fontSize: 14,
+  },
+  invoiceRightContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  expandIcon: {
+    marginLeft: spacing.xs,
+  },
+
+  // Expanded invoice details
+  invoiceExpandedDetails: {
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
+    backgroundColor: colors.palette.neutral100,
+    gap: spacing.xs,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: spacing.xxs,
+  },
+  detailLabel: {
+    color: colors.palette.neutral600,
+    fontSize: 14,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  detailValue: {
+    color: colors.palette.neutral800,
+    fontSize: 14,
+    flex: 2,
+    textAlign: "right",
+  },
+
+  // Empty State styles
+  emptyInvoiceCard: {
+    marginTop: spacing.lg,
+  },
+  emptyInvoiceContent: {
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyInvoiceIcon: {
+    marginBottom: spacing.xs,
+  },
+  emptyInvoiceTitle: {
+    color: colors.palette.neutral600,
+    textAlign: "center",
+  },
+  emptyInvoiceMessage: {
+    color: colors.palette.neutral500,
+    textAlign: "center",
+    fontSize: 14,
   },
 })
 
