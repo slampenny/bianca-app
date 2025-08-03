@@ -2237,28 +2237,8 @@ class OpenAIRealtimeService {
   }
 
   async diagnoseVoiceDetection(callId) {
-    const conn = this.connections.get(callId);
-    if (!conn) {
-        logger.error(`[VOICE DIAGNOSIS] No connection found for ${callId}`);
-        return { error: 'No connection found' };
-    }
-    
-    logger.info(`[VOICE DIAGNOSIS] ===== SIMPLE CHECK FOR ${callId} =====`);
-    
-    // Just check basic OpenAI connection stuff - NO RTP STATS
-    logger.info(`[VOICE DIAGNOSIS] OpenAI Connection:`, {
-        sessionReady: conn.sessionReady || false,
-        audioChunksReceived: conn.audioChunksReceived || 0,
-        audioChunksSent: conn.audioChunksSent || 0,
-        validAudioChunksSent: conn.validAudioChunksSent || 0
-    });
-    
-    logger.info(`[VOICE DIAGNOSIS] ===============================================`);
-    
-    return {
-        audioReachingOpenAI: (conn.validAudioChunksSent || 0) > 0,
-        sessionReady: conn.sessionReady || false
-    };
+    logger.info(`[VOICE DIAGNOSIS] Disabled due to crashes`);
+    return { disabled: true };
 }
 
 

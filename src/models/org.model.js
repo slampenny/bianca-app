@@ -18,6 +18,11 @@ const orgSchema = mongoose.Schema(
       required: false,
       trim: true,
     },
+    logo: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     email: {
       type: String,
       required: true,

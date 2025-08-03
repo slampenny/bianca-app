@@ -8,10 +8,6 @@ const config = require('../config/config');
 const { CaregiverDTO } = require('../dtos');
 
 const getCaregivers = catchAsync(async (req, res) => {
-  // if you're not an orgAdmin or superAdmin, you can only see yourself
-  if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
-    return res.status(httpStatus.OK).send(req.caregiver);
-  }
   // Start with query filters for name and role from req.query
   const filter = pick(req.query, ['name', 'role']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);

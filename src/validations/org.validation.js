@@ -15,6 +15,7 @@ const createOrg = {
           }
           return value;
         }),
+      logo: Joi.string().optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     }),
@@ -61,6 +62,7 @@ const updateOrg = {
           }
           return value;
         }),
+      logo: Joi.string().optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })
