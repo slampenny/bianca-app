@@ -26,7 +26,10 @@ class RtpSenderService extends EventEmitter {
         
         // Audio buffering and timing
         this.audioBuffers = new Map(); // callId -> buffered audio
-        this.packetTimers = new Map(); // callId -> interval timer
+        this.activeCallsForTimer = new Set(); // callIds that need timer processing
+        
+        // OPTIMIZATION: Single global timer instead of per-call timers
+        this.globalTimer = null;
         
         // RTP Constants
         this.RTP_VERSION = 2;
@@ -55,7 +58,38 @@ class RtpSenderService extends EventEmitter {
         // Debug counters
         this.debugCounters = new Map(); // callId -> { audioChunks, packetsSent }
         
-        logger.info('[RTP Sender] Service initialized with fixed timing and buffering');
+        logger.info('[RTP Sender] Service initialized with BATCH TIMER optimization for scalability');
+    }
+
+    /**
+     * OPTIMIZATION: Start global timer that processes ALL calls in batches
+     */
+    startGlobalTimer() {
+        if (this.globalTimer) return; // Already running
+        
+        this.globalTimer = setInterval(() => {
+            // Process all active calls in a single timer callback
+            for (const callId of this.activeCallsForTimer) {
+                try {
+                    this.sendNextFrame(callId);
+                } catch (err) {
+                    logger.error(`[RTP Sender] Error processing frame for ${callId}: ${err.message}`);
+                }
+            }
+        }, this.PACKET_INTERVAL_MS);
+        
+        logger.info(`[RTP Sender] 🚀 OPTIMIZATION: Started global batch timer processing ${this.activeCallsForTimer.size} calls`);
+    }
+
+    /**
+     * OPTIMIZATION: Stop global timer when no active calls
+     */
+    stopGlobalTimer() {
+        if (this.globalTimer) {
+            clearInterval(this.globalTimer);
+            this.globalTimer = null;
+            logger.info('[RTP Sender] 🛑 OPTIMIZATION: Stopped global batch timer - no active calls');
+        }
     }
 
     /**
@@ -148,21 +182,18 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Start packet sender timer - FIXED to actually send packets
+     * OPTIMIZED: Add call to batch timer processing instead of individual timers
      */
     startPacketSender(callId) {
-        // Clear any existing timer
-        if (this.packetTimers.has(callId)) {
-            clearInterval(this.packetTimers.get(callId));
+        // Add call to the batch processing set
+        this.activeCallsForTimer.add(callId);
+        
+        // Start global timer if this is the first call
+        if (this.activeCallsForTimer.size === 1) {
+            this.startGlobalTimer();
         }
-
-        // Create new timer for this call with consistent timing
-        const timer = setInterval(() => {
-            this.sendNextFrame(callId);
-        }, this.PACKET_INTERVAL_MS);
-
-        this.packetTimers.set(callId, timer);
-        logger.info(`[RTP Sender] Started packet sender timer for ${callId} (${this.PACKET_INTERVAL_MS}ms intervals)`);
+        
+        logger.info(`[RTP Sender] 🚀 OPTIMIZATION: Added ${callId} to batch timer (${this.activeCallsForTimer.size} total calls)`);
     }
 
     /**
@@ -388,17 +419,21 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Enhanced cleanup with timer stopping
+     * OPTIMIZED: Enhanced cleanup with batch timer management
      */
     cleanupCall(callId) {
         logger.info(`[RTP Sender] Cleaning up call ${callId}`);
         
-        // CRITICAL: Stop packet timer
-        if (this.packetTimers.has(callId)) {
-            clearInterval(this.packetTimers.get(callId));
-            this.packetTimers.delete(callId);
-            logger.info(`[RTP Sender] Stopped packet timer for ${callId}`);
+        // OPTIMIZATION: Remove from batch timer processing
+        this.activeCallsForTimer.delete(callId);
+        
+        // Stop global timer if no more active calls
+        if (this.activeCallsForTimer.size === 0) {
+            this.stopGlobalTimer();
         }
+        
+        logger.info(`[RTP Sender] 🗑️ OPTIMIZATION: Removed ${callId} from batch timer (${this.activeCallsForTimer.size} remaining calls)`);
+        
 
         // Clear audio buffer
         this.audioBuffers.delete(callId);
@@ -430,11 +465,15 @@ class RtpSenderService extends EventEmitter {
     }
 
     /**
-     * Enhanced cleanup all
+     * OPTIMIZED: Enhanced cleanup all with global timer shutdown
      */
     cleanupAll() {
         logger.info(`[RTP Sender] Cleaning up all calls (${this.activeCalls.size} active)`);
         this.isShuttingDown = true;
+        
+        // OPTIMIZATION: Force stop global timer
+        this.stopGlobalTimer();
+        this.activeCallsForTimer.clear();
         
         const callIds = [...this.activeCalls.keys()];
         callIds.forEach(callId => {
@@ -446,7 +485,7 @@ class RtpSenderService extends EventEmitter {
         });
         
         this.globalStats.activeCalls = 0;
-        logger.info('[RTP Sender] All calls cleaned up');
+        logger.info('[RTP Sender] 🚀 OPTIMIZATION: All calls and global timer cleaned up');
     }
 
     /**
@@ -487,6 +526,11 @@ class RtpSenderService extends EventEmitter {
             globalStats: {
                 ...this.globalStats,
                 uptime: Date.now() - this.globalStats.startTime
+            },
+            optimization: {
+                batchTimerActive: !!this.globalTimer,
+                callsInBatchTimer: this.activeCallsForTimer.size,
+                scalabilityMode: 'BATCH_TIMER_OPTIMIZED'
             },
             calls: callDetails,
             isShuttingDown: this.isShuttingDown

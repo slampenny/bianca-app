@@ -56,7 +56,11 @@ class OpenAIRealtimeService {
     this.connections = new Map(); // callId -> connection state object
     // This buffer now stores uLaw chunks received from RTP listener
     this.pendingAudio = new Map(); // callId -> array of base64 uLaw audio chunks
-    this.commitTimers = new Map(); // callId -> debounce timers
+    
+    // OPTIMIZATION: Batch commit timer system instead of per-call timers
+    this.pendingCommits = new Map(); // callId -> timestamp when commit was requested
+    this.globalCommitTimer = null; // Single timer for all commits
+    
     this.isReconnecting = new Map(); // callId -> boolean
     this.reconnectAttempts = new Map(); // callId -> number
     this.connectionTimeouts = new Map(); // callId -> connection timeout
@@ -64,7 +68,77 @@ class OpenAIRealtimeService {
 
     this.notifyCallback = null;
 
-    logger.info('[OpenAI Realtime] Service initialized');
+    logger.info('[OpenAI Realtime] Service initialized with BATCH COMMIT optimization');
+  }
+
+  /**
+   * OPTIMIZATION: Start global commit timer that processes ALL pending commits in batches
+   */
+  startGlobalCommitTimer() {
+    if (this.globalCommitTimer) return; // Already running
+    
+    this.globalCommitTimer = setInterval(() => {
+      const now = Date.now();
+      const commitsToProcess = [];
+      
+      // Find commits that are ready (100ms old)
+      for (const [callId, requestTime] of this.pendingCommits) {
+        if (now - requestTime >= CONSTANTS.COMMIT_DEBOUNCE_DELAY) {
+          commitsToProcess.push(callId);
+        }
+      }
+      
+      // Process all ready commits
+      for (const callId of commitsToProcess) {
+        try {
+          this.processCommit(callId);
+          this.pendingCommits.delete(callId);
+        } catch (err) {
+          logger.error(`[OpenAI Realtime] Batch commit error for ${callId}: ${err.message}`);
+          this.pendingCommits.delete(callId); // Remove failed commit
+        }
+      }
+      
+      // Stop timer if no more pending commits
+      if (this.pendingCommits.size === 0) {
+        this.stopGlobalCommitTimer();
+      }
+      
+    }, 25); // Check every 25ms for responsive commit processing
+    
+    logger.info(`[OpenAI Realtime] 🚀 OPTIMIZATION: Started global batch commit timer`);
+  }
+
+  /**
+   * OPTIMIZATION: Stop global commit timer when no pending commits
+   */
+  stopGlobalCommitTimer() {
+    if (this.globalCommitTimer) {
+      clearInterval(this.globalCommitTimer);
+      this.globalCommitTimer = null;
+      logger.info('[OpenAI Realtime] 🛑 OPTIMIZATION: Stopped global batch commit timer');
+    }
+  }
+
+  /**
+   * OPTIMIZATION: Process a single commit (extracted from timer logic)
+   */
+  async processCommit(callId) {
+    const conn = this.connections.get(callId);
+    
+    if (conn?.webSocket?.readyState === WebSocket.OPEN && conn.sessionReady) {
+      try {
+        await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+        conn.lastCommitTime = Date.now();
+        conn.firstSpeechTime = null;
+        conn.hasHeardSpeech = false;
+        
+        logger.info(`[OpenAI Realtime] 🚀 BATCH: Commit sent for ${callId}`);
+      } catch (commitErr) {
+        logger.error(`[OpenAI Realtime] 🚀 BATCH: Commit failed for ${callId}: ${commitErr.message}`);
+        throw commitErr;
+      }
+    }
   }
 
   /**
@@ -1498,11 +1572,15 @@ class OpenAIRealtimeService {
         // CRITICAL FIX: Also reset the last successful append time to prevent stale commits
         conn.lastSuccessfulAppendTime = 0;
 
-        // CRITICAL FIX: Clear any pending commit timers
-        if (this.commitTimers.has(callId)) {
-          clearTimeout(this.commitTimers.get(callId));
-          this.commitTimers.delete(callId);
-          logger.info(`[OpenAI Realtime] Cleared pending commit timer for ${callId}`);
+        // OPTIMIZATION: Remove from pending commits
+        if (this.pendingCommits.has(callId)) {
+          this.pendingCommits.delete(callId);
+          logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending commits`);
+          
+          // Stop global timer if no more pending commits
+          if (this.pendingCommits.size === 0) {
+            this.stopGlobalCommitTimer();
+          }
         }
       }
     } else if (errorMsg.includes('Conversation already has an active response')) {
@@ -1922,7 +2000,7 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * IMPROVED: Smarter debounce commit logic with validation
+   * OPTIMIZED: Batch commit system - adds call to pending commits instead of creating individual timers
    */
   debounceCommit(callId) {
     const conn = this.connections.get(callId);
@@ -1930,33 +2008,20 @@ class OpenAIRealtimeService {
       return;
     }
 
-    // Don't start new timer if one is already active
-    if (this.commitTimers.has(callId)) {
+    // Don't add if commit is already pending for this call
+    if (this.pendingCommits.has(callId)) {
       return;
     }
 
-    // CONSERVATIVE timing - prioritize audio quality over speed
-    const debounceDelay = CONSTANTS.COMMIT_DEBOUNCE_DELAY; // 100ms
-
-    const timer = setTimeout(async () => {
-      this.commitTimers.delete(callId);
-      const currentConn = this.connections.get(callId);
-
-      if (currentConn?.webSocket?.readyState === WebSocket.OPEN && currentConn.sessionReady) {
-        try {
-          await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
-          currentConn.lastCommitTime = Date.now();
-          currentConn.firstSpeechTime = null;
-          currentConn.hasHeardSpeech = false;
-
-          logger.info(`[OpenAI Realtime] Commit sent for ${callId}`);
-        } catch (commitErr) {
-          logger.error(`[OpenAI Realtime] Commit failed: ${commitErr.message}`);
-        }
-      }
-    }, debounceDelay);
-
-    this.commitTimers.set(callId, timer);
+    // Add to pending commits with current timestamp
+    this.pendingCommits.set(callId, Date.now());
+    
+    // Start global timer if this is the first pending commit
+    if (this.pendingCommits.size === 1) {
+      this.startGlobalCommitTimer();
+    }
+    
+    logger.debug(`[OpenAI Realtime] 🚀 BATCH: Added ${callId} to pending commits (${this.pendingCommits.size} total)`);
   }
 
   /**
@@ -2308,10 +2373,15 @@ class OpenAIRealtimeService {
         this.pendingAudio.set(callId, []);
       }
 
-      // Step 3: Cancel any pending commit timers
-      if (this.commitTimers.has(callId)) {
-        clearTimeout(this.commitTimers.get(callId));
-        this.commitTimers.delete(callId);
+      // Step 3: OPTIMIZATION: Remove from pending commits
+      if (this.pendingCommits.has(callId)) {
+        this.pendingCommits.delete(callId);
+        logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending commits (buffer error recovery)`);
+        
+        // Stop global timer if no more pending commits
+        if (this.pendingCommits.size === 0) {
+          this.stopGlobalCommitTimer();
+        }
       }
 
       logger.info(`[OpenAI Realtime] Successfully recovered from buffer error for ${callId} (OpenAI already cleared buffer)`);
@@ -2526,9 +2596,16 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Disconnecting ${callId} (Status: ${conn.status})`);
 
     this.clearConnectionTimeout(callId);
-    if (this.commitTimers.has(callId)) {
-      clearTimeout(this.commitTimers.get(callId));
-      this.commitTimers.delete(callId);
+    
+    // OPTIMIZATION: Remove from pending commits
+    if (this.pendingCommits.has(callId)) {
+      this.pendingCommits.delete(callId);
+      logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending commits (disconnect)`);
+      
+      // Stop global timer if no more pending commits
+      if (this.pendingCommits.size === 0) {
+        this.stopGlobalCommitTimer();
+      }
     }
 
     if (conn.webSocket) {
@@ -2565,9 +2642,16 @@ class OpenAIRealtimeService {
    */
   cleanup(callId, clearReconnectFlags = true) {
     this.clearConnectionTimeout(callId);
-    if (this.commitTimers.has(callId)) {
-      clearTimeout(this.commitTimers.get(callId));
-      this.commitTimers.delete(callId);
+    
+    // OPTIMIZATION: Remove from pending commits
+    if (this.pendingCommits.has(callId)) {
+      this.pendingCommits.delete(callId);
+      logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending commits (cleanup)`);
+      
+      // Stop global timer if no more pending commits
+      if (this.pendingCommits.size === 0) {
+        this.stopGlobalCommitTimer();
+      }
     }
 
     if (this.pendingAudio.has(callId)) {
