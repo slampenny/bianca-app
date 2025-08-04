@@ -258,7 +258,7 @@ const sendInviteEmail = async (to, inviteLink) => {
  */
 const sendResetPasswordEmail = async (to, token) => {
   const subject = i18n.__ ? i18n.__('sendResetPasswordEmail.subject') : 'My Phone Friend - Password Reset Request';
-  const resetLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/v1/auth/reset-password?token=${token}`;
+  const resetLink = `${config.frontendUrl}/reset-password?token=${token}`;
   
   let text;
   if (i18n.__) {
