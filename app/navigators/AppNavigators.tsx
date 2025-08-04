@@ -1,5 +1,5 @@
 import { createStackNavigator } from "@react-navigation/stack"
-import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, TermsScreen, EmailVerifiedScreen } from "app/screens"
+import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, TermsScreen, EmailVerifiedScreen, SignupScreen } from "app/screens"
 import MainTabs from "./MainTabs"
 import { AppStackParamList, LoginStackParamList } from "./navigationTypes"
 
@@ -19,6 +19,7 @@ export const UnauthStack = () => (
   <LoginStack.Navigator screenOptions={{ headerShown: false }}>
     <LoginStack.Screen name="Login" component={LoginScreen} />
     <LoginStack.Screen name="Register" component={RegisterScreen} />
+    <LoginStack.Screen name="Signup" component={SignupScreen} />
     <LoginStack.Screen name="RequestReset" component={RequestResetScreen} />
     <LoginStack.Screen name="ConfirmReset" component={ConfirmResetScreen} />
     <LoginStack.Screen name="Privacy" component={PrivacyScreen} />

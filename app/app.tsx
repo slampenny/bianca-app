@@ -45,6 +45,8 @@ const config = {
     },
     MainTabs: "MainTabs",
     EmailVerified: "email-verified",
+    Signup: "signup",
+    ConfirmReset: "reset-password",
   },
 }
 

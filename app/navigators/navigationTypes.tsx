@@ -62,10 +62,11 @@ export type LoginStackParamList = {
   Login: undefined
   Register: undefined
   RequestReset: undefined
-  ConfirmReset: undefined
+  ConfirmReset: { token?: string }
   Privacy: undefined
   Terms: undefined
   EmailVerified: undefined
+  Signup: { token?: string }
 }
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {

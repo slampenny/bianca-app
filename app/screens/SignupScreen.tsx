@@ -2,14 +2,15 @@ import React, { useState, useEffect, useLayoutEffect } from "react"
 import { StyleSheet, View, ScrollView, Alert } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
-import { useResetPasswordMutation } from "../services/api/authApi"
+import { useRegisterWithInviteMutation } from "../services/api/authApi"
 import { Button, Text, TextField } from "app/components"
+import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { colors, spacing } from "app/theme"
 
-type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
+type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
-export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
+export const SignupScreen = (props: SignupScreenRouteProp) => {
   const { navigation } = props
   const route = useRoute()
   const token = (route.params as any)?.token
@@ -19,33 +20,40 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
       headerShown: true,
       header: () => (
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Reset Your Password</Text>
+          <Text style={styles.headerTitle}>Complete Your Invitation</Text>
         </View>
       ),
     })
   }, [navigation])
 
-  const [resetPassword, { isLoading }] = useResetPasswordMutation()
+  const [registerWithInvite, { isLoading }] = useRegisterWithInviteMutation()
 
-  const [newPassword, setNewPassword] = useState("")
+  // Form state - name, email, phone will be prefilled from invite
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+
+  // Error states
   const [passwordError, setPasswordError] = useState("")
   const [confirmPasswordError, setConfirmPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
-  const [isSuccess, setIsSuccess] = useState(false)
 
-  // Check if we have a reset token
+  // Check if we have an invite token
   useEffect(() => {
     if (!token) {
       Alert.alert(
-        "Invalid Reset Link",
-        "This password reset link is invalid or has expired. Please request a new password reset.",
-        [{ text: "OK", onPress: () => navigation.navigate("RequestReset") }]
+        "Invalid Invitation",
+        "This invitation link is invalid or has expired. Please contact your organization administrator.",
+        [{ text: "OK", onPress: () => navigation.navigate("Login") }]
       )
       return
     }
 
-    console.log("Password reset with token:", token)
+    // TODO: Decode token to prefill user information
+    // For now, we'll let the backend handle token validation
+    console.log("Signup with invite token:", token)
   }, [token, navigation])
 
   const validateForm = () => {
@@ -57,10 +65,10 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
     setGeneralError("")
 
     // Validate password
-    if (!newPassword) {
+    if (!password) {
       setPasswordError("Password is required")
       isValid = false
-    } else if (newPassword.length < 6) {
+    } else if (password.length < 6) {
       setPasswordError("Password must be at least 6 characters")
       isValid = false
     }
@@ -69,7 +77,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
     if (!confirmPassword) {
       setConfirmPasswordError("Please confirm your password")
       isValid = false
-    } else if (newPassword !== confirmPassword) {
+    } else if (password !== confirmPassword) {
       setConfirmPasswordError("Passwords do not match")
       isValid = false
     }
@@ -77,56 +85,42 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
     return isValid
   }
 
-  const handleConfirmReset = async () => {
+  const handleSignup = async () => {
     if (!validateForm()) return
     if (!token) return
 
     try {
-      await resetPassword({ token, password: newPassword }).unwrap()
+      const result = await registerWithInvite({
+        token,
+        password,
+        // The backend will get name, email, phone from the token
+      }).unwrap()
+
+      console.log("Signup successful:", result)
       
-      setIsSuccess(true)
-      
-      // Show success and redirect to login after 2 seconds
-      setTimeout(() => {
-        navigation.navigate("Login")
-      }, 2000)
+      // Navigate to main app since user is now registered and logged in
+      navigation.navigate("MainTabs" as any)
       
     } catch (error: any) {
-      console.error("Password reset error:", error)
+      console.error("Signup error:", error)
       
       if (error?.data?.message) {
         setGeneralError(error.data.message)
       } else if (error?.message) {
         setGeneralError(error.message)
       } else {
-        setGeneralError("Password reset failed. Please try again or request a new reset link.")
+        setGeneralError("An error occurred during signup. Please try again.")
       }
     }
-  }
-
-  if (isSuccess) {
-    return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.content}>
-          <View style={styles.successContainer}>
-            <Text style={styles.successIcon}>✓</Text>
-            <Text style={styles.successTitle}>Password Reset Successful!</Text>
-            <Text style={styles.successMessage}>
-              Your password has been updated successfully. You can now log in with your new password.
-            </Text>
-            <Text style={styles.redirectText}>Redirecting to login...</Text>
-          </View>
-        </View>
-      </ScrollView>
-    )
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.content}>
-        <Text style={styles.title}>Reset Your Password</Text>
+        <Text style={styles.title}>Welcome to My Phone Friend!</Text>
         <Text style={styles.subtitle}>
-          Enter your new password below. Make sure it's secure and easy for you to remember.
+          You've been invited to join your organization's account. 
+          Complete your registration below.
         </Text>
 
         {generalError ? (
@@ -135,13 +129,13 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
 
         <View style={styles.form}>
           <TextField
-            value={newPassword}
+            value={password}
             onChangeText={(text) => {
-              setNewPassword(text)
+              setPassword(text)
               setPasswordError("")
             }}
-            label="New Password"
-            placeholder="Enter your new password"
+            label="Password"
+            placeholder="Enter your password"
             secureTextEntry
             status={passwordError ? "error" : undefined}
             helper={passwordError}
@@ -154,8 +148,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
               setConfirmPassword(text)
               setConfirmPasswordError("")
             }}
-            label="Confirm New Password"
-            placeholder="Confirm your new password"
+            label="Confirm Password"
+            placeholder="Confirm your password"
             secureTextEntry
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError}
@@ -163,19 +157,18 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
           />
 
           <Button
-            text={isLoading ? "Resetting Password..." : "Reset Password"}
-            onPress={handleConfirmReset}
-            disabled={isLoading || !newPassword || !confirmPassword}
-            style={styles.resetButton}
+            text="Complete Registration"
+            onPress={handleSignup}
+            disabled={isLoading || !password || !confirmPassword}
+            style={styles.signupButton}
           />
 
-          <Button
-            text="Back to Login"
-            onPress={() => navigation.navigate("Login")}
-            preset="secondary"
-            style={styles.backButton}
-          />
+          <Text style={styles.infoText}>
+            Your name, email, and organization details have been pre-configured by your administrator.
+          </Text>
         </View>
+
+        <LegalLinks />
       </View>
     </ScrollView>
   )
@@ -229,12 +222,9 @@ const styles = StyleSheet.create({
   textField: {
     marginBottom: spacing.md,
   },
-  resetButton: {
+  signupButton: {
     marginTop: spacing.lg,
     marginBottom: spacing.md,
-  },
-  backButton: {
-    marginTop: spacing.sm,
   },
   errorText: {
     color: colors.error,
@@ -243,44 +233,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     paddingHorizontal: spacing.sm,
   },
-  successContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-    backgroundColor: colors.palette.neutral100,
-    padding: spacing.xl,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  successIcon: {
-    fontSize: 48,
-    color: colors.palette.primary500,
-    marginBottom: spacing.md,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.text,
-    marginBottom: spacing.sm,
-    textAlign: "center",
-  },
-  successMessage: {
-    fontSize: 16,
-    color: colors.textDim,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: spacing.lg,
-  },
-  redirectText: {
+  infoText: {
     fontSize: 14,
     color: colors.textDim,
+    textAlign: "center",
     fontStyle: "italic",
+    marginTop: spacing.md,
+    lineHeight: 20,
   },
 })

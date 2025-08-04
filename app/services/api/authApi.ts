@@ -18,6 +18,16 @@ export const authApi = createApi({
         body: data,
       }),
     }),
+    registerWithInvite: builder.mutation<
+      { caregiver: Caregiver; tokens: any },
+      { token: string; password: string }
+    >({
+      query: (data) => ({
+        url: "/auth/registerWithInvite",
+        method: "POST",
+        body: data,
+      }),
+    }),
     login: builder.mutation<
       { org: Org; caregiver: Caregiver; patients: Patient[]; alerts: Alert[]; tokens: any },
       { email: string; password: string }
@@ -70,6 +80,7 @@ export const authApi = createApi({
 
 export const {
   useRegisterMutation,
+  useRegisterWithInviteMutation,
   useLoginMutation,
   useLogoutMutation,
   useRefreshTokensMutation,

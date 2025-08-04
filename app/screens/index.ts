@@ -17,6 +17,7 @@ export * from "./ProfileScreen"
 export * from "./RegisterScreen"
 export * from "./RequestResetScreen"
 export * from "./SchedulesScreen"
+export * from "./SignupScreen"
 export * from "./TermsScreen"
 
 export * from "./ErrorScreen/ErrorBoundary"
