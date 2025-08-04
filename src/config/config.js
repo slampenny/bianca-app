@@ -29,6 +29,12 @@ const envVarsSchema = Joi.object({
   EMAIL_FROM: Joi.string().email().description('Default "from" email address for all outgoing emails'),
   // SES specific
   AWS_SES_REGION: Joi.string().description('AWS Region for SES (e.g., us-east-1)'),
+  
+  // Base URL configuration (should be set by Terraform)
+  API_BASE_URL: Joi.string().uri().description('Base API URL (e.g., https://api.myphonefriend.com)'),
+  BASE_URL: Joi.string().uri().description('Base URL (alternative to API_BASE_URL)'),
+  WEBSOCKET_URL: Joi.string().uri().description('WebSocket URL (e.g., wss://api.myphonefriend.com)'),
+  
   // Generic SMTP (can be used for Ethereal if manually configured, or other SMTP services)
   SMTP_HOST: Joi.string().description('SMTP host'),
   SMTP_PORT: Joi.number().description('SMTP port'),
@@ -179,17 +185,18 @@ const baselineConfig = {
 
 // Set production-specific overrides (Restored and updated)
 if (envVars.NODE_ENV === 'production') {
-  // Restore user's original production overrides
+  // Use environment variables set by Terraform
+  const apiBaseUrl = envVars.API_BASE_URL || envVars.BASE_URL || 'https://api.myphonefriend.com';
   
-  baselineConfig.baseUrl = 'https://api.myphonefriend.com'; // Example - VERIFY
-  baselineConfig.apiUrl = `${baselineConfig.baseUrl}/v1`; // User's original value
+  baselineConfig.baseUrl = apiBaseUrl;
+  baselineConfig.apiUrl = `${apiBaseUrl}/v1`;
   baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb.myphonefriend.internal:27017/bianca-app';
-  baselineConfig.email.smtp.secure = true; // User's original value
-  baselineConfig.twilio.apiUrl = baselineConfig.baseUrl; // User's original value (Ensure this is HTTPS)
+  baselineConfig.email.smtp.secure = true;
+  baselineConfig.twilio.apiUrl = apiBaseUrl;
 
   // **NEW/UPDATED:** Add necessary production overrides for WebSocket URL
   // Ensure this uses wss:// and points to your correct production WebSocket endpoint
-  baselineConfig.twilio.websocketUrl = 'wss://api.myphonefriend.com'; // Example - **VERIFY THIS URL**
+  baselineConfig.twilio.websocketUrl = envVars.WEBSOCKET_URL || `wss://${apiBaseUrl.replace('https://', '')}`;
 
   // Ensure baseUrl is also correct for production if used elsewhere
   // Ensure Asterisk ARI URL points to the internal service discovery name in production
@@ -273,13 +280,13 @@ baselineConfig.loadSecrets = async () => {
     if (secrets.TWILIO_ACCOUNTSID) baselineConfig.twilio.accountSid = secrets.TWILIO_ACCOUNTSID;
     if (secrets.TWILIO_AUTHTOKEN) baselineConfig.twilio.authToken = secrets.TWILIO_AUTHTOKEN;
     if (secrets.TWILIO_VOICEURL) baselineConfig.twilio.voiceUrl = secrets.TWILIO_VOICEURL; // If still used
-    // Ensure production apiUrl and websocketUrl are loaded from secrets if available, overriding the hardcoded production values
-    // if (secrets.API_BASE_URL) { // Assuming secret name matches env var name
+    // URLs should come from environment variables set by Terraform, not secrets
+    // if (secrets.API_BASE_URL) { 
     //     baselineConfig.twilio.apiUrl = secrets.API_BASE_URL;
     //     baselineConfig.baseUrl = secrets.API_BASE_URL;
     //     baselineConfig.apiUrl = secrets.API_BASE_URL + '/v1';
     // }
-    //if (secrets.WEBSOCKET_URL) baselineConfig.twilio.websocketUrl = secrets.WEBSOCKET_URL; // Load WS URL from secrets
+    // if (secrets.WEBSOCKET_URL) baselineConfig.twilio.websocketUrl = secrets.WEBSOCKET_URL;
     // OpenAI
     if (secrets.OPENAI_API_KEY) baselineConfig.openai.apiKey = secrets.OPENAI_API_KEY;
     //if (secrets.OPENAI_REALTIME_MODEL) baselineConfig.openai.realtimeModel = secrets.OPENAI_REALTIME_MODEL; // Load Realtime model from secrets

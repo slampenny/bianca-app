@@ -1212,6 +1212,7 @@ resource "aws_ecs_task_definition" "app_task" {
         # UPDATED: Use service discovery DNS name instead of localhost
         { name = "MONGODB_URL", value = "mongodb://mongodb.myphonefriend.internal:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
+        { name = "API_BASE_URL", value = "https://api.myphonefriend.com" },
         { name = "WEBSOCKET_URL", value = "wss://api.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
