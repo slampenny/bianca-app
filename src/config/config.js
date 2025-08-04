@@ -33,6 +33,7 @@ const envVarsSchema = Joi.object({
   // Base URL configuration (should be set by Terraform)
   API_BASE_URL: Joi.string().uri().description('Base API URL (e.g., https://api.myphonefriend.com)'),
   BASE_URL: Joi.string().uri().description('Base URL (alternative to API_BASE_URL)'),
+  FRONTEND_URL: Joi.string().uri().description('Frontend URL for email links (e.g., https://app.myphonefriend.com)'),
   WEBSOCKET_URL: Joi.string().uri().description('WebSocket URL (e.g., wss://api.myphonefriend.com)'),
   
   // Generic SMTP (can be used for Ethereal if manually configured, or other SMTP services)
@@ -88,6 +89,7 @@ const baselineConfig = {
   authEnabled: true, // Assuming auth is generally enabled
   baseUrl: envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`, // Default base URL
   apiUrl: (envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`) + '/v1', // Default API URL
+  frontendUrl: envVars.FRONTEND_URL || 'https://app.myphonefriend.com', // Frontend URL for invite links
   mongoose: {
     url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {

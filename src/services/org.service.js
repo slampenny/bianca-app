@@ -166,7 +166,7 @@ const sendInvite = async (orgId, name, email, phone) => {
 
     // Generate invite token and send email
     const inviteToken = await tokenService.generateInviteToken(caregiver);
-    const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
+    const inviteLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
     await emailService.sendInviteEmail(email, inviteLink);
 
     return { caregiver, inviteToken };

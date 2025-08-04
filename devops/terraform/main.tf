@@ -1214,6 +1214,7 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "NODE_ENV", value = "production" },
         { name = "API_BASE_URL", value = "https://api.myphonefriend.com" },
         { name = "WEBSOCKET_URL", value = "wss://api.myphonefriend.com" },
+        { name = "FRONTEND_URL", value = "https://app.myphonefriend.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
         # Internal communication uses private IP for both ARI and RTP

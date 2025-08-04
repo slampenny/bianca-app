@@ -6,6 +6,20 @@ const i18n = require('i18n'); // Assuming you use i18n for email text
 const config = require('../config/config'); // Your application's config file
 const logger = require('../config/logger'); // Your application's logger
 
+// Configure i18n for email service
+i18n.configure({
+  locales: ['en', 'es'],
+  directory: `${__dirname}/../locales`,
+  objectNotation: true,
+  defaultLocale: 'en',
+  logWarnFn(msg) {
+    // do nothing
+  },
+});
+
+// Set locale to English for email service
+i18n.setLocale('en');
+
 let transport;
 let etherealTestAccount = null; // To store Ethereal account details if used
 let isInitialized = false;
@@ -244,7 +258,7 @@ const sendInviteEmail = async (to, inviteLink) => {
  */
 const sendResetPasswordEmail = async (to, token) => {
   const subject = i18n.__ ? i18n.__('sendResetPasswordEmail.subject') : 'My Phone Friend - Password Reset Request';
-  const resetLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/auth/reset-password?token=${token}`;
+  const resetLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/v1/auth/reset-password?token=${token}`;
   
   let text;
   if (i18n.__) {
@@ -287,7 +301,7 @@ const sendResetPasswordEmail = async (to, token) => {
  */
 const sendVerificationEmail = async (to, token) => {
   const subject = i18n.__ ? i18n.__('sendVerificationEmail.subject') : 'My Phone Friend - Please Verify Your Email Address';
-  const verificationLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/verify-email?token=${token}`;
+  const verificationLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/v1/auth/verify-email?token=${token}`;
   
   let text;
   if (i18n.__) {
