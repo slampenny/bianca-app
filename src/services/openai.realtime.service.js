@@ -79,49 +79,19 @@ class OpenAIRealtimeService {
    * OPTIMIZATION: Start global commit timer that processes ALL pending commits in batches
    */
   startGlobalCommitTimer() {
-    if (this.globalCommitTimer) return; // Already running
-    
-    this.globalCommitTimer = setInterval(() => {
-      const now = Date.now();
-      const commitsToProcess = [];
-      
-      // Find commits that are ready (100ms old)
-      for (const [callId, requestTime] of this.pendingCommits) {
-        if (now - requestTime >= CONSTANTS.COMMIT_DEBOUNCE_DELAY) {
-          commitsToProcess.push(callId);
-        }
-      }
-      
-      // Process all ready commits
-      for (const callId of commitsToProcess) {
-        try {
-          this.processCommit(callId);
-          this.pendingCommits.delete(callId);
-        } catch (err) {
-          logger.error(`[OpenAI Realtime] Batch commit error for ${callId}: ${err.message}`);
-          this.pendingCommits.delete(callId); // Remove failed commit
-        }
-      }
-      
-      // Stop timer if no more pending commits
-      if (this.pendingCommits.size === 0) {
-        this.stopGlobalCommitTimer();
-      }
-      
-    }, 25); // Check every 25ms for responsive commit processing
-    
-    logger.info(`[OpenAI Realtime] 🚀 OPTIMIZATION: Started global batch commit timer`);
-  }
+    // NO-OP with server VAD
+    logger.debug(`[OpenAI Realtime] Manual commit timer disabled - using server VAD`);
+}
 
   /**
    * OPTIMIZATION: Stop global commit timer when no pending commits
    */
   stopGlobalCommitTimer() {
     if (this.globalCommitTimer) {
-      clearInterval(this.globalCommitTimer);
-      this.globalCommitTimer = null;
-      logger.info('[OpenAI Realtime] 🛑 OPTIMIZATION: Stopped global batch commit timer');
+        clearInterval(this.globalCommitTimer);
+        this.globalCommitTimer = null;
     }
+    // Don't log as "stopped" - it should never start with VAD
   }
 
   /**
@@ -1034,9 +1004,9 @@ class OpenAIRealtimeService {
         // CRITICAL: Add turn detection to prevent interruptions
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,          // Sensitivity (0.0 to 1.0)
-          prefix_padding_ms: 300,  // Audio before speech
-          silence_duration_ms: 800 // How long to wait for silence before ending turn
+          threshold: 0.5,              // Keep at 0.5 for balanced detection
+          prefix_padding_ms: 300,      // Keep original
+          silence_duration_ms: 1200    // Increase to 1200ms for more natural pauses
         },
 
         // Add input transcription for debugging
@@ -1307,9 +1277,9 @@ class OpenAIRealtimeService {
         // CRITICAL: Add turn detection to prevent interruptions
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,          // Sensitivity (0.0 to 1.0)
-          prefix_padding_ms: 300,  // Audio before speech
-          silence_duration_ms: 800 // How long to wait for silence before ending turn
+          threshold: 0.5,              // Keep at 0.5 for balanced detection
+          prefix_padding_ms: 300,      // Keep original
+          silence_duration_ms: 1200    // Increase to 1200ms for more natural pauses
         },
 
         // Add input transcription for debugging
@@ -2091,25 +2061,8 @@ class OpenAIRealtimeService {
    * OPTIMIZED: Batch commit system - adds call to pending commits instead of creating individual timers
    */
   debounceCommit(callId) {
-    const conn = this.connections.get(callId);
-    if (!conn?.sessionReady || !conn.webSocket || conn.webSocket.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    // Don't add if commit is already pending for this call
-    if (this.pendingCommits.has(callId)) {
-      return;
-    }
-
-    // Add to pending commits with current timestamp
-    this.pendingCommits.set(callId, Date.now());
-    
-    // Start global timer if this is the first pending commit
-    if (this.pendingCommits.size === 1) {
-      this.startGlobalCommitTimer();
-    }
-    
-    logger.debug(`[OpenAI Realtime] 🚀 BATCH: Added ${callId} to pending commits (${this.pendingCommits.size} total)`);
+    // NO-OP when using server VAD
+    logger.debug(`[OpenAI Realtime] Manual commit disabled - using server VAD for ${callId}`);
   }
 
   /**
@@ -2212,42 +2165,24 @@ class OpenAIRealtimeService {
     try {
       // Record audio for debugging
       const ulawBuffer = Buffer.from(audioChunkBase64ULaw, 'base64');
-      await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
+        await this.appendToContinuousDebugFile(callId, 'continuous_from_asterisk_ulaw.ulaw', ulawBuffer);
 
-      // Send uLaw audio directly to OpenAI
-      await this.sendJsonMessage(callId, {
-        type: 'input_audio_buffer.append',
-        audio: audioChunkBase64ULaw,
-      });
+        // Send uLaw audio directly to OpenAI
+        await this.sendJsonMessage(callId, {
+            type: 'input_audio_buffer.append',
+            audio: audioChunkBase64ULaw,
+        });
 
-      // Update tracking
-      conn.audioChunksSent++;
-      conn.validAudioChunksSent = (conn.validAudioChunksSent || 0) + 1;
-      conn.totalAudioBytesSent = (conn.totalAudioBytesSent || 0) + ulawBuffer.length;
-      conn.lastSuccessfulAppendTime = Date.now();
+        // Update tracking
+        conn.audioChunksSent++;
+        conn.validAudioChunksSent = (conn.validAudioChunksSent || 0) + 1;
+        conn.totalAudioBytesSent = (conn.totalAudioBytesSent || 0) + ulawBuffer.length;
+        conn.lastSuccessfulAppendTime = Date.now();
 
-      // Log progress occasionally
-      if (conn.validAudioChunksSent <= 10 || conn.validAudioChunksSent % 100 === 0) {
-        logger.info(`[OpenAI Realtime] Sent audio chunk #${conn.validAudioChunksSent} to OpenAI for ${callId}`);
-      }
-
-      // CRITICAL: With turn detection, we rely on OpenAI's server VAD
-      // Only commit in emergency situations or when explicitly needed
-      const timeSinceFirstAudio = conn.firstAudioReceivedTime ? (Date.now() - conn.firstAudioReceivedTime) : 0;
-
-      // CONSERVATIVE commit conditions - let OpenAI's turn detection handle most cases
-      const shouldCommit = (
-        // Emergency fallback - force commit after very long delay if no commits yet
-        (timeSinceFirstAudio > 5000 && !conn.lastCommitTime && conn.hasHeardSpeech) ||
-
-        // Force commit if we're accumulating too much audio without any commits
-        (conn.validAudioChunksSent >= 50 && (Date.now() - (conn.lastCommitTime || 0)) > 2000)
-      );
-
-      if (shouldCommit) {
-        logger.info(`[OpenAI Realtime] Emergency commit for ${callId}: chunks=${conn.validAudioChunksSent}, time=${timeSinceFirstAudio}ms`);
-        this.debounceCommit(callId);
-      }
+        // Log progress occasionally
+        if (conn.validAudioChunksSent <= 10 || conn.validAudioChunksSent % 100 === 0) {
+            logger.info(`[OpenAI Realtime] Sent audio chunk #${conn.validAudioChunksSent} to OpenAI for ${callId}`);
+        }
 
     } catch (audioProcessingError) {
       logger.error(`[OpenAI Realtime] Audio processing error for ${callId}: ${audioProcessingError.message}`);

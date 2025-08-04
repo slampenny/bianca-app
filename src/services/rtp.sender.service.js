@@ -41,9 +41,11 @@ class RtpSenderService extends EventEmitter {
         this.SAMPLES_PER_FRAME = 160;
         this.PACKET_INTERVAL_MS = 20;
         
-        // CRITICAL FIX: Reduce audio buffer sizes for lower latency
-        this.MAX_BUFFER_SIZE_BYTES = 1600; // Max 100ms of audio (160 * 10 frames)
-        this.TARGET_BUFFER_SIZE_BYTES = 480; // Target 30ms of audio (160 * 3 frames)
+        this.MAX_BUFFER_SIZE_BYTES = 640;    // 40ms max (4 frames)
+        this.TARGET_BUFFER_SIZE_BYTES = 320; // 20ms target (2 frames)
+        this.MIN_BUFFER_SIZE_BYTES = 160;    // 10ms min (1 frame)
+
+        this.adaptiveBuffering = new Map();
         
         // Enhanced error tracking
         this.isShuttingDown = false;
@@ -207,44 +209,42 @@ class RtpSenderService extends EventEmitter {
         if (!callConfig || !socket || !callConfig.initialized || this.isShuttingDown) {
             return;
         }
-
-        // Simple check - if no data, wait for more
-        if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
-            return;
-        }
-
-        // Extract one frame worth of data
-        const frameData = buffer.slice(0, this.SAMPLES_PER_FRAME);
+    
+        // CRITICAL FIX: Always send something to maintain timing
+        let frameData;
         
-        // Update buffer to remove sent data
-        const remaining = buffer.slice(this.SAMPLES_PER_FRAME);
-        this.audioBuffers.set(callId, remaining);
-
-        // Send the frame
-        try {
-            const timestamp = this.timestamps.get(callId);
-            const rtpPacket = this.createRtpPacket(callId, frameData, callConfig, timestamp);
+        if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
+            // Buffer underrun - send comfort noise instead of skipping
+            frameData = Buffer.alloc(this.SAMPLES_PER_FRAME, 0x7F); // uLaw silence
             
-            if (rtpPacket) {
-                this.sendRtpPacketSync(socket, rtpPacket, callConfig.rtpHost, callConfig.rtpPort, callId);
-                
-                // Update timestamp for next packet
-                const nextTimestamp = (timestamp + this.SAMPLES_PER_FRAME) >>> 0;
-                this.timestamps.set(callId, nextTimestamp);
-                
-                // Update debug counter
-                const debug = this.debugCounters.get(callId);
-                if (debug) {
-                    debug.packetsSent++;
-                    if (debug.packetsSent <= 10 || debug.packetsSent % 100 === 0) {
-                        logger.info(`[RTP Sender] Sent packet #${debug.packetsSent} for ${callId} (buffer: ${remaining.length} bytes)`);
-                    }
-                }
+            // Track underruns
+            if (!this.bufferUnderrunCount) {
+                this.bufferUnderrunCount = new Map();
             }
-        } catch (err) {
-            logger.error(`[RTP Sender] Error sending frame for ${callId}: ${err.message}`);
-            this.updateStats(callId, 'error');
+            const underruns = (this.bufferUnderrunCount.get(callId) || 0) + 1;
+            this.bufferUnderrunCount.set(callId, underruns);
+            
+            // Log periodically
+            if (underruns === 1 || underruns % 50 === 0) {
+                logger.warn(`[RTP Sender] Buffer underrun for ${callId}: ${underruns} total (sending silence)`);
+            }
+        } else {
+            // Normal case - we have audio data
+            frameData = buffer.slice(0, this.SAMPLES_PER_FRAME);
+            
+            // Update buffer to remove sent data
+            const remaining = buffer.slice(this.SAMPLES_PER_FRAME);
+            this.audioBuffers.set(callId, remaining);
+            
+            // Reset underrun counter
+            if (this.bufferUnderrunCount && this.bufferUnderrunCount.get(callId) > 0) {
+                logger.info(`[RTP Sender] Buffer recovered for ${callId} after ${this.bufferUnderrunCount.get(callId)} underruns`);
+                this.bufferUnderrunCount.set(callId, 0);
+            }
         }
+    
+        // Always send the frame (either real audio or silence)
+        this.sendFrameData(callId, frameData, callConfig, socket);
     }
 
     sendFrameData(callId, frameData, callConfig, socket) {
