@@ -301,7 +301,7 @@ const sendResetPasswordEmail = async (to, token) => {
  */
 const sendVerificationEmail = async (to, token) => {
   const subject = i18n.__ ? i18n.__('sendVerificationEmail.subject') : 'My Phone Friend - Please Verify Your Email Address';
-  const verificationLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/v1/auth/verify-email?token=${token}`;
+  const verificationLink = `${config.apiUrl}/auth/verify-email?token=${token}`;
   
   let text;
   if (i18n.__) {
