@@ -1919,6 +1919,24 @@ resource "aws_route53_record" "ses_dkim_records" {
   records = ["${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
 }
 
+# SPF Record - Authorize SES to send emails for this domain
+resource "aws_route53_record" "ses_spf_record" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = aws_ses_domain_identity.ses_domain.domain
+  type    = "TXT"
+  ttl     = 600
+  records = ["v=spf1 include:amazonses.com ~all"]
+}
+
+# DMARC Record - Email authentication policy
+resource "aws_route53_record" "ses_dmarc_record" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "_dmarc.${aws_ses_domain_identity.ses_domain.domain}"
+  type    = "TXT"
+  ttl     = 600
+  records = ["v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${aws_ses_domain_identity.ses_domain.domain}"]
+}
+
 ################################################################################
 # OUTPUTS - UPDATED FOR VERIFICATION
 ################################################################################

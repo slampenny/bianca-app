@@ -283,12 +283,12 @@ class RtpSenderService extends EventEmitter {
         if (this.isShuttingDown || !audioBase64Ulaw || audioBase64Ulaw.length === 0) {
             return;
         }
-
+    
         const callConfig = this.activeCalls.get(callId);
         if (!callConfig || !callConfig.initialized) {
             return;
         }
-
+    
         try {
             const ulawBuffer = Buffer.from(audioBase64Ulaw, 'base64');
             if (ulawBuffer.length === 0) {
@@ -303,12 +303,54 @@ class RtpSenderService extends EventEmitter {
             } else {
                 audioPayload = ulawBuffer;
             }
-
-            // SIMPLE buffering - just append, no fancy overflow management
+    
+            // Get adaptive buffer config
+            if (!this.adaptiveBuffering.has(callId)) {
+                this.adaptiveBuffering.set(callId, {
+                    targetSize: this.TARGET_BUFFER_SIZE_BYTES,
+                    underrunCount: 0,
+                    overflowCount: 0
+                });
+            }
+    
+            const adaptive = this.adaptiveBuffering.get(callId);
             const currentBuffer = this.audioBuffers.get(callId) || Buffer.alloc(0);
-            const newBuffer = Buffer.concat([currentBuffer, audioPayload]);
-            this.audioBuffers.set(callId, newBuffer);
-
+    
+            // Adjust target based on performance
+            if (currentBuffer.length === 0 && audioPayload.length > 0) {
+                // Underrun detected
+                adaptive.underrunCount++;
+                if (adaptive.underrunCount > 5) {
+                    // Increase buffer target
+                    adaptive.targetSize = Math.min(adaptive.targetSize + 160, this.MAX_BUFFER_SIZE_BYTES);
+                    logger.info(`[RTP Sender] Increasing buffer target to ${adaptive.targetSize} for ${callId}`);
+                    adaptive.underrunCount = 0;
+                }
+            } else if (currentBuffer.length > this.MAX_BUFFER_SIZE_BYTES) {
+                // Overflow detected
+                adaptive.overflowCount++;
+                if (adaptive.overflowCount > 5) {
+                    // Decrease buffer target
+                    adaptive.targetSize = Math.max(adaptive.targetSize - 160, this.MIN_BUFFER_SIZE_BYTES);
+                    logger.info(`[RTP Sender] Decreasing buffer target to ${adaptive.targetSize} for ${callId}`);
+                    adaptive.overflowCount = 0;
+                }
+            }
+    
+            // Apply adaptive overflow protection
+            if (currentBuffer.length > adaptive.targetSize * 2) {
+                // Drop oldest audio to stay within 2x target
+                const dropBytes = currentBuffer.length - adaptive.targetSize;
+                const trimmedBuffer = currentBuffer.slice(dropBytes);
+                const newBuffer = Buffer.concat([trimmedBuffer, audioPayload]);
+                this.audioBuffers.set(callId, newBuffer);
+                logger.warn(`[RTP Sender] Adaptive overflow for ${callId}: dropped ${dropBytes} bytes`);
+            } else {
+                // Normal buffering
+                const newBuffer = Buffer.concat([currentBuffer, audioPayload]);
+                this.audioBuffers.set(callId, newBuffer);
+            }
+    
             this.updateStats(callId, 'audio_received', { bytes: audioPayload.length });
             
         } catch (err) {
@@ -437,6 +479,7 @@ class RtpSenderService extends EventEmitter {
 
         // Clear audio buffer
         this.audioBuffers.delete(callId);
+        this.adaptiveBuffering.delete(callId);
         this.debugCounters.delete(callId);
         
         const socket = this.udpSockets.get(callId);
