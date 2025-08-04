@@ -200,9 +200,39 @@ const sendEmail = async (to, subject, text, html) => {
  * @returns {Promise}
  */
 const sendInviteEmail = async (to, inviteLink) => {
-  const subject = i18n.__ ? i18n.__('inviteEmail.subject') : 'You are invited!';
-  const text = i18n.__ ? i18n.__('inviteEmail.text', inviteLink) : `Please use the following link to join: ${inviteLink}`;
-  await sendEmail(to, subject, text);
+  const subject = i18n.__ ? i18n.__('inviteEmail.subject') : 'Welcome to My Phone Friend - Invitation to Join';
+  
+  let text;
+  if (i18n.__) {
+    // Get the template and replace %s with the invite link
+    const template = i18n.__('inviteEmail.text');
+    text = template.replace('%s', inviteLink);
+  } else {
+    text = `Dear caregiver,\n\nYou have been invited to join My Phone Friend, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n${inviteLink}\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe My Phone Friend Team`;
+  }
+  
+  // Create HTML version for better deliverability
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #2c3e50; margin-top: 0;">You're Invited to My Phone Friend!</h2>
+        <p style="color: #555; line-height: 1.6;">Dear caregiver,</p>
+        <p style="color: #555; line-height: 1.6;">You have been invited to join My Phone Friend, a secure platform for healthcare communication.</p>
+        <p style="color: #555; line-height: 1.6;">To accept your invitation and set up your account, please click the button below:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${inviteLink}" style="background-color: #27ae60; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Accept Invitation</a>
+        </div>
+        <p style="color: #777; font-size: 14px;">This invitation will expire in 7 days for security purposes.</p>
+        <p style="color: #777; font-size: 14px;">If you did not expect this invitation, please ignore this email.</p>
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">Welcome to secure healthcare communication!</p>
+        <p style="color: #555; line-height: 1.6;">Best regards,<br>The My Phone Friend Team</p>
+        <hr style="border: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: myphonefriend.com</p>
+      </div>
+    </div>
+  `;
+  
+  await sendEmail(to, subject, text, html);
   logger.info(`Invite email successfully queued for ${to}`);
 };
 
@@ -213,11 +243,39 @@ const sendInviteEmail = async (to, inviteLink) => {
  * @returns {Promise}
  */
 const sendResetPasswordEmail = async (to, token) => {
-  const subject = i18n.__ ? i18n.__('sendResetPasswordEmail.subject') : 'Reset Your Password';
-  // Ensure config.apiUrl is correctly defined and accessible for link generation
+  const subject = i18n.__ ? i18n.__('sendResetPasswordEmail.subject') : 'My Phone Friend - Password Reset Request';
   const resetLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/auth/reset-password?token=${token}`;
-  const text = i18n.__ ? i18n.__('sendResetPasswordEmail.text', resetLink) : `Reset your password using this link: ${resetLink}`;
-  await sendEmail(to, subject, text);
+  
+  let text;
+  if (i18n.__) {
+    // Get the template and replace %s with the reset link
+    const template = i18n.__('sendResetPasswordEmail.text');
+    text = template.replace('%s', resetLink);
+  } else {
+    text = `Dear caregiver,\n\nWe received a request to reset your My Phone Friend account password.\n\nTo reset your password, please click the link below:\n\n${resetLink}\n\nThis reset link will expire in 1 hour for security purposes.\n\nIf you did not request a password reset, please ignore this email. Your account remains secure.\n\nBest regards,\nThe My Phone Friend Team`;
+  }
+  
+  // Create HTML version for better deliverability
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #2c3e50; margin-top: 0;">Password Reset Request</h2>
+        <p style="color: #555; line-height: 1.6;">Dear caregiver,</p>
+        <p style="color: #555; line-height: 1.6;">We received a request to reset your My Phone Friend account password.</p>
+        <p style="color: #555; line-height: 1.6;">To reset your password, please click the button below:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetLink}" style="background-color: #e74c3c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Reset Password</a>
+        </div>
+        <p style="color: #777; font-size: 14px;">This reset link will expire in 1 hour for security purposes.</p>
+        <p style="color: #777; font-size: 14px;">If you did not request a password reset, please ignore this email. Your account remains secure.</p>
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">Best regards,<br>The My Phone Friend Team</p>
+        <hr style="border: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: myphonefriend.com</p>
+      </div>
+    </div>
+  `;
+  
+  await sendEmail(to, subject, text, html);
   logger.info(`Reset password email successfully queued for ${to}`);
 };
 
@@ -228,10 +286,39 @@ const sendResetPasswordEmail = async (to, token) => {
  * @returns {Promise}
  */
 const sendVerificationEmail = async (to, token) => {
-  const subject = i18n.__ ? i18n.__('sendVerificationEmail.subject') : 'Verify Your Email Address';
+  const subject = i18n.__ ? i18n.__('sendVerificationEmail.subject') : 'My Phone Friend - Please Verify Your Email Address';
   const verificationLink = `${config.apiUrl || config.baseUrl || 'http://localhost:3000'}/verify-email?token=${token}`;
-  const text = i18n.__ ? i18n.__('sendVerificationEmail.text', verificationLink) : `Verify your email using this link: ${verificationLink}`;
-  await sendEmail(to, subject, text);
+  
+  let text;
+  if (i18n.__) {
+    // Get the template and replace %s with the verification link
+    const template = i18n.__('sendVerificationEmail.text');
+    text = template.replace('%s', verificationLink);
+  } else {
+    text = `Dear caregiver,\n\nThank you for creating your My Phone Friend account! To complete your registration and ensure account security, please verify your email address.\n\nClick the link below to verify your email:\n\n${verificationLink}\n\nThis verification link will expire in 24 hours for security purposes.\n\nIf you did not create a My Phone Friend account, please ignore this email.\n\nWelcome to secure healthcare communication!\n\nBest regards,\nThe My Phone Friend Team`;
+  }
+  
+  // Create HTML version for better deliverability
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #2c3e50; margin-top: 0;">Welcome to My Phone Friend!</h2>
+        <p style="color: #555; line-height: 1.6;">Dear caregiver,</p>
+        <p style="color: #555; line-height: 1.6;">Thank you for creating your My Phone Friend account! To complete your registration and ensure account security, please verify your email address.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${verificationLink}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Verify Your Email</a>
+        </div>
+        <p style="color: #777; font-size: 14px;">This verification link will expire in 24 hours for security purposes.</p>
+        <p style="color: #777; font-size: 14px;">If you did not create a My Phone Friend account, please ignore this email.</p>
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">Welcome to secure healthcare communication!</p>
+        <p style="color: #555; line-height: 1.6;">Best regards,<br>The My Phone Friend Team</p>
+        <hr style="border: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: myphonefriend.com</p>
+      </div>
+    </div>
+  `;
+  
+  await sendEmail(to, subject, text, html);
   logger.info(`Verification email successfully queued for ${to}`);
 };
 

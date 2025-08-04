@@ -1928,13 +1928,13 @@ resource "aws_route53_record" "ses_spf_record" {
   records = ["v=spf1 include:amazonses.com ~all"]
 }
 
-# DMARC Record - Email authentication policy
+# DMARC Record - Email authentication policy (relaxed for better deliverability)
 resource "aws_route53_record" "ses_dmarc_record" {
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
   name    = "_dmarc.${aws_ses_domain_identity.ses_domain.domain}"
   type    = "TXT"
   ttl     = 600
-  records = ["v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${aws_ses_domain_identity.ses_domain.domain}"]
+  records = ["v=DMARC1; p=none; rua=mailto:dmarc-reports@${aws_ses_domain_identity.ses_domain.domain}; ruf=mailto:dmarc-reports@${aws_ses_domain_identity.ses_domain.domain}"]
 }
 
 ################################################################################
