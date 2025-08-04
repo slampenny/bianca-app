@@ -6,6 +6,7 @@ export type AppStackParamList = {
   Profile: undefined
   Privacy: undefined
   Terms: undefined
+  EmailVerified: undefined
 }
 
 export type DrawerParamList = {
@@ -64,6 +65,7 @@ export type LoginStackParamList = {
   ConfirmReset: undefined
   Privacy: undefined
   Terms: undefined
+  EmailVerified: undefined
 }
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {
