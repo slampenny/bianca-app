@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useLayoutEffect } from "react"
-import { StyleSheet, View, ScrollView, Alert } from "react-native"
+import React, { useState, useEffect } from "react"
+import { View, ViewStyle, Alert } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useRegisterWithInviteMutation } from "../services/api/authApi"
-import { Button, Text, TextField } from "app/components"
+import { Button, Text, TextField, Screen, Header } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
-import { colors, spacing } from "app/theme"
+import { spacing } from "app/theme"
 
 type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
@@ -15,16 +15,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   const route = useRoute()
   const token = (route.params as any)?.token
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      header: () => (
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Complete Your Invitation</Text>
-        </View>
-      ),
-    })
-  }, [navigation])
+
 
   const [registerWithInvite, { isLoading }] = useRegisterWithInviteMutation()
 
@@ -115,19 +106,68 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Welcome to My Phone Friend!</Text>
-        <Text style={styles.subtitle}>
-          You've been invited to join your organization's account. 
-          Complete your registration below.
-        </Text>
+    <Screen 
+      preset="auto" 
+      contentContainerStyle={$screenContentContainer}
+      safeAreaEdges={["top"]}
+    >
+      <Header 
+        title="Complete Your Invitation"
+        leftIcon="back"
+        onLeftPress={() => navigation.goBack()}
+      />
+      
+      <View style={$content}>
+        <Text 
+          preset="heading" 
+          text="Welcome to My Phone Friend!" 
+          style={$title}
+        />
+        
+        <Text 
+          preset="default"
+          text="You've been invited to join your organization's account. Complete your registration below."
+          style={$subtitle}
+        />
 
         {generalError ? (
-          <Text style={styles.errorText}>{generalError}</Text>
+          <Text 
+            text={generalError}
+            style={$errorText}
+          />
         ) : null}
 
-        <View style={styles.form}>
+        <View style={$form}>
+          <TextField
+            value={name}
+            onChangeText={setName}
+            label="Full Name"
+            placeholder="Your full name"
+            editable={false}
+            containerStyle={$textField}
+          />
+
+          <TextField
+            value={email}
+            onChangeText={setEmail}
+            label="Email Address"
+            placeholder="your.email@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={false}
+            containerStyle={$textField}
+          />
+
+          <TextField
+            value={phone}
+            onChangeText={setPhone}
+            label="Phone Number"
+            placeholder="(555) 123-4567"
+            keyboardType="phone-pad"
+            editable={false}
+            containerStyle={$textField}
+          />
+
           <TextField
             value={password}
             onChangeText={(text) => {
@@ -139,7 +179,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
             secureTextEntry
             status={passwordError ? "error" : undefined}
             helper={passwordError}
-            style={styles.textField}
+            containerStyle={$textField}
           />
 
           <TextField
@@ -153,92 +193,73 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
             secureTextEntry
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError}
-            style={styles.textField}
+            containerStyle={$textField}
           />
 
           <Button
-            text="Complete Registration"
+            text={isLoading ? "Creating Account..." : "Complete Registration"}
             onPress={handleSignup}
             disabled={isLoading || !password || !confirmPassword}
-            style={styles.signupButton}
+            style={$signupButton}
           />
 
-          <Text style={styles.infoText}>
-            Your name, email, and organization details have been pre-configured by your administrator.
-          </Text>
+          <Text 
+            size="sm"
+            text="Your name, email, and organization details have been pre-configured by your administrator."
+            style={$infoText}
+          />
         </View>
 
         <LegalLinks />
       </View>
-    </ScrollView>
+    </Screen>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  contentContainer: {
-    flexGrow: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  header: {
-    backgroundColor: colors.background,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.text,
-    textAlign: "center",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: colors.text,
-    textAlign: "center",
-    marginBottom: spacing.sm,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textDim,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: spacing.xl,
-  },
-  form: {
-    flex: 1,
-  },
-  textField: {
-    marginBottom: spacing.md,
-  },
-  signupButton: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  infoText: {
-    fontSize: 14,
-    color: colors.textDim,
-    textAlign: "center",
-    fontStyle: "italic",
-    marginTop: spacing.md,
-    lineHeight: 20,
-  },
-})
+const $screenContentContainer: ViewStyle = {
+  flexGrow: 1,
+}
+
+const $content: ViewStyle = {
+  flex: 1,
+  paddingHorizontal: spacing.lg,
+  paddingTop: spacing.md,
+  paddingBottom: spacing.lg,
+}
+
+const $title = {
+  textAlign: "center" as const,
+  marginBottom: spacing.sm,
+}
+
+const $subtitle = {
+  textAlign: "center" as const,
+  marginBottom: spacing.xl,
+  lineHeight: 24,
+}
+
+const $form: ViewStyle = {
+  flex: 1,
+}
+
+const $textField: ViewStyle = {
+  marginBottom: spacing.md,
+}
+
+const $signupButton: ViewStyle = {
+  marginTop: spacing.lg,
+  marginBottom: spacing.md,
+}
+
+const $errorText = {
+  textAlign: "center" as const,
+  marginBottom: spacing.md,
+  paddingHorizontal: spacing.sm,
+}
+
+const $infoText = {
+  textAlign: "center" as const,
+  fontStyle: "italic" as const,
+  marginTop: spacing.md,
+  lineHeight: 20,
+}

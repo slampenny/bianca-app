@@ -1,8 +1,9 @@
 import React, { useEffect } from "react"
-import { View, Text, StyleSheet } from "react-native"
+import { View, ViewStyle } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "app/store/authSlice"
+import { Screen, Text } from "app/components"
 import { colors, spacing } from "app/theme"
 
 export const EmailVerifiedScreen = () => {
@@ -10,7 +11,7 @@ export const EmailVerifiedScreen = () => {
   const isLoggedIn = useSelector(isAuthenticated)
 
   useEffect(() => {
-    // Show success message for 2 seconds, then navigate
+    // Show success message for 3 seconds, then navigate
     const timer = setTimeout(() => {
       if (isLoggedIn) {
         // User is logged in, go to main app
@@ -19,71 +20,91 @@ export const EmailVerifiedScreen = () => {
         // User is not logged in, go to login
         navigation.navigate("Login" as never)
       }
-    }, 2000)
+    }, 3000)
 
     return () => clearTimeout(timer)
   }, [navigation, isLoggedIn])
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.checkmark}>✓</Text>
-        <Text style={styles.title}>Email Verified!</Text>
-        <Text style={styles.message}>
-          Your My Phone Friend account has been successfully verified.
-        </Text>
-        <Text style={styles.redirect}>
-          Redirecting you to the app...
-        </Text>
+    <Screen 
+      preset="fixed" 
+      style={$container}
+      contentContainerStyle={$contentContainer}
+    >
+      <View style={$successCard}>
+        <Text style={$checkmark}>✓</Text>
+        
+        <Text 
+          preset="heading" 
+          text="Email Verified!" 
+          style={$title}
+        />
+        
+        <Text 
+          preset="default"
+          text="Your My Phone Friend account has been successfully verified."
+          style={$message}
+        />
+        
+        <Text 
+          size="sm"
+          text="Redirecting you to the app..."
+          style={$redirectText}
+        />
       </View>
-    </View>
+    </Screen>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.lg,
+const $container: ViewStyle = {
+  flex: 1,
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: spacing.lg,
+}
+
+const $contentContainer: ViewStyle = {
+  flex: 1,
+  justifyContent: "center",
+  alignItems: "center",
+}
+
+const $successCard: ViewStyle = {
+  backgroundColor: colors.palette.neutral100,
+  padding: spacing.xl,
+  borderRadius: spacing.md,
+  alignItems: "center",
+  shadowColor: colors.palette.neutral800,
+  shadowOffset: {
+    width: 0,
+    height: 2,
   },
-  content: {
-    alignItems: "center",
-    backgroundColor: colors.palette.neutral100,
-    padding: spacing.xl,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  checkmark: {
-    fontSize: 48,
-    color: colors.palette.primary500,
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.text,
-    marginBottom: spacing.sm,
-    textAlign: "center",
-  },
-  message: {
-    fontSize: 16,
-    color: colors.textDim,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: spacing.lg,
-  },
-  redirect: {
-    fontSize: 14,
-    color: colors.textDim,
-    fontStyle: "italic",
-  },
-})
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 5,
+  maxWidth: 320,
+  width: "100%",
+}
+
+const $checkmark = {
+  fontSize: 60,
+  color: colors.palette.accent500,
+  marginBottom: spacing.md,
+}
+
+const $title = {
+  textAlign: "center" as const,
+  marginBottom: spacing.md,
+}
+
+const $message = {
+  textAlign: "center" as const,
+  marginBottom: spacing.lg,
+  lineHeight: 24,
+}
+
+const $redirectText = {
+  textAlign: "center" as const,
+  color: colors.textDim,
+  fontStyle: "italic" as const,
+}

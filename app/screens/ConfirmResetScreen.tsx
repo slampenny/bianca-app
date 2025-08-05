@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useLayoutEffect } from "react"
-import { StyleSheet, View, ScrollView, Alert } from "react-native"
+import React, { useState, useEffect } from "react"
+import { View, ViewStyle, Alert } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useResetPasswordMutation } from "../services/api/authApi"
-import { Button, Text, TextField } from "app/components"
+import { Button, Text, TextField, Screen, Header } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
-import { colors, spacing } from "app/theme"
+import { spacing } from "app/theme"
 
 type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
 
@@ -14,16 +14,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const route = useRoute()
   const token = (route.params as any)?.token
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      header: () => (
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Reset Your Password</Text>
-        </View>
-      ),
-    })
-  }, [navigation])
+
 
   const [resetPassword, { isLoading }] = useResetPasswordMutation()
 
@@ -106,34 +97,69 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
 
   if (isSuccess) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.content}>
-          <View style={styles.successContainer}>
-            <Text style={styles.successIcon}>✓</Text>
-            <Text style={styles.successTitle}>Password Reset Successful!</Text>
-            <Text style={styles.successMessage}>
-              Your password has been updated successfully. You can now log in with your new password.
-            </Text>
-            <Text style={styles.redirectText}>Redirecting to login...</Text>
-          </View>
+      <Screen 
+        preset="fixed" 
+        style={$container}
+        contentContainerStyle={$contentContainer}
+      >
+        <View style={$successContainer}>
+          <Text style={$successIcon}>✓</Text>
+          
+          <Text 
+            preset="heading" 
+            text="Password Reset Successful!" 
+            style={$successTitle}
+          />
+          
+          <Text 
+            preset="default"
+            text="Your password has been updated successfully. You can now log in with your new password."
+            style={$successMessage}
+          />
+          
+          <Text 
+            size="sm"
+            text="Redirecting to login..."
+            style={$redirectText}
+          />
         </View>
-      </ScrollView>
+      </Screen>
     )
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Reset Your Password</Text>
-        <Text style={styles.subtitle}>
-          Enter your new password below. Make sure it's secure and easy for you to remember.
-        </Text>
+    <Screen 
+      preset="auto" 
+      contentContainerStyle={$screenContentContainer}
+      safeAreaEdges={["top"]}
+    >
+      <Header 
+        title="Reset Your Password"
+        leftIcon="back"
+        onLeftPress={() => navigation.goBack()}
+      />
+      
+      <View style={$content}>
+        <Text 
+          preset="heading" 
+          text="Reset Your Password" 
+          style={$title}
+        />
+        
+        <Text 
+          preset="default"
+          text="Enter your new password below. Make sure it's secure and easy for you to remember."
+          style={$subtitle}
+        />
 
         {generalError ? (
-          <Text style={styles.errorText}>{generalError}</Text>
+          <Text 
+            text={generalError}
+            style={$errorText}
+          />
         ) : null}
 
-        <View style={styles.form}>
+        <View style={$form}>
           <TextField
             value={newPassword}
             onChangeText={(text) => {
@@ -145,7 +171,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
             secureTextEntry
             status={passwordError ? "error" : undefined}
             helper={passwordError}
-            style={styles.textField}
+            containerStyle={$textField}
           />
 
           <TextField
@@ -159,128 +185,111 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
             secureTextEntry
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError}
-            style={styles.textField}
+            containerStyle={$textField}
           />
 
           <Button
             text={isLoading ? "Resetting Password..." : "Reset Password"}
             onPress={handleConfirmReset}
             disabled={isLoading || !newPassword || !confirmPassword}
-            style={styles.resetButton}
+            style={$resetButton}
           />
 
           <Button
             text="Back to Login"
             onPress={() => navigation.navigate("Login")}
             preset="secondary"
-            style={styles.backButton}
+            style={$backButton}
           />
         </View>
       </View>
-    </ScrollView>
+    </Screen>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  contentContainer: {
-    flexGrow: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  header: {
-    backgroundColor: colors.background,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.text,
-    textAlign: "center",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: colors.text,
-    textAlign: "center",
-    marginBottom: spacing.sm,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textDim,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: spacing.xl,
-  },
-  form: {
-    flex: 1,
-  },
-  textField: {
-    marginBottom: spacing.md,
-  },
-  resetButton: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  backButton: {
-    marginTop: spacing.sm,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  successContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-    backgroundColor: colors.palette.neutral100,
-    padding: spacing.xl,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  successIcon: {
-    fontSize: 48,
-    color: colors.palette.primary500,
-    marginBottom: spacing.md,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.text,
-    marginBottom: spacing.sm,
-    textAlign: "center",
-  },
-  successMessage: {
-    fontSize: 16,
-    color: colors.textDim,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: spacing.lg,
-  },
-  redirectText: {
-    fontSize: 14,
-    color: colors.textDim,
-    fontStyle: "italic",
-  },
-})
+const $container: ViewStyle = {
+  flex: 1,
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: spacing.lg,
+}
+
+const $contentContainer: ViewStyle = {
+  flex: 1,
+  justifyContent: "center",
+  alignItems: "center",
+}
+
+const $screenContentContainer: ViewStyle = {
+  flexGrow: 1,
+}
+
+const $content: ViewStyle = {
+  flex: 1,
+  paddingHorizontal: spacing.lg,
+  paddingTop: spacing.md,
+  paddingBottom: spacing.lg,
+}
+
+const $title = {
+  textAlign: "center" as const,
+  marginBottom: spacing.sm,
+}
+
+const $subtitle = {
+  textAlign: "center" as const,
+  marginBottom: spacing.xl,
+  lineHeight: 24,
+}
+
+const $form: ViewStyle = {
+  flex: 1,
+}
+
+const $textField: ViewStyle = {
+  marginBottom: spacing.md,
+}
+
+const $resetButton: ViewStyle = {
+  marginTop: spacing.lg,
+  marginBottom: spacing.md,
+}
+
+const $backButton: ViewStyle = {
+  marginTop: spacing.sm,
+}
+
+const $errorText = {
+  textAlign: "center" as const,
+  marginBottom: spacing.md,
+  paddingHorizontal: spacing.sm,
+}
+
+const $successContainer: ViewStyle = {
+  alignItems: "center",
+  justifyContent: "center",
+  flex: 1,
+  maxWidth: 320,
+  width: "100%",
+}
+
+const $successIcon = {
+  fontSize: 60,
+  marginBottom: spacing.md,
+}
+
+const $successTitle = {
+  textAlign: "center" as const,
+  marginBottom: spacing.sm,
+}
+
+const $successMessage = {
+  textAlign: "center" as const,
+  lineHeight: 24,
+  marginBottom: spacing.lg,
+}
+
+const $redirectText = {
+  textAlign: "center" as const,
+  fontStyle: "italic" as const,
+}
