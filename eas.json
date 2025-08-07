@@ -28,13 +28,20 @@
       "ios": { "simulator": true },
       "android": { "buildType": "apk" }
     },
+    "local-apk": {
+      "distribution": "internal",
+      "android": { 
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
+    },
     "preview:device": {
       "extends": "preview",
       "ios": { "simulator": false }
     },
     "production": {
       "android": {
-        "buildType": "aab"
+        "buildType": "app-bundle"
       }
     }
   },

@@ -1,164 +1,131 @@
-# Welcome to your new ignited app!
+# MyPhoneFriend Mobile & Web App
 
-[![CircleCI](https://circleci.com/gh/infinitered/ignite.svg?style=svg)](https://circleci.com/gh/infinitered/ignite)
+> React Native/Expo healthcare communication platform for secure caregiver coordination and wellness monitoring
 
-## The latest and greatest boilerplate for Infinite Red opinions
+[![React Native](https://img.shields.io/badge/React%20Native-0.73-blue.svg)](https://reactnative.dev/)
+[![Expo](https://img.shields.io/badge/Expo-50+-black.svg)](https://expo.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 
-This is the boilerplate that [Infinite Red](https://infinite.red) uses as a way to test bleeding-edge changes to our React Native stack.
+## 📱 Overview
 
-Currently includes:
+MyPhoneFriend is a cross-platform mobile and web application that enables healthcare organizations, caregivers, and families to coordinate patient care through secure communication, automated wellness checks, and real-time monitoring.
 
-- React Native
-- React Navigation
-- MobX State Tree
-- TypeScript
-- And more!
+### 🎯 Key Features
 
-## Quick Start
+- 🔐 **Secure Authentication** - Multi-factor authentication with biometric support
+- 👥 **Patient Management** - Comprehensive patient profiles and care coordination
+- 📞 **Voice Calls** - High-quality voice calls for wellness checks
+- 📅 **Smart Scheduling** - AI-powered scheduling for wellness checks
+- 📊 **Real-time Dashboard** - Live patient status and care metrics
+- 🏥 **Multi-Organization** - Support for healthcare facilities and home care
+- 📱 **Cross-Platform** - iOS, Android, and web support
+- 🔒 **HIPAA Compliant** - End-to-end encryption for patient data
 
-The Ignite boilerplate project's structure will look similar to this:
+## 🛠️ Technology Stack
 
-```
-ignite-project
-├── app
-│   ├── components
-│   ├── config
-│   ├── i18n
-│   ├── models
-│   ├── navigators
-│   ├── screens
-│   ├── services
-│   ├── theme
-│   ├── utils
-│   └── app.tsx
-├── assets
-│   ├── icons
-│   └── images
-├── test
-│   ├── __snapshots__
-│   ├── mockFile.ts
-│   └── setup.ts
-├── README.md
-├── android
-│   ├── app
-│   ├── build.gradle
-│   ├── gradle
-│   ├── gradle.properties
-│   ├── gradlew
-│   ├── gradlew.bat
-│   ├── keystores
-│   └── settings.gradle
-├── ignite
-│   └── templates
-|       |── app-icon
-│       ├── component
-│       ├── model
-│       ├── navigator
-│       └── screen
-├── index.js
-├── ios
-│   ├── IgniteProject
-│   ├── IgniteProject-tvOS
-│   ├── IgniteProject-tvOSTests
-│   ├── IgniteProject.xcodeproj
-│   └── IgniteProjectTests
-├── .env
-└── package.json
+- **React Native 0.73** - Cross-platform mobile development
+- **Expo 50+** - Development platform and deployment
+- **TypeScript** - Type-safe JavaScript development
+- **Ignite CLI** - React Native boilerplate and toolchain
+- **Redux Toolkit** - State management
+- **React Navigation 6** - Navigation and routing
+- **Socket.io** - Real-time communication
+- **EAS Build** - Cloud-based builds and deployment
 
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Expo CLI (`npm install -g @expo/cli`)
+- EAS CLI (`npm install -g eas-cli`)
+
+### Installation
+
+```bash
+git clone https://github.com/jordanlapp/myphonefriend-frontend.git
+cd myphonefriend-frontend
+yarn install
+yarn start
 ```
 
-### ./app directory
+### Development
 
-Included in an Ignite boilerplate project is the `app` directory. This is a directory you would normally have to create when using vanilla React Native.
-
-The inside of the `app` directory looks similar to the following:
-
-```
-app
-├── components
-├── config
-├── i18n
-├── models
-├── navigators
-├── screens
-├── services
-├── theme
-├── utils
-└── app.tsx
+```bash
+yarn start             # Start Expo development server
+yarn ios               # Run on iOS simulator
+yarn android           # Run on Android emulator
+yarn web               # Run on web browser
+yarn test              # Run tests
 ```
 
-**components**
-This is where your reusable components live which help you build your screens.
+### Building for Production
 
-**i18n**
-This is where your translations will live if you are using `react-native-i18n`.
-
-**models**
-This is where your app's models will live. Each model has a directory which will contain the `mobx-state-tree` model file, test file, and any other supporting files like actions, types, etc.
-
-**navigators**
-This is where your `react-navigation` navigators will live.
-
-**screens**
-This is where your screen components will live. A screen is a React component which will take up the entire screen and be part of the navigation hierarchy. Each screen will have a directory containing the `.tsx` file, along with any assets or other helper files.
-
-**services**
-Any services that interface with the outside world will live here (think REST APIs, Push Notifications, etc.).
-
-**theme**
-Here lives the theme for your application, including spacing, colors, and typography.
-
-**utils**
-This is a great place to put miscellaneous helpers and utilities. Things like date helpers, formatters, etc. are often found here. However, it should only be used for things that are truly shared across your application. If a helper or utility is only used by a specific component or model, consider co-locating your helper with that component or model.
-
-**app.tsx** This is the entry point to your app. This is where you will find the main App component which renders the rest of the application.
-
-### ./assets directory
-
-This directory is designed to organize and store various assets, making it easy for you to manage and use them in your application. The assets are further categorized into subdirectories, including `icons` and `images`:
-
-```
-assets
-├── icons
-└── images
+```bash
+yarn build:android:prod:cloud    # Build Android AAB
+yarn build:ios:prod:cloud        # Build iOS IPA
+yarn deploy:android              # Deploy to Google Play Store
+yarn deploy:ios                  # Deploy to Apple App Store
 ```
 
-**icons**
-This is where your icon assets will live. These icons can be used for buttons, navigation elements, or any other UI components. The recommended format for icons is PNG, but other formats can be used as well.
-
-Ignite comes with a built-in `Icon` component. You can find detailed usage instructions in the [docs](https://github.com/infinitered/ignite/blob/master/docs/Components-Icon.md).
-
-**images**
-This is where your images will live, such as background images, logos, or any other graphics. You can use various formats such as PNG, JPEG, or GIF for your images.
-
-Another valuable built-in component within Ignite is the `AutoImage` component. You can find detailed usage instructions in the [docs](https://github.com/infinitered/ignite/blob/master/docs/Components-AutoImage.md).
-
-How to use your `icon` or `image` assets:
+## 📁 Project Structure
 
 ```
-import { Image } from 'react-native';
+app/
+├── components/          # Reusable UI components
+├── screens/            # Application screens
+├── navigators/         # Navigation configuration
+├── services/           # API services
+├── store/             # Redux store and slices
+├── theme/             # Design system
+└── utils/             # Utility functions
 
-const MyComponent = () => {
-  return (
-    <Image source={require('../assets/images/my_image.png')} />
-  );
-};
+assets/
+├── images/            # Image assets
+├── icons/             # Icon assets
+└── fonts/             # Custom fonts
 ```
 
-### ./ignite directory
+## 📱 Platform Support
 
-The `ignite` directory stores all things Ignite, including CLI and boilerplate items. Here you will find templates you can customize to help you get started with React Native.
+### Mobile
+- **iOS 13+** - iPhone and iPad
+- **Android 8+** - Phone and tablet
+- **Deep Linking** - Custom URL schemes (`bianca://`)
+- **Push Notifications** - Real-time updates
+- **Biometric Auth** - Face ID, Touch ID, Fingerprint
 
-### ./test directory
+### Web
+- **Modern Browsers** - Chrome, Firefox, Safari, Edge
+- **Responsive Design** - Desktop and mobile layouts
+- **PWA Support** - Progressive Web App capabilities
 
-This directory will hold your Jest configs and mocks.
+## 🧪 Testing
 
-## Running Maestro end-to-end tests
+```bash
+yarn test              # Unit tests
+yarn test:watch        # Tests in watch mode
+yarn test:web:e2e      # Web E2E tests
+yarn test:maestro      # Mobile E2E tests
+```
 
-Follow our [Maestro Setup](https://ignitecookbook.com/docs/recipes/MaestroSetup) recipe from the [Ignite Cookbook](https://ignitecookbook.com/)!
+## 📱 App Store Information
 
-## Previous Boilerplates
+### Google Play Store
+- **Package**: `com.negascout.bianca`
+- **Category**: Medical
+- **Version**: 1.0.0
 
-- [2018 aka Bowser](https://github.com/infinitered/ignite-bowser)
-- [2017 aka Andross](https://github.com/infinitered/ignite-andross)
-- [2016 aka Ignite 1.0](https://github.com/infinitered/ignite-ir-boilerplate-2016)
+### Apple App Store
+- **Bundle ID**: `com.negascout.bianca`
+- **Category**: Medical
+- **Version**: 1.0.0
+
+## 📞 Support
+
+- **Email**: support@myphonefriend.com
+- **Phone**: +1-604-562-4263
+- **Address**: 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+---
+
+**MyPhoneFriend** - Secure Healthcare Communication Platform
