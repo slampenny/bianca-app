@@ -1,170 +1,118 @@
-# Wellness Check Application Architecture
+# MyPhoneFriend Backend API
 
-## Overview
+> Secure healthcare communication platform for caregivers and wellness monitoring
 
-This application provides automated wellness checks for elderly patients using AI-powered phone calls. The system can:
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Express.js](https://img.shields.io/badge/Express.js-4.x-blue.svg)](https://expressjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green.svg)](https://www.mongodb.com/)
+[![AWS](https://img.shields.io/badge/AWS-Cloud-orange.svg)](https://aws.amazon.com/)
 
-1. Make outbound calls to patients via Twilio
-2. Handle incoming calls via Asterisk (optional)
-3. Connect patients with OpenAI's realtime voice API
-4. Record and summarize conversations for care providers
-5. Generate alerts for missed calls or concerning health issues
+## 🏥 Overview
 
-## Core Components
+MyPhoneFriend Backend is a comprehensive healthcare communication API that enables secure caregiver coordination, automated wellness checks, and patient monitoring. Built with enterprise-grade security and HIPAA compliance.
 
-### 1. Telephony Integration
+### 🎯 Key Features
 
-The application supports two telephony options:
+- 🔐 **Secure Authentication** - JWT-based auth with role-based access control
+- 📞 **Voice Communication** - Real-time voice calls via Asterisk/FreePBX
+- 🤖 **AI Transcription** - Automated call transcription using OpenAI Whisper
+- 👥 **Patient Management** - Comprehensive patient and caregiver coordination
+- 📅 **Scheduling System** - Automated wellness check scheduling
+- 📧 **Email Services** - HIPAA-compliant email notifications via AWS SES
+- 🏢 **Multi-Organization** - Support for healthcare organizations
+- 📊 **Analytics & Reporting** - Wellness check analytics and insights
+- 🔒 **HIPAA Compliance** - End-to-end encryption and audit trails
 
-#### Twilio Integration
-- Handles outbound calls to patients
-- Uses Twilio's media streams for bidirectional audio
-- Provides answering machine detection
-- Records call metadata (duration, status, etc.)
+## 🛠️ Technology Stack
 
-#### Asterisk Integration (Optional)
-- Handles incoming/outbound calls via SIP/VoIP
-- Uses Asterisk REST Interface (ARI) for call control
-- Requires more configuration but costs less per call
-- Good for high call volume environments
+### Core Framework
+- **Node.js 18+** - Runtime environment
+- **Express.js** - Web application framework
+- **MongoDB Atlas** - NoSQL database with encryption
+- **Mongoose** - MongoDB object modeling
 
-### 2. OpenAI Realtime Service
+### Security & Authentication
+- **JWT** - Stateless authentication
+- **bcrypt** - Password hashing
+- **Helmet.js** - Security headers
+- **Rate Limiting** - API abuse prevention
 
-The core AI component that:
-- Connects to OpenAI's realtime voice API
-- Handles audio transcoding between telephony and OpenAI
-- Manages the conversation flow
-- Stores conversation text in the database
-- Handles failures gracefully with reconnection logic
+### Communication & Voice
+- **Asterisk/FreePBX** - VoIP server for voice calls
+- **Twilio** - SIP trunk provider
+- **WebRTC** - Real-time peer-to-peer communication
+- **Socket.io** - Real-time bidirectional communication
 
-### 3. WebSocket Service
+### AI & Machine Learning
+- **OpenAI API** - GPT-4 integration
+- **OpenAI Whisper** - Speech-to-text transcription
 
-Bridges between telephony systems and OpenAI:
-- Handles WebSocket connections from Twilio
-- Routes audio between systems
-- Tracks call state
-- Ensures proper cleanup when calls end
+### Cloud Infrastructure (AWS)
+- **ECS** - Container orchestration
+- **SES** - Email delivery
+- **S3** - File storage
+- **Route53** - DNS management
+- **VPC** - Network isolation
 
-### 4. Database Integration
+## 🚀 Quick Start
 
-Stores important data about calls:
-- Patient information
-- Call metadata (time, duration, status)
-- Conversation transcripts
-- Summaries for care providers
+### Prerequisites
+- Node.js 18+
+- MongoDB Atlas account
+- AWS account with SES configured
+- Docker (optional)
 
-## Data Flow
+### Installation
 
-1. **Call Initiation**:
-   - Outbound: System initiates a call to patient via Twilio
-   - Inbound: Patient calls a number connected to Asterisk
-
-2. **Call Establishment**:
-   - Telephony system connects to the WebSocket service
-   - WebSocket service initializes OpenAI connection
-   - Initial greeting is played to the patient
-
-3. **Conversation**:
-   - Patient's audio is sent to OpenAI via the WebSocket
-   - OpenAI processes the audio and returns responses
-   - AI responses are played back to the patient
-
-4. **Call Completion**:
-   - Call ends (patient hangs up or timeout)
-   - Resources are cleaned up
-   - Conversation is summarized
-   - Alerts are generated if needed
-
-## Improvements Made
-
-### 1. Code Organization
-- Refactored to use class-based architecture
-- Implemented proper singleton pattern
-- Improved method organization and naming
-
-### 2. Error Handling
-- Added comprehensive error handling
-- Implemented retry logic with exponential backoff
-- Added graceful cleanup on failures
-
-### 3. Connection Management
-- Centralized tracking of connections
-- Improved lifecycle management
-- Better state handling
-
-### 4. Audio Processing
-- Streamlined conversion between audio formats
-- Reduced unnecessary processing steps
-- Improved buffering for audio chunks
-
-### 5. Logging
-- Added detailed logging at appropriate levels
-- Included context in log messages
-- Better diagnostics for troubleshooting
-
-## Configuration
-
-The application is configured via environment variables or a configuration file:
-
-```javascript
-// config.js example structure
-module.exports = {
-  env: process.env.NODE_ENV || 'development',
-  port: process.env.PORT || 3000,
-  
-  mongoose: {
-    url: process.env.MONGODB_URL || 'mongodb://localhost:27017/wellness-app',
-    options: {/* ... */}
-  },
-  
-  twilio: {
-    accountSid: process.env.TWILIO_ACCOUNT_SID,
-    authToken: process.env.TWILIO_AUTH_TOKEN,
-    phone: process.env.TWILIO_PHONE_NUMBER,
-    apiUrl: process.env.API_URL || 'http://localhost:3000',
-    websocketUrl: process.env.WEBSOCKET_URL || 'ws://localhost:3000'
-  },
-  
-  asterisk: {
-    enabled: process.env.ASTERISK_ENABLED === 'true',
-    url: process.env.ASTERISK_URL || 'http://asterisk:8088',
-    username: process.env.ASTERISK_USERNAME || 'myphonefriend',
-    password: process.env.ASTERISK_PASSWORD
-  },
-  
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY,
-    realtimeModel: process.env.OPENAI_MODEL || 'gpt-4-turbo'
-  }
-};
+```bash
+git clone https://github.com/jordanlapp/myphonefriend-backend.git
+cd myphonefriend-backend
+npm install
+cp .env.example .env
+# Configure your .env file
 ```
 
-## Deployment Considerations
+### Development
 
-### 1. Scaling
-- The application can handle multiple concurrent calls
-- WebSocket connections require persistent server connections
-- Consider using PM2 or similar for process management
+```bash
+npm run dev     # Start development server
+npm test        # Run tests
+npm run lint    # Lint code
+```
 
-### 2. Security
-- Store API keys securely (not in code)
-- Use HTTPS for all endpoints
-- Secure WebSocket connections with WSS
+## 📁 Project Structure
 
-### 3. Monitoring
-- Implement health checks
-- Monitor call quality and success rates
-- Set up alerts for system failures
+```
+src/
+├── config/          # Configuration files
+├── controllers/     # Request handlers
+├── middleware/      # Custom middleware
+├── models/          # Database models
+├── routes/          # API routes
+├── services/        # Business logic
+├── utils/           # Utility functions
+└── validations/     # Request validations
+```
 
-### 4. Cost Management
-- Track API usage (Twilio, OpenAI)
-- Consider time-of-day scheduling for non-urgent checks
-- Optimize call duration
+## 🔌 API Endpoints
 
-## Future Enhancements
+### Authentication
+- `POST /v1/auth/register` - Register new user
+- `POST /v1/auth/login` - User login
+- `GET /v1/auth/verify-email` - Verify email address
 
-1. **Patient Context**: Provide OpenAI with patient history and context for more personalized interactions
-2. **Emergency Detection**: Improved detection of health emergencies with automated escalation
-3. **Integration with EHR**: Connect with Electronic Health Records for better context
-4. **Multiple Languages**: Support for patients who speak languages other than English
-5. **Call Scheduling**: Advanced scheduling with preferences and optimal timing
+### Patients & Care
+- `GET /v1/patients` - Get patients
+- `POST /v1/patients` - Create patient
+- `GET /v1/wellness-checks` - Get wellness checks
+- `POST /v1/calls/initiate` - Initiate voice call
+
+## 📞 Support
+
+- **Email**: support@myphonefriend.com
+- **Phone**: +1-604-562-4263
+- **Address**: 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+---
+
+**MyPhoneFriend** - Secure Healthcare Communication Platform

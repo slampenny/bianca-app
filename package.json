@@ -1,10 +1,12 @@
 {
-  "name": "bianca-app-backend",
-  "version": "0.0.7",
-  "description": "A Tele-Health application that performs wellness checks for the elderly and disabled.",
+  "name": "myphonefriend-backend",
+  "version": "1.0.0",
+  "description": "MyPhoneFriend Backend API - Secure healthcare communication platform for caregivers and wellness monitoring. Provides REST API, real-time voice calls, AI-powered transcription, and HIPAA-compliant patient care coordination.",
   "main": "src/index.js",
-  "repository": "https://github.com/slampenny/bianca-app-backend.git",
-  "author": "Jordan Lapp <negascout@gmail.com>",
+  "repository": "https://github.com/jordanlapp/myphonefriend-backend.git",
+  "author": "Jordan Lapp <jordanglapp@gmail.com>",
+  "license": "UNLICENSED",
+  "keywords": ["healthcare", "telemedicine", "wellness-checks", "caregiving", "hipaa", "voice-calls", "patient-monitoring", "nodejs", "express", "mongodb"],
   "engines": {
     "node": ">=18.0.0"
   },

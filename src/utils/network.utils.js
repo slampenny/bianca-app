@@ -211,8 +211,16 @@ async function getRTPAddress(forceRefresh = false) {
 // Function to get Asterisk IP for ARI communication
 function getAsteriskIP() {
     const networkMode = process.env.NETWORK_MODE;
+    const deploymentType = process.env.DEPLOYMENT_TYPE;
+    const asteriskHost = process.env.ASTERISK_HOST;
     const asteriskPrivateIP = process.env.ASTERISK_PRIVATE_IP;
     const asteriskPublicIP = process.env.ASTERISK_PUBLIC_IP;
+    
+    // Docker Compose deployment - use service name
+    if (deploymentType === 'docker-compose' && asteriskHost) {
+        logger.info(`[Network Utils] Using Asterisk Docker service name for ARI: ${asteriskHost}`);
+        return asteriskHost;
+    }
     
     if (networkMode === 'HYBRID' && asteriskPrivateIP) {
         logger.info(`[Network Utils] Using Asterisk private IP for ARI: ${asteriskPrivateIP}`);

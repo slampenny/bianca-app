@@ -1939,8 +1939,339 @@ resource "aws_route53_record" "ses_dmarc_record" {
 }
 
 ################################################################################
+# EMAIL FORWARDING - Route legal emails to personal Gmail
+################################################################################
+
+# Create SES rule set for email forwarding
+resource "aws_ses_receipt_rule_set" "email_forwarding" {
+  rule_set_name = "myphonefriend-email-forwarding"
+}
+
+# Activate the rule set
+resource "aws_ses_active_receipt_rule_set" "email_forwarding_active" {
+  rule_set_name = aws_ses_receipt_rule_set.email_forwarding.rule_set_name
+}
+
+# S3 bucket for storing emails temporarily (required for SES receipt)
+resource "aws_s3_bucket" "ses_email_storage" {
+  bucket = "myphonefriend-ses-email-storage-${random_string.bucket_suffix.result}"
+}
+
+resource "random_string" "bucket_suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+resource "aws_s3_bucket_public_access_block" "ses_email_storage" {
+  bucket = aws_s3_bucket.ses_email_storage.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# IAM role for SES to access S3
+resource "aws_iam_role" "ses_email_forwarding_role" {
+  name = "ses-email-forwarding-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ses.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "ses_email_forwarding_policy" {
+  name = "ses-email-forwarding-policy"
+  role = aws_iam_role.ses_email_forwarding_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl"
+        ]
+        Resource = "${aws_s3_bucket.ses_email_storage.arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# S3 bucket policy to allow SES to write emails
+resource "aws_s3_bucket_policy" "ses_email_storage_policy" {
+  bucket = aws_s3_bucket.ses_email_storage.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowSESPuts"
+        Effect = "Allow"
+        Principal = {
+          Service = "ses.amazonaws.com"
+        }
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl"
+        ]
+        Resource = "${aws_s3_bucket.ses_email_storage.arn}/*"
+        Condition = {
+          StringEquals = {
+            "aws:Referer" = var.aws_account_id
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Lambda function for email forwarding
+resource "aws_lambda_function" "email_forwarder" {
+  filename         = "email-forwarder.zip"
+  function_name    = "myphonefriend-email-forwarder"
+  role            = aws_iam_role.lambda_email_forwarding_role.arn
+  handler         = "index.handler"
+  runtime         = "nodejs18.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      FORWARD_TO_EMAIL = "jordanglapp@gmail.com"
+      FROM_DOMAIN      = "myphonefriend.com"
+    }
+  }
+
+  depends_on = [data.archive_file.email_forwarder_zip]
+}
+
+# Create Lambda deployment package
+data "archive_file" "email_forwarder_zip" {
+  type        = "zip"
+  output_path = "email-forwarder.zip"
+  source {
+    content = <<EOF
+const AWS = require('aws-sdk');
+const ses = new AWS.SES();
+
+exports.handler = async (event) => {
+    console.log('SES Event:', JSON.stringify(event, null, 2));
+    
+    for (const record of event.Records) {
+        if (record.eventSource === 'aws:ses') {
+            const message = record.ses.mail;
+            const originalTo = message.destination[0];
+            const forwardTo = process.env.FORWARD_TO_EMAIL;
+            
+            // Create forwarded email
+            const params = {
+                Source: `noreply@$${process.env.FROM_DOMAIN}`,
+                Destination: {
+                    ToAddresses: [forwardTo]
+                },
+                Message: {
+                    Subject: {
+                        Data: `[FORWARDED from $${originalTo}] $${message.commonHeaders.subject || 'No Subject'}`
+                    },
+                    Body: {
+                        Text: {
+                            Data: `This email was forwarded from $${originalTo}\n\nOriginal sender: $${message.commonHeaders.from}\nDate: $${message.commonHeaders.date}\n\n---\n\nPlease check your S3 bucket for the full email content or set up proper email forwarding.`
+                        }
+                    }
+                }
+            };
+            
+            try {
+                await ses.sendEmail(params).promise();
+                console.log(`Email forwarded from $${originalTo} to $${forwardTo}`);
+            } catch (error) {
+                console.error('Error forwarding email:', error);
+                throw error;
+            }
+        }
+    }
+    
+    return { statusCode: 200, body: 'Emails processed successfully' };
+};
+EOF
+    filename = "index.js"
+  }
+}
+
+# IAM role for Lambda
+resource "aws_iam_role" "lambda_email_forwarding_role" {
+  name = "lambda-email-forwarding-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_email_forwarding_basic" {
+  role       = aws_iam_role.lambda_email_forwarding_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_email_forwarding_ses" {
+  name = "lambda-email-forwarding-ses"
+  role = aws_iam_role.lambda_email_forwarding_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "${aws_s3_bucket.ses_email_storage.arn}/*"
+      }
+    ]
+  })
+}
+
+# Lambda permission for SES to invoke the function
+resource "aws_lambda_permission" "allow_ses" {
+  statement_id  = "AllowExecutionFromSES"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.email_forwarder.function_name
+  principal     = "ses.amazonaws.com"
+}
+
+# SES receipt rules for each email address
+resource "aws_ses_receipt_rule" "privacy_email" {
+  name          = "privacy-email-forwarding"
+  rule_set_name = aws_ses_receipt_rule_set.email_forwarding.rule_set_name
+  recipients    = ["privacy@myphonefriend.com"]
+  enabled       = true
+
+  s3_action {
+    bucket_name = aws_s3_bucket.ses_email_storage.bucket
+    object_key_prefix = "privacy/"
+    position = 1
+  }
+
+  lambda_action {
+    function_arn = aws_lambda_function.email_forwarder.arn
+    position     = 2
+  }
+
+  depends_on = [aws_lambda_permission.allow_ses]
+}
+
+resource "aws_ses_receipt_rule" "support_email" {
+  name          = "support-email-forwarding"
+  rule_set_name = aws_ses_receipt_rule_set.email_forwarding.rule_set_name
+  recipients    = ["support@myphonefriend.com"]
+  enabled       = true
+
+  s3_action {
+    bucket_name = aws_s3_bucket.ses_email_storage.bucket
+    object_key_prefix = "support/"
+    position = 1
+  }
+
+  lambda_action {
+    function_arn = aws_lambda_function.email_forwarder.arn
+    position     = 2
+  }
+
+  depends_on = [aws_lambda_permission.allow_ses]
+}
+
+resource "aws_ses_receipt_rule" "legal_email" {
+  name          = "legal-email-forwarding"
+  rule_set_name = aws_ses_receipt_rule_set.email_forwarding.rule_set_name
+  recipients    = ["legal@myphonefriend.com"]
+  enabled       = true
+
+  s3_action {
+    bucket_name = aws_s3_bucket.ses_email_storage.bucket
+    object_key_prefix = "legal/"
+    position = 1
+  }
+
+  lambda_action {
+    function_arn = aws_lambda_function.email_forwarder.arn
+    position     = 2
+  }
+
+  depends_on = [aws_lambda_permission.allow_ses]
+}
+
+# MX record to direct emails to SES
+resource "aws_route53_record" "ses_mx_record" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "myphonefriend.com"
+  type    = "MX"
+  ttl     = 600
+  records = ["10 inbound-smtp.${var.aws_region}.amazonaws.com"]
+}
+
+################################################################################
 # OUTPUTS - UPDATED FOR VERIFICATION
 ################################################################################
+
+# Email forwarding outputs
+output "email_forwarding_rule_set" {
+  description = "SES rule set name for email forwarding"
+  value       = aws_ses_receipt_rule_set.email_forwarding.rule_set_name
+}
+
+output "email_storage_bucket" {
+  description = "S3 bucket for storing received emails"
+  value       = aws_s3_bucket.ses_email_storage.bucket
+}
+
+output "lambda_forwarder_function" {
+  description = "Lambda function name for email forwarding"
+  value       = aws_lambda_function.email_forwarder.function_name
+}
+
+output "forwarded_email_addresses" {
+  description = "Email addresses that will be forwarded to jordanglapp@gmail.com"
+  value = [
+    "privacy@myphonefriend.com",
+    "support@myphonefriend.com", 
+    "legal@myphonefriend.com"
+  ]
+}
 
 output "asterisk_public_ip" {
   description = "Public IP for Twilio/external SIP traffic"

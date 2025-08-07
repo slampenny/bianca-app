@@ -208,3 +208,16 @@ debug_audio_calls/
 # Build artifacts
 build/
 dist/
+
+# Terraform files (can be large) - exclude entire devops directory
+devops/
+
+# If you need some devops files, be more specific:
+# devops/terraform/.terraform/
+# devops/terraform/*.tfstate*
+# devops/terraform/*.backup
+# devops/terraform/*.lock.hcl
+
+# Scripts and configs not needed in container
+scripts/
+*.sh

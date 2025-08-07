@@ -45,7 +45,7 @@ COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js node
 # Copy source code
 COPY --chown=node:node src/ ./src/
 COPY --chown=node:node tests/ ./tests/
-COPY --chown=node:node devops/ ./devops/
+# Note: devops/ directory not needed in container - used only for infrastructure deployment
 
 # Production stage - minimal final image
 FROM base AS production

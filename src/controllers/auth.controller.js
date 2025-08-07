@@ -94,65 +94,95 @@ const verifyEmail = catchAsync(async (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Email Verified - My Phone Friend</title>
       <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
         body {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+          background-color: #f8f9fa;
+          color: #1a1a1a;
           display: flex;
           justify-content: center;
           align-items: center;
           min-height: 100vh;
-          margin: 0;
-          text-align: center;
+          padding: 16px;
         }
         .container {
           background: white;
-          color: #333;
-          padding: 2rem;
+          padding: 32px;
           border-radius: 12px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-          max-width: 400px;
-          width: 90%;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          max-width: 320px;
+          width: 100%;
+          text-align: center;
+          border: 1px solid #e5e5e5;
         }
         .checkmark {
-          color: #27ae60;
-          font-size: 3rem;
-          margin-bottom: 1rem;
+          color: #10B981;
+          font-size: 60px;
+          margin-bottom: 16px;
+          display: block;
         }
-        h1 {
-          color: #2c3e50;
-          margin-bottom: 1rem;
-          font-size: 1.5rem;
+        .title {
+          color: #1a1a1a;
+          font-size: 24px;
+          font-weight: bold;
+          margin-bottom: 16px;
+          line-height: 1.2;
         }
-        p {
-          margin-bottom: 1.5rem;
-          line-height: 1.6;
+        .message {
+          color: #6b7280;
+          font-size: 16px;
+          margin-bottom: 24px;
+          line-height: 1.5;
         }
-        .loading {
-          margin: 1rem 0;
-          color: #7f8c8d;
+        .status {
+          color: #6b7280;
+          font-size: 14px;
+          font-style: italic;
+          margin-bottom: 16px;
         }
         .fallback-link {
           display: inline-block;
-          background: #3498db;
+          background: #10B981;
           color: white;
           padding: 12px 24px;
           text-decoration: none;
-          border-radius: 6px;
-          margin-top: 1rem;
-          transition: background 0.3s;
+          border-radius: 8px;
+          font-weight: 500;
+          font-size: 16px;
+          transition: background 0.2s;
+          display: none;
         }
         .fallback-link:hover {
-          background: #2980b9;
+          background: #059669;
+        }
+        .spinner {
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 2px solid #e5e5e5;
+          border-radius: 50%;
+          border-top-color: #10B981;
+          animation: spin 1s ease-in-out infinite;
+          margin-right: 8px;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="checkmark">✓</div>
-        <h1>Email Verified Successfully!</h1>
-        <p>Your My Phone Friend account is now verified.</p>
-        <div class="loading" id="status">Opening app...</div>
+        <h1 class="title">Email Verified!</h1>
+        <p class="message">Your My Phone Friend account has been successfully verified.</p>
+        <div class="status" id="status">
+          <span class="spinner"></span>
+          Redirecting you to the app...
+        </div>
         <a href="${config.frontendUrl}" class="fallback-link" id="fallback">Continue to App</a>
       </div>
       
@@ -165,16 +195,16 @@ const verifyEmail = catchAsync(async (req, res) => {
           // Try to open mobile app
           window.location.href = deepLink;
           
-          // If mobile app doesn't open in 2 seconds, redirect to web
+          // If mobile app doesn't open in 3 seconds, show fallback
           setTimeout(() => {
-            document.getElementById('status').textContent = 'App not installed? Click below to continue in browser.';
+            document.getElementById('status').innerHTML = 'App not installed? Click below to continue in browser.';
             document.getElementById('fallback').style.display = 'inline-block';
             
             // Auto-redirect to web after 5 seconds if user doesn't click
             setTimeout(() => {
               window.location.href = webFallback;
             }, 5000);
-          }, 2000);
+          }, 3000);
         }
         
         // Start the process
