@@ -253,6 +253,9 @@ resource "aws_launch_template" "staging" {
     environment    = "staging"
   }))
 
+  # Force recreation when userdata changes
+  update_default_version = true
+
   tag_specifications {
     resource_type = "instance"
     tags = {
@@ -360,31 +363,19 @@ resource "aws_lb_target_group_attachment" "staging_frontend" {
   port             = 80
 }
 
-# ALB Listener for API traffic
-resource "aws_lb_listener" "staging_api" {
+# ALB Listener for HTTP to HTTPS redirect
+resource "aws_lb_listener" "staging_http_redirect" {
   load_balancer_arn = aws_lb.staging.arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.staging_frontend.arn
-  }
-}
+    type = "redirect"
 
-# ALB Listener for API traffic (port 3000)
-resource "aws_lb_listener_rule" "staging_api_rule" {
-  listener_arn = aws_lb_listener.staging_api.arn
-  priority     = 100
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.staging_api.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/api/*", "/health", "/admin/*"]
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
     }
   }
 }
@@ -455,6 +446,46 @@ resource "aws_route53_record" "staging_frontend" {
     evaluate_target_health = false
   }
 }
+
+# ACM Certificate for staging (uses the same wildcard cert as production)
+data "aws_acm_certificate" "staging_cert" {
+  domain      = "*.myphonefriend.com"
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
+
+# HTTPS Listener for staging
+resource "aws_lb_listener" "staging_https" {
+  load_balancer_arn = aws_lb.staging.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  certificate_arn   = data.aws_acm_certificate.staging_cert.arn
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.staging_frontend.arn
+  }
+}
+
+# HTTPS Listener Rule for API traffic
+resource "aws_lb_listener_rule" "staging_api_https_rule" {
+  listener_arn = aws_lb_listener.staging_https.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.staging_api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*", "/health", "/admin/*"]
+    }
+  }
+}
+
+
 
 # IAM Role for Lambda auto-stop function
 resource "aws_iam_role" "staging_lambda_role" {
@@ -595,7 +626,7 @@ output "staging_instance_ip" {
 }
 
 output "staging_api_url" {
-  value = "http://staging-api.myphonefriend.com"
+  value = "https://staging-api.myphonefriend.com"
   description = "Staging API URL"
 }
 
@@ -605,7 +636,7 @@ output "staging_sip_url" {
 }
 
 output "staging_ssh_command" {
-  value = "ssh -i ~/.SSH/${var.asterisk_key_pair_name}.pem ec2-user@${aws_instance.staging.public_ip}"
+  value = "ssh -i ~/.ssh/${var.asterisk_key_pair_name}.pem ec2-user@${aws_instance.staging.public_ip}"
   description = "SSH command to connect to staging"
 }
 
@@ -615,7 +646,7 @@ output "staging_monthly_cost" {
 }
 
 output "staging_frontend_url" {
-  value = "http://staging.myphonefriend.com"
+  value = "https://staging.myphonefriend.com"
   description = "Staging frontend URL"
 }
 

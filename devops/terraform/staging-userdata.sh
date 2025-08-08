@@ -14,7 +14,7 @@ curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-comp
 chmod +x /usr/local/bin/docker-compose
 
 # Install utilities
-yum install -y aws-cli jq git nginx
+yum install -y aws-cli jq git
 
 # Get instance metadata
 INSTANCE_ID=$(ec2-metadata --instance-id | cut -d " " -f 2)
@@ -25,8 +25,58 @@ PUBLIC_IP=$(ec2-metadata --public-ipv4 | cut -d " " -f 2 || echo $PRIVATE_IP)
 mkdir -p /opt/bianca-staging
 cd /opt/bianca-staging
 
-# Create frontend directory
+# Create frontend directory and nginx config
 mkdir -p /var/www/staging-frontend
+
+# Create nginx config for Docker
+cat > nginx.conf << 'NGINX'
+# Frontend server (staging.myphonefriend.com)
+server {
+    listen 80;
+    server_name staging.myphonefriend.com;
+    
+    # Trust X-Forwarded-* headers from ALB
+    real_ip_header X-Forwarded-For;
+    set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    
+    # Frontend routes - proxy to frontend container
+    location / {
+        proxy_pass http://frontend:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# API server (staging-api.myphonefriend.com)
+server {
+    listen 80;
+    server_name staging-api.myphonefriend.com;
+    
+    # Trust X-Forwarded-* headers from ALB
+    real_ip_header X-Forwarded-For;
+    set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    
+    # API routes - proxy ALL traffic to backend (no /api/ prefix needed!)
+    location / {
+        proxy_pass http://app:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+NGINX
 
 # Create docker-compose.yml
 cat > docker-compose.yml << 'COMPOSE'
@@ -100,6 +150,29 @@ services:
     depends_on:
       - mongodb
       - asterisk
+
+  # Frontend container (using the same image as production)
+  frontend:
+    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-frontend:latest
+    container_name: staging_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - app
+
+  # Nginx for reverse proxy (no longer serves static files)
+  nginx:
+    image: nginx:alpine
+    container_name: staging_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+      - frontend
 
 volumes:
   mongo_data:
@@ -197,174 +270,16 @@ CLOUDWATCH
     -a fetch-config -m ec2 -s \
     -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json || true
 
-# Setup nginx for frontend
-cat > /etc/nginx/conf.d/staging-frontend.conf << NGINX
-server {
-    listen 80;
-    server_name staging.myphonefriend.com staging-api.myphonefriend.com;
-    
-    # Frontend routes
-    location / {
-        root /var/www/staging-frontend;
-        try_files \$uri \$uri/ /index.html;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-    
-    # API routes - proxy to backend
-    location /api/ {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
-    }
-    
-    # Health check endpoint
-    location /health {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-    
-    # Admin routes
-    location /admin/ {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-NGINX
 
-# Create a simple placeholder frontend
-cat > /var/www/staging-frontend/index.html << FRONTEND
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bianca App - Staging</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            text-align: center;
-            max-width: 600px;
-        }
-        h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        .status {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            backdrop-filter: blur(10px);
-        }
-        .endpoint {
-            background: rgba(255,255,255,0.2);
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            font-family: monospace;
-        }
-        .health-check {
-            margin-top: 30px;
-        }
-        .health-status {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-weight: bold;
-            margin: 10px;
-        }
-        .healthy { background: #4CAF50; }
-        .unhealthy { background: #f44336; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Bianca App</h1>
-        <div class="status">
-            <h2>Staging Environment</h2>
-            <p>Full-stack development environment with API, frontend, and telephony services.</p>
-        </div>
-        
-        <div class="status">
-            <h3>📡 Endpoints</h3>
-            <div class="endpoint">
-                <strong>Frontend:</strong> <a href="/" style="color: white;">staging.myphonefriend.com</a>
-            </div>
-            <div class="endpoint">
-                <strong>API:</strong> <a href="/api/health" style="color: white;">staging-api.myphonefriend.com</a>
-            </div>
-            <div class="endpoint">
-                <strong>SIP:</strong> staging-sip.myphonefriend.com
-            </div>
-        </div>
-        
-        <div class="health-check">
-            <h3>🔍 Health Status</h3>
-            <div id="health-status" class="health-status unhealthy">Checking...</div>
-        </div>
-    </div>
 
-    <script>
-        // Health check
-        async function checkHealth() {
-            try {
-                const response = await fetch('/api/health');
-                const status = document.getElementById('health-status');
-                if (response.ok) {
-                    status.textContent = '✅ Healthy';
-                    status.className = 'health-status healthy';
-                } else {
-                    status.textContent = '❌ Unhealthy';
-                    status.className = 'health-status unhealthy';
-                }
-            } catch (error) {
-                const status = document.getElementById('health-status');
-                status.textContent = '❌ Unhealthy';
-                status.className = 'health-status unhealthy';
-            }
-        }
-        
-        // Check health on load and every 30 seconds
-        checkHealth();
-        setInterval(checkHealth, 30000);
-    </script>
-</body>
-</html>
-FRONTEND
 
-# Start nginx
-systemctl enable nginx
-systemctl start nginx
+
+
 
 echo "Bianca staging environment ready!"
 echo "Access points:"
-echo "  Frontend: http://staging.myphonefriend.com"
-echo "  API: http://staging-api.myphonefriend.com"
+echo "  Frontend: https://staging.myphonefriend.com"
+echo "  API: https://staging-api.myphonefriend.com"
 echo "  Direct API: http://$PUBLIC_IP:3000"
 echo "  Asterisk ARI: http://$PUBLIC_IP:8088 (user: asterisk, pass: staging123)"
 echo "  SIP: sip:$PUBLIC_IP"    

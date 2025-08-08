@@ -51,10 +51,15 @@ yarn terraform:command plan \
   -target=aws_launch_template.staging \
   -target=aws_instance.staging \
   -target=aws_lb.staging \
-  -target=aws_lb_target_group.staging \
-  -target=aws_lb_target_group_attachment.staging \
-  -target=aws_lb_listener.staging_http \
+  -target=aws_lb_target_group.staging_api \
+  -target=aws_lb_target_group.staging_frontend \
+  -target=aws_lb_target_group_attachment.staging_api \
+  -target=aws_lb_target_group_attachment.staging_frontend \
+  -target=aws_lb_listener.staging_http_redirect \
+  -target=aws_lb_listener.staging_https \
+  -target=aws_lb_listener_rule.staging_api_https_rule \
   -target=aws_route53_record.staging_api \
+  -target=aws_route53_record.staging_frontend \
   -target=aws_route53_record.staging_sip \
   -target=aws_iam_role.staging_lambda_role \
   -target=aws_iam_role_policy.staging_lambda_policy \
@@ -86,10 +91,15 @@ yarn terraform:command apply -auto-approve \
   -target=aws_launch_template.staging \
   -target=aws_instance.staging \
   -target=aws_lb.staging \
-  -target=aws_lb_target_group.staging \
-  -target=aws_lb_target_group_attachment.staging \
-  -target=aws_lb_listener.staging_http \
+  -target=aws_lb_target_group.staging_api \
+  -target=aws_lb_target_group.staging_frontend \
+  -target=aws_lb_target_group_attachment.staging_api \
+  -target=aws_lb_target_group_attachment.staging_frontend \
+  -target=aws_lb_listener.staging_http_redirect \
+  -target=aws_lb_listener.staging_https \
+  -target=aws_lb_listener_rule.staging_api_https_rule \
   -target=aws_route53_record.staging_api \
+  -target=aws_route53_record.staging_frontend \
   -target=aws_route53_record.staging_sip \
   -target=aws_iam_role.staging_lambda_role \
   -target=aws_iam_role_policy.staging_lambda_policy \
@@ -106,8 +116,9 @@ echo "Waiting 30 seconds for deployment to complete..."
 sleep 30
 
 echo "Testing staging API..."
-curl -f http://staging-api.myphonefriend.com/health && echo "✅ Staging environment is healthy!" || echo "❌ Staging environment health check failed"
+curl -f https://staging-api.myphonefriend.com/health && echo "✅ Staging environment is healthy!" || echo "❌ Staging environment health check failed"
 
 echo "🎉 Staging deployment complete!"
-echo "🌐 Staging API: http://staging-api.myphonefriend.com"
+echo "🌐 Staging API: https://staging-api.myphonefriend.com"
+echo "🌐 Staging Frontend: https://staging.myphonefriend.com"
 echo "🔗 SIP Endpoint: staging-sip.myphonefriend.com"
