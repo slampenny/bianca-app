@@ -125,6 +125,10 @@ const corsOptions = {
       'http://myphonefriend.com',
       'https://staging.myphonefriend.com',
       'http://staging.myphonefriend.com',
+      'https://staging-api.myphonefriend.com',
+      'http://staging-api.myphonefriend.com',
+      'https://api.myphonefriend.com',
+      'http://api.myphonefriend.com',
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:8080'

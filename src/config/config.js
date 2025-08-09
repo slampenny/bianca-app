@@ -233,7 +233,7 @@ if (envVars.NODE_ENV === 'staging') {
   baselineConfig.baseUrl = apiBaseUrl;
   baselineConfig.apiUrl = `${apiBaseUrl}/v1`;
   baselineConfig.frontendUrl = envVars.FRONTEND_URL || 'https://staging.myphonefriend.com';
-  baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb:27017/bianca-staging';
+  baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb:27017/bianca-service';
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = apiBaseUrl;
   baselineConfig.twilio.websocketUrl = envVars.WEBSOCKET_URL || `wss://${apiBaseUrl.replace('https://', '')}`;

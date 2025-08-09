@@ -14,7 +14,7 @@ services:
       - FRONTEND_URL=https://staging.myphonefriend.com
       - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
       # MongoDB for staging (using containerized version)
-      - MONGODB_URL=mongodb://mongodb:27017/bianca-staging
+      - MONGODB_URL=mongodb://mongodb:27017/bianca-service
     volumes:
       - .:/usr/src/bianca-app
       - /usr/src/bianca-app/node_modules  # Exclude node_modules from volume mount

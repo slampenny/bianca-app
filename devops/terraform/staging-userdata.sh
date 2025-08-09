@@ -119,7 +119,7 @@ services:
       - "3000:3000"
     environment:
       - AWS_REGION=${region}
-      - MONGODB_URL=mongodb://mongodb:27017/bianca-staging
+      - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - NODE_ENV=staging
       - API_BASE_URL=https://staging-api.myphonefriend.com
       - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
