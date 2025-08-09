@@ -53,7 +53,11 @@ fi
 
 cd ../bianca-app-backend
 
-# Step 2: Plan staging resources
+# Step 2: Taint the staging instance to force userdata script execution
+echo "🔄 Tainting staging instance to ensure userdata script runs..."
+yarn terraform:command taint aws_instance.staging
+
+# Step 3: Plan staging resources
 echo "📋 Planning staging resources..."
 yarn terraform:command plan \
   -target=aws_vpc.staging \
@@ -93,7 +97,7 @@ yarn terraform:command plan \
 echo "💡 Review the plan above. Press Enter to continue with apply, or Ctrl+C to cancel..."
 read
 
-# Step 3: Apply staging resources
+# Step 4: Apply staging resources
 echo "🚀 Applying staging resources..."
 yarn terraform:command apply -auto-approve \
   -target=aws_vpc.staging \

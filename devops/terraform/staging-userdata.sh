@@ -118,34 +118,24 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=staging
+      - AWS_REGION=${region}
       - MONGODB_URL=mongodb://mongodb:27017/bianca-staging
+      - NODE_ENV=staging
       - API_BASE_URL=https://staging-api.myphonefriend.com
+      - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
       - FRONTEND_URL=https://staging.myphonefriend.com
       - ASTERISK_URL=http://asterisk:8088
-      - ASTERISK_HOST=asterisk
-      - ASTERISK_PRIVATE_IP=PRIVATE_IP_PLACEHOLDER
+      - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=PUBLIC_IP_PLACEHOLDER
-      - DEPLOYMENT_TYPE=docker-compose
-      - AWS_REGION=${region}
-      # Staging-specific settings
-      - LOG_LEVEL=debug
-      - ENABLE_MONITORING=false
-      - USE_MOCK_TWILIO=false
-      - EMAIL_CRITICAL=false
-      - FAIL_ON_EMAIL_ERROR=false
-      # Required Twilio configuration (non-secret values)
-      - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
-      - TWILIO_PHONENUMBER=+19786256514
-      - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
-      # Email configuration
       - AWS_SES_REGION=${region}
       - EMAIL_FROM=staging@myphonefriend.com
+      - TWILIO_PHONENUMBER=+19786256514
+      - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
+      - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
       - RTP_LISTENER_HOST=0.0.0.0
       - USE_PRIVATE_NETWORK_FOR_RTP=true
       - NETWORK_MODE=HYBRID
       # Secrets will be fetched by the app from AWS Secrets Manager at runtime
-      # No need to pass them as environment variables
     depends_on:
       - mongodb
       - asterisk
@@ -191,18 +181,8 @@ cd /opt/bianca-staging
 aws ecr get-login-password --region ${region} | \
   docker login --username AWS --password-stdin 730335291008.dkr.ecr.${region}.amazonaws.com
 
-# Get secrets from AWS Secrets Manager
-echo "Fetching secrets from AWS Secrets Manager..."
-JWT_SECRET=$(aws secretsmanager get-secret-value --region ${region} --secret-id "MySecretsManagerSecret" --query SecretString --output text | jq -r .JWT_SECRET)
-TWILIO_AUTHTOKEN=$(aws secretsmanager get-secret-value --region ${region} --secret-id "MySecretsManagerSecret" --query SecretString --output text | jq -r .TWILIO_AUTHTOKEN)
-ARI_PASSWORD=$(aws secretsmanager get-secret-value --region ${region} --secret-id "MySecretsManagerSecret" --query SecretString --output text | jq -r .ARI_PASSWORD)
-OPENAI_API_KEY=$(aws secretsmanager get-secret-value --region ${region} --secret-id "MySecretsManagerSecret" --query SecretString --output text | jq -r .OPENAI_API_KEY)
-
-# Export secrets as environment variables for docker-compose
-export JWT_SECRET
-export TWILIO_AUTHTOKEN  
-export ARI_PASSWORD
-export OPENAI_API_KEY
+# Note: Secrets are loaded at runtime by the application from AWS Secrets Manager
+# No need to fetch them here as environment variables
 
 # Pull latest app image
 docker-compose pull app || true

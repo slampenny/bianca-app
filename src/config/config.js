@@ -15,10 +15,18 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 // Define the environment variable schema, including new variables
 const envVarsSchema = Joi.object({
   NODE_ENV: Joi.string().valid('production', 'development', 'test', 'staging').required(),
-  JWT_SECRET: Joi.string(),
+  JWT_SECRET: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().required() // Required in dev/test environments
+  }),
   MONGODB_URL: Joi.string(),
 
-  ARI_PASSWORD: Joi.string(),
+  ARI_PASSWORD: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().optional() // Optional in dev/test environments
+  }),
   BIANCA_PASSWORD: Joi.string(),
   ASTERISK_URL: Joi.string(),
   EXTERNAL_ADDRESS: Joi.string(),
@@ -47,14 +55,22 @@ const envVarsSchema = Joi.object({
 
   TWILIO_PHONENUMBER: Joi.string(),
   TWILIO_ACCOUNTSID: Joi.string().required(),
-  TWILIO_AUTHTOKEN: Joi.string().required(),
+  TWILIO_AUTHTOKEN: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().required() // Required in dev/test environments
+  }),
   TWILIO_VOICEURL: Joi.string(), // Keep if used elsewhere
   PUBLIC_TUNNEL_URL: Joi.string(), // Used for twilio.apiUrl in dev/testing
   API_BASE_URL: Joi.string(), // Alternative base URL for APIs/webhooks
   AWS_SECRET_ID: Joi.string(), // Added for consistency
   AWS_REGION: Joi.string(), // Added for consistency
   PORT: Joi.number().default(3000), // Added for consistency
-  OPENAI_API_KEY: Joi.string(),
+  OPENAI_API_KEY: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().optional() // Optional in dev/test environments
+  }),
   STRIPE_SECRET_KEY: Joi.string(),
   STRIPE_PUBLISHABLE_KEY: Joi.string(),
   // **NEW:** Realtime API specific variables
