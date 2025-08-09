@@ -144,18 +144,15 @@ services:
       - RTP_LISTENER_HOST=0.0.0.0
       - USE_PRIVATE_NETWORK_FOR_RTP=true
       - NETWORK_MODE=HYBRID
-      # Secrets (pulled from AWS Secrets Manager)
-      - JWT_SECRET=$${JWT_SECRET}
-      - TWILIO_AUTHTOKEN=$${TWILIO_AUTHTOKEN}
-      - ARI_PASSWORD=$${ARI_PASSWORD}
-      - OPENAI_API_KEY=$${OPENAI_API_KEY}
+      # Secrets will be fetched by the app from AWS Secrets Manager at runtime
+      # No need to pass them as environment variables
     depends_on:
       - mongodb
       - asterisk
 
-  # Frontend container (using the same image as production)
+  # Frontend container (using staging tag for consistency)
   frontend:
-    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-frontend:latest
+    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-frontend:staging
     container_name: staging_frontend
     restart: unless-stopped
     ports:

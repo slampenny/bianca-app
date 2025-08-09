@@ -225,13 +225,14 @@ if (envVars.NODE_ENV === 'staging') {
 
 // Add method to load secrets from AWS Secrets Manager (if used)
 baselineConfig.loadSecrets = async () => {
-  // Skip in non-production environments or if AWS SDK isn't configured/needed
-  if (baselineConfig.env !== 'production') {
-    logger.info('Skipping AWS Secrets Manager in non-production environment.');
+  // Skip in development and test, but load for staging and production
+  if (baselineConfig.env === 'development' || baselineConfig.env === 'test') {
+    logger.info('Skipping AWS Secrets Manager in development/test environment.');
     return baselineConfig;
   }
 
-  const secretId = process.env.AWS_SECRET_ID || 'MySecretsManagerSecret'; // Use env var for secret name
+  // Use the same production secrets for staging (real API keys, etc.)
+  const secretId = process.env.AWS_SECRET_ID || 'MySecretsManagerSecret';
   const region = process.env.AWS_REGION || 'us-east-2'; // Use env var for region
 
   try {

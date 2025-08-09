@@ -3,8 +3,8 @@
 
 echo "🚀 Deploying Bianca Staging Environment..."
 
-# Step 1: Build and push Docker image first
-echo "🐳 Building and pushing Docker image..."
+# Step 1: Build and push Docker images (backend and frontend)
+echo "🐳 Building and pushing backend Docker image..."
 docker build -t bianca-app-backend:staging .
 
 if [ $? -ne 0 ]; then
@@ -24,13 +24,34 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "📦 Pushing image to ECR..."
+echo "📦 Pushing backend image to ECR..."
 docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
 
 if [ $? -ne 0 ]; then
-    echo "❌ Docker push failed. Please check the error above."
+    echo "❌ Backend docker push failed. Please check the error above."
     exit 1
 fi
+
+echo "🐳 Building and pushing frontend Docker image..."
+cd ../bianca-app-frontend
+docker build -t bianca-app-frontend:staging -f devops/Dockerfile .
+
+if [ $? -ne 0 ]; then
+    echo "❌ Frontend docker build failed. Please check the error above."
+    exit 1
+fi
+
+docker tag bianca-app-frontend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
+
+echo "📦 Pushing frontend image to ECR..."
+docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
+
+if [ $? -ne 0 ]; then
+    echo "❌ Frontend docker push failed. Please check the error above."
+    exit 1
+fi
+
+cd ../bianca-app-backend
 
 # Step 2: Plan staging resources
 echo "📋 Planning staging resources..."
