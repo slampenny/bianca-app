@@ -112,17 +112,37 @@ app.use(compression());
 
 // Enable CORS
 const corsOptions = {
-  origin: [
-    'https://app.myphonefriend.com',
-    'http://app.myphonefriend.com',
-    'https://www.myphonefriend.com',
-    'http://www.myphonefriend.com',
-    'https://myphonefriend.com',
-    'http://myphonefriend.com',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:8080'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'https://app.myphonefriend.com',
+      'http://app.myphonefriend.com',
+      'https://www.myphonefriend.com',
+      'http://www.myphonefriend.com',
+      'https://myphonefriend.com',
+      'http://myphonefriend.com',
+      'https://staging.myphonefriend.com',
+      'http://staging.myphonefriend.com',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8080'
+    ];
+    
+    // Check if it's an allowed origin
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel preview deployments (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Block all other origins
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']

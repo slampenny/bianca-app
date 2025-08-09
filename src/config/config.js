@@ -14,7 +14,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 // Define the environment variable schema, including new variables
 const envVarsSchema = Joi.object({
-  NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
+  NODE_ENV: Joi.string().valid('production', 'development', 'test', 'staging').required(),
   JWT_SECRET: Joi.string(),
   MONGODB_URL: Joi.string(),
 
@@ -207,6 +207,20 @@ if (envVars.NODE_ENV === 'production') {
   baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
   baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || `bianca-app.myphonefriend.internal`;
   baselineConfig.asterisk.rtpAsteriskHost = envVars.RTP_ASTERISK_HOST || `asterisk.myphonefriend.internal`;
+}
+
+// Set staging-specific overrides
+if (envVars.NODE_ENV === 'staging') {
+  // Use environment variables from docker-compose
+  const apiBaseUrl = envVars.API_BASE_URL || 'https://staging-api.myphonefriend.com';
+  
+  baselineConfig.baseUrl = apiBaseUrl;
+  baselineConfig.apiUrl = `${apiBaseUrl}/v1`;
+  baselineConfig.frontendUrl = envVars.FRONTEND_URL || 'https://staging.myphonefriend.com';
+  baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb:27017/bianca-staging';
+  baselineConfig.email.smtp.secure = true;
+  baselineConfig.twilio.apiUrl = apiBaseUrl;
+  baselineConfig.twilio.websocketUrl = envVars.WEBSOCKET_URL || `wss://${apiBaseUrl.replace('https://', '')}`;
 }
 
 // Add method to load secrets from AWS Secrets Manager (if used)

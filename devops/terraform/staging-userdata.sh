@@ -112,7 +112,7 @@ services:
 
   # Your application
   app:
-    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-backend:latest
+    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-backend:staging
     container_name: staging_app
     restart: unless-stopped
     ports:
@@ -120,6 +120,8 @@ services:
     environment:
       - NODE_ENV=staging
       - MONGODB_URL=mongodb://mongodb:27017/bianca-staging
+      - API_BASE_URL=https://staging-api.myphonefriend.com
+      - FRONTEND_URL=https://staging.myphonefriend.com
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_HOST=asterisk
       - ASTERISK_PRIVATE_IP=PRIVATE_IP_PLACEHOLDER
