@@ -13,6 +13,17 @@ usermod -a -G docker ec2-user
 curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 
+# Create a symlink in /usr/bin for systemd services
+ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+# Add /usr/local/bin to PATH for all users (safely)
+echo 'export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"' >> /etc/profile
+echo 'export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"' >> /home/ec2-user/.bashrc
+source /etc/profile
+
+# Also add to current session
+export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
+
 # Install utilities
 yum install -y aws-cli jq git
 
@@ -85,19 +96,20 @@ version: '3.8'
 services:
   # Asterisk for call handling
   asterisk:
-    image: 730335291008.dkr.ecr.${region}.amazonaws.com/bianca-app-asterisk:latest
+    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-asterisk:latest
     container_name: staging_asterisk
     restart: unless-stopped
     network_mode: host
     environment:
       - EXTERNAL_ADDRESS=PUBLIC_IP_PLACEHOLDER
       - PRIVATE_ADDRESS=PRIVATE_IP_PLACEHOLDER
-      - ARI_PASSWORD=staging123
-      - BIANCA_PASSWORD=staging123
+      - ARI_PASSWORD=$${ARI_PASSWORD:-staging123}
+      - BIANCA_PASSWORD=$${BIANCA_PASSWORD:-staging123}
       - RTP_START_PORT=10000
       - RTP_END_PORT=10500
     volumes:
       - asterisk_logs:/var/log/asterisk
+    # Removed healthcheck to simplify startup
 
   # MongoDB (lightweight config for staging)
   mongodb:
@@ -127,6 +139,7 @@ services:
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=PUBLIC_IP_PLACEHOLDER
+      - BIANCA_PUBLIC_IP=staging_app
       - AWS_SES_REGION=${region}
       - EMAIL_FROM=staging@myphonefriend.com
       - TWILIO_PHONENUMBER=+19786256514
@@ -137,8 +150,8 @@ services:
       - NETWORK_MODE=HYBRID
       # Secrets will be fetched by the app from AWS Secrets Manager at runtime
     depends_on:
-      - mongodb
-      - asterisk
+      mongodb:
+        condition: service_started
 
   # Frontend container (using staging tag for consistency)
   frontend:
@@ -171,21 +184,26 @@ COMPOSE
 # Replace placeholders with actual values
 sed -i "s/PRIVATE_IP_PLACEHOLDER/$PRIVATE_IP/g" docker-compose.yml
 sed -i "s/PUBLIC_IP_PLACEHOLDER/$PUBLIC_IP/g" docker-compose.yml
+sed -i "s/\$\${ARI_PASSWORD:-staging123}/staging123/g" docker-compose.yml
+sed -i "s/\$\${BIANCA_PASSWORD:-staging123}/staging123/g" docker-compose.yml
 
 # Create startup script
 cat > /usr/local/bin/start-staging.sh << 'STARTUP'
 #!/bin/bash
 cd /opt/bianca-staging
 
+# Set PATH explicitly for this script
+export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
+
 # Login to ECR
 aws ecr get-login-password --region ${region} | \
-  docker login --username AWS --password-stdin 730335291008.dkr.ecr.${region}.amazonaws.com
+  docker login --username AWS --password-stdin ${aws_account_id}.dkr.ecr.${region}.amazonaws.com
 
 # Note: Secrets are loaded at runtime by the application from AWS Secrets Manager
 # No need to fetch them here as environment variables
 
-# Pull latest app image
-docker-compose pull app || true
+# Pull latest images
+docker-compose pull app asterisk || true
 
 # Start all services
 docker-compose up -d
@@ -208,11 +226,13 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
 ExecStart=/usr/local/bin/start-staging.sh
-ExecStop=/usr/local/bin/docker-compose -f /opt/bianca-staging/docker-compose.yml down
+ExecStop=/usr/bin/docker-compose -f /opt/bianca-staging/docker-compose.yml down
 WorkingDirectory=/opt/bianca-staging
+Restart=on-failure
+RestartSec=10
+Environment=PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
 
 [Install]
 WantedBy=multi-user.target

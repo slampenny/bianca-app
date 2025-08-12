@@ -125,9 +125,18 @@ class TwilioCallService {
 
       // For human answer, connect to Asterisk SIP endpoint
       
-      const asteriskUrl = new URL('http://sip.myphonefriend.com:5061');
-      const sipHost = asteriskUrl.hostname;
-      const sipPort = config.asterisk.externalPort || 5061;
+      // Determine SIP endpoint based on environment
+      let sipHost, sipPort;
+      if (config.env === 'staging') {
+        // Staging: Use Twilio SIP domain
+        sipHost = 'staging-bianca.sip.twilio.com';
+        sipPort = 5061;
+      } else {
+        // Production: Use direct Asterisk SIP
+        sipHost = 'sip.myphonefriend.com';
+        sipPort = config.asterisk.externalPort || 5061;
+      }
+      
       const sipUser = config.asterisk.sipUserName; // Or make dynamic if needed
       const sipUri = `sip:${sipUser}@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};patientId=${encodeURIComponent(patientId)}`;
 
