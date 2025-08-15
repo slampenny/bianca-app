@@ -128,8 +128,9 @@ router.get('/test-sip', (req, res) => {
     sipHost = 'staging-sip.myphonefriend.com';
     sipPort = '5061';
   } else {
-    sipHost = new URL(config.asterisk.url).hostname || 'sip.myphonefriend.com';
-    sipPort = new URL(config.asterisk.url).port || '5060';
+    // Production: Use direct Asterisk SIP
+    sipHost = 'sip.myphonefriend.com';
+    sipPort = '5061';
   }
 
   twiml.say('Testing SIP connection to Asterisk from Twilio.');
