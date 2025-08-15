@@ -308,8 +308,8 @@ baselineConfig.loadSecrets = async () => {
     if (secrets.SMTP_FROM) baselineConfig.email.from = secrets.SMTP_FROM;
     if (typeof secrets.SMTP_SECURE !== 'undefined') baselineConfig.email.smtp.secure = secrets.SMTP_SECURE;
     if (typeof secrets.SMTP_REQUIRETLS !== 'undefined') baselineConfig.email.smtp.requireTLS = secrets.SMTP_REQUIRETLS;
-    // Twilio
-    if (secrets.TWILIO_PHONENUMBER) baselineConfig.twilio.phone = secrets.TWILIO_PHONENUMBER;
+    // Twilio - Phone number comes from environment variables, not secrets
+    // if (secrets.TWILIO_PHONENUMBER) baselineConfig.twilio.phone = secrets.TWILIO_PHONENUMBER;
     if (secrets.TWILIO_ACCOUNTSID) baselineConfig.twilio.accountSid = secrets.TWILIO_ACCOUNTSID;
     if (secrets.TWILIO_AUTHTOKEN) baselineConfig.twilio.authToken = secrets.TWILIO_AUTHTOKEN;
     if (secrets.TWILIO_VOICEURL) baselineConfig.twilio.voiceUrl = secrets.TWILIO_VOICEURL; // If still used

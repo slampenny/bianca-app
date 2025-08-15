@@ -122,8 +122,15 @@ router.get('/test-sip', (req, res) => {
   const testPatientId = req.query.testPatientId || 'direct-sip-test';
   const testTwilioSid = req.query.testTwilioSid || `TEST_SIP_${Date.now()}`;
 
-  const sipHost = new URL(config.asterisk.url).hostname || 'sip.myphonefriend.com';
-  const sipPort = new URL(config.asterisk.url).port || '5060';
+  // Use environment-appropriate SIP endpoint
+  let sipHost, sipPort;
+  if (config.env === 'staging') {
+    sipHost = 'staging-sip.myphonefriend.com';
+    sipPort = '5061';
+  } else {
+    sipHost = new URL(config.asterisk.url).hostname || 'sip.myphonefriend.com';
+    sipPort = new URL(config.asterisk.url).port || '5060';
+  }
 
   twiml.say('Testing SIP connection to Asterisk from Twilio.');
   twiml.dial({

@@ -1,58 +1,170 @@
 #!/bin/bash
-# staging-userdata.sh - Setup script for staging environment
+# Simple, working staging setup script
 
 set -e
+exec > >(tee /var/log/user-data.log) 2>&1
 
-# Update and install Docker
+# Terraform variables
+AWS_ACCOUNT_ID="${aws_account_id}"
+AWS_REGION="${region}"
+
+echo "Starting staging setup..."
+
+# Update and install packages
 yum update -y
-amazon-linux-extras install docker -y
-service docker start
+yum install -y docker git jq
+
+# Start Docker
+systemctl start docker
+systemctl enable docker
+
+# Add ec2-user to docker group
 usermod -a -G docker ec2-user
 
 # Install docker-compose
 curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
+ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-# Create a symlink in /usr/bin for systemd services
-ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
-
-# Add /usr/local/bin to PATH for all users (safely)
-echo 'export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"' >> /etc/profile
-echo 'export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"' >> /home/ec2-user/.bashrc
-source /etc/profile
-
-# Also add to current session
-export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
-
-# Install utilities
-yum install -y aws-cli jq git
+# Install AWS CLI v2 if not present
+if ! command -v aws &> /dev/null; then
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip -q awscliv2.zip
+    ./aws/install
+    rm -rf aws awscliv2.zip
+fi
 
 # Get instance metadata
-INSTANCE_ID=$(ec2-metadata --instance-id | cut -d " " -f 2)
-PRIVATE_IP=$(ec2-metadata --local-ipv4 | cut -d " " -f 2)
-PUBLIC_IP=$(ec2-metadata --public-ipv4 | cut -d " " -f 2 || echo $PRIVATE_IP)
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
+echo "Instance: $${INSTANCE_ID}"
+echo "Private IP: $${PRIVATE_IP}"
+echo "Public IP: $${PUBLIC_IP}"
 
 # Create app directory
 mkdir -p /opt/bianca-staging
 cd /opt/bianca-staging
 
-# Create frontend directory and nginx config
-mkdir -p /var/www/staging-frontend
+# Get secrets
+echo "Fetching secrets..."
+SECRET_JSON=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id MySecretsManagerSecret --query SecretString --output text)
+ARI_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.ARI_PASSWORD')
+BIANCA_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.BIANCA_PASSWORD')
+TWILIO_AUTHTOKEN=$(echo $${SECRET_JSON} | jq -r '.TWILIO_AUTHTOKEN')
 
-# Create nginx config for Docker
-cat > nginx.conf << 'NGINX'
-# Frontend server (staging.myphonefriend.com)
+# Create docker-compose.yml
+cat > docker-compose.yml <<EOF
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:4.4
+    container_name: staging_mongodb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    command: mongod --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - bianca-network
+
+  asterisk:
+    image: $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com/bianca-app-asterisk:latest
+    container_name: staging_asterisk
+    restart: unless-stopped
+    ports:
+      - "5060:5060/udp"
+      - "5061:5061/tcp"
+      - "10000-10100:10000-10100/udp"
+      - "8088:8088"
+    environment:
+      - EXTERNAL_ADDRESS=$${PUBLIC_IP}
+      - PRIVATE_ADDRESS=$${PRIVATE_IP}
+      - ARI_PASSWORD=$${ARI_PASSWORD}
+      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
+      - RTP_START_PORT=10000
+      - RTP_END_PORT=10100
+    volumes:
+      - asterisk_logs:/var/log/asterisk
+    networks:
+      - bianca-network
+
+  app:
+    image: $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com/bianca-app-backend:staging
+    container_name: staging_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - AWS_REGION=$${AWS_REGION}
+      - MONGODB_URL=mongodb://mongodb:27017/bianca-service
+      - NODE_ENV=staging
+      - API_BASE_URL=https://staging-api.myphonefriend.com
+      - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
+      - FRONTEND_URL=https://staging.myphonefriend.com
+      - ASTERISK_URL=http://asterisk:8088
+      - ASTERISK_PRIVATE_IP=asterisk
+      - ASTERISK_PUBLIC_IP=$${PUBLIC_IP}
+      - AWS_SES_REGION=$${AWS_REGION}
+      - EMAIL_FROM=staging@myphonefriend.com
+      - TWILIO_PHONENUMBER=+19285758645
+      - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
+      - TWILIO_AUTHTOKEN=$${TWILIO_AUTHTOKEN}
+      - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
+      - RTP_LISTENER_HOST=0.0.0.0
+      - USE_PRIVATE_NETWORK_FOR_RTP=true
+      - NETWORK_MODE=DOCKER_COMPOSE
+      - ARI_PASSWORD=$${ARI_PASSWORD}
+      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
+    depends_on:
+      - mongodb
+      - asterisk
+    networks:
+      - bianca-network
+
+  frontend:
+    image: $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com/bianca-app-frontend:staging
+    container_name: staging_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - app
+    networks:
+      - bianca-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: staging_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+      - frontend
+    networks:
+      - bianca-network
+
+volumes:
+  mongo_data:
+  asterisk_logs:
+
+networks:
+  bianca-network:
+    driver: bridge
+EOF
+
+# Create nginx config
+cat > nginx.conf <<'EOF'
 server {
     listen 80;
     server_name staging.myphonefriend.com;
     
-    # Trust X-Forwarded-* headers from ALB
-    real_ip_header X-Forwarded-For;
-    set_real_ip_from 10.0.0.0/8;
-    set_real_ip_from 172.16.0.0/12;
-    set_real_ip_from 192.168.0.0/16;
-    
-    # Frontend routes - proxy to frontend container
     location / {
         proxy_pass http://frontend:80;
         proxy_http_version 1.1;
@@ -63,18 +175,10 @@ server {
     }
 }
 
-# API server (staging-api.myphonefriend.com)
 server {
     listen 80;
     server_name staging-api.myphonefriend.com;
     
-    # Trust X-Forwarded-* headers from ALB
-    real_ip_header X-Forwarded-For;
-    set_real_ip_from 10.0.0.0/8;
-    set_real_ip_from 172.16.0.0/12;
-    set_real_ip_from 192.168.0.0/16;
-    
-    # API routes - proxy ALL traffic to backend (no /api/ prefix needed!)
     location / {
         proxy_pass http://app:3000;
         proxy_http_version 1.1;
@@ -87,198 +191,49 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 }
-NGINX
+EOF
 
-# Create docker-compose.yml
-cat > docker-compose.yml << 'COMPOSE'
-version: '3.8'
+# Login to ECR (as root for systemd)
+echo "Logging into ECR..."
+aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
 
-services:
-  # Asterisk for call handling
-  asterisk:
-    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-asterisk:latest
-    container_name: staging_asterisk
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - EXTERNAL_ADDRESS=PUBLIC_IP_PLACEHOLDER
-      - PRIVATE_ADDRESS=PRIVATE_IP_PLACEHOLDER
-      - ARI_PASSWORD=$${ARI_PASSWORD:-staging123}
-      - BIANCA_PASSWORD=$${BIANCA_PASSWORD:-staging123}
-      - RTP_START_PORT=10000
-      - RTP_END_PORT=10500
-    volumes:
-      - asterisk_logs:/var/log/asterisk
-    # Removed healthcheck to simplify startup
-
-  # MongoDB (lightweight config for staging)
-  mongodb:
-    image: mongo:4.4
-    container_name: staging_mongodb
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:27017:27017"
-    command: mongod --wiredTigerCacheSizeGB 0.5
-    volumes:
-      - mongo_data:/data/db
-
-  # Your application
-  app:
-    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-backend:staging
-    container_name: staging_app
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - AWS_REGION=${region}
-      - MONGODB_URL=mongodb://mongodb:27017/bianca-service
-      - NODE_ENV=staging
-      - API_BASE_URL=https://staging-api.myphonefriend.com
-      - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
-      - FRONTEND_URL=https://staging.myphonefriend.com
-      - ASTERISK_URL=http://asterisk:8088
-      - ASTERISK_PRIVATE_IP=asterisk
-      - ASTERISK_PUBLIC_IP=PUBLIC_IP_PLACEHOLDER
-      - BIANCA_PUBLIC_IP=staging_app
-      - AWS_SES_REGION=${region}
-      - EMAIL_FROM=staging@myphonefriend.com
-      - TWILIO_PHONENUMBER=+19786256514
-      - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
-      - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
-      - RTP_LISTENER_HOST=0.0.0.0
-      - USE_PRIVATE_NETWORK_FOR_RTP=true
-      - NETWORK_MODE=HYBRID
-      # Secrets will be fetched by the app from AWS Secrets Manager at runtime
-    depends_on:
-      mongodb:
-        condition: service_started
-
-  # Frontend container (using staging tag for consistency)
-  frontend:
-    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-frontend:staging
-    container_name: staging_frontend
-    restart: unless-stopped
-    ports:
-      - "3001:80"
-    depends_on:
-      - app
-
-  # Nginx for reverse proxy (no longer serves static files)
-  nginx:
-    image: nginx:alpine
-    container_name: staging_nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - app
-      - frontend
-
-volumes:
-  mongo_data:
-  asterisk_logs:
-COMPOSE
-
-# Replace placeholders with actual values
-sed -i "s/PRIVATE_IP_PLACEHOLDER/$PRIVATE_IP/g" docker-compose.yml
-sed -i "s/PUBLIC_IP_PLACEHOLDER/$PUBLIC_IP/g" docker-compose.yml
-sed -i "s/\$\${ARI_PASSWORD:-staging123}/staging123/g" docker-compose.yml
-sed -i "s/\$\${BIANCA_PASSWORD:-staging123}/staging123/g" docker-compose.yml
-
-# Create startup script
-cat > /usr/local/bin/start-staging.sh << 'STARTUP'
-#!/bin/bash
-cd /opt/bianca-staging
-
-# Set PATH explicitly for this script
-export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
-
-# Login to ECR
-aws ecr get-login-password --region ${region} | \
-  docker login --username AWS --password-stdin ${aws_account_id}.dkr.ecr.${region}.amazonaws.com
-
-# Note: Secrets are loaded at runtime by the application from AWS Secrets Manager
-# No need to fetch them here as environment variables
-
-# Pull latest images
-docker-compose pull app asterisk || true
-
-# Start all services
+# Pull and start containers
+echo "Starting containers..."
+docker-compose pull
 docker-compose up -d
 
-# Wait for services to be ready
-echo "Waiting for services to start..."
-sleep 30
-
-# Check service health
-docker-compose ps
-STARTUP
-
-chmod +x /usr/local/bin/start-staging.sh
-
 # Create systemd service
-cat > /etc/systemd/system/bianca-staging.service << SYSTEMD
+cat > /etc/systemd/system/bianca-staging.service <<EOF
 [Unit]
-Description=Bianca Staging Stack
+Description=Bianca Staging
 After=docker.service
 Requires=docker.service
 
 [Service]
-Type=simple
-ExecStart=/usr/local/bin/start-staging.sh
-ExecStop=/usr/bin/docker-compose -f /opt/bianca-staging/docker-compose.yml down
+Type=oneshot
+RemainAfterExit=yes
 WorkingDirectory=/opt/bianca-staging
-Restart=on-failure
-RestartSec=10
-Environment=PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
+ExecStart=/usr/bin/docker-compose up -d
+ExecStop=/usr/bin/docker-compose down
+StandardOutput=journal
 
 [Install]
 WantedBy=multi-user.target
-SYSTEMD
+EOF
 
-# Enable and start the service
+systemctl daemon-reload
 systemctl enable bianca-staging
-systemctl start bianca-staging
 
-# Setup CloudWatch monitoring (minimal for staging)
-wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
-rpm -U ./amazon-cloudwatch-agent.rpm
+# Setup cron for ECR refresh
+echo "0 */6 * * * root aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com" > /etc/cron.d/ecr-refresh
 
-cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json << CLOUDWATCH
-{
-  "metrics": {
-    "namespace": "Bianca/Staging",
-    "metrics_collected": {
-      "mem": {
-        "measurement": ["mem_used_percent"],
-        "metrics_collection_interval": 300
-      },
-      "disk": {
-        "measurement": ["used_percent"],
-        "metrics_collection_interval": 300,
-        "resources": ["/"]
-      }
-    }
-  }
-}
-CLOUDWATCH
+# Wait and check
+sleep 20
 
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-    -a fetch-config -m ec2 -s \
-    -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json || true
+echo "==================================="
+echo "Staging setup complete!"
+echo "Frontend: https://staging.myphonefriend.com"
+echo "API: https://staging-api.myphonefriend.com"
+echo "==================================="
 
-
-
-
-
-
-
-echo "Bianca staging environment ready!"
-echo "Access points:"
-echo "  Frontend: https://staging.myphonefriend.com"
-echo "  API: https://staging-api.myphonefriend.com"
-echo "  Direct API: http://$PUBLIC_IP:3000"
-echo "  Asterisk ARI: http://$PUBLIC_IP:8088 (user: asterisk, pass: staging123)"
-echo "  SIP: sip:$PUBLIC_IP"    
+docker ps

@@ -130,10 +130,10 @@ resource "aws_security_group" "staging" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # RTP (reduced range for staging)
+  # RTP (staging-optimized range)
   ingress {
     from_port   = 10000
-    to_port     = 10500
+    to_port     = 10100
     protocol    = "udp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -143,7 +143,7 @@ resource "aws_security_group" "staging" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Restrict to your IP
+    cidr_blocks = ["0.0.0.0/0"]  # Restrict to your IP in production
   }
 
   egress {
@@ -190,7 +190,13 @@ resource "aws_iam_role_policy_attachment" "staging_cloudwatch" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
-# Custom policy for staging instance
+# CRITICAL: Add ECR read-only policy for pulling images
+resource "aws_iam_role_policy_attachment" "staging_ecr_readonly" {
+  role       = aws_iam_role.staging_instance_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+# Custom policy for staging instance (updated with explicit ECR permissions)
 resource "aws_iam_role_policy" "staging_instance_policy" {
   name = "bianca-staging-instance-policy"
   role = aws_iam_role.staging_instance_role.id
@@ -201,14 +207,24 @@ resource "aws_iam_role_policy" "staging_instance_policy" {
       {
         Effect = "Allow"
         Action = [
+          # ECR permissions (explicit)
           "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage",
+          "ecr:DescribeRepositories",
+          "ecr:ListImages",
+          
+          # Secrets Manager
           "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          
+          # CloudWatch Logs
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
+          
+          # SES permissions
           "ses:GetSendQuota",
           "ses:SendEmail",
           "ses:SendRawEmail",
@@ -484,8 +500,6 @@ resource "aws_lb_listener_rule" "staging_api_https_rule" {
     }
   }
 }
-
-
 
 # IAM Role for Lambda auto-stop function
 resource "aws_iam_role" "staging_lambda_role" {

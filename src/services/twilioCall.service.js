@@ -125,11 +125,17 @@ class TwilioCallService {
 
       // For human answer, connect to Asterisk SIP endpoint
       
+      // Add initial message so user knows Twilio is working
+      twiml.say({
+        voice: 'alice',
+        language: 'en-US'
+      }, "Hello! I'm connecting you to your AI assistant. Please wait while I transfer your call.");
+      
       // Determine SIP endpoint based on environment
       let sipHost, sipPort;
       if (config.env === 'staging') {
-        // Staging: Use Twilio SIP domain
-        sipHost = 'staging-bianca.sip.twilio.com';
+        // Staging: Use staging SIP endpoint
+        sipHost = 'staging-sip.myphonefriend.com';
         sipPort = 5061;
       } else {
         // Production: Use direct Asterisk SIP
