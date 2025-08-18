@@ -47,6 +47,15 @@ echo "Public IP: $${PUBLIC_IP}"
 mkdir -p /opt/bianca-staging
 cd /opt/bianca-staging
 
+# Create app directory for volume mounting
+mkdir -p /opt/bianca-staging/app
+
+# Set proper permissions for the app directory
+chown -R ec2-user:ec2-user /opt/bianca-staging/app/
+chmod -R 755 /opt/bianca-staging/app/
+
+
+
 # Get secrets
 echo "Fetching secrets..."
 SECRET_JSON=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id MySecretsManagerSecret --query SecretString --output text)
@@ -98,6 +107,11 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+
+    command: ["yarn", "dev:staging"]
+    volumes:
+      - /opt/bianca-staging/app:/usr/src/bianca-app:rw
+
     environment:
       - AWS_REGION=$${AWS_REGION}
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
@@ -197,10 +211,32 @@ EOF
 echo "Logging into ECR..."
 aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
 
+
+
+
+
+
+
 # Pull and start containers
 echo "Starting containers..."
 docker-compose pull
+
+
+
+
+
+
+
 docker-compose up -d
+
+# Copy source code to host for editing (after containers are running)
+echo "Copying source code to host for editing..."
+docker run --rm --user root -v /opt/bianca-staging/app:/target $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com/bianca-app-backend:staging sh -c "cp -r /usr/src/bianca-app/* /target/"
+
+# Debug: Check what we copied
+echo "Checking copied files on host:"
+ls -la /opt/bianca-staging/
+ls -la /opt/bianca-staging/src/
 
 # Create systemd service
 cat > /etc/systemd/system/bianca-staging.service <<EOF

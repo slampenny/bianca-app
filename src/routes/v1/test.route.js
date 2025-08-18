@@ -3048,7 +3048,7 @@ router.get('/config', (req, res) => {
     res.json({
         environment: config.env,
         asterisk: {
-            enabled: config.asterisk.enabled,
+            enabled: true, // Always enabled
             host: config.asterisk.host,
             url: config.asterisk.url,
             rtpBiancaHost: config.asterisk.rtpBiancaHost,

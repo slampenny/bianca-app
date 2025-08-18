@@ -60,7 +60,7 @@ async function startServer() {
 
     // Initialize ARI Client connection (non-blocking)
     let ariReady = false;
-    if (config.asterisk && config.asterisk.enabled) {
+    if (config.asterisk) {
       logger.info('Asterisk integration enabled, starting ARI client in background...');
 
       // Start ARI connection in background - don't block server startup
@@ -94,7 +94,7 @@ async function startServer() {
         logger.error('[Startup] Background ARI connection failed:', err);
       });
     } else {
-      logger.info('Asterisk integration disabled in configuration.');
+      logger.info('Asterisk configuration not found.');
     }
 
     // Create and start the HTTP server

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 echo "Starting entrypoint script..."
 ASTERISK_CONF_DIR="/etc/asterisk"

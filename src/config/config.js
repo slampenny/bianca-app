@@ -218,7 +218,7 @@ if (envVars.NODE_ENV === 'production') {
 
   // Ensure baseUrl is also correct for production if used elsewhere
   // Ensure Asterisk ARI URL points to the internal service discovery name in production
-  baselineConfig.asterisk.enabled = envVars.ASTERISK_ENABLED || true; // Default to true if not set
+  baselineConfig.asterisk.enabled = true; // Always enable Asterisk
   baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.myphonefriend.internal`;
   baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
   baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || `bianca-app.myphonefriend.internal`;
@@ -291,7 +291,7 @@ baselineConfig.loadSecrets = async () => {
 
 
     // Asterisk secrets
-    if (secrets.ASTERISK_ENABLED) baselineConfig.asterisk.enabled = (secrets.ASTERISK_ENABLED === 'true');
+    baselineConfig.asterisk.enabled = true; // Always enable Asterisk
     if (secrets.ASTERISK_ARI_URL) baselineConfig.asterisk.url = secrets.ASTERISK_ARI_URL; // Use a specific ARI URL from secrets
     else if (secrets.ASTERISK_HOST) baselineConfig.asterisk.url = `http://${secrets.ASTERISK_HOST}:8088`;
     if (secrets.RTP_BIANCA_HOST) baselineConfig.asterisk.rtpBiancaHost = secrets.RTP_BIANCA_HOST;

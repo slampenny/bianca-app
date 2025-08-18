@@ -12,7 +12,7 @@ console.log('ARI_PASSWORD env var:', process.env.ARI_PASSWORD ? '***SET***' : 'N
 console.log('');
 
 console.log('Config.asterisk:');
-console.log('  enabled:', config.asterisk.enabled);
+console.log('  enabled: true (always enabled)');
 console.log('  url:', config.asterisk.url);
 console.log('  host:', config.asterisk.host);
 console.log('  username:', config.asterisk.username);
