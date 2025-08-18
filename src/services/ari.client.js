@@ -1124,7 +1124,7 @@ class AsteriskAriClient extends EventEmitter {
 
             // Step 3: Create a bridge for the snoop channel
             const snoopBridge = await this.client.bridges.create({
-                type: 'simple_bridge',
+                type: 'mixing',
                 name: `snoop-bridge-${parentChannelId}`
             });
 
@@ -1242,12 +1242,9 @@ class AsteriskAriClient extends EventEmitter {
             await channel.answer();
             logger.info(`[ARI] Answered playback channel ${channelId}`);
 
-            // CRITICAL: Add to main bridge so audio can flow to the phone
-            await this.client.bridges.addChannel({
-                bridgeId: parentCallData.mainBridgeId,
-                channel: channelId
-            });
-            logger.info(`[ARI] Added playback channel ${channelId} to main bridge ${parentCallData.mainBridgeId}`);
+            // FIXED: Don't add playback channel to main bridge to prevent technology switch
+            // The audio will flow through the UnicastRTP channels instead
+            logger.info(`[ARI] Playback channel ${channelId} ready but not added to main bridge to prevent technology switch`);
 
             // The WRITE ExternalMedia is created on the snoop channel, not here
 
@@ -2030,7 +2027,7 @@ class AsteriskAriClient extends EventEmitter {
 
             // Step 6: Create the main bridge for mixing audio
             mainBridge = await this.client.bridges.create({
-                type: 'simple_bridge',
+                type: 'mixing',
                 name: `call-${asteriskChannelId}`
             });
 
