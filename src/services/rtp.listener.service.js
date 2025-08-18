@@ -85,63 +85,44 @@ class RtpListener {
     async handleMessage(msg, rinfo) {
         this.stats.packetsReceived++;
         
-        // ENHANCED LOGGING for first few packets to debug voice detection
-        if (this.stats.packetsReceived <= 10) {
-            logger.info(`[RTP Listener ${this.port}] Packet #${this.stats.packetsReceived} from ${rinfo.address}:${rinfo.port} (${msg.length} bytes) for call ${this.callId}`);
-            
-            // CRITICAL: Log the first packet timestamp
-            if (this.stats.packetsReceived === 1) {
-                this.stats.firstPacketTime = Date.now();
-                logger.info(`[RTP Listener ${this.port}] FIRST PACKET received at ${this.stats.firstPacketTime} for call ${this.callId}`);
-            }
+        // Log first few packets to confirm we're receiving data
+        if (this.stats.packetsReceived <= 5) {
+            logger.info(`[RTP Listener ${this.port}] Received packet #${this.stats.packetsReceived} from ${rinfo.address}:${rinfo.port} (${msg.length} bytes) for call ${this.callId}`);
         }
         
         this.logStatsIfNeeded();
         
         if (msg.length > MAX_PACKET_SIZE) {
-            logger.warn(`[RTP Listener ${this.port}] Oversized packet: ${msg.length} bytes`);
+            logger.warn(`[RTP Listener ${this.port}] Oversized packet from ${rinfo.address}:${rinfo.port}: ${msg.length} bytes`);
             this.stats.invalidPackets++;
             return;
         }
-    
+
         const rtpPacket = this.parseRtpPacket(msg);
         if (!rtpPacket) {
             this.stats.invalidPackets++;
             return;
         }
         
-        // Check payload type
+        // Check if this is μ-law audio (payload type 0)
         if (rtpPacket.payloadType !== 0) {
-            logger.warn(`[RTP Listener ${this.port}] Unexpected payload type ${rtpPacket.payloadType} (expected 0 for μ-law)`);
+            logger.warn(`[RTP Listener ${this.port}] Unexpected payload type ${rtpPacket.payloadType} for call ${this.callId} (expected 0 for μ-law)`);
             this.stats.invalidPackets++;
             return;
         }
-    
+
+        // Process the audio payload
         try {
+            // The RTP payload is already raw μ-law bytes from Asterisk
+            // Convert to base64 for OpenAI (which expects base64-encoded μ-law)
             const audioBase64 = rtpPacket.payload.toString('base64');
             
             if (audioBase64 && audioBase64.length > 0) {
-                // ENHANCED DIAGNOSTICS for first few packets
-                if (this.stats.packetsSent < 20) {
-                    const isSilence = this.isAudioSilence(rtpPacket.payload);
-                    const isStatic = this.isStaticBurst(rtpPacket.payload);
-                    
-                    // Log audio characteristics
-                    logger.info(`[RTP Listener ${this.port}] Packet #${this.stats.packetsSent + 1} ANALYSIS:`, {
-                        rawBytes: rtpPacket.payload.length,
-                        base64Length: audioBase64.length,
-                        isSilence,
-                        isStatic,
-                        firstFewBytes: Array.from(rtpPacket.payload.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')
-                    });
+                // Only log every 100th packet to reduce noise
+                if (this.stats.packetsSent % 100 === 0) {
+                    logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
                 }
-                
-                // Track when we start sending audio to OpenAI
-                if (this.stats.packetsSent === 0) {
-                    logger.info(`[RTP Listener ${this.port}] Sending FIRST audio chunk to OpenAI for call ${this.callId}`);
-                }
-                
-                await openAIService.sendAudioChunk(this.callId, audioBase64);
+                await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
                 this.stats.packetsSent++;
             } else {
                 logger.warn(`[RTP Listener ${this.port}] Empty audio data for call ${this.callId}`);
@@ -214,54 +195,6 @@ class RtpListener {
         } catch (err) {
             logger.debug(`[RTP Listener ${this.port}] Error parsing RTP packet: ${err.message}`);
             return null;
-        }
-    }
-
-    /**
-     * Check if audio buffer is silence
-     * @param {Buffer} audioBuffer - Raw audio buffer
-     * @returns {boolean} True if audio is silence
-     */
-    isAudioSilence(audioBuffer) {
-        try {
-            const silenceValue = 0x7F; // uLaw silence
-            const tolerance = 2; // Allow small variations
-            
-            for (let i = 0; i < audioBuffer.length; i++) {
-                if (Math.abs(audioBuffer[i] - silenceValue) > tolerance) {
-                    return false;
-                }
-            }
-            return true;
-        } catch (err) {
-            return false;
-        }
-    }
-
-    /**
-     * Check if audio buffer looks like a static burst
-     * @param {Buffer} audioBuffer - Raw audio buffer
-     * @returns {boolean} True if audio looks like static
-     */
-    isStaticBurst(audioBuffer) {
-        try {
-            // Static typically has high-frequency noise patterns
-            // Look for rapid changes in amplitude
-            let changes = 0;
-            const threshold = 10; // Minimum change to count as significant
-            
-            for (let i = 1; i < audioBuffer.length; i++) {
-                const diff = Math.abs(audioBuffer[i] - audioBuffer[i-1]);
-                if (diff > threshold) {
-                    changes++;
-                }
-            }
-            
-            // If more than 30% of samples have significant changes, it might be static
-            const changeRatio = changes / audioBuffer.length;
-            return changeRatio > 0.3;
-        } catch (err) {
-            return false;
         }
     }
 
