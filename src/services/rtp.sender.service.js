@@ -41,9 +41,10 @@ class RtpSenderService extends EventEmitter {
         this.SAMPLES_PER_FRAME = 160;
         this.PACKET_INTERVAL_MS = 20;
         
-        this.MAX_BUFFER_SIZE_BYTES = 640;    // 40ms max (4 frames)
-        this.TARGET_BUFFER_SIZE_BYTES = 320; // 20ms target (2 frames)
-        this.MIN_BUFFER_SIZE_BYTES = 160;    // 10ms min (1 frame)
+        // Increased buffer sizes to prevent underruns
+        this.MAX_BUFFER_SIZE_BYTES = 1280;   // 80ms max (8 frames) - doubled
+        this.TARGET_BUFFER_SIZE_BYTES = 640;  // 40ms target (4 frames) - doubled
+        this.MIN_BUFFER_SIZE_BYTES = 320;    // 20ms min (2 frames) - doubled
 
         this.adaptiveBuffering = new Map();
         
@@ -210,12 +211,22 @@ class RtpSenderService extends EventEmitter {
             return;
         }
     
-        // CRITICAL FIX: Always send something to maintain timing
+        // IMPROVED: Better buffer management to reduce underruns
         let frameData;
         
         if (!buffer || buffer.length < this.SAMPLES_PER_FRAME) {
-            // Buffer underrun - send comfort noise instead of skipping
-            frameData = Buffer.alloc(this.SAMPLES_PER_FRAME, 0x7F); // uLaw silence
+            // Buffer underrun - check if we should wait or send silence
+            const bufferSize = buffer ? buffer.length : 0;
+            const waitThreshold = this.MIN_BUFFER_SIZE_BYTES / 2; // Wait if buffer is less than 10ms
+            
+            if (bufferSize < waitThreshold) {
+                // Buffer too small - skip this frame to let it fill up
+                logger.debug(`[RTP Sender] Buffer too small for ${callId}: ${bufferSize} bytes, skipping frame to let buffer fill`);
+                return;
+            }
+            
+            // Buffer has some data but not enough for full frame - send what we have
+            frameData = buffer || Buffer.alloc(this.SAMPLES_PER_FRAME, 0x7F); // Use available data or silence
             
             // Track underruns
             if (!this.bufferUnderrunCount) {
@@ -226,10 +237,13 @@ class RtpSenderService extends EventEmitter {
             
             // Log periodically
             if (underruns === 1 || underruns % 50 === 0) {
-                logger.warn(`[RTP Sender] Buffer underrun for ${callId}: ${underruns} total (sending silence)`);
+                logger.warn(`[RTP Sender] Buffer underrun for ${callId}: ${underruns} total (buffer: ${bufferSize} bytes)`);
             }
+            
+            // Clear the buffer since we used all available data
+            this.audioBuffers.set(callId, Buffer.alloc(0));
         } else {
-            // Normal case - we have audio data
+            // Normal case - we have sufficient audio data
             frameData = buffer.slice(0, this.SAMPLES_PER_FRAME);
             
             // Update buffer to remove sent data
@@ -243,7 +257,7 @@ class RtpSenderService extends EventEmitter {
             }
         }
     
-        // Always send the frame (either real audio or silence)
+        // Send the frame
         this.sendFrameData(callId, frameData, callConfig, socket);
     }
 

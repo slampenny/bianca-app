@@ -25,6 +25,17 @@ class RtpListener {
         };
         this.isActive = false;
         this.isShuttingDown = false;
+        
+        // Audio buffering for OpenAI
+        this.audioBuffer = Buffer.alloc(0);
+        this.lastFlushTime = Date.now();
+        this.flushInterval = 100; // Flush every 100ms
+        this.minAudioBytes = 320; // Minimum 40ms of audio (8kHz * 0.04s = 320 bytes)
+        
+        // Start flush timer
+        this.flushTimer = setInterval(() => {
+            this.flushAudioBuffer();
+        }, this.flushInterval);
     }
 
     async start() {
@@ -113,19 +124,29 @@ class RtpListener {
 
         // Process the audio payload
         try {
-            // The RTP payload is already raw μ-law bytes from Asterisk
-            // Convert to base64 for OpenAI (which expects base64-encoded μ-law)
-            const audioBase64 = rtpPacket.payload.toString('base64');
+            // Buffer the audio payload for OpenAI
+            this.audioBuffer = Buffer.concat([this.audioBuffer, rtpPacket.payload]);
             
-            if (audioBase64 && audioBase64.length > 0) {
-                // Only log every 100th packet to reduce noise
-                if (this.stats.packetsSent % 100 === 0) {
-                    logger.debug(`[RTP Listener ${this.port}] Forwarding ${audioBase64.length} base64 bytes for call ${this.callId} (${rtpPacket.payload.length} raw μ-law bytes)`);
+            // Log first few packets to confirm we're receiving data
+            if (this.stats.packetsReceived <= 5) {
+                logger.info(`[RTP Listener ${this.port}] Buffered ${rtpPacket.payload.length} bytes, total buffer: ${this.audioBuffer.length} bytes for call ${this.callId}`);
+            }
+            
+            // Check if we have enough audio to send
+            if (this.audioBuffer.length >= this.minAudioBytes) {
+                const audioBase64 = this.audioBuffer.toString('base64');
+                
+                if (audioBase64 && audioBase64.length > 0) {
+                    // Only log every 100th packet to reduce noise
+                    if (this.stats.packetsSent % 100 === 0) {
+                        logger.debug(`[RTP Listener ${this.port}] Sending ${audioBase64.length} base64 bytes for call ${this.callId} (${this.audioBuffer.length} raw μ-law bytes)`);
+                    }
+                    await openAIService.sendAudioChunk(this.callId, audioBase64);
+                    this.stats.packetsSent++;
+                    
+                    // Clear the buffer after sending
+                    this.audioBuffer = Buffer.alloc(0);
                 }
-                await openAIService.sendAudioChunk(this.callId, audioBase64); // Let it buffer until OpenAI is ready
-                this.stats.packetsSent++;
-            } else {
-                logger.warn(`[RTP Listener ${this.port}] Empty audio data for call ${this.callId}`);
             }
         } catch (err) {
             logger.error(`[RTP Listener ${this.port}] Error processing audio: ${err.message}`);
@@ -211,11 +232,40 @@ class RtpListener {
             logger.info(`[RTP Listener ${this.port}] Stopping for call ${this.callId}`);
             this.isShuttingDown = true;
             
+            // Clear the flush timer
+            if (this.flushTimer) {
+                clearInterval(this.flushTimer);
+                this.flushTimer = null;
+            }
+            
+            // Flush any remaining audio
+            this.flushAudioBuffer();
+            
             try {
                 this.udpServer.close();
             } catch (err) {
                 logger.error(`[RTP Listener ${this.port}] Error closing UDP server: ${err.message}`);
             }
+        }
+    }
+    
+    flushAudioBuffer() {
+        if (this.audioBuffer.length > 0) {
+            try {
+                const audioBase64 = this.audioBuffer.toString('base64');
+                if (audioBase64 && audioBase64.length > 0) {
+                    logger.info(`[RTP Listener ${this.port}] Flushing ${this.audioBuffer.length} bytes of audio for call ${this.callId}`);
+                    openAIService.sendAudioChunk(this.callId, audioBase64).catch(err => {
+                        logger.error(`[RTP Listener ${this.port}] Error flushing audio: ${err.message}`);
+                    });
+                    this.stats.packetsSent++;
+                }
+            } catch (err) {
+                logger.error(`[RTP Listener ${this.port}] Error flushing audio buffer: ${err.message}`);
+            }
+            
+            // Clear the buffer
+            this.audioBuffer = Buffer.alloc(0);
         }
     }
 
