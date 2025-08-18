@@ -1124,7 +1124,7 @@ class AsteriskAriClient extends EventEmitter {
 
             // Step 3: Create a bridge for the snoop channel
             const snoopBridge = await this.client.bridges.create({
-                type: 'mixing',
+                type: 'simple_bridge',
                 name: `snoop-bridge-${parentChannelId}`
             });
 
@@ -2030,7 +2030,7 @@ class AsteriskAriClient extends EventEmitter {
 
             // Step 6: Create the main bridge for mixing audio
             mainBridge = await this.client.bridges.create({
-                type: 'mixing',
+                type: 'simple_bridge',
                 name: `call-${asteriskChannelId}`
             });
 

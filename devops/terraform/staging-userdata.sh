@@ -129,6 +129,7 @@ services:
       - TWILIO_AUTHTOKEN=$${TWILIO_AUTHTOKEN}
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
       - RTP_LISTENER_HOST=0.0.0.0
+      - RTP_BIANCA_HOST=localhost
       - USE_PRIVATE_NETWORK_FOR_RTP=true
       - NETWORK_MODE=DOCKER_COMPOSE
       - ARI_PASSWORD=$${ARI_PASSWORD}
@@ -236,7 +237,7 @@ docker run --rm --user root -v /opt/bianca-staging/app:/target $${AWS_ACCOUNT_ID
 # Debug: Check what we copied
 echo "Checking copied files on host:"
 ls -la /opt/bianca-staging/
-ls -la /opt/bianca-staging/src/
+ls -la /opt/bianca-staging/app/
 
 # Create systemd service
 cat > /etc/systemd/system/bianca-staging.service <<EOF
