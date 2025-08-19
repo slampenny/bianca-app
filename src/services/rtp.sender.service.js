@@ -41,10 +41,10 @@ class RtpSenderService extends EventEmitter {
         this.SAMPLES_PER_FRAME = 160;
         this.PACKET_INTERVAL_MS = 20;
         
-        // Increased buffer sizes to prevent underruns
-        this.MAX_BUFFER_SIZE_BYTES = 1280;   // 80ms max (8 frames) - doubled
-        this.TARGET_BUFFER_SIZE_BYTES = 640;  // 40ms target (4 frames) - doubled
-        this.MIN_BUFFER_SIZE_BYTES = 320;    // 20ms min (2 frames) - doubled
+        // Increased buffer sizes to prevent underruns and chunk dropping
+        this.MAX_BUFFER_SIZE_BYTES = 2560;   // 160ms max (16 frames) - quadrupled
+        this.TARGET_BUFFER_SIZE_BYTES = 1280; // 80ms target (8 frames) - doubled
+        this.MIN_BUFFER_SIZE_BYTES = 640;    // 40ms min (4 frames) - doubled
 
         this.adaptiveBuffering = new Map();
         
@@ -351,14 +351,14 @@ class RtpSenderService extends EventEmitter {
                 }
             }
     
-            // Apply adaptive overflow protection
-            if (currentBuffer.length > adaptive.targetSize * 2) {
-                // Drop oldest audio to stay within 2x target
-                const dropBytes = currentBuffer.length - adaptive.targetSize;
-                const trimmedBuffer = currentBuffer.slice(dropBytes);
-                const newBuffer = Buffer.concat([trimmedBuffer, audioPayload]);
+            // IMPROVED: Better overflow handling - don't drop audio chunks
+            if (currentBuffer.length > this.MAX_BUFFER_SIZE_BYTES) {
+                // Buffer is getting too large - log warning but don't drop chunks
+                logger.warn(`[RTP Sender] Buffer large for ${callId}: ${currentBuffer.length} bytes (max: ${this.MAX_BUFFER_SIZE_BYTES})`);
+                
+                // Still add the new audio to prevent loss
+                const newBuffer = Buffer.concat([currentBuffer, audioPayload]);
                 this.audioBuffers.set(callId, newBuffer);
-                logger.warn(`[RTP Sender] Adaptive overflow for ${callId}: dropped ${dropBytes} bytes`);
             } else {
                 // Normal buffering
                 const newBuffer = Buffer.concat([currentBuffer, audioPayload]);
