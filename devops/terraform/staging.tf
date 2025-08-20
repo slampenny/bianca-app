@@ -305,6 +305,11 @@ resource "aws_instance" "staging" {
     Environment = "staging"
     AutoStop    = "true"
   }
+
+  # Prevent unnecessary user_data changes from triggering instance updates
+  lifecycle {
+    ignore_changes = [user_data]
+  }
 }
 
 # Staging ALB

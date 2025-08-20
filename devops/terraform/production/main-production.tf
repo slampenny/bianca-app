@@ -226,12 +226,11 @@ variable "github_app_connection_arn" {
 }
 
 # --- Secrets Manager Variables ---
-# COST MINIMIZATION: Secrets Manager variable - STOPPED (ECS services commented out)
-# variable "secrets_manager_secret_name" {
-#   description = "Name of the secret in AWS Secrets Manager."
-#   type        = string
-#   default     = "MySecretsManagerSecret"
-# }
+variable "secrets_manager_secret_name" {
+  description = "Name of the secret in AWS Secrets Manager."
+  type        = string
+  default     = "MySecretsManagerSecret"
+}
 
 # --- Allowed IP Ranges ---
 variable "twilio_ip_ranges" {
@@ -255,10 +254,9 @@ variable "bianca_client_static_ips" {
 # DATA SOURCES
 ################################################################################
 
-# COST MINIMIZATION: Secrets Manager data source - STOPPED (ECS services commented out)
-# data "aws_secretsmanager_secret" "app_secret" {
-#   name = var.secrets_manager_secret_name
-# }
+data "aws_secretsmanager_secret" "app_secret" {
+  name = var.secrets_manager_secret_name
+}
 
 data "aws_route53_zone" "myphonefriend" {
   name         = "myphonefriend.com."
@@ -847,80 +845,76 @@ resource "aws_iam_role_policy_attachment" "asterisk_cloudwatch" {
 }
 
 # Policy for Secrets Manager access
-# COST MINIMIZATION: Asterisk secrets IAM policy - STOPPED (ECS services commented out)
-# resource "aws_iam_role_policy" "asterisk_secrets" {
-#   name = "asterisk-secrets-policy"
-#   role = aws_iam_role.asterisk_ec2_role.id
-#
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [{
-#       Effect = "Allow"
-#       Action = [
-#         "secretsmanager:GetSecretValue"
-#       ]
-#       Resource = data.aws_secretsmanager_secret.app_secret.arn
-#     }]
-#   })
-# }
+resource "aws_iam_role_policy" "asterisk_secrets" {
+  name = "asterisk-secrets-policy"
+  role = aws_iam_role.asterisk_ec2_role.id
 
-# COST MINIMIZATION: EC2 Instance - STOPPED (saves $256.77/month)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_instance" "asterisk" {
-#   ami           = var.asterisk_ami_id != "" ? var.asterisk_ami_id : data.aws_ami.amazon_linux_2.id
-#   instance_type = var.asterisk_instance_type
-#   
-#   # REVERTED: Asterisk back in public subnet for Twilio access
-#   subnet_id = aws_subnet.public_a.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "secretsmanager:GetSecretValue"
+      ]
+      Resource = data.aws_secretsmanager_secret.app_secret.arn
+    }]
+  })
+}
 
-#   vpc_security_group_ids = [aws_security_group.asterisk_ec2_sg.id]
-#   iam_instance_profile   = aws_iam_instance_profile.asterisk_profile.name
-#   key_name               = var.asterisk_key_pair_name
+# EC2 Instance - BACK IN PUBLIC SUBNET
+resource "aws_instance" "asterisk" {
+  ami           = var.asterisk_ami_id != "" ? var.asterisk_ami_id : data.aws_ami.amazon_linux_2.id
+  instance_type = var.asterisk_instance_type
+  
+  # REVERTED: Asterisk back in public subnet for Twilio access
+  subnet_id = aws_subnet.public_a.id
 
-#   # Enable detailed monitoring
-#   monitoring = true
+  vpc_security_group_ids = [aws_security_group.asterisk_ec2_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.asterisk_profile.name
+  key_name               = var.asterisk_key_pair_name
 
-#   # User data script to install Docker and run Asterisk
-#   user_data = base64encode(templatefile("${path.module}/asterisk-userdata.sh", {
-#     external_ip            = aws_eip.asterisk_eip.public_ip
-#     ari_password_secret    = data.aws_secretsmanager_secret.app_secret.arn
-#     bianca_password_secret = data.aws_secretsmanager_secret.app_secret.arn
-#     region                 = var.aws_region
-#     # Pass private subnet CIDR for RTP routing
-#     private_subnet_cidrs   = "172.31.110.0/24,172.31.111.0/24"
-#     rtp_start_port         = var.asterisk_rtp_start_port
-#     rtp_end_port           = var.asterisk_rtp_end_port
-#   }))
+  # Enable detailed monitoring
+  monitoring = true
 
-#   root_block_device {
-#     volume_type = "gp3"
-#     volume_size = 30
-#     encrypted   = true
-#   }
+  # User data script to install Docker and run Asterisk
+  user_data = base64encode(templatefile("${path.module}/asterisk-userdata.sh", {
+    external_ip            = aws_eip.asterisk_eip.public_ip
+    ari_password_secret    = data.aws_secretsmanager_secret.app_secret.arn
+    bianca_password_secret = data.aws_secretsmanager_secret.app_secret.arn
+    region                 = var.aws_region
+    # Pass private subnet CIDR for RTP routing
+    private_subnet_cidrs   = "172.31.110.0/24,172.31.111.0/24"
+    rtp_start_port         = var.asterisk_rtp_start_port
+    rtp_end_port           = var.asterisk_rtp_end_port
+  }))
 
-#   tags = {
-#     Name = "asterisk-server",
-#     Environment = "production",
-#   }
-# }
+  root_block_device {
+    volume_type = "gp3"
+    volume_size = 30
+    encrypted   = true
+  }
 
-# COST MINIMIZATION: EIP Association - STOPPED (saves associated costs)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_eip_association" "asterisk_eip_assoc" {
-#   instance_id   = aws_instance.asterisk.id
-#   allocation_id = aws_eip.asterisk_eip.id
-# }
+  tags = {
+    Name = "asterisk-server",
+    Environment = "production",
+  }
+}
 
-# COST MINIMIZATION: Service Discovery Instance - STOPPED
-# To restart: uncomment this section and run terraform apply
-# resource "aws_service_discovery_instance" "asterisk" {
-#   instance_id = "asterisk-ec2"
-#   service_id  = aws_service_discovery_service.asterisk_sd_service.id
+# EIP Association (still works with instance in private subnet!)
+resource "aws_eip_association" "asterisk_eip_assoc" {
+  instance_id   = aws_instance.asterisk.id
+  allocation_id = aws_eip.asterisk_eip.id
+}
 
-#   attributes = {
-#     AWS_INSTANCE_IPV4 = aws_instance.asterisk.private_ip
-#   }
-# }
+# Service Discovery Instance for Asterisk EC2
+resource "aws_service_discovery_instance" "asterisk" {
+  instance_id = "asterisk-ec2"
+  service_id  = aws_service_discovery_service.asterisk_sd_service.id
+
+  attributes = {
+    AWS_INSTANCE_IPV4 = aws_instance.asterisk.private_ip
+  }
+}
 
 # Wait for Asterisk to be fully ready before starting the app
 # resource "null_resource" "wait_for_asterisk" {
@@ -1032,68 +1026,60 @@ resource "aws_efs_file_system_policy" "mongodb_policy" {
 # APPLICATION LOAD BALANCER (ALB) - For Bianca App HTTP/S Traffic
 ################################################################################
 
-# COST MINIMIZATION: ALB - STOPPED (saves $16.75/month)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_lb" "app_lb" {
-#   name               = var.load_balancer_name
-#   internal           = false
-#   load_balancer_type = "application"
-#   idle_timeout       = 120
-#   security_groups    = [aws_security_group.alb_sg.id]
-#   # ALB stays in public subnets to receive external traffic
-#   subnets = [aws_subnet.public_a.id, aws_subnet.public_b.id]
-#   tags    = { Name = var.load_balancer_name }
-# }
+resource "aws_lb" "app_lb" {
+  name               = var.load_balancer_name
+  internal           = false
+  load_balancer_type = "application"
+  idle_timeout       = 120
+  security_groups    = [aws_security_group.alb_sg.id]
+  # ALB stays in public subnets to receive external traffic
+  subnets = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+  tags    = { Name = var.load_balancer_name }
+}
 
-# COST MINIMIZATION: Target Group - STOPPED
-# To restart: uncomment this section and run terraform apply
-# resource "aws_lb_target_group" "app_tg" {
-#   name        = "bianca-target-group"
-#   port        = var.container_port
-#   protocol    = "HTTP"
-#   vpc_id      = aws_vpc.main.id
-#   target_type = "ip"
+resource "aws_lb_target_group" "app_tg" {
+  name        = "bianca-target-group"
+  port        = var.container_port
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
 
-#   health_check {
-#     path                = "/health"
-#     interval            = 30        # Reduced for faster health detection
-#     timeout             = 10        # Reduced timeout
-#     healthy_threshold   = 2         # Keep at 2 for stability
-#     unhealthy_threshold = 3         # Reduced to fail faster during deployment
-#     matcher             = "200"
-#     port                = "traffic-port"
-#     protocol            = "HTTP"
-#   }
-#   tags = { Name = "bianca-target-group" }
-# }
+  health_check {
+    path                = "/health"
+    interval            = 30        # Reduced for faster health detection
+    timeout             = 10        # Reduced timeout
+    healthy_threshold   = 2         # Keep at 2 for stability
+    unhealthy_threshold = 3         # Reduced to fail faster during deployment
+    matcher             = "200"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+  }
+  tags = { Name = "bianca-target-group" }
+}
 
 
 
-# COST MINIMIZATION: HTTP Listener - STOPPED
-# To restart: uncomment this section and run terraform apply
-# resource "aws_lb_listener" "http_listener" {
-#   load_balancer_arn = aws_lb.app_lb.arn
-#   port              = 80
-#   protocol          = "HTTP"
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.app_tg.arn
-#   }
-# }
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
+}
 
-# COST MINIMIZATION: HTTPS Listener - STOPPED
-# To restart: uncomment this section and run terraform apply
-# resource "aws_lb_listener" "https_listener" {
-#   load_balancer_arn = aws_lb.app_lb.arn
-#   port              = 443
-#   protocol          = "HTTPS"
-#   certificate_arn   = data.aws_acm_certificate.app_cert.arn
-#   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06"
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.app_tg.arn
-#   }
-# }
+resource "aws_lb_listener" "https_listener" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = data.aws_acm_certificate.app_cert.arn
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
+}
 
 ################################################################################
 # ECS (Cluster, Task Definitions, Services) - UPDATED FOR PRIVATE NETWORKING
@@ -1167,188 +1153,184 @@ resource "aws_ecs_task_definition" "mongodb_task" {
   tags = { Name = "mongodb-service" }
 }
 
-# COST MINIMIZATION: MongoDB ECS Service - STOPPED (saves $47.81/month)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_ecs_service" "mongodb_service" {
-#   name             = "mongodb-service"
-#   cluster          = aws_ecs_cluster.cluster.id
-#   task_definition  = aws_ecs_task_definition.mongodb_task.arn
-#   launch_type      = "FARGATE"
-#   platform_version = "LATEST"
-#   desired_count    = 1
+# NEW: MongoDB ECS Service
+resource "aws_ecs_service" "mongodb_service" {
+  name             = "mongodb-service"
+  cluster          = aws_ecs_cluster.cluster.id
+  task_definition  = aws_ecs_task_definition.mongodb_task.arn
+  launch_type      = "FARGATE"
+  platform_version = "LATEST"
+  desired_count    = 1
 
-#   network_configuration {
-#     subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
-#     security_groups  = [
-#       aws_security_group.mongodb_sg.id,
-#       aws_security_group.vpc_endpoints_sg.id  # ADD THIS - critical for VPC endpoint access
-#     ]
-#     assign_public_ip = false
-#   }
+  network_configuration {
+    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+    security_groups  = [
+      aws_security_group.mongodb_sg.id,
+      aws_security_group.vpc_endpoints_sg.id  # ADD THIS - critical for VPC endpoint access
+    ]
+    assign_public_ip = false
+  }
 
-#   service_registries {
-#     registry_arn = aws_service_discovery_service.mongodb_sd_service.arn
-#   }
+  service_registries {
+    registry_arn = aws_service_discovery_service.mongodb_sd_service.arn
+  }
 
-#   lifecycle { 
-#     ignore_changes = [desired_count]
-#   }
+  lifecycle { 
+    ignore_changes = [desired_count]
+  }
 
-#   tags = { Name = "mongodb-service" }
-# }
+  tags = { Name = "mongodb-service" }
+}
 
 # Add this rule to allow MongoDB to reach EFS
 # MongoDB to EFS egress is now handled by the general egress rule in the MongoDB security group
 # UPDATED: Task definition with improved health check and startup
 # UPDATED: Task definition without MongoDB container
-# COST MINIMIZATION: App ECS Task Definition - STOPPED (saves $47.81/month)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_ecs_task_definition" "app_task" {
-#   family                   = var.service_name
-#   network_mode             = "awsvpc"
-#   requires_compatibilities = ["FARGATE"]
-#   cpu                      = "512"
-#   memory                   = "1024"
-#   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
-#   task_role_arn            = aws_iam_role.ecs_task_role.arn
-#
-#   # REMOVED: volume block - app doesn't need direct EFS access
-#
-#   container_definitions = jsonencode([
-#     {
-#       name      = var.container_name
-#       image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest"
-#       essential = true
-#       portMappings = [
-#         { containerPort = var.container_port, hostPort = var.container_port, protocol = "tcp" }
-#         # Note: UDP ports 10000-20000 are handled by security group rules, not port mappings
-#         # Fargate doesn't support port range mappings, so we rely on security groups
-#       ]
-#       environment = [
-#         { name = "AWS_REGION", value = var.aws_region },
-#         # UPDATED: Use service discovery DNS name instead of localhost
-#         { name = "MONGODB_URL", value = "mongodb://mongodb.myphonefriend.internal:${var.mongodb_port}/${var.service_name}" },
-#         { name = "NODE_ENV", value = "production" },
-#         { name = "API_BASE_URL", value = "https://api.myphonefriend.com" },
-#         { name = "WEBSOCKET_URL", value = "wss://api.myphonefriend.com" },
-#         { name = "FRONTEND_URL", value = "https://app.myphonefriend.com" },
-#         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
-#         
-#         # Internal communication uses private IP for both ARI and RTP
-#         { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
-#         { name = "ASTERISK_PRIVATE_IP", value = aws_instance.asterisk.private_ip },
-#         { name = "ASTERISK_RTP_HOST", value = aws_instance.asterisk.private_ip },  # ADDED: Ensure RTP uses private IP
-#         
-#         # External SIP signaling uses public IP (for Twilio)
-#         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
-#         
-#         { name = "AWS_SES_REGION", value = var.aws_region },
-#         { name = "EMAIL_FROM", value = "support@myphonefriend.com" },
-#         { name = "TWILIO_PHONENUMBER", value = "+19786256514" },  # Replace with your actual Twilio number
-#         { name = "TWILIO_ACCOUNTSID", value = "TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED" },  # Replace with your actual Twilio SID
-#         { name = "STRIPE_PUBLISHABLE_KEY", value = "pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef" },  # Replace with your actual Stripe publishable key
-#         { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
-#         { name = "RTP_LISTENER_HOST", value = "0.0.0.0" },
-#         
-#         # App will auto-detect its private IP for RTP
-#         { name = "USE_PRIVATE_NETWORK_FOR_RTP", value = "true" },
-#         { name = "NETWORK_MODE", value = "HYBRID" },
-#         { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name },
-#         
-#         # CRITICAL: Set the app's RTP host for Asterisk to connect to
-#         { name = "RTP_BIANCA_HOST", value = "bianca-app.myphonefriend.internal" },
-#         { name = "BIANCA_PUBLIC_IP", value = "bianca-app.myphonefriend.internal" },
-#         
-#         # Help with Asterisk connection retry
-#         { name = "ASTERISK_CONNECT_TIMEOUT", value = "300000" },  # 5 minutes
-#         { name = "ASTERISK_RETRY_INTERVAL", value = "15000" },    # 15 seconds
-#         { name = "ASTERISK_MAX_RETRIES", value = "20" },          # Maximum retry attempts
-#         { name = "ASTERISK_HEALTH_CHECK_INTERVAL", value = "30000" },  # Health check every 30 seconds
-#         { name = "ASTERISK_CONNECTION_POOL_SIZE", value = "5" }   # Connection pool size
-#       ]
-#       secrets = [
-#         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
-#         { name = "OPENAI_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:OPENAI_API_KEY::" },
-#         { name = "TWILIO_AUTHTOKEN", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_AUTHTOKEN::" },
-#         { name = "STRIPE_SECRET_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_SECRET_KEY::" },
-#         { name = "ARI_PASSWORD", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ARI_PASSWORD::" }
-#       ]
-#       logConfiguration = {
-#         logDriver = "awslogs"
-#         options = {
-#           "awslogs-group"         = aws_cloudwatch_log_group.app_log_group.name
-#           "awslogs-region"        = var.aws_region
-#           "awslogs-stream-prefix" = "app"
-#         }
-#       },
-#       healthCheck = {
-#         command     = ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
-#         interval    = 30
-#         timeout     = 10        # Increased from 5
-#         retries     = 5         # Reduced from 10 to fail faster during deployment
-#         startPeriod = 180       # Increased to give more time for startup
-#       }
-#       # REMOVED: dependsOn MongoDB
-#     }
-#     # REMOVED: MongoDB container from here
-#   ])
-#   tags = { Name = var.service_name }
-# }
+resource "aws_ecs_task_definition" "app_task" {
+  family                   = var.service_name
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "512"
+  memory                   = "1024"
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  # REMOVED: volume block - app doesn't need direct EFS access
+
+  container_definitions = jsonencode([
+    {
+      name      = var.container_name
+      image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.repository_name}:latest"
+      essential = true
+      portMappings = [
+        { containerPort = var.container_port, hostPort = var.container_port, protocol = "tcp" }
+        # Note: UDP ports 10000-20000 are handled by security group rules, not port mappings
+        # Fargate doesn't support port range mappings, so we rely on security groups
+      ]
+      environment = [
+        { name = "AWS_REGION", value = var.aws_region },
+        # UPDATED: Use service discovery DNS name instead of localhost
+        { name = "MONGODB_URL", value = "mongodb://mongodb.myphonefriend.internal:${var.mongodb_port}/${var.service_name}" },
+        { name = "NODE_ENV", value = "production" },
+        { name = "API_BASE_URL", value = "https://api.myphonefriend.com" },
+        { name = "WEBSOCKET_URL", value = "wss://api.myphonefriend.com" },
+        { name = "FRONTEND_URL", value = "https://app.myphonefriend.com" },
+        { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
+        
+        # Internal communication uses private IP for both ARI and RTP
+        { name = "ASTERISK_URL", value = "http://${aws_instance.asterisk.private_ip}:${var.asterisk_ari_http_port}" },
+        { name = "ASTERISK_PRIVATE_IP", value = aws_instance.asterisk.private_ip },
+        { name = "ASTERISK_RTP_HOST", value = aws_instance.asterisk.private_ip },  # ADDED: Ensure RTP uses private IP
+        
+        # External SIP signaling uses public IP (for Twilio)
+        { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
+        
+        { name = "AWS_SES_REGION", value = var.aws_region },
+        { name = "EMAIL_FROM", value = "support@myphonefriend.com" },
+        { name = "TWILIO_PHONENUMBER", value = "+19786256514" },  # Replace with your actual Twilio number
+        { name = "TWILIO_ACCOUNTSID", value = "TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED" },  # Replace with your actual Twilio SID
+        { name = "STRIPE_PUBLISHABLE_KEY", value = "pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef" },  # Replace with your actual Stripe publishable key
+        { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
+        { name = "RTP_LISTENER_HOST", value = "0.0.0.0" },
+        
+        # App will auto-detect its private IP for RTP
+        { name = "USE_PRIVATE_NETWORK_FOR_RTP", value = "true" },
+        { name = "NETWORK_MODE", value = "HYBRID" },
+        { name = "ALB_DNS_NAME", value = aws_lb.app_lb.dns_name },
+        
+        # CRITICAL: Set the app's RTP host for Asterisk to connect to
+        { name = "RTP_BIANCA_HOST", value = "bianca-app.myphonefriend.internal" },
+        { name = "BIANCA_PUBLIC_IP", value = "bianca-app.myphonefriend.internal" },
+        
+        # Help with Asterisk connection retry
+        { name = "ASTERISK_CONNECT_TIMEOUT", value = "300000" },  # 5 minutes
+        { name = "ASTERISK_RETRY_INTERVAL", value = "15000" },    # 15 seconds
+        { name = "ASTERISK_MAX_RETRIES", value = "20" },          # Maximum retry attempts
+        { name = "ASTERISK_HEALTH_CHECK_INTERVAL", value = "30000" },  # Health check every 30 seconds
+        { name = "ASTERISK_CONNECTION_POOL_SIZE", value = "5" }   # Connection pool size
+      ]
+      secrets = [
+        { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
+        { name = "OPENAI_API_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:OPENAI_API_KEY::" },
+        { name = "TWILIO_AUTHTOKEN", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:TWILIO_AUTHTOKEN::" },
+        { name = "STRIPE_SECRET_KEY", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:STRIPE_SECRET_KEY::" },
+        { name = "ARI_PASSWORD", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:ARI_PASSWORD::" }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.app_log_group.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "app"
+        }
+      },
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+        interval    = 30
+        timeout     = 10        # Increased from 5
+        retries     = 5         # Reduced from 10 to fail faster during deployment
+        startPeriod = 180       # Increased to give more time for startup
+      }
+      # REMOVED: dependsOn MongoDB
+    }
+    # REMOVED: MongoDB container from here
+  ])
+  tags = { Name = var.service_name }
+}
 
 # UPDATED: ECS service with better health check grace period
-# COST MINIMIZATION: App ECS Service - STOPPED (saves $47.81/month)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_ecs_service" "app_service" {
-#   name = var.service_name
-#   cluster = aws_ecs_cluster.cluster.id
-#   task_definition = aws_ecs_task_definition.app_task.arn
-#   launch_type = "FARGATE"
-#   platform_version                   = "LATEST"
-#   desired_count = 1
-#   deployment_maximum_percent         = 200  # Allow 2 tasks during deployment
-#   deployment_minimum_healthy_percent = 0    # FIXED: Allow 0 healthy during deployment to prevent race condition
-#   enable_execute_command             = true
-#   health_check_grace_period_seconds  = 300  # Increased from 120
+# UPDATED: ECS service with better deployment configuration
+resource "aws_ecs_service" "app_service" {
+  name = var.service_name
+  cluster = aws_ecs_cluster.cluster.id
+  task_definition = aws_ecs_task_definition.app_task.arn
+  launch_type = "FARGATE"
+  platform_version                   = "LATEST"
+  desired_count = 1
+  deployment_maximum_percent         = 200  # Allow 2 tasks during deployment
+  deployment_minimum_healthy_percent = 0    # FIXED: Allow 0 healthy during deployment to prevent race condition
+  enable_execute_command             = true
+  health_check_grace_period_seconds  = 300  # Increased from 120
 
-#   # Add deployment circuit breaker for automatic rollback
-#   deployment_circuit_breaker {
-#     enable   = true
-#     rollback = true
-#   }
+  # Add deployment circuit breaker for automatic rollback
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
-#   network_configuration {
-#     subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
-#     security_groups  = [
-#       aws_security_group.bianca_app_sg.id,
-#       aws_security_group.vpc_endpoints_sg.id  # CRITICAL: Add this
-#     ]
-#     assign_public_ip = false
-#   }
+  network_configuration {
+    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+    security_groups  = [
+      aws_security_group.bianca_app_sg.id,
+      aws_security_group.vpc_endpoints_sg.id  # CRITICAL: Add this
+    ]
+    assign_public_ip = false
+  }
 
-#   service_registries {
-#     registry_arn = aws_service_discovery_service.bianca_app_sd_service.arn
-#   }
+  service_registries {
+    registry_arn = aws_service_discovery_service.bianca_app_sd_service.arn
+  }
 
-#   load_balancer {
-#     target_group_arn = aws_lb_target_group.app_tg.arn
-#     container_name   = var.container_name
-#     container_port   = var.container_port
-#   }
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app_tg.arn
+    container_name   = var.container_name
+    container_port   = var.container_port
+  }
 
-#   lifecycle { ignore_changes = [desired_count] }
+  lifecycle { ignore_changes = [desired_count] }
 
-#   depends_on = [
-#     aws_lb_listener.http_listener,
-#     aws_lb_listener.https_listener,
-#     aws_service_discovery_service.bianca_app_sd_service,
-#     aws_security_group.bianca_app_sg,
-#     aws_instance.asterisk,  # Wait for Asterisk
-#     aws_eip_association.asterisk_eip_assoc,  # NEW: Also wait for EIP association
-#     aws_ecs_service.mongodb_service,  # NEW: Add dependency on MongoDB service
-#     # null_resource.wait_for_asterisk  # NEW: Wait for Asterisk to be fully ready
-#   ]
-#   tags = { Name = var.service_name }
-# }
+  depends_on = [
+    aws_lb_listener.http_listener,
+    aws_lb_listener.https_listener,
+    aws_service_discovery_service.bianca_app_sd_service,
+    aws_security_group.bianca_app_sg,
+    aws_instance.asterisk,  # Wait for Asterisk
+    aws_eip_association.asterisk_eip_assoc,  # NEW: Also wait for EIP association
+    aws_ecs_service.mongodb_service,  # NEW: Add dependency on MongoDB service
+    # null_resource.wait_for_asterisk  # NEW: Wait for Asterisk to be fully ready
+  ]
+  tags = { Name = var.service_name }
+}
 
 ################################################################################
 # ECR & S3 (Artifacts)
@@ -1448,26 +1430,23 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy_attachment"
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# COST MINIMIZATION: ECS execution secrets policy - STOPPED (ECS services commented out)
-# resource "aws_iam_policy" "ecs_execution_secrets_policy" {
-#   name        = "ECSTaskExecutionSecretsManagerPolicy"
-#   description = "Allows ECS tasks to get secrets from Secrets Manager for env vars"
-#   policy = jsonencode({
-#     Version   = "2012-10-17"
-#     Statement = [{
-#       Effect   = "Allow"
-#       Action   = "Allow"
-#       Action   = "secretsmanager:GetSecretValue"
-#       Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
-#     }]
-#   })
-# }
+resource "aws_iam_policy" "ecs_execution_secrets_policy" {
+  name        = "ECSTaskExecutionSecretsManagerPolicy"
+  description = "Allows ECS tasks to get secrets from Secrets Manager for env vars"
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "secretsmanager:GetSecretValue"
+      Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
+    }]
+  })
+}
 
-# COST MINIMIZATION: ECS execution secrets policy attachment - STOPPED (ECS services commented out)
-# resource "aws_iam_role_policy_attachment" "ecs_execution_secrets_policy_attach" {
-#   role       = aws_iam_role.ecs_execution_role.name
-#   policy_arn = aws_iam_policy.ecs_execution_secrets_policy.arn
-# }
+resource "aws_iam_role_policy_attachment" "ecs_execution_secrets_policy_attach" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = aws_iam_policy.ecs_execution_secrets_policy.arn
+}
 
 resource "aws_iam_role" "ecs_task_role" {
   name               = var.ecs_task_role_name
@@ -1504,26 +1483,23 @@ resource "aws_iam_role_policy_attachment" "ecs_task_exec_policy_attach" {
   policy_arn = aws_iam_policy.ecs_task_exec_policy.arn
 }
 
-# COST MINIMIZATION: ECS task secrets policy - STOPPED (ECS services commented out)
-# resource "aws_iam_policy" "ecs_task_secrets_policy" {
-#   name        = "ECSTaskSecretsManagerPolicyForApp"
-#   description = "Allows ECS tasks to get secrets from Secrets Manager (for application use)"
-#   policy = jsonencode({
-#     Version   = "2012-10-17"
-#     Statement = [{
-#       Effect   = "Allow"
-#       Action   = "Allow"
-#       Action   = "secretsmanager:GetSecretValue"
-#       Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
-#     }]
-#   })
-# }
+resource "aws_iam_policy" "ecs_task_secrets_policy" {
+  name        = "ECSTaskSecretsManagerPolicyForApp"
+  description = "Allows ECS tasks to get secrets from Secrets Manager (for application use)"
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "secretsmanager:GetSecretValue"
+      Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
+    }]
+  })
+}
 
-# COST MINIMIZATION: ECS task secrets policy attachment - STOPPED (ECS services commented out)
-# resource "aws_iam_role_policy_attachment" "ecs_task_secrets_policy_attach" {
-#   role       = aws_iam_role.ecs_task_role.name
-#   policy_arn = aws_iam_policy.ecs_task_secrets_policy.arn
-# }
+resource "aws_iam_role_policy_attachment" "ecs_task_secrets_policy_attach" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.ecs_task_secrets_policy.arn
+}
 
 resource "aws_iam_policy" "ecs_task_ses_policy" {
   name        = "ECSTaskSESPolicy"
@@ -1756,7 +1732,7 @@ resource "aws_iam_policy" "codepipeline_base_policy" {
       {
         Effect   = "Allow",
         Action   = "secretsmanager:GetSecretValue",
-        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*"
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:${var.secrets_manager_secret_name}-*"
       }
     ]
   })
@@ -1777,134 +1753,126 @@ resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
 # CODEBUILD PROJECT (App Only - Asterisk is on EC2)
 ################################################################################
 
-# COST MINIMIZATION: CodeBuild Project - STOPPED (saves $7.99/month)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_codebuild_project" "bianca_project" {
-#   name         = "bianca-app-build"
-#   description  = "Builds Docker images for Bianca application"
-#   service_role = aws_iam_role.codebuild_role.arn
+resource "aws_codebuild_project" "bianca_project" {
+  name         = "bianca-app-build"
+  description  = "Builds Docker images for Bianca application"
+  service_role = aws_iam_role.codebuild_role.arn
 
-#   artifacts { type = "CODEPIPELINE" }
+  artifacts { type = "CODEPIPELINE" }
 
-#   environment {
-#     compute_type                = "BUILD_GENERAL1_SMALL"
-#     image                       = "aws/codebuild/standard:7.0"
-#     type                        = "LINUX_CONTAINER"
-#     privileged_mode             = true
-#     image_pull_credentials_type = "CODEBUILD"
-#   }
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+    image_pull_credentials_type = "CODEBUILD"
+  }
 
-#   source {
-#     type      = "CODEPIPELINE"
-#     buildspec = "devops/buildspec.yml"
-#   }
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "devops/buildspec.yml"
+  }
 
-#   logs_config {
-#     cloudwatch_logs { status = "ENABLED" }
-#   }
-#   tags = { Name = "bianca-app-build" }
-# }
+  logs_config {
+    cloudwatch_logs { status = "ENABLED" }
+  }
+  tags = { Name = "bianca-app-build" }
+}
 
 ################################################################################
 # CODEPIPELINE (App Only - Asterisk is on EC2)
 ################################################################################
 
-# COST MINIMIZATION: CodePipeline - STOPPED (saves associated costs)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_codepipeline" "bianca_pipeline" {
-#   name     = "BiancaApp-ECS-Pipeline"
-#   role_arn = aws_iam_role.codepipeline_role.arn
+resource "aws_codepipeline" "bianca_pipeline" {
+  name     = "BiancaApp-ECS-Pipeline"
+  role_arn = aws_iam_role.codepipeline_role.arn
 
-#   artifact_store {
-#     type     = "S3"
-#     location = aws_s3_bucket.artifact_bucket.bucket
-#   }
+  artifact_store {
+    type     = "S3"
+    location = aws_s3_bucket.artifact_bucket.bucket
+  }
 
-#   stage {
-#     name = "Source"
-#     action {
-#       name             = "Source"
-#       category         = "Source"
-#       owner            = "AWS"
-#       provider         = "CodeStarSourceConnection"
-#       version          = "1"
-#       output_artifacts = ["SourceOutput"]
-#       configuration = {
-#         ConnectionArn        = var.github_app_connection_arn
-#         FullRepositoryId     = "${var.github_owner}/${var.github_repo}"
-#         BranchName           = var.github_branch
-#         OutputArtifactFormat = "CODE_ZIP"
-#       }
-#       run_order = 1
-#       }
-#   }
+  stage {
+    name = "Source"
+    action {
+      name             = "Source"
+      category         = "Source"
+      owner            = "AWS"
+      provider         = "CodeStarSourceConnection"
+      version          = "1"
+      output_artifacts = ["SourceOutput"]
+      configuration = {
+        ConnectionArn        = var.github_app_connection_arn
+        FullRepositoryId     = "${var.github_owner}/${var.github_repo}"
+        BranchName           = var.github_branch
+        OutputArtifactFormat = "CODE_ZIP"
+      }
+      run_order = 1
+    }
+  }
 
-#   stage {
-#     name = "Build"
-#     action {
-#       name             = "Build"
-#       category         = "Build"
-#       owner            = "AWS"
-#       provider         = "CodeBuild"
-#       version          = "1"
-#       input_artifacts  = ["SourceOutput"]
-#       output_artifacts = ["BuildOutputApp", "BuildOutputAsterisk"]
-#       configuration = {
-#         ProjectName = aws_codebuild_project.bianca_project.name
-#       }
-#       run_order = 1
-#     }
-#   }
+  stage {
+    name = "Build"
+    action {
+      name             = "Build"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["BuildOutputApp", "BuildOutputAsterisk"]
+      configuration = {
+        ProjectName = aws_codebuild_project.bianca_project.name
+      }
+      run_order = 1
+    }
+  }
 
-#   stage {
-#     name = "Deploy"
-#     action {
-#       name            = "DeployAppECS"
-#       category        = "Deploy"
-#       owner           = "AWS"
-#       provider        = "ECS"
-#       version         = "1"
-#       input_artifacts = ["BuildOutputApp"]
-#       configuration = {
-#         ClusterName = aws_ecs_cluster.cluster.name
-#         ServiceName = aws_ecs_service.app_service.name
-#         FileName    = "imagedefinitions_app.json"
-#       }
-#       run_order = 1
-#     }
-#   }
-#   tags = { Name = "BiancaApp-ECS-Pipeline" }
-# }
+  stage {
+    name = "Deploy"
+    action {
+      name            = "DeployAppECS"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["BuildOutputApp"]
+      configuration = {
+        ClusterName = aws_ecs_cluster.cluster.name
+        ServiceName = aws_ecs_service.app_service.name
+        FileName    = "imagedefinitions_app.json"
+      }
+      run_order = 1
+    }
+  }
+  tags = { Name = "BiancaApp-ECS-Pipeline" }
+}
 
 ################################################################################
 # ROUTE 53 RECORDS
 ################################################################################
 
-# COST MINIMIZATION: API subdomain - STOPPED (points to stopped ALB)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_route53_record" "api_subdomain" {
-#   zone_id = data.aws_route53_zone.myphonefriend.zone_id
-#   name    = "api.myphonefriend.com"
-#   type    = "A"
-#   alias {
-#     name                   = aws_lb.app_lb.dns_name
-#     zone_id                = aws_lb.app_lb.zone_id
-#     evaluate_target_health = true
-#   }
-# }
+resource "aws_route53_record" "api_subdomain" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "api.myphonefriend.com"
+  type    = "A"
+  alias {
+    name                   = aws_lb.app_lb.dns_name
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
 
-# COST MINIMIZATION: App subdomain - STOPPED (points to stopped ALB)
-# To restart: uncomment this section and run terraform apply
-# resource "aws_route53_record" "app_subdomain" {
-#   zone_id = data.aws_route53_zone.myphonefriend.zone_id
-#   name    = "app.myphonefriend.com"
-#   type    = "A"
-#   alias {
-#     name                   = aws_lb.app_lb.dns_name
-#     zone_id                = aws_lb.app_lb.zone_id
-#     evaluate_target_health = true
-#   }
-# }
+resource "aws_route53_record" "app_subdomain" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "app.myphonefriend.com"
+  type    = "A"
+  alias {
+    name                   = aws_lb.app_lb.dns_name
+    zone_id                = aws_lb.app_lb.zone_id
+    evaluate_target_health = true
+  }
+}
 
 # KEPT: Direct EIP mapping for SIP (Twilio needs direct access)
 resource "aws_route53_record" "sip_subdomain" {
@@ -2310,28 +2278,25 @@ output "asterisk_public_ip" {
   value       = aws_eip.asterisk_eip.public_ip
 }
 
-# COST MINIMIZATION: Asterisk private IP output - STOPPED (asterisk instance commented out)
-# output "asterisk_private_ip" {
-#   description = "Private IP for internal App-Asterisk RTP"
-#   value       = aws_instance.asterisk.private_ip
-# }
+output "asterisk_private_ip" {
+  description = "Private IP for internal App-Asterisk RTP"
+  value       = aws_instance.asterisk.private_ip
+}
 
 output "sip_dns_name" {
   description = "DNS name for SIP (sip.myphonefriend.com)"
   value       = aws_route53_record.sip_subdomain.name
 }
 
-# COST MINIMIZATION: API ALB DNS output - STOPPED (ALB commented out)
-# output "api_alb_dns_name" {
-#   description = "DNS name for the Application Load Balancer (api.myphonefriend.com)"
-#   value       = aws_route53_record.api_subdomain.name
-# }
+output "api_alb_dns_name" {
+  description = "DNS name for the Application Load Balancer (api.myphonefriend.com)"
+  value       = aws_route53_record.api_subdomain.name
+}
 
-# COST MINIMIZATION: Asterisk instance ID output - STOPPED (asterisk instance commented out)
-# output "asterisk_instance_id" {
-#   description = "EC2 instance ID for Asterisk"
-#   value       = aws_instance.asterisk.id
-# }
+output "asterisk_instance_id" {
+  description = "EC2 instance ID for Asterisk"
+  value       = aws_instance.asterisk.id
+}
 
 output "private_subnet_cidrs" {
   description = "Private subnet CIDRs where Fargate runs"
@@ -2348,35 +2313,34 @@ output "nat_gateway_ip" {
   value       = aws_eip.nat_gateway.public_ip
 }
 
-# COST MINIMIZATION: Connection test commands output - STOPPED (asterisk instance and ECS commented out)
-# output "connection_test_commands" {
-#   description = "Commands to test connectivity after deployment"
-#   value = <<-EOT
-#     # Test from local machine:
-#     curl -u asterisk:YOUR_ARI_PASSWORD http://${aws_eip.asterisk_eip.public_ip}:8088/ari/asterisk/info
-#     
-#     # SSH to Asterisk instance:
-#     ssh -i your-key.pem ec2-user@${aws_eip.asterisk_eip.public_ip}
-#     
-#     # From Asterisk instance, test internal connectivity:
-#     curl http://localhost:8088/ari/asterisk/info
-#     
-#     # Check Docker status on Asterisk:
-#     sudo docker ps
-#     sudo docker logs asterisk
-#     
-#     # Use ECS Exec to test from app container:
-#     aws ecs execute-command --cluster ${var.cluster_name} --task TASK_ID --container ${var.container_name} --interactive --command "/bin/sh"
-#     # Then inside container:
-#     curl http://${aws_instance.asterisk.private_ip}:8088/ari/asterisk/info
-#     
-#     # Test MongoDB connectivity from app container:
-#     # First get MongoDB task ID:
-#     aws ecs list-tasks --cluster ${var.cluster_name} --service-name mongodb-service
-#     # Then test connection:
-#     mongosh mongodb://mongodb.myphonefriend.internal:27017
-#   EOT
-# }
+output "connection_test_commands" {
+  description = "Commands to test connectivity after deployment"
+  value = <<-EOT
+    # Test from local machine:
+    curl -u asterisk:YOUR_ARI_PASSWORD http://${aws_eip.asterisk_eip.public_ip}:8088/ari/asterisk/info
+    
+    # SSH to Asterisk instance:
+    ssh -i your-key.pem ec2-user@${aws_eip.asterisk_eip.public_ip}
+    
+    # From Asterisk instance, test internal connectivity:
+    curl http://localhost:8088/ari/asterisk/info
+    
+    # Check Docker status on Asterisk:
+    sudo docker ps
+    sudo docker logs asterisk
+    
+    # Use ECS Exec to test from app container:
+    aws ecs execute-command --cluster ${var.cluster_name} --task TASK_ID --container ${var.container_name} --interactive --command "/bin/sh"
+    # Then inside container:
+    curl http://${aws_instance.asterisk.private_ip}:8088/ari/asterisk/info
+    
+    # Test MongoDB connectivity from app container:
+    # First get MongoDB task ID:
+    aws ecs list-tasks --cluster ${var.cluster_name} --service-name mongodb-service
+    # Then test connection:
+    mongosh mongodb://mongodb.myphonefriend.internal:27017
+  EOT
+}
 
 # NEW: MongoDB-specific outputs
 output "mongodb_service_discovery_dns" {
