@@ -43,9 +43,8 @@ if (process.env.NODE_ENV === 'test' ||
     ExtraConfig = DevConfig
     console.log('Using DEV config');
   }
-  // Use staging config if explicitly set or if hostname is staging domain
-  else if (process.env.REACT_APP_ENVIRONMENT === 'staging' || 
-           (typeof window !== 'undefined' && window.location.hostname === 'staging.myphonefriend.com')) {
+  // Use staging config if NODE_ENV is staging
+  else if (process.env.NODE_ENV === 'staging') {
     ExtraConfig = StagingConfig
     console.log('Using STAGING config');
   } else {
