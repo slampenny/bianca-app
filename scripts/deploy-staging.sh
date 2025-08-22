@@ -34,8 +34,8 @@ fi
 
 echo "🐳 Building and pushing frontend Docker image..."
 cd ../bianca-app-frontend
-# Build frontend with NODE_ENV=staging for proper config
-docker build -t bianca-app-frontend:staging -f devops/Dockerfile --build-arg NODE_ENV=staging .
+# Build frontend with staging config for proper environment
+docker build -t bianca-app-frontend:staging -f devops/Dockerfile --build-arg BUILD_ENV=staging .
 
 if [ $? -ne 0 ]; then
     echo "❌ Frontend docker build failed. Please check the error above."
