@@ -14,10 +14,10 @@ RUN yarn install --frozen-lockfile
 COPY . .
 
 # Build argument for environment
-ARG NODE_ENV=production
+ARG BUILD_ENV=production
 
 # Build the frontend with the specified environment
-RUN if [ "$NODE_ENV" = "staging" ]; then yarn bundle:web:staging; else yarn bundle:web; fi
+RUN if [ "$BUILD_ENV" = "staging" ]; then yarn bundle:web:staging; else yarn bundle:web; fi
 
 # Production stage
 FROM nginx:alpine

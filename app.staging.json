@@ -1,8 +1,8 @@
 {
   "name": "bianca_app_frontend",
-  "displayName": "MyPhoneFriend",
+  "displayName": "MyPhoneFriend (Staging)",
   "expo": {
-    "name": "MyPhoneFriend",
+    "name": "MyPhoneFriend (Staging)",
     "slug": "bianca_app_frontend",
     "scheme": "bianca",
     "version": "1.0.0",
@@ -22,7 +22,7 @@
     ],
     "android": {
       "icon": "./assets/images/app-icon-android-legacy.png",
-      "package": "com.negascout.bianca",
+      "package": "com.negascout.bianca.staging",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
@@ -43,7 +43,7 @@
     "ios": {
       "icon": "./assets/images/app-icon-ios.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.negascout.bianca",
+      "bundleIdentifier": "com.negascout.bianca.staging",
       "splash": {
         "image": "./assets/images/splash-logo-ios-mobile.png",
         "tabletImage": "./assets/images/splash-logo-ios-tablet.png",
@@ -88,7 +88,7 @@
       "eas": {
         "projectId": "fb5ec1ef-180c-455a-8b64-2c41f9c8ca2d"
       },
-      "environment": "production"
+      "environment": "staging"
     },
     "owner": "negascout"
   },

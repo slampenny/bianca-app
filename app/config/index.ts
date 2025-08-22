@@ -18,6 +18,7 @@ import ProdConfig from "./config.prod"
 import DevConfig from "./config.dev"
 import TestConfig from "./config.test"
 import StagingConfig from "./config.staging"
+import Constants from "expo-constants"
 
 // Check for test environment first to avoid window access issues
 let ExtraConfig = ProdConfig
@@ -34,7 +35,7 @@ if (process.env.NODE_ENV === 'test' ||
     NODE_ENV: process.env.NODE_ENV,
     PLAYWRIGHT_TEST: process.env.PLAYWRIGHT_TEST,
     JEST_WORKER_ID: process.env.JEST_WORKER_ID,
-    REACT_APP_ENVIRONMENT: process.env.REACT_APP_ENVIRONMENT,
+    expo_environment: Constants.expoConfig?.extra?.environment || 'undefined',
     window_location: typeof window !== 'undefined' ? window.location.hostname : 'undefined'
   });
 
@@ -43,10 +44,10 @@ if (process.env.NODE_ENV === 'test' ||
     ExtraConfig = DevConfig
     console.log('Using DEV config');
   }
-  // Use staging config if NODE_ENV is staging
-  else if (process.env.NODE_ENV === 'staging') {
+  // Use staging config if explicitly set in Expo config
+  else if (Constants.expoConfig?.extra?.environment === 'staging') {
     ExtraConfig = StagingConfig
-    console.log('Using STAGING config');
+    console.log('Using STAGING config (from Expo constants)');
   } else {
     console.log('Using PROD config');
   }
