@@ -8,6 +8,7 @@ import {
   PatientScreen,
   SchedulesScreen,
   ConversationsScreen,
+  CallScreen,
   CaregiverScreen,
   CaregiversScreen,
   CaregiverInvitedScreen,
@@ -80,6 +81,7 @@ function HomeStack() {
       <Stack.Screen name="Patient" component={PatientScreen} />
       <Stack.Screen name="Schedule" component={SchedulesScreen} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
+      <Stack.Screen name="Call" component={CallScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: "Privacy Policy" }} />
       <Stack.Screen name="Terms" component={TermsScreen} options={{ title: "Terms of Service" }} />

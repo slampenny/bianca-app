@@ -152,6 +152,15 @@ export interface Conversation {
   duration: number
   status?: string
   callType?: string
+  
+  // NEW: Call workflow fields
+  callStatus?: 'initiating' | 'ringing' | 'answered' | 'connected' | 'ended' | 'failed' | 'busy' | 'no_answer'
+  callStartTime?: string
+  callEndTime?: string
+  callDuration?: number
+  callOutcome?: 'answered' | 'no_answer' | 'busy' | 'failed' | 'voicemail'
+  agentId?: string
+  callNotes?: string
 }
 
 // api.types.ts

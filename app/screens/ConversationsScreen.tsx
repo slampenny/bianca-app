@@ -3,14 +3,16 @@ import { View, Text, StyleSheet, ActivityIndicator, FlatList, Pressable, Refresh
 import { useSelector, useDispatch } from "react-redux"
 import { useGetConversationsByPatientQuery } from "../services/api/conversationApi"
 import { getPatient } from "../store/patientSlice"
-import { getConversations, clearConversations, getConversation, setConversation } from "../store/conversationSlice"
+import { getConversations, clearConversations, getConversation, setConversation, getActiveCall } from "../store/conversationSlice"
 import { Conversation, Message, ConversationPages } from "../services/api/api.types"
 import { colors } from "app/theme/colors"
+import { CallStatusBanner } from "../components/CallStatusBanner"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
   const conversations = useSelector(getConversations)
   const currentConversation = useSelector(getConversation)
+  const activeCall = useSelector(getActiveCall)
   const dispatch = useDispatch()
   const [expandedConversations, setExpandedConversations] = useState<Set<string>>(new Set())
   const [refreshing, setRefreshing] = useState(false)
@@ -213,7 +215,12 @@ export function ConversationsScreen() {
   }
 
   const renderEmpty = () => (
-    <Text style={styles.noConversationsText}>No conversations to display</Text>
+    <Text style={styles.noConversationsText}>
+      {activeCall 
+        ? "No previous conversations found. This will be the first conversation with this patient." 
+        : "No conversations to display"
+      }
+    </Text>
   )
 
   // Conversations are already sorted by the backend (startTime:desc)
@@ -221,6 +228,24 @@ export function ConversationsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <Header title="Conversations" />
+      
+      {/* Call Status Banner - Show when there's an active call */}
+      {(currentConversation?.callStatus && 
+       ['setting-up', 'initiating', 'ringing', 'answered', 'connected'].includes(currentConversation.callStatus)) ||
+       activeCall ? (
+        <CallStatusBanner
+          conversationId={currentConversation?.id || activeCall?.conversationId || 'temp-call'}
+          initialStatus={activeCall?.callStatus || currentConversation?.callStatus || 'setting-up'}
+          patientName={activeCall?.patientName || patient?.name || 'Patient'}
+          onStatusChange={(status) => {
+            // Update the conversation status in Redux if needed
+            console.log('Call status changed:', status)
+          }}
+        />
+      ) : null}
+
       {/* Loading/Error States */}
       {isLoading && !refreshing && (
         <View style={styles.loaderContainer}>
@@ -229,7 +254,12 @@ export function ConversationsScreen() {
       )}
       {error && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error fetching conversations</Text>
+          <Text style={styles.errorText}>
+            {activeCall 
+              ? "No previous conversations found for this patient" 
+              : "Error fetching conversations"
+            }
+          </Text>
         </View>
       )}
 

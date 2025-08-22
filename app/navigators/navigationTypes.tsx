@@ -23,6 +23,7 @@ export type HomeStackParamList = {
   Patient: undefined
   Schedule: undefined
   Conversations: undefined
+  Call: undefined
   Privacy: undefined
   Terms: undefined
 }

@@ -19,37 +19,38 @@ import DevConfig from "./config.dev"
 import TestConfig from "./config.test"
 import StagingConfig from "./config.staging"
 
+// Check for test environment first to avoid window access issues
 let ExtraConfig = ProdConfig
 
-// Debug logging
-console.log('Config loading - Environment check:', {
-  __DEV__: typeof __DEV__ !== 'undefined' ? __DEV__ : 'undefined',
-  NODE_ENV: process.env.NODE_ENV,
-  PLAYWRIGHT_TEST: process.env.PLAYWRIGHT_TEST,
-  JEST_WORKER_ID: process.env.JEST_WORKER_ID,
-  REACT_APP_ENVIRONMENT: process.env.REACT_APP_ENVIRONMENT,
-  window_location: typeof window !== 'undefined' ? window.location.hostname : 'undefined'
-});
-
-// Use test config for testing environments
 if (process.env.NODE_ENV === 'test' || 
     process.env.PLAYWRIGHT_TEST === '1' ||
     process.env.JEST_WORKER_ID) {
   ExtraConfig = TestConfig
   console.log('Using TEST config');
-}
-// Use dev config for development
-else if (typeof __DEV__ !== 'undefined' && __DEV__) {
-  ExtraConfig = DevConfig
-  console.log('Using DEV config');
-}
-// Use staging config if explicitly set or if hostname is staging domain
-else if (process.env.REACT_APP_ENVIRONMENT === 'staging' || 
-         (typeof window !== 'undefined' && window.location.hostname === 'staging.myphonefriend.com')) {
-  ExtraConfig = StagingConfig
-  console.log('Using STAGING config');
 } else {
-  console.log('Using PROD config');
+  // Debug logging (only when not in test environment)
+  console.log('Config loading - Environment check:', {
+    __DEV__: typeof __DEV__ !== 'undefined' ? __DEV__ : 'undefined',
+    NODE_ENV: process.env.NODE_ENV,
+    PLAYWRIGHT_TEST: process.env.PLAYWRIGHT_TEST,
+    JEST_WORKER_ID: process.env.JEST_WORKER_ID,
+    REACT_APP_ENVIRONMENT: process.env.REACT_APP_ENVIRONMENT,
+    window_location: typeof window !== 'undefined' ? window.location.hostname : 'undefined'
+  });
+
+  // Use dev config for development
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    ExtraConfig = DevConfig
+    console.log('Using DEV config');
+  }
+  // Use staging config if explicitly set or if hostname is staging domain
+  else if (process.env.REACT_APP_ENVIRONMENT === 'staging' || 
+           (typeof window !== 'undefined' && window.location.hostname === 'staging.myphonefriend.com')) {
+    ExtraConfig = StagingConfig
+    console.log('Using STAGING config');
+  } else {
+    console.log('Using PROD config');
+  }
 }
 
 const Config = { ...BaseConfig, ...ExtraConfig }

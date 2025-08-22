@@ -5,15 +5,19 @@ import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
 import { setPatient, getPatientsForCaregiver, clearPatient } from "../store/patientSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
+import { setActiveCall } from "../store/conversationSlice"
+import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { Caregiver, Patient } from "../services/api/api.types"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { RootState } from "../store/store"
 import { colors } from "app/theme/colors"
 
+
 export function HomeScreen() {
   const dispatch = useDispatch()
   const currentUser: Caregiver | null = useSelector(getCurrentUser)
+  const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
   const patients = useSelector((state: RootState) => {
     const patientList = currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []
     console.log(`HomeScreen - currentUser.id: ${currentUser?.id}`)
@@ -59,6 +63,49 @@ export function HomeScreen() {
     navigation.navigate("Patient")
   }
 
+  const handleCallNow = async (patient: Patient) => {
+    try {
+      // Set the patient in Redux first
+      dispatch(setPatient(patient))
+      
+      // Actually initiate the call via backend API
+      console.log('Initiating call for patient:', patient.id, patient.name)
+      const response = await initiateCall({
+        patientId: patient.id || '',
+        callNotes: `Manual call initiated by agent to ${patient.name}`
+      }).unwrap()
+      
+      console.log('Call initiated successfully, response:', response)
+      
+      // Set the real call data from backend response
+      dispatch(setActiveCall({
+        conversationId: response.conversationId,
+        callSid: response.callSid,
+        patientId: response.patientId,
+        patientName: response.patientName,
+        patientPhone: response.patientPhone,
+        agentId: response.agentId,
+        agentName: response.agentName,
+        callStatus: response.callStatus
+      }))
+      
+      // Navigate to dedicated call screen
+      navigation.navigate("Call")
+    } catch (error: any) {
+      console.error('Failed to initiate call:', error)
+      
+      // Handle different types of errors
+      if (error.response?.status === 401) {
+        console.error('Authentication failed - user may need to login again')
+        // You might want to redirect to login or show an auth error
+      } else if (error.response?.status >= 400) {
+        console.error('API error:', error.response?.data?.message || 'Unknown error')
+      }
+      
+      // You might want to show an error message to the user here
+    }
+  }
+
   const renderPatient = ({ item }: { item: Patient }) => {
     return (
       <Card
@@ -70,13 +117,22 @@ export function HomeScreen() {
         contentStyle={styles.patientName}
         ContentTextProps={{ testID: `patient-name-${item.name}` }}
         RightComponent={
-          <Button
-            text="Edit"
-            style={styles.editButton}
-            textStyle={styles.editButtonText}
-            onPress={() => handlePatientPress(item)}
-            testID={`edit-patient-button-${item.name}`}
-          />
+          <View style={styles.buttonContainer}>
+            <Button
+              text="Call"
+              style={styles.callButton}
+              textStyle={styles.callButtonText}
+              onPress={() => handleCallNow(item)}
+              testID={`call-now-${item.name}`}
+            />
+            <Button
+              text="Edit"
+              style={styles.editButton}
+              textStyle={styles.editButtonText}
+              onPress={() => handlePatientPress(item)}
+              testID={`edit-patient-button-${item.name}`}
+            />
+          </View>
         }
       />
     )
@@ -157,6 +213,17 @@ const styles = StyleSheet.create({
     color: colors.palette.neutral100,
     fontSize: 16,
   },
+  callButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 16,
+  },
+  callButton: {
+    backgroundColor: colors.palette.biancaButtonSelected,
+    borderRadius: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 8,
+  },
   header: {
     alignItems: "center",
     backgroundColor: colors.palette.neutral100,
@@ -205,6 +272,11 @@ const styles = StyleSheet.create({
     color: colors.palette.biancaHeader,
     flexShrink: 1,
     fontSize: 16,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 
   tooltip: {

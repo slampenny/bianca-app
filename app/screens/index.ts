@@ -1,4 +1,5 @@
 export * from "./AlertScreen"
+export * from "./CallScreen"
 export * from "./CaregiverInvitedScreen"
 export * from "./CaregiverScreen"
 export * from "./CaregiversScreen"

@@ -8,6 +8,7 @@ import paymentReducer from "./paymentSlice"
 import paymentMethodReducer from "./paymentMethodSlice"
 import scheduleReducer from "./scheduleSlice"
 import conversationReducer from "./conversationSlice"
+import callWorkflowReducer from "./callWorkflowSlice"
 import {
   alertApi,
   authApi,
@@ -18,6 +19,7 @@ import {
   paymentApi,
   paymentMethodApi,
   conversationApi,
+  callWorkflowApi,
 } from "../services/api/"
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import {
@@ -46,6 +48,7 @@ const rootReducer = combineReducers({
   auth: authReducer,
   alert: alertReducer,
   conversation: conversationReducer,
+  callWorkflow: callWorkflowReducer,
   payment: paymentReducer,
   paymentMethod: paymentMethodReducer,
   [alertApi.reducerPath]: alertApi.reducer,
@@ -57,6 +60,7 @@ const rootReducer = combineReducers({
   [paymentApi.reducerPath]: paymentApi.reducer,
   [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
   [scheduleApi.reducerPath]: scheduleApi.reducer,
+  [callWorkflowApi.reducerPath]: callWorkflowApi.reducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)
@@ -78,6 +82,7 @@ export const store = configureStore({
       paymentMethodApi.middleware,
       scheduleApi.middleware,
       conversationApi.middleware,
+      callWorkflowApi.middleware,
     ),
 })
 
