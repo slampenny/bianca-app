@@ -17,7 +17,16 @@ COPY . .
 ARG BUILD_ENV=production
 
 # Build the frontend with the specified environment
-RUN if [ "$BUILD_ENV" = "staging" ]; then yarn bundle:web:staging; else yarn bundle:web; fi
+RUN if [ "$BUILD_ENV" = "staging" ]; then \
+      echo "Building for staging environment..." && \
+      cp app.staging.json app.json && \
+      yarn bundle:web && \
+      echo "Staging build complete"; \
+    else \
+      echo "Building for production environment..." && \
+      yarn bundle:web && \
+      echo "Production build complete"; \
+    fi
 
 # Production stage
 FROM nginx:alpine
