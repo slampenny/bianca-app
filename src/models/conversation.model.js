@@ -58,7 +58,7 @@ const conversationSchema = mongoose.Schema(
     },
     callType: {
       type: String,
-      enum: ['inbound', 'wellness-check', 'follow-up'],
+      enum: ['inbound', 'outbound', 'wellness-check', 'follow-up'],
       default: 'inbound',
     },
     
@@ -145,7 +145,46 @@ const conversationSchema = mongoose.Schema(
         type: Number,
         default: 0,
       }
-    }  
+    },
+
+    // NEW: Call workflow fields
+    callStatus: {
+      type: String,
+      enum: ['initiating', 'ringing', 'answered', 'connected', 'ended', 'failed', 'busy', 'no_answer'],
+      default: 'initiating',
+    },
+    
+    callStartTime: {
+      type: Date,
+      default: Date.now,
+    },
+    
+    callEndTime: {
+      type: Date,
+    },
+    
+    callDuration: {
+      type: Number,
+      default: 0,
+      min: [0, 'Call duration cannot be negative'],
+    },
+    
+    callOutcome: {
+      type: String,
+      enum: ['answered', 'no_answer', 'busy', 'failed', 'voicemail', null],
+      default: null,
+    },
+    
+    agentId: {
+      type: mongoose.SchemaTypes.ObjectId,
+      ref: 'Caregiver',
+      required: false,
+    },
+    
+    callNotes: {
+      type: String,
+      default: '',
+    }
   },
   {
     timestamps: true,

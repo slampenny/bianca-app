@@ -12,6 +12,7 @@ const reportRoute = require('./report.route');
 const scheduleRoute = require('./schedule.route');
 const testRoute = require('./test.route');
 const twilioRoute = require('./twilioCall.route');
+const callWorkflowRoute = require('./callWorkflow.route');
 const docsRoute = require('./docs.route');
 
 const router = express.Router();
@@ -24,6 +25,10 @@ const defaultRoutes = [
   {
     path: '/auth',
     route: authRoute,
+  },
+  {
+    path: '/calls',
+    route: callWorkflowRoute,
   },
   {
     path: '/caregivers',
