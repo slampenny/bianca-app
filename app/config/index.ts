@@ -36,6 +36,10 @@ if (process.env.NODE_ENV === 'test' ||
     PLAYWRIGHT_TEST: process.env.PLAYWRIGHT_TEST,
     JEST_WORKER_ID: process.env.JEST_WORKER_ID,
     expo_environment: Constants.expoConfig?.extra?.environment || 'undefined',
+    Constants_full: JSON.stringify(Constants, null, 2),
+    Constants_expoConfig: JSON.stringify(Constants.expoConfig, null, 2),
+    Constants_manifest: JSON.stringify(Constants.manifest, null, 2),
+    Constants_manifest2: JSON.stringify(Constants.manifest2, null, 2),
     window_location: typeof window !== 'undefined' ? window.location.hostname : 'undefined'
   });
 
@@ -44,10 +48,11 @@ if (process.env.NODE_ENV === 'test' ||
     ExtraConfig = DevConfig
     console.log('Using DEV config');
   }
-  // Use staging config if explicitly set in Expo config
-  else if (Constants.expoConfig?.extra?.environment === 'staging') {
+  // Use staging config if explicitly set in Expo config or build-time environment
+  else if (Constants.expoConfig?.extra?.environment === 'staging' || 
+           process.env.EXPO_PUBLIC_ENVIRONMENT === 'staging') {
     ExtraConfig = StagingConfig
-    console.log('Using STAGING config (from Expo constants)');
+    console.log('Using STAGING config (from Expo constants or build env)');
   } else {
     console.log('Using PROD config');
   }

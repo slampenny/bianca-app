@@ -19,8 +19,9 @@ ARG BUILD_ENV=production
 # Build the frontend with the specified environment
 RUN if [ "$BUILD_ENV" = "staging" ]; then \
       echo "Building for staging environment..." && \
-      cp app.staging.json app.json && \
-      yarn bundle:web && \
+      echo "Setting EXPO_PUBLIC_ENVIRONMENT=staging..." && \
+      export EXPO_PUBLIC_ENVIRONMENT=staging && \
+      yarn bundle:web:staging && \
       echo "Staging build complete"; \
     else \
       echo "Building for production environment..." && \
