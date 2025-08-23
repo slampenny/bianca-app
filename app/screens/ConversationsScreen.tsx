@@ -235,15 +235,26 @@ export function ConversationsScreen() {
       {(currentConversation?.callStatus && 
        ['setting-up', 'initiating', 'ringing', 'answered', 'connected'].includes(currentConversation.callStatus)) ||
        activeCall ? (
-        <CallStatusBanner
-          conversationId={currentConversation?.id || activeCall?.conversationId || 'temp-call'}
-          initialStatus={activeCall?.callStatus || currentConversation?.callStatus || 'setting-up'}
-          patientName={activeCall?.patientName || patient?.name || 'Patient'}
-          onStatusChange={(status) => {
-            // Update the conversation status in Redux if needed
-            console.log('Call status changed:', status)
-          }}
-        />
+        <>
+          {/* Debug info for active call */}
+          {__DEV__ && activeCall && (
+            <View style={{ padding: 10, backgroundColor: '#f0f0f0', margin: 10 }}>
+              <Text>Debug - Active Call:</Text>
+              <Text>conversationId: {activeCall.conversationId || 'undefined'}</Text>
+              <Text>callStatus: {activeCall.callStatus || 'undefined'}</Text>
+              <Text>Full activeCall: {JSON.stringify(activeCall, null, 2)}</Text>
+            </View>
+          )}
+          <CallStatusBanner
+            conversationId={currentConversation?.id || activeCall?.conversationId || 'temp-call'}
+            initialStatus={activeCall?.callStatus || currentConversation?.callStatus || 'setting-up'}
+            patientName={activeCall?.patientName || patient?.name || 'Patient'}
+            onStatusChange={(status) => {
+              // Update the conversation status in Redux if needed
+              console.log('Call status changed:', status)
+            }}
+          />
+        </>
       ) : null}
 
       {/* Loading/Error States */}

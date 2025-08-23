@@ -39,32 +39,37 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       })
       
       // Store call data in Redux
-      dispatch(setActiveCall(response.data))
+      console.log('CallNowButton - Full response:', response)
+      console.log('CallNowButton - response.conversationId:', response.conversationId)
+      console.log('CallNowButton - response.data:', (response as any).data)
+      console.log('CallNowButton - response.success:', (response as any).success)
+      
+      dispatch(setActiveCall(response))
       dispatch(setCallStatus({
-        conversationId: response.data.conversationId,
-        callStatus: response.data.callStatus,
+        conversationId: response.conversationId,
+        callStatus: response.callStatus,
         callStartTime: new Date().toISOString(),
         callDuration: 0,
         callOutcome: null,
-        callNotes: response.data.callNotes,
+        callNotes: response.callNotes,
         patient: {
           _id: patientId,
           name: patientName,
           phone: "" // Will be populated by backend
         },
         agent: {
-          _id: response.data.agentId,
-          name: response.data.agentName
+          _id: response.agentId,
+          name: response.agentName
         },
         status: "initiated"
       }))
       
       // Navigate to conversation screen with call in progress
       navigation.navigate("Conversations" as keyof HomeStackParamList, {
-        conversationId: response.data.conversationId,
+        conversationId: response.conversationId,
         isActiveCall: true,
-        callStatus: response.data.callStatus,
-        patientName: response.data.patientName
+        callStatus: response.callStatus,
+        patientName: response.patientName
       })
       
     } catch (err: any) {

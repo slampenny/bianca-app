@@ -76,6 +76,7 @@ export function HomeScreen() {
       }).unwrap()
       
       console.log('Call initiated successfully, response:', response)
+      console.log('HomeScreen - response.conversationId:', response.conversationId)
       
       // Set the real call data from backend response
       dispatch(setActiveCall({
