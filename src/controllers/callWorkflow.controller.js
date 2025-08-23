@@ -58,18 +58,14 @@ const initiateCall = catchAsync(async (req, res) => {
     logger.info(`[CallWorkflow] Call initiated for patient ${patient.name}, SID: ${callSid}`);
 
     res.status(httpStatus.CREATED).send({
-      success: true,
-      data: {
-        conversationId: conversation._id,
-        callSid,
-        patientId: patient._id,
-        patientName: patient.name,
-        patientPhone: patient.phone,
-        agentId: agent._id,
-        agentName: agent.name,
-        callStatus: conversation.callStatus,
-      },
-      message: 'Call initiated successfully'
+      conversationId: conversation._id,
+      callSid,
+      patientId: patient._id,
+      patientName: patient.name,
+      patientPhone: patient.phone,
+      agentId: agent._id,
+      agentName: agent.name,
+      callStatus: conversation.callStatus,
     });
 
   } catch (error) {
@@ -116,10 +112,7 @@ const getCallStatus = catchAsync(async (req, res) => {
     status: conversation.status
   };
   
-  res.status(httpStatus.OK).send({
-    success: true,
-    data: status
-  });
+  res.status(httpStatus.OK).send(status);
 });
 
 /**
@@ -152,11 +145,7 @@ const updateCallStatus = catchAsync(async (req, res) => {
 
   logger.info(`[CallWorkflow] Updated call status for conversation ${conversationId} to ${status}`);
 
-  res.status(httpStatus.OK).send({
-    success: true,
-    data: ConversationDTO(conversation),
-    message: 'Call status updated successfully'
-  });
+  res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
 /**
@@ -185,11 +174,7 @@ const endCall = catchAsync(async (req, res) => {
   await conversation.save();
   logger.info(`[CallWorkflow] Ended call for conversation ${conversationId} with outcome: ${outcome}`);
 
-  res.status(httpStatus.OK).send({
-    success: true,
-    data: ConversationDTO(conversation),
-    message: 'Call ended successfully'
-  });
+  res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
 /**
@@ -210,7 +195,6 @@ const getActiveCalls = catchAsync(async (req, res) => {
   .lean();
   
   res.status(httpStatus.OK).send({
-    success: true,
     data: activeCalls.map(call => ConversationDTO(call)),
     count: activeCalls.length
   });
@@ -245,10 +229,7 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     status: conversation.status
   };
   
-  res.status(httpStatus.OK).send({
-    success: true,
-    data: callDetails
-  });
+  res.status(httpStatus.OK).send(callDetails);
 });
 
 module.exports = {
