@@ -54,86 +54,9 @@ fi
 
 cd ../bianca-app-backend
 
-# Step 2: Taint the staging instance to force userdata script execution
-echo "🔄 Tainting staging instance to ensure userdata script runs..."
-yarn terraform:command taint aws_instance.staging
-
-# Step 3: Plan staging resources
-echo "📋 Planning staging resources..."
-yarn terraform:command plan \
-  -target=aws_vpc.staging \
-  -target=aws_internet_gateway.staging \
-  -target=aws_subnet.staging_public \
-  -target=aws_subnet.staging_public_b \
-  -target=aws_route_table.staging \
-  -target=aws_route_table_association.staging_a \
-  -target=aws_route_table_association.staging_b \
-  -target=aws_security_group.staging \
-  -target=aws_iam_role.staging_instance_role \
-  -target=aws_iam_role_policy_attachment.staging_ssm \
-  -target=aws_iam_role_policy_attachment.staging_cloudwatch \
-  -target=aws_iam_role_policy.staging_instance_policy \
-  -target=aws_iam_instance_profile.staging_profile \
-  -target=aws_launch_template.staging \
-  -target=aws_instance.staging \
-  -target=aws_lb.staging \
-  -target=aws_lb_target_group.staging_api \
-  -target=aws_lb_target_group.staging_frontend \
-  -target=aws_lb_target_group_attachment.staging_api \
-  -target=aws_lb_target_group_attachment.staging_frontend \
-  -target=aws_lb_listener.staging_http_redirect \
-  -target=aws_lb_listener.staging_https \
-  -target=aws_lb_listener_rule.staging_api_https_rule \
-  -target=aws_route53_record.staging_api \
-  -target=aws_route53_record.staging_frontend \
-  -target=aws_route53_record.staging_sip \
-  -target=aws_iam_role.staging_lambda_role \
-  -target=aws_iam_role_policy.staging_lambda_policy \
-  -target=data.archive_file.staging_auto_stop \
-  -target=aws_lambda_function.staging_auto_stop \
-  -target=aws_cloudwatch_event_rule.staging_auto_stop \
-  -target=aws_cloudwatch_event_target.staging_auto_stop \
-  -target=aws_lambda_permission.staging_auto_stop
-
-echo "💡 Review the plan above. Press Enter to continue with apply, or Ctrl+C to cancel..."
-read
-
-# Step 4: Apply staging resources
-echo "🚀 Applying staging resources..."
-yarn terraform:command apply -auto-approve \
-  -target=aws_vpc.staging \
-  -target=aws_internet_gateway.staging \
-  -target=aws_subnet.staging_public \
-  -target=aws_subnet.staging_public_b \
-  -target=aws_route_table.staging \
-  -target=aws_route_table_association.staging_a \
-  -target=aws_route_table_association.staging_b \
-  -target=aws_security_group.staging \
-  -target=aws_iam_role.staging_instance_role \
-  -target=aws_iam_role_policy_attachment.staging_ssm \
-  -target=aws_iam_role_policy_attachment.staging_cloudwatch \
-  -target=aws_iam_role_policy.staging_instance_policy \
-  -target=aws_iam_instance_profile.staging_profile \
-  -target=aws_launch_template.staging \
-  -target=aws_instance.staging \
-  -target=aws_lb.staging \
-  -target=aws_lb_target_group.staging_api \
-  -target=aws_lb_target_group.staging_frontend \
-  -target=aws_lb_target_group_attachment.staging_api \
-  -target=aws_lb_target_group_attachment.staging_frontend \
-  -target=aws_lb_listener.staging_http_redirect \
-  -target=aws_lb_listener.staging_https \
-  -target=aws_lb_listener_rule.staging_api_https_rule \
-  -target=aws_route53_record.staging_api \
-  -target=aws_route53_record.staging_frontend \
-  -target=aws_route53_record.staging_sip \
-  -target=aws_iam_role.staging_lambda_role \
-  -target=aws_iam_role_policy.staging_lambda_policy \
-  -target=data.archive_file.staging_auto_stop \
-  -target=aws_lambda_function.staging_auto_stop \
-  -target=aws_cloudwatch_event_rule.staging_auto_stop \
-  -target=aws_cloudwatch_event_target.staging_auto_stop \
-  -target=aws_lambda_permission.staging_auto_stop
+# Step 2: Deploy staging infrastructure (preserves database)
+echo "🚀 Deploying staging infrastructure..."
+yarn terraform:deploy
 
 echo "✅ Staging infrastructure deployed!"
 
