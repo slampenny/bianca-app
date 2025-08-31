@@ -112,7 +112,7 @@ const getCallStatus = catchAsync(async (req, res) => {
     status: conversation.status
   };
   
-  res.status(httpStatus.OK).send(status);
+  res.status(httpStatus.OK).send({ data: status });
 });
 
 /**
@@ -229,7 +229,7 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     status: conversation.status
   };
   
-  res.status(httpStatus.OK).send(callDetails);
+  res.status(httpStatus.OK).send({ data: callDetails });
 });
 
 module.exports = {
