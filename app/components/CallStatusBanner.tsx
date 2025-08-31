@@ -33,14 +33,27 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     skip: ['ended', 'failed', 'busy', 'no_answer'].includes(callStatus)
   })
   
+  // Debug logging for call monitoring
+  React.useEffect(() => {
+    console.log('CallStatusBanner - conversationId:', conversationId)
+    console.log('CallStatusBanner - initialStatus:', initialStatus)
+    console.log('CallStatusBanner - current callStatus:', callStatus)
+    console.log('CallStatusBanner - callStatusData:', callStatusData)
+    console.log('CallStatusBanner - callStatusError:', callStatusError)
+  }, [conversationId, initialStatus, callStatus, callStatusData, callStatusError])
+  
   const [endCall, { isLoading: isEndingCall }] = useEndCallMutation()
 
   // Update call status from RTK Query data
   useEffect(() => {
+    console.log('CallStatusBanner - Processing callStatusData:', callStatusData)
+    
     if (callStatusData && callStatusData.data) {
       const newStatus = callStatusData.data.callStatus
+      console.log('CallStatusBanner - New status from API:', newStatus, 'Current status:', callStatus)
       
       if (newStatus !== callStatus) {
+        console.log('CallStatusBanner - Status changed, updating to:', newStatus)
         setCallStatus(newStatus)
         onStatusChange?.(newStatus)
         
@@ -60,8 +73,10 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       if (callStatusData.data.callStartTime) {
         setCallStartTime(new Date(callStatusData.data.callStartTime))
       }
+    } else if (callStatusError) {
+      console.error('CallStatusBanner - API Error:', callStatusError)
     }
-  }, [callStatusData, callStatus, onStatusChange, dispatch, conversationId])
+  }, [callStatusData, callStatus, onStatusChange, dispatch, conversationId, callStatusError])
 
   // Update duration timer for active calls
   useEffect(() => {

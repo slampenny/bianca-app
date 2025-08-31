@@ -20,34 +20,43 @@ export function HomeScreen() {
   const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
   const patients = useSelector((state: RootState) => {
     const patientList = currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []
-    console.log(`HomeScreen - currentUser.id: ${currentUser?.id}`)
-    console.log(`HomeScreen - patients count: ${patientList.length}`)
-    console.log(`HomeScreen - patients:`, patientList.map(p => ({ id: p.id, name: p.name })))
     return patientList
   })
+  
+  // Debug logging - moved outside selector to prevent infinite re-renders
+  React.useEffect(() => {
+    if (currentUser?.id && patients.length > 0) {
+      console.log(`HomeScreen - currentUser.id: ${currentUser.id}`)
+      console.log(`HomeScreen - patients count: ${patients.length}`)
+      console.log(`HomeScreen - patients:`, patients.map(p => ({ id: p.id, name: p.name })))
+    }
+  }, [currentUser?.id, patients.length])
+  
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
   const [showTooltip, setShowTooltip] = React.useState(false)
-  
-  // Debug logging
-  console.log('HomeScreen - currentUser:', currentUser)
-  console.log('HomeScreen - currentUser?.role:', currentUser?.role)
-  console.log('HomeScreen - currentUser?.email:', currentUser?.email)
   
   // More defensive role checking
   const isStaff = currentUser?.role === "staff"
   const isOrgAdmin = currentUser?.role === "orgAdmin"
   const isSuperAdmin = currentUser?.role === "superAdmin"
   
-  console.log('HomeScreen - isStaff:', isStaff)
-  console.log('HomeScreen - isOrgAdmin:', isOrgAdmin)
-  console.log('HomeScreen - isSuperAdmin:', isSuperAdmin)
-  
   // Role-based access control for patient creation
   // Only org admins and super admins can create patients
   // Staff users can only view patients
   const shouldDisableButton = isStaff
   
-  console.log('HomeScreen - shouldDisableButton:', shouldDisableButton)
+  // Debug logging - consolidated into useEffect to prevent infinite re-renders
+  React.useEffect(() => {
+    if (currentUser) {
+      console.log('HomeScreen - currentUser:', currentUser)
+      console.log('HomeScreen - currentUser?.role:', currentUser.role)
+      console.log('HomeScreen - currentUser?.email:', currentUser.email)
+      console.log('HomeScreen - isStaff:', isStaff)
+      console.log('HomeScreen - isOrgAdmin:', isOrgAdmin)
+      console.log('HomeScreen - isSuperAdmin:', isSuperAdmin)
+      console.log('HomeScreen - shouldDisableButton:', shouldDisableButton)
+    }
+  }, [currentUser, isStaff, isOrgAdmin, isSuperAdmin, shouldDisableButton])
   
   const tooltipMessage = "Only org admins and super admins can add patients"
 
@@ -163,8 +172,10 @@ export function HomeScreen() {
         <View
           onTouchStart={() => { if (shouldDisableButton) setShowTooltip(true) }}
           onTouchEnd={() => setShowTooltip(false)}
-          onMouseEnter={() => { if (shouldDisableButton && Platform.OS === "web") setShowTooltip(true) }}
-          onMouseLeave={() => { if (shouldDisableButton && Platform.OS === "web") setShowTooltip(false) }}
+          {...(Platform.OS === "web" ? {
+            onMouseEnter: () => { if (shouldDisableButton) setShowTooltip(true) },
+            onMouseLeave: () => setShowTooltip(false)
+          } : {})}
         >
           <Button
             text="Add Patient"

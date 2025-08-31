@@ -71,6 +71,14 @@ export function CallScreen() {
         </View>
       )}
       
+      {/* Debug info for activeCall */}
+      {__DEV__ && activeCall && (
+        <View style={styles.debugContainer}>
+          <Text style={styles.debugText}>Debug: activeCall.conversationId = {activeCall.conversationId || 'undefined'}</Text>
+          <Text style={styles.debugText}>Debug: activeCall.callStatus = {activeCall.callStatus || 'undefined'}</Text>
+        </View>
+      )}
+      
       {/* Debug info */}
       {__DEV__ && (
         <View style={styles.debugContainer}>
