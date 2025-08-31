@@ -72,21 +72,17 @@ export const conversationSlice = createSlice({
     setCallStatus: (state, action: PayloadAction<CallStatusResponse | null>) => {
       state.callStatus = action.payload
     },
-    updateCallStatus: (state, action: PayloadAction<{ conversationId: string; status: string; outcome?: string; notes?: string }>) => {
-      const { conversationId, status, outcome, notes } = action.payload
+    updateCallStatus: (state, action: PayloadAction<{ conversationId: string; status: string }>) => {
+      const { conversationId, status } = action.payload
       
       // Update active call if it matches
       if (state.activeCall?.conversationId === conversationId) {
         state.activeCall.callStatus = status
-        if (outcome) state.activeCall.callOutcome = outcome
-        if (notes) state.activeCall.callNotes = notes
       }
       
       // Update call status if it matches
       if (state.callStatus?.conversationId === conversationId) {
-        state.callStatus.callStatus = status
-        if (outcome) state.callStatus.callOutcome = outcome
-        if (notes) state.callStatus.callNotes = notes
+        state.callStatus.status = status
       }
     },
     clearCallData: (state) => {

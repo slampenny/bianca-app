@@ -62,7 +62,7 @@ export function CallScreen() {
         <View style={styles.bannerContainer}>
           <CallStatusBanner
             conversationId={activeCall.conversationId || 'temp-call'}
-            initialStatus={activeCall.callStatus || 'setting-up'}
+            initialStatus={activeCall.callStatus || 'initiated'}
             patientName={patient.name}
             onStatusChange={(status) => {
               console.log('Call status changed:', status)
@@ -106,7 +106,7 @@ export function CallScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Status:</Text>
             <Text style={styles.infoValue}>
-              {activeCall?.callStatus ? activeCall.callStatus.replace('-', ' ').toUpperCase() : 'SETTING UP'}
+              {activeCall?.callStatus ? activeCall.callStatus.replace('-', ' ').toUpperCase() : 'INITIATED'}
             </Text>
           </View>
         </View>

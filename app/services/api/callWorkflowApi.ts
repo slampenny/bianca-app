@@ -20,12 +20,10 @@ export interface InitiateCallResponse {
 
 export interface CallStatusResponse {
   conversationId: string
-  callStatus: string
-  callStartTime: string
-  callEndTime?: string
-  callDuration: number
-  callOutcome?: string
-  callNotes?: string
+  status: string
+  startTime: string
+  endTime?: string
+  duration: number
   patient: {
     _id: string
     name: string
@@ -35,7 +33,6 @@ export interface CallStatusResponse {
     _id: string
     name: string
   }
-  status: string
 }
 
 export interface UpdateCallStatusRequest {
@@ -56,9 +53,8 @@ export interface ActiveCall {
     name: string
     phone: string
   }
-  callStatus: string
-  callStartTime: string
-  callNotes?: string
+  status: string
+  startTime: string
 }
 
 export interface ActiveCallsResponse {

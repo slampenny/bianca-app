@@ -39,8 +39,8 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   // RTK Query hooks
   const { data: callStatusData, error: callStatusError } = useGetCallStatusQuery(conversationId, {
     pollingInterval: 2000, // Poll every 2 seconds
-    // Don't skip polling - let the API tell us the current status
-    skip: conversationId === 'temp-call'
+    // Only skip polling when call is completed or failed
+    skip: conversationId === 'temp-call' || ['completed', 'failed'].includes(callStatus)
   })
   
   // Debug logging for call monitoring
@@ -68,7 +68,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     console.log('CallStatusBanner - Processing callStatusData:', callStatusData)
     
     if (callStatusData && callStatusData.data) {
-      const newStatus = callStatusData.data.callStatus
+      const newStatus = callStatusData.data.status
       console.log('CallStatusBanner - New status from API:', newStatus, 'Current status:', callStatus)
       
       // Always update the status from the API - it's the source of truth
@@ -80,19 +80,17 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         // Update Redux store
         dispatch(updateCallStatus({
           conversationId,
-          status: newStatus,
-          outcome: callStatusData.data.callOutcome,
-          notes: callStatusData.data.callNotes
+          status: newStatus
         }))
       }
       
       // Update duration and start time if available
-      if (callStatusData.data.callDuration !== undefined) {
-        setCallDuration(callStatusData.data.callDuration)
+      if (callStatusData.data.duration !== undefined) {
+        setCallDuration(callStatusData.data.duration)
       }
       
-      if (callStatusData.data.callStartTime) {
-        setCallStartTime(new Date(callStatusData.data.callStartTime))
+      if (callStatusData.data.startTime) {
+        setCallStartTime(new Date(callStatusData.data.startTime))
       }
     } else if (callStatusError) {
       console.error('CallStatusBanner - API Error:', callStatusError)
@@ -102,7 +100,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
 
   // Update duration timer for active calls
   useEffect(() => {
-    if (callStartTime && ['answered', 'connected'].includes(callStatus)) {
+    if (callStartTime && callStatus === 'in-progress') {
       const interval = setInterval(() => {
         const now = new Date()
         const duration = Math.round((now.getTime() - callStartTime.getTime()) / 1000)
@@ -115,18 +113,13 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'setting-up':
-      case 'initiating':
-      case 'ringing':
+      case 'initiated':
         return colors.palette.warning
-      case 'answered':
-      case 'connected':
+      case 'in-progress':
         return colors.palette.success
-      case 'ended':
+      case 'completed':
         return colors.palette.info
       case 'failed':
-      case 'busy':
-      case 'no_answer':
         return colors.palette.error
       default:
         return colors.palette.neutral600
@@ -135,31 +128,21 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
 
   const getStatusMessage = (status: string) => {
     switch (status) {
-      case 'setting-up':
-        return 'Dialing...'
-      case 'initiating':
+      case 'initiated':
         return 'Initiating call...'
-      case 'ringing':
-        return `Calling ${patientName}...`
-      case 'answered':
-        return `${patientName} answered`
-      case 'connected':
+      case 'in-progress':
         return `Connected with ${patientName}`
-      case 'ended':
+      case 'completed':
         return 'Call ended'
       case 'failed':
         return 'Call failed'
-      case 'busy':
-        return 'Line busy'
-      case 'no_answer':
-        return 'No answer'
       default:
         return 'Unknown status'
     }
   }
 
   const handleEndCall = async () => {
-    if (!['answered', 'connected'].includes(callStatus)) return
+    if (callStatus !== 'in-progress') return
     
     try {
       await endCall({
@@ -170,15 +153,13 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         }
       }).unwrap()
       
-      setCallStatus('ended')
-      onStatusChange?.('ended')
+      setCallStatus('completed')
+      onStatusChange?.('completed')
       
       // Update Redux store
       dispatch(updateCallStatus({
         conversationId,
-        status: 'ended',
-        outcome: 'answered',
-        notes: 'Call ended by agent'
+        status: 'completed'
       }))
     } catch (err: any) {
       setError('Failed to end call')
@@ -186,8 +167,8 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     }
   }
 
-  const showEndCallButton = ['answered', 'connected'].includes(callStatus)
-  const showDuration = callDuration > 0 && ['answered', 'connected', 'ended'].includes(callStatus)
+  const showEndCallButton = callStatus === 'in-progress'
+  const showDuration = callDuration > 0 && ['in-progress', 'completed'].includes(callStatus)
 
   return (
     <View style={styles.container}>
