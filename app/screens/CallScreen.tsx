@@ -1,17 +1,26 @@
 import React from "react"
 import { View, Text, StyleSheet, ScrollView } from "react-native"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { getPatient } from "../store/patientSlice"
 import { getConversation } from "../store/conversationSlice"
-import { getActiveCall } from "../store/callSlice"
+import { getActiveCall, consumePendingCallData } from "../store/callSlice"
 import { CallStatusBanner } from "../components/CallStatusBanner"
 import { colors } from "app/theme/colors"
 import { Message } from "../services/api/api.types"
 
 export function CallScreen() {
+  const dispatch = useDispatch()
   const patient = useSelector(getPatient)
   const activeCall = useSelector(getActiveCall)
   const currentConversation = useSelector(getConversation)
+
+  // Consume pending call data when component mounts
+  React.useEffect(() => {
+    if (!activeCall) {
+      console.log('CallScreen - Consuming pending call data')
+      dispatch(consumePendingCallData())
+    }
+  }, [activeCall, dispatch])
 
   // Helper function to format conversation preview
   const getConversationPreview = (messages: Message[]) => {

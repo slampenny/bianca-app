@@ -5,11 +5,13 @@ import { InitiateCallResponse, CallStatusResponse } from "../services/api/callWo
 interface CallState {
   activeCall: InitiateCallResponse | null
   callStatus: CallStatusResponse | null
+  pendingCallData: InitiateCallResponse | null
 }
 
 const initialState: CallState = {
   activeCall: null,
   callStatus: null,
+  pendingCallData: null,
 }
 
 export const callSlice = createSlice({
@@ -39,6 +41,15 @@ export const callSlice = createSlice({
       state.activeCall = null
       state.callStatus = null
     },
+    setPendingCallData: (state, action: PayloadAction<InitiateCallResponse | null>) => {
+      state.pendingCallData = action.payload
+    },
+    consumePendingCallData: (state) => {
+      if (state.pendingCallData) {
+        state.activeCall = state.pendingCallData
+        state.pendingCallData = null
+      }
+    },
   },
 })
 
@@ -46,7 +57,9 @@ export const {
   setActiveCall,
   setCallStatus,
   updateCallStatus,
-  clearCallData
+  clearCallData,
+  setPendingCallData,
+  consumePendingCallData
 } = callSlice.actions
 
 export const getActiveCall = (state: RootState) => state.call.activeCall

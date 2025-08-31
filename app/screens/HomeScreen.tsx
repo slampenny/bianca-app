@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
 import { setPatient, getPatientsForCaregiver, clearPatient } from "../store/patientSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
-import { setActiveCall } from "../store/callSlice"
+import { setPendingCallData } from "../store/callSlice"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { Caregiver, Patient } from "../services/api/api.types"
@@ -74,8 +74,8 @@ export function HomeScreen() {
       console.log('Call initiated successfully, response:', response)
       console.log('HomeScreen - response.conversationId:', response.conversationId)
       
-      // Set the real call data from backend response
-      dispatch(setActiveCall({
+      // Set pending call data for CallScreen to consume
+      dispatch(setPendingCallData({
         conversationId: response.conversationId,
         callSid: response.callSid,
         patientId: response.patientId,
