@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
 import { setPatient, getPatientsForCaregiver, clearPatient } from "../store/patientSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
-import { setActiveCall } from "../store/conversationSlice"
+import { setActiveCall } from "../store/callSlice"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { Caregiver, Patient } from "../services/api/api.types"
@@ -18,7 +18,8 @@ export function HomeScreen() {
   const dispatch = useDispatch()
   const currentUser: Caregiver | null = useSelector(getCurrentUser)
   const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
-  // Memoize the selector to prevent unnecessary re-renders
+  
+  // Memoize the patients selector to prevent unnecessary re-renders
   const patientsSelector = React.useMemo(
     () => (state: RootState) => {
       const patientList = currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []
@@ -28,6 +29,8 @@ export function HomeScreen() {
   )
   
   const patients = useSelector(patientsSelector)
+  
+
   
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
   const [showTooltip, setShowTooltip] = React.useState(false)

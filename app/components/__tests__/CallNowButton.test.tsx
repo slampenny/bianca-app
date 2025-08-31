@@ -4,6 +4,7 @@ import { CallNowButton } from '../CallNowButton'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { conversationSlice } from '../../store/conversationSlice'
+import { callSlice } from '../../store/callSlice'
 import { callWorkflowSlice } from '../../store/callWorkflowSlice'
 
 // Mock the navigation
@@ -26,6 +27,7 @@ const createTestStore = () => {
   return configureStore({
     reducer: {
       conversation: conversationSlice.reducer,
+      call: callSlice.reducer,
       callWorkflow: callWorkflowSlice.reducer,
     },
   })

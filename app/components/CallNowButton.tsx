@@ -6,7 +6,7 @@ import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { initiateCall } from "../services/api/callWorkflowApi"
 import { colors } from "app/theme/colors"
 import { useAppDispatch } from "../store/store"
-import { setActiveCall, setCallStatus } from "../store/conversationSlice"
+import { setActiveCall, setCallStatus } from "../store/callSlice"
 
 interface CallNowButtonProps {
   patientId: string

@@ -5,7 +5,7 @@ import { useGetCallStatusQuery, useEndCallMutation } from "../services/api/callW
 import { formatDuration } from "../utils/dateUtils"
 import { colors } from "app/theme/colors"
 import { useAppDispatch, useAppSelector } from "../store/store"
-import { setCallStatus, updateCallStatus } from "../store/conversationSlice"
+import { setCallStatus, updateCallStatus } from "../store/callSlice"
 
 interface CallStatusBannerProps {
   conversationId: string
@@ -30,7 +30,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     )
   }
   const dispatch = useAppDispatch()
-  const storedCallStatus = useAppSelector(state => state.conversation.callStatus)
+  const storedCallStatus = useAppSelector(state => state.call.callStatus)
   const [callStatus, setCallStatus] = useState(initialStatus)
   const [callDuration, setCallDuration] = useState(0)
   const [callStartTime, setCallStartTime] = useState<Date | null>(null)

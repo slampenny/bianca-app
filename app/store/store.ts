@@ -8,6 +8,7 @@ import paymentReducer from "./paymentSlice"
 import paymentMethodReducer from "./paymentMethodSlice"
 import scheduleReducer from "./scheduleSlice"
 import conversationReducer from "./conversationSlice"
+import callReducer from "./callSlice"
 import callWorkflowReducer from "./callWorkflowSlice"
 import {
   alertApi,
@@ -48,6 +49,7 @@ const rootReducer = combineReducers({
   auth: authReducer,
   alert: alertReducer,
   conversation: conversationReducer,
+  call: callReducer,
   callWorkflow: callWorkflowReducer,
   payment: paymentReducer,
   paymentMethod: paymentMethodReducer,

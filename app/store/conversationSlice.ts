@@ -2,13 +2,10 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Conversation } from "../services/api/api.types"
 import { patientApi, conversationApi } from "../services/api"
-import { InitiateCallResponse, CallStatusResponse } from "../services/api/callWorkflowApi"
 
 interface ConversationState {
   conversation: Conversation
   conversations: Conversation[]
-  activeCall: InitiateCallResponse | null
-  callStatus: CallStatusResponse | null
 }
 
 const defaultConversation: Conversation = {
@@ -28,8 +25,6 @@ const defaultConversation: Conversation = {
 const initialState: ConversationState = {
   conversation: defaultConversation,
   conversations: [],
-  activeCall: null,
-  callStatus: null,
 }
 
 export const conversationSlice = createSlice({
@@ -65,29 +60,6 @@ export const conversationSlice = createSlice({
     clearConversations: (state) => {
       state.conversation = defaultConversation
       state.conversations = []
-    },
-    setActiveCall: (state, action: PayloadAction<InitiateCallResponse | null>) => {
-      state.activeCall = action.payload
-    },
-    setCallStatus: (state, action: PayloadAction<CallStatusResponse | null>) => {
-      state.callStatus = action.payload
-    },
-    updateCallStatus: (state, action: PayloadAction<{ conversationId: string; status: string }>) => {
-      const { conversationId, status } = action.payload
-      
-      // Update active call if it matches
-      if (state.activeCall?.conversationId === conversationId) {
-        state.activeCall.callStatus = status
-      }
-      
-      // Update call status if it matches
-      if (state.callStatus?.conversationId === conversationId) {
-        state.callStatus.status = status
-      }
-    },
-    clearCallData: (state) => {
-      state.activeCall = null
-      state.callStatus = null
     },
   },
   extraReducers: (builder) => {
@@ -155,16 +127,10 @@ export const {
   setConversation, 
   setConversations, 
   clearConversation, 
-  clearConversations,
-  setActiveCall,
-  setCallStatus,
-  updateCallStatus,
-  clearCallData
+  clearConversations
 } = conversationSlice.actions
 
 export const getConversation = (state: RootState) => state.conversation.conversation
 export const getConversations = (state: RootState) => state.conversation.conversations
-export const getActiveCall = (state: RootState) => state.conversation.activeCall
-export const getCallStatus = (state: RootState) => state.conversation.callStatus
 
 export default conversationSlice.reducer
