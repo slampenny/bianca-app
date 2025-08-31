@@ -50,8 +50,8 @@ const initiateCall = catchAsync(async (req, res) => {
     // Add call workflow-specific fields
     conversation.agentId = agentId;
     conversation.callNotes = callNotes;
-    conversation.callStatus = 'ringing';
-    conversation.callStartTime = new Date();
+    conversation.status = 'in-progress';
+    conversation.startTime = new Date();
     conversation.callType = 'outbound';
     await conversation.save();
 
@@ -65,7 +65,7 @@ const initiateCall = catchAsync(async (req, res) => {
       patientPhone: patient.phone,
       agentId: agent._id,
       agentName: agent.name,
-      callStatus: conversation.callStatus,
+      callStatus: conversation.status,
     });
 
   } catch (error) {
@@ -73,9 +73,7 @@ const initiateCall = catchAsync(async (req, res) => {
     
     // Update conversation status to failed
     if (conversation) {
-      conversation.callStatus = 'failed';
-      conversation.callOutcome = 'failed';
-      conversation.callEndTime = new Date();
+      conversation.status = 'failed';
       await conversation.save();
     }
     
@@ -101,15 +99,12 @@ const getCallStatus = catchAsync(async (req, res) => {
   
   const status = {
     conversationId: conversation._id,
-    callStatus: conversation.callStatus,
-    callStartTime: conversation.callStartTime,
-    callEndTime: conversation.callEndTime,
-    callDuration: conversation.callDuration,
-    callOutcome: conversation.callOutcome,
-    callNotes: conversation.callNotes,
+    status: conversation.status,
+    startTime: conversation.startTime,
+    endTime: conversation.endTime,
+    duration: conversation.duration,
     patient: conversation.patientId,
-    agent: conversation.agentId,
-    status: conversation.status
+    agent: conversation.agentId
   };
   
   res.status(httpStatus.OK).send({ data: status });
@@ -129,15 +124,14 @@ const updateCallStatus = catchAsync(async (req, res) => {
   }
 
   // Update call status
-  conversation.callStatus = status;
-  if (outcome) conversation.callOutcome = outcome;
+  conversation.status = status;
   if (notes) conversation.callNotes = notes;
 
   // Handle call end
-  if (['ended', 'failed', 'busy', 'no_answer'].includes(status)) {
-    conversation.callEndTime = new Date();
-    if (conversation.callStartTime) {
-      conversation.callDuration = Math.round((conversation.callEndTime - conversation.callStartTime) / 1000);
+  if (['completed', 'failed'].includes(status)) {
+    conversation.endTime = new Date();
+    if (conversation.startTime) {
+      conversation.duration = Math.round((conversation.endTime - conversation.startTime) / 1000);
     }
   }
 
@@ -161,14 +155,12 @@ const endCall = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
 
-  conversation.callStatus = 'ended';
-  conversation.callOutcome = outcome;
-  conversation.callEndTime = new Date();
-  if (notes) conversation.callNotes = notes;
   conversation.status = 'completed';
+  if (notes) conversation.callNotes = notes;
 
-  if (conversation.callStartTime) {
-    conversation.callDuration = Math.round((conversation.callEndTime - conversation.callStartTime) / 1000);
+  if (conversation.startTime) {
+    conversation.endTime = new Date();
+    conversation.duration = Math.round((conversation.endTime - conversation.startTime) / 1000);
   }
 
   await conversation.save();
@@ -187,7 +179,7 @@ const getActiveCalls = catchAsync(async (req, res) => {
   // Get conversations that are active calls for this agent
   const activeCalls = await Conversation.find({
     agentId,
-    callStatus: { $in: ['initiating', 'ringing', 'answered', 'connected'] }
+    status: { $in: ['initiated', 'in-progress'] }
   })
   .populate('patientId', 'name phone')
   .populate('agentId', 'name')
@@ -218,15 +210,12 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
   
   const callDetails = {
     conversationId: conversation._id,
-    callStatus: conversation.callStatus,
-    callStartTime: conversation.callStartTime,
-    callEndTime: conversation.callEndTime,
-    callDuration: conversation.callDuration,
-    callOutcome: conversation.callOutcome,
-    callNotes: conversation.callNotes,
+    status: conversation.status,
+    startTime: conversation.startTime,
+    endTime: conversation.endTime,
+    duration: conversation.duration,
     patient: conversation.patientId,
-    agent: conversation.agentId,
-    status: conversation.status
+    agent: conversation.agentId
   };
   
   res.status(httpStatus.OK).send({ data: callDetails });

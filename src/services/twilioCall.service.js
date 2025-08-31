@@ -284,6 +284,9 @@ class TwilioCallService {
             case 'in-progress':
               conversation.status = 'in-progress';
               break;
+            case 'answered':
+              conversation.status = 'in-progress';
+              break;
             default:
               // For any other status, keep as initiated
               conversation.status = 'initiated';
