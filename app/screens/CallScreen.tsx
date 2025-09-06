@@ -5,6 +5,7 @@ import { getPatient } from "../store/patientSlice"
 import { getConversation } from "../store/conversationSlice"
 import { getActiveCall, consumePendingCallData } from "../store/callSlice"
 import { CallStatusBanner } from "../components/CallStatusBanner"
+import { useGetConversationQuery } from "../services/api/conversationApi"
 import { colors } from "app/theme/colors"
 import { Message } from "../services/api/api.types"
 
@@ -14,6 +15,47 @@ export function CallScreen() {
   const activeCall = useSelector(getActiveCall)
   const currentConversation = useSelector(getConversation)
 
+  // Real-time conversation polling when there's an active call
+  const { 
+    data: liveConversationData, 
+    error: conversationError,
+    isLoading: isConversationLoading,
+    isFetching: isConversationFetching
+  } = useGetConversationQuery(
+    { conversationId: activeCall?.conversationId || '' },
+    {
+      pollingInterval: 3000, // Poll every 3 seconds for conversation updates
+      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call'
+    }
+  )
+
+  // Log conversation polling activity
+  React.useEffect(() => {
+    console.log('💬 CallScreen - Conversation polling status:', {
+      conversationId: activeCall?.conversationId,
+      isLoading: isConversationLoading,
+      isFetching: isConversationFetching,
+      hasData: !!liveConversationData,
+      hasError: !!conversationError,
+      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call'
+    })
+  }, [activeCall?.conversationId, isConversationLoading, isConversationFetching, liveConversationData, conversationError])
+
+  // Use live conversation data if available, otherwise fall back to Redux store
+  const conversationToDisplay = liveConversationData || currentConversation
+
+  // Log conversation updates
+  React.useEffect(() => {
+    if (liveConversationData) {
+      console.log('💬 CallScreen - Live conversation data updated:', {
+        conversationId: liveConversationData.id,
+        messageCount: liveConversationData.messages?.length || 0,
+        lastMessage: liveConversationData.messages?.[liveConversationData.messages.length - 1]?.content?.substring(0, 50) || 'No messages',
+        timestamp: new Date().toISOString()
+      })
+    }
+  }, [liveConversationData])
+
   // Consume pending call data when component mounts
   React.useEffect(() => {
     if (!activeCall) {
@@ -22,14 +64,6 @@ export function CallScreen() {
     }
   }, [activeCall, dispatch])
 
-  // Helper function to format conversation preview
-  const getConversationPreview = (messages: Message[]) => {
-    if (messages.length === 0) return "No messages yet"
-    const lastMessage = messages[messages.length - 1]
-    return lastMessage.content.length > 50
-      ? lastMessage.content.substring(0, 50) + "..."
-      : lastMessage.content
-  }
 
   // Helper function to format date
   const formatDate = (dateString: string) => {
@@ -93,6 +127,8 @@ export function CallScreen() {
       {__DEV__ && (
         <View style={styles.debugContainer}>
           <Text style={styles.debugText}>Debug: activeCall = {JSON.stringify(activeCall, null, 2)}</Text>
+          <Text style={styles.debugText}>Debug: conversation polling = {isConversationFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
+          <Text style={styles.debugText}>Debug: live conversation messages = {conversationToDisplay?.messages?.length || 0}</Text>
         </View>
       )}
 
@@ -123,15 +159,20 @@ export function CallScreen() {
 
         {/* Live Conversation Display */}
         <View style={styles.conversationSection}>
-          <Text style={styles.sectionTitle}>Live Conversation</Text>
+          <Text style={styles.sectionTitle}>
+            Live Conversation
+            {isConversationFetching && (
+              <Text style={styles.liveIndicator}> 🔄</Text>
+            )}
+          </Text>
           
-          {currentConversation && currentConversation.messages && currentConversation.messages.length > 0 ? (
+          {conversationToDisplay && conversationToDisplay.messages && conversationToDisplay.messages.length > 0 ? (
             <View style={styles.messagesContainer}>
-              {currentConversation.messages.map((message: Message, index: number) => {
+              {conversationToDisplay.messages.map((message: Message, index: number) => {
                 const isUser = message.role === "user"
                 return (
                   <View
-                    key={`${currentConversation.id}-${index}`}
+                    key={`${conversationToDisplay.id}-${index}`}
                     style={[
                       styles.messageContainer,
                       isUser ? styles.userMessageContainer : styles.assistantMessageContainer,
@@ -220,6 +261,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 12,
   },
+  liveIndicator: {
+    color: colors.palette.biancaSuccess,
+    fontSize: 16,
+  },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -248,6 +293,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   messagesContainer: {
+    borderTopColor: colors.palette.biancaBorder,
+    borderTopWidth: 1,
+    paddingBottom: 16,
     paddingTop: 12,
   },
   messageContainer: {
@@ -273,12 +321,12 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   userBubble: {
-    backgroundColor: colors.palette.biancaButtonSelected,
-    borderBottomRightRadius: 4,
+    backgroundColor: colors.palette.biancaButtonSelected, // Blue for user
+    borderBottomRightRadius: 4, // WhatsApp-style tail
   },
   assistantBubble: {
-    backgroundColor: colors.palette.biancaSuccess,
-    borderBottomLeftRadius: 4,
+    backgroundColor: colors.palette.biancaSuccess, // Green for assistant
+    borderBottomLeftRadius: 4, // WhatsApp-style tail
   },
   messageText: {
     fontSize: 16,
@@ -286,10 +334,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   userMessageText: {
-    color: colors.palette.neutral100,
+    color: colors.palette.neutral100, // White text on blue
   },
   assistantMessageText: {
-    color: colors.palette.neutral100,
+    color: colors.palette.neutral100, // White text on green
   },
   messageTime: {
     fontSize: 11,
