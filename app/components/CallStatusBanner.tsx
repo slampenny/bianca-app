@@ -37,11 +37,22 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   const [error, setError] = useState<string | null>(null)
   
   // RTK Query hooks
-  const { data: callStatusData, error: callStatusError } = useGetCallStatusQuery(conversationId, {
+  const { data: callStatusData, error: callStatusError, isLoading, isFetching } = useGetCallStatusQuery(conversationId, {
     pollingInterval: 2000, // Poll every 2 seconds
     // Only skip polling when call is completed or failed
     skip: conversationId === 'temp-call' || ['completed', 'failed'].includes(callStatus)
   })
+
+  // Log polling activity
+  React.useEffect(() => {
+    console.log('🔄 CallStatusBanner - Polling status check:', {
+      conversationId,
+      isLoading,
+      isFetching,
+      callStatus,
+      skip: conversationId === 'temp-call' || ['completed', 'failed'].includes(callStatus)
+    })
+  }, [isLoading, isFetching, conversationId, callStatus])
   
   // Debug logging for call monitoring
   React.useEffect(() => {
@@ -65,15 +76,26 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
 
   // Update call status from RTK Query data
   useEffect(() => {
-    console.log('CallStatusBanner - Processing callStatusData:', callStatusData)
+    console.log('📡 CallStatusBanner - API Response received:', {
+      hasData: !!callStatusData,
+      hasError: !!callStatusError,
+      data: callStatusData,
+      error: callStatusError,
+      timestamp: new Date().toISOString()
+    })
     
     if (callStatusData && callStatusData.data) {
       const newStatus = callStatusData.data.status
-      console.log('CallStatusBanner - New status from API:', newStatus, 'Current status:', callStatus)
+      console.log('✅ CallStatusBanner - Processing API data:', {
+        newStatus,
+        currentStatus: callStatus,
+        fullResponse: callStatusData.data,
+        statusChanged: newStatus !== callStatus
+      })
       
       // Always update the status from the API - it's the source of truth
       if (newStatus && newStatus !== callStatus) {
-        console.log('CallStatusBanner - Status changed, updating to:', newStatus)
+        console.log('🔄 CallStatusBanner - Status changed, updating to:', newStatus)
         setCallStatus(newStatus)
         onStatusChange?.(newStatus)
         
@@ -82,18 +104,22 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
           conversationId,
           status: newStatus
         }))
+      } else {
+        console.log('⏸️ CallStatusBanner - Status unchanged:', newStatus)
       }
       
       // Update duration and start time if available
       if (callStatusData.data.duration !== undefined) {
+        console.log('⏱️ CallStatusBanner - Updating duration:', callStatusData.data.duration)
         setCallDuration(callStatusData.data.duration)
       }
       
       if (callStatusData.data.startTime) {
+        console.log('🕐 CallStatusBanner - Updating start time:', callStatusData.data.startTime)
         setCallStartTime(new Date(callStatusData.data.startTime))
       }
     } else if (callStatusError) {
-      console.error('CallStatusBanner - API Error:', callStatusError)
+      console.error('❌ CallStatusBanner - API Error:', callStatusError)
       // Don't update local state on error - keep the last known good state
     }
   }, [callStatusData, callStatus, onStatusChange, dispatch, conversationId, callStatusError])
