@@ -15,7 +15,7 @@ export function CallScreen() {
   const activeCall = useSelector(getActiveCall)
   const currentConversation = useSelector(getConversation)
 
-  // Real-time conversation polling when there's an active call
+  // Real-time conversation polling for live call messages
   const { 
     data: liveConversationData, 
     error: conversationError,
@@ -24,7 +24,7 @@ export function CallScreen() {
   } = useGetConversationQuery(
     { conversationId: activeCall?.conversationId || '' },
     {
-      pollingInterval: 3000, // Poll every 3 seconds for conversation updates
+      pollingInterval: 2000, // Poll every 2 seconds for live conversation updates
       skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call'
     }
   )

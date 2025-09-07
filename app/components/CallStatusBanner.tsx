@@ -109,8 +109,9 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       }
       
       // Update duration and start time if available
-      if (callStatusData.data.duration !== undefined) {
-        console.log('⏱️ CallStatusBanner - Updating duration:', callStatusData.data.duration)
+      // Only update duration from API for completed calls to avoid conflicts with local timer
+      if (callStatusData.data.duration !== undefined && newStatus !== 'in-progress') {
+        console.log('⏱️ CallStatusBanner - Updating duration from API:', callStatusData.data.duration)
         setCallDuration(callStatusData.data.duration)
       }
       
