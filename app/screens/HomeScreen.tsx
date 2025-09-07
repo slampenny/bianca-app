@@ -5,7 +5,8 @@ import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
 import { setPatient, getPatientsForCaregiver, clearPatient } from "../store/patientSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
-import { setPendingCallData } from "../store/callSlice"
+import { setPendingCallData, clearCallData } from "../store/callSlice"
+import { clearConversation } from "../store/conversationSlice"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { Caregiver, Patient } from "../services/api/api.types"
@@ -73,6 +74,10 @@ export function HomeScreen() {
       
       console.log('Call initiated successfully, response:', response)
       console.log('HomeScreen - response.conversationId:', response.conversationId)
+      
+      // Clear any existing call and conversation data before setting new call
+      dispatch(clearCallData())
+      dispatch(clearConversation())
       
       // Set pending call data for CallScreen to consume
       // Always start with 'initiating' status regardless of API response

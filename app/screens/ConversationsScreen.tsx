@@ -7,7 +7,6 @@ import { getConversations, clearConversations, getConversation, setConversation 
 import { getActiveCall } from "../store/callSlice"
 import { Conversation, Message, ConversationPages } from "../services/api/api.types"
 import { colors } from "app/theme/colors"
-import { CallStatusBanner } from "../components/CallStatusBanner"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
@@ -232,31 +231,15 @@ export function ConversationsScreen() {
       {/* Header */}
       <Header title="Conversations" />
       
-      {/* Call Status Banner - Show when there's an active call */}
-      {(currentConversation?.status && 
-       ['initiated', 'in-progress'].includes(currentConversation.status)) ||
-       activeCall ? (
-        <>
-          {/* Debug info for active call */}
-          {__DEV__ && activeCall && (
-            <View style={{ padding: 10, backgroundColor: '#f0f0f0', margin: 10 }}>
-              <Text>Debug - Active Call:</Text>
-              <Text>conversationId: {activeCall.conversationId || 'undefined'}</Text>
-              <Text>status: {activeCall.status || 'undefined'}</Text>
-              <Text>Full activeCall: {JSON.stringify(activeCall, null, 2)}</Text>
-            </View>
-          )}
-          <CallStatusBanner
-            conversationId={currentConversation?.id || activeCall?.conversationId || 'temp-call'}
-            initialStatus={activeCall?.status || currentConversation?.status || 'initiated'}
-            patientName={activeCall?.patientName || patient?.name || 'Patient'}
-            onStatusChange={(status) => {
-              // Update the conversation status in Redux if needed
-              console.log('Call status changed:', status)
-            }}
-          />
-        </>
-      ) : null}
+      {/* Debug info for active call */}
+      {__DEV__ && activeCall && (
+        <View style={{ padding: 10, backgroundColor: '#f0f0f0', margin: 10 }}>
+          <Text>Debug - Active Call:</Text>
+          <Text>conversationId: {activeCall.conversationId || 'undefined'}</Text>
+          <Text>status: {activeCall.status || 'undefined'}</Text>
+          <Text>Full activeCall: {JSON.stringify(activeCall, null, 2)}</Text>
+        </View>
+      )}
 
       {/* Loading/Error States */}
       {isLoading && !refreshing && (
