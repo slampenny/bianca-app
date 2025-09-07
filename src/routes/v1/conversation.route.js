@@ -127,4 +127,42 @@ router
     conversationController.getConversation
   );
 
+/**
+ * @swagger
+ * /conversations/{conversationId}:
+ *   get:
+ *     summary: Get a conversation by ID
+ *     description: Get a specific conversation with its messages
+ *     tags: [Conversations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Conversation id
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *                $ref: '#/components/schemas/Conversation'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+  .route('/:conversationId')
+  .get(
+    auth('readAny:conversation'),
+    validate(conversationValidation.getConversation),
+    conversationController.getConversation
+  );
+
 module.exports = router;

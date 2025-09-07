@@ -60,6 +60,25 @@ yarn terraform:deploy
 
 echo "✅ Staging infrastructure deployed!"
 
+# Step 3: Update running containers with new images
+echo "🔄 Updating staging containers with new images..."
+STAGING_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan)
+
+if [ -n "$STAGING_IP" ]; then
+    echo "Updating containers on staging instance: $STAGING_IP"
+    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "cd /opt/bianca-staging && aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && docker-compose pull && docker-compose up -d"
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Staging containers updated successfully!"
+    else
+        echo "❌ Failed to update staging containers"
+        exit 1
+    fi
+else
+    echo "❌ Could not find staging instance IP"
+    exit 1
+fi
+
 echo "🧪 Testing staging environment..."
 echo "Waiting 30 seconds for deployment to complete..."
 sleep 30
