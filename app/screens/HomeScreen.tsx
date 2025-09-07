@@ -75,6 +75,8 @@ export function HomeScreen() {
       console.log('HomeScreen - response.conversationId:', response.conversationId)
       
       // Set pending call data for CallScreen to consume
+      // Always start with 'initiating' status regardless of API response
+      // to prevent showing "completed" before the call actually starts
       dispatch(setPendingCallData({
         conversationId: response.conversationId,
         callSid: response.callSid,
@@ -83,7 +85,7 @@ export function HomeScreen() {
         patientPhone: response.patientPhone,
         agentId: response.agentId,
         agentName: response.agentName,
-        callStatus: response.callStatus
+        status: 'initiated' // Force initiated status initially
       }))
       
       // Navigate to dedicated call screen

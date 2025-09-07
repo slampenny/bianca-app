@@ -47,7 +47,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       dispatch(setActiveCall(response))
       dispatch(setCallStatus({
         conversationId: response.conversationId,
-        callStatus: response.callStatus,
+        status: response.status,
         callStartTime: new Date().toISOString(),
         callDuration: 0,
         callOutcome: null,
@@ -68,7 +68,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       navigation.navigate("Conversations" as keyof HomeStackParamList, {
         conversationId: response.conversationId,
         isActiveCall: true,
-        callStatus: response.callStatus,
+        status: response.status,
         patientName: response.patientName
       })
       

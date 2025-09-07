@@ -153,8 +153,7 @@ export interface Conversation {
   status?: string
   callType?: string
   
-  // NEW: Call workflow fields
-  callStatus?: 'initiating' | 'ringing' | 'answered' | 'connected' | 'ended' | 'failed' | 'busy' | 'no_answer'
+  // Call workflow fields - using status field only
   callStartTime?: string
   callEndTime?: string
   callDuration?: number

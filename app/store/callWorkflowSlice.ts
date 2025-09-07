@@ -34,7 +34,7 @@ export const callWorkflowSlice = createSlice({
       // Update active calls
       const callIndex = state.activeCalls.findIndex(call => call._id === conversationId)
       if (callIndex !== -1) {
-        state.activeCalls[callIndex].callStatus = status
+        state.activeCalls[callIndex].status = status
         if (notes) {
           state.activeCalls[callIndex].callNotes = notes
         }
@@ -47,7 +47,7 @@ export const callWorkflowSlice = createSlice({
       
       // Update current call if it matches
       if (state.currentCall?.conversationId === conversationId) {
-        state.currentCall.callStatus = status
+        state.currentCall.status = status
         if (outcome) state.currentCall.callOutcome = outcome
         if (notes) state.currentCall.callNotes = notes
       }

@@ -31,7 +31,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   }
   const dispatch = useAppDispatch()
   const storedCallStatus = useAppSelector(state => state.call.callStatus)
-  const [callStatus, setCallStatus] = useState(initialStatus)
+  const [status, setStatus] = useState(initialStatus)
   const [callDuration, setCallDuration] = useState(0)
   const [callStartTime, setCallStartTime] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -39,8 +39,8 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   // RTK Query hooks
   const { data: callStatusData, error: callStatusError, isLoading, isFetching } = useGetCallStatusQuery(conversationId, {
     pollingInterval: 2000, // Poll every 2 seconds
-    // Only skip polling when call is completed or failed
-    skip: conversationId === 'temp-call' || ['completed', 'failed'].includes(callStatus)
+    // Only skip polling when call is in a terminal state
+    skip: conversationId === 'temp-call' || ['completed', 'failed', 'busy', 'no_answer', 'ended'].includes(status)
   })
 
   // Log polling activity
@@ -49,16 +49,16 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       conversationId,
       isLoading,
       isFetching,
-      callStatus,
-      skip: conversationId === 'temp-call' || ['completed', 'failed'].includes(callStatus)
+      status,
+      skip: conversationId === 'temp-call' || ['completed', 'failed'].includes(status)
     })
-  }, [isLoading, isFetching, conversationId, callStatus])
+  }, [isLoading, isFetching, conversationId, status])
   
   // Debug logging for call monitoring
   React.useEffect(() => {
     console.log('CallStatusBanner - conversationId:', conversationId)
     console.log('CallStatusBanner - initialStatus:', initialStatus)
-    console.log('CallStatusBanner - current callStatus:', callStatus)
+    console.log('CallStatusBanner - current status:', status)
     console.log('CallStatusBanner - callStatusData:', callStatusData)
     console.log('CallStatusBanner - callStatusError:', callStatusError)
     
@@ -70,7 +70,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         console.log('CallStatusBanner - Data property content:', callStatusData.data)
       }
     }
-  }, [conversationId, initialStatus, callStatus, callStatusData, callStatusError])
+  }, [conversationId, initialStatus, status, callStatusData, callStatusError])
   
   const [endCall, { isLoading: isEndingCall }] = useEndCallMutation()
 
@@ -88,15 +88,15 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       const newStatus = callStatusData.data.status
       console.log('✅ CallStatusBanner - Processing API data:', {
         newStatus,
-        currentStatus: callStatus,
+        currentStatus: status,
         fullResponse: callStatusData.data,
-        statusChanged: newStatus !== callStatus
+        statusChanged: newStatus !== status
       })
       
       // Always update the status from the API - it's the source of truth
-      if (newStatus && newStatus !== callStatus) {
+      if (newStatus && newStatus !== status) {
         console.log('🔄 CallStatusBanner - Status changed, updating to:', newStatus)
-        setCallStatus(newStatus)
+        setStatus(newStatus)
         onStatusChange?.(newStatus)
         
         // Update Redux store
@@ -122,11 +122,11 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       console.error('❌ CallStatusBanner - API Error:', callStatusError)
       // Don't update local state on error - keep the last known good state
     }
-  }, [callStatusData, callStatus, onStatusChange, dispatch, conversationId, callStatusError])
+  }, [callStatusData, status, onStatusChange, dispatch, conversationId, callStatusError])
 
   // Update duration timer for active calls
   useEffect(() => {
-    if (callStartTime && callStatus === 'in-progress') {
+    if (callStartTime && status === 'in-progress') {
       const interval = setInterval(() => {
         const now = new Date()
         const duration = Math.round((now.getTime() - callStartTime.getTime()) / 1000)
@@ -135,7 +135,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
 
       return () => clearInterval(interval)
     }
-  }, [callStartTime, callStatus])
+  }, [callStartTime, status])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -155,7 +155,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   const getStatusMessage = (status: string) => {
     switch (status) {
       case 'initiated':
-        return 'Initiating call...'
+        return 'Setting up call...'
       case 'in-progress':
         return `Connected with ${patientName}`
       case 'completed':
@@ -168,7 +168,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   }
 
   const handleEndCall = async () => {
-    if (callStatus !== 'in-progress') return
+    if (status !== 'in-progress') return
     
     try {
       await endCall({
@@ -193,8 +193,8 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     }
   }
 
-  const showEndCallButton = callStatus === 'in-progress'
-  const showDuration = callDuration > 0 && ['in-progress', 'completed'].includes(callStatus)
+  const showEndCallButton = status === 'in-progress'
+  const showDuration = callDuration > 0 && ['in-progress', 'completed'].includes(status)
 
   return (
     <View style={styles.container}>
@@ -207,17 +207,17 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       <View style={styles.banner}>
         <View style={styles.statusSection}>
           <View 
-            style={[styles.statusBadge, { backgroundColor: getStatusColor(callStatus) }]}
+            style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}
             testID="call-status-badge"
           >
             <Text style={styles.statusBadgeText}>
-              {callStatus.replace('_', ' ').toUpperCase()}
+              {status.replace('_', ' ').toUpperCase()}
             </Text>
           </View>
           
           <View style={styles.statusInfo}>
             <Text style={styles.statusMessage}>
-              {getStatusMessage(callStatus)}
+              {getStatusMessage(status)}
             </Text>
             
             {showDuration && (

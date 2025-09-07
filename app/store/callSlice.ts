@@ -29,7 +29,7 @@ export const callSlice = createSlice({
       
       // Update active call if it matches
       if (state.activeCall?.conversationId === conversationId) {
-        state.activeCall.callStatus = status
+        state.activeCall.status = status
       }
       
       // Update call status if it matches

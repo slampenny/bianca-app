@@ -15,7 +15,7 @@ export interface InitiateCallResponse {
   patientPhone: string
   agentId: string
   agentName: string
-  callStatus: string
+  status: string
 }
 
 export interface CallStatusResponse {
