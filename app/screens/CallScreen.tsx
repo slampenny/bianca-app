@@ -2,7 +2,7 @@ import React from "react"
 import { View, Text, StyleSheet, ScrollView } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import { getPatient } from "../store/patientSlice"
-import { getConversation } from "../store/conversationSlice"
+import { getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall, consumePendingCallData } from "../store/callSlice"
 import { CallStatusBanner } from "../components/CallStatusBanner"
 import { useGetConversationQuery } from "../services/api/conversationApi"
@@ -44,7 +44,7 @@ export function CallScreen() {
   // Use live conversation data if available, otherwise fall back to Redux store
   const conversationToDisplay = liveConversationData || currentConversation
 
-  // Log conversation updates
+  // Log conversation updates and sync with Redux store
   React.useEffect(() => {
     if (liveConversationData) {
       console.log('💬 CallScreen - Live conversation data updated:', {
@@ -53,8 +53,15 @@ export function CallScreen() {
         lastMessage: liveConversationData.messages?.[liveConversationData.messages.length - 1]?.content?.substring(0, 50) || 'No messages',
         timestamp: new Date().toISOString()
       })
+      
+      // Ensure the live conversation data is set as the current conversation in Redux
+      // This ensures the conversation screen shows the same conversation as the call status banner
+      if (liveConversationData.id !== currentConversation?.id) {
+        console.log('🔄 CallScreen - Syncing live conversation to Redux store:', liveConversationData.id);
+        dispatch(setConversation(liveConversationData));
+      }
     }
-  }, [liveConversationData])
+  }, [liveConversationData, currentConversation?.id, dispatch])
 
   // Consume pending call data when component mounts
   React.useEffect(() => {

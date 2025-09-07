@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Conversation } from "../services/api/api.types"
 import { patientApi, conversationApi } from "../services/api"
+import { setActiveCall } from "./callSlice"
 
 interface ConversationState {
   conversation: Conversation
@@ -33,8 +34,10 @@ export const conversationSlice = createSlice({
   reducers: {
     setConversation: (state, action: PayloadAction<Conversation | null>) => {
       if (!action.payload) {
+        console.log('[ConversationSlice] Setting conversation to default (null)');
         state.conversation = defaultConversation
       } else {
+        console.log('[ConversationSlice] Setting conversation:', action.payload.id);
         state.conversation = action.payload
         const index = state.conversations.findIndex(
           (conversation) => conversation.id === state.conversation.id,
@@ -46,6 +49,7 @@ export const conversationSlice = createSlice({
     },
     setConversations: (state, action: PayloadAction<Conversation[]>) => {
       if (action.payload.length > 0) {
+        console.log('[ConversationSlice] Setting conversations, current conversation set to:', action.payload[0].id);
         state.conversation = action.payload[0]
       }
       state.conversations = action.payload
@@ -119,6 +123,32 @@ export const conversationSlice = createSlice({
       } else {
         state.conversation = defaultConversation
       }
+    })
+    // Listen for active call changes and sync conversation ID
+    builder.addMatcher(setActiveCall.match, (state, { payload }) => {
+      if (payload?.conversationId) {
+        console.log('[ConversationSlice] Active call set, syncing conversation ID:', payload.conversationId);
+        
+        // Find the conversation that matches the active call's conversation ID
+        const matchingConversation = state.conversations.find(
+          (conversation) => conversation.id === payload.conversationId
+        );
+        
+        if (matchingConversation) {
+          console.log('[ConversationSlice] Found matching conversation, setting as current:', matchingConversation.id);
+          state.conversation = matchingConversation;
+        } else {
+          console.log('[ConversationSlice] No matching conversation found for active call ID:', payload.conversationId);
+          // The conversation might not be loaded yet, but we should still set a placeholder
+          // This will be updated when the conversation is fetched
+        }
+      }
+    })
+    // Listen for when a specific conversation is fetched and sync with active call
+    builder.addMatcher(conversationApi.endpoints.getConversation.matchFulfilled, (state, { payload, meta }) => {
+      // We'll handle this in the component level since we can't easily access other slice state here
+      // The CallScreen will handle setting the conversation when it gets the data
+      console.log('[ConversationSlice] Conversation fetched:', payload.id);
     })
   },
 })
