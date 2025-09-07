@@ -25,7 +25,9 @@ export function CallScreen() {
     { conversationId: activeCall?.conversationId || '' },
     {
       pollingInterval: 2000, // Poll every 2 seconds for live conversation updates
-      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call'
+      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call',
+      // Note: RTK Query doesn't support custom retry logic in the same way as React Query
+      // We'll handle retries through polling instead
     }
   )
 
@@ -37,8 +39,19 @@ export function CallScreen() {
       isFetching: isConversationFetching,
       hasData: !!liveConversationData,
       hasError: !!conversationError,
+      errorStatus: (conversationError as any)?.status,
+      errorMessage: (conversationError as any)?.data?.message || (conversationError as any)?.message,
       skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call'
     })
+    
+    // Log specific 404 errors
+    if ((conversationError as any)?.status === 404) {
+      console.warn('⚠️ CallScreen - Conversation not found (404):', {
+        conversationId: activeCall?.conversationId,
+        error: conversationError,
+        timestamp: new Date().toISOString()
+      });
+    }
   }, [activeCall?.conversationId, isConversationLoading, isConversationFetching, liveConversationData, conversationError])
 
   // Use live conversation data if available, otherwise fall back to Redux store
@@ -136,6 +149,20 @@ export function CallScreen() {
           <Text style={styles.debugText}>Debug: activeCall = {JSON.stringify(activeCall, null, 2)}</Text>
           <Text style={styles.debugText}>Debug: conversation polling = {isConversationFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
           <Text style={styles.debugText}>Debug: live conversation messages = {conversationToDisplay?.messages?.length || 0}</Text>
+          {(conversationError as any)?.status === 404 && (
+            <Text style={[styles.debugText, { color: 'orange' }]}>
+              Debug: Conversation not found (404) - retrying...
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Conversation Loading/Error State */}
+      {(conversationError as any)?.status === 404 && (
+        <View style={styles.warningContainer}>
+          <Text style={styles.warningText}>
+            Setting up conversation... This may take a moment.
+          </Text>
         </View>
       )}
 
@@ -244,6 +271,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.palette.neutral100,
     borderBottomWidth: 1,
     borderColor: colors.palette.biancaBorder,
+  },
+  warningContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff3cd',
+    borderBottomWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  warningText: {
+    color: '#856404',
+    fontSize: 14,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   content: {
     flex: 1,
