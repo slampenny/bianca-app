@@ -71,7 +71,7 @@ if [ -n "$STAGING_IP" ]; then
     echo "Copying staging override configuration..."
     scp -i ~/.ssh/bianca-key-pair.pem docker-compose.staging.yml ec2-user@$STAGING_IP:~/ && ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "sudo mv ~/docker-compose.staging.yml /opt/bianca-staging/ && sudo chown root:root /opt/bianca-staging/docker-compose.staging.yml"
     
-    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "cd /opt/bianca-staging && aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data && docker-compose -f docker-compose.yml -f docker-compose.staging.yml pull && docker stop \$(docker ps -q) 2>/dev/null || true && docker rm \$(docker ps -aq) 2>/dev/null || true && docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d"
+    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "cd /opt/bianca-staging && aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data && docker-compose -f docker-compose.yml -f docker-compose.staging.yml pull && docker-compose -f docker-compose.yml -f docker-compose.staging.yml down && docker system prune -f && docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d"
     
     if [ $? -eq 0 ]; then
         echo "✅ Staging containers updated successfully!"

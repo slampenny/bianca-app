@@ -134,7 +134,7 @@ services:
     ports:
       - "3000:3000"
 
-    command: ["yarn", "start"]
+    command: ["yarn", "dev:staging"]
 
     environment:
       - AWS_REGION=$${AWS_REGION}
