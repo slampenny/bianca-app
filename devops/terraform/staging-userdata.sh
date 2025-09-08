@@ -134,9 +134,7 @@ services:
     ports:
       - "3000:3000"
 
-    command: ["yarn", "dev:staging"]
-    volumes:
-      - /opt/bianca-staging/app:/usr/src/bianca-app:rw
+    command: ["yarn", "start"]
 
     environment:
       - AWS_REGION=$${AWS_REGION}
