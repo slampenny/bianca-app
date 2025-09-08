@@ -1,10 +1,7 @@
 # Staging override - uses staging environment with AWS secrets
 services:
   bianca-app:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-      target: build  # Use build stage for staging debugging
+    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
     environment:
       - NODE_ENV=staging
       - AWS_REGION=us-east-2
@@ -15,26 +12,27 @@ services:
       - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
       # MongoDB for staging (using containerized version)
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
+    # Mount AWS credentials for secrets access
     volumes:
-      - .:/usr/src/bianca-app
-      - /usr/src/bianca-app/node_modules  # Exclude node_modules from volume mount
-      # Mount AWS credentials for secrets access
       - ~/.aws:/root/.aws:ro
-    command: ["yarn", "dev:staging"]  # Use staging development command
     ports:
-      - "9229:9229"  # Debug port
+      - "3000:3000"
     cap_add:
       - NET_RAW
       - NET_ADMIN
     networks:
       - node-network
 
+  mongodb:
+    volumes:
+      - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
+
   asterisk:
     volumes:
       # Mount recordings for staging debugging
       - ./devops/asterisk/recordings:/var/spool/asterisk/recording
 
-# Define the network at the top level
+# Define networks at the top level
 networks:
   node-network:
     driver: bridge

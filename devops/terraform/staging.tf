@@ -312,6 +312,26 @@ resource "aws_instance" "staging" {
   }
 }
 
+# EBS Volume for MongoDB data persistence
+resource "aws_ebs_volume" "staging_mongodb" {
+  availability_zone = aws_subnet.staging_public.availability_zone
+  size              = 20  # 20GB should be plenty for staging
+  type              = "gp3"
+  
+  tags = {
+    Name        = "bianca-staging-mongodb-data"
+    Environment = "staging"
+    Purpose     = "MongoDB data persistence"
+  }
+}
+
+# Attach EBS volume to staging instance
+resource "aws_volume_attachment" "staging_mongodb" {
+  device_name = "/dev/sdf"  # Use /dev/sdf for data volume
+  volume_id   = aws_ebs_volume.staging_mongodb.id
+  instance_id = aws_instance.staging.id
+}
+
 # Staging ALB
 resource "aws_lb" "staging" {
   name               = "bianca-staging-alb"

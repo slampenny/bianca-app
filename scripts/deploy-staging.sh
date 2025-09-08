@@ -66,7 +66,7 @@ STAGING_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-s
 
 if [ -n "$STAGING_IP" ]; then
     echo "Updating containers on staging instance: $STAGING_IP"
-    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "cd /opt/bianca-staging && aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && docker-compose pull && docker-compose up -d"
+    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "cd /opt/bianca-staging && aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data && docker-compose pull && docker-compose up -d"
     
     if [ $? -eq 0 ]; then
         echo "✅ Staging containers updated successfully!"

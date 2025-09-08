@@ -54,6 +54,32 @@ mkdir -p /opt/bianca-staging/app
 chown -R ec2-user:ec2-user /opt/bianca-staging/app/
 chmod -R 755 /opt/bianca-staging/app/
 
+# Format and mount EBS volume for MongoDB data
+echo "Setting up EBS volume for MongoDB..."
+# Check if /dev/sdf is available and format it if needed
+if [ -b /dev/sdf ]; then
+    # Check if it's already formatted
+    if ! blkid /dev/sdf >/dev/null 2>&1; then
+        echo "Formatting EBS volume /dev/sdf..."
+        mkfs.ext4 /dev/sdf
+    fi
+    
+    # Create mount point and mount
+    mkdir -p /opt/mongodb-data
+    mount /dev/sdf /opt/mongodb-data
+    
+    # Set proper permissions for MongoDB (user 999)
+    chown 999:999 /opt/mongodb-data
+    chmod 755 /opt/mongodb-data
+    
+    # Add to fstab for persistence
+    echo "/dev/sdf /opt/mongodb-data ext4 defaults,nofail 0 2" >> /etc/fstab
+    
+    echo "EBS volume mounted successfully"
+else
+    echo "Warning: EBS volume /dev/sdf not found"
+fi
+
 
 
 # Get secrets
@@ -76,7 +102,7 @@ services:
       - "127.0.0.1:27017:27017"
     command: mongod --wiredTigerCacheSizeGB 0.5
     volumes:
-      - mongo_data:/data/db
+      - /opt/mongodb-data:/data/db
     networks:
       - bianca-network
 
@@ -168,7 +194,6 @@ services:
       - bianca-network
 
 volumes:
-  mongo_data:
   asterisk_logs:
 
 networks:
