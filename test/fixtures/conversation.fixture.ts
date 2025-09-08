@@ -8,7 +8,7 @@ export function newConversation(patientId: string): Partial<Conversation> {
   // Create some default messages
   const messages: Message[] = [
     { role: 'patient', content: 'Hello, I need some assistance.' },
-    { role: 'doctor', content: 'Sure, how can I help you today?' },
+    { role: 'assistant', content: 'Sure, how can I help you today?' },
   ];
 
   return {

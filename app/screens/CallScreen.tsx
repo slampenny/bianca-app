@@ -6,6 +6,7 @@ import { getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall, consumePendingCallData } from "../store/callSlice"
 import { CallStatusBanner } from "../components/CallStatusBanner"
 import { useGetConversationQuery } from "../services/api/conversationApi"
+import { useGetCallStatusQuery } from "../services/api/callWorkflowApi"
 import { colors } from "app/theme/colors"
 import { Message } from "../services/api/api.types"
 
@@ -15,7 +16,21 @@ export function CallScreen() {
   const activeCall = useSelector(getActiveCall)
   const currentConversation = useSelector(getConversation)
 
-  // Real-time conversation polling for live call messages
+  // Use the same call status polling that CallStatusBanner uses (this is working!)
+  const { 
+    data: callStatusData, 
+    error: callStatusError,
+    isLoading: isCallStatusLoading,
+    isFetching: isCallStatusFetching
+  } = useGetCallStatusQuery(
+    activeCall?.conversationId || '',
+    {
+      pollingInterval: 2000, // Poll every 2 seconds for live call updates
+      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call',
+    }
+  )
+
+  // Fallback: Try to get full conversation data if call status is working
   const { 
     data: liveConversationData, 
     error: conversationError,
@@ -24,38 +39,55 @@ export function CallScreen() {
   } = useGetConversationQuery(
     { conversationId: activeCall?.conversationId || '' },
     {
-      pollingInterval: 2000, // Poll every 2 seconds for live conversation updates
-      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call',
-      // Note: RTK Query doesn't support custom retry logic in the same way as React Query
-      // We'll handle retries through polling instead
+      pollingInterval: 3000, // Poll every 3 seconds (less frequent than call status)
+      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call' || !callStatusData,
+      // Only try conversation API if call status is working
     }
   )
 
-  // Log conversation polling activity
+  // Log call status and conversation polling activity
   React.useEffect(() => {
-    console.log('💬 CallScreen - Conversation polling status:', {
+    console.log('💬 CallScreen - Call status polling:', {
       conversationId: activeCall?.conversationId,
-      isLoading: isConversationLoading,
-      isFetching: isConversationFetching,
-      hasData: !!liveConversationData,
-      hasError: !!conversationError,
-      errorStatus: (conversationError as any)?.status,
-      errorMessage: (conversationError as any)?.data?.message || (conversationError as any)?.message,
-      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call'
+      callStatusLoading: isCallStatusLoading,
+      callStatusFetching: isCallStatusFetching,
+      callStatusData: !!callStatusData,
+      callStatusError: !!callStatusError,
+      conversationLoading: isConversationLoading,
+      conversationFetching: isConversationFetching,
+      conversationData: !!liveConversationData,
+      conversationError: !!conversationError,
+      conversationErrorStatus: (conversationError as any)?.status,
     })
     
-    // Log specific 404 errors
+    // Log specific 404 errors with more context
     if ((conversationError as any)?.status === 404) {
-      console.warn('⚠️ CallScreen - Conversation not found (404):', {
+      console.warn('⚠️ CallScreen - Conversation not found (404), but call status is working:', {
         conversationId: activeCall?.conversationId,
+        callStatusWorking: !!callStatusData,
         error: conversationError,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        note: 'Using call status data as primary source'
       });
     }
-  }, [activeCall?.conversationId, isConversationLoading, isConversationFetching, liveConversationData, conversationError])
+  }, [activeCall?.conversationId, isCallStatusLoading, isCallStatusFetching, callStatusData, callStatusError, isConversationLoading, isConversationFetching, liveConversationData, conversationError])
 
-  // Use live conversation data if available, otherwise fall back to Redux store
-  const conversationToDisplay = liveConversationData || currentConversation
+  // Use live conversation data if available, otherwise use call status data, then fall back to Redux store
+  const conversationToDisplay = liveConversationData || 
+    (callStatusData?.data ? {
+      id: callStatusData.data.conversationId,
+      messages: [], // Call status API doesn't include messages, so we'll show empty for now
+      startTime: callStatusData.data.startTime,
+      endTime: callStatusData.data.endTime,
+      duration: callStatusData.data.duration,
+      status: callStatusData.data.status,
+      patientId: callStatusData.data.patient._id,
+      callSid: '', // Not available in call status
+      lineItemId: null,
+      history: '',
+      analyzedData: {},
+      metadata: {}
+    } : null) || currentConversation
 
   // Log conversation updates and sync with Redux store
   React.useEffect(() => {
@@ -147,21 +179,26 @@ export function CallScreen() {
       {__DEV__ && (
         <View style={styles.debugContainer}>
           <Text style={styles.debugText}>Debug: activeCall = {JSON.stringify(activeCall, null, 2)}</Text>
+          <Text style={styles.debugText}>Debug: call status polling = {isCallStatusFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
           <Text style={styles.debugText}>Debug: conversation polling = {isConversationFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
           <Text style={styles.debugText}>Debug: live conversation messages = {conversationToDisplay?.messages?.length || 0}</Text>
-          {(conversationError as any)?.status === 404 && (
+          <Text style={styles.debugText}>Debug: using call status data = {!!callStatusData && !liveConversationData ? 'YES' : 'NO'}</Text>
+          {(conversationError as any)?.status === 404 && callStatusData && (
             <Text style={[styles.debugText, { color: 'orange' }]}>
-              Debug: Conversation not found (404) - retrying...
+              Debug: Conversation API 404, but call status working - using fallback
             </Text>
           )}
         </View>
       )}
 
       {/* Conversation Loading/Error State */}
-      {(conversationError as any)?.status === 404 && (
+      {(conversationError as any)?.status === 404 && callStatusData && (
         <View style={styles.warningContainer}>
           <Text style={styles.warningText}>
-            Setting up conversation... This may take a moment.
+            📞 Call is active - conversation details loading...
+          </Text>
+          <Text style={[styles.warningText, { fontSize: 12, marginTop: 4 }]}>
+            Using call status data while conversation API catches up.
           </Text>
         </View>
       )}

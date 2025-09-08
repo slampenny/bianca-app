@@ -111,19 +111,6 @@ export const conversationSlice = createSlice({
     //     state.conversations[index] = payload;
     //   }
     // });
-    builder.addMatcher(conversationApi.endpoints.deleteConversation.matchFulfilled, (state) => {
-      if (state.conversation) {
-        state.conversations = state.conversations.filter(
-          (conversation) => conversation.id !== state.conversation!.id,
-        )
-      }
-
-      if (state.conversations.length > 0) {
-        state.conversation = state.conversations[0]
-      } else {
-        state.conversation = defaultConversation
-      }
-    })
     // Listen for active call changes and sync conversation ID
     builder.addMatcher(setActiveCall.match, (state, { payload }) => {
       if (payload?.conversationId) {

@@ -28,12 +28,12 @@ export const conversationApi = createApi({
     }),
     addMessageToConversation: builder.mutation<
       Conversation,
-      { conversationId: string; message: string }
+      { conversationId: string; role: string; content: string }
     >({
-      query: ({ conversationId, message }) => ({
+      query: ({ conversationId, role, content }) => ({
         url: `/conversations/${conversationId}`,
         method: "POST",
-        body: { message },
+        body: { role, content },
       }),
     }),
     getConversation: builder.query<Conversation, { conversationId: string }>({
@@ -64,12 +64,6 @@ export const conversationApi = createApi({
         return response;
       },
     }),
-    deleteConversation: builder.mutation<{ success: boolean }, { conversationId: string }>({
-      query: ({ conversationId }) => ({
-        url: `/conversations/${conversationId}`,
-        method: "DELETE",
-      }),
-    }),
   }),
 })
 
@@ -78,5 +72,4 @@ export const {
   useAddMessageToConversationMutation,
   useGetConversationQuery,
   useGetConversationsByPatientQuery,
-  useDeleteConversationMutation,
 } = conversationApi

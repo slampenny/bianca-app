@@ -33,6 +33,8 @@ export interface CallStatusResponse {
     _id: string
     name: string
   }
+  callOutcome?: string
+  callNotes?: string
 }
 
 export interface UpdateCallStatusRequest {
@@ -55,6 +57,7 @@ export interface ActiveCall {
   }
   status: string
   startTime: string
+  callNotes?: string
 }
 
 export interface ActiveCallsResponse {
