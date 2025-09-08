@@ -233,7 +233,7 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
                           messageType;
 
     const message = await Message.create({
-      role: role === 'assistant' ? 'assistant' : 'user',
+      role: role === 'assistant' ? 'assistant' : 'patient',
       content: content.trim(),
       conversationId,
       messageType: normalizedType,

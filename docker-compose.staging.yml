@@ -1,6 +1,6 @@
 # Staging override - uses staging environment with AWS secrets
 services:
-  bianca-app:
+  app:
     image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
     environment:
       - NODE_ENV=staging
