@@ -25,7 +25,7 @@ const generateMessage = (role) => {
     "I'd be happy to schedule a follow-up call. What time works best for you?",
   ];
   
-  const content = role === 'user' 
+  const content = role === 'patient' 
     ? faker.random.arrayElement(userMessages)
     : faker.random.arrayElement(assistantMessages);
   
@@ -82,8 +82,8 @@ const insertConversations = async (conversations) => {
     const messageDataArray = [];
     
     for (let i = 0; i < messageCount; i++) {
-      // Alternate between user and assistant messages
-      const role = i % 2 === 0 ? 'user' : 'assistant';
+      // Alternate between patient and assistant messages
+      const role = i % 2 === 0 ? 'patient' : 'assistant';
       messageDataArray.push(generateMessage(role));
     }
     

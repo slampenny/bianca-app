@@ -3,7 +3,7 @@ const { objectId } = require('./custom.validation');
 
 const getConversation = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    conversationId: Joi.string().custom(objectId),
   }),
 };
 
@@ -18,7 +18,7 @@ const addMessageToConversation = {
     conversationId: Joi.string().custom(objectId),
   }),
   body: Joi.object().keys({
-    role: Joi.string().required().valid('user', 'assistant', 'admin', 'system'),
+    role: Joi.string().required().valid('patient', 'assistant', 'system'),
     content: Joi.string().required(),
   }),
 };

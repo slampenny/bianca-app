@@ -26,7 +26,7 @@ describe('Conversation model', () => {
       validConversation = new Conversation(conversationData);
 
       const messageData = {
-        role: 'user',
+        role: 'patient',
         content: 'Hello, how are you?',
         conversationId: validConversation._id,
         messageType: 'text',

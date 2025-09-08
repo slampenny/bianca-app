@@ -9,6 +9,12 @@ const { prompts } = require('../templates/prompts'); // Your Bianca system promp
 
 // ===== EXISTING METHODS (unchanged) =====
 const createConversationForPatient = async (patientId) => {
+  // Validate that the patient exists
+  const patient = await Patient.findById(patientId);
+  if (!patient) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+  }
+  
   const conversation = new Conversation({ patientId });
   await conversation.save();
   return conversation;
@@ -27,7 +33,10 @@ const addMessageToConversation = async (conversationId, role, content) => {
   await message.save();
   conversation.messages.push(message._id);
   await conversation.save();
-  return conversation;
+  
+  // Populate messages before returning
+  const populatedConversation = await Conversation.findById(conversationId).populate('messages');
+  return populatedConversation;
 };
 
 const getConversationById = async (id) => {

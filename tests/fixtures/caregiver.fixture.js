@@ -41,7 +41,7 @@ const admin = {
   email: 'admin@example.org',
   phone: '+16045624263',
   role: 'orgAdmin',
-  patiends: [],
+  patients: [],
 };
 
 const superAdmin = {
@@ -49,7 +49,7 @@ const superAdmin = {
   email: 'superAdmin@example.org',
   phone: '+16045624263',
   role: 'superAdmin',
-  patiends: [],
+  patients: [],
 };
 
 const insertCaregivers = async (caregivers) => {

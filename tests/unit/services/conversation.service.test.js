@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const conversationService = require('../../../src/services/conversation.service');
-const { Conversation, Message } = require('../../../src/models');
+const { Conversation, Message, Patient } = require('../../../src/models');
 
 let mongoServer;
 
@@ -18,16 +18,38 @@ afterAll(async () => {
 });
 
 describe('conversationService', () => {
+  beforeEach(async () => {
+    await Patient.deleteMany();
+    await Conversation.deleteMany();
+    await Message.deleteMany();
+  });
+
   it('should create a new conversation for a patient', async () => {
-    const patientId = new mongoose.Types.ObjectId();
-    const conversation = await conversationService.createConversationForPatient(patientId);
+    // Create a patient first
+    const patient = new Patient({
+      name: 'Test Patient',
+      email: 'test@example.com',
+      phone: '+16045624263',
+      preferredLanguage: 'en'
+    });
+    await patient.save();
+
+    const conversation = await conversationService.createConversationForPatient(patient._id);
     expect(conversation).toHaveProperty('_id');
-    expect(conversation).toHaveProperty('patientId', patientId);
+    expect(conversation).toHaveProperty('patientId', patient._id);
   });
 
   it('should add a message to a conversation', async () => {
-    const patientId = new mongoose.Types.ObjectId();
-    const conversation = await conversationService.createConversationForPatient(patientId);
+    // Create a patient first
+    const patient = new Patient({
+      name: 'Test Patient',
+      email: 'test@example.com',
+      phone: '+16045624263',
+      preferredLanguage: 'en'
+    });
+    await patient.save();
+
+    const conversation = await conversationService.createConversationForPatient(patient._id);
     const messageContent = 'Hello, world!';
     const updatedConversation = await conversationService.addMessageToConversation(
       conversation._id,
@@ -40,17 +62,33 @@ describe('conversationService', () => {
   });
 
   it('should get a conversation by id', async () => {
-    const patientId = new mongoose.Types.ObjectId();
-    const conversation = await conversationService.createConversationForPatient(patientId);
+    // Create a patient first
+    const patient = new Patient({
+      name: 'Test Patient',
+      email: 'test@example.com',
+      phone: '+16045624263',
+      preferredLanguage: 'en'
+    });
+    await patient.save();
+
+    const conversation = await conversationService.createConversationForPatient(patient._id);
     const fetchedConversation = await conversationService.getConversationById(conversation._id);
     expect(fetchedConversation).toHaveProperty('_id', conversation._id);
   });
 
   it('should get conversations by patient', async () => {
-    const patientId = new mongoose.Types.ObjectId();
-    await conversationService.createConversationForPatient(patientId);
-    await conversationService.createConversationForPatient(patientId);
-    const conversations = await conversationService.getConversationsByPatient(patientId);
+    // Create a patient first
+    const patient = new Patient({
+      name: 'Test Patient',
+      email: 'test@example.com',
+      phone: '+16045624263',
+      preferredLanguage: 'en'
+    });
+    await patient.save();
+
+    await conversationService.createConversationForPatient(patient._id);
+    await conversationService.createConversationForPatient(patient._id);
+    const conversations = await conversationService.getConversationsByPatient(patient._id);
     expect(conversations).toHaveLength(2);
   });
 });

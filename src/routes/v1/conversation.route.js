@@ -160,7 +160,7 @@ router
 router
   .route('/:conversationId')
   .get(
-    auth('readAny:conversation'),
+    auth('readOwn:conversation', 'readAny:conversation'),
     validate(conversationValidation.getConversation),
     conversationController.getConversation
   );

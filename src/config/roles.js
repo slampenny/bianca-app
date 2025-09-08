@@ -13,6 +13,7 @@ const allRoles = {
     'updateOwn:alert',
     'deleteOwn:alert',
     'readOwn:invoice', // Add this for staff to read their invoices
+    'readOwn:conversation', // Add this for staff to read conversations of their patients
   ],
   orgAdmin: [
     // Inherited from staff
