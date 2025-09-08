@@ -177,7 +177,7 @@ export function ConversationsScreen() {
         {isExpanded && (
           <View style={styles.messagesContainer}>
             {(item.messages || []).map((message: Message, index: number) => {
-              const isUser = message.role === "user"
+              const isUser = message.role === "patient"
               return (
                 <View
                   key={`${item.id}-${index}`}
