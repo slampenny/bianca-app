@@ -240,7 +240,7 @@ export function CallScreen() {
           {conversationToDisplay && conversationToDisplay.messages && conversationToDisplay.messages.length > 0 ? (
             <View style={styles.messagesContainer}>
               {conversationToDisplay.messages.map((message: Message, index: number) => {
-                const isUser = message.role === "user"
+                const isUser = message.role === "patient"
                 return (
                   <View
                     key={`${conversationToDisplay.id}-${index}`}
