@@ -532,6 +532,7 @@ class OpenAIRealtimeService {
       lastUserSpeechTime: null,
       lastAssistantSpeechTime: null,
       _userHasSpoken: false, // Track if user has spoken to trigger first response
+      _waitingForInitialGreeting: true, // Track if we're waiting for Bianca's initial greeting
 
       // CRITICAL: Speech end detection variables
       lastSpeechTime: null, // When we last heard speech
@@ -1398,11 +1399,18 @@ class OpenAIRealtimeService {
       }
 
       logger.info(`[OpenAI Realtime] Audio pipeline ready for ${callId} - waiting for user input`);
-      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Waiting for user input.`);
+      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Triggering initial greeting.`);
 
       try {
-        // Don't make OpenAI speak immediately - wait for user to speak first
-        logger.info(`[OpenAI Realtime] Session ready for ${callId} - waiting for user input`);
+        // Trigger initial greeting immediately - Bianca should say hello first
+        logger.info(`[OpenAI Realtime] Session ready for ${callId} - triggering initial greeting`);
+        
+        // Set flag to ignore user input until Bianca has spoken
+        conn._waitingForInitialGreeting = true;
+        
+        // Trigger the initial greeting
+        await this.sendResponseCreate(callId);
+        
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
         logger.error(`[OpenAI Realtime] Error in session setup for ${callId}: ${err.message}`);
@@ -1543,6 +1551,12 @@ class OpenAIRealtimeService {
     if (!conn) {
       this.notify(callId, 'response_done', {});
       return;
+    }
+
+    // Clear the initial greeting flag - Bianca has now spoken
+    if (conn._waitingForInitialGreeting) {
+      logger.info(`[OpenAI Realtime] Initial greeting complete for ${callId} - now accepting user input`);
+      conn._waitingForInitialGreeting = false;
     }
 
     // AI text is now saved immediately when transcript is complete
@@ -1687,6 +1701,12 @@ class OpenAIRealtimeService {
 
     const conn = this.connections.get(callId);
     if (!conn) return;
+
+    // Ignore user input until Bianca has given her initial greeting
+    if (conn._waitingForInitialGreeting) {
+      logger.info(`[OpenAI Realtime] Ignoring user input for ${callId} - waiting for Bianca's initial greeting`);
+      return;
+    }
 
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
 
