@@ -1118,6 +1118,10 @@ class OpenAIRealtimeService {
             conn._aiIsSpeaking = true;
             conn._lastAiSpeechStart = Date.now();
             logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId}`);
+            
+            // Create placeholder message when AI starts speaking
+            // This ensures the timestamp reflects when AI actually started speaking
+            await this.createPlaceholderAssistantMessage(callId);
           }
 
           await this.handleResponseAudioDelta(callId, message);
@@ -1514,12 +1518,12 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Handle audio transcript done - Save complete AI transcript immediately
+   * Handle audio transcript done - Update placeholder AI message with transcript
    * 
    * MESSAGE FLOW LOGIC:
    * This handles the final audio transcript from the AI (response.audio_transcript.done).
-   * Since the AI is only generating audio responses, we need to use this transcript as the text content.
-   * Save immediately to match user text timing - both should be saved when the speaker finishes.
+   * We update the existing placeholder message to preserve the timestamp of when AI started speaking.
+   * This ensures consistent timing with user messages - both get timestamps when they started speaking.
    */
   async handleResponseAudioTranscriptDone(callId, message) {
     if (!message.transcript) return;
@@ -1529,10 +1533,30 @@ class OpenAIRealtimeService {
 
     logger.info(`[OpenAI Realtime] AI audio transcript completed for ${callId}: "${message.transcript}"`);
 
-    // Save AI text immediately when transcript is complete (like user text)
-    // This ensures proper timing - both user and AI text saved when speaker finishes
-    await this.saveCompleteMessage(callId, 'assistant', message.transcript);
-    logger.info(`[OpenAI Realtime] Saved assistant transcript immediately: "${message.transcript}"`);
+    // Update the existing placeholder message to preserve timestamp
+    if (conn.activeAssistantMessageId) {
+      try {
+        const { Message } = require('../models');
+        await Message.findByIdAndUpdate(
+          conn.activeAssistantMessageId,
+          { 
+            content: message.transcript.trim(),
+            messageType: 'assistant_response'
+          },
+          { timestamps: false, runValidators: false } // Preserve original timestamp
+        );
+        logger.info(`[OpenAI Realtime] Updated assistant placeholder message with transcript: "${message.transcript}"`);
+        conn.activeAssistantMessageId = null; // Clear the active message ID
+      } catch (err) {
+        logger.error(`[OpenAI Realtime] Failed to update assistant message: ${err.message}`);
+        // Fallback: create new message if update fails
+        await this.saveCompleteMessage(callId, 'assistant', message.transcript);
+      }
+    } else {
+      // Fallback: create new message if no placeholder exists
+      await this.saveCompleteMessage(callId, 'assistant', message.transcript);
+      logger.info(`[OpenAI Realtime] Created new assistant message with transcript: "${message.transcript}"`);
+    }
   }
 
   /**
@@ -1557,6 +1581,12 @@ class OpenAIRealtimeService {
     if (conn._waitingForInitialGreeting) {
       logger.info(`[OpenAI Realtime] Initial greeting complete for ${callId} - now accepting user input`);
       conn._waitingForInitialGreeting = false;
+    }
+
+    // Clear the active assistant message ID since AI finished speaking
+    if (conn.activeAssistantMessageId) {
+      logger.info(`[OpenAI Realtime] Cleared active assistant message ID for ${callId}`);
+      conn.activeAssistantMessageId = null;
     }
 
     // AI text is now saved immediately when transcript is complete
@@ -1685,6 +1715,36 @@ class OpenAIRealtimeService {
       }
     } catch (err) {
       logger.error(`[OpenAI Realtime] Failed to create placeholder user message: ${err.message}`);
+    }
+  }
+
+  /**
+   * Create placeholder assistant message when AI starts speaking
+   * 
+   * MESSAGE FLOW LOGIC:
+   * 1. Create a placeholder message with timestamp when AI starts speaking
+   * 2. Store the message ID in the connection for later updating
+   * 3. This ensures the timestamp reflects when AI actually started speaking
+   */
+  async createPlaceholderAssistantMessage(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn?.conversationId) return;
+
+    try {
+      const conversationService = require('./conversation.service');
+      const message = await conversationService.saveRealtimeMessage(
+        conn.conversationId,
+        'assistant',
+        '[Speaking...]', // Placeholder content
+        'assistant_response'
+      );
+      
+      if (message) {
+        conn.activeAssistantMessageId = message._id;
+        logger.info(`[OpenAI Realtime] Created placeholder assistant message ${message._id} for ${callId}`);
+      }
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Failed to create placeholder assistant message: ${err.message}`);
     }
   }
 
