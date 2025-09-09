@@ -1,5 +1,33 @@
 #!/bin/bash
 # Deploy staging environment script
+#
+# AWS Credential Setup:
+# To avoid having to re-login every time, set up AWS credential caching:
+# 1. For AWS SSO: Run 'aws sso login' once per day
+# 2. For long-term credentials: Configure with 'aws configure'
+# 3. For credential caching: Install aws-vault or similar tool
+
+# Helper function to check and login to ECR
+check_and_login_ecr() {
+    local context="$1"
+    echo "🔐 Checking ECR access for $context..."
+    
+    # Check if Docker is already logged into ECR
+    if docker info | grep -q "730335291008.dkr.ecr.us-east-2.amazonaws.com" 2>/dev/null; then
+        echo "✅ ECR credentials are still valid for $context, skipping login"
+        return 0
+    fi
+    
+    echo "🔐 Logging into ECR for $context..."
+    aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+    
+    if [ $? -ne 0 ]; then
+        echo "❌ ECR login failed for $context. Please check your AWS credentials and try again."
+        return 1
+    fi
+    echo "✅ ECR login successful for $context"
+    return 0
+}
 
 echo "🚀 Deploying Bianca Staging Environment..."
 
@@ -14,15 +42,19 @@ fi
 
 docker tag bianca-app-backend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
 
-echo "🔐 Logging into ECR..."
-# Use temporary credential helper to avoid WSL issues
+echo "🔐 Checking AWS credentials..."
 export AWS_PROFILE=jordan
-aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
 
-if [ $? -ne 0 ]; then
-    echo "❌ ECR login failed. Please check your AWS credentials and try again."
+# Check if AWS credentials are valid
+if ! aws sts get-caller-identity --profile jordan >/dev/null 2>&1; then
+    echo "❌ AWS credentials not valid or expired. Please run 'aws configure' or 'aws sso login'"
     exit 1
 fi
+
+echo "✅ AWS credentials are valid"
+
+# Check and login to ECR for backend
+check_and_login_ecr "backend push" || exit 1
 
 echo "📦 Pushing backend image to ECR..."
 docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
@@ -43,6 +75,9 @@ if [ $? -ne 0 ]; then
 fi
 
 docker tag bianca-app-frontend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
+
+# Check and login to ECR for frontend (credentials might have expired)
+check_and_login_ecr "frontend push" || exit 1
 
 echo "📦 Pushing frontend image to ECR..."
 docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
@@ -71,7 +106,40 @@ if [ -n "$STAGING_IP" ]; then
     echo "Copying staging override configuration..."
     scp -i ~/.ssh/bianca-key-pair.pem docker-compose.staging.yml ec2-user@$STAGING_IP:~/ && ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "sudo mv ~/docker-compose.staging.yml /opt/bianca-staging/ && sudo chown root:root /opt/bianca-staging/docker-compose.staging.yml"
     
-    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "cd /opt/bianca-staging && aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data && docker-compose -f docker-compose.yml -f docker-compose.staging.yml pull && docker-compose -f docker-compose.yml -f docker-compose.staging.yml down && docker stop \$(docker ps -q) 2>/dev/null || true && docker rm \$(docker ps -aq) 2>/dev/null || true && docker system prune -f && docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d"
+    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP "
+      cd /opt/bianca-staging
+      
+      # Login to ECR
+      aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+      
+      # Create MongoDB data directory
+      sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
+      
+      # Pull latest images
+      docker-compose -f docker-compose.yml -f docker-compose.staging.yml pull
+      
+      echo 'Stopping and removing all containers...'
+      
+      # Stop and remove all containers more aggressively
+      docker-compose -f docker-compose.yml -f docker-compose.staging.yml down || true
+      
+      # Force stop all running containers
+      docker stop \$(docker ps -q) 2>/dev/null || true
+      
+      # Force remove all containers
+      docker rm \$(docker ps -aq) 2>/dev/null || true
+      
+      # Remove any dangling containers
+      docker container prune -f
+      
+      # Clean up system
+      docker system prune -f
+      
+      echo 'Starting new containers...'
+      
+      # Start new containers
+      docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+    "
     
     if [ $? -eq 0 ]; then
         echo "✅ Staging containers updated successfully!"

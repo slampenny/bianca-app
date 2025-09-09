@@ -1,5 +1,34 @@
 // src/services/openai.realtime.service.js
 
+/**
+ * MESSAGE FLOW ARCHITECTURE:
+ * 
+ * This service handles real-time conversation between users and AI assistant.
+ * The key challenge is ensuring messages are saved in the correct chronological order.
+ * 
+ * MESSAGE SAVING STRATEGY:
+ * 1. ACCUMULATE: Both user and AI messages are accumulated in memory (not saved immediately)
+ * 2. SAVE WHEN COMPLETE: Messages are only saved when the speaker finishes their turn
+ * 3. TIMESTAMP CONSISTENCY: All messages get timestamps when saved, not when first generated
+ * 
+ * USER MESSAGE FLOW:
+ * 1. User speaks → Audio transcribed → Accumulated in pendingUserTranscript
+ * 2. User stops speaking → input_audio_buffer.speech_stopped event
+ * 3. pendingUserTranscript saved to database with timestamp
+ * 
+ * AI MESSAGE FLOW:
+ * 1. AI generates text → response.content_part.added event → Accumulated in pendingAssistantTranscript
+ * 2. AI finishes speaking → response.done event
+ * 3. pendingAssistantTranscript saved to database with timestamp
+ * 
+ * FALLBACK MECHANISMS:
+ * - Stale transcript cleanup: Messages saved after timeout if speaker doesn't finish cleanly
+ * - Call end cleanup: Any remaining messages saved when call ends
+ * 
+ * This ensures messages appear in conversation in the order speakers actually finished speaking,
+ * not in the order text was first generated or transcribed.
+ */
+
 const WebSocket = require('ws');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
@@ -1105,10 +1134,14 @@ class OpenAIRealtimeService {
             conn._lastAiSpeechEnd = Date.now();
             conn._responseCreated = false;
 
-            // Save any pending assistant transcript
+            // MESSAGE FLOW: Save AI transcript when AI finishes speaking
+            // This ensures AI messages get timestamps reflecting when AI actually finished speaking
             if (conn.pendingAssistantTranscript) {
+              logger.info(`[OpenAI Realtime] Saving AI transcript for ${callId}: "${conn.pendingAssistantTranscript}"`);
               await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
               conn.pendingAssistantTranscript = '';
+            } else {
+              logger.warn(`[OpenAI Realtime] No pending AI transcript to save for ${callId}`);
             }
 
             logger.info(`[OpenAI Realtime] AI turn complete for ${callId} - ready for user input`);
@@ -1125,12 +1158,20 @@ class OpenAIRealtimeService {
           await this.handleResponseAudioTranscriptDelta(callId, message);
           break;
 
+        case 'response.audio_transcript.done':
+          await this.handleResponseAudioTranscriptDone(callId, message);
+          break;
+
         case 'input_audio_buffer.speech_started':
           logger.info(`[OpenAI Realtime] USER SPEECH STARTED for ${callId}`);
 
           if (conn) {
             conn._userIsSpeaking = true;
             conn._lastUserSpeechStart = Date.now();
+
+            // Create placeholder message when user starts speaking
+            // This ensures the timestamp reflects when user actually started speaking
+            await this.createPlaceholderUserMessage(callId);
 
             // CRITICAL: If AI is currently speaking, we need to interrupt it
             if (conn._aiIsSpeaking) {
@@ -1155,10 +1196,16 @@ class OpenAIRealtimeService {
             conn._userIsSpeaking = false;
             conn._lastUserSpeechEnd = Date.now();
 
-            // Save any pending user transcript
-            if (conn.pendingUserTranscript) {
-              await this.saveCompleteMessage(callId, 'user', conn.pendingUserTranscript);
-              conn.pendingUserTranscript = '';
+            // Clean up any placeholder message if user stops speaking without transcript
+            if (conn.activeUserMessageId) {
+              try {
+                const { Message } = require('../models');
+                await Message.findByIdAndDelete(conn.activeUserMessageId);
+                logger.info(`[OpenAI Realtime] Cleaned up placeholder user message for ${callId}`);
+                conn.activeUserMessageId = null;
+              } catch (err) {
+                logger.error(`[OpenAI Realtime] Failed to clean up placeholder user message: ${err.message}`);
+              }
             }
 
             // CRITICAL: Only trigger AI response if user has finished speaking
@@ -1200,6 +1247,14 @@ class OpenAIRealtimeService {
             conn.totalAudioBytesSent = 0;
             conn.consecutiveBufferErrors = 0;
             logger.info(`[OpenAI Realtime] Reset audio counters for ${callId} after processing ${chunksProcessed} chunks (${validChunksProcessed} valid, ${bytesProcessed} bytes)`);
+            
+            // Clear the buffer after successful commit to prevent duplicate processing
+            try {
+              await this.sendJsonMessage(callId, { type: 'input_audio_buffer.clear' });
+              logger.info(`[OpenAI Realtime] Cleared audio buffer after commit for ${callId}`);
+            } catch (clearErr) {
+              logger.warn(`[OpenAI Realtime] Could not clear buffer after commit for ${callId}: ${clearErr.message}`);
+            }
           }
           break;
 
@@ -1386,6 +1441,13 @@ class OpenAIRealtimeService {
 
   /**
    * Handle content part added
+   * 
+   * MESSAGE FLOW LOGIC:
+   * 1. When AI generates text, it comes through here as 'response.content_part.added'
+   * 2. We accumulate the text in pendingAssistantTranscript (don't save yet)
+   * 3. Text is saved later when AI finishes speaking (response.done) or becomes stale
+   * 4. This ensures AI messages are saved with timestamps reflecting when AI finished speaking
+   * 5. User messages follow the same pattern - accumulated then saved when user stops speaking
    */
   async handleContentPartAdded(callId, message) {
     const part = message.part;
@@ -1396,6 +1458,16 @@ class OpenAIRealtimeService {
 
     if (part.type === 'text') {
       logger.info(`[OpenAI Realtime] Received TEXT content part for ${callId}: "${part.text}"`);
+
+      // Accumulate AI text instead of saving immediately (like user transcription)
+      const conn = this.connections.get(callId);
+      if (conn) {
+        conn.pendingAssistantTranscript += (conn.pendingAssistantTranscript ? ' ' : '') + part.text;
+        conn.lastAssistantTextTime = Date.now();
+        logger.info(`[OpenAI Realtime] Accumulated assistant text: "${conn.pendingAssistantTranscript}"`);
+      } else {
+        logger.warn(`[OpenAI Realtime] No connection found for ${callId} when trying to accumulate AI text`);
+      }
 
       this.notify(callId, 'openai_text_delta', {
         text: part.text,
@@ -1414,6 +1486,11 @@ class OpenAIRealtimeService {
 
   /**
    * Handle audio transcript deltas - ENHANCED to save transcripts
+   * 
+   * MESSAGE FLOW LOGIC:
+   * This handles audio transcripts of what the AI is saying (different from text content).
+   * We should NOT accumulate this in pendingAssistantTranscript since we already have the text content.
+   * Audio transcripts are typically used for debugging/monitoring, not for saving to conversation.
    */
   async handleResponseAudioTranscriptDelta(callId, message) {
     if (!message.delta) return;
@@ -1423,16 +1500,41 @@ class OpenAIRealtimeService {
 
     logger.info(`[OpenAI Realtime] Audio transcript delta for ${callId}: "${message.delta}"`);
 
-    // Just accumulate - don't check who's speaking
-    conn.pendingAssistantTranscript += message.delta;
-    conn.lastAssistantSpeechTime = Date.now();
+    // Don't accumulate audio transcripts - we already have the text content
+    // Audio transcripts are for monitoring/debugging, not for conversation storage
+    logger.debug(`[OpenAI Realtime] Skipping audio transcript accumulation - using text content instead`);
   }
 
   /**
-   * Handle response.done - UPDATED to flush any remaining transcripts
+   * Handle audio transcript done - Save complete AI transcript immediately
+   * 
+   * MESSAGE FLOW LOGIC:
+   * This handles the final audio transcript from the AI (response.audio_transcript.done).
+   * Since the AI is only generating audio responses, we need to use this transcript as the text content.
+   * Save immediately to match user text timing - both should be saved when the speaker finishes.
    */
+  async handleResponseAudioTranscriptDone(callId, message) {
+    if (!message.transcript) return;
+
+    const conn = this.connections.get(callId);
+    if (!conn) return;
+
+    logger.info(`[OpenAI Realtime] AI audio transcript completed for ${callId}: "${message.transcript}"`);
+
+    // Save AI text immediately when transcript is complete (like user text)
+    // This ensures proper timing - both user and AI text saved when speaker finishes
+    await this.saveCompleteMessage(callId, 'assistant', message.transcript);
+    logger.info(`[OpenAI Realtime] Saved assistant transcript immediately: "${message.transcript}"`);
+  }
+
   /**
    * Handle response.done - Save complete assistant response
+   * 
+   * MESSAGE FLOW LOGIC:
+   * 1. This is called when the AI finishes speaking (response.done event)
+   * 2. We save any accumulated AI text from pendingAssistantTranscript
+   * 3. This ensures AI messages are saved with timestamps reflecting when AI actually finished speaking
+   * 4. The message gets a timestamp when it's saved to the database, not when text was first generated
    */
   async handleResponseDone(callId) {
     logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
@@ -1443,11 +1545,8 @@ class OpenAIRealtimeService {
       return;
     }
 
-    // Save complete assistant message
-    if (conn.pendingAssistantTranscript) {
-      await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
-      conn.pendingAssistantTranscript = '';
-    }
+    // AI text is now saved immediately when transcript is complete
+    // No need to save here since we handle it in handleResponseAudioTranscriptDone
 
     // Reset response flag so new commits can trigger new responses
     conn._responseCreated = false;
@@ -1490,7 +1589,7 @@ class OpenAIRealtimeService {
 
         // Check assistant transcript independently
         if (conn.pendingAssistantTranscript && conn.pendingAssistantTranscript.trim()) {
-          const assistantSilenceTime = now - (conn.lastAssistantSpeechTime || 0);
+          const assistantSilenceTime = now - (conn.lastAssistantTextTime || 0);
           if (assistantSilenceTime > STALE_THRESHOLD) {
             // Capture the transcript to save
             const transcriptToSave = conn.pendingAssistantTranscript;
@@ -1501,7 +1600,7 @@ class OpenAIRealtimeService {
               // Only clear if it hasn't changed
               if (conn.pendingAssistantTranscript === transcriptToSave) {
                 conn.pendingAssistantTranscript = '';
-                conn.lastAssistantSpeechTime = null;
+                conn.lastAssistantTextTime = null;
               }
             } catch (err) {
               logger.error(`[Transcript Cleanup] Error: ${err.message}`);
@@ -1516,9 +1615,13 @@ class OpenAIRealtimeService {
 
   async saveCompleteMessage(callId, role, content) {
     const conn = this.connections.get(callId);
-    if (!conn?.conversationId || !content?.trim()) return;
+    if (!conn?.conversationId || !content?.trim()) {
+      logger.warn(`[OpenAI Realtime] Cannot save ${role} message for ${callId}: conn=${!!conn}, conversationId=${conn?.conversationId}, content="${content}"`);
+      return;
+    }
 
     try {
+      logger.info(`[OpenAI Realtime] Attempting to save ${role} message for ${callId}: "${content}"`);
       const conversationService = require('./conversation.service');
       await conversationService.saveRealtimeMessage(
         conn.conversationId,
@@ -1526,9 +1629,9 @@ class OpenAIRealtimeService {
         content.trim(),
         role === 'assistant' ? 'assistant_response' : 'user_message'
       );
-      logger.info(`[OpenAI Realtime] Saved ${role} message (${content.length} chars) to conversation ${conn.conversationId}`);
+      logger.info(`[OpenAI Realtime] Successfully saved ${role} message (${content.length} chars) to conversation ${conn.conversationId}`);
     } catch (err) {
-      logger.error(`[OpenAI Realtime] Failed to save ${role} message: ${err.message}`);
+      logger.error(`[OpenAI Realtime] Failed to save ${role} message: ${err.message}`, err);
     }
   }
 
@@ -1542,10 +1645,42 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Handle input audio transcription completed - ENHANCED to save user speech
+   * Create placeholder user message when user starts speaking
+   * 
+   * MESSAGE FLOW LOGIC:
+   * 1. Create a placeholder message with timestamp when user starts speaking
+   * 2. Store the message ID in the connection for later updating
+   * 3. This ensures the timestamp reflects when user actually started speaking
    */
+  async createPlaceholderUserMessage(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn?.conversationId) return;
+
+    try {
+      const conversationService = require('./conversation.service');
+      const message = await conversationService.saveRealtimeMessage(
+        conn.conversationId,
+        'user',
+        '[Speaking...]', // Placeholder content
+        'user_message'
+      );
+      
+      if (message) {
+        conn.activeUserMessageId = message._id;
+        logger.info(`[OpenAI Realtime] Created placeholder user message ${message._id} for ${callId}`);
+      }
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Failed to create placeholder user message: ${err.message}`);
+    }
+  }
+
   /**
    * Handle input audio transcription completed - UPDATED
+   * 
+   * MESSAGE FLOW LOGIC:
+   * 1. This is called when user speech is transcribed (conversation.item.input_audio_transcription.completed)
+   * 2. Update the existing placeholder message with the actual transcript
+   * 3. This ensures the timestamp reflects when user started speaking, not when transcript was created
    */
   async handleInputAudioTranscriptionCompleted(callId, message) {
     if (!message.transcript) return;
@@ -1555,12 +1690,32 @@ class OpenAIRealtimeService {
 
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
 
-    // DON'T interrupt the assistant - they can speak simultaneously
-    // Just accumulate the user transcript
-    conn.pendingUserTranscript += (conn.pendingUserTranscript ? ' ' : '') + message.transcript;
-    conn.lastUserSpeechTime = Date.now();
-
-    logger.debug(`[OpenAI Realtime] Accumulated user transcript: "${conn.pendingUserTranscript}"`);
+    // Update the existing placeholder message with the actual transcript
+    if (conn.activeUserMessageId) {
+      try {
+        const { Message } = require('../models');
+        await Message.findByIdAndUpdate(
+          conn.activeUserMessageId, 
+          { content: message.transcript },
+          { 
+            // Preserve the original createdAt timestamp
+            timestamps: false,
+            // Don't update the updatedAt field
+            runValidators: false
+          }
+        );
+        conn.activeUserMessageId = null; // Clear the active message ID
+        logger.info(`[OpenAI Realtime] Updated user message with transcript: "${message.transcript}"`);
+      } catch (err) {
+        logger.error(`[OpenAI Realtime] Failed to update user message: ${err.message}`);
+        // Fallback: create new message if update fails
+        await this.saveCompleteMessage(callId, 'user', message.transcript);
+      }
+    } else {
+      // Fallback: create new message if no placeholder exists
+      await this.saveCompleteMessage(callId, 'user', message.transcript);
+      logger.info(`[OpenAI Realtime] Created new user message with transcript: "${message.transcript}"`);
+    }
   }
 
   /**
@@ -1744,24 +1899,10 @@ class OpenAIRealtimeService {
     if (!item) return;
 
     try {
-      // Only save completed messages
+      // Skip saving completed messages here - they're now saved when speakers finish
+      // (AI text is accumulated and saved in handleResponseDone, user transcription in handleInputAudioTranscriptionCompleted)
       if (item.type === 'message' && item.status === 'completed') {
-        const contentArray = item.content || [];
-        const contentText = contentArray
-          .map(part => (part?.type === 'text' ? part.text : ''))
-          .join('')
-          .trim();
-
-        if (contentText && dbConversationId) {
-          const conversationService = require('./conversation.service');
-          await conversationService.saveRealtimeMessage(
-            dbConversationId,
-            item.role,
-            contentText,
-            item.role === 'assistant' ? 'assistant_response' : 'user_message'
-          );
-          logger.info(`[OpenAI Realtime] Saved ${item.role} message to conversation ${dbConversationId}`);
-        }
+        logger.debug(`[OpenAI Realtime] Skipping immediate save of ${item.role} message - will be saved when speaker finishes`);
       }
 
       // Only save completed audio transcripts

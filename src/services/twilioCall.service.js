@@ -129,7 +129,7 @@ class TwilioCallService {
       twiml.say({
         voice: 'alice',
         language: 'en-US'
-      }, "Hello! I'm connecting you to your AI assistant. Please wait while I transfer your call.");
+      }, "Hello, connecting you to Bianca");
       
       // Determine SIP endpoint based on environment
       let sipHost, sipPort;

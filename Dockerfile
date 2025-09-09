@@ -1,6 +1,6 @@
 # Multi-stage build for better caching and smaller final image
 # syntax=docker/dockerfile:1.4
-FROM public.ecr.aws/docker/library/node:18-bullseye AS base
+FROM node:18-bullseye AS base
 
 # Create app directory
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app

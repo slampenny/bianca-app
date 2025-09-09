@@ -232,15 +232,15 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
                           messageType === 'user_message' ? 'user_message' : 
                           messageType;
 
+    // Create and save the message to the database FIRST
     const message = await Message.create({
       role: role === 'assistant' ? 'assistant' : 'patient',
       content: content.trim(),
       conversationId,
       messageType: normalizedType,
     });
-    
 
-    // Also update the conversation's messages array for proper references
+    // Then update the conversation's messages array with the saved message's ID
     await Conversation.findByIdAndUpdate(
       conversationId,
       { 
