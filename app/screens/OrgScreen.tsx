@@ -71,6 +71,11 @@ export function OrgScreen() {
     navigation.navigate("Caregiver")
   }
 
+  const handlePaymentPress = () => {
+    // Navigate to payment screen
+    navigation.navigate("Payment")
+  }
+
   if (isLoading) {
     return <LoadingScreen />
   }
@@ -145,6 +150,9 @@ export function OrgScreen() {
           <Text style={styles.inviteCaregiverButtonText}>Invite Caregiver</Text>
         </Pressable>
       )}
+      <Pressable style={styles.paymentButton} onPress={handlePaymentPress} testID="payment-button">
+        <Text style={styles.paymentButtonText}>Payments</Text>
+      </Pressable>
     </ScrollView>
   )
 }
@@ -270,5 +278,17 @@ const styles = StyleSheet.create({
     color: colors.palette.neutral600,
     fontSize: 12,
     textAlign: "center",
+  },
+  paymentButton: {
+    alignItems: "center",
+    backgroundColor: colors.palette.accent500,
+    borderRadius: 5,
+    marginTop: 10,
+    paddingVertical: 15,
+  },
+  paymentButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 18,
+    fontWeight: "600",
   },
 })

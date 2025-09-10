@@ -19,6 +19,9 @@ import {
   LogoutScreen,
   PrivacyScreen,
   TermsScreen,
+  ReportsScreen,
+  SentimentReportScreen,
+  HealthReportScreen,
 } from "app/screens"
 import { DrawerParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
@@ -118,11 +121,12 @@ function OrgStack() {
       <Stack.Screen name="CaregiverInvited">
         {(props) => <CaregiverInvitedScreen {...(props as any)} />}
       </Stack.Screen>
+      <Stack.Screen name="Payment" component={PaymentInfoScreen} />
     </Stack.Navigator>
   )
 }
 
-function PaymentStack() {
+function ReportsStack() {
   return (
     <Stack.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -130,7 +134,9 @@ function PaymentStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Payment" component={PaymentInfoScreen} />
+      <Stack.Screen name="Reports" component={ReportsScreen} />
+      <Stack.Screen name="SentimentReport" component={SentimentReportScreen} options={{ title: "Sentiment Analysis" }} />
+      <Stack.Screen name="HealthReport" component={HealthReportScreen} options={{ title: "Mental Health Report" }} />
     </Stack.Navigator>
   )
 }
@@ -155,8 +161,8 @@ export default function MainTabNavigator() {
             iconName = focused ? "home" : "home-outline"
           } else if (route.name === "Org") {
             iconName = focused ? "people" : "people-outline"
-          } else if (route.name === "Payment") {
-            iconName = focused ? "card" : "card-outline"
+          } else if (route.name === "Reports") {
+            iconName = focused ? "analytics" : "analytics-outline"
           } else if (route.name === "Alert") {
             iconName = focused ? "alert-circle" : "alert-circle-outline"
           }
@@ -182,11 +188,11 @@ export default function MainTabNavigator() {
         }} 
       />
       <Tab.Screen 
-        name="Payment" 
-        component={PaymentStack} 
+        name="Reports" 
+        component={ReportsStack} 
         options={{ 
-          tabBarLabel: "Payments",
-          tabBarTestID: "tab-payment" 
+          tabBarLabel: "Reports",
+          tabBarTestID: "tab-reports" 
         }} 
       />
       <Tab.Screen

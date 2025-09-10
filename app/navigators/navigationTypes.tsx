@@ -14,7 +14,7 @@ export type DrawerParamList = {
   Profile: undefined
   Alert: undefined
   Org: undefined
-  Payment: undefined
+  Reports: undefined
   Logout: undefined
 }
 
@@ -49,6 +49,7 @@ export type OrgStackParamList = {
       email: string
     }
   }
+  Payment: undefined
 }
 
 export type PaymentStackParamList = {
