@@ -3360,26 +3360,23 @@ class OpenAIRealtimeService {
 
         try {
           const conversationService = require('./conversation.service');
-          const summary = await conversationService.finalizeConversation(
+          const finalizationResult = await conversationService.finalizeConversation(
             conversationId,
             true // true = use realtime messages from Message collection
           );
 
-          if (summary) {
-            logger.info(`[OpenAI Call End] Successfully generated summary for conversation ${conversationId}: "${summary.substring(0, 100)}..."`);
+          if (finalizationResult && finalizationResult.summary) {
+            logger.info(`[OpenAI Call End] Successfully generated summary for conversation ${conversationId}: "${finalizationResult.summary.substring(0, 100)}..."`);
+            
+            if (finalizationResult.sentimentAnalysis) {
+              logger.info(`[OpenAI Call End] Sentiment analysis completed: ${finalizationResult.sentimentAnalysis.overallSentiment} (score: ${finalizationResult.sentimentAnalysis.sentimentScore})`);
+            }
           } else {
             logger.warn(`[OpenAI Call End] No summary generated for conversation ${conversationId}`);
           }
 
-          // Update final conversation status
-          const { Conversation } = require('../models');
-          await Conversation.findByIdAndUpdate(conversationId, {
-            endTime: new Date(),
-            status: 'completed',
-            callEndReason: 'normal_completion'
-          });
-
-          logger.info(`[OpenAI Call End] Conversation ${conversationId} marked as completed`);
+          // Note: Conversation status is already updated by finalizeConversation
+          logger.info(`[OpenAI Call End] Conversation ${conversationId} finalized with summary and sentiment analysis`);
 
         } catch (summaryErr) {
           logger.error(`[OpenAI Call End] Error finalizing conversation ${conversationId}: ${summaryErr.message}`);

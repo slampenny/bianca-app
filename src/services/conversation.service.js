@@ -333,15 +333,46 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       userDomain
     );
 
-    // Update conversation using your existing history field
-    await Conversation.findByIdAndUpdate(conversationId, {
+    // Perform sentiment analysis on the conversation
+    let sentimentAnalysis = null;
+    try {
+      const { getOpenAISentimentServiceInstance } = require('./openai.sentiment.service');
+      const sentimentService = getOpenAISentimentServiceInstance();
+      
+      logger.info(`[Finalize] Starting sentiment analysis for conversation ${conversationId}`);
+      sentimentAnalysis = await sentimentService.analyzeSentiment(conversationText, {
+        detailed: true
+      });
+      
+      if (sentimentAnalysis.success) {
+        logger.info(`[Finalize] Sentiment analysis completed for conversation ${conversationId}: ${sentimentAnalysis.data.overallSentiment}`);
+      } else {
+        logger.warn(`[Finalize] Sentiment analysis failed for conversation ${conversationId}: ${sentimentAnalysis.error}`);
+      }
+    } catch (sentimentErr) {
+      logger.error(`[Finalize] Error during sentiment analysis for conversation ${conversationId}: ${sentimentErr.message}`);
+    }
+
+    // Update conversation with summary and sentiment analysis
+    const updateData = {
       history: summary, // Store summary in your existing history field
       endTime: new Date(),
       status: 'completed'
-    });
+    };
 
-    logger.info(`[Finalize] Successfully summarized conversation ${conversationId} with ${messages.length} messages`);
-    return summary;
+    // Add sentiment analysis to analyzedData if successful
+    if (sentimentAnalysis && sentimentAnalysis.success) {
+      updateData['analyzedData.sentiment'] = sentimentAnalysis.data;
+      updateData['analyzedData.sentimentAnalyzedAt'] = new Date();
+    }
+
+    await Conversation.findByIdAndUpdate(conversationId, updateData);
+
+    logger.info(`[Finalize] Successfully finalized conversation ${conversationId} with ${messages.length} messages${sentimentAnalysis && sentimentAnalysis.success ? ' and sentiment analysis' : ''}`);
+    return {
+      summary,
+      sentimentAnalysis: sentimentAnalysis && sentimentAnalysis.success ? sentimentAnalysis.data : null
+    };
 
   } catch (err) {
     logger.error(`[Finalize] Error: ${err.message}`, err);
@@ -356,6 +387,11 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     } catch (updateErr) {
       logger.error(`[Finalize] Failed to update: ${updateErr.message}`);
     }
+    
+    return {
+      summary: 'Summary generation failed - manual review needed',
+      sentimentAnalysis: null
+    };
   }
 };
 
@@ -389,6 +425,230 @@ const getPatientContext = async (patientId) => {
   }
 };
 
+/**
+ * Get sentiment trend data for a patient over a specified time range
+ */
+const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
+  try {
+    const now = new Date();
+    let startDate;
+
+    // Calculate start date based on time range
+    switch (timeRange) {
+      case 'lastCall':
+        // For lastCall, we'll get the most recent conversation with sentiment analysis
+        const lastConversation = await Conversation.findOne({
+          patientId,
+          'analyzedData.sentiment': { $exists: true }
+        })
+        .select('endTime')
+        .sort({ endTime: -1 })
+        .lean();
+        
+        if (lastConversation) {
+          // Get conversations from the last call date to now
+          startDate = lastConversation.endTime;
+        } else {
+          // No conversations with sentiment analysis, return empty data
+          return {
+            patientId,
+            timeRange,
+            startDate: now.toISOString(),
+            endDate: now.toISOString(),
+            totalConversations: 0,
+            analyzedConversations: 0,
+            dataPoints: [],
+            summary: {
+              averageSentiment: 0,
+              sentimentDistribution: {},
+              trendDirection: 'stable',
+              confidence: 0,
+              keyInsights: []
+            }
+          };
+        }
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case 'lifetime':
+        startDate = new Date(0); // Beginning of time
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    }
+
+    // Get conversations with sentiment analysis for the patient
+    const conversations = await Conversation.find({
+      patientId,
+      endTime: { $gte: startDate, $lte: now },
+      'analyzedData.sentiment': { $exists: true }
+    })
+      .select('_id startTime endTime duration analyzedData')
+      .sort({ endTime: 1 })
+      .lean();
+
+    // Get all conversations (including those without sentiment) for total count
+    const totalConversations = await Conversation.countDocuments({
+      patientId,
+      endTime: { $gte: startDate, $lte: now }
+    });
+
+    // Process sentiment data
+    const dataPoints = conversations.map(conv => ({
+      conversationId: conv._id,
+      date: conv.endTime || conv.startTime,
+      duration: conv.duration,
+      sentiment: conv.analyzedData.sentiment,
+      sentimentAnalyzedAt: conv.analyzedData.sentimentAnalyzedAt
+    }));
+
+    // Calculate summary statistics
+    const sentimentScores = conversations
+      .map(conv => conv.analyzedData.sentiment?.sentimentScore)
+      .filter(score => score !== undefined);
+
+    const averageSentiment = sentimentScores.length > 0 
+      ? sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length 
+      : 0;
+
+    // Calculate sentiment distribution
+    const sentimentDistribution = conversations.reduce((dist, conv) => {
+      const sentiment = conv.analyzedData.sentiment?.overallSentiment || 'unknown';
+      dist[sentiment] = (dist[sentiment] || 0) + 1;
+      return dist;
+    }, {});
+
+    // Calculate trend direction
+    let trendDirection = 'stable';
+    if (dataPoints.length >= 2) {
+      const firstHalf = dataPoints.slice(0, Math.floor(dataPoints.length / 2));
+      const secondHalf = dataPoints.slice(Math.floor(dataPoints.length / 2));
+      
+      const firstAvg = firstHalf.reduce((sum, point) => sum + (point.sentiment?.sentimentScore || 0), 0) / firstHalf.length;
+      const secondAvg = secondHalf.reduce((sum, point) => sum + (point.sentiment?.sentimentScore || 0), 0) / secondHalf.length;
+      
+      if (secondAvg > firstAvg + 0.1) trendDirection = 'improving';
+      else if (secondAvg < firstAvg - 0.1) trendDirection = 'declining';
+    }
+
+    // Calculate confidence based on number of data points
+    const confidence = Math.min(1, dataPoints.length / 10); // Max confidence at 10+ data points
+
+    // Generate key insights
+    const keyInsights = [];
+    if (averageSentiment > 0.3) keyInsights.push('Patient shows generally positive sentiment');
+    else if (averageSentiment < -0.3) keyInsights.push('Patient shows generally negative sentiment');
+    
+    if (trendDirection === 'improving') keyInsights.push('Sentiment trend is improving over time');
+    else if (trendDirection === 'declining') keyInsights.push('Sentiment trend is declining over time');
+    
+    if (sentimentDistribution.negative > sentimentDistribution.positive) {
+      keyInsights.push('Patient has more negative than positive conversations');
+    }
+
+    return {
+      patientId,
+      timeRange,
+      startDate,
+      endDate: now,
+      totalConversations,
+      analyzedConversations: conversations.length,
+      dataPoints,
+      summary: {
+        averageSentiment,
+        sentimentDistribution,
+        trendDirection,
+        confidence,
+        keyInsights
+      }
+    };
+
+  } catch (error) {
+    logger.error(`[Sentiment Trend] Error getting sentiment trend for patient ${patientId}: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Get sentiment summary for a patient
+ */
+const getSentimentSummary = async (patientId) => {
+  try {
+    // Get recent conversations (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentConversations = await Conversation.find({
+      patientId,
+      endTime: { $gte: thirtyDaysAgo }
+    })
+      .select('_id startTime endTime duration analyzedData')
+      .sort({ endTime: -1 })
+      .limit(10)
+      .lean();
+
+    const analyzedConversations = recentConversations.filter(conv => conv.analyzedData?.sentiment);
+    
+    // Calculate summary statistics
+    const sentimentScores = analyzedConversations
+      .map(conv => conv.analyzedData.sentiment?.sentimentScore)
+      .filter(score => score !== undefined);
+
+    const averageSentiment = sentimentScores.length > 0 
+      ? sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length 
+      : 0;
+
+    // Calculate sentiment distribution
+    const sentimentDistribution = analyzedConversations.reduce((dist, conv) => {
+      const sentiment = conv.analyzedData.sentiment?.overallSentiment || 'unknown';
+      dist[sentiment] = (dist[sentiment] || 0) + 1;
+      return dist;
+    }, {});
+
+    // Calculate trend direction from recent conversations
+    let trendDirection = 'stable';
+    if (analyzedConversations.length >= 3) {
+      const recent = analyzedConversations.slice(0, 3);
+      const older = analyzedConversations.slice(3, 6);
+      
+      if (recent.length > 0 && older.length > 0) {
+        const recentAvg = recent.reduce((sum, conv) => sum + (conv.analyzedData.sentiment?.sentimentScore || 0), 0) / recent.length;
+        const olderAvg = older.reduce((sum, conv) => sum + (conv.analyzedData.sentiment?.sentimentScore || 0), 0) / older.length;
+        
+        if (recentAvg > olderAvg + 0.1) trendDirection = 'improving';
+        else if (recentAvg < olderAvg - 0.1) trendDirection = 'declining';
+      }
+    }
+
+    // Calculate confidence
+    const confidence = Math.min(1, analyzedConversations.length / 5);
+
+    // Generate key insights
+    const keyInsights = [];
+    if (averageSentiment > 0.3) keyInsights.push('Recent conversations show positive sentiment');
+    else if (averageSentiment < -0.3) keyInsights.push('Recent conversations show negative sentiment');
+    
+    if (trendDirection === 'improving') keyInsights.push('Recent sentiment trend is improving');
+    else if (trendDirection === 'declining') keyInsights.push('Recent sentiment trend is declining');
+
+    return {
+      totalConversations: recentConversations.length,
+      analyzedConversations: analyzedConversations.length,
+      averageSentiment,
+      sentimentDistribution,
+      trendDirection,
+      confidence,
+      keyInsights,
+      recentTrend: analyzedConversations.slice(0, 5) // Last 5 analyzed conversations
+    };
+
+  } catch (error) {
+    logger.error(`[Sentiment Summary] Error getting sentiment summary for patient ${patientId}: ${error.message}`);
+    throw error;
+  }
+};
+
 module.exports = {
   // Existing methods (unchanged)
   createConversationForPatient,
@@ -402,5 +662,9 @@ module.exports = {
   buildEnhancedPrompt,
   saveRealtimeMessage,
   finalizeConversation,
-  getPatientContext
+  getPatientContext,
+  
+  // Sentiment analysis methods
+  getSentimentTrend,
+  getSentimentSummary
 };

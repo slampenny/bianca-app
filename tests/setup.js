@@ -1,6 +1,24 @@
 // Global test setup to handle cleanup of intervals and resources
 // This prevents Jest from hanging due to open handles
 
+// Mock i18n module to prevent configuration issues in tests
+jest.mock('i18n', () => ({
+  configure: jest.fn(),
+  setLocale: jest.fn(),
+  getLocale: jest.fn(() => 'en'),
+  __: jest.fn((key) => key), // Return the key as the translation
+  __mf: jest.fn((key) => key),
+  __l: jest.fn((key) => key),
+  __h: jest.fn((key) => key),
+  __n: jest.fn((key) => key),
+  getCatalog: jest.fn(() => ({})),
+  getLocales: jest.fn(() => ['en']),
+  addLocale: jest.fn(),
+  removeLocale: jest.fn(),
+  init: jest.fn(),
+  I18n: jest.fn()
+}));
+
 // Store references to intervals that need cleanup
 const intervalsToCleanup = new Set();
 const timeoutsToCleanup = new Set();

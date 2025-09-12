@@ -1,3 +1,8 @@
+// Set test environment variables before importing config
+process.env.NODE_ENV = 'test';
+process.env.API_BASE_URL = 'http://localhost:3000';
+process.env.PORT = '3000';
+
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const config = require('../../../src/config/config');
@@ -8,7 +13,20 @@ const { Caregiver, Org, Token } = require('../../../src/models');
 
 // Mock i18n
 jest.mock('i18n', () => ({
+  configure: jest.fn(),
+  setLocale: jest.fn(),
+  getLocale: jest.fn(() => 'en'),
   __: jest.fn((key, value) => (key === 'inviteEmail.text' ? `Invite link: ${value}` : key)),
+  __mf: jest.fn((key) => key),
+  __l: jest.fn((key) => key),
+  __h: jest.fn((key) => key),
+  __n: jest.fn((key) => key),
+  getCatalog: jest.fn(() => ({})),
+  getLocales: jest.fn(() => ['en']),
+  addLocale: jest.fn(),
+  removeLocale: jest.fn(),
+  init: jest.fn(),
+  I18n: jest.fn()
 }));
 
 let mongoServer;
@@ -49,6 +67,11 @@ describe('inviteService', () => {
       expect(caregiver.phone).toEqual(caregiverOne.phone);
       expect(caregiver.role).toEqual('invited');
 
+      console.log('Config apiUrl:', config.apiUrl);
+      console.log('Config baseUrl:', config.baseUrl);
+      console.log('Environment API_BASE_URL:', process.env.API_BASE_URL);
+      console.log('Environment NODE_ENV:', process.env.NODE_ENV);
+      
       const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
       expect(emailService.sendInviteEmail).toHaveBeenCalledWith(caregiverOne.email, inviteLink);
     });

@@ -1,4 +1,5 @@
 // conversation.dto.js
+const { SentimentAnalysisDTO } = require('./sentiment.dto');
 
 const ConversationDTO = (conversation) => {
   const { _id, callSid, patientId, lineItemId, messages, history, analyzedData, metadata, startTime, endTime, duration, callStatus, callStartTime, callEndTime, callDuration, callOutcome, callNotes, agentId, status } =
@@ -26,6 +27,9 @@ const ConversationDTO = (conversation) => {
     callNotes,
     agentId,
     status,
+    // Include sentiment analysis if available
+    sentiment: analyzedData?.sentiment ? SentimentAnalysisDTO(analyzedData.sentiment) : null,
+    sentimentAnalyzedAt: analyzedData?.sentimentAnalyzedAt ? new Date(analyzedData.sentimentAnalyzedAt).toISOString() : null,
   };
 };
 

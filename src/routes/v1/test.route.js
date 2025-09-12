@@ -9783,7 +9783,820 @@ router.post('/analyze-audio-data', async (req, res) => {
          diagnostic.issues.push(`Unexpected error: ${err.message}`);
          res.status(500).json(diagnostic);
      }
- });
+});
 
- // Export the router
- module.exports = router;
+// ============================================
+// SENTIMENT ANALYSIS TEST ROUTES
+// ============================================
+
+/**
+ * @swagger
+ * /test/sentiment/analyze:
+ *   post:
+ *     summary: Test sentiment analysis with sample conversation
+ *     description: Tests the sentiment analysis service with a sample conversation
+ *     tags: [Test]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               conversationText:
+ *                 type: string
+ *                 description: Sample conversation text to analyze
+ *                 default: "Patient: Hi Bianca, I'm feeling really good today! Bianca: That's wonderful to hear! What's making you feel so good? Patient: I had a great walk this morning and my medication seems to be working well."
+ *               detailed:
+ *                 type: boolean
+ *                 description: Whether to return detailed analysis
+ *                 default: true
+ *     responses:
+ *       "200":
+ *         description: Sentiment analysis completed successfully
+ *       "500":
+ *         description: Sentiment analysis failed
+ */
+router.post('/sentiment/analyze', async (req, res) => {
+    try {
+        const { getOpenAISentimentServiceInstance } = require('../../services/openai.sentiment.service');
+        const sentimentService = getOpenAISentimentServiceInstance();
+        
+        const defaultConversation = `Patient: Hi Bianca, I'm feeling really good today!
+Bianca: That's wonderful to hear! What's making you feel so good?
+Patient: I had a great walk this morning and my medication seems to be working well.
+Bianca: I'm so happy to hear that! Regular exercise and proper medication can make such a difference.
+Patient: Yes, I feel like I have more energy and I'm sleeping better too.
+Bianca: That's fantastic! It sounds like you're taking great care of yourself.`;
+
+        const conversationText = req.body.conversationText || defaultConversation;
+        const detailed = req.body.detailed !== false; // Default to true
+
+        logger.info('[Test Sentiment] Starting sentiment analysis test');
+        
+        const result = await sentimentService.analyzeSentiment(conversationText, { detailed });
+        
+        res.json({
+            success: true,
+            testType: 'sentiment_analysis',
+            input: {
+                conversationText: conversationText.substring(0, 100) + '...',
+                detailed
+            },
+            result
+        });
+        
+    } catch (error) {
+        logger.error('[Test Sentiment] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            testType: 'sentiment_analysis',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/sentiment/trend/{patientId}:
+ *   get:
+ *     summary: Test sentiment trend analysis for a patient
+ *     description: Tests the sentiment trend analysis for a specific patient
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The patient ID to test
+ *       - in: query
+ *         name: timeRange
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [month, year, lifetime]
+ *           default: month
+ *         description: Time range for the analysis
+ *     responses:
+ *       "200":
+ *         description: Sentiment trend analysis completed successfully
+ *       "404":
+ *         description: Patient not found
+ *       "500":
+ *         description: Analysis failed
+ */
+router.get('/sentiment/trend/:patientId', async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        const { timeRange = 'month' } = req.query;
+        
+        const { conversationService } = require('../../services');
+        
+        logger.info(`[Test Sentiment] Testing sentiment trend for patient ${patientId}, timeRange: ${timeRange}`);
+        
+        const trendData = await conversationService.getSentimentTrend(patientId, timeRange);
+        
+        res.json({
+            success: true,
+            testType: 'sentiment_trend',
+            input: { patientId, timeRange },
+            result: trendData
+        });
+        
+    } catch (error) {
+        logger.error('[Test Sentiment] Trend analysis error:', error.message);
+        res.status(500).json({
+            success: false,
+            testType: 'sentiment_trend',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/sentiment/summary/{patientId}:
+ *   get:
+ *     summary: Test sentiment summary for a patient
+ *     description: Tests the sentiment summary analysis for a specific patient
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The patient ID to test
+ *     responses:
+ *       "200":
+ *         description: Sentiment summary analysis completed successfully
+ *       "404":
+ *         description: Patient not found
+ *       "500":
+ *         description: Analysis failed
+ */
+router.get('/sentiment/summary/:patientId', async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        
+        const { conversationService } = require('../../services');
+        
+        logger.info(`[Test Sentiment] Testing sentiment summary for patient ${patientId}`);
+        
+        const summaryData = await conversationService.getSentimentSummary(patientId);
+        
+        res.json({
+            success: true,
+            testType: 'sentiment_summary',
+            input: { patientId },
+            result: summaryData
+        });
+        
+    } catch (error) {
+        logger.error('[Test Sentiment] Summary analysis error:', error.message);
+        res.status(500).json({
+            success: false,
+            testType: 'sentiment_summary',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/sentiment/conversation/{conversationId}:
+ *   get:
+ *     summary: Test sentiment analysis for a specific conversation
+ *     description: Tests getting sentiment analysis for a specific conversation
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The conversation ID to test
+ *     responses:
+ *       "200":
+ *         description: Conversation sentiment analysis retrieved successfully
+ *       "404":
+ *         description: Conversation not found
+ *       "500":
+ *         description: Analysis failed
+ */
+router.get('/sentiment/conversation/:conversationId', async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        
+        const { conversationService } = require('../../services');
+        
+        logger.info(`[Test Sentiment] Testing conversation sentiment for ${conversationId}`);
+        
+        const conversation = await conversationService.getConversationById(conversationId);
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                testType: 'conversation_sentiment',
+                error: 'Conversation not found'
+            });
+        }
+        
+        const sentimentData = conversation.analyzedData?.sentiment || null;
+        const sentimentAnalyzedAt = conversation.analyzedData?.sentimentAnalyzedAt || null;
+        
+        res.json({
+            success: true,
+            testType: 'conversation_sentiment',
+            input: { conversationId },
+            result: {
+                conversationId,
+                sentiment: sentimentData,
+                sentimentAnalyzedAt: sentimentAnalyzedAt ? new Date(sentimentAnalyzedAt).toISOString() : null,
+                hasSentimentAnalysis: !!sentimentData
+            }
+        });
+        
+    } catch (error) {
+        logger.error('[Test Sentiment] Conversation sentiment error:', error.message);
+        res.status(500).json({
+            success: false,
+            testType: 'conversation_sentiment',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/sentiment/analyze-conversation/{conversationId}:
+ *   post:
+ *     summary: Test manual sentiment analysis for a conversation
+ *     description: Tests manually triggering sentiment analysis for a specific conversation
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The conversation ID to analyze
+ *     responses:
+ *       "200":
+ *         description: Sentiment analysis triggered successfully
+ *       "400":
+ *         description: Conversation not completed or already analyzed
+ *       "404":
+ *         description: Conversation not found
+ *       "500":
+ *         description: Analysis failed
+ */
+router.post('/sentiment/analyze-conversation/:conversationId', async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        
+        const { conversationService } = require('../../services');
+        const { getOpenAISentimentServiceInstance } = require('../../services/openai.sentiment.service');
+        
+        logger.info(`[Test Sentiment] Testing manual sentiment analysis for conversation ${conversationId}`);
+        
+        // Check if conversation exists and is completed
+        const conversation = await conversationService.getConversationById(conversationId);
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                testType: 'manual_sentiment_analysis',
+                error: 'Conversation not found'
+            });
+        }
+        
+        if (conversation.status !== 'completed') {
+            return res.status(400).json({
+                success: false,
+                testType: 'manual_sentiment_analysis',
+                error: 'Can only analyze sentiment for completed conversations'
+            });
+        }
+        
+        // Trigger sentiment analysis
+        const sentimentService = getOpenAISentimentServiceInstance();
+        const analysisResult = await sentimentService.analyzeConversationSentiment(conversationId, {
+            detailed: true
+        });
+        
+        if (analysisResult.success) {
+            res.json({
+                success: true,
+                testType: 'manual_sentiment_analysis',
+                input: { conversationId },
+                result: {
+                    conversationId,
+                    sentiment: analysisResult.data,
+                    analyzedAt: new Date().toISOString()
+                }
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                testType: 'manual_sentiment_analysis',
+                error: `Sentiment analysis failed: ${analysisResult.error}`
+            });
+        }
+        
+    } catch (error) {
+        logger.error('[Test Sentiment] Manual analysis error:', error.message);
+        res.status(500).json({
+            success: false,
+            testType: 'manual_sentiment_analysis',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/sentiment/run-all-tests:
+ *   post:
+ *     summary: Run all sentiment analysis tests
+ *     description: Runs a comprehensive test suite for all sentiment analysis functionality
+ *     tags: [Test]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               patientId:
+ *                 type: string
+ *                 description: Patient ID to test with (optional)
+ *               conversationId:
+ *                 type: string
+ *                 description: Conversation ID to test with (optional)
+ *     responses:
+ *       "200":
+ *         description: All tests completed
+ *       "500":
+ *         description: Some tests failed
+ */
+router.post('/sentiment/run-all-tests', async (req, res) => {
+    try {
+        const { patientId, conversationId } = req.body;
+        const results = [];
+        
+        logger.info('[Test Sentiment] Running comprehensive sentiment analysis test suite');
+        
+        // Test 1: Basic sentiment analysis
+        try {
+            const { getOpenAISentimentServiceInstance } = require('../../services/openai.sentiment.service');
+            const sentimentService = getOpenAISentimentServiceInstance();
+            
+            const testConversation = `Patient: Hi Bianca, I'm feeling really good today!
+Bianca: That's wonderful to hear! What's making you feel so good?
+Patient: I had a great walk this morning and my medication seems to be working well.`;
+            
+            const analysisResult = await sentimentService.analyzeSentiment(testConversation, { detailed: true });
+            
+            results.push({
+                test: 'basic_sentiment_analysis',
+                success: analysisResult.success,
+                result: analysisResult.success ? 'Sentiment analysis working' : analysisResult.error
+            });
+        } catch (error) {
+            results.push({
+                test: 'basic_sentiment_analysis',
+                success: false,
+                result: error.message
+            });
+        }
+        
+        // Test 2: Patient trend analysis (if patientId provided)
+        if (patientId) {
+            try {
+                const { conversationService } = require('../../services');
+                const trendData = await conversationService.getSentimentTrend(patientId, 'month');
+                
+                results.push({
+                    test: 'patient_trend_analysis',
+                    success: true,
+                    result: `Found ${trendData.dataPoints.length} data points for patient ${patientId}`
+                });
+            } catch (error) {
+                results.push({
+                    test: 'patient_trend_analysis',
+                    success: false,
+                    result: error.message
+                });
+            }
+            
+            // Test 3: Patient summary analysis
+            try {
+                const { conversationService } = require('../../services');
+                const summaryData = await conversationService.getSentimentSummary(patientId);
+                
+                results.push({
+                    test: 'patient_summary_analysis',
+                    success: true,
+                    result: `Summary generated with ${summaryData.analyzedConversations} analyzed conversations`
+                });
+            } catch (error) {
+                results.push({
+                    test: 'patient_summary_analysis',
+                    success: false,
+                    result: error.message
+                });
+            }
+        }
+        
+        // Test 4: Conversation analysis (if conversationId provided)
+        if (conversationId) {
+            try {
+                const { conversationService } = require('../../services');
+                const conversation = await conversationService.getConversationById(conversationId);
+                
+                if (conversation) {
+                    results.push({
+                        test: 'conversation_retrieval',
+                        success: true,
+                        result: `Conversation found with status: ${conversation.status}`
+                    });
+                    
+                    if (conversation.analyzedData?.sentiment) {
+                        results.push({
+                            test: 'conversation_sentiment_check',
+                            success: true,
+                            result: 'Conversation already has sentiment analysis'
+                        });
+                    } else {
+                        results.push({
+                            test: 'conversation_sentiment_check',
+                            success: false,
+                            result: 'Conversation does not have sentiment analysis'
+                        });
+                    }
+                } else {
+                    results.push({
+                        test: 'conversation_retrieval',
+                        success: false,
+                        result: 'Conversation not found'
+                    });
+                }
+            } catch (error) {
+                results.push({
+                    test: 'conversation_retrieval',
+                    success: false,
+                    result: error.message
+                });
+            }
+        }
+        
+        const successCount = results.filter(r => r.success).length;
+        const totalTests = results.length;
+        
+        res.json({
+            success: successCount === totalTests,
+            testType: 'comprehensive_sentiment_test_suite',
+            summary: {
+                totalTests,
+                successfulTests: successCount,
+                failedTests: totalTests - successCount
+            },
+            results
+        });
+        
+    } catch (error) {
+        logger.error('[Test Sentiment] Comprehensive test error:', error.message);
+        res.status(500).json({
+            success: false,
+            testType: 'comprehensive_sentiment_test_suite',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/debug-sentiment-analysis:
+ *   post:
+ *     summary: Debug sentiment analysis for recent conversations
+ *     description: |
+ *       Debug and fix sentiment analysis for recent conversations. This endpoint will:
+ *       1. Find recent completed conversations without sentiment analysis
+ *       2. Attempt to analyze them manually using OpenAI
+ *       3. Update the conversations with sentiment data
+ *       4. Return detailed results for each conversation processed
+ *     tags: [Test Routes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               hoursBack:
+ *                 type: number
+ *                 default: 24
+ *                 description: Number of hours back to look for conversations
+ *               maxConversations:
+ *                 type: number
+ *                 default: 10
+ *                 description: Maximum number of conversations to process
+ *               forceReanalyze:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Force re-analysis even if sentiment already exists
+ *     responses:
+ *       "200":
+ *         description: Debug analysis completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 debugType:
+ *                   type: string
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalConversations:
+ *                       type: number
+ *                     conversationsWithoutSentiment:
+ *                       type: number
+ *                     successfullyAnalyzed:
+ *                       type: number
+ *                     failedAnalyses:
+ *                       type: number
+ *                 conversations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       conversationId:
+ *                         type: string
+ *                       patientName:
+ *                         type: string
+ *                       endTime:
+ *                         type: string
+ *                       hadSentiment:
+ *                         type: boolean
+ *                       messageCount:
+ *                         type: number
+ *                       analysisResult:
+ *                         type: object
+ *                         properties:
+ *                           success:
+ *                             type: boolean
+ *                           sentiment:
+ *                             type: string
+ *                           score:
+ *                             type: number
+ *                           error:
+ *                             type: string
+ *       "500":
+ *         description: Debug analysis failed
+ */
+router.post('/debug-sentiment-analysis', async (req, res) => {
+    try {
+        const { hoursBack = 24, maxConversations = 10, forceReanalyze = false } = req.body;
+        
+        logger.info(`[Test Debug] Starting sentiment analysis debug - hoursBack: ${hoursBack}, maxConversations: ${maxConversations}, forceReanalyze: ${forceReanalyze}`);
+        
+        const { Conversation, Message } = require('../../models');
+        const { getOpenAISentimentServiceInstance } = require('../../services/openai.sentiment.service');
+        
+        // Get recent completed conversations
+        const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+        const query = {
+            status: 'completed',
+            endTime: { $gte: cutoffTime }
+        };
+        
+        // If not forcing re-analysis, only get conversations without sentiment
+        if (!forceReanalyze) {
+            query.$or = [
+                { 'analyzedData.sentiment': { $exists: false } },
+                { 'analyzedData.sentiment': null }
+            ];
+        }
+        
+        const conversations = await Conversation.find(query)
+            .populate('patientId', 'name')
+            .sort({ endTime: -1 })
+            .limit(maxConversations);
+        
+        logger.info(`[Test Debug] Found ${conversations.length} conversations to analyze`);
+        
+        const results = {
+            success: true,
+            debugType: 'sentiment_analysis_debug',
+            summary: {
+                totalConversations: conversations.length,
+                conversationsWithoutSentiment: conversations.filter(c => !c.analyzedData?.sentiment).length,
+                successfullyAnalyzed: 0,
+                failedAnalyses: 0
+            },
+            conversations: []
+        };
+        
+        const sentimentService = getOpenAISentimentServiceInstance();
+        
+        for (const conversation of conversations) {
+            const conversationResult = {
+                conversationId: conversation._id.toString(),
+                patientName: conversation.patientId?.name || 'Unknown',
+                endTime: conversation.endTime?.toISOString() || 'Unknown',
+                hadSentiment: !!conversation.analyzedData?.sentiment,
+                messageCount: 0,
+                analysisResult: null
+            };
+            
+            try {
+                // Get messages for this conversation
+                const messages = await Message.find({ conversationId: conversation._id })
+                    .sort({ createdAt: 1 })
+                    .select('role content')
+                    .limit(50); // Limit to prevent huge conversations
+                
+                conversationResult.messageCount = messages.length;
+                
+                if (messages.length === 0) {
+                    conversationResult.analysisResult = {
+                        success: false,
+                        error: 'No messages found in conversation'
+                    };
+                    results.summary.failedAnalyses++;
+                } else {
+                    // Format conversation text
+                    const conversationText = messages
+                        .map(msg => {
+                            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+                            return `${speaker}: ${msg.content}`;
+                        })
+                        .join('\n');
+                    
+                    // Perform sentiment analysis
+                    const analysisResult = await sentimentService.analyzeSentiment(conversationText, { detailed: true });
+                    
+                    if (analysisResult.success) {
+                        // Update conversation with sentiment data
+                        await Conversation.findByIdAndUpdate(conversation._id, {
+                            $set: {
+                                'analyzedData.sentiment': analysisResult.data,
+                                'analyzedData.sentimentAnalyzedAt': new Date()
+                            }
+                        });
+                        
+                        conversationResult.analysisResult = {
+                            success: true,
+                            sentiment: analysisResult.data.overallSentiment,
+                            score: analysisResult.data.sentimentScore,
+                            confidence: analysisResult.data.confidence,
+                            mood: analysisResult.data.patientMood,
+                            emotions: analysisResult.data.keyEmotions,
+                            concernLevel: analysisResult.data.concernLevel
+                        };
+                        
+                        results.summary.successfullyAnalyzed++;
+                        
+                        logger.info(`[Test Debug] Successfully analyzed conversation ${conversation._id}: ${analysisResult.data.overallSentiment} (${analysisResult.data.sentimentScore})`);
+                    } else {
+                        conversationResult.analysisResult = {
+                            success: false,
+                            error: analysisResult.error
+                        };
+                        results.summary.failedAnalyses++;
+                        
+                        logger.error(`[Test Debug] Failed to analyze conversation ${conversation._id}: ${analysisResult.error}`);
+                    }
+                }
+                
+            } catch (error) {
+                conversationResult.analysisResult = {
+                    success: false,
+                    error: error.message
+                };
+                results.summary.failedAnalyses++;
+                
+                logger.error(`[Test Debug] Error processing conversation ${conversation._id}: ${error.message}`);
+            }
+            
+            results.conversations.push(conversationResult);
+        }
+        
+        logger.info(`[Test Debug] Debug completed - Successfully analyzed: ${results.summary.successfullyAnalyzed}, Failed: ${results.summary.failedAnalyses}`);
+        
+        res.json(results);
+        
+    } catch (error) {
+        logger.error('[Test Debug] Debug sentiment analysis error:', error.message);
+        res.status(500).json({
+            success: false,
+            debugType: 'sentiment_analysis_debug',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/debug-conversation-data:
+ *   post:
+ *     summary: Debug conversation data for a patient
+ *     description: Debug the actual conversation data structure to understand sentiment analysis issues
+ *     tags: [Test Routes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               patientId:
+ *                 type: string
+ *                 description: The patient ID to debug
+ *     responses:
+ *       "200":
+ *         description: Debug data returned successfully
+ */
+router.post('/debug-conversation-data', async (req, res) => {
+    try {
+        const { patientId } = req.body;
+        
+        if (!patientId) {
+            return res.status(400).json({
+                success: false,
+                error: 'patientId is required'
+            });
+        }
+        
+        const { Conversation } = require('../../models');
+        
+        logger.info(`[Test Debug] Debugging conversation data for patient ${patientId}`);
+        
+        // Get ALL conversations for this patient (no time limit)
+        const allConversations = await Conversation.find({
+            patientId
+        })
+        .select('_id startTime endTime duration status analyzedData')
+        .sort({ endTime: -1 })
+        .lean();
+        
+        // Get conversations from last 30 days (same as sentiment summary)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const recentConversations = await Conversation.find({
+            patientId,
+            endTime: { $gte: thirtyDaysAgo }
+        })
+        .select('_id startTime endTime duration status analyzedData')
+        .sort({ endTime: -1 })
+        .limit(10)
+        .lean();
+        
+        // Find conversations with sentiment data
+        const conversationsWithSentiment = allConversations.filter(conv => conv.analyzedData?.sentiment);
+        const recentWithSentiment = recentConversations.filter(conv => conv.analyzedData?.sentiment);
+        
+        // Get the specific conversation from your test (if it exists)
+        const testConversation = allConversations.find(conv => 
+            conv.endTime && 
+            conv.endTime.toISOString().includes('2025-09-11T17:45')
+        );
+        
+        res.json({
+            success: true,
+            debugType: 'conversation_data_debug',
+            summary: {
+                totalConversations: allConversations.length,
+                recentConversations: recentConversations.length,
+                conversationsWithSentiment: conversationsWithSentiment.length,
+                recentWithSentiment: recentWithSentiment.length,
+                testConversationFound: !!testConversation
+            },
+            data: {
+                allConversations: allConversations.slice(0, 5), // First 5 for brevity
+                recentConversations: recentConversations,
+                conversationsWithSentiment: conversationsWithSentiment,
+                testConversation: testConversation,
+                thirtyDaysAgo: thirtyDaysAgo.toISOString()
+            }
+        });
+        
+    } catch (error) {
+        logger.error('[Test Debug] Conversation data debug error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Export the router
+module.exports = router;

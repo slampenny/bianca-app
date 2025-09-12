@@ -4,3 +4,6 @@ module.exports.ConversationDTO = require('./conversation.dto');
 module.exports.OrgDTO = require('./org.dto');
 module.exports.PatientDTO = require('./patient.dto');
 module.exports.ScheduleDTO = require('./schedule.dto');
+module.exports.SentimentAnalysisDTO = require('./sentiment.dto').SentimentAnalysisDTO;
+module.exports.SentimentTrendDTO = require('./sentiment.dto').SentimentTrendDTO;
+module.exports.SentimentSummaryDTO = require('./sentiment.dto').SentimentSummaryDTO;
