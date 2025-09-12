@@ -20,8 +20,8 @@ import {
   PrivacyScreen,
   TermsScreen,
   ReportsScreen,
-  SentimentReportScreen,
   HealthReportScreen,
+  SentimentAnalysisScreen,
 } from "app/screens"
 import { DrawerParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
@@ -85,6 +85,7 @@ function HomeStack() {
       <Stack.Screen name="Schedule" component={SchedulesScreen} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
       <Stack.Screen name="Call" component={CallScreen} />
+      <Stack.Screen name="SentimentAnalysis" component={SentimentAnalysisScreen} options={{ title: "Sentiment Analysis" }} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: "Privacy Policy" }} />
       <Stack.Screen name="Terms" component={TermsScreen} options={{ title: "Terms of Service" }} />
@@ -135,7 +136,7 @@ function ReportsStack() {
       })}
     >
       <Stack.Screen name="Reports" component={ReportsScreen} />
-      <Stack.Screen name="SentimentReport" component={SentimentReportScreen} options={{ title: "Sentiment Analysis" }} />
+      <Stack.Screen name="SentimentReport" component={SentimentAnalysisScreen} options={{ title: "Sentiment Analysis" }} />
       <Stack.Screen name="HealthReport" component={HealthReportScreen} options={{ title: "Mental Health Report" }} />
     </Stack.Navigator>
   )

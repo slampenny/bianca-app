@@ -21,6 +21,7 @@ import {
   paymentMethodApi,
   conversationApi,
   callWorkflowApi,
+  sentimentApi,
 } from "../services/api/"
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import {
@@ -63,6 +64,7 @@ const rootReducer = combineReducers({
   [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
   [scheduleApi.reducerPath]: scheduleApi.reducer,
   [callWorkflowApi.reducerPath]: callWorkflowApi.reducer,
+  [sentimentApi.reducerPath]: sentimentApi.reducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)
@@ -85,6 +87,7 @@ export const store = configureStore({
       scheduleApi.middleware,
       conversationApi.middleware,
       callWorkflowApi.middleware,
+      sentimentApi.middleware,
     ),
 })
 

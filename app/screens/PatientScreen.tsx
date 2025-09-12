@@ -483,6 +483,19 @@ function PatientScreen() {
                 preset="filled"
               />
 
+              <Button
+                text="VIEW SENTIMENT ANALYSIS"
+                onPress={() => navigation.navigate("SentimentAnalysis", {
+                  patientId: patient.id!,
+                  patientName: patient.name,
+                })}
+                disabled={isLoading}
+                testID="view-sentiment-analysis-button"
+                style={[styles.button, styles.manageButton]}
+                textStyle={styles.buttonText}
+                preset="filled"
+              />
+
                           {canManageCaregivers && (
               <Button
                 text="MANAGE CAREGIVERS"

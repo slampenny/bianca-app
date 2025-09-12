@@ -24,6 +24,10 @@ export type HomeStackParamList = {
   Schedule: undefined
   Conversations: undefined
   Call: undefined
+  SentimentAnalysis: {
+    patientId?: string
+    patientName?: string
+  } | undefined
   Privacy: undefined
   Terms: undefined
 }

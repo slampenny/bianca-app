@@ -160,6 +160,10 @@ export interface Conversation {
   callOutcome?: 'answered' | 'no_answer' | 'busy' | 'failed' | 'voicemail'
   agentId?: string
   callNotes?: string
+  
+  // Sentiment analysis fields
+  sentiment?: SentimentAnalysis
+  sentimentAnalyzedAt?: string
 }
 
 // api.types.ts
@@ -240,4 +244,61 @@ export interface ApiConfig {
    * Milliseconds before we timeout the request.
    */
   timeout: number
+}
+
+// Sentiment Analysis Types
+export type SentimentType = "positive" | "negative" | "neutral" | "mixed"
+export type TrendDirection = "improving" | "declining" | "stable"
+export type ConcernLevel = "low" | "medium" | "high"
+
+export interface SentimentAnalysis {
+  overallSentiment: SentimentType
+  sentimentScore: number // -1 to 1
+  confidence: number // 0 to 1
+  patientMood?: string
+  keyEmotions?: string[]
+  concernLevel?: ConcernLevel
+  satisfactionIndicators?: {
+    positive?: string[]
+    negative?: string[]
+  }
+  summary?: string
+  recommendations?: string
+  fallback?: boolean
+}
+
+export interface SentimentTrendPoint {
+  conversationId: string
+  date: string
+  duration: number
+  sentiment: SentimentAnalysis | null
+  sentimentAnalyzedAt?: string
+}
+
+export interface SentimentTrend {
+  patientId: string
+  timeRange: "lastCall" | "month" | "lifetime"
+  startDate: string
+  endDate: string
+  totalConversations: number
+  analyzedConversations: number
+  dataPoints: SentimentTrendPoint[]
+  summary: {
+    averageSentiment: number
+    sentimentDistribution: Record<SentimentType, number>
+    trendDirection: TrendDirection
+    confidence: number
+    keyInsights: string[]
+  }
+}
+
+export interface SentimentSummary {
+  totalConversations: number
+  analyzedConversations: number
+  averageSentiment: number
+  sentimentDistribution: Record<SentimentType, number>
+  trendDirection: TrendDirection
+  confidence: number
+  keyInsights: string[]
+  recentTrend: SentimentTrendPoint[]
 }

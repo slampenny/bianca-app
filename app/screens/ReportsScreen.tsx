@@ -1,21 +1,45 @@
-import React from "react"
-import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native"
+import React, { useState, useMemo } from "react"
+import { View, Text, StyleSheet, Pressable, Dimensions, Modal, TouchableWithoutFeedback, ScrollView } from "react-native"
 import { colors } from "app/theme/colors"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
+import { useSelector, useDispatch } from "react-redux"
+import { getCurrentUser } from "../store/authSlice"
+import { getPatientsForCaregiver, setPatient } from "../store/patientSlice"
+import { Patient } from "../services/api/api.types"
 
 const { width } = Dimensions.get('window')
 const buttonSize = Math.min((width - 60) / 2, 160) // Max 160px width, responsive
 
 export function ReportsScreen() {
   const navigation = useNavigation()
+  const dispatch = useDispatch()
+  const currentUser = useSelector(getCurrentUser)
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [showPatientPicker, setShowPatientPicker] = useState(false)
+
+  // Get patients for the current user
+  const patientsSelector = useMemo(
+    () => (state: any) => {
+      const patientList = currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []
+      return patientList
+    },
+    [currentUser?.id]
+  )
+  const patients = useSelector(patientsSelector)
 
   const handleSentimentPress = () => {
-    navigation.navigate("SentimentReport" as never)
+    if (selectedPatient) {
+      // Set the patient in Redux state
+      dispatch(setPatient(selectedPatient))
+      // Navigate to sentiment analysis screen
+      navigation.navigate("SentimentReport" as never)
+    }
   }
 
   const handleHealthPress = () => {
-    navigation.navigate("HealthReport" as never)
+    // TODO: Show coming soon message
+    console.log("Health reports coming soon")
   }
 
   const handleComingSoonPress = () => {
@@ -25,12 +49,32 @@ export function ReportsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Patient Selector */}
+      <View style={styles.patientSelector}>
+        <Text style={styles.selectorLabel}>Select Patient:</Text>
+        <Pressable
+          style={styles.patientPicker}
+          onPress={() => setShowPatientPicker(true)}
+          testID="patient-picker-button"
+        >
+          <Text style={styles.patientPickerText}>
+            {selectedPatient ? selectedPatient.name : "Choose a patient..."}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={colors.palette.neutral600} />
+        </Pressable>
+      </View>
+
       <View style={styles.grid}>
         {/* Top Row */}
         <View style={styles.row}>
           <Pressable 
-            style={[styles.button, { width: buttonSize, height: buttonSize }]} 
+            style={[
+              styles.button, 
+              { width: buttonSize, height: buttonSize },
+              !selectedPatient && styles.buttonDisabled
+            ]} 
             onPress={handleSentimentPress}
+            disabled={!selectedPatient}
             testID="sentiment-reports-button"
           >
             <View style={styles.buttonContent}>
@@ -44,7 +88,7 @@ export function ReportsScreen() {
           </Pressable>
           
           <Pressable 
-            style={[styles.button, { width: buttonSize, height: buttonSize }]} 
+            style={[styles.button, styles.comingSoonButton, { width: buttonSize, height: buttonSize }]} 
             onPress={handleHealthPress}
             testID="health-reports-button"
           >
@@ -52,9 +96,9 @@ export function ReportsScreen() {
               <Ionicons 
                 name="heart" 
                 size={32} 
-                color={colors.palette.neutral100}
+                color={colors.palette.neutral600}
               />
-              <Text style={styles.buttonText}>Health</Text>
+              <Text style={[styles.buttonText, styles.comingSoonText]}>Coming Soon</Text>
             </View>
           </Pressable>
         </View>
@@ -92,6 +136,51 @@ export function ReportsScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Patient Picker Modal */}
+      <Modal
+        visible={showPatientPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPatientPicker(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowPatientPicker(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Select Patient</Text>
+                <ScrollView style={styles.patientList}>
+                  {patients.map((patient) => (
+                    <Pressable
+                      key={patient.id}
+                      style={[
+                        styles.patientItem,
+                        selectedPatient?.id === patient.id && styles.selectedPatientItem
+                      ]}
+                      onPress={() => {
+                        setSelectedPatient(patient)
+                        setShowPatientPicker(false)
+                      }}
+                      testID={`patient-option-${patient.id}`}
+                    >
+                      <Text style={styles.patientItemText}>{patient.name}</Text>
+                      {selectedPatient?.id === patient.id && (
+                        <Ionicons name="checkmark" size={20} color={colors.palette.biancaButtonSelected} />
+                      )}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Pressable
+                  style={styles.modalCloseButton}
+                  onPress={() => setShowPatientPicker(false)}
+                >
+                  <Text style={styles.modalCloseText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   )
 }
@@ -101,6 +190,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.palette.biancaBackground,
     padding: 20,
+  },
+  patientSelector: {
+    marginBottom: 20,
+  },
+  selectorLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.palette.biancaHeader,
+    marginBottom: 8,
+  },
+  patientPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral300,
+  },
+  patientPickerText: {
+    fontSize: 16,
+    color: colors.palette.biancaHeader,
+    flex: 1,
   },
   grid: {
     flex: 1,
@@ -146,5 +259,65 @@ const styles = StyleSheet.create({
   },
   comingSoonText: {
     color: colors.palette.neutral600,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+    backgroundColor: colors.palette.neutral300,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.palette.biancaHeader,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  patientList: {
+    maxHeight: 300,
+    marginBottom: 16,
+  },
+  patientItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: colors.palette.neutral200,
+  },
+  selectedPatientItem: {
+    backgroundColor: colors.palette.biancaSuccessBackground,
+    borderWidth: 1,
+    borderColor: colors.palette.biancaSuccess,
+  },
+  patientItemText: {
+    fontSize: 16,
+    color: colors.palette.biancaHeader,
+    flex: 1,
+  },
+  modalCloseButton: {
+    backgroundColor: colors.palette.neutral300,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.palette.neutral700,
   },
 })

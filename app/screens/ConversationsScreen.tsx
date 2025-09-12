@@ -7,6 +7,7 @@ import { getConversations, clearConversations, getConversation, setConversation 
 import { getActiveCall } from "../store/callSlice"
 import { Conversation, Message, ConversationPages } from "../services/api/api.types"
 import { colors } from "app/theme/colors"
+import { SentimentIndicator } from "../components/SentimentIndicator"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
@@ -157,9 +158,17 @@ export function ConversationsScreen() {
           android_ripple={{ color: colors.palette.biancaButtonUnselected }}
         >
           <View style={styles.conversationInfo}>
-            <Text style={styles.conversationTitle}>
-              Conversation {formatDate(conversationDate)}
-            </Text>
+            <View style={styles.conversationHeaderRow}>
+              <Text style={styles.conversationTitle}>
+                Conversation {formatDate(conversationDate)}
+              </Text>
+              <SentimentIndicator 
+                sentiment={item.sentiment} 
+                size="small" 
+                showScore={false}
+                showMood={false}
+              />
+            </View>
             <Text style={styles.conversationPreview}>
               {getConversationPreview(item.messages || [])}
             </Text>
@@ -337,6 +346,12 @@ const styles = StyleSheet.create({
   },
   conversationInfo: {
     flex: 1,
+  },
+  conversationHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
   },
   conversationPreview: {
     color: colors.palette.neutral600,
