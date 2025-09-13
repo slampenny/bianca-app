@@ -157,7 +157,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
               </Text>
             </View>
             <Text style={styles.concernDescription}>
-              {getConcernDescription(sentiment.concernLevel)}
+              {sentiment.summary || getConcernDescription(sentiment.concernLevel)}
             </Text>
           </View>
         </View>

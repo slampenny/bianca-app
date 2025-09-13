@@ -5,9 +5,10 @@ import { useGetConversationsByPatientQuery } from "../services/api/conversationA
 import { getPatient } from "../store/patientSlice"
 import { getConversations, clearConversations, getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall } from "../store/callSlice"
-import { Conversation, Message, ConversationPages } from "../services/api/api.types"
+import { Conversation, Message } from "../services/api/api.types"
 import { colors } from "app/theme/colors"
 import { SentimentIndicator } from "../components/SentimentIndicator"
+import { ConversationMessages } from "../components/ConversationMessages"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
@@ -184,40 +185,10 @@ export function ConversationsScreen() {
         </Pressable>
 
         {isExpanded && (
-          <View style={styles.messagesContainer}>
-            {(item.messages || []).map((message: Message, index: number) => {
-              const isUser = message.role === "patient"
-              return (
-                <View
-                  key={`${item.id}-${index}`}
-                  style={[
-                    styles.messageContainer,
-                    isUser ? styles.userMessageContainer : styles.assistantMessageContainer,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      isUser ? styles.userBubble : styles.assistantBubble,
-                    ]}
-                  >
-                    <Text style={[
-                      styles.messageText,
-                      isUser ? styles.userMessageText : styles.assistantMessageText,
-                    ]}>
-                      {message.content}
-                    </Text>
-                                         <Text style={[
-                       styles.messageTime,
-                       isUser ? styles.userMessageTime : styles.assistantMessageTime,
-                     ]}>
-                       {formatDate(message.createdAt || new Date().toISOString())}
-                     </Text>
-                  </View>
-                </View>
-              )
-            })}
-          </View>
+            <ConversationMessages
+              messages={item.messages || []}
+              style={styles.messagesContainer}
+            />
         )}
       </View>
     )
@@ -411,33 +382,10 @@ const styles = StyleSheet.create({
   loaderContainer: {
     padding: 20,
   },
-  messageBubble: {
-    borderRadius: 18,
-    elevation: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    shadowColor: colors.palette.neutral900,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  messageContainer: {
-    marginBottom: 8,
-    maxWidth: "80%",
-  },
   messageCount: {
     color: colors.palette.biancaButtonSelected,
     fontSize: 12,
     fontWeight: "500",
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  messageTime: {
-    fontSize: 11,
-    opacity: 0.7,
   },
   messagesContainer: {
     borderTopColor: colors.palette.biancaBorder,
@@ -451,20 +399,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 20,
     textAlign: "center",
-  },
-  userBubble: {
-    backgroundColor: colors.palette.biancaButtonSelected, // Blue for user
-    borderBottomRightRadius: 4, // WhatsApp-style tail
-  },
-  userMessageContainer: {
-    alignSelf: "flex-end",
-    marginLeft: "20%",
-  },
-  userMessageText: {
-    color: colors.palette.neutral100, // White text on blue
-  },
-  userMessageTime: {
-    color: colors.palette.neutral100,
-    textAlign: "right",
   },
 })

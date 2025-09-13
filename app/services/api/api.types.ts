@@ -122,9 +122,11 @@ export interface Schedule {
   isActive: boolean
 }
 
+export type MessageRole = "patient" | "assistant" | "system" | "debug-user"
+
 export interface Message {
   id?: string
-  role: string
+  role: MessageRole
   content: string
   createdAt?: string
   updatedAt?: string

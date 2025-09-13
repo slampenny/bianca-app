@@ -1,6 +1,7 @@
 import React from "react"
 import { View, StyleSheet, FlatList, Pressable, Platform } from "react-native"
 import { AutoImage, Card, Button, Text } from "app/components"
+import { Ionicons } from "@expo/vector-icons"
 import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
 import { setPatient, getPatientsForCaregiver, clearPatient } from "../store/patientSlice"
@@ -122,20 +123,30 @@ export function HomeScreen() {
         ContentTextProps={{ testID: `patient-name-${item.name}` }}
         RightComponent={
           <View style={styles.buttonContainer}>
-            <Button
-              text="Call"
-              style={styles.callButton}
-              textStyle={styles.callButtonText}
+            <Pressable
+              style={({ pressed }) => [
+                styles.callButton,
+                { opacity: pressed ? 0.7 : 1 }
+              ]}
               onPress={() => handleCallNow(item)}
               testID={`call-now-${item.name}`}
-            />
-            <Button
-              text="Edit"
-              style={styles.editButton}
-              textStyle={styles.editButtonText}
+              accessibilityLabel={`Call ${item.name}`}
+              accessibilityRole="button"
+            >
+              <Ionicons name="call" size={20} color={colors.palette.neutral100} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.editButton,
+                { opacity: pressed ? 0.7 : 1 }
+              ]}
               onPress={() => handlePatientPress(item)}
               testID={`edit-patient-button-${item.name}`}
-            />
+              accessibilityLabel={`Edit ${item.name}`}
+              accessibilityRole="button"
+            >
+              <Ionicons name="create-outline" size={20} color={colors.palette.neutral100} />
+            </Pressable>
           </View>
         }
       />
@@ -211,24 +222,24 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 5,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  editButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 16,
-  },
-  callButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 16,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 44,
+    minHeight: 44,
   },
   callButton: {
     backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 5,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     marginRight: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 44,
+    minHeight: 44,
   },
   header: {
     alignItems: "center",
