@@ -304,3 +304,103 @@ export interface SentimentSummary {
   keyInsights: string[]
   recentTrend: SentimentTrendPoint[]
 }
+
+// Medical Analysis Types
+export type MedicalAnalysisConfidence = "high" | "medium" | "low" | "none"
+export type MedicalAnalysisTrigger = "monthly" | "manual" | "on-demand"
+
+export interface CognitiveMetrics {
+  riskScore: number
+  fillerWordDensity: number
+  vagueReferenceDensity: number
+  repetitionRate: number
+  complexityScore: number
+  attentionDeficit: number
+  memoryIssues: number
+  languageDecline: number
+}
+
+export interface PsychiatricMetrics {
+  depressionScore: number
+  anxietyScore: number
+  overallRiskScore: number
+  detailedAnalysis: {
+    depression: {
+      sadness: { count: number; examples: string[] }
+      hopelessness: { count: number; examples: string[] }
+      worthlessness: { count: number; examples: string[] }
+      suicidal: { count: number; examples: string[] }
+    }
+    anxiety: {
+      worry: { count: number; examples: string[] }
+      catastrophicThinking: { count: number; examples: string[] }
+      hypervigilance: { count: number; examples: string[] }
+      panic: { count: number; examples: string[] }
+    }
+  }
+}
+
+export interface VocabularyMetrics {
+  complexityScore: number
+  avgSentenceLength: number
+  typeTokenRatio: number
+  lexicalDiversity: number
+  sophisticatedWords: number
+  simpleWords: number
+  totalWords: number
+}
+
+export interface MedicalAnalysisResult {
+  patientId: string
+  analysisDate: string
+  conversationCount: number
+  messageCount: number
+  totalWords: number
+  cognitiveMetrics: CognitiveMetrics
+  psychiatricMetrics: PsychiatricMetrics
+  vocabularyMetrics: VocabularyMetrics
+  warnings: string[]
+  confidence: MedicalAnalysisConfidence
+  trigger: MedicalAnalysisTrigger
+  batchId?: string
+  error?: string
+  status?: string
+}
+
+export interface MedicalAnalysisTrendPoint {
+  analysisId: string
+  date: string
+  analysis: MedicalAnalysisResult
+}
+
+export interface MedicalAnalysisTrend {
+  patientId: string
+  timeRange: "month" | "quarter" | "year"
+  startDate: string
+  endDate: string
+  totalAnalyses: number
+  dataPoints: MedicalAnalysisTrendPoint[]
+  summary: {
+    averageCognitiveRisk: number
+    averagePsychiatricRisk: number
+    cognitiveTrend: TrendDirection
+    psychiatricTrend: TrendDirection
+    vocabularyTrend: TrendDirection
+    confidence: number
+    keyInsights: string[]
+    criticalWarnings: string[]
+  }
+}
+
+export interface MedicalAnalysisSummary {
+  totalAnalyses: number
+  averageCognitiveRisk: number
+  averagePsychiatricRisk: number
+  cognitiveTrend: TrendDirection
+  psychiatricTrend: TrendDirection
+  vocabularyTrend: TrendDirection
+  confidence: number
+  keyInsights: string[]
+  criticalWarnings: string[]
+  recentAnalyses: MedicalAnalysisTrendPoint[]
+}

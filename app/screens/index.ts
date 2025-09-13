@@ -21,6 +21,7 @@ export * from "./RequestResetScreen"
 export * from "./SchedulesScreen"
 export * from "./HealthReportScreen"
 export * from "./SentimentAnalysisScreen"
+export * from "./MedicalAnalysisScreen"
 export * from "./SignupScreen"
 export * from "./TermsScreen"
 

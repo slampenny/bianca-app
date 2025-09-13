@@ -28,6 +28,10 @@ export type HomeStackParamList = {
     patientId?: string
     patientName?: string
   } | undefined
+  MedicalAnalysis: {
+    patientId?: string
+    patientName?: string
+  } | undefined
   Privacy: undefined
   Terms: undefined
 }

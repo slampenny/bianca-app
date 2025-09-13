@@ -38,8 +38,12 @@ export function ReportsScreen() {
   }
 
   const handleHealthPress = () => {
-    // TODO: Show coming soon message
-    console.log("Health reports coming soon")
+    if (selectedPatient) {
+      // Set the patient in Redux state
+      dispatch(setPatient(selectedPatient))
+      // Navigate to medical analysis screen
+      navigation.navigate("MedicalAnalysis" as never)
+    }
   }
 
   const handleComingSoonPress = () => {
@@ -88,17 +92,22 @@ export function ReportsScreen() {
           </Pressable>
           
           <Pressable 
-            style={[styles.button, styles.comingSoonButton, { width: buttonSize, height: buttonSize }]} 
+            style={[
+              styles.button, 
+              { width: buttonSize, height: buttonSize },
+              !selectedPatient && styles.buttonDisabled
+            ]} 
             onPress={handleHealthPress}
+            disabled={!selectedPatient}
             testID="health-reports-button"
           >
             <View style={styles.buttonContent}>
               <Ionicons 
                 name="heart" 
                 size={32} 
-                color={colors.palette.neutral600}
+                color={colors.palette.neutral100}
               />
-              <Text style={[styles.buttonText, styles.comingSoonText]}>Coming Soon</Text>
+              <Text style={styles.buttonText}>Medical Analysis</Text>
             </View>
           </Pressable>
         </View>
