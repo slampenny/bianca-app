@@ -18,7 +18,7 @@ const addMessageToConversation = {
     conversationId: Joi.string().custom(objectId),
   }),
   body: Joi.object().keys({
-    role: Joi.string().required().valid('patient', 'assistant', 'system'),
+    role: Joi.string().required().valid('patient', 'assistant', 'system', 'debug-user'),
     content: Joi.string().required(),
   }),
 };

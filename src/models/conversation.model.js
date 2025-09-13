@@ -5,7 +5,7 @@ const messageSchema = mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['patient', 'assistant', 'system'],
+    enum: ['patient', 'assistant', 'system', 'debug-user'],
   },
   content: {
     type: String,
@@ -19,7 +19,7 @@ const messageSchema = mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['text', 'assistant_response', 'user_message', 'function_call', 'audio_transcript_delta'],
+    enum: ['text', 'assistant_response', 'user_message', 'function_call', 'audio_transcript_delta', 'debug_user_message'],
     default: 'text',
   },
   metadata: {

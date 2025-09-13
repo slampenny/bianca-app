@@ -533,6 +533,7 @@ class OpenAIRealtimeService {
       lastAssistantSpeechTime: null,
       _userHasSpoken: false, // Track if user has spoken to trigger first response
       _waitingForInitialGreeting: true, // Track if we're waiting for Bianca's initial greeting
+      _initialGreetingTriggered: false, // Prevent multiple initial greeting triggers
 
       // CRITICAL: Speech end detection variables
       lastSpeechTime: null, // When we last heard speech
@@ -1139,6 +1140,12 @@ class OpenAIRealtimeService {
             conn._lastAiSpeechEnd = Date.now();
             conn._responseCreated = false;
 
+            // Clear the initial greeting flag - Bianca has now spoken
+            if (conn._waitingForInitialGreeting) {
+              logger.info(`[OpenAI Realtime] Initial greeting complete for ${callId} - now accepting user input`);
+              conn._waitingForInitialGreeting = false;
+            }
+
             // MESSAGE FLOW: Save AI transcript when AI finishes speaking
             // This ensures AI messages get timestamps reflecting when AI actually finished speaking
             if (conn.pendingAssistantTranscript) {
@@ -1221,7 +1228,7 @@ class OpenAIRealtimeService {
               // Small delay to ensure audio processing is complete
               setTimeout(async () => {
                 const currentConn = this.connections.get(callId);
-                if (currentConn && !currentConn._userIsSpeaking && !currentConn._aiIsSpeaking) {
+                if (currentConn && !currentConn._userIsSpeaking && !currentConn._aiIsSpeaking && !currentConn._waitingForInitialGreeting) {
                   try {
                     await this.sendResponseCreate(callId);
                     currentConn._aiIsSpeaking = true;
@@ -1229,6 +1236,8 @@ class OpenAIRealtimeService {
                   } catch (err) {
                     logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
                   }
+                } else if (currentConn && currentConn._waitingForInitialGreeting) {
+                  logger.info(`[OpenAI Realtime] Skipping auto-response trigger for ${callId} - still waiting for initial greeting`);
                 }
               }, 200);
             } else {
@@ -1409,11 +1418,17 @@ class OpenAIRealtimeService {
         // Trigger initial greeting immediately - Bianca should say hello first
         logger.info(`[OpenAI Realtime] Session ready for ${callId} - triggering initial greeting`);
         
-        // Set flag to ignore user input until Bianca has spoken
-        conn._waitingForInitialGreeting = true;
-        
-        // Trigger the initial greeting
-        await this.sendResponseCreate(callId);
+        // Prevent multiple initial greeting triggers
+        if (!conn._initialGreetingTriggered) {
+          conn._initialGreetingTriggered = true;
+          conn._waitingForInitialGreeting = true;
+          
+          // Trigger the initial greeting
+          await this.sendResponseCreate(callId);
+          logger.info(`[OpenAI Realtime] Initial greeting triggered for ${callId}`);
+        } else {
+          logger.info(`[OpenAI Realtime] Initial greeting already triggered for ${callId}, skipping`);
+        }
         
         this.notify(callId, 'openai_session_ready', {});
       } catch (err) {
@@ -1577,12 +1592,6 @@ class OpenAIRealtimeService {
       return;
     }
 
-    // Clear the initial greeting flag - Bianca has now spoken
-    if (conn._waitingForInitialGreeting) {
-      logger.info(`[OpenAI Realtime] Initial greeting complete for ${callId} - now accepting user input`);
-      conn._waitingForInitialGreeting = false;
-    }
-
     // Clear the active assistant message ID since AI finished speaking
     if (conn.activeAssistantMessageId) {
       logger.info(`[OpenAI Realtime] Cleared active assistant message ID for ${callId}`);
@@ -1671,13 +1680,16 @@ class OpenAIRealtimeService {
         conn.conversationId,
         role,
         content.trim(),
-        role === 'assistant' ? 'assistant_response' : 'user_message'
+        role === 'assistant' ? 'assistant_response' : 
+        role === 'debug-user' ? 'debug_user_message' :
+        'user_message'
       );
       logger.info(`[OpenAI Realtime] Successfully saved ${role} message (${content.length} chars) to conversation ${conn.conversationId}`);
     } catch (err) {
       logger.error(`[OpenAI Realtime] Failed to save ${role} message: ${err.message}`, err);
     }
   }
+
 
   /**
    * Handle conversation item created
@@ -1770,31 +1782,14 @@ class OpenAIRealtimeService {
 
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
 
-    // Update the existing placeholder message with the actual transcript
+    // Save user message using the conversation service for proper handling
+    // Note: This transcript IS what the assistant thinks the user said - no need for separate debug messages
+    await this.saveCompleteMessage(callId, 'patient', message.transcript);
+    logger.info(`[OpenAI Realtime] Saved user message with transcript: "${message.transcript}"`);
+    
+    // Clear any active user message ID since we've saved the message
     if (conn.activeUserMessageId) {
-      try {
-        const { Message } = require('../models');
-        await Message.findByIdAndUpdate(
-          conn.activeUserMessageId, 
-          { content: message.transcript },
-          { 
-            // Preserve the original createdAt timestamp
-            timestamps: false,
-            // Don't update the updatedAt field
-            runValidators: false
-          }
-        );
-        conn.activeUserMessageId = null; // Clear the active message ID
-        logger.info(`[OpenAI Realtime] Updated user message with transcript: "${message.transcript}"`);
-      } catch (err) {
-        logger.error(`[OpenAI Realtime] Failed to update user message: ${err.message}`);
-        // Fallback: create new message if update fails
-        await this.saveCompleteMessage(callId, 'user', message.transcript);
-      }
-    } else {
-      // Fallback: create new message if no placeholder exists
-      await this.saveCompleteMessage(callId, 'user', message.transcript);
-      logger.info(`[OpenAI Realtime] Created new user message with transcript: "${message.transcript}"`);
+      conn.activeUserMessageId = null;
     }
   }
 

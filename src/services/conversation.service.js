@@ -230,11 +230,12 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
     // Simple message types now
     const normalizedType = messageType === 'assistant_response' ? 'assistant_response' : 
                           messageType === 'user_message' ? 'user_message' : 
+                          messageType === 'debug_user_message' ? 'debug_user_message' :
                           messageType;
 
     // Create and save the message to the database FIRST
     const message = await Message.create({
-      role: role === 'assistant' ? 'assistant' : 'patient',
+      role: role, // Use the role as-is (supports 'assistant', 'patient', 'system', 'debug-user')
       content: content.trim(),
       conversationId,
       messageType: normalizedType,
