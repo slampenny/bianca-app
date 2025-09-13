@@ -153,6 +153,20 @@ const getCaregivers = async (patientId) => {
   return patient.caregivers;
 };
 
+/**
+ * Get active patients
+ * @returns {Promise<Array>}
+ */
+const getActivePatients = async () => {
+  try {
+    // Return all patients for now - in a real implementation, you might filter by status
+    return await Patient.find({}).select('_id name email');
+  } catch (error) {
+    logger.error('Error getting active patients:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   createPatient,
   queryPatients,
@@ -163,4 +177,5 @@ module.exports = {
   assignCaregiver,
   removeCaregiver,
   getCaregivers,
+  getActivePatients,
 };

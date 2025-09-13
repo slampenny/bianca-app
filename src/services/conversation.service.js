@@ -650,6 +650,92 @@ const getSentimentSummary = async (patientId) => {
   }
 };
 
+// Medical Analysis Methods
+const getMedicalBaseline = async (patientId) => {
+  try {
+    // This would typically be stored in a separate collection or embedded in patient document
+    // For now, return null as placeholder
+    return null;
+  } catch (error) {
+    logger.error('Error getting medical baseline:', error);
+    throw error;
+  }
+};
+
+const storeMedicalBaseline = async (patientId, baseline) => {
+  try {
+    // This would typically store in a separate collection or embed in patient document
+    // For now, just log the operation
+    logger.info('Medical baseline stored', { patientId, baselineVersion: baseline.version });
+  } catch (error) {
+    logger.error('Error storing medical baseline:', error);
+    throw error;
+  }
+};
+
+const getMedicalAnalysisResults = async (patientId, limit = 10) => {
+  try {
+    // This would typically query a medical analysis results collection
+    // For now, return empty array as placeholder
+    return [];
+  } catch (error) {
+    logger.error('Error getting medical analysis results:', error);
+    throw error;
+  }
+};
+
+const storeMedicalAnalysisResult = async (patientId, result) => {
+  try {
+    // This would typically store in a medical analysis results collection
+    // For now, just log the operation
+    logger.info('Medical analysis result stored', { patientId, analysisDate: result.analysisDate });
+  } catch (error) {
+    logger.error('Error storing medical analysis result:', error);
+    throw error;
+  }
+};
+
+const deleteOldMedicalAnalyses = async (cutoffDate) => {
+  try {
+    // This would typically delete old medical analysis results
+    // For now, return a mock result
+    return { deletedCount: 0 };
+  } catch (error) {
+    logger.error('Error deleting old medical analyses:', error);
+    throw error;
+  }
+};
+
+const getActivePatients = async () => {
+  try {
+    // This would typically get active patients from the patient service
+    // For now, return empty array as placeholder
+    return [];
+  } catch (error) {
+    logger.error('Error getting active patients:', error);
+    throw error;
+  }
+};
+
+const getConversationsByPatientAndDateRange = async (patientId, startDate, endDate) => {
+  try {
+    const conversations = await Conversation.find({
+      patientId,
+      createdAt: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    })
+    .populate('messages')
+    .sort({ createdAt: 1 });
+
+    return conversations;
+  } catch (error) {
+    logger.error('Error getting conversations by patient and date range:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   // Existing methods (unchanged)
   createConversationForPatient,
@@ -667,5 +753,14 @@ module.exports = {
   
   // Sentiment analysis methods
   getSentimentTrend,
-  getSentimentSummary
+  getSentimentSummary,
+  
+  // Medical analysis methods
+  getMedicalBaseline,
+  storeMedicalBaseline,
+  getMedicalAnalysisResults,
+  storeMedicalAnalysisResult,
+  deleteOldMedicalAnalyses,
+  getActivePatients,
+  getConversationsByPatientAndDateRange
 };

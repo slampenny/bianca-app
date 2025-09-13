@@ -3,6 +3,7 @@ const alertRoute = require('./alert.route');
 const authRoute = require('./auth.route');
 const caregiverRoute = require('./caregiver.route');
 const conversationRoute = require('./conversation.route');
+const medicalAnalysisRoute = require('./medicalAnalysis.route');
 const openaiRoute = require('./openai.route');
 const orgRoute = require('./org.route');
 const patientRoute = require('./patient.route');
@@ -38,6 +39,10 @@ const defaultRoutes = [
   {
     path: '/conversations',
     route: conversationRoute,
+  },
+  {
+    path: '/medical-analysis',
+    route: medicalAnalysisRoute,
   },
   {
     path: '/openai',
