@@ -38,6 +38,9 @@ const envVarsSchema = Joi.object({
   // SES specific
   AWS_SES_REGION: Joi.string().description('AWS Region for SES (e.g., us-east-1)'),
   
+  // SNS specific for emergency notifications
+  EMERGENCY_SNS_TOPIC_ARN: Joi.string().description('SNS Topic ARN for emergency notifications'),
+  
   // Base URL configuration (should be set by Terraform)
   API_BASE_URL: Joi.string().uri().description('Base API URL (e.g., https://api.myphonefriend.com)'),
   BASE_URL: Joi.string().uri().description('Base URL (alternative to API_BASE_URL)'),
@@ -132,6 +135,10 @@ const baselineConfig = {
   email: {
     ses: { // Configuration for AWS SES (used in production/test by email.service.js)
       region: envVars.AWS_SES_REGION || envVars.AWS_REGION || 'us-east-2', // Default to AWS_REGION if AWS_SES_REGION not set
+    },
+    sns: { // Configuration for AWS SNS (used for emergency notifications)
+      region: envVars.AWS_REGION || 'us-east-2',
+      topicArn: envVars.EMERGENCY_SNS_TOPIC_ARN,
     },
     smtp: { // Fallback or alternative SMTP settings (Ethereal in dev is handled by createTestAccount)
       host: envVars.SMTP_HOST, // Example: 'smtp.ethereal.email' if you want to pin it

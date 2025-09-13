@@ -2060,7 +2060,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId, callType);
 
             // Step 5: Initialize OpenAI service for this call
-            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, enhancedPrompt);
+            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, enhancedPrompt, patientId);
 
             // Step 6: Create the main bridge for mixing audio
             mainBridge = await this.client.bridges.create({

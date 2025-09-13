@@ -35,6 +35,7 @@ const config = require('../config/config');
 const logger = require('../config/logger');
 const { Message } = require('../models'); // Assuming Message model is used for saving transcripts
 const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
+const { emergencyProcessor } = require('./emergencyProcessor.service');
 
 /**
  * Constants for configuration
@@ -487,7 +488,7 @@ class OpenAIRealtimeService {
   /**
    * Initialize a connection to OpenAI for a call. Uses callSid as the primary key.
    */
-  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt) {
+  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt, patientId = null) {
     const callId = callSid || initialAsteriskChannelId; // Prefer callSid if available
     if (!callId) {
       logger.error('[OpenAI Realtime] Initialize: Critical - Missing call identifier.');
@@ -504,12 +505,16 @@ class OpenAIRealtimeService {
 
     logger.info(`[OpenAI Realtime] Initializing for callId: ${callId} (Initial Asterisk ID: ${initialAsteriskChannelId})`);
     logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);
+    if (patientId) {
+      logger.info(`[OpenAI Realtime] Emergency detection enabled for patient: ${patientId}`);
+    }
 
     this.connections.set(callId, {
       status: 'initializing',
       conversationId,
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
+      patientId, // Store patient ID for emergency detection
       webSocket: null,
       sessionReady: false,
       startTime: Date.now(),
@@ -1685,6 +1690,35 @@ class OpenAIRealtimeService {
         'user_message'
       );
       logger.info(`[OpenAI Realtime] Successfully saved ${role} message (${content.length} chars) to conversation ${conn.conversationId}`);
+
+      // EMERGENCY DETECTION: Post-message analysis for user messages
+      if ((role === 'user' || role === 'patient') && conn.patientId && content && content.trim().length > 10) {
+        try {
+          const emergencyResult = await emergencyProcessor.processUtterance(
+            conn.patientId,
+            content,
+            Date.now()
+          );
+
+          if (emergencyResult.shouldAlert && !emergencyResult.processing.falsePositive) {
+            logger.warn(`[Emergency Detection] Post-message emergency detected for patient ${conn.patientId}: ${emergencyResult.reason}`);
+            
+            const alertResult = await emergencyProcessor.createAlert(
+              conn.patientId,
+              emergencyResult.alertData,
+              content
+            );
+
+            if (alertResult.success) {
+              logger.info(`[Emergency Detection] Post-message alert created: ${alertResult.alert._id}`);
+            } else {
+              logger.error(`[Emergency Detection] Failed to create post-message alert: ${alertResult.error}`);
+            }
+          }
+        } catch (error) {
+          logger.error(`[Emergency Detection] Error in post-message detection for ${callId}:`, error);
+        }
+      }
     } catch (err) {
       logger.error(`[OpenAI Realtime] Failed to save ${role} message: ${err.message}`, err);
     }
@@ -1781,6 +1815,44 @@ class OpenAIRealtimeService {
     }
 
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
+
+    // EMERGENCY DETECTION: Real-time analysis of user transcript
+    if (conn.patientId && message.transcript && message.transcript.trim().length > 10) {
+      try {
+        const emergencyResult = await emergencyProcessor.processUtterance(
+          conn.patientId,
+          message.transcript,
+          Date.now()
+        );
+
+        if (emergencyResult.shouldAlert) {
+          logger.warn(`[Emergency Detection] EMERGENCY DETECTED for patient ${conn.patientId}: ${emergencyResult.reason}`);
+          
+          // Create alert and notify caregivers
+          const alertResult = await emergencyProcessor.createAlert(
+            conn.patientId,
+            emergencyResult.alertData,
+            message.transcript
+          );
+
+          if (alertResult.success) {
+            logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert._id}`);
+            
+            // For CRITICAL emergencies, log warning for potential intervention
+            if (emergencyResult.alertData.severity === 'CRITICAL') {
+              logger.warn(`[Emergency Detection] CRITICAL emergency - consider immediate intervention for patient ${conn.patientId}`);
+            }
+          } else {
+            logger.error(`[Emergency Detection] Failed to create alert: ${alertResult.error}`);
+          }
+        } else {
+          logger.debug(`[Emergency Detection] No emergency detected for ${callId}: ${emergencyResult.reason}`);
+        }
+      } catch (error) {
+        logger.error(`[Emergency Detection] Error processing emergency detection for ${callId}:`, error);
+        // Don't let emergency detection errors break the conversation
+      }
+    }
 
     // Save user message using the conversation service for proper handling
     // Note: This transcript IS what the assistant thinks the user said - no need for separate debug messages
