@@ -22,6 +22,7 @@ import {
   conversationApi,
   callWorkflowApi,
   sentimentApi,
+  medicalAnalysisApi,
 } from "../services/api/"
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import {
@@ -65,6 +66,7 @@ const rootReducer = combineReducers({
   [scheduleApi.reducerPath]: scheduleApi.reducer,
   [callWorkflowApi.reducerPath]: callWorkflowApi.reducer,
   [sentimentApi.reducerPath]: sentimentApi.reducer,
+  [medicalAnalysisApi.reducerPath]: medicalAnalysisApi.reducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)
@@ -88,6 +90,7 @@ export const store = configureStore({
       conversationApi.middleware,
       callWorkflowApi.middleware,
       sentimentApi.middleware,
+      medicalAnalysisApi.middleware,
     ),
 })
 

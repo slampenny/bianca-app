@@ -1,12 +1,17 @@
 import React, { useState, useCallback } from "react"
-import { View, StyleSheet, Text, ScrollView, Pressable, Alert } from "react-native"
+import { View, StyleSheet, Text, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native"
 import { useRoute, RouteProp } from "@react-navigation/native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { Screen } from "../components/Screen"
 import { colors } from "../theme/colors"
 import { Ionicons } from "@expo/vector-icons"
-import { medicalAnalysisApi } from "../services/api"
+import { 
+  useGetMedicalAnalysisResultsQuery,
+  useGetMedicalAnalysisTrendQuery,
+  useTriggerMedicalAnalysisMutation,
+  useGetMedicalAnalysisStatusQuery
+} from "../services/api/medicalAnalysisApi"
 import { 
   MedicalAnalysisResult, 
   MedicalAnalysisConfidence,
@@ -32,52 +37,84 @@ export function MedicalAnalysisScreen() {
   const patientId = routePatientId || selectedPatient?.id
   const patientName = routePatientName || selectedPatient?.name
 
-  const [analysisResults, setAnalysisResults] = useState<MedicalAnalysisResult[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [isTriggering, setIsTriggering] = useState(false)
+  // RTK Query hooks
+  const {
+    data: analysisData,
+    isLoading,
+    error: analysisError
+  } = useGetMedicalAnalysisResultsQuery(
+    { patientId: patientId || '', limit: 5 },
+    { skip: !patientId }
+  )
 
-  const loadAnalysisResults = useCallback(async () => {
-    if (!patientId) return
-    
-    setIsLoading(true)
-    try {
-      const results = await medicalAnalysisApi.getMedicalAnalysisResults(patientId, 5)
-      setAnalysisResults(results)
-    } catch (error) {
-      console.error('Error loading medical analysis results:', error)
-      Alert.alert('Error', 'Failed to load medical analysis results')
-    } finally {
-      setIsLoading(false)
+  const {
+    data: trendData,
+    isLoading: isTrendLoading,
+    error: trendError
+  } = useGetMedicalAnalysisTrendQuery(
+    { patientId: patientId || '', timeRange: 'month' },
+    { skip: !patientId }
+  )
+
+  // Handle trend errors
+  React.useEffect(() => {
+    if (trendError) {
+      console.error('Error fetching trend data:', trendError)
     }
-  }, [patientId])
+  }, [trendError])
 
-  const triggerAnalysis = useCallback(async () => {
+  const [triggerAnalysis, { isLoading: isTriggering, error: triggerError }] = useTriggerMedicalAnalysisMutation()
+
+  const analysisResults = analysisData?.results || []
+
+  // Handle analysis errors
+  React.useEffect(() => {
+    if (analysisError) {
+      console.error('Error loading medical analysis results:', analysisError)
+      let errorMessage = 'Failed to load medical analysis results'
+      if ('data' in analysisError && analysisError.data) {
+        errorMessage = (analysisError.data as any)?.message || errorMessage
+      }
+      Alert.alert('Error', errorMessage)
+    }
+  }, [analysisError])
+
+  // Handle trigger errors
+  React.useEffect(() => {
+    if (triggerError) {
+      console.error('Error triggering medical analysis:', triggerError)
+      let errorMessage = 'Failed to trigger medical analysis'
+      if ('data' in triggerError && triggerError.data) {
+        errorMessage = (triggerError.data as any)?.message || errorMessage
+      }
+      Alert.alert('Error', errorMessage)
+    }
+  }, [triggerError])
+
+  const handleTriggerAnalysis = useCallback(async () => {
     if (!patientId) return
     
-    setIsTriggering(true)
     try {
-      const result = await medicalAnalysisApi.triggerMedicalAnalysis(patientId)
+      console.log('Triggering medical analysis for patient:', patientId)
+      const result = await triggerAnalysis({ patientId }).unwrap()
+      console.log('Trigger analysis result:', result)
+      
       if (result.success) {
-        Alert.alert('Success', 'Medical analysis triggered successfully. Results will be available shortly.')
-        // Reload results after a short delay
-        setTimeout(() => {
-          loadAnalysisResults()
-        }, 2000)
+        Alert.alert(
+          'Success', 
+          'Medical analysis triggered successfully. Results will appear in about 10 seconds.'
+        )
+        // RTK Query will automatically refetch results after 10 seconds
+        // No manual polling needed!
       } else {
         Alert.alert('Error', result.message || 'Failed to trigger analysis')
       }
     } catch (error) {
-      console.error('Error triggering medical analysis:', error)
-      Alert.alert('Error', 'Failed to trigger medical analysis')
-    } finally {
-      setIsTriggering(false)
+      // Error is handled by the useEffect above
+      console.error('Trigger analysis failed:', error)
     }
-  }, [patientId, loadAnalysisResults])
+  }, [patientId, triggerAnalysis])
 
-  // Load results when component mounts or patient changes
-  React.useEffect(() => {
-    loadAnalysisResults()
-  }, [loadAnalysisResults])
 
   if (!patientId) {
     return (
@@ -109,6 +146,22 @@ export function MedicalAnalysisScreen() {
     return { level: 'Low', color: colors.palette.biancaSuccess }
   }
 
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case 'improving': return 'trending-up'
+      case 'declining': return 'trending-down'
+      default: return 'remove'
+    }
+  }
+
+  const getTrendColor = (trend: string) => {
+    switch (trend) {
+      case 'improving': return colors.palette.biancaSuccess
+      case 'declining': return colors.palette.biancaError
+      default: return colors.palette.neutral500
+    }
+  }
+
   return (
     <Screen preset="scroll" style={styles.container}>
       <View style={styles.header}>
@@ -118,34 +171,28 @@ export function MedicalAnalysisScreen() {
 
       <View style={styles.actions}>
         <Pressable 
-          style={[styles.actionButton, styles.triggerButton]} 
-          onPress={triggerAnalysis}
+          style={[
+            styles.actionButton, 
+            styles.triggerButton,
+            isTriggering && styles.buttonDisabled
+          ]} 
+          onPress={handleTriggerAnalysis}
           disabled={isTriggering}
         >
-          <Ionicons 
-            name="play-circle" 
-            size={20} 
-            color={colors.palette.neutral100} 
-          />
+          {isTriggering ? (
+            <ActivityIndicator size="small" color={colors.palette.neutral100} />
+          ) : (
+            <Ionicons 
+              name="play-circle" 
+              size={20} 
+              color={colors.palette.neutral100} 
+            />
+          )}
           <Text style={styles.actionButtonText}>
             {isTriggering ? 'Triggering...' : 'Trigger Analysis'}
           </Text>
         </Pressable>
 
-        <Pressable 
-          style={[styles.actionButton, styles.refreshButton]} 
-          onPress={loadAnalysisResults}
-          disabled={isLoading}
-        >
-          <Ionicons 
-            name="refresh" 
-            size={20} 
-            color={colors.palette.biancaButtonSelected} 
-          />
-          <Text style={[styles.actionButtonText, styles.refreshButtonText]}>
-            {isLoading ? 'Loading...' : 'Refresh'}
-          </Text>
-        </Pressable>
       </View>
 
       {isLoading ? (
@@ -160,21 +207,66 @@ export function MedicalAnalysisScreen() {
         </View>
       ) : (
         <ScrollView style={styles.resultsContainer}>
-          {analysisResults.map((result, index) => (
-            <View key={result.analysisDate || index} style={styles.resultCard}>
+          {(() => {
+            console.log('Total analysis results:', analysisResults.length)
+            
+            // Get the most recent analysis result
+            const latestResult = analysisResults
+              .filter((result, index, self) => 
+                // Keep only unique results based on analysis date
+                index === self.findIndex(r => 
+                  new Date(r.analysisDate).getTime() === new Date(result.analysisDate).getTime()
+                )
+              )
+              .sort((a, b) => new Date(b.analysisDate).getTime() - new Date(a.analysisDate).getTime()) // Sort by date, newest first
+              [0] // Get only the most recent result
+            
+            // Get all results for time series (sorted by date)
+            const timeSeriesData = analysisResults
+              .filter((result, index, self) => 
+                index === self.findIndex(r => 
+                  new Date(r.analysisDate).getTime() === new Date(result.analysisDate).getTime()
+                )
+              )
+              .sort((a, b) => new Date(a.analysisDate).getTime() - new Date(b.analysisDate).getTime()) // Sort chronologically for chart
+            
+            console.log('Latest result:', latestResult)
+            console.log('Time series data points:', timeSeriesData.length)
+            console.log('Trend data:', trendData)
+            console.log('Trend data structure:', {
+              hasTrendData: !!trendData,
+              hasTrend: !!trendData?.trend,
+              hasSummary: !!trendData?.trend?.summary,
+              summaryKeys: trendData?.trend?.summary ? Object.keys(trendData.trend.summary) : 'no summary'
+            })
+            
+            if (!latestResult) {
+              return (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="analytics" size={48} color={colors.palette.neutral600} />
+                  <Text style={styles.emptyText}>No analysis results available</Text>
+                  <Text style={styles.emptySubtext}>Trigger an analysis to get started</Text>
+                </View>
+              )
+            }
+            
+            return (
+              <>
+                {/* Latest Analysis Card */}
+                <View style={styles.resultCard}>
               <View style={styles.resultHeader}>
                 <Text style={styles.resultDate}>
-                  {new Date(result.analysisDate).toLocaleDateString()}
+                  {new Date(latestResult.analysisDate).toLocaleDateString()}
                 </Text>
                 <View style={styles.confidenceBadge}>
                   <View 
                     style={[
                       styles.confidenceDot, 
-                      { backgroundColor: getConfidenceColor(result.confidence) }
+                      { backgroundColor: getConfidenceColor(latestResult.confidence) }
                     ]} 
                   />
                   <Text style={styles.confidenceText}>
-                    {result.confidence.toUpperCase()}
+                    {latestResult.confidence.toUpperCase()}
                   </Text>
                 </View>
               </View>
@@ -184,14 +276,16 @@ export function MedicalAnalysisScreen() {
                 <View style={styles.metricCard}>
                   <Text style={styles.metricTitle}>Cognitive Health</Text>
                   <View style={styles.metricValue}>
-                    <Text style={styles.metricNumber}>{result.cognitiveMetrics.riskScore}</Text>
+                    <Text style={styles.metricNumber}>
+                      {latestResult.cognitiveMetrics?.riskScore ?? '--'}
+                    </Text>
                     <Text style={styles.metricUnit}>/100</Text>
                   </View>
                   <Text style={[
                     styles.metricLevel, 
-                    { color: getRiskLevel(result.cognitiveMetrics.riskScore).color }
+                    { color: getRiskLevel(latestResult.cognitiveMetrics?.riskScore ?? 0).color }
                   ]}>
-                    {getRiskLevel(result.cognitiveMetrics.riskScore).level} Risk
+                    {getRiskLevel(latestResult.cognitiveMetrics?.riskScore ?? 0).level} Risk
                   </Text>
                 </View>
 
@@ -199,14 +293,16 @@ export function MedicalAnalysisScreen() {
                 <View style={styles.metricCard}>
                   <Text style={styles.metricTitle}>Mental Health</Text>
                   <View style={styles.metricValue}>
-                    <Text style={styles.metricNumber}>{result.psychiatricMetrics.overallRiskScore}</Text>
+                    <Text style={styles.metricNumber}>
+                      {latestResult.psychiatricMetrics?.overallRiskScore ?? '--'}
+                    </Text>
                     <Text style={styles.metricUnit}>/100</Text>
                   </View>
                   <Text style={[
                     styles.metricLevel, 
-                    { color: getRiskLevel(result.psychiatricMetrics.overallRiskScore).color }
+                    { color: getRiskLevel(latestResult.psychiatricMetrics?.overallRiskScore ?? 0).color }
                   ]}>
-                    {getRiskLevel(result.psychiatricMetrics.overallRiskScore).level} Risk
+                    {getRiskLevel(latestResult.psychiatricMetrics?.overallRiskScore ?? 0).level} Risk
                   </Text>
                 </View>
 
@@ -214,24 +310,26 @@ export function MedicalAnalysisScreen() {
                 <View style={styles.metricCard}>
                   <Text style={styles.metricTitle}>Language</Text>
                   <View style={styles.metricValue}>
-                    <Text style={styles.metricNumber}>{result.vocabularyMetrics.complexityScore}</Text>
+                    <Text style={styles.metricNumber}>
+                      {latestResult.vocabularyMetrics?.complexityScore ?? '--'}
+                    </Text>
                     <Text style={styles.metricUnit}>/100</Text>
                   </View>
                   <Text style={[
                     styles.metricLevel, 
-                    { color: getRiskLevel(100 - result.vocabularyMetrics.complexityScore).color }
+                    { color: getRiskLevel(100 - (latestResult.vocabularyMetrics?.complexityScore ?? 0)).color }
                   ]}>
-                    {result.vocabularyMetrics.complexityScore >= 70 ? 'Good' : 
-                     result.vocabularyMetrics.complexityScore >= 40 ? 'Fair' : 'Poor'}
+                    {(latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 70 ? 'Good' : 
+                     (latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 40 ? 'Fair' : 'Poor'}
                   </Text>
                 </View>
               </View>
 
               {/* Warnings */}
-              {result.warnings && result.warnings.length > 0 && (
+              {latestResult.warnings && latestResult.warnings.length > 0 && (
                 <View style={styles.warningsContainer}>
                   <Text style={styles.warningsTitle}>Warnings & Insights</Text>
-                  {result.warnings.map((warning, warningIndex) => (
+                  {latestResult.warnings.map((warning, warningIndex) => (
                     <View key={warningIndex} style={styles.warningItem}>
                       <Ionicons name="warning" size={16} color={colors.palette.biancaWarning} />
                       <Text style={styles.warningText}>{warning}</Text>
@@ -246,24 +344,103 @@ export function MedicalAnalysisScreen() {
                 <View style={styles.detailsGrid}>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>Conversations</Text>
-                    <Text style={styles.detailValue}>{result.conversationCount}</Text>
+                    <Text style={styles.detailValue}>{latestResult.conversationCount ?? '--'}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>Messages</Text>
-                    <Text style={styles.detailValue}>{result.messageCount}</Text>
+                    <Text style={styles.detailValue}>{latestResult.messageCount ?? '--'}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>Total Words</Text>
-                    <Text style={styles.detailValue}>{result.totalWords}</Text>
+                    <Text style={styles.detailValue}>{latestResult.totalWords ?? '--'}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>Trigger</Text>
-                    <Text style={styles.detailValue}>{result.trigger}</Text>
+                    <Text style={styles.detailValue}>{latestResult.trigger ?? '--'}</Text>
                   </View>
                 </View>
               </View>
             </View>
-          ))}
+
+            {/* Time Series Chart */}
+            {(trendData?.trend?.summary || timeSeriesData.length >= 1) && (
+              <View style={styles.chartContainer}>
+                <Text style={styles.chartTitle}>Trends Over Time</Text>
+                {trendData?.trend?.summary ? (
+                  <View style={styles.trendsContainer}>
+                    <View style={styles.trendItem}>
+                      <Text style={styles.trendLabel}>Cognitive Health</Text>
+                      <View style={styles.trendValue}>
+                        <Ionicons 
+                          name={getTrendIcon(trendData.trend.summary.cognitiveTrend)} 
+                          size={20} 
+                          color={getTrendColor(trendData.trend.summary.cognitiveTrend)} 
+                        />
+                        <Text style={[styles.trendText, { color: getTrendColor(trendData.trend.summary.cognitiveTrend) }]}>
+                          {trendData.trend.summary.cognitiveTrend}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.trendItem}>
+                      <Text style={styles.trendLabel}>Mental Health</Text>
+                      <View style={styles.trendValue}>
+                        <Ionicons 
+                          name={getTrendIcon(trendData.trend.summary.psychiatricTrend)} 
+                          size={20} 
+                          color={getTrendColor(trendData.trend.summary.psychiatricTrend)} 
+                        />
+                        <Text style={[styles.trendText, { color: getTrendColor(trendData.trend.summary.psychiatricTrend) }]}>
+                          {trendData.trend.summary.psychiatricTrend}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.trendItem}>
+                      <Text style={styles.trendLabel}>Language</Text>
+                      <View style={styles.trendValue}>
+                        <Ionicons 
+                          name={getTrendIcon(trendData.trend.summary.vocabularyTrend)} 
+                          size={20} 
+                          color={getTrendColor(trendData.trend.summary.vocabularyTrend)} 
+                        />
+                        <Text style={[styles.trendText, { color: getTrendColor(trendData.trend.summary.vocabularyTrend) }]}>
+                          {trendData.trend.summary.vocabularyTrend}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.trendItem}>
+                      <Text style={styles.trendLabel}>Overall Health</Text>
+                      <View style={styles.trendValue}>
+                        <Text style={styles.trendText}>
+                          {trendData.trend.totalAnalyses} analyses
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.chartPlaceholder}>
+                    <Ionicons name="trending-up" size={48} color={colors.palette.neutral400} />
+                    <Text style={styles.chartPlaceholderText}>
+                      Trend analysis coming soon
+                    </Text>
+                    <Text style={styles.chartSubtext}>
+                      {timeSeriesData.length} analysis results available
+                    </Text>
+                  </View>
+                )}
+                
+                {trendData?.trend?.totalAnalyses > 0 && (
+                  <Text style={styles.chartSubtext}>
+                    Based on {trendData.trend.totalAnalyses} analysis results over {trendData.trend.timeRange}
+                  </Text>
+                )}
+              </View>
+            )}
+              </>
+            )
+          })()}
         </ScrollView>
       )}
     </Screen>
@@ -307,18 +484,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.palette.biancaButtonSelected,
     flex: 1,
   },
-  refreshButton: {
-    backgroundColor: colors.palette.neutral200,
-    borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-  },
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.palette.neutral100,
-  },
-  refreshButtonText: {
-    color: colors.palette.biancaButtonSelected,
   },
   loadingContainer: {
     flex: 1,
@@ -490,5 +659,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.palette.biancaHeader,
+  },
+  chartContainer: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 12,
+    padding: 20,
+    marginTop: 20,
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.palette.neutral900,
+    marginBottom: 16,
+  },
+  trendsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  trendItem: {
+    width: '48%',
+    backgroundColor: colors.palette.neutral50,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  trendLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.palette.neutral700,
+    marginBottom: 8,
+  },
+  trendValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trendText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 6,
+    textTransform: 'capitalize',
+  },
+  chartPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    backgroundColor: colors.palette.neutral50,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral200,
+    borderStyle: 'dashed',
+  },
+  chartPlaceholderText: {
+    fontSize: 16,
+    color: colors.palette.neutral600,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  chartSubtext: {
+    fontSize: 14,
+    color: colors.palette.neutral500,
+    marginTop: 4,
+    textAlign: 'center',
   },
 })
