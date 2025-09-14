@@ -6,6 +6,7 @@ const conversationService = require('../services/conversation.service');
 const patientService = require('../services/patient.service');
 const MedicalPatternAnalyzer = require('../services/ai/medicalPatternAnalyzer.service');
 const baselineManager = require('../services/ai/baselineManager.service');
+const medicalAnalysisScheduler = require('../services/ai/medicalAnalysisScheduler.service');
 const { MedicalAnalysis } = require('../models');
 const logger = require('../config/logger');
 
@@ -505,9 +506,270 @@ function calculateOverallHealthScore(analysis) {
   return Math.max(Math.round(score), 0);
 }
 
+/**
+ * Get medical analysis results for a patient
+ */
+const getMedicalAnalysisResults = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+  const { limit = 10 } = req.query;
+
+  try {
+    logger.info('[MedicalAnalysis] Fetching medical analysis results for patient', { patientId, limit });
+    
+    const results = await conversationService.getMedicalAnalysisResults(patientId, parseInt(limit));
+    
+    res.status(httpStatus.OK).json({
+      success: true,
+      results,
+      count: results.length
+    });
+  } catch (error) {
+    logger.error('Error fetching medical analysis results:', error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to fetch medical analysis results',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * Trigger medical analysis for a specific patient
+ */
+const triggerPatientAnalysis = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+
+  try {
+    logger.info('[MedicalAnalysis] Triggering medical analysis for patient', { patientId });
+    
+    // Validate patient exists
+    const patient = await patientService.getPatientById(patientId);
+    if (!patient) {
+      return res.status(httpStatus.NOT_FOUND).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+
+    // Schedule the analysis
+    const job = await medicalAnalysisScheduler.schedulePatientAnalysis(patientId, {
+      trigger: 'manual',
+      batchId: `manual-${Date.now()}`
+    });
+
+    res.status(httpStatus.OK).json({
+      success: true,
+      message: 'Medical analysis triggered successfully',
+      jobId: job.attrs._id
+    });
+  } catch (error) {
+    logger.error('Error triggering patient medical analysis:', error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to trigger patient medical analysis',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * Trigger medical analysis for all active patients
+ */
+const triggerAllAnalysis = catchAsync(async (req, res) => {
+  try {
+    logger.info('[MedicalAnalysis] Triggering medical analysis for all patients');
+    
+    // Get all active patients
+    const patients = await conversationService.getActivePatients();
+    
+    if (!patients || patients.length === 0) {
+      return res.status(httpStatus.OK).json({
+        success: true,
+        message: 'No active patients found',
+        jobCount: 0
+      });
+    }
+
+    // Schedule analysis for all patients
+    const patientIds = patients.map(p => p._id.toString());
+    const jobs = await medicalAnalysisScheduler.scheduleBatchAnalysis(patientIds, {
+      trigger: 'manual',
+      batchId: `batch-manual-${Date.now()}`
+    });
+
+    res.status(httpStatus.OK).json({
+      success: true,
+      message: 'Medical analysis triggered for all patients',
+      jobCount: jobs.length
+    });
+  } catch (error) {
+    logger.error('Error triggering all medical analysis:', error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to trigger medical analysis for all patients',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * Get medical analysis scheduler status
+ */
+const getSchedulerStatus = catchAsync(async (req, res) => {
+  try {
+    const status = await medicalAnalysisScheduler.getStatus();
+    
+    res.status(httpStatus.OK).json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    logger.error('Error getting scheduler status:', error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to get scheduler status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * Get medical analysis trend data for time series visualization
+ */
+const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+  const { timeRange = 'year' } = req.query;
+
+  try {
+    logger.info('[MedicalAnalysis] Fetching trend data for patient', { patientId, timeRange });
+    
+    // Validate patient exists
+    const patient = await patientService.getPatientById(patientId);
+    if (!patient) {
+      return res.status(httpStatus.NOT_FOUND).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+
+    // Calculate date range
+    let start, end;
+    const now = new Date();
+    
+    switch (timeRange) {
+      case 'month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'quarter':
+        const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+        start = new Date(now.getFullYear(), quarterStart, 1);
+        end = new Date(now.getFullYear(), quarterStart + 3, 0, 23, 59, 59);
+        break;
+      case 'year':
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    }
+
+    // Get all medical analysis results for the patient
+    const timeSeriesResults = await MedicalAnalysis.find({ 
+      patientId,
+      analysisDate: { $gte: start, $lte: end }
+    }).sort({ analysisDate: 1 });
+
+    if (timeSeriesResults.length === 0) {
+      return res.status(httpStatus.OK).json({
+        success: true,
+        trend: {
+          patientId,
+          timeRange,
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          totalAnalyses: 0,
+          dataPoints: [],
+          summary: {
+            averageCognitiveRisk: 0,
+            averagePsychiatricRisk: 0,
+            cognitiveTrend: 'stable',
+            psychiatricTrend: 'stable',
+            vocabularyTrend: 'stable',
+            confidence: 0,
+            keyInsights: ['No analysis data available for the specified time range'],
+            criticalWarnings: []
+          }
+        }
+      });
+    }
+
+    // Transform stored time series data for frontend
+    const dataPoints = timeSeriesResults.map(result => ({
+      date: result.analysisDate.toISOString().split('T')[0], // YYYY-MM-DD format
+      cognitiveScore: result.timeSeriesData?.cognitiveScore || 0,
+      mentalHealthScore: result.timeSeriesData?.mentalHealthScore || 0,
+      languageScore: result.timeSeriesData?.languageScore || 0,
+      overallHealthScore: result.timeSeriesData?.overallHealthScore || 0,
+      conversationCount: result.conversationCount || 0,
+      messageCount: result.messageCount || 0
+    }));
+
+    // Get trends from the latest analysis (already calculated and stored)
+    const latestAnalysis = timeSeriesResults[timeSeriesResults.length - 1];
+    const trends = latestAnalysis.trends || {
+      cognitive: 'stable',
+      mentalHealth: 'stable',
+      language: 'stable',
+      overall: 'stable'
+    };
+
+    res.status(httpStatus.OK).json({
+      success: true,
+      trend: {
+        patientId,
+        timeRange,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        totalAnalyses: dataPoints.length,
+        dataPoints: dataPoints.map(point => ({
+          analysisId: point.analysisId,
+          date: point.date,
+          analysis: point.analysis
+        })),
+        summary: {
+          averageCognitiveRisk: dataPoints.reduce((sum, p) => sum + (p.analysis?.cognitiveScore || 0), 0) / dataPoints.length,
+          averagePsychiatricRisk: dataPoints.reduce((sum, p) => sum + (p.analysis?.mentalHealthScore || 0), 0) / dataPoints.length,
+          cognitiveTrend: trends.cognitive,
+          psychiatricTrend: trends.mentalHealth,
+          vocabularyTrend: trends.language,
+          confidence: 0.8, // Default confidence
+          keyInsights: dataPoints.length > 1 ? [`Based on ${dataPoints.length} analyses over ${timeRange}`] : ['Single analysis - trends require multiple data points'],
+          criticalWarnings: []
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching medical analysis trend:', error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to fetch medical analysis trend',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
 module.exports = {
   getMedicalAnalysis,
   getMedicalAnalysisSummary,
   getBaseline,
-  establishBaseline
+  establishBaseline,
+  getMedicalAnalysisResults,
+  triggerPatientAnalysis,
+  triggerAllAnalysis,
+  getSchedulerStatus,
+  getMedicalAnalysisTrend
 };

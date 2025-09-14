@@ -22,6 +22,270 @@ const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = scheduleFixt
 const { conversationOne, conversationTwo, insertConversations } = conversationFixture;
 const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = paymentMethodFixture;
 
+/**
+ * Add declining patient conversations to show progression over time
+ * @param {string} patientId - The patient ID to add conversations for
+ */
+async function addDecliningPatientConversations(patientId) {
+  console.log('Adding declining patient conversations for patient:', patientId);
+  
+  const decliningConversations = [];
+  
+  // Month 1: Healthy baseline
+  const month1Date = new Date();
+  month1Date.setMonth(month1Date.getMonth() - 5);
+  
+  // Create conversation first
+  const conv1 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient discussing medication management and overall health status.',
+    analyzedData: {},
+    metadata: { source: 'declining_patient_seed', month: 1 },
+    createdAt: month1Date,
+    updatedAt: month1Date
+  });
+  await conv1.save();
+  
+  // Create and save message
+  const msg1 = new Message({
+    role: 'patient',
+    content: 'Good morning! I hope you are having a wonderful day. I wanted to discuss my medication schedule with you today. I take my blood pressure medication every morning at 8 AM, and I have been very consistent with it. I feel good and I have energy. I am managing my health well and everything is going smoothly. My memory has been sharp and I have been able to keep track of all my appointments and medications without any issues.',
+    conversationId: conv1._id
+  });
+  await msg1.save();
+  
+  // Update conversation with message reference
+  conv1.messages.push(msg1._id);
+  await conv1.save();
+  decliningConversations.push(conv1);
+  
+  // Month 2: Slight concerns
+  const month2Date = new Date();
+  month2Date.setMonth(month2Date.getMonth() - 4);
+  
+  const conv2 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient expressing mild concerns about mood and memory.',
+    analyzedData: {},
+    metadata: { source: 'declining_patient_seed', month: 2 },
+    createdAt: month2Date,
+    updatedAt: month2Date
+  });
+  await conv2.save();
+  
+  const msg2 = new Message({
+    role: 'patient',
+    content: 'Hi there, I wanted to talk about how I have been feeling lately. I have been having some ups and downs. Some days I feel okay, but other days I feel really down. I have been having trouble sleeping and I worry a lot about work. I am managing okay though. I have noticed that sometimes I forget where I put my keys, but I think that is normal for my age.',
+    conversationId: conv2._id
+  });
+  await msg2.save();
+  
+  conv2.messages.push(msg2._id);
+  await conv2.save();
+  decliningConversations.push(conv2);
+  
+  // Month 3: More noticeable issues
+  const month3Date = new Date();
+  month3Date.setMonth(month3Date.getMonth() - 3);
+  
+  const conv3 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient showing increased cognitive concerns and anxiety.',
+    analyzedData: {},
+    metadata: { source: 'declining_patient_seed', month: 3 },
+    createdAt: month3Date,
+    updatedAt: month3Date
+  });
+  await conv3.save();
+  
+  const msg3 = new Message({
+    role: 'patient',
+    content: 'I am feeling more confused lately. I keep forgetting things and I do not know why. I had trouble remembering my daughter\'s name yesterday and that scared me. I feel like I am losing my mind. I cannot concentrate on anything and I feel very anxious about everything. I worry that something is really wrong with me.',
+    conversationId: conv3._id
+  });
+  await msg3.save();
+  
+  conv3.messages.push(msg3._id);
+  await conv3.save();
+  decliningConversations.push(conv3);
+  
+  // Month 4: Clear decline
+  const month4Date = new Date();
+  month4Date.setMonth(month4Date.getMonth() - 2);
+  
+  const conv4 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient showing significant cognitive decline and confusion.',
+    analyzedData: {},
+    metadata: { source: 'declining_patient_seed', month: 4 },
+    createdAt: month4Date,
+    updatedAt: month4Date
+  });
+  await conv4.save();
+  
+  const msg4 = new Message({
+    role: 'patient',
+    content: 'I do not understand what is happening to me. I cannot remember what I did yesterday or what I am supposed to do today. I feel lost and confused all the time. I am afraid to leave my house because I might get lost. I cannot think clearly anymore and I keep saying the wrong words. I feel like I am going crazy.',
+    conversationId: conv4._id
+  });
+  await msg4.save();
+  
+  conv4.messages.push(msg4._id);
+  await conv4.save();
+  decliningConversations.push(conv4);
+  
+  // Month 5: Severe decline
+  const month5Date = new Date();
+  month5Date.setMonth(month5Date.getMonth() - 1);
+  
+  const conv5 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient showing severe cognitive decline with disorientation.',
+    analyzedData: {},
+    metadata: { source: 'declining_patient_seed', month: 5 },
+    createdAt: month5Date,
+    updatedAt: month5Date
+  });
+  await conv5.save();
+  
+  const msg5 = new Message({
+    role: 'patient',
+    content: 'Help me... please help me. I do not know where I am or what is happening. I am... I am at home, I think. But I do not remember how I got here. I feel confused and afraid. I cannot think clearly and I keep forgetting things. The thing is... you know what I mean? I keep repeating myself and I do not know why. I am scared.',
+    conversationId: conv5._id
+  });
+  await msg5.save();
+  
+  conv5.messages.push(msg5._id);
+  await conv5.save();
+  decliningConversations.push(conv5);
+  
+  // Month 6: Crisis point
+  const month6Date = new Date();
+  
+  const conv6 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient in crisis with severe depression and cognitive impairment.',
+    analyzedData: {},
+    metadata: { source: 'declining_patient_seed', month: 6 },
+    createdAt: month6Date,
+    updatedAt: month6Date
+  });
+  await conv6.save();
+  
+  const msg6 = new Message({
+    role: 'patient',
+    content: 'I do not know why I keep trying. Nothing ever gets better. I cannot function anymore. I cannot work, I cannot take care of myself, I cannot even get out of bed most days. I just want the pain to stop. I feel worthless and hopeless about everything. I do not know who I am anymore or what I am supposed to do. I am lost.',
+    conversationId: conv6._id
+  });
+  await msg6.save();
+  
+  conv6.messages.push(msg6._id);
+  await conv6.save();
+  decliningConversations.push(conv6);
+  
+  console.log(`Created ${decliningConversations.length} declining patient conversations`);
+  
+  return decliningConversations;
+}
+
+/**
+ * Add normal patient conversations to show stable/healthy patterns
+ * @param {string} patientId - The patient ID to add conversations for
+ */
+async function addNormalPatientConversations(patientId) {
+  console.log('Adding normal patient conversations for patient:', patientId);
+  
+  const normalConversations = [];
+  
+  // Month 1: Healthy baseline
+  const month1Date = new Date();
+  month1Date.setMonth(month1Date.getMonth() - 5);
+  
+  const conv1 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient showing healthy cognitive function and good communication.',
+    analyzedData: {},
+    metadata: { source: 'normal_patient_seed', month: 1 },
+    createdAt: month1Date,
+    updatedAt: month1Date
+  });
+  await conv1.save();
+  
+  const msg1 = new Message({
+    role: 'patient',
+    content: 'Good morning! I hope you are having a wonderful day. I wanted to discuss my medication schedule with you today. I take my blood pressure medication every morning at 8 AM, and I have been very consistent with it. I feel good and I have energy. I am managing my health well and everything is going smoothly. My memory has been sharp and I have been able to keep track of all my appointments and medications without any issues.',
+    conversationId: conv1._id
+  });
+  await msg1.save();
+  
+  conv1.messages.push(msg1._id);
+  await conv1.save();
+  normalConversations.push(conv1);
+  
+  // Month 2: Continued good health
+  const month2Date = new Date();
+  month2Date.setMonth(month2Date.getMonth() - 4);
+  
+  const conv2 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient maintaining good cognitive function and clear communication.',
+    analyzedData: {},
+    metadata: { source: 'normal_patient_seed', month: 2 },
+    createdAt: month2Date,
+    updatedAt: month2Date
+  });
+  await conv2.save();
+  
+  const msg2 = new Message({
+    role: 'patient',
+    content: 'Hello again! I am doing well today. I have been keeping up with my exercise routine and eating healthy meals. My doctor says my blood pressure is stable and my cholesterol levels are improving. I feel mentally alert and I have been reading books and doing crossword puzzles to keep my mind active. I am also staying socially connected with friends and family.',
+    conversationId: conv2._id
+  });
+  await msg2.save();
+  
+  conv2.messages.push(msg2._id);
+  await conv2.save();
+  normalConversations.push(conv2);
+  
+  // Month 3: Stable and healthy
+  const month3Date = new Date();
+  month3Date.setMonth(month3Date.getMonth() - 3);
+  
+  const conv3 = new Conversation({
+    patientId: patientId,
+    messages: [],
+    history: 'Patient showing consistent cognitive health and clear thinking.',
+    analyzedData: {},
+    metadata: { source: 'normal_patient_seed', month: 3 },
+    createdAt: month3Date,
+    updatedAt: month3Date
+  });
+  await conv3.save();
+  
+  const msg3 = new Message({
+    role: 'patient',
+    content: 'I wanted to share some good news with you today. I have been feeling great and my recent health checkup went very well. My doctor was pleased with all my test results. I have been maintaining a positive outlook and staying active in my community. I volunteer at the local library twice a week and I find it very rewarding. My memory remains sharp and I have no trouble remembering important dates and appointments.',
+    conversationId: conv3._id
+  });
+  await msg3.save();
+  
+  conv3.messages.push(msg3._id);
+  await conv3.save();
+  normalConversations.push(conv3);
+  
+  console.log(`Created ${normalConversations.length} normal patient conversations`);
+  
+  return normalConversations;
+}
+
 async function seedDatabase() {
   try {
     // Connect to the database
@@ -515,6 +779,12 @@ async function seedDatabase() {
       ]);
     console.log('Inserted conversations');
 
+    // Add declining patient conversations for Agnes Alphabet (patient1)
+    await addDecliningPatientConversations(patient1._id);
+
+    // Add some normal conversation data for Barnaby Button (patient2)
+    await addNormalPatientConversations(patient2._id);
+
     // Insert conversation-specific alerts
     const conversationAlertThree = {
       ...alertThree,
@@ -578,6 +848,38 @@ async function seedDatabase() {
 
     const invoiceRecord = await Invoice.create(dummyInvoiceData);
     console.log('Seeded Invoice:', invoiceRecord);
+
+    // Run medical analysis on the seeded patient data
+    console.log('Running medical analysis on seeded patient data...');
+    try {
+      const medicalAnalysisScheduler = require('../services/ai/medicalAnalysisScheduler.service');
+      
+      // Wait a moment for the scheduler to be ready
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Run multiple analyses on Agnes Alphabet (patient1) to create trend data
+      console.log('Triggering multiple medical analyses for Agnes Alphabet...');
+      for (let i = 0; i < 3; i++) {
+        await medicalAnalysisScheduler.schedulePatientAnalysis(patient1._id.toString(), {
+          trigger: 'seeding',
+          batchId: `seeding-${Date.now()}-${i}`
+        });
+        // Wait a moment between analyses
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Also run analysis on Barnaby Button (patient2) for variety
+      console.log('Triggering medical analysis for Barnaby Button...');
+      await medicalAnalysisScheduler.schedulePatientAnalysis(patient2._id.toString(), {
+        trigger: 'seeding',
+        batchId: `seeding-${Date.now()}`
+      });
+      
+      console.log('Medical analysis jobs scheduled for seeded data');
+    } catch (error) {
+      console.warn('Failed to run medical analysis on seeded data:', error.message);
+      // Don't fail the entire seeding process if medical analysis fails
+    }
 
     console.log('Database seeded!');
     return { org1, caregiver: caregiverOneRecord, patients: [patient1, patient2], invoiceRecord, paymentMethods };

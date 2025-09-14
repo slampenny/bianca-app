@@ -5,6 +5,7 @@ const MedicalPatternAnalyzer = require('./medicalPatternAnalyzer.service');
 const conversationService = require('../conversation.service');
 const patientService = require('../patient.service');
 const logger = require('../../config/logger');
+const config = require('../../config/config');
 
 /**
  * Medical Analysis Scheduler Service
@@ -13,7 +14,7 @@ const logger = require('../../config/logger');
 class MedicalAnalysisScheduler {
   constructor() {
     this.agenda = new Agenda({
-      db: { address: process.env.MONGODB_URI || 'mongodb://localhost:27017/bianca-app' },
+      db: { address: config.mongoose.url },
       collection: 'medicalAnalysisJobs'
     });
     
@@ -201,7 +202,7 @@ class MedicalAnalysisScheduler {
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - 1);
 
-      const conversations = await conversationService.getConversationsByDateRange(
+      const conversations = await conversationService.getConversationsByPatientAndDateRange(
         patientId,
         startDate,
         endDate

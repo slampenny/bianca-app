@@ -376,4 +376,251 @@ router.post(
   medicalAnalysisController.establishBaseline
 );
 
+/**
+ * @swagger
+ * /api/v1/medical-analysis/results/{patientId}:
+ *   get:
+ *     summary: Get medical analysis results for a patient
+ *     description: Retrieves stored medical analysis results for a patient
+ *     tags: [MedicalAnalysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Maximum number of results to return
+ *     responses:
+ *       200:
+ *         description: Medical analysis results retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 count:
+ *                   type: integer
+ *       404:
+ *         description: Patient not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  '/results/:patientId',
+  auth('readAny:medicalAnalysis'),
+  medicalAnalysisController.getMedicalAnalysisResults
+);
+
+/**
+ * @swagger
+ * /api/v1/medical-analysis/trigger-patient/{patientId}:
+ *   post:
+ *     summary: Trigger medical analysis for a specific patient
+ *     description: Manually triggers medical analysis for a specific patient
+ *     tags: [MedicalAnalysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
+ *     responses:
+ *       200:
+ *         description: Medical analysis triggered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Medical analysis triggered successfully"
+ *                 jobId:
+ *                   type: string
+ *       404:
+ *         description: Patient not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  '/trigger-patient/:patientId',
+  auth('createAny:medicalAnalysis'),
+  medicalAnalysisController.triggerPatientAnalysis
+);
+
+/**
+ * @swagger
+ * /api/v1/medical-analysis/trigger-all:
+ *   post:
+ *     summary: Trigger medical analysis for all active patients
+ *     description: Manually triggers medical analysis for all active patients
+ *     tags: [MedicalAnalysis]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Medical analysis triggered successfully for all patients
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Medical analysis triggered for all patients"
+ *                 jobCount:
+ *                   type: integer
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  '/trigger-all',
+  auth('createAny:medicalAnalysis'),
+  medicalAnalysisController.triggerAllAnalysis
+);
+
+/**
+ * @swagger
+ * /api/v1/medical-analysis/status:
+ *   get:
+ *     summary: Get medical analysis scheduler status
+ *     description: Retrieves the current status of the medical analysis scheduler
+ *     tags: [MedicalAnalysis]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Scheduler status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     isInitialized:
+ *                       type: boolean
+ *                     isRunning:
+ *                       type: boolean
+ *                     jobCount:
+ *                       type: integer
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  '/status',
+  auth('readAny:medicalAnalysis'),
+  medicalAnalysisController.getSchedulerStatus
+);
+
+/**
+ * @swagger
+ * /api/v1/medical-analysis/trend/{patientId}:
+ *   get:
+ *     summary: Get medical analysis trend data for time series visualization
+ *     description: Retrieves time series data for medical analysis metrics over time
+ *     tags: [MedicalAnalysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
+ *       - in: query
+ *         name: timeRange
+ *         schema:
+ *           type: string
+ *           enum: [month, quarter, year]
+ *           default: year
+ *         description: Time range for trend analysis
+ *     responses:
+ *       200:
+ *         description: Medical analysis trend data retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     patientId:
+ *                       type: string
+ *                     timeRange:
+ *                       type: string
+ *                     dataPoints:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           date:
+ *                             type: string
+ *                             format: date
+ *                           cognitiveScore:
+ *                             type: number
+ *                           mentalHealthScore:
+ *                             type: number
+ *                           languageScore:
+ *                             type: number
+ *                           conversationCount:
+ *                             type: number
+ *                           messageCount:
+ *                             type: number
+ *                     trends:
+ *                       type: object
+ *                       properties:
+ *                         cognitive:
+ *                           type: string
+ *                           enum: [improving, stable, declining]
+ *                         mentalHealth:
+ *                           type: string
+ *                           enum: [improving, stable, declining]
+ *                         language:
+ *                           type: string
+ *                           enum: [improving, stable, declining]
+ *       404:
+ *         description: Patient not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  '/trend/:patientId',
+  auth('readAny:medicalAnalysis'),
+  medicalAnalysisController.getMedicalAnalysisTrend
+);
+
 module.exports = router;

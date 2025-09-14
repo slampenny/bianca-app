@@ -217,7 +217,7 @@ const medicalAnalysisSchema = new mongoose.Schema({
     indicators: [{
       type: {
         type: String,
-        enum: ['depression', 'anxiety', 'crisis', 'absolutist_language', 'pronoun_usage', 'temporal_focus']
+        enum: ['depression', 'anxiety', 'crisis', 'absolutist_language', 'pronoun_usage', 'temporal_focus', 'negative_tone']
       },
       severity: {
         type: String,
@@ -422,6 +422,58 @@ const medicalAnalysisSchema = new mongoose.Schema({
     suggestedActions: [String]
   }],
   
+  // Time series data for trend visualization
+  timeSeriesData: {
+    cognitiveScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      description: 'Cognitive risk score for time series'
+    },
+    mentalHealthScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      description: 'Overall mental health risk score for time series'
+    },
+    languageScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      description: 'Language complexity score for time series'
+    },
+    overallHealthScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      description: 'Overall health score for time series'
+    }
+  },
+  
+  // Trend indicators (calculated when analysis runs)
+  trends: {
+    cognitive: {
+      type: String,
+      enum: ['improving', 'stable', 'declining'],
+      default: 'stable'
+    },
+    mentalHealth: {
+      type: String,
+      enum: ['improving', 'stable', 'declining'],
+      default: 'stable'
+    },
+    language: {
+      type: String,
+      enum: ['improving', 'stable', 'declining'],
+      default: 'stable'
+    },
+    overall: {
+      type: String,
+      enum: ['improving', 'stable', 'declining'],
+      default: 'stable'
+    }
+  },
+  
   // Processing metadata
   processingTime: {
     type: Number,
@@ -531,6 +583,34 @@ medicalAnalysisSchema.statics.getHighRiskAnalyses = function(options = {}) {
   }
   
   return this.find(query).sort({ analysisDate: -1 });
+};
+
+// Static method to get time series data for trend visualization
+medicalAnalysisSchema.statics.getTimeSeriesData = function(patientId, timeRange = 'year') {
+  let startDate;
+  const endDate = new Date();
+  
+  switch (timeRange) {
+    case 'month':
+      startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+      break;
+    case 'quarter':
+      const quarterStart = Math.floor(endDate.getMonth() / 3) * 3;
+      startDate = new Date(endDate.getFullYear(), quarterStart, 1);
+      break;
+    case 'year':
+      startDate = new Date(endDate.getFullYear(), 0, 1);
+      break;
+    default:
+      throw new Error('Invalid timeRange. Must be: month, quarter, or year');
+  }
+
+  return this.find({
+    patientId,
+    analysisDate: { $gte: startDate, $lte: endDate }
+  })
+  .select('analysisDate timeSeriesData trends conversationCount messageCount')
+  .sort({ analysisDate: 1 }); // Sort chronologically for trend calculation
 };
 
 module.exports = mongoose.model('MedicalAnalysis', medicalAnalysisSchema);
