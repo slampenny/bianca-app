@@ -14,6 +14,7 @@ const allRoles = {
     'deleteOwn:alert',
     'readOwn:invoice', // Add this for staff to read their invoices
     'readOwn:conversation', // Add this for staff to read conversations of their patients
+    'readOwn:medicalAnalysis', // Add this for staff to read medical analysis of their patients
   ],
   orgAdmin: [
     // Inherited from staff
@@ -50,6 +51,8 @@ const allRoles = {
     'readAny:invoice',
     'updateAny:invoice',
     'deleteAny:invoice',
+    'readAny:medicalAnalysis', // Add this for orgAdmin to read medical analysis of any patient
+    'createAny:medicalAnalysis', // Add this for orgAdmin to trigger medical analysis
   ],
   superAdmin: [], // superAdmin can do everything without explicit permissions
 };

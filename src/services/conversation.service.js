@@ -650,6 +650,373 @@ const getSentimentSummary = async (patientId) => {
   }
 };
 
+// Medical Analysis Methods
+const getMedicalBaseline = async (patientId) => {
+  try {
+    // This would typically be stored in a separate collection or embedded in patient document
+    // For now, return null as placeholder
+    return null;
+  } catch (error) {
+    logger.error('Error getting medical baseline:', error);
+    throw error;
+  }
+};
+
+const storeMedicalBaseline = async (patientId, baseline) => {
+  try {
+    // This would typically store in a separate collection or embed in patient document
+    // For now, just log the operation
+    logger.info('Medical baseline stored', { patientId, baselineVersion: baseline.version });
+  } catch (error) {
+    logger.error('Error storing medical baseline:', error);
+    throw error;
+  }
+};
+
+const getMedicalAnalysisResults = async (patientId, limit = 10) => {
+  try {
+    const MedicalAnalysis = require('../models/medicalAnalysis.model');
+    
+    const results = await MedicalAnalysis.find({ patientId })
+      .sort({ analysisDate: -1 })
+      .limit(limit)
+      .lean(); // Use lean() for better performance since we don't need Mongoose documents
+    
+    logger.info('Retrieved medical analysis results', { 
+      patientId, 
+      count: results.length,
+      limit 
+    });
+    
+    return results;
+  } catch (error) {
+    logger.error('Error getting medical analysis results:', error);
+    throw error;
+  }
+};
+
+const storeMedicalAnalysisResult = async (patientId, result) => {
+  try {
+    const MedicalAnalysis = require('../models/medicalAnalysis.model');
+    
+    // Calculate time series data and trends
+    const timeSeriesData = calculateTimeSeriesData(result);
+    const trends = await calculateTrends(patientId, timeSeriesData);
+    
+    // Clean and validate the analysis data before storing
+    const cleanedResult = cleanAnalysisData(result);
+    
+    // Create medical analysis document
+    const medicalAnalysis = new MedicalAnalysis({
+      patientId,
+      analysisDate: result.analysisDate || new Date(),
+      timeRange: 'month', // Default to monthly analysis
+      startDate: result.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      endDate: result.endDate || new Date(),
+      conversationCount: result.conversationCount || 0,
+      messageCount: result.messageCount || 0,
+      totalWords: result.totalWords || 0,
+      cognitiveMetrics: cleanedResult.cognitiveMetrics || {},
+      psychiatricMetrics: cleanedResult.psychiatricMetrics || {},
+      vocabularyMetrics: cleanedResult.vocabularyMetrics || {},
+      timeSeriesData,
+      trends,
+      confidence: result.confidence || 'low',
+      warnings: result.warnings || [],
+      processingTime: result.processingTime || 0,
+      version: '1.0'
+    });
+
+    // Final safety check - ensure patterns is always an array
+    if (medicalAnalysis.cognitiveMetrics?.detailedAnalysis?.conversationFlow?.patterns) {
+      const patterns = medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns;
+      logger.debug('Final patterns check', { 
+        patternsType: typeof patterns, 
+        isArray: Array.isArray(patterns),
+        patternsValue: patterns 
+      });
+      
+      if (typeof patterns === 'string') {
+        try {
+          const parsed = JSON.parse(patterns);
+          medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns = Array.isArray(parsed) ? parsed : [];
+          logger.debug('Parsed patterns from string', { count: medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns.length });
+        } catch (e) {
+          logger.warn('Failed to parse patterns string, setting to empty array', e);
+          medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns = [];
+        }
+      } else if (!Array.isArray(patterns)) {
+        logger.warn('Patterns is not an array, setting to empty array', { type: typeof patterns });
+        medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns = [];
+      }
+      
+      // Ensure each pattern has the correct structure
+      if (Array.isArray(medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns)) {
+        medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns = medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns.map(pattern => ({
+          messageIndex: Number(pattern.messageIndex) || 0,
+          type: String(pattern.type) || 'unknown',
+          coherenceRatio: Number(pattern.coherenceRatio) || 0
+        }));
+        logger.debug('Final patterns structure', { count: medicalAnalysis.cognitiveMetrics.detailedAnalysis.conversationFlow.patterns.length });
+      }
+    }
+
+    await medicalAnalysis.save();
+    logger.info('Medical analysis result stored with time series data', { 
+      patientId, 
+      analysisId: medicalAnalysis._id,
+      analysisDate: medicalAnalysis.analysisDate,
+      timeSeriesData,
+      trends
+    });
+    
+    return medicalAnalysis;
+  } catch (error) {
+    logger.error('Error storing medical analysis result:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clean and validate analysis data to ensure it matches the schema
+ * @param {Object} result - Raw analysis result
+ * @returns {Object} Cleaned analysis result
+ */
+const cleanAnalysisData = (result) => {
+  const cleaned = JSON.parse(JSON.stringify(result)); // Deep clone
+  
+  logger.debug('Cleaning analysis data', { 
+    hasCognitiveMetrics: !!cleaned.cognitiveMetrics,
+    hasConversationFlow: !!cleaned.cognitiveMetrics?.detailedAnalysis?.conversationFlow,
+    patternsType: typeof cleaned.cognitiveMetrics?.detailedAnalysis?.conversationFlow?.patterns,
+    patternsValue: cleaned.cognitiveMetrics?.detailedAnalysis?.conversationFlow?.patterns
+  });
+  
+  // Fix conversationFlow patterns if they're malformed
+  if (cleaned.cognitiveMetrics?.detailedAnalysis?.conversationFlow) {
+    const conversationFlow = cleaned.cognitiveMetrics.detailedAnalysis.conversationFlow;
+    
+    if (conversationFlow.patterns) {
+      const patterns = conversationFlow.patterns;
+      
+      // If patterns is a string, try to parse it
+      if (typeof patterns === 'string') {
+        try {
+          conversationFlow.patterns = JSON.parse(patterns);
+          logger.debug('Parsed conversationFlow patterns from string');
+        } catch (e) {
+          logger.warn('Failed to parse conversationFlow patterns, setting to empty array', e);
+          conversationFlow.patterns = [];
+        }
+      }
+      
+      // Ensure patterns is an array of objects with correct structure
+      if (Array.isArray(conversationFlow.patterns)) {
+        conversationFlow.patterns = conversationFlow.patterns.map(pattern => ({
+          messageIndex: Number(pattern.messageIndex) || 0,
+          type: String(pattern.type) || 'unknown',
+          coherenceRatio: Number(pattern.coherenceRatio) || 0
+        }));
+        logger.debug('Cleaned conversationFlow patterns', { count: conversationFlow.patterns.length });
+      } else {
+        logger.warn('conversationFlow.patterns is not an array, setting to empty array');
+        conversationFlow.patterns = [];
+      }
+    } else {
+      // Ensure patterns field exists
+      conversationFlow.patterns = [];
+    }
+  }
+  
+  // Clean psychiatric indicators to ensure valid enum values
+  if (cleaned.psychiatricMetrics?.indicators) {
+    const validTypes = ['depression', 'anxiety', 'crisis', 'absolutist_language', 'pronoun_usage', 'temporal_focus', 'negative_tone'];
+    cleaned.psychiatricMetrics.indicators = cleaned.psychiatricMetrics.indicators
+      .filter(indicator => validTypes.includes(indicator.type))
+      .map(indicator => ({
+        type: indicator.type,
+        severity: indicator.severity || 'low',
+        message: indicator.message || '',
+        details: indicator.details || ''
+      }));
+    logger.debug('Cleaned psychiatric indicators', { count: cleaned.psychiatricMetrics.indicators.length });
+  }
+  
+  return cleaned;
+};
+
+const deleteOldMedicalAnalyses = async (cutoffDate) => {
+  try {
+    const MedicalAnalysis = require('../models/medicalAnalysis.model');
+    
+    const result = await MedicalAnalysis.deleteMany({
+      analysisDate: { $lt: cutoffDate }
+    });
+    
+    logger.info('Deleted old medical analyses', { 
+      deletedCount: result.deletedCount,
+      cutoffDate 
+    });
+    
+    return result;
+  } catch (error) {
+    logger.error('Error deleting old medical analyses:', error);
+    throw error;
+  }
+};
+
+const getActivePatients = async () => {
+  try {
+    // This would typically get active patients from the patient service
+    // For now, return empty array as placeholder
+    return [];
+  } catch (error) {
+    logger.error('Error getting active patients:', error);
+    throw error;
+  }
+};
+
+const getConversationsByPatientAndDateRange = async (patientId, startDate, endDate) => {
+  try {
+    const conversations = await Conversation.find({
+      patientId,
+      createdAt: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    })
+    .populate('messages')
+    .sort({ createdAt: 1 });
+
+    return conversations;
+  } catch (error) {
+    logger.error('Error getting conversations by patient and date range:', error);
+    throw error;
+  }
+};
+
+/**
+ * Calculate time series data from analysis result
+ * @param {Object} result - Analysis result object
+ * @returns {Object} Time series data
+ */
+const calculateTimeSeriesData = (result) => {
+  return {
+    cognitiveScore: result.cognitiveMetrics?.riskScore || 0,
+    mentalHealthScore: result.psychiatricMetrics?.overallRiskScore || 0,
+    languageScore: result.vocabularyMetrics?.complexityScore || 0,
+    overallHealthScore: calculateOverallHealthScore(result)
+  };
+};
+
+/**
+ * Calculate overall health score from analysis result
+ * @param {Object} result - Analysis result object
+ * @returns {Number} Overall health score (0-100, higher is better)
+ */
+const calculateOverallHealthScore = (result) => {
+  let score = 100;
+  
+  // Deduct points for cognitive issues
+  if (result.cognitiveMetrics?.riskScore > 0) {
+    score -= Math.min(result.cognitiveMetrics.riskScore * 0.3, 30);
+  }
+  
+  // Deduct points for psychiatric issues
+  if (result.psychiatricMetrics?.depressionScore > 0) {
+    score -= Math.min(result.psychiatricMetrics.depressionScore * 0.2, 25);
+  }
+  
+  if (result.psychiatricMetrics?.anxietyScore > 0) {
+    score -= Math.min(result.psychiatricMetrics.anxietyScore * 0.15, 20);
+  }
+  
+  // Deduct points for crisis indicators
+  if (result.psychiatricMetrics?.crisisIndicators?.hasCrisisIndicators) {
+    score -= 25;
+  }
+  
+  return Math.max(Math.round(score), 0);
+};
+
+/**
+ * Calculate trends by comparing with previous analyses
+ * @param {string} patientId - Patient ID
+ * @param {Object} currentTimeSeriesData - Current time series data
+ * @returns {Object} Trend indicators
+ */
+const calculateTrends = async (patientId, currentTimeSeriesData) => {
+  try {
+    const MedicalAnalysis = require('../models/medicalAnalysis.model');
+    
+    // Get the last 3 analyses for trend calculation
+    const previousAnalyses = await MedicalAnalysis.find({ patientId })
+      .select('timeSeriesData')
+      .sort({ analysisDate: -1 })
+      .limit(3)
+      .lean();
+    
+    if (previousAnalyses.length < 2) {
+      // Not enough data for trend calculation
+      return {
+        cognitive: 'stable',
+        mentalHealth: 'stable',
+        language: 'stable',
+        overall: 'stable'
+      };
+    }
+    
+    // Calculate trends using linear regression on the last few data points
+    const trends = {};
+    
+    // Calculate trend for each metric
+    ['cognitiveScore', 'mentalHealthScore', 'languageScore', 'overallHealthScore'].forEach(metric => {
+      const values = [currentTimeSeriesData[metric], ...previousAnalyses.map(a => a.timeSeriesData?.[metric] || 0)];
+      trends[metric.replace('Score', '')] = calculateLinearTrend(values);
+    });
+    
+    return trends;
+  } catch (error) {
+    logger.error('Error calculating trends:', error);
+    return {
+      cognitive: 'stable',
+      mentalHealth: 'stable',
+      language: 'stable',
+      overall: 'stable'
+    };
+  }
+};
+
+/**
+ * Calculate linear trend from a series of values
+ * @param {Array} values - Array of numeric values (most recent first)
+ * @returns {string} 'improving', 'stable', or 'declining'
+ */
+const calculateLinearTrend = (values) => {
+  if (values.length < 2) return 'stable';
+  
+  // Simple linear regression slope
+  const n = values.length;
+  const x = Array.from({ length: n }, (_, i) => i);
+  const y = values;
+  
+  const sumX = x.reduce((a, b) => a + b, 0);
+  const sumY = y.reduce((a, b) => a + b, 0);
+  const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+  const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  
+  // Determine trend based on slope
+  // For cognitive/mental health: higher scores = worse, so positive slope = declining
+  // For language/overall: higher scores = better, so positive slope = improving
+  if (Math.abs(slope) < 0.1) return 'stable';
+  
+  // For cognitive and mental health scores, positive slope means declining
+  // For language and overall scores, positive slope means improving
+  return slope > 0 ? 'declining' : 'improving';
+};
+
 module.exports = {
   // Existing methods (unchanged)
   createConversationForPatient,
@@ -667,5 +1034,14 @@ module.exports = {
   
   // Sentiment analysis methods
   getSentimentTrend,
-  getSentimentSummary
+  getSentimentSummary,
+  
+  // Medical analysis methods
+  getMedicalBaseline,
+  storeMedicalBaseline,
+  getMedicalAnalysisResults,
+  storeMedicalAnalysisResult,
+  deleteOldMedicalAnalyses,
+  getActivePatients,
+  getConversationsByPatientAndDateRange
 };

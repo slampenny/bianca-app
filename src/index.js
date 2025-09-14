@@ -97,6 +97,24 @@ async function startServer() {
       logger.info('Asterisk configuration not found.');
     }
 
+    // Initialize Medical Analysis Scheduler
+    let schedulerReady = false;
+    try {
+      logger.info('Initializing medical analysis scheduler...');
+      const medicalAnalysisScheduler = require('./services/ai/medicalAnalysisScheduler.service');
+      await medicalAnalysisScheduler.initialize();
+      schedulerReady = true;
+      logger.info('✅ Medical analysis scheduler initialized successfully');
+    } catch (schedulerError) {
+      logger.error('❌ Medical analysis scheduler initialization failed:', schedulerError);
+      if (config.env === 'production') {
+        logger.error('Medical analysis scheduler is critical in production, exiting...');
+        process.exit(1);
+      } else {
+        logger.warn('Continuing without medical analysis scheduler in development...');
+      }
+    }
+
     // Create and start the HTTP server
     const server = http.createServer(app);
     const port = config.port || 3000;
@@ -106,6 +124,7 @@ async function startServer() {
       logger.info(`MongoDB: ${mongoConnected ? '✅ Connected' : '❌ Not connected'}`);
       logger.info(`Email Service: ${emailReady ? '✅ Ready' : '❌ Not ready'}`);
       logger.info(`ARI Client: ${ariReady ? '✅ Ready' : '❌ Not ready'}`);
+      logger.info(`Medical Analysis Scheduler: ${schedulerReady ? '✅ Ready' : '❌ Not ready'}`);
       logger.info('=============================');
       logger.info(`📊 Health check: http://localhost:${port}/health`);
       logger.info(`📧 Email test: http://localhost:${port}/v1/test/email`);

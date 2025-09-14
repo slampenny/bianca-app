@@ -10598,5 +10598,354 @@ router.post('/debug-conversation-data', async (req, res) => {
     }
 });
 
+// ============================================
+// MEDICAL ANALYSIS TEST ROUTES
+// ============================================
+
+/**
+ * @swagger
+ * /test/medical-analysis/trigger-all:
+ *   post:
+ *     summary: Trigger medical analysis for all active patients
+ *     description: Manually trigger medical analysis for all active patients (testing purposes)
+ *     tags: [Test]
+ *     responses:
+ *       200:
+ *         description: Medical analysis triggered successfully
+ *       500:
+ *         description: Failed to trigger medical analysis
+ */
+router.post('/medical-analysis/trigger-all', async (req, res) => {
+    try {
+        const medicalAnalysisScheduler = require('../../services/ai/medicalAnalysisScheduler.service');
+        const patientService = require('../../services/patient.service');
+        
+        logger.info('[Test] Manual trigger: Starting medical analysis for all patients');
+        
+        // Get all active patients
+        const patients = await patientService.getActivePatients();
+        
+        if (patients.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: 'No active patients found for analysis',
+                patientsAnalyzed: 0,
+                jobsScheduled: 0
+            });
+        }
+
+        // Schedule analysis for all patients
+        const jobs = await medicalAnalysisScheduler.scheduleBatchAnalysis(
+            patients.map(p => p._id.toString()),
+            {
+                trigger: 'manual',
+                batchId: `manual-${Date.now()}`
+            }
+        );
+
+        const successfulJobs = jobs.filter(job => !job.error);
+        const failedJobs = jobs.filter(job => job.error);
+
+        logger.info('[Test] Manual trigger completed', {
+            totalPatients: patients.length,
+            successfulJobs: successfulJobs.length,
+            failedJobs: failedJobs.length
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Medical analysis triggered for ${patients.length} patients`,
+            patientsAnalyzed: patients.length,
+            jobsScheduled: successfulJobs.length,
+            failedJobs: failedJobs.length,
+            batchId: `manual-${Date.now()}`,
+            patients: patients.map(p => ({
+                id: p._id,
+                name: p.name || 'Unknown'
+            })),
+            errors: failedJobs.map(job => ({
+                patientId: job.patientId,
+                error: job.error
+            }))
+        });
+
+    } catch (error) {
+        logger.error('[Test] Error in manual medical analysis trigger:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to trigger medical analysis',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/medical-analysis/trigger-patient/{patientId}:
+ *   post:
+ *     summary: Trigger medical analysis for a specific patient
+ *     description: Manually trigger medical analysis for a specific patient (testing purposes)
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
+ *     responses:
+ *       200:
+ *         description: Medical analysis triggered successfully
+ *       404:
+ *         description: Patient not found
+ *       500:
+ *         description: Failed to trigger medical analysis
+ */
+router.post('/medical-analysis/trigger-patient/:patientId', async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        const medicalAnalysisScheduler = require('../../services/ai/medicalAnalysisScheduler.service');
+        const patientService = require('../../services/patient.service');
+        
+        logger.info('[Test] Manual trigger: Starting medical analysis for patient', { patientId });
+
+        // Verify patient exists
+        const patient = await patientService.getPatientById(patientId);
+        if (!patient) {
+            return res.status(404).json({
+                success: false,
+                message: 'Patient not found',
+                patientId
+            });
+        }
+
+        // Schedule analysis for the patient
+        const job = await medicalAnalysisScheduler.schedulePatientAnalysis(patientId, {
+            trigger: 'manual',
+            batchId: `manual-${Date.now()}`
+        });
+
+        logger.info('[Test] Manual trigger completed for patient', {
+            patientId,
+            jobId: job.attrs._id
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Medical analysis triggered for patient ${patient.name || patientId}`,
+            patientId,
+            jobId: job.attrs._id,
+            batchId: `manual-${Date.now()}`
+        });
+
+    } catch (error) {
+        logger.error('[Test] Error in manual patient medical analysis trigger:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to trigger patient medical analysis',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/medical-analysis/results/{patientId}:
+ *   get:
+ *     summary: Get medical analysis results for a specific patient
+ *     description: Retrieve medical analysis results for a specific patient (testing purposes)
+ *     tags: [Test]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Maximum number of results to return
+ *     responses:
+ *       200:
+ *         description: Medical analysis results retrieved successfully
+ *       500:
+ *         description: Failed to fetch medical analysis results
+ */
+router.get('/medical-analysis/results/:patientId', async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        const { limit = 10 } = req.query;
+        const conversationService = require('../../services/conversation.service');
+        
+        logger.info('[Test] Fetching medical analysis results for patient', { patientId, limit });
+
+        // Get analysis results
+        const results = await conversationService.getMedicalAnalysisResults(patientId, parseInt(limit));
+
+        res.status(200).json({
+            success: true,
+            patientId,
+            results: results,
+            count: results.length
+        });
+
+    } catch (error) {
+        logger.error('[Test] Error fetching medical analysis results:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch medical analysis results',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/medical-analysis/results:
+ *   get:
+ *     summary: Get medical analysis results summary for all patients
+ *     description: Retrieve medical analysis results summary for all patients (testing purposes)
+ *     tags: [Test]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 5
+ *         description: Maximum number of results per patient to return
+ *     responses:
+ *       200:
+ *         description: Medical analysis results summary retrieved successfully
+ *       500:
+ *         description: Failed to fetch medical analysis results summary
+ */
+router.get('/medical-analysis/results', async (req, res) => {
+    try {
+        const { limit = 5 } = req.query;
+        const conversationService = require('../../services/conversation.service');
+        const patientService = require('../../services/patient.service');
+        
+        logger.info('[Test] Fetching medical analysis results summary', { limit });
+
+        // Get all active patients
+        const patients = await patientService.getActivePatients();
+        
+        // Get latest analysis results for each patient
+        const patientResults = await Promise.all(
+            patients.map(async (patient) => {
+                try {
+                    const results = await conversationService.getMedicalAnalysisResults(
+                        patient._id.toString(), 
+                        1 // Get only the latest result
+                    );
+                    return {
+                        patientId: patient._id,
+                        patientName: patient.name || 'Unknown',
+                        latestAnalysis: results[0] || null,
+                        hasResults: results.length > 0
+                    };
+                } catch (error) {
+                    logger.error(`[Test] Error fetching results for patient ${patient._id}:`, error);
+                    return {
+                        patientId: patient._id,
+                        patientName: patient.name || 'Unknown',
+                        latestAnalysis: null,
+                        hasResults: false,
+                        error: error.message
+                    };
+                }
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            patients: patientResults,
+            totalPatients: patients.length,
+            patientsWithResults: patientResults.filter(p => p.hasResults).length
+        });
+
+    } catch (error) {
+        logger.error('[Test] Error fetching medical analysis results summary:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch medical analysis results summary',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/medical-analysis/status:
+ *   get:
+ *     summary: Get medical analysis scheduler status
+ *     description: Get the current status of the medical analysis scheduler (testing purposes)
+ *     tags: [Test]
+ *     responses:
+ *       200:
+ *         description: Scheduler status retrieved successfully
+ *       500:
+ *         description: Failed to fetch scheduler status
+ */
+router.get('/medical-analysis/status', async (req, res) => {
+    try {
+        const medicalAnalysisScheduler = require('../../services/ai/medicalAnalysisScheduler.service');
+        const status = await medicalAnalysisScheduler.getStatus();
+        
+        res.status(200).json({
+            success: true,
+            status: status
+        });
+
+    } catch (error) {
+        logger.error('[Test] Error fetching scheduler status:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch scheduler status',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /test/medical-analysis/initialize:
+ *   post:
+ *     summary: Initialize the medical analysis scheduler
+ *     description: Initialize the medical analysis scheduler if not already initialized (testing purposes)
+ *     tags: [Test]
+ *     responses:
+ *       200:
+ *         description: Scheduler initialized successfully
+ *       500:
+ *         description: Failed to initialize scheduler
+ */
+router.post('/medical-analysis/initialize', async (req, res) => {
+    try {
+        const medicalAnalysisScheduler = require('../../services/ai/medicalAnalysisScheduler.service');
+        
+        logger.info('[Test] Manual trigger: Initializing medical analysis scheduler');
+        
+        await medicalAnalysisScheduler.initialize();
+        
+        res.status(200).json({
+            success: true,
+            message: 'Medical analysis scheduler initialized successfully',
+            status: await medicalAnalysisScheduler.getStatus()
+        });
+
+    } catch (error) {
+        logger.error('[Test] Error initializing medical analysis scheduler:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to initialize medical analysis scheduler',
+            error: error.message
+        });
+    }
+});
+
 // Export the router
 module.exports = router;
