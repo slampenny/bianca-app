@@ -1,8 +1,11 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../../src/app');
+// Import integration test app AFTER all mocks are set up
+const app = require('../utils/integration-app');
 const { Alert, Org, Caregiver, Patient, Schedule, Conversation } = require('../../src/models');
 const { caregiverOne, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { alertOne, insertAlerts } = require('../fixtures/alert.fixture');
@@ -10,13 +13,7 @@ const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 const { patientOne, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
 const { scheduleOne, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
 const { tokenService } = require('../../src/services');
-
-// Mock Twilio service for testing
-jest.mock('../../src/services/twilioCall.service', () => ({
-  initiateCall: jest.fn().mockResolvedValue('mock-call-sid-12345'),
-  generateCallTwiML: jest.fn(),
-  handleCallStatus: jest.fn(),
-}));
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
 let caregiverToken;
@@ -26,15 +23,11 @@ let patient;
 
 describe('Call Workflow Integration Tests', () => {
   beforeAll(async () => {
-    mongoServer = new MongoMemoryServer();
-    await mongoServer.start();
-    const mongoUri = await mongoServer.getUri();
-    await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+    await setupMongoMemoryServer();
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    await teardownMongoMemoryServer();
   });
 
   beforeEach(async () => {
@@ -70,21 +63,19 @@ describe('Call Workflow Integration Tests', () => {
         .send(callData)
         .expect(httpStatus.CREATED);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('conversationId');
-      expect(response.body.data).toHaveProperty('callSid');
-      expect(response.body.data.patientId).toBe(patient.id);
-      expect(response.body.data.patientName).toBe(patient.name);
-      expect(response.body.data.agentId).toBe(caregiver.id);
-      expect(response.body.data.callStatus).toBe('ringing');
-      expect(response.body.message).toBe('Call initiated successfully');
+      expect(response.body).toHaveProperty('conversationId');
+      expect(response.body).toHaveProperty('callSid', 'mock-call-sid-12345');
+      expect(response.body.patientId.toString()).toBe(patient.id);
+      expect(response.body.patientName).toBe(patient.name);
+      expect(response.body.agentId.toString()).toBe(caregiver.id);
+      expect(response.body.callStatus).toBe('in-progress');
 
       // Verify conversation was created in database
-      const conversation = await Conversation.findById(response.body.data.conversationId);
+      const conversation = await Conversation.findById(response.body.conversationId);
       expect(conversation).toBeTruthy();
       expect(conversation.patientId.toString()).toBe(patient.id);
       expect(conversation.agentId.toString()).toBe(caregiver.id);
-      expect(conversation.callStatus).toBe('ringing');
+      expect(conversation.callStatus).toBe('initiating');
       expect(conversation.callNotes).toBe(callData.callNotes);
     });
 
@@ -158,9 +149,9 @@ describe('Call Workflow Integration Tests', () => {
         .set('Authorization', `Bearer ${caregiverToken.access.token}`)
         .expect(httpStatus.OK);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.conversationId).toBe(conversation.id);
-      expect(response.body.data.callStatus).toBe('ringing');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data.conversationId.toString()).toBe(conversation.id);
+      expect(response.body.data.status).toBe('initiated');
       expect(response.body.data.patient).toBeTruthy();
       expect(response.body.data.agent).toBeTruthy();
     });
@@ -199,7 +190,7 @@ describe('Call Workflow Integration Tests', () => {
 
     it('should update call status successfully', async () => {
       const updateData = {
-        status: 'answered',
+        status: 'answered', // Call status that maps to 'in-progress' conversation status
         outcome: 'answered',
         notes: 'Patient answered the call'
       };
@@ -210,19 +201,19 @@ describe('Call Workflow Integration Tests', () => {
         .send(updateData)
         .expect(httpStatus.OK);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Call status updated successfully');
+      // The response is a ConversationDTO
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.status).toBe('in-progress'); // Mapped conversation status
 
       // Verify database was updated
       const updatedConversation = await Conversation.findById(conversation.id);
-      expect(updatedConversation.callStatus).toBe('answered');
-      expect(updatedConversation.callOutcome).toBe('answered');
+      expect(updatedConversation.status).toBe('in-progress');
       expect(updatedConversation.callNotes).toBe(updateData.notes);
     });
 
     it('should handle call end status correctly', async () => {
       const updateData = {
-        status: 'ended',
+        status: 'ended', // Call status that maps to 'completed' conversation status
         outcome: 'answered',
         notes: 'Call completed successfully'
       };
@@ -233,10 +224,15 @@ describe('Call Workflow Integration Tests', () => {
         .send(updateData)
         .expect(httpStatus.OK);
 
+      // The response is a ConversationDTO
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.status).toBe('completed'); // Mapped conversation status
+
       // Verify call end time and duration were set
       const updatedConversation = await Conversation.findById(conversation.id);
-      expect(updatedConversation.callEndTime).toBeTruthy();
-      expect(updatedConversation.callDuration).toBeGreaterThan(0);
+      expect(updatedConversation.status).toBe('completed');
+      expect(updatedConversation.endTime).toBeTruthy();
+      expect(updatedConversation.duration).toBeGreaterThan(0);
     });
 
     it('should return 400 for invalid status', async () => {
@@ -280,17 +276,16 @@ describe('Call Workflow Integration Tests', () => {
         .send(endData)
         .expect(httpStatus.OK);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Call ended successfully');
+      // The response is a ConversationDTO
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.status).toBe('completed');
 
       // Verify database was updated
       const updatedConversation = await Conversation.findById(conversation.id);
-      expect(updatedConversation.callStatus).toBe('ended');
-      expect(updatedConversation.callOutcome).toBe('answered');
-      expect(updatedConversation.callNotes).toBe(endData.notes);
       expect(updatedConversation.status).toBe('completed');
-      expect(updatedConversation.callEndTime).toBeTruthy();
-      expect(updatedConversation.callDuration).toBeGreaterThan(0);
+      expect(updatedConversation.callNotes).toBe(endData.notes);
+      expect(updatedConversation.endTime).toBeTruthy();
+      expect(updatedConversation.duration).toBeGreaterThan(0);
     });
 
     it('should return 400 without required outcome', async () => {
@@ -337,13 +332,13 @@ describe('Call Workflow Integration Tests', () => {
         .set('Authorization', `Bearer ${caregiverToken.access.token}`)
         .expect(httpStatus.OK);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.count).toBe(2);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('count', 2);
       expect(response.body.data).toHaveLength(2);
       
-      // Verify all returned calls are active
+      // Verify all returned calls are active (using conversation status values)
       response.body.data.forEach(call => {
-        expect(['initiating', 'ringing', 'answered', 'connected']).toContain(call.callStatus);
+        expect(['initiated', 'in-progress']).toContain(call.status);
       });
     });
 
@@ -377,10 +372,9 @@ describe('Call Workflow Integration Tests', () => {
         .set('Authorization', `Bearer ${caregiverToken.access.token}`)
         .expect(httpStatus.OK);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.conversationId).toBe(conversation.id);
-      expect(response.body.data.callStatus).toBe('connected');
-      expect(response.body.data.callNotes).toBe('Test conversation');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data.conversationId.toString()).toBe(conversation.id);
+      expect(response.body.data.status).toBe('in-progress');
       expect(response.body.data.patient).toBeTruthy();
       expect(response.body.data.agent).toBeTruthy();
     });

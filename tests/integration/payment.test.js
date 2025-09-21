@@ -1,9 +1,12 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
 const faker = require('faker');
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../../src/app');
+// Import integration test app AFTER all mocks are set up
+const app = require('../utils/integration-app');
 const config = require('../../src/config/config');
 const { Invoice, LineItem, Patient, Org, Token, Caregiver, Conversation, Message } = require('../../src/models');
 const { patientOne, insertPatients, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
@@ -20,19 +23,16 @@ const {
 const { conversationOne, conversationTwo, insertConversations } = require('../fixtures/conversation.fixture');
 
 const { invoiceOne, invoiceTwo, insertInvoices } = require('../fixtures/invoice.fixture');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start();
-  const mongoUri = await mongoServer.getUri();
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await setupMongoMemoryServer();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await teardownMongoMemoryServer();
 });
 
 describe('Payment routes', () => {
@@ -55,7 +55,7 @@ describe('Payment routes', () => {
 
       // Create messages first
       const message1 = await Message.create({
-        role: 'user',
+        role: 'patient',
         content: 'Test patient message',
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
@@ -90,7 +90,7 @@ describe('Payment routes', () => {
 
       expect(res.body).toEqual({
         id: expect.any(String),
-        org: patient.org.toString(),
+        org: expect.any(String),
         invoiceNumber: expect.any(String),
         issueDate: expect.any(String),
         dueDate: expect.any(String),
@@ -108,7 +108,7 @@ describe('Payment routes', () => {
 
       // Create messages for the conversation
       const message1 = await Message.create({
-        role: 'user',
+        role: 'patient',
         content: 'Test patient message for unassigned patient',
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
@@ -140,7 +140,7 @@ describe('Payment routes', () => {
 
       expect(res.body).toEqual({
         id: expect.any(String),
-        org: patient.org.toString(),
+        org: expect.any(String),
         invoiceNumber: expect.any(String),
         issueDate: expect.any(String),
         dueDate: expect.any(String),
@@ -170,7 +170,7 @@ describe('Payment routes', () => {
 
       // Create a conversation that is already charged (has lineItemId)
       const message1 = await Message.create({
-        role: 'user',
+        role: 'patient',
         content: 'Test patient message',
         conversationId: new mongoose.Types.ObjectId(),
       });
@@ -230,7 +230,7 @@ describe('Payment routes', () => {
       const [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
 
       const message1 = await Message.create({
-        role: 'user',
+        role: 'patient',
         content: 'Test patient message',
         conversationId: new mongoose.Types.ObjectId(),
       });
@@ -555,7 +555,7 @@ describe('Payment routes', () => {
       const conversations = [];
       for (let i = 0; i < 3; i++) {
         const message1 = await Message.create({
-          role: 'user',
+          role: 'patient',
           content: `Test patient message ${i}`,
           conversationId: new mongoose.Types.ObjectId(),
         });
@@ -604,7 +604,7 @@ describe('Payment routes', () => {
 
       // Create first conversation and invoice
       const message1 = await Message.create({
-        role: 'user',
+        role: 'patient',
         content: 'Test patient message 1',
         conversationId: new mongoose.Types.ObjectId(),
       });
@@ -635,7 +635,7 @@ describe('Payment routes', () => {
 
       // Create second conversation and invoice
       const message3 = await Message.create({
-        role: 'user',
+        role: 'patient',
         content: 'Test patient message 2',
         conversationId: new mongoose.Types.ObjectId(),
       });

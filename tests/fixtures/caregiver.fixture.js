@@ -29,7 +29,7 @@ const caregiverOneWithPassword = {
 };
 
 const caregiverTwo = {
-  name: 'Test User',
+  name: 'Test User Two',
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
   role: 'staff',

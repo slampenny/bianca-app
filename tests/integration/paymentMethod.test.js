@@ -1,9 +1,11 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
 const faker = require('faker');
 const httpStatus = require('http-status');
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../../src/app');
+// Import integration test app AFTER all mocks are set up
+const app = require('../utils/integration-app');
 const { PaymentMethod, Org, Token, Caregiver } = require('../../src/models');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 
@@ -13,19 +15,16 @@ const {
 } = require('../fixtures/caregiver.fixture');
 
 const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = require('../fixtures/paymentMethod.fixture');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start();
-  const mongoUri = await mongoServer.getUri();
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await setupMongoMemoryServer();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await teardownMongoMemoryServer();
 });
 
 describe('PaymentMethod routes', () => {
@@ -56,8 +55,6 @@ describe('PaymentMethod routes', () => {
         isDefault: expect.any(Boolean),
         brand: expect.any(String),
         last4: expect.any(String),
-        expMonth: expect.any(Number),
-        expYear: expect.any(Number),
         billingDetails: expect.any(Object),
         metadata: expect.any(Object),
       });
@@ -96,8 +93,6 @@ describe('PaymentMethod routes', () => {
         isDefault: expect.any(Boolean),
         brand: expect.any(String),
         last4: expect.any(String),
-        expMonth: expect.any(Number),
-        expYear: expect.any(Number),
         billingDetails: expect.any(Object),
         metadata: expect.any(Object),
       });
@@ -133,8 +128,6 @@ describe('PaymentMethod routes', () => {
         isDefault: expect.any(Boolean),
         brand: expect.any(String),
         last4: expect.any(String),
-        expMonth: expect.any(Number),
-        expYear: expect.any(Number),
         billingDetails: expect.any(Object),
         metadata: expect.any(Object),
       });

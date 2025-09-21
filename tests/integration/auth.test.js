@@ -1,11 +1,15 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
 const httpStatus = require('http-status');
 const httpMocks = require('node-mocks-http');
 const moment = require('moment');
 const bcrypt = require('bcryptjs');
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../../src/app');
+
+// Import integration test app AFTER all mocks are set up
+const app = require('../utils/integration-app');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 const config = require('../../src/config/config');
 const auth = require('../../src/middlewares/auth');
 const { tokenService, emailService } = require('../../src/services');
@@ -26,39 +30,14 @@ const {
 } = require('../fixtures/caregiver.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 
-// Mock Agenda to prevent database connection issues in tests
-jest.mock('agenda', () => {
-  return jest.fn().mockImplementation(() => ({
-    start: jest.fn(),
-    stop: jest.fn(),
-    define: jest.fn(),
-    schedule: jest.fn(),
-    every: jest.fn(),
-    now: jest.fn(),
-    jobs: jest.fn().mockReturnValue([]),
-    on: jest.fn(),
-    once: jest.fn(),
-    off: jest.fn(),
-    remove: jest.fn(),
-    cancel: jest.fn(),
-    purge: jest.fn(),
-    close: jest.fn()
-  }));
-});
-
-// Only mock external services, not internal ones
+// External services are mocked in integration-setup.js
 
 beforeAll(async () => {
-  // Connect to the test MongoDB instance (should be running via docker-compose)
-  const mongoUri = process.env.MONGODB_URL || 'mongodb://localhost:27018/bianca-app-test';
-  await mongoose.connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
+  await setupMongoMemoryServer();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
+  await teardownMongoMemoryServer();
 });
 
 describe('Auth routes', () => {
@@ -486,7 +465,7 @@ describe('Auth routes', () => {
   });
 
   describe('POST /v1/auth/verify-email', () => {
-    test('should return 204 and verify the email', async () => {
+    test('should return 200 and verify the email', async () => {
       const [dbCaregiver] = await insertCaregivers([caregiverOne]);
       const expires = moment().add(config.jwt.verifyEmailExpirationMinutes, 'minutes');
       const verifyEmailToken = tokenService.generateToken(dbCaregiver.id, expires);
@@ -496,7 +475,7 @@ describe('Auth routes', () => {
         .post('/v1/auth/verify-email')
         .query({ token: verifyEmailToken })
         .send()
-        .expect(httpStatus.NO_CONTENT);
+        .expect(httpStatus.OK);
 
       const dbNewCaregiver = await Caregiver.findById(dbCaregiver._id);
 

@@ -1,25 +1,23 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
 const httpStatus = require('http-status');
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../../src/app');
+
+// Import integration test app AFTER all mocks are set up
+const app = require('../utils/integration-app');
 const { Org, Caregiver, Token } = require('../../src/models');
 const { caregiverOne, caregiverTwo, admin, insertCaregivers, superAdmin } = require('../fixtures/caregiver.fixture');
 const { orgOne, orgTwo, insertOrgs } = require('../fixtures/org.fixture');
 const { tokenService, orgService } = require('../../src/services');
-
-let mongoServer;
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start(); // Fix: Use start() function instead of new keyword
-  const mongoUri = await mongoServer.getUri();
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await setupMongoMemoryServer();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await teardownMongoMemoryServer();
 });
 
 describe('Org routes', () => {

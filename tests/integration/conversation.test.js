@@ -1,8 +1,11 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../../src/app');
+// Import integration test app AFTER all mocks are set up
+const app = require('../utils/integration-app');
 const { Org, Patient, Token, Caregiver, Conversation, Message } = require('../../src/models');
 const { insertOrgs } = require('../fixtures/org.fixture');
 const { patientOne, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
@@ -16,19 +19,16 @@ const {
   insertCaregiversAndAddToOrg,
 } = require('../fixtures/caregiver.fixture');
 const tokenService = require('../../src/services/token.service');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start();
-  const mongoUri = await mongoServer.getUri();
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await setupMongoMemoryServer();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await teardownMongoMemoryServer();
 });
 
 describe('Conversation routes', () => {
@@ -73,7 +73,6 @@ describe('Conversation routes', () => {
         id: expect.any(String),
         patientId: patient._id.toString(),
         messages: expect.arrayContaining([]),
-        history: undefined,
         analyzedData: expect.any(Object),
         metadata: expect.any(Object),
         startTime: expect.any(String),
@@ -87,6 +86,8 @@ describe('Conversation routes', () => {
         callOutcome: null,
         callNotes: expect.any(String),
         lineItemId: null,
+        sentiment: null,
+        sentimentAnalyzedAt: null,
       });
     });
 
@@ -145,7 +146,6 @@ describe('Conversation routes', () => {
         id: conversationId,
         patientId: patient._id.toString(),
         messages: expect.arrayContaining([]),
-        history: undefined,
         analyzedData: expect.any(Object),
         metadata: expect.any(Object),
         startTime: expect.any(String),
@@ -157,6 +157,8 @@ describe('Conversation routes', () => {
         callEndTime: null,
         callDuration: expect.any(Number),
         callOutcome: null,
+        sentiment: null,
+        sentimentAnalyzedAt: null,
         callNotes: expect.any(String),
         lineItemId: null,
       });
@@ -385,8 +387,7 @@ describe('Conversation routes', () => {
       expect(res.body).toEqual({
         id: conversationId,
         patientId: patient._id.toString(),
-        messages: expect.arrayContaining([expect.any(String)]),
-        history: undefined,
+        messages: expect.arrayContaining([expect.any(Object)]),
         analyzedData: expect.any(Object),
         metadata: expect.any(Object),
         startTime: expect.any(String),
@@ -400,6 +401,8 @@ describe('Conversation routes', () => {
         callOutcome: null,
         callNotes: expect.any(String),
         lineItemId: null,
+        sentiment: null,
+        sentimentAnalyzedAt: null,
       });
 
       // Verify the message was actually created

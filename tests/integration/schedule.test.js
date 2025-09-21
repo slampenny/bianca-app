@@ -1,7 +1,9 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../../src/app');
+// Import integration test app AFTER all mocks are set up
+const app = require('../utils/integration-app');
 const httpStatus = require('http-status');
 const { Patient, Token, Caregiver, Schedule, Org } = require('../../src/models');
 const { insertOrgs } = require('../fixtures/org.fixture');
@@ -13,19 +15,16 @@ const {
   insertCaregivertoOrgAndReturnTokenByRole,
 } = require('../fixtures/caregiver.fixture');
 const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start();
-  const mongoUri = await mongoServer.getUri();
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await setupMongoMemoryServer();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await teardownMongoMemoryServer();
 });
 
 describe('Schedule routes', () => {

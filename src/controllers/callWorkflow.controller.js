@@ -123,12 +123,24 @@ const updateCallStatus = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
 
-  // Update call status
-  conversation.status = status;
+  // Map call status to conversation status
+  const statusMapping = {
+    'initiating': 'initiated',
+    'ringing': 'in-progress', 
+    'answered': 'in-progress',
+    'connected': 'in-progress',
+    'ended': 'completed',
+    'failed': 'failed',
+    'busy': 'failed',
+    'no_answer': 'failed'
+  };
+  
+  const conversationStatus = statusMapping[status] || 'in-progress';
+  conversation.status = conversationStatus;
   if (notes) conversation.callNotes = notes;
 
   // Handle call end
-  if (['completed', 'failed'].includes(status)) {
+  if (['ended', 'failed', 'busy', 'no_answer'].includes(status)) {
     conversation.endTime = new Date();
     if (conversation.startTime) {
       conversation.duration = Math.round((conversation.endTime - conversation.startTime) / 1000);

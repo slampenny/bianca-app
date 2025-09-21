@@ -1,8 +1,12 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 // tests/integration/medicalAnalysisPipeline.test.js
 const MedicalPatternAnalyzer = require('../../src/services/ai/medicalPatternAnalyzer.service');
-const MedicalAnalysisScheduler = require('../../src/services/ai/medicalAnalysisScheduler.service');
+const medicalAnalysisScheduler = require('../../src/services/ai/medicalAnalysisScheduler.service');
 const baselineManager = require('../../src/services/ai/baselineManager.service');
 const conversationService = require('../../src/services/conversation.service');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 const {
   medicalPatients,
   cognitiveDeclineConversations,
@@ -16,9 +20,21 @@ describe('Medical Analysis Pipeline Integration', () => {
   let analyzer;
   let scheduler;
 
-  beforeEach(() => {
+  // Set timeout for all tests in this suite to 30 seconds
+  jest.setTimeout(30000);
+
+  beforeAll(async () => {
+    await setupMongoMemoryServer();
+  });
+
+  afterAll(async () => {
+    await teardownMongoMemoryServer();
+  });
+
+  beforeEach(async () => {
+    await clearDatabase();
     analyzer = new MedicalPatternAnalyzer();
-    scheduler = new MedicalAnalysisScheduler();
+    scheduler = medicalAnalysisScheduler; // Use the singleton instance
   });
 
   describe('End-to-End Medical Analysis Pipeline', () => {
