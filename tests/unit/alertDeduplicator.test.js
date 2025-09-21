@@ -1,6 +1,6 @@
-// src/utils/__tests__/alertDeduplicator.test.js
+// tests/unit/alertDeduplicator.test.js
 
-const { AlertDeduplicator } = require('../alertDeduplicator');
+const { AlertDeduplicator } = require('../../src/utils/alertDeduplicator');
 
 describe('Alert Deduplicator', () => {
   let deduplicator;

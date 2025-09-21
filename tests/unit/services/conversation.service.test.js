@@ -1,4 +1,4 @@
-sconst mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const conversationService = require('../../../src/services/conversation.service');
 const { Conversation, Message, Patient } = require('../../../src/models');

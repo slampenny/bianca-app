@@ -121,9 +121,11 @@ class BaselineManager {
       const cutoffDate = new Date();
       cutoffDate.setMonth(cutoffDate.getMonth() - this.config.rollingBaselineMonths);
       
-      const filteredDataPoints = updatedDataPoints.filter(point => 
-        new Date(point.analysisDate) >= cutoffDate
-      );
+      const filteredDataPoints = updatedDataPoints.filter(point => {
+        // If no analysisDate, keep the point (for backward compatibility)
+        if (!point.analysisDate) return true;
+        return new Date(point.analysisDate) >= cutoffDate;
+      });
 
       // Calculate new baseline metrics
       const updatedMetrics = this.calculateBaselineMetrics(filteredDataPoints);
@@ -146,7 +148,7 @@ class BaselineManager {
 
       await this.storeBaseline(patientId, updatedBaseline);
       
-      logger.log('Baseline updated', { 
+      logger.info('Baseline updated', { 
         patientId, 
         dataPoints: filteredDataPoints.length,
         significantChanges: significantChanges.length
@@ -163,7 +165,7 @@ class BaselineManager {
   /**
    * Get deviation from baseline for current metrics
    * @param {string} patientId - Patient ID
-   * @param {Object} currentMetrics - Current metrics to compare
+   * @param {Object} currentMetrics - Current metrics to compare (can be nested medical analysis result)
    * @returns {Promise<Object>} Deviation analysis
    */
   async getDeviation(patientId, currentMetrics) {
@@ -177,15 +179,18 @@ class BaselineManager {
         };
       }
 
+      // Flatten current metrics to match baseline structure
+      const flattenedCurrentMetrics = this.flattenMetrics(currentMetrics);
+      
       const deviations = {};
       const zScores = {};
       const significantChanges = [];
 
       // Calculate deviations for each metric
-      Object.keys(currentMetrics).forEach(metricKey => {
+      Object.keys(flattenedCurrentMetrics).forEach(metricKey => {
         if (baseline.metrics[metricKey]) {
           const baselineMetric = baseline.metrics[metricKey];
-          const currentValue = currentMetrics[metricKey];
+          const currentValue = flattenedCurrentMetrics[metricKey];
           
           if (typeof currentValue === 'number' && typeof baselineMetric.mean === 'number') {
             // Calculate deviation
@@ -258,6 +263,34 @@ class BaselineManager {
   }
 
   /**
+   * Flatten nested medical analysis metrics to flat structure
+   * @param {Object} analysisResult - Medical analysis result with nested metrics
+   * @returns {Object} Flattened metrics object
+   */
+  flattenMetrics(analysisResult) {
+    const flattened = {};
+    
+    // Helper function to recursively flatten nested objects
+    const flattenObject = (obj, prefix = '') => {
+      Object.keys(obj).forEach(key => {
+        const value = obj[key];
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        
+        if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+          // Recursively flatten nested objects
+          flattenObject(value, newKey);
+        } else if (typeof value === 'number' && !isNaN(value)) {
+          // Store numeric values
+          flattened[newKey] = value;
+        }
+      });
+    };
+    
+    flattenObject(analysisResult);
+    return flattened;
+  }
+
+  /**
    * Calculate baseline metrics from data points
    * @param {Array} dataPoints - Array of metric data points
    * @returns {Object} Calculated baseline metrics
@@ -269,11 +302,16 @@ class BaselineManager {
 
     const metrics = {};
     
-    // Get all metric keys from data points
+    // Flatten each data point and collect all metric keys
     const metricKeys = new Set();
+    const flattenedDataPoints = [];
+    
     dataPoints.forEach(point => {
-      Object.keys(point).forEach(key => {
-        if (typeof point[key] === 'number') {
+      const flattened = this.flattenMetrics(point);
+      flattenedDataPoints.push(flattened);
+      
+      Object.keys(flattened).forEach(key => {
+        if (typeof flattened[key] === 'number') {
           metricKeys.add(key);
         }
       });
@@ -281,7 +319,7 @@ class BaselineManager {
 
     // Calculate statistics for each metric
     metricKeys.forEach(metricKey => {
-      const values = dataPoints
+      const values = flattenedDataPoints
         .map(point => point[metricKey])
         .filter(value => typeof value === 'number' && !isNaN(value));
 

@@ -23,6 +23,8 @@ class RtpSenderService extends EventEmitter {
         this.timestamps = new Map(); // callId -> current timestamp
         this.ssrcs = new Map(); // callId -> SSRC
         this.stats = new Map(); // callId -> statistics
+        this.continuousTimestamps = new Map(); // callId -> continuous timestamp tracking
+        this.packetTimers = new Map(); // callId -> packet timer references
         
         // Audio buffering and timing
         this.audioBuffers = new Map(); // callId -> buffered audio
@@ -103,8 +105,13 @@ class RtpSenderService extends EventEmitter {
             throw new Error('CallId is required for RTP sender initialization');
         }
 
-        if (!config || !config.rtpHost || !config.rtpPort) {
+        if (!config || !config.rtpHost || config.rtpPort === undefined || config.rtpPort === null) {
             throw new Error('Valid config with rtpHost and rtpPort is required');
+        }
+
+        // Validate RTP endpoint early
+        if (isNaN(config.rtpPort) || config.rtpPort < 1 || config.rtpPort > 65535) {
+            throw new Error(`Invalid RTP port: ${config.rtpPort}`);
         }
 
         if (this.activeCalls.has(callId)) {
@@ -123,10 +130,6 @@ class RtpSenderService extends EventEmitter {
         });
 
         try {
-            // Validate RTP endpoint
-            if (isNaN(config.rtpPort) || config.rtpPort < 1 || config.rtpPort > 65535) {
-                throw new Error(`Invalid RTP port: ${config.rtpPort}`);
-            }
 
             const ssrc = Math.floor(Math.random() * 0xFFFFFFFF);
             const initialSequence = Math.floor(Math.random() * 0xFFFF);
@@ -153,6 +156,13 @@ class RtpSenderService extends EventEmitter {
             // Initialize audio buffer and debug counters
             this.audioBuffers.set(callId, Buffer.alloc(0));
             this.debugCounters.set(callId, { audioChunks: 0, packetsSent: 0 });
+            
+            // Initialize continuous timestamps and packet timers
+            this.continuousTimestamps.set(callId, {
+                lastTimestamp: initialTimestamp,
+                lastPacketTime: Date.now()
+            });
+            this.packetTimers.set(callId, null);
 
             // Create socket with enhanced error handling
             const socket = dgram.createSocket('udp4');
@@ -294,12 +304,19 @@ class RtpSenderService extends EventEmitter {
      * FIXED: Buffer audio instead of sending immediately
      */
     async sendAudio(callId, audioBase64Ulaw) {
-        if (this.isShuttingDown || !audioBase64Ulaw || audioBase64Ulaw.length === 0) {
+        if (this.isShuttingDown) {
+            logger.debug(`[RTP Sender] Service shutting down, ignoring audio for ${callId}`);
+            return;
+        }
+        
+        if (!audioBase64Ulaw || audioBase64Ulaw.length === 0) {
+            logger.debug(`[RTP Sender] Empty audio data for ${callId}`);
             return;
         }
     
         const callConfig = this.activeCalls.get(callId);
         if (!callConfig || !callConfig.initialized) {
+            logger.warn(`[RTP Sender] Call ${callId} not initialized, ignoring audio`);
             return;
         }
     
@@ -378,7 +395,8 @@ class RtpSenderService extends EventEmitter {
      */
     createRtpPacket(callId, audioData, callConfig, frameTimestamp) {
         let sequenceNumber = this.sequenceNumbers.get(callId);
-        const ssrc = this.ssrcs.get(callId);
+        // Use SSRC from config if provided, otherwise use the stored one
+        const ssrc = callConfig.ssrc !== undefined ? callConfig.ssrc : this.ssrcs.get(callId);
 
         // Validate all parameters
         if (typeof sequenceNumber !== 'number' || isNaN(sequenceNumber)) {
@@ -471,6 +489,12 @@ class RtpSenderService extends EventEmitter {
                 stats.audioChunksReceived++;
                 stats.lastAudioSize = data.bytes || 0;
                 break;
+            case 'audio_sent':
+                stats.lastAudioSize = data.bytes || 0;
+                break;
+            case 'frames_sent':
+                stats.framesSent = (stats.framesSent || 0) + (data.count || 1);
+                break;
         }
     }
 
@@ -515,6 +539,8 @@ class RtpSenderService extends EventEmitter {
         this.timestamps.delete(callId);
         this.ssrcs.delete(callId);
         this.stats.delete(callId);
+        this.continuousTimestamps.delete(callId);
+        this.packetTimers.delete(callId);
         
         this.globalStats.activeCalls = Math.max(0, this.globalStats.activeCalls - 1);
         
@@ -554,7 +580,7 @@ class RtpSenderService extends EventEmitter {
             const stats = this.stats.get(callId) || {};
             const bufferSize = this.audioBuffers.get(callId)?.length || 0;
             const debug = this.debugCounters.get(callId) || {};
-            const hasTimer = this.packetTimers.has(callId);
+            const hasTimer = this.activeCallsForTimer.has(callId);
             
             callDetails.push({
                 callId,
@@ -584,11 +610,6 @@ class RtpSenderService extends EventEmitter {
                 ...this.globalStats,
                 uptime: Date.now() - this.globalStats.startTime
             },
-            optimization: {
-                batchTimerActive: !!this.globalTimer,
-                callsInBatchTimer: this.activeCallsForTimer.size,
-                scalabilityMode: 'BATCH_TIMER_OPTIMIZED'
-            },
             calls: callDetails,
             isShuttingDown: this.isShuttingDown
         };
@@ -598,13 +619,15 @@ class RtpSenderService extends EventEmitter {
      * Health check
      */
     healthCheck() {
-        const status = this.getStatus();
-        const isHealthy = !this.isShuttingDown && status.globalStats.totalErrors < 100;
+        const isHealthy = !this.isShuttingDown && this.globalStats.totalErrors < 100;
         
         return {
             healthy: isHealthy,
-            status: isHealthy ? 'running' : (this.isShuttingDown ? 'shutting_down' : 'degraded'),
-            ...status
+            activeCalls: this.globalStats.activeCalls,
+            totalCalls: this.globalStats.totalCalls,
+            totalPacketsSent: this.globalStats.totalPacketsSent,
+            totalErrors: this.globalStats.totalErrors,
+            uptime: Date.now() - this.globalStats.startTime
         };
     }
 }
@@ -625,3 +648,4 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 module.exports = rtpSenderService;
+module.exports.RtpSenderService = RtpSenderService;

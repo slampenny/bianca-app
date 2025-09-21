@@ -317,9 +317,14 @@ function getOpenAISentimentServiceInstance() {
   return openAISentimentServiceInstance;
 }
 
+function resetInstance() {
+  openAISentimentServiceInstance = null;
+}
+
 module.exports = {
   OpenAISentimentService,
-  getOpenAISentimentServiceInstance
+  getOpenAISentimentServiceInstance,
+  resetInstance
 };
 
 

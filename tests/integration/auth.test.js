@@ -29,10 +29,12 @@ const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start(); // Fix: Use start() function instead of new keyword
-  const mongoUri = await mongoServer.getUri();
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  // Start in-memory MongoDB instance
+  mongoServer = await MongoMemoryServer.create();
+  const mongoUri = mongoServer.getUri();
+  
+  // Connect to the in-memory database
+  await mongoose.connect(mongoUri);
 });
 
 afterAll(async () => {

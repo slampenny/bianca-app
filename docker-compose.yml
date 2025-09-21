@@ -14,6 +14,8 @@ services:
       - ASTERISK_USERNAME=myphonefriend
       - ASTERISK_PASSWORD=${ARI_PASSWORD}  # Use the same ARI_PASSWORD here
       - ASTERISK_ENABLED=true
+      - AWS_REGION=us-east-2
+      - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:us-east-2:730335291008:bianca-emergency-alerts
     ports:
       - '3000:3000'
     depends_on:

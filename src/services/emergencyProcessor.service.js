@@ -1,7 +1,7 @@
 // src/services/emergencyProcessor.service.js
 
 const { detectEmergency, filterFalsePositives } = require('../utils/emergencyDetector');
-const { alertDeduplicator } = require('../utils/alertDeduplicator');
+const { getAlertDeduplicator } = require('../utils/alertDeduplicator');
 const { config } = require('../config/emergency.config');
 const { snsService } = require('./sns.service');
 const alertService = require('./alert.service');
@@ -79,7 +79,7 @@ class EmergencyProcessor {
       // Step 3: Check deduplication
       let deduplicationResult = { shouldAlert: true, reason: 'No deduplication check performed' };
       if (emergencyResult.isEmergency && !falsePositiveResult.isFalsePositive) {
-        deduplicationResult = alertDeduplicator.shouldAlert(
+        deduplicationResult = getAlertDeduplicator().shouldAlert(
           patientId, 
           emergencyResult.category, 
           text, 
@@ -107,7 +107,7 @@ class EmergencyProcessor {
         };
 
         // Record the alert in deduplicator
-        alertDeduplicator.recordAlert(patientId, emergencyResult.category, timestamp, text);
+        getAlertDeduplicator().recordAlert(patientId, emergencyResult.category, timestamp, text);
       }
 
       // Step 7: Create response
@@ -339,7 +339,7 @@ class EmergencyProcessor {
         enableSNSPushNotifications: config.enableSNSPushNotifications
       },
       snsStatus: snsService.getStatus(),
-      deduplicatorStats: alertDeduplicator.getStats()
+      deduplicatorStats: getAlertDeduplicator().getStats()
     };
   }
 }

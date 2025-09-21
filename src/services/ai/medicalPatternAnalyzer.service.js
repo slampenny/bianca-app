@@ -34,7 +34,7 @@ class MedicalPatternAnalyzer {
   async analyzeMonth(conversations, baseline = null) {
     try {
       // Extract and combine all patient messages from conversations
-      const patientMessages = this.extractPatientMessages(conversations);
+      const patientMessages = await this.extractPatientMessages(conversations);
       const combinedText = patientMessages.join(' ');
 
       if (combinedText.length < 100) {
@@ -103,18 +103,31 @@ class MedicalPatternAnalyzer {
    * @param {Array} conversations - Array of conversation objects
    * @returns {Array} Array of patient message strings
    */
-  extractPatientMessages(conversations) {
+  async extractPatientMessages(conversations) {
     const messages = [];
+    const { Message } = require('../../models');
     
-    conversations.forEach(conversation => {
+    for (const conversation of conversations) {
       if (conversation.messages && Array.isArray(conversation.messages)) {
-        conversation.messages.forEach(message => {
-          if (message.role === 'patient' && message.content && message.content.trim()) {
-            messages.push(message.content.trim());
-          }
-        });
+        // Check if messages are populated objects or just IDs
+        if (conversation.messages.length > 0 && typeof conversation.messages[0] === 'string') {
+          // Messages are IDs, need to populate them
+          const populatedMessages = await Message.find({ _id: { $in: conversation.messages } });
+          populatedMessages.forEach(message => {
+            if (message.role === 'patient' && message.content && message.content.trim()) {
+              messages.push(message.content.trim());
+            }
+          });
+        } else {
+          // Messages are already populated objects
+          conversation.messages.forEach(message => {
+            if (message.role === 'patient' && message.content && message.content.trim()) {
+              messages.push(message.content.trim());
+            }
+          });
+        }
       }
-    });
+    }
 
     return messages;
   }

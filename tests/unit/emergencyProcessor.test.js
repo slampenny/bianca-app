@@ -1,10 +1,10 @@
-// src/services/__tests__/emergencyProcessor.test.js
+// tests/unit/emergencyProcessor.test.js
 
-const { EmergencyProcessor } = require('../emergencyProcessor.service');
-const { detectEmergency } = require('../../utils/emergencyDetector');
+const { EmergencyProcessor } = require('../../src/services/emergencyProcessor.service');
+const { detectEmergency } = require('../../src/utils/emergencyDetector');
 
 // Mock dependencies
-jest.mock('../../models', () => ({
+jest.mock('../../src/models', () => ({
   Patient: {
     findById: jest.fn(),
     findByIdAndUpdate: jest.fn()
@@ -14,26 +14,21 @@ jest.mock('../../models', () => ({
   }
 }));
 
-jest.mock('../alert.service', () => ({
+jest.mock('../../src/services/alert.service', () => ({
   createAlert: jest.fn()
 }));
 
-jest.mock('../../utils/alertDeduplicator', () => ({
-  alertDeduplicator: {
-    shouldAlert: jest.fn(),
-    recordAlert: jest.fn()
-  }
-}));
+// Don't mock alertDeduplicator - it's our own code, not an external dependency
 
-jest.mock('../sns.service', () => ({
+jest.mock('../../src/services/sns.service', () => ({
   snsService: {
     testConnectivity: jest.fn(),
     sendEmergencyAlert: jest.fn(),
-    getStatus: jest.fn()
+    getStatus: jest.fn().mockReturnValue({ connected: true, region: 'us-east-1' })
   }
 }));
 
-jest.mock('../../config/emergency.config', () => ({
+jest.mock('../../src/config/emergency.config', () => ({
   config: {
     enableFalsePositiveFilter: true,
     enableAlertsAPI: true,
@@ -85,8 +80,13 @@ describe('Emergency Processor', () => {
       { _id: 'caregiver2', name: 'Dr. Johnson', phone: '+1987654321' }
     ];
 
-    // Reset mocks
+    // Reset mocks and set up default return values
     jest.clearAllMocks();
+    
+    // Clear alertDeduplicator state between tests to prevent interference
+    const { getAlertDeduplicator } = require('../../src/utils/alertDeduplicator');
+    const deduplicator = getAlertDeduplicator();
+    deduplicator.clearHistory();
   });
 
   describe('processUtterance', () => {
@@ -155,7 +155,7 @@ describe('Emergency Processor', () => {
 
   describe('createAlert', () => {
     beforeEach(() => {
-      const { Patient, Caregiver } = require('../../models');
+      const { Patient, Caregiver } = require('../../src/models');
       Patient.findById.mockResolvedValue(mockPatient);
       Patient.findById.mockImplementation(() => ({
         populate: jest.fn().mockResolvedValue({
@@ -164,7 +164,7 @@ describe('Emergency Processor', () => {
         })
       }));
 
-      const alertService = require('../alert.service');
+      const alertService = require('../../src/services/alert.service');
       alertService.createAlert.mockResolvedValue({
         _id: 'alert123',
         message: 'Test alert',
@@ -173,6 +173,9 @@ describe('Emergency Processor', () => {
     });
 
     test('should create alert successfully', async () => {
+      const { Patient } = require('../../src/models');
+      Patient.findById.mockResolvedValue(mockPatient);
+
       const alertData = {
         severity: 'CRITICAL',
         category: 'Medical',
@@ -190,7 +193,7 @@ describe('Emergency Processor', () => {
     });
 
     test('should handle patient not found', async () => {
-      const { Patient } = require('../../models');
+      const { Patient } = require('../../src/models');
       Patient.findById.mockResolvedValue(null);
 
       const alertData = {
@@ -218,7 +221,7 @@ describe('Emergency Processor', () => {
 
       await processor.createAlert('patient123', alertData, "I'm having a heart attack");
       
-      const alertService = require('../alert.service');
+      const alertService = require('../../src/services/alert.service');
       expect(alertService.createAlert).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringContaining('🚨 CRITICAL Medical Emergency'),
@@ -233,7 +236,7 @@ describe('Emergency Processor', () => {
     });
 
     test('should handle alert creation errors', async () => {
-      const alertService = require('../alert.service');
+      const alertService = require('../../src/services/alert.service');
       alertService.createAlert.mockRejectedValue(new Error('Database error'));
 
       const alertData = {
@@ -253,7 +256,7 @@ describe('Emergency Processor', () => {
 
   describe('integration tests', () => {
     test('should process complete emergency flow', async () => {
-      const { Patient, Caregiver } = require('../../models');
+      const { Patient, Caregiver } = require('../../src/models');
       Patient.findById.mockResolvedValue(mockPatient);
       Patient.findById.mockImplementation(() => ({
         populate: jest.fn().mockResolvedValue({
@@ -262,7 +265,7 @@ describe('Emergency Processor', () => {
         })
       }));
 
-      const alertService = require('../alert.service');
+      const alertService = require('../../src/services/alert.service');
       alertService.createAlert.mockResolvedValue({
         _id: 'alert123',
         message: 'Test alert',

@@ -1,6 +1,7 @@
 // Set test environment variables before importing config
 process.env.NODE_ENV = 'test';
 process.env.API_BASE_URL = 'http://localhost:3000';
+process.env.FRONTEND_URL = 'http://localhost:3000';
 process.env.PORT = '3000';
 
 const mongoose = require('mongoose');
@@ -68,11 +69,13 @@ describe('inviteService', () => {
       expect(caregiver.role).toEqual('invited');
 
       console.log('Config apiUrl:', config.apiUrl);
+      console.log('Config frontendUrl:', config.frontendUrl);
       console.log('Config baseUrl:', config.baseUrl);
       console.log('Environment API_BASE_URL:', process.env.API_BASE_URL);
+      console.log('Environment FRONTEND_URL:', process.env.FRONTEND_URL);
       console.log('Environment NODE_ENV:', process.env.NODE_ENV);
       
-      const inviteLink = `${config.apiUrl}/signup?token=${inviteToken}`;
+      const inviteLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
       expect(emailService.sendInviteEmail).toHaveBeenCalledWith(caregiverOne.email, inviteLink);
     });
   });

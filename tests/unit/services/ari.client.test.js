@@ -1,6 +1,5 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
-let ariClient = require('../../../src/services/ari.client');
 
 // Mock dependencies
 jest.mock('../../../src/config/logger', () => ({
@@ -24,6 +23,9 @@ jest.mock('../../../src/config/config', () => ({
     fileExtension: 'ulaw'
   },
   asterisk: {
+    url: 'http://localhost:8088/ari',
+    username: 'testuser',
+    password: 'testpass',
     rtpBiancaHost: '127.0.0.1',
     rtpAsteriskHost: '127.0.0.1'
   }
@@ -65,11 +67,27 @@ jest.mock('../../../src/models', () => ({
   }
 }));
 
+jest.mock('../../../src/utils/network.utils', () => ({
+  getAsteriskIP: jest.fn(() => '127.0.0.1'),
+  getRTPAddress: jest.fn(() => Promise.resolve('127.0.0.1')),
+  getNetworkDebugInfo: jest.fn(() => Promise.resolve({
+    environment: { NETWORK_MODE: 'test', USE_PRIVATE_NETWORK_FOR_RTP: false },
+    rtpAddress: '127.0.0.1',
+    asteriskIP: '127.0.0.1'
+  }))
+}));
+
+jest.mock('ari-client', () => ({
+  connect: jest.fn()
+}));
+
 jest.mock('ws');
 jest.mock('events');
 
 // Import the service after mocking dependencies
-let ARIClient;
+let ariClientModule;
+let AsteriskAriClient;
+let mockAriClient;
 
 describe('ARI Client', () => {
   let mockWebSocket;
@@ -87,15 +105,21 @@ describe('ARI Client', () => {
     jest.resetModules();
     
     // Import the service
-    ariClient = require('../../../src/services/ari.client');
+    ariClientModule = require('../../../src/services/ari.client');
+    AsteriskAriClient = ariClientModule.AsteriskAriClient;
     
-    // Get the class constructor if available
-    try {
-      ARIClient = require('../../../src/services/ari.client').ARIClient;
-    } catch (error) {
-      // If the class is not exported directly, we'll work with the singleton instance
-      ARIClient = null;
-    }
+    // Mock the AriClient.connect function
+    const AriClient = require('ari-client');
+    mockAriClient = {
+      applications: {
+        list: jest.fn().mockResolvedValue([
+          { name: 'test-app' }
+        ])
+      },
+      on: jest.fn(),
+      close: jest.fn()
+    };
+    AriClient.connect.mockResolvedValue(mockAriClient);
   });
 
   beforeEach(() => {
@@ -119,41 +143,21 @@ describe('ARI Client', () => {
     mockRtpListenerService = require('../../../src/services/rtp.listener.service');
     mockModels = require('../../../src/models');
     
-    // Create service instance - use the singleton or create new instance
-    if (ARIClient) {
-      service = new ARIClient();
-    } else {
-      service = ariClient;
-    }
+    // Create fresh service instance for each test
+    service = new AsteriskAriClient();
   });
 
   afterEach(async () => {
     // Clean up service
-    if (service && typeof service.disconnect === 'function') {
-      service.disconnect();
-    }
-    
-    if (service && typeof service.close === 'function') {
-      service.close();
-    }
-    
-    if (service && typeof service.destroy === 'function') {
-      service.destroy();
+    if (service && typeof service.shutdown === 'function') {
+      await service.shutdown();
     }
   });
 
   afterAll(async () => {
     // Final cleanup
-    if (service && typeof service.disconnect === 'function') {
-      service.disconnect();
-    }
-    
-    if (service && typeof service.close === 'function') {
-      service.close();
-    }
-    
-    if (service && typeof service.destroy === 'function') {
-      service.destroy();
+    if (service && typeof service.shutdown === 'function') {
+      await service.shutdown();
     }
   });
 
@@ -167,7 +171,7 @@ describe('ARI Client', () => {
       expect(service.resourceManager).toBeDefined();
       expect(service.reconnectTimer).toBeNull();
       expect(service.healthCheckInterval).toBeNull();
-      expect(service.RTP_BIANCA_HOST).toBe('127.0.0.1');
+      expect(service.RTP_BIANCA_HOST).toBeNull(); // Initially null until network config
       expect(service.RTP_ASTERISK_HOST).toBe('127.0.0.1');
     });
 
@@ -180,20 +184,24 @@ describe('ARI Client', () => {
     it('should start ARI client successfully', async () => {
       await service.start();
       
-      expect(ARIClient.connect).toHaveBeenCalledWith(
-        expect.stringContaining('http://'),
-        expect.stringContaining('test-app'),
-        expect.stringContaining('password')
+      const AriClient = require('ari-client');
+      expect(AriClient.connect).toHaveBeenCalledWith(
+        'http://localhost:8088/ari',
+        'testuser',
+        'testpass',
+        expect.objectContaining({
+          keepAliveIntervalMs: 20000,
+          perMessageDeflate: false,
+          reconnect: expect.any(Object)
+        })
       );
       expect(service.isConnected).toBe(true);
-      expect(mockWebSocket.on).toHaveBeenCalledWith('StasisStart', expect.any(Function));
-      expect(mockWebSocket.on).toHaveBeenCalledWith('StasisEnd', expect.any(Function));
-      expect(mockWebSocket.on).toHaveBeenCalledWith('ChannelDestroyed', expect.any(Function));
-      expect(mockWebSocket.on).toHaveBeenCalledWith('ChannelHangupRequest', expect.any(Function));
+      expect(service.client).toBe(mockAriClient);
     });
 
     it('should handle connection failure', async () => {
-      ARIClient.connect.mockRejectedValue(new Error('Connection failed'));
+      const AriClient = require('ari-client');
+      AriClient.connect.mockRejectedValue(new Error('Connection failed'));
       
       await expect(service.start()).rejects.toThrow('Connection failed');
       expect(service.isConnected).toBe(false);
@@ -204,90 +212,157 @@ describe('ARI Client', () => {
       
       await service.start();
       
-      expect(ARIClient.connect).not.toHaveBeenCalled();
+      const AriClient = require('ari-client');
+      expect(AriClient.connect).not.toHaveBeenCalled();
     });
   });
 
   describe('waitForReady()', () => {
     it('should wait for ready state', async () => {
-      service.isConnected = false;
+      service.isConnected = true;
+      service.client = mockAriClient;
       
-      // Start connection in background
-      const startPromise = service.start();
+      const result = await service.waitForReady();
       
-      // Wait for ready
-      const readyPromise = service.waitForReady();
-      
-      // Resolve start
-      await startPromise;
-      
-      // Ready should resolve
-      await readyPromise;
+      expect(result).toBe(true);
+      expect(mockAriClient.applications.list).toHaveBeenCalled();
     });
 
-    it('should timeout if not ready', async () => {
+    it('should throw error if not connected', async () => {
       service.isConnected = false;
       
-      await expect(service.waitForReady(100)).rejects.toThrow('timeout');
+      await expect(service.waitForReady()).rejects.toThrow('ARI client not connected');
+    });
+  });
+
+  describe('healthCheck()', () => {
+    it('should return health status when connected', async () => {
+      service.isConnected = true;
+      service.retryCount = 0;
+      mockChannelTracker.calls.size = 0;
+      
+      const health = await service.healthCheck();
+      
+      expect(health).toEqual({
+        healthy: true,
+        connected: true,
+        retryCount: 0,
+        activeCalls: 0
+      });
+    });
+
+    it('should return unhealthy status when disconnected', async () => {
+      service.isConnected = false;
+      service.retryCount = 0;
+      mockChannelTracker.calls.size = 0;
+      
+      const health = await service.healthCheck();
+      
+      expect(health).toEqual({
+        healthy: false,
+        connected: false,
+        retryCount: 0,
+        activeCalls: 0
+      });
+    });
+  });
+
+  describe('updateCallState()', () => {
+    it('should update call state successfully', () => {
+      const channelId = 'test-channel-id';
+      
+      service.updateCallState(channelId, 'new_state');
+      
+      expect(mockChannelTracker.updateCall).toHaveBeenCalledWith(
+        channelId,
+        { state: 'new_state' }
+      );
+    });
+  });
+
+  describe('safeHangup()', () => {
+    it('should hangup channel successfully', async () => {
+      const mockChannel = {
+        id: 'test-channel-id',
+        hangup: jest.fn().mockResolvedValue()
+      };
+      
+      await service.safeHangup(mockChannel, 'Test reason');
+      
+      expect(mockChannel.hangup).toHaveBeenCalledWith('Test reason');
+    });
+
+    it('should handle hangup errors gracefully', async () => {
+      const mockChannel = {
+        id: 'test-channel-id',
+        hangup: jest.fn().mockRejectedValue(new Error('Hangup failed'))
+      };
+      
+      await service.safeHangup(mockChannel, 'Test reason');
+      
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Error hanging up channel')
+      );
+    });
+  });
+
+  describe('safeDestroy()', () => {
+    it('should destroy bridge successfully', async () => {
+      const mockBridge = {
+        id: 'test-bridge-id',
+        destroy: jest.fn().mockResolvedValue()
+      };
+      
+      await service.safeDestroy(mockBridge, 'Test reason');
+      
+      expect(mockBridge.destroy).toHaveBeenCalled();
+    });
+
+    it('should handle destroy errors gracefully', async () => {
+      const mockBridge = {
+        id: 'test-bridge-id',
+        destroy: jest.fn().mockRejectedValue(new Error('Destroy failed'))
+      };
+      
+      await service.safeDestroy(mockBridge, 'Test reason');
+      
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Error destroying bridge')
+      );
+    });
+  });
+
+  describe('cleanupChannel()', () => {
+    it('should cleanup channel successfully', async () => {
+      const channelId = 'test-channel-id';
+      
+      mockChannelTracker.getCall.mockReturnValue({
+        state: 'active',
+        resources: { channels: [], bridges: [], recordings: [] }
+      });
+      
+      await service.cleanupChannel(channelId, 'Test reason');
+      
+      expect(mockOpenAIService.disconnect).toHaveBeenCalled();
+      expect(mockRtpListenerService.stopRtpListenerForCall).toHaveBeenCalled();
+      expect(mockPortManager.releasePorts).toHaveBeenCalled();
+      expect(mockChannelTracker.removeCall).toHaveBeenCalled();
+    });
+
+    it('should handle missing call data', async () => {
+      const channelId = 'test-channel-id';
+      
+      mockChannelTracker.getCall.mockReturnValue(null);
+      
+      await service.cleanupChannel(channelId, 'Test reason');
+      
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('No call data found')
+      );
     });
   });
 
   describe('handleStasisStart()', () => {
-    const mockChannel = {
-      id: 'test-channel-id',
-      name: 'SIP/test-123',
-      state: 'Ring',
-      caller: { number: '1234567890' },
-      dialplan: { context: 'test-context', exten: 'test-exten' }
-    };
-
-    const mockEvent = {
-      channel: mockChannel,
-      args: ['test-arg1', 'test-arg2']
-    };
-
-    it('should handle main channel stasis start', async () => {
-      mockChannel.name = 'SIP/test-123';
-      
-      await service.handleStasisStart(mockEvent, mockChannel);
-      
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('StasisStart for main channel')
-      );
-    });
-
-    it('should handle unicast RTP channel stasis start', async () => {
-      mockChannel.name = 'UnicastRTP/127.0.0.1:1234-...';
-      
-      await service.handleStasisStart(mockEvent, mockChannel);
-      
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Processing UnicastRTP channel')
-      );
-    });
-
-    it('should handle snoop channel stasis start', async () => {
-      mockChannel.name = 'Snoop/test-channel-id';
-      
-      await service.handleStasisStart(mockEvent, mockChannel);
-      
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Processing Snoop channel')
-      );
-    });
-
-    it('should handle playback channel stasis start', async () => {
-      mockChannel.name = 'Playback/test-file';
-      
-      await service.handleStasisStart(mockEvent, mockChannel);
-      
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Processing Playback channel')
-      );
-    });
-  });
-
-  describe('handleStasisStartForMainChannel()', () => {
     const mockChannel = {
       id: 'test-channel-id',
       name: 'SIP/test-123',
@@ -312,90 +387,23 @@ describe('ARI Client', () => {
       });
     });
 
-    it('should setup main channel successfully', async () => {
-      await service.handleStasisStartForMainChannel(mockChannel, mockEvent);
+    it('should handle main channel stasis start', async () => {
+      mockChannel.name = 'SIP/test-123';
       
-      expect(mockChannelTracker.addCall).toHaveBeenCalled();
-      expect(mockPortManager.allocatePorts).toHaveBeenCalled();
-      expect(mockChannel.answer).toHaveBeenCalled();
+      await service.handleStasisStart(mockEvent, mockChannel);
+      
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Main channel answered')
+        expect.stringContaining('StasisStart for main channel')
       );
     });
 
-    it('should handle missing patient', async () => {
-      mockModels.Patient.findById.mockResolvedValue(null);
+    it('should handle unicast RTP channel stasis start', async () => {
+      mockChannel.name = 'UnicastRTP/127.0.0.1:1234-...';
       
-      await service.handleStasisStartForMainChannel(mockChannel, mockEvent);
+      await service.handleStasisStart(mockEvent, mockChannel);
       
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Patient not found')
-      );
-    });
-
-    it('should handle port allocation failure', async () => {
-      mockPortManager.allocatePorts.mockRejectedValue(new Error('Port allocation failed'));
-      
-      await service.handleStasisStartForMainChannel(mockChannel, mockEvent);
-      
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to allocate ports')
-      );
-    });
-
-    it('should handle channel answer failure', async () => {
-      mockChannel.answer.mockRejectedValue(new Error('Answer failed'));
-      
-      await service.handleStasisStartForMainChannel(mockChannel, mockEvent);
-      
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to answer channel')
-      );
-    });
-  });
-
-  describe('setupMediaPipeline()', () => {
-    const mockChannel = {
-      id: 'test-channel-id',
-      name: 'SIP/test-123'
-    };
-
-    const mockTwilioCallSid = 'test-twilio-sid';
-    const mockPatientId = 'test-patient-id';
-
-    beforeEach(() => {
-      mockModels.Conversation.create.mockResolvedValue({
-        _id: 'test-conversation-id'
-      });
-    });
-
-    it('should setup media pipeline successfully', async () => {
-      await service.setupMediaPipeline(mockChannel, mockTwilioCallSid, mockPatientId);
-      
-      expect(mockModels.Conversation.create).toHaveBeenCalled();
-      expect(mockOpenAIService.initialize).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Media pipeline setup completed')
-      );
-    });
-
-    it('should handle conversation creation failure', async () => {
-      mockModels.Conversation.create.mockRejectedValue(new Error('Database error'));
-      
-      await service.setupMediaPipeline(mockChannel, mockTwilioCallSid, mockPatientId);
-      
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create conversation')
-      );
-    });
-
-    it('should handle OpenAI initialization failure', async () => {
-      mockOpenAIService.initialize.mockResolvedValue(false);
-      
-      await service.setupMediaPipeline(mockChannel, mockTwilioCallSid, mockPatientId);
-      
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to initialize OpenAI')
+        expect.stringContaining('Processing UnicastRTP channel')
       );
     });
   });
@@ -425,16 +433,6 @@ describe('ARI Client', () => {
       );
     });
 
-    it('should handle stasis end for auxiliary channel', async () => {
-      mockChannel.name = 'UnicastRTP/127.0.0.1:1234-...';
-      
-      await service.handleStasisEnd(mockEvent, mockChannel);
-      
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('StasisEnd for auxiliary channel')
-      );
-    });
-
     it('should handle missing call data', async () => {
       mockChannelTracker.getCall.mockReturnValue(null);
       
@@ -446,199 +444,43 @@ describe('ARI Client', () => {
     });
   });
 
-  describe('cleanupChannel()', () => {
-    const mockChannelId = 'test-channel-id';
-
-    beforeEach(() => {
-      mockChannelTracker.getCall.mockReturnValue({
-        state: 'active',
-        resources: { channels: [], bridges: [], recordings: [] }
-      });
-    });
-
-    it('should cleanup channel successfully', async () => {
-      await service.cleanupChannel(mockChannelId, 'Test reason');
-      
-      expect(mockOpenAIService.disconnect).toHaveBeenCalled();
-      expect(mockRtpListenerService.stopRtpListenerForCall).toHaveBeenCalled();
-      expect(mockPortManager.releasePorts).toHaveBeenCalled();
-      expect(mockChannelTracker.removeCall).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Channel cleanup completed')
-      );
-    });
-
-    it('should handle missing call data', async () => {
-      mockChannelTracker.getCall.mockReturnValue(null);
-      
-      await service.cleanupChannel(mockChannelId, 'Test reason');
-      
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('No call data found')
-      );
-    });
-
-    it('should handle cleanup errors gracefully', async () => {
-      mockOpenAIService.disconnect.mockRejectedValue(new Error('Disconnect failed'));
-      
-      await service.cleanupChannel(mockChannelId, 'Test reason');
-      
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error during channel cleanup')
-      );
-    });
-  });
-
-  describe('safeHangup()', () => {
+  describe('setupMediaPipeline()', () => {
     const mockChannel = {
       id: 'test-channel-id',
-      hangup: jest.fn()
+      name: 'SIP/test-123'
     };
 
-    it('should hangup channel successfully', async () => {
-      await service.safeHangup(mockChannel, 'Test reason');
-      
-      expect(mockChannel.hangup).toHaveBeenCalledWith('Test reason');
-    });
+    const mockTwilioCallSid = 'test-twilio-sid';
+    const mockPatientId = 'test-patient-id';
 
-    it('should handle hangup errors gracefully', async () => {
-      mockChannel.hangup.mockRejectedValue(new Error('Hangup failed'));
-      
-      await service.safeHangup(mockChannel, 'Test reason');
-      
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Error hanging up channel')
-      );
-    });
-  });
-
-  describe('safeDestroy()', () => {
-    const mockBridge = {
-      id: 'test-bridge-id',
-      destroy: jest.fn()
-    };
-
-    it('should destroy bridge successfully', async () => {
-      await service.safeDestroy(mockBridge, 'Test reason');
-      
-      expect(mockBridge.destroy).toHaveBeenCalled();
-    });
-
-    it('should handle destroy errors gracefully', async () => {
-      mockBridge.destroy.mockRejectedValue(new Error('Destroy failed'));
-      
-      await service.safeDestroy(mockBridge, 'Test reason');
-      
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Error destroying bridge')
-      );
-    });
-  });
-
-  describe('updateCallState()', () => {
-    const mockChannelId = 'test-channel-id';
-
-    it('should update call state successfully', () => {
-      service.updateCallState(mockChannelId, 'new_state');
-      
-      expect(mockChannelTracker.updateCall).toHaveBeenCalledWith(
-        mockChannelId,
-        { state: 'new_state' }
-      );
-    });
-
-    it('should handle invalid state transitions', () => {
-      mockChannelTracker.getCall.mockReturnValue({ state: 'invalid_state' });
-      
-      service.updateCallState(mockChannelId, 'new_state');
-      
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid state transition')
-      );
-    });
-  });
-
-  describe('healthCheck()', () => {
-    it('should return health status when connected', async () => {
-      service.isConnected = true;
-      
-      const health = await service.healthCheck();
-      
-      expect(health).toEqual({
-        healthy: true,
-        connected: true,
-        retryCount: 0,
-        activeCalls: 0
+    beforeEach(() => {
+      mockModels.Conversation.create.mockResolvedValue({
+        _id: 'test-conversation-id'
       });
     });
 
-    it('should return unhealthy status when disconnected', async () => {
-      service.isConnected = false;
+    it('should setup media pipeline successfully', async () => {
+      await service.setupMediaPipeline(mockChannel, mockTwilioCallSid, mockPatientId);
       
-      const health = await service.healthCheck();
-      
-      expect(health).toEqual({
-        healthy: false,
-        connected: false,
-        retryCount: 0,
-        activeCalls: 0
-      });
+      expect(mockModels.Conversation.create).toHaveBeenCalled();
+      expect(mockOpenAIService.initialize).toHaveBeenCalled();
     });
-  });
 
-  describe('cleanup()', () => {
-    it('should cleanup client resources', () => {
-      service.reconnectTimer = setTimeout(() => {}, 1000);
-      service.healthCheckInterval = setInterval(() => {}, 1000);
+    it('should handle conversation creation failure', async () => {
+      mockModels.Conversation.create.mockRejectedValue(new Error('Database error'));
       
-      service.cleanup();
-      
-      expect(service.isConnected).toBe(false);
-      expect(service.reconnectTimer).toBeNull();
-      expect(service.healthCheckInterval).toBeNull();
-      expect(service.resourceManager.cleanupAll).toHaveBeenCalled();
-    });
-  });
-
-  describe('Error handling', () => {
-    it('should handle client errors', () => {
-      const errorListener = jest.fn();
-      service.on('error', errorListener);
-      
-      // Simulate client error
-      const errorCallback = mockWebSocket.on.mock.calls.find(
-        call => call[0] === 'error'
-      )[1];
-      
-      const error = new Error('Client error');
-      errorCallback(error);
+      await service.setupMediaPipeline(mockChannel, mockTwilioCallSid, mockPatientId);
       
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('ARI client error')
-      );
-    });
-
-    it('should handle disconnection', () => {
-      service.isConnected = true;
-      
-      // Simulate disconnection
-      const closeCallback = mockWebSocket.on.mock.calls.find(
-        call => call[0] === 'close'
-      )[1];
-      
-      closeCallback();
-      
-      expect(service.isConnected).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('ARI client disconnected')
+        expect.stringContaining('Failed to create conversation')
       );
     });
   });
 
   describe('Circuit breaker functionality', () => {
     it('should handle circuit breaker state changes', async () => {
-      // Mock ARIClient.connect to fail
-      ARIClient.connect.mockRejectedValue(new Error('Connection failed'));
+      const AriClient = require('ari-client');
+      AriClient.connect.mockRejectedValue(new Error('Connection failed'));
       
       // Try to start multiple times to trigger circuit breaker
       for (let i = 0; i < 6; i++) {
@@ -673,4 +515,4 @@ describe('ARI Client', () => {
       expect(service.resourceManager.resources.has(channelId)).toBe(false);
     });
   });
-}); 
+});

@@ -19,6 +19,9 @@ class AlertDeduplicator {
     // Structure: { patientId: { alerts: [{ category, timestamp, text }], hourlyCount: number } }
     this.alertHistory = new Map();
     
+    // Store cleanup interval ID for proper cleanup
+    this.cleanupIntervalId = null;
+    
     // Start cleanup interval
     this.startCleanupInterval();
   }
@@ -173,9 +176,20 @@ class AlertDeduplicator {
   startCleanupInterval() {
     const cleanupIntervalMs = this.config.cleanupIntervalMinutes * 60 * 1000;
     
-    setInterval(() => {
+    this.cleanupIntervalId = setInterval(() => {
       this.cleanupOldAlerts();
     }, cleanupIntervalMs);
+  }
+
+  /**
+   * Stop the cleanup interval (useful for testing)
+   * @public
+   */
+  stopCleanupInterval() {
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
   }
 
   /**
@@ -245,10 +259,21 @@ class AlertDeduplicator {
   }
 }
 
-// Create singleton instance
-const alertDeduplicator = new AlertDeduplicator();
+// Lazy singleton instance
+let alertDeduplicatorInstance = null;
+
+function getAlertDeduplicator() {
+  if (!alertDeduplicatorInstance) {
+    alertDeduplicatorInstance = new AlertDeduplicator();
+  }
+  return alertDeduplicatorInstance;
+}
 
 module.exports = {
   AlertDeduplicator,
-  alertDeduplicator // Singleton instance
+  getAlertDeduplicator,
+  // For backward compatibility, export the getter as the default export
+  get alertDeduplicator() {
+    return getAlertDeduplicator();
+  }
 };

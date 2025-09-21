@@ -25,6 +25,12 @@ variable "aws_account_id" {
   default     = "730335291008"
 }
 
+variable "environment" {
+  description = "Environment name (e.g., staging, production)."
+  type        = string
+  default     = "staging"
+}
+
 variable "vpc_id" {
   description = "ID of the VPC where resources will be deployed."
   type        = string

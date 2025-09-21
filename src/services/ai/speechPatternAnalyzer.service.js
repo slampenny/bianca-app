@@ -121,7 +121,7 @@ class SpeechPatternAnalyzer {
       return {
         avgUtteranceLength: utteranceAnalysis.averageLength,
         utteranceDistribution: utteranceAnalysis.distribution,
-        incompleteSentences: incompleteAnalysis.percentage,
+        incompleteSentences: incompleteAnalysis,
         topicCoherence: coherenceAnalysis.score,
         wordSubstitutions: substitutionAnalysis.count,
         speechAbnormalities: abnormalityAnalysis.abnormalities,
@@ -547,7 +547,10 @@ class SpeechPatternAnalyzer {
    */
   analyzeLengthTrend(messages) {
     const lengths = messages.map(msg => {
-      const words = this.tokenizer.tokenize(msg.content.toLowerCase());
+      // Handle both message objects with content property and plain strings
+      const content = typeof msg === 'string' ? msg : msg.content;
+      if (!content) return 0;
+      const words = this.tokenizer.tokenize(content.toLowerCase());
       return words.length;
     });
 

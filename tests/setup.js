@@ -110,6 +110,19 @@ afterAll(async () => {
   }
   
   try {
+    // Clean up AlertDeduplicator if it exists
+    const alertDeduplicator = require('../src/utils/alertDeduplicator');
+    if (alertDeduplicator && typeof alertDeduplicator.getAlertDeduplicator === 'function') {
+      const instance = alertDeduplicator.getAlertDeduplicator();
+      if (instance && typeof instance.stopCleanupInterval === 'function') {
+        instance.stopCleanupInterval();
+      }
+    }
+  } catch (error) {
+    // Ignore errors if service doesn't exist or methods don't exist
+  }
+  
+  try {
     // Clean up RTP Listener Service if it exists
     const rtpListener = require('../src/services/rtp.listener.service');
     if (rtpListener && typeof rtpListener.close === 'function') {

@@ -1,6 +1,6 @@
-// src/utils/__tests__/emergencyDetector.test.js
+// tests/unit/emergencyDetector.test.js
 
-const { detectEmergency, getAllEmergencyPatterns, filterFalsePositives } = require('../emergencyDetector');
+const { detectEmergency, getAllEmergencyPatterns, filterFalsePositives } = require('../../src/utils/emergencyDetector');
 
 describe('Emergency Detector', () => {
   describe('detectEmergency', () => {

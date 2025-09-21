@@ -37,6 +37,15 @@ class PsychiatricMarkerAnalyzer {
       socialWithdrawal: [
         'don\'t want to see anyone', 'isolated', 'lonely', 'no friends',
         'avoiding people', 'staying home', 'not going out', 'withdrawn'
+      ],
+      anhedonia: [
+        'don\'t enjoy', 'no pleasure', 'lost interest', 'nothing brings pleasure',
+        'can\'t feel pleasure', 'no joy', 'feel nothing', 'emotionally numb',
+        'anhedonia', 'don\'t care about', 'used to love', 'feel empty',
+        'nothing fun', 'no satisfaction', 'lost enjoyment', 'no happiness',
+        'don\'t like', 'no interest in', 'stopped enjoying', 'not interested',
+        'don\'t get any pleasure', 'don\'t want to see', 'feel like a burden',
+        'prefer to be alone', 'no pleasure from', 'used to be fun'
       ]
     };
 
@@ -118,7 +127,8 @@ class PsychiatricMarkerAnalyzer {
         negativeThoughts: 0.30,
         physicalSymptoms: 0.20,
         cognitiveSymptoms: 0.15,
-        socialWithdrawal: 0.10
+        socialWithdrawal: 0.10,
+        anhedonia: 0.20
       },
       anxiety: {
         worry: 0.25,
@@ -229,7 +239,8 @@ class PsychiatricMarkerAnalyzer {
       negativeThoughts: this.countMarkers(lowerText, this.depressionMarkers.negativeThoughts),
       physicalSymptoms: this.countMarkers(lowerText, this.depressionMarkers.physicalSymptoms),
       cognitiveSymptoms: this.countMarkers(lowerText, this.depressionMarkers.cognitiveSymptoms),
-      socialWithdrawal: this.countMarkers(lowerText, this.depressionMarkers.socialWithdrawal)
+      socialWithdrawal: this.countMarkers(lowerText, this.depressionMarkers.socialWithdrawal),
+      anhedonia: this.countMarkers(lowerText, this.depressionMarkers.anhedonia)
     };
 
     // Calculate weighted score
@@ -496,7 +507,7 @@ class PsychiatricMarkerAnalyzer {
     const indicators = [];
 
     // Depression indicators
-    if (analyses.depression.weightedScore > 5) {
+    if (analyses.depression.weightedScore > 0.5) {
       indicators.push({
         type: 'depression',
         severity: analyses.depression.severity,
@@ -506,7 +517,7 @@ class PsychiatricMarkerAnalyzer {
     }
 
     // Anxiety indicators
-    if (analyses.anxiety.weightedScore > 5) {
+    if (analyses.anxiety.weightedScore > 0.5) {
       indicators.push({
         type: 'anxiety',
         severity: analyses.anxiety.severity,
@@ -516,7 +527,7 @@ class PsychiatricMarkerAnalyzer {
     }
 
     // General psychiatric indicators
-    if (analyses.general.weightedScore > 3) {
+    if (analyses.general.weightedScore > 0.5) {
       indicators.push({
         type: 'general_psychiatric',
         severity: analyses.general.severity,
@@ -536,7 +547,7 @@ class PsychiatricMarkerAnalyzer {
     }
 
     // Emotional tone indicators
-    if (analyses.emotionalTone.dominantTone === 'negative' && analyses.emotionalTone.negativeRatio > 0.7) {
+    if (analyses.emotionalTone.dominantTone === 'negative' && analyses.emotionalTone.negativeRatio > 0.6) {
       indicators.push({
         type: 'negative_tone',
         severity: 'medium',

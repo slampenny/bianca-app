@@ -10947,5 +10947,160 @@ router.post('/medical-analysis/initialize', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/push-notification:
+ *   post:
+ *     summary: Send test push notification to first patient's caregiver
+ *     description: Send a test emergency push notification to the first patient's caregiver via SNS (testing purposes only)
+ *     tags: [Test]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               severity:
+ *                 type: string
+ *                 enum: [CRITICAL, HIGH, MEDIUM]
+ *                 default: MEDIUM
+ *                 description: Severity level of the test alert
+ *               category:
+ *                 type: string
+ *                 default: Test
+ *                 description: Category of the test alert
+ *               phrase:
+ *                 type: string
+ *                 default: Test emergency phrase
+ *                 description: Emergency phrase for the test alert
+ *             example:
+ *               severity: MEDIUM
+ *               category: Test
+ *               phrase: Test emergency phrase
+ *     responses:
+ *       200:
+ *         description: Push notification sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 patient:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                 caregivers:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       phone:
+ *                         type: string
+ *                 notificationResult:
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                     successful:
+ *                       type: number
+ *                     failed:
+ *                       type: number
+ *                     total:
+ *                       type: number
+ *                     results:
+ *                       type: array
+ *       404:
+ *         description: No patients or caregivers found
+ *       500:
+ *         description: Failed to send push notification
+ */
+router.post('/push-notification', async (req, res) => {
+    try {
+        const { Patient, Caregiver } = require('../../models');
+        const { snsService } = require('../../services/sns.service');
+        
+        // Get the first patient
+        const patient = await Patient.findOne().lean();
+        if (!patient) {
+            return res.status(404).json({
+                success: false,
+                message: 'No patients found in database'
+            });
+        }
+
+        // Get caregivers for the patient
+        const caregivers = await Caregiver.find({ 
+            patients: patient._id 
+        }).lean();
+        
+        if (!caregivers || caregivers.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `No caregivers found for patient: ${patient.name}`,
+                patient: {
+                    id: patient._id,
+                    name: patient.name
+                }
+            });
+        }
+
+        // Get test alert parameters from request body or use defaults
+        const { 
+            severity = 'MEDIUM', 
+            category = 'Test', 
+            phrase = 'Test emergency phrase' 
+        } = req.body;
+
+        // Create alert data
+        const alertData = {
+            patientId: patient._id.toString(),
+            patientName: patient.name,
+            severity: severity,
+            category: category,
+            phrase: phrase
+        };
+
+        logger.info(`[Test] Sending push notification to ${caregivers.length} caregivers for patient: ${patient.name}`);
+
+        // Send push notification
+        const notificationResult = await snsService.sendEmergencyAlert(alertData, caregivers);
+
+        res.status(200).json({
+            success: true,
+            message: `Test push notification sent to ${caregivers.length} caregivers`,
+            patient: {
+                id: patient._id,
+                name: patient.name
+            },
+            caregivers: caregivers.map(caregiver => ({
+                id: caregiver._id,
+                name: caregiver.name,
+                phone: caregiver.phone
+            })),
+            notificationResult: notificationResult
+        });
+
+    } catch (error) {
+        logger.error('[Test] Error sending test push notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send test push notification',
+            error: error.message
+        });
+    }
+});
+
 // Export the router
 module.exports = router;

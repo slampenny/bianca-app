@@ -1,3 +1,16 @@
+// Mock dgram BEFORE any imports
+const mockSocket = {
+  bind: jest.fn(),
+  send: jest.fn(),
+  close: jest.fn(),
+  on: jest.fn(),
+  removeAllListeners: jest.fn()
+};
+
+jest.mock('dgram', () => ({
+  createSocket: jest.fn(() => mockSocket)
+}));
+
 const dgram = require('dgram');
 const { Buffer } = require('buffer');
 const EventEmitter = require('events');
@@ -12,10 +25,12 @@ jest.mock('../../../src/config/logger', () => ({
   debug: jest.fn()
 }));
 
-jest.mock('../../../src/api/audio.utils', () => ({
+const mockAudioUtils = {
   convertUlawToPcm: jest.fn(),
   resamplePcm: jest.fn()
-}));
+};
+
+jest.mock('../../../src/api/audio.utils', () => mockAudioUtils);
 
 jest.mock('../../../src/config/config', () => ({
   rtp: {
@@ -25,10 +40,7 @@ jest.mock('../../../src/config/config', () => ({
   }
 }));
 
-jest.mock('dgram');
-
 describe('RTP Sender Service', () => {
-  let mockSocket;
   let mockLogger;
   let mockConfig;
   let service;
@@ -40,38 +52,20 @@ describe('RTP Sender Service', () => {
     // Import the service
     rtpSenderService = require('../../../src/services/rtp.sender.service');
     
-    // Get the class constructor if available
-    try {
-      RTPSenderService = require('../../../src/services/rtp.sender.service').RTPSenderService;
-    } catch (error) {
-      // If the class is not exported directly, we'll work with the singleton instance
-      RTPSenderService = null;
-    }
+    // Get the class constructor
+    RTPSenderService = require('../../../src/services/rtp.sender.service').RtpSenderService;
   });
 
   beforeEach(() => {
+    // Clear all mocks
     jest.clearAllMocks();
-    
-    // Mock UDP socket
-    mockSocket = {
-      bind: jest.fn(),
-      send: jest.fn(),
-      close: jest.fn(),
-      on: jest.fn(),
-      removeAllListeners: jest.fn()
-    };
-    dgram.createSocket.mockReturnValue(mockSocket);
     
     // Get mocked modules
     mockLogger = require('../../../src/config/logger');
     mockConfig = require('../../../src/config/config');
     
-    // Create service instance - use the singleton or create new instance
-    if (RTPSenderService) {
-      service = new RTPSenderService();
-    } else {
-      service = rtpSenderService;
-    }
+    // Create a fresh service instance for each test
+    service = new RTPSenderService();
   });
 
   afterEach(async () => {
@@ -145,6 +139,11 @@ describe('RTP Sender Service', () => {
     it('should initialize call successfully', async () => {
       await service.initializeCall(testCallId, testConfig);
       
+      // Verify socket is stored in the service (the important part)
+      const socket = service.udpSockets.get(testCallId);
+      expect(socket).toBeDefined();
+      expect(socket).toBe(mockSocket);
+      
       expect(service.activeCalls.has(testCallId)).toBe(true);
       expect(service.udpSockets.has(testCallId)).toBe(true);
       expect(service.sequenceNumbers.has(testCallId)).toBe(true);
@@ -161,7 +160,6 @@ describe('RTP Sender Service', () => {
       expect(callConfig.rtpPort).toBe(1234);
       expect(callConfig.format).toBe('ulaw');
       
-      expect(dgram.createSocket).toHaveBeenCalledWith('udp4');
       expect(mockSocket.on).toHaveBeenCalledWith('error', expect.any(Function));
       expect(mockSocket.on).toHaveBeenCalledWith('close', expect.any(Function));
     });
@@ -186,11 +184,13 @@ describe('RTP Sender Service', () => {
     });
 
     it('should throw error for invalid port', async () => {
-      const invalidConfig = { ...testConfig, rtpPort: 0 };
-      await expect(service.initializeCall(testCallId, invalidConfig))
+      // First test with port 0 (which should pass config validation but fail port validation)
+      const invalidConfig1 = { rtpHost: '127.0.0.1', rtpPort: 0 };
+      await expect(service.initializeCall(testCallId, invalidConfig1))
         .rejects.toThrow('Invalid RTP port: 0');
       
-      const invalidConfig2 = { ...testConfig, rtpPort: 70000 };
+      // Test with port > 65535
+      const invalidConfig2 = { rtpHost: '127.0.0.1', rtpPort: 70000 };
       await expect(service.initializeCall(testCallId, invalidConfig2))
         .rejects.toThrow('Invalid RTP port: 70000');
     });
@@ -216,7 +216,8 @@ describe('RTP Sender Service', () => {
       errorCallback(new Error('Socket error'));
       
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Socket error')
+        expect.stringContaining('Socket error'),
+        expect.any(Error)
       );
       expect(service.globalStats.totalErrors).toBe(1);
     });

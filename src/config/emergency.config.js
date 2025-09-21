@@ -24,7 +24,7 @@ const defaultConfig = {
 
   // Alert system settings
   enableAlertsAPI: true,
-  enableSNSPushNotifications: false,
+  enableSNSPushNotifications: process.env.EMERGENCY_SNS_TOPIC_ARN ? true : false,
   
   // SNS notification settings (will use main config)
   sns: {
@@ -92,6 +92,16 @@ function loadConfig() {
       }
     } catch (fileError) {
       console.warn('Could not load emergency config file, using defaults:', fileError.message);
+    }
+
+    // Set SNS topic ARN from environment variable if available
+    if (process.env.EMERGENCY_SNS_TOPIC_ARN) {
+      defaultConfig.sns.topicArn = process.env.EMERGENCY_SNS_TOPIC_ARN;
+    }
+
+    // Set SNS region from AWS_REGION environment variable if available
+    if (process.env.AWS_REGION) {
+      defaultConfig.sns.region = process.env.AWS_REGION;
     }
 
     // Return default config

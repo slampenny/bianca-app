@@ -651,11 +651,13 @@ const getSentimentSummary = async (patientId) => {
 };
 
 // Medical Analysis Methods
+// In-memory storage for medical baselines (for testing purposes)
+const medicalBaselines = new Map();
+
 const getMedicalBaseline = async (patientId) => {
   try {
-    // This would typically be stored in a separate collection or embedded in patient document
-    // For now, return null as placeholder
-    return null;
+    // Return stored baseline if it exists
+    return medicalBaselines.get(patientId) || null;
   } catch (error) {
     logger.error('Error getting medical baseline:', error);
     throw error;
@@ -664,13 +666,18 @@ const getMedicalBaseline = async (patientId) => {
 
 const storeMedicalBaseline = async (patientId, baseline) => {
   try {
-    // This would typically store in a separate collection or embed in patient document
-    // For now, just log the operation
+    // Store baseline in memory
+    medicalBaselines.set(patientId, baseline);
     logger.info('Medical baseline stored', { patientId, baselineVersion: baseline.version });
   } catch (error) {
     logger.error('Error storing medical baseline:', error);
     throw error;
   }
+};
+
+// Helper function to clear baselines (for testing)
+const clearMedicalBaselines = () => {
+  medicalBaselines.clear();
 };
 
 const getMedicalAnalysisResults = async (patientId, limit = 10) => {
@@ -1039,6 +1046,7 @@ module.exports = {
   // Medical analysis methods
   getMedicalBaseline,
   storeMedicalBaseline,
+  clearMedicalBaselines,
   getMedicalAnalysisResults,
   storeMedicalAnalysisResult,
   deleteOldMedicalAnalyses,

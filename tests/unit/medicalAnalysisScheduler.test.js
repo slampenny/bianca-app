@@ -51,7 +51,7 @@ MedicalPatternAnalyzer.mockImplementation(() => mockAnalyzer);
 
 // Mock conversation service
 conversationService.getActivePatients = jest.fn().mockResolvedValue(['patient1']);
-conversationService.getConversationsByDateRange = jest.fn().mockResolvedValue([]);
+conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue([]);
 conversationService.getMedicalAnalysisResults = jest.fn().mockResolvedValue([]);
 conversationService.storeMedicalAnalysisResult = jest.fn().mockResolvedValue();
 conversationService.deleteOldMedicalAnalyses = jest.fn().mockResolvedValue({ deletedCount: 0 });
@@ -209,13 +209,13 @@ describe('Medical Analysis Scheduler', () => {
       ];
 
       // Mock the conversation service
-      scheduler.conversationService.getConversationsByDateRange = jest.fn().mockResolvedValue(mockConversations);
+      scheduler.conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue(mockConversations);
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
       scheduler.getBaselineAnalysis = jest.fn().mockResolvedValue(null);
 
       await scheduler.handlePatientAnalysis(mockJob);
 
-      expect(scheduler.conversationService.getConversationsByDateRange).toHaveBeenCalledWith(
+      expect(scheduler.conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
         'patient1',
         expect.any(Date),
         expect.any(Date)
@@ -247,12 +247,12 @@ describe('Medical Analysis Scheduler', () => {
       };
 
       // Mock the conversation service to return empty array
-      scheduler.conversationService.getConversationsByDateRange = jest.fn().mockResolvedValue([]);
+      scheduler.conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue([]);
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
 
       await scheduler.handlePatientAnalysis(mockJob);
 
-      expect(scheduler.conversationService.getConversationsByDateRange).toHaveBeenCalledWith(
+      expect(scheduler.conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
         'patient1',
         expect.any(Date),
         expect.any(Date)
@@ -286,7 +286,7 @@ describe('Medical Analysis Scheduler', () => {
       };
 
       // Mock the conversation service to throw error
-      scheduler.conversationService.getConversationsByDateRange = jest.fn().mockRejectedValue(new Error('Database error'));
+      scheduler.conversationService.getConversationsByPatientAndDateRange = jest.fn().mockRejectedValue(new Error('Database error'));
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
 
       await expect(scheduler.handlePatientAnalysis(mockJob)).rejects.toThrow('Database error');

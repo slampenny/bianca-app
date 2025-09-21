@@ -160,6 +160,7 @@ services:
       - APP_RTP_PORT_RANGE=20002-30000
       - ARI_PASSWORD=$${ARI_PASSWORD}
       - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
+      - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:$${AWS_REGION}:$${AWS_ACCOUNT_ID}:bianca-emergency-alerts
     depends_on:
       - mongodb
       - asterisk

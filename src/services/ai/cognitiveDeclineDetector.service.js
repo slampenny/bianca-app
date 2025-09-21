@@ -460,7 +460,7 @@ class CognitiveDeclineDetector {
     const indicators = [];
 
     // Filler word indicators
-    if (analyses.fillerWords.severity === 'high') {
+    if (analyses.fillerWords.severity === 'high' || analyses.fillerWords.severity === 'medium') {
       indicators.push({
         type: 'filler_words',
         severity: 'high',
@@ -470,7 +470,7 @@ class CognitiveDeclineDetector {
     }
 
     // Vague reference indicators
-    if (analyses.vagueReferences.severity === 'high') {
+    if (analyses.vagueReferences.severity === 'high' || analyses.vagueReferences.severity === 'medium') {
       indicators.push({
         type: 'vague_references',
         severity: 'high',
@@ -510,7 +510,7 @@ class CognitiveDeclineDetector {
     }
 
     // Information density indicators
-    if (analyses.informationDensity.severity === 'high') {
+    if (analyses.informationDensity.severity === 'high' || analyses.informationDensity.severity === 'medium') {
       indicators.push({
         type: 'information_density',
         severity: 'medium',
