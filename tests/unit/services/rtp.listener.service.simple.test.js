@@ -1,13 +1,30 @@
-// Mock dgram module (uses centralized mock from tests/__mocks__/dgram.js)
-jest.mock('dgram');
 const dgram = require('dgram');
+
+// Mock dgram module (external dependency)
+jest.mock('dgram');
 
 // Using real services now
 const rtpListenerService = require('../../../src/services/rtp.listener.service');
 
 describe('RTP Listener Service - Public API', () => {
+  let mockUdpServer;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    mockUdpServer = {
+      bind: jest.fn((port, host, callback) => {
+        // Simulate successful bind by calling the callback immediately
+        if (callback) {
+          setTimeout(() => callback(), 0);
+        }
+      }),
+      close: jest.fn(),
+      on: jest.fn(),
+      address: jest.fn().mockReturnValue({ address: '0.0.0.0', port: 1234 })
+    };
+
+    dgram.createSocket.mockReturnValue(mockUdpServer);
   });
 
   afterEach(() => {
@@ -17,20 +34,20 @@ describe('RTP Listener Service - Public API', () => {
 
   describe('startRtpListenerForCall', () => {
     it('should start listener for new call', async () => {
-    const testPort = 1234;
-    const testCallId = 'test-call-123';
-    const testAsteriskChannelId = 'test-channel-456';
+      const testPort = 1234;
+      const testCallId = 'test-call-123';
+      const testAsteriskChannelId = 'test-channel-456';
 
       const listener = await rtpListenerService.startRtpListenerForCall(testPort, testCallId, testAsteriskChannelId);
-
-      expect(listener).toBeDefined();
-        expect(listener.port).toBe(testPort);
-        expect(listener.callId).toBe(testCallId);
-        expect(listener.asteriskChannelId).toBe(testAsteriskChannelId);
       
-       // Verify UDP server was created and configured
-        expect(dgram.createSocket).toHaveBeenCalledWith('udp4');
-       expect(dgram.createSocket().bind).toHaveBeenCalledWith(testPort, '0.0.0.0', expect.any(Function));
+      expect(listener).toBeDefined();
+      expect(listener.port).toBe(testPort);
+      expect(listener.callId).toBe(testCallId);
+      expect(listener.asteriskChannelId).toBe(testAsteriskChannelId);
+      
+      // Verify UDP server was created and configured
+      expect(dgram.createSocket).toHaveBeenCalledWith('udp4');
+      expect(mockUdpServer.bind).toHaveBeenCalledWith(testPort, '0.0.0.0', expect.any(Function));
     });
 
     it('should throw error for missing parameters', async () => {
@@ -56,28 +73,28 @@ describe('RTP Listener Service - Public API', () => {
 
   describe('stopRtpListenerForCall', () => {
     it('should stop and remove listener', async () => {
-    const testPort = 1234;
-    const testCallId = 'test-call-123';
-    const testAsteriskChannelId = 'test-channel-456';
+      const testPort = 1234;
+      const testCallId = 'test-call-123';
+      const testAsteriskChannelId = 'test-channel-456';
 
       // Start listener
       await rtpListenerService.startRtpListenerForCall(testPort, testCallId, testAsteriskChannelId);
       
       // Stop listener
-        const result = rtpListenerService.stopRtpListenerForCall(testCallId);
-
-        expect(result).toBe(true);
-       expect(dgram.createSocket().close).toHaveBeenCalled();
-      });
-
-      it('should return false for non-existent listener', () => {
-      const result = rtpListenerService.stopRtpListenerForCall('nonexistent-call');
-        expect(result).toBe(false);
-      });
+      const result = rtpListenerService.stopRtpListenerForCall(testCallId);
+      
+      expect(result).toBe(true);
+      expect(mockUdpServer.close).toHaveBeenCalled();
     });
 
+    it('should return false for non-existent listener', () => {
+      const result = rtpListenerService.stopRtpListenerForCall('nonexistent-call');
+      expect(result).toBe(false);
+    });
+  });
+
   describe('getListenerForCall', () => {
-      it('should return listener for existing call', async () => {
+    it('should return listener for existing call', async () => {
       const testPort = 1234;
       const testCallId = 'test-call-123';
       const testAsteriskChannelId = 'test-channel-456';
@@ -90,16 +107,16 @@ describe('RTP Listener Service - Public API', () => {
       
       expect(listener).toBeDefined();
       expect(listener.callId).toBe(testCallId);
-      });
-
-      it('should return undefined for non-existent call', () => {
-      const listener = rtpListenerService.getListenerForCall('nonexistent-call');
-        expect(listener).toBeUndefined();
-      });
     });
 
+    it('should return undefined for non-existent call', () => {
+      const listener = rtpListenerService.getListenerForCall('nonexistent-call');
+      expect(listener).toBeUndefined();
+    });
+  });
+
   describe('getAllActiveListeners', () => {
-      it('should return stats for all active listeners', async () => {
+    it('should return stats for all active listeners', async () => {
       const testPort1 = 1234;
       const testPort2 = 1235;
       const testCallId1 = 'test-call-123';
@@ -111,22 +128,22 @@ describe('RTP Listener Service - Public API', () => {
       await rtpListenerService.startRtpListenerForCall(testPort2, testCallId2, testAsteriskChannelId);
       
       // Get all listeners
-        const listeners = rtpListenerService.getAllActiveListeners();
-
+      const listeners = rtpListenerService.getAllActiveListeners();
+      
       expect(listeners).toBeDefined();
-        expect(Object.keys(listeners)).toHaveLength(2);
+      expect(Object.keys(listeners)).toHaveLength(2);
       expect(listeners[testCallId1]).toBeDefined();
       expect(listeners[testCallId2]).toBeDefined();
-      });
-
-      it('should return empty object when no listeners', () => {
-        const listeners = rtpListenerService.getAllActiveListeners();
-        expect(listeners).toEqual({});
-      });
     });
 
+    it('should return empty object when no listeners', () => {
+      const listeners = rtpListenerService.getAllActiveListeners();
+      expect(listeners).toEqual({});
+    });
+  });
+
   describe('stopAllListeners', () => {
-      it('should stop all active listeners', async () => {
+    it('should stop all active listeners', async () => {
       const testPort1 = 1234;
       const testPort2 = 1235;
       const testCallId1 = 'test-call-123';
@@ -138,8 +155,8 @@ describe('RTP Listener Service - Public API', () => {
       await rtpListenerService.startRtpListenerForCall(testPort2, testCallId2, testAsteriskChannelId);
       
       // Stop all listeners
-        rtpListenerService.stopAllListeners();
-        
+      rtpListenerService.stopAllListeners();
+      
       // Verify all listeners were stopped
       const listeners = rtpListenerService.getAllActiveListeners();
       expect(listeners).toEqual({});
@@ -229,4 +246,4 @@ describe('RTP Listener Service - Public API', () => {
       expect(status.listeners).toEqual([]);
     });
   });
-}); 
+});

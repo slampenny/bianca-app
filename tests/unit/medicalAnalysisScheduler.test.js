@@ -1,11 +1,7 @@
 // tests/unit/medicalAnalysisScheduler.test.js
 
-// Mock dependencies before importing the service
+// Only mock external dependencies
 jest.mock('agenda');
-jest.mock('../../src/services/ai/medicalPatternAnalyzer.service');
-jest.mock('../../src/services/conversation.service');
-jest.mock('../../src/services/patient.service');
-jest.mock('../../src/config/logger');
 
 const Agenda = require('agenda');
 const MedicalPatternAnalyzer = require('../../src/services/ai/medicalPatternAnalyzer.service');
@@ -47,19 +43,7 @@ const mockAnalyzer = {
   })
 };
 
-MedicalPatternAnalyzer.mockImplementation(() => mockAnalyzer);
-
-// Mock conversation service
-conversationService.getActivePatients = jest.fn().mockResolvedValue(['patient1']);
-conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue([]);
-conversationService.getMedicalAnalysisResults = jest.fn().mockResolvedValue([]);
-conversationService.storeMedicalAnalysisResult = jest.fn().mockResolvedValue();
-conversationService.deleteOldMedicalAnalyses = jest.fn().mockResolvedValue({ deletedCount: 0 });
-
-// Mock patient service
-patientService.getActivePatients = jest.fn().mockResolvedValue([
-  { _id: 'patient1', name: 'Test Patient' }
-]);
+// Using real services now - no mocking needed
 
 // Now import the service
 const medicalAnalysisScheduler = require('../../src/services/ai/medicalAnalysisScheduler.service');

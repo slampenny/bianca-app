@@ -1,91 +1,21 @@
+// Set required environment variables for tests
+process.env.JWT_SECRET = 'test-jwt-secret-for-testing';
+process.env.TWILIO_ACCOUNTSID = 'test-twilio-account-sid';
+process.env.TWILIO_AUTHTOKEN = 'test-twilio-auth-token';
+
 const WebSocket = require('ws');
 const { Buffer } = require('buffer');
 
-// Mock dependencies
-jest.mock('../../../src/config/logger', () => ({
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  debug: jest.fn()
-}));
+// Only mock external dependencies
+// Using real emergency processor service now
 
-jest.mock('../../../src/config/config', () => ({
-  openai: {
-    apiKey: 'test-api-key',
-    debugAudio: true
-  },
-  debug: {
-    cleanupLocalFiles: false
-  }
-}));
-
-jest.mock('../../../src/models', () => ({
-  Message: {
-    create: jest.fn().mockResolvedValue({ _id: 'test-message-id' })
-  }
-}));
-
-jest.mock('../../../src/api/audio.utils', () => ({
-  convertUlawToPcm: jest.fn(),
-  resamplePcm: jest.fn()
-}));
-
-jest.mock('../../../src/services/emergencyProcessor.service', () => ({
-  emergencyProcessor: {
-    processEmergencyDetection: jest.fn().mockResolvedValue({ isEmergency: false })
-  }
-}));
-
-// Mock WebSocket
+// Use centralized external service mocks
 jest.mock('ws');
-
-// Mock fs module to prevent AWS SDK and MongoDB issues
-jest.mock('fs', () => ({
-  promises: {
-    readFile: jest.fn(),
-    writeFile: jest.fn(),
-    mkdir: jest.fn(),
-    access: jest.fn(),
-    stat: jest.fn()
-  },
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-  appendFileSync: jest.fn(),
-  statSync: jest.fn(),
-  readFileSync: jest.fn(),
-  writeFileSync: jest.fn(),
-  unlinkSync: jest.fn(),
-  rmdirSync: jest.fn(),
-  readdirSync: jest.fn(),
-  lstatSync: jest.fn(),
-  chmodSync: jest.fn(),
-  chownSync: jest.fn(),
-  utimesSync: jest.fn(),
-  realpathSync: jest.fn(),
-  symlinkSync: jest.fn(),
-  linkSync: jest.fn(),
-  copyFileSync: jest.fn(),
-  truncateSync: jest.fn(),
-  accessSync: jest.fn(),
-  openSync: jest.fn(),
-  closeSync: jest.fn(),
-  readSync: jest.fn(),
-  writeSync: jest.fn(),
-  fstatSync: jest.fn(),
-  ftruncateSync: jest.fn(),
-  futimesSync: jest.fn(),
-  fsyncSync: jest.fn(),
-  fdatasyncSync: jest.fn()
-}));
+jest.mock('fs');
 
 describe('OpenAI Realtime Service', () => {
   let OpenAIRealtimeService;
   let mockWebSocket;
-  let mockLogger;
-  let mockConfig;
-  let mockMessage;
-  let mockAudioUtils;
-  let mockEmergencyProcessor;
   let service;
 
   beforeAll(() => {
@@ -94,12 +24,6 @@ describe('OpenAI Realtime Service', () => {
     // Import the service
     const openAIService = require('../../../src/services/openai.realtime.service');
     OpenAIRealtimeService = openAIService.OpenAIRealtimeService;
-    
-    mockLogger = require('../../../src/config/logger');
-    mockConfig = require('../../../src/config/config');
-    mockMessage = require('../../../src/models').Message;
-    mockAudioUtils = require('../../../src/api/audio.utils');
-    mockEmergencyProcessor = require('../../../src/services/emergencyProcessor.service').emergencyProcessor;
   });
 
   beforeEach(() => {
@@ -117,10 +41,6 @@ describe('OpenAI Realtime Service', () => {
     
     // Create a fresh service instance for each test
     service = new OpenAIRealtimeService();
-    
-    // Set up audio utils mock return values
-    mockAudioUtils.convertUlawToPcm.mockReturnValue(Buffer.alloc(1024));
-    mockAudioUtils.resamplePcm.mockReturnValue(Buffer.alloc(1024));
   });
 
   afterEach(() => {

@@ -7,19 +7,8 @@ const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 const { patientOne, insertPatients } = require('../../fixtures/patient.fixture');
 const { conversationOne, conversationTwo, insertConversations } = require('../../fixtures/conversation.fixture');
 
-// Mock the Stripe module
-jest.mock('../../../src/config/stripe', () => ({
-  paymentMethods: {
-    attach: jest.fn().mockResolvedValue({ id: 'pm_test', customer: 'cus_test' }),
-    retrieve: jest.fn().mockResolvedValue({ id: 'pm_test' }),
-    update: jest.fn().mockResolvedValue({ id: 'pm_test', metadata: { updated: true } }),
-    detach: jest.fn().mockResolvedValue({ id: 'pm_test' })
-  },
-  customers: {
-    create: jest.fn().mockResolvedValue({ id: 'cus_test' }),
-    update: jest.fn().mockResolvedValue({ id: 'cus_test' })
-  }
-}));
+// Mock Stripe SDK (external dependency)
+jest.mock('stripe');
 
 let mongoServer;
 

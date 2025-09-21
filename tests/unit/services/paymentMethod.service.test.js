@@ -5,61 +5,8 @@ const paymentMethodService = require('../../../src/services/paymentMethod.servic
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = require('../../fixtures/paymentMethod.fixture');
 
-// Mock the Stripe module completely to avoid real API calls
-jest.mock('../../../src/config/stripe', () => ({
-  paymentMethods: {
-    attach: jest.fn().mockImplementation((pmId) =>
-      Promise.resolve({
-        id: pmId,
-        customer: 'cus_test123',
-      })
-    ),
-    retrieve: jest.fn().mockImplementation((pmId) =>
-      Promise.resolve({
-        id: pmId,
-        type: 'card',
-        card: {
-          brand: 'visa',
-          last4: '4242',
-          exp_month: 12,
-          exp_year: 2025,
-        },
-        billing_details: {
-          name: 'Test User',
-          email: 'test@example.com',
-        },
-      })
-    ),
-    update: jest.fn().mockImplementation((pmId) =>
-      Promise.resolve({
-        id: pmId,
-        billing_details: {
-          name: 'Updated Name',
-          email: 'updated@example.com',
-        },
-      })
-    ),
-    detach: jest.fn().mockImplementation((pmId) => Promise.resolve({ id: pmId })),
-  },
-  customers: {
-    create: jest.fn().mockResolvedValue({
-      id: 'cus_test123',
-      name: 'Test Org',
-    }),
-    update: jest.fn().mockResolvedValue({
-      id: 'cus_test123',
-      invoice_settings: {
-        default_payment_method: 'pm_test123',
-      },
-    }),
-    retrieve: jest.fn().mockResolvedValue({
-      id: 'cus_test123',
-      invoice_settings: {
-        default_payment_method: 'pm_test123',
-      },
-    }),
-  },
-}));
+// Mock Stripe SDK (external dependency)
+jest.mock('stripe');
 
 let mongoServer;
 
