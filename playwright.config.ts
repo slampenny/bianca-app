@@ -18,7 +18,7 @@ export default defineConfig({
   ],
   globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
   reporter: [
-    ['html'],
-    ['list']
+    ['list'],
+    ['html']
   ],
 })

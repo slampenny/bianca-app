@@ -71,9 +71,9 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <Screen style={styles.container}>
+    <Screen style={styles.container} testID="login-form">
       <Header titleTx="loginScreen.signIn" />
-      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      {errorMessage ? <Text testID="login-error" style={styles.error}>{errorMessage}</Text> : null}
       <TextField
         testID="email-input"
         value={authEmail}

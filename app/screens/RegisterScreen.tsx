@@ -169,6 +169,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   // Pure HTML approach for React Native Web
   return (
     <div
+      data-testid="register-form"
       style={{
         position: "absolute",
         top: 0,
