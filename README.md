@@ -107,6 +107,15 @@ src/
 - `GET /v1/wellness-checks` - Get wellness checks
 - `POST /v1/calls/initiate` - Initiate voice call
 
+## 📚 Documentation
+
+- **[Documentation Hub](docs/README.md)** - Complete documentation index
+- **[Workflows](docs/WORKFLOWS.md)** - System workflows sorted by business value
+- **[AI Test Suite](docs/AI_TEST_SUITE.md)** - AI tests and diagnostic capabilities
+- **[Testing Strategy](docs/testing-strategy.md)** - Comprehensive testing approach
+- **[Medical Analysis API](docs/MEDICAL_ANALYSIS_API.md)** - Medical analysis endpoints
+- **[Emergency System](docs/EMERGENCY_SYSTEM.md)** - Emergency detection system
+
 ## 📞 Support
 
 - **Email**: support@myphonefriend.com
