@@ -84,8 +84,8 @@ describe('Medical NLP Analysis System', () => {
       expect(result.confidence).toBe('low');
     });
 
-    it('should extract patient messages correctly', () => {
-      const patientMessages = analyzer.extractPatientMessages(sampleConversations);
+    it('should extract patient messages correctly', async () => {
+      const patientMessages = await analyzer.extractPatientMessages(sampleConversations);
       
       expect(patientMessages).toHaveLength(4);
       expect(patientMessages[0]).toContain('Hello, I am feeling very sad today');

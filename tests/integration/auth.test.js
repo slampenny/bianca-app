@@ -26,20 +26,39 @@ const {
 } = require('../fixtures/caregiver.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 
-let mongoServer;
+// Mock Agenda to prevent database connection issues in tests
+jest.mock('agenda', () => {
+  return jest.fn().mockImplementation(() => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    define: jest.fn(),
+    schedule: jest.fn(),
+    every: jest.fn(),
+    now: jest.fn(),
+    jobs: jest.fn().mockReturnValue([]),
+    on: jest.fn(),
+    once: jest.fn(),
+    off: jest.fn(),
+    remove: jest.fn(),
+    cancel: jest.fn(),
+    purge: jest.fn(),
+    close: jest.fn()
+  }));
+});
+
+// Only mock external services, not internal ones
 
 beforeAll(async () => {
-  // Start in-memory MongoDB instance
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  
-  // Connect to the in-memory database
-  await mongoose.connect(mongoUri);
+  // Connect to the test MongoDB instance (should be running via docker-compose)
+  const mongoUri = process.env.MONGODB_URL || 'mongodb://localhost:27018/bianca-app-test';
+  await mongoose.connect(mongoUri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
 });
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
 });
 
 describe('Auth routes', () => {
@@ -90,7 +109,7 @@ describe('Auth routes', () => {
         access: { token: expect.anything(), expires: expect.anything() },
         refresh: { token: expect.anything(), expires: expect.anything() },
       });
-    });
+    }, 15000);
 
     test('should return 400 error if email is invalid', async () => {
       await request(app)

@@ -70,7 +70,7 @@ describe('Medical Analysis Basic Tests', () => {
       expect(result.totalWords).toBeGreaterThan(0);
     });
 
-    it('should extract patient messages correctly', () => {
+    it('should extract patient messages correctly', async () => {
       const conversations = [
         {
           _id: 'conv1',
@@ -83,7 +83,7 @@ describe('Medical Analysis Basic Tests', () => {
         }
       ];
 
-      const patientMessages = analyzer.extractPatientMessages(conversations);
+      const patientMessages = await analyzer.extractPatientMessages(conversations);
 
       expect(patientMessages).toHaveLength(2);
       expect(patientMessages[0]).toBe('I feel sad today.');
