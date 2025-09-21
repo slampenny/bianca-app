@@ -49,7 +49,6 @@ describe('Call routes', () => {
   });
 
   it('should test that the correct user gets a call', async () => {
-    logger.info('calling twilio');
     // await twilioCallService.initiateCall(patient.id);
   });
 

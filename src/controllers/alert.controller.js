@@ -23,7 +23,6 @@ const getAlertById = catchAsync(async (req, res) => {
 const getAlerts = catchAsync(async (req, res) => {
   // Assuming 'showRead' is passed as a query parameter to toggle visibility of read alerts
   const showRead = req.query.showRead === 'true';
-  console.log('showRead:', showRead);
   const alerts = await alertService.getAlerts(req.caregiver.id, showRead);
   res.send(alerts);
 });
