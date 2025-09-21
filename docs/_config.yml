@@ -1,0 +1,43 @@
+# GitHub Pages configuration for MyPhoneFriend Documentation
+title: MyPhoneFriend Documentation
+description: Complete documentation for MyPhoneFriend healthcare communication platform
+baseurl: "/myphonefriend-docs"
+url: "https://jordanlapp.github.io"
+
+# Navigation
+navigation:
+  - title: Home
+    url: /
+  - title: Documentation Hub
+    url: /README.html
+  - title: User Workflows
+    url: /WORKFLOWS.html
+  - title: AI Test Suite
+    url: /AI_TEST_SUITE.html
+  - title: Emergency System
+    url: /EMERGENCY_SYSTEM.html
+  - title: Medical Analysis API
+    url: /MEDICAL_ANALYSIS_API.html
+  - title: Testing Strategy
+    url: /testing-strategy.html
+
+# Theme
+theme: minima
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Markdown settings
+markdown: kramdown
+highlighter: rouge
+
+# Exclude files
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - README.md

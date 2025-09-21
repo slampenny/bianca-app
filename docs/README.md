@@ -1,96 +1,57 @@
-# MyPhoneFriend Documentation Hub
+# MyPhoneFriend Documentation
 
-Welcome to the comprehensive documentation for MyPhoneFriend Backend. This hub provides organized access to all documentation across the platform.
+This directory contains the complete documentation for MyPhoneFriend, deployed automatically to GitHub Pages.
 
-## 🏠 [Back to Main README](../README.md)
+## 📚 Documentation Structure
 
-## 📋 **Documentation Index**
+- **[Documentation Hub](README.md)** - Complete documentation index
+- **[User Workflows](WORKFLOWS.md)** - User journeys and business processes
+- **[AI Test Suite](AI_TEST_SUITE.md)** - AI testing and diagnostics
+- **[Emergency System](EMERGENCY_SYSTEM.md)** - Emergency detection system
+- **[Medical Analysis API](MEDICAL_ANALYSIS_API.md)** - Medical analysis endpoints
+- **[Testing Strategy](testing-strategy.md)** - Development testing approach
 
-### 🏗️ **Architecture & Design**
-- [Workflows](WORKFLOWS.md) - **Complete system workflows sorted by business value**
-- [Testing Strategy](testing-strategy.md) - Comprehensive testing approach and best practices
-- [Medical Analysis API](MEDICAL_ANALYSIS_API.md) - Medical analysis endpoints and functionality
-- [Emergency System](EMERGENCY_SYSTEM.md) - Emergency detection and response system
-- [Sentiment Analysis API](SENTIMENT_ANALYSIS_API.md) - Sentiment analysis endpoints
+## 🚀 GitHub Pages Deployment
 
-### 🤖 **AI & Machine Learning**
-- [AI Test Suite Overview](AI_TEST_SUITE.md) - **Complete guide to all AI tests and what they diagnose**
-- [Medical Test Suite](MEDICAL_TEST_SUITE.md) - Detailed medical analysis test documentation
-- [Sentiment Analysis Tests](SENTIMENT_ANALYSIS_TESTS.md) - Sentiment analysis test documentation
+This documentation is automatically deployed to GitHub Pages when changes are pushed to the main branch.
 
-### 🔧 **Integration & Setup**
-- [Emergency Integration Guide](../EMERGENCY_INTEGRATION_GUIDE.md) - Emergency system integration
-- [SNS Setup Guide](../SNS_SETUP_GUIDE.md) - AWS SNS configuration
-- [Call Workflow](../CALL_WORKFLOW_README.md) - Call processing workflows
+**Live Documentation**: [https://jordanlapp.github.io/myphonefriend-docs](https://jordanlapp.github.io/myphonefriend-docs)
 
-### 🛠️ **Development**
-- [Scripts Documentation](../scripts/README.md) - Available scripts and utilities
-- [API Documentation](API_REFERENCE.md) - Complete API reference (coming soon)
+## 🛠️ Local Development
 
-## 🎯 **Quick Links**
+To run the documentation locally:
 
-### For Developers
-- [Workflows](WORKFLOWS.md) - **System workflows and business processes**
-- [Testing Strategy](testing-strategy.md) - How to write effective tests
-- [AI Test Suite](AI_TEST_SUITE.md) - Understanding AI test coverage
-- [Emergency System](EMERGENCY_SYSTEM.md) - Emergency detection implementation
+```bash
+cd docs
+bundle install
+bundle exec jekyll serve
+```
 
-### For AI/ML Engineers
-- [Medical Test Suite](MEDICAL_TEST_SUITE.md) - Medical analysis test framework
-- [Sentiment Analysis Tests](SENTIMENT_ANALYSIS_TESTS.md) - Sentiment analysis testing
-- [AI Test Suite](AI_TEST_SUITE.md) - Complete AI testing overview
+Then visit `http://localhost:4000` to view the documentation.
 
-### For DevOps/Integration
-- [SNS Setup Guide](../SNS_SETUP_GUIDE.md) - AWS SNS configuration
-- [Emergency Integration Guide](../EMERGENCY_INTEGRATION_GUIDE.md) - Emergency system setup
-- [Call Workflow](../CALL_WORKFLOW_README.md) - Call processing setup
+## 📝 Adding New Documentation
 
-## 📊 **Documentation Status**
+1. Create new `.md` file in this directory
+2. Add entry to the documentation hub
+3. Update navigation in `_config.yml`
+4. Push changes to trigger automatic deployment
 
-| Document | Status | Last Updated | Maintainer |
-|----------|--------|--------------|------------|
-| [Workflows](WORKFLOWS.md) | ✅ Complete | 2024-01-XX | Architecture Team |
-| [AI Test Suite](AI_TEST_SUITE.md) | ✅ Complete | 2024-01-XX | AI Team |
-| [Testing Strategy](testing-strategy.md) | ✅ Complete | 2024-01-XX | Dev Team |
-| [Medical Test Suite](MEDICAL_TEST_SUITE.md) | ✅ Complete | 2024-01-XX | AI Team |
-| [Emergency System](EMERGENCY_SYSTEM.md) | ✅ Complete | 2024-01-XX | Backend Team |
-| [API Reference](API_REFERENCE.md) | 🚧 In Progress | - | API Team |
+## 🔧 Configuration
 
-## 🔄 **Documentation Workflow**
+- **Jekyll Config**: `_config.yml`
+- **GitHub Actions**: `.github/workflows/docs.yml`
+- **Dependencies**: `Gemfile`
 
-### Adding New Documentation
-1. Create new `.md` file in appropriate directory
-2. Add entry to this index
-3. Update status table
-4. Link from relevant sections
-5. Update main README if needed
+## 📊 Documentation Status
 
-### Updating Existing Documentation
-1. Update the document
-2. Update "Last Updated" date in status table
-3. Test all links
-4. Notify relevant team members
-
-## 📝 **Documentation Standards**
-
-### File Naming
-- Use `UPPERCASE_WITH_UNDERSCORES.md` for major documents
-- Use `lowercase-with-dashes.md` for minor documents
-- Include date in filename for versioned documents: `v1.2.3_UPDATE.md`
-
-### Structure
-- Start with overview/purpose
-- Include table of contents for long documents
-- Use consistent heading hierarchy
-- Include examples where applicable
-- Link to related documents
-
-### Maintenance
-- Review quarterly for accuracy
-- Update when APIs change
-- Archive outdated versions
-- Keep links functional
+| Document | Status | Last Updated |
+|----------|--------|--------------|
+| User Workflows | ✅ Complete | 2024-09-21 |
+| AI Test Suite | ✅ Complete | 2024-09-21 |
+| Emergency System | ✅ Complete | 2024-09-21 |
+| Medical Analysis API | ✅ Complete | 2024-09-21 |
+| Testing Strategy | ✅ Complete | 2024-09-21 |
 
 ---
 
-**Need help?** Contact the documentation team or create an issue for documentation improvements.
+**Need help?** Contact the development team or create an issue in the repository.
