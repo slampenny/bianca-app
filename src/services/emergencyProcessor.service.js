@@ -1,6 +1,7 @@
 // src/services/emergencyProcessor.service.js
 
 const { detectEmergency, filterFalsePositives } = require('../utils/emergencyDetector');
+const { localizedEmergencyDetector } = require('./localizedEmergencyDetector.service');
 const { getAlertDeduplicator } = require('../utils/alertDeduplicator');
 const { config } = require('../config/emergency.config');
 const { snsService } = require('./sns.service');
@@ -59,8 +60,19 @@ class EmergencyProcessor {
         return this.createErrorResponse('Invalid input: text must be a non-empty string');
       }
 
-      // Step 1: Detect emergency patterns
-      const emergencyResult = detectEmergency(text);
+      // Get patient information to determine language
+      let patientLanguage = 'en'; // Default to English
+      try {
+        const patient = await Patient.findById(patientId).select('preferredLanguage');
+        if (patient && patient.preferredLanguage) {
+          patientLanguage = patient.preferredLanguage;
+        }
+      } catch (error) {
+        logger.warn(`Could not fetch patient language for ${patientId}, using default: ${error.message}`);
+      }
+
+      // Step 1: Detect emergency patterns using localized detector
+      const emergencyResult = await localizedEmergencyDetector.detectEmergency(text, patientLanguage);
       
       if (config.logging.logAllDetections) {
         logger.info(`Emergency detection for patient ${patientId}:`, emergencyResult);

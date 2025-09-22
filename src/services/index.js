@@ -4,6 +4,7 @@ module.exports.chatService = require('./chat.service');
 module.exports.caregiverService = require('./caregiver.service');
 module.exports.conversationService = require('./conversation.service');
 module.exports.emailService = require('./email.service');
+module.exports.emergencyPhraseService = require('./emergencyPhrase.service');
 module.exports.openaiService = require('./openai.realtime.service');
 module.exports.orgService = require('./org.service');
 module.exports.patientService = require('./patient.service');

@@ -5,6 +5,7 @@ module.exports.Token = require('./token.model');
 module.exports.Org = require('./org.model');
 module.exports.Caregiver = require('./caregiver.model');
 module.exports.Patient = require('./patient.model');
+module.exports.EmergencyPhrase = require('./emergencyPhrase.model');
 
 module.exports.Invoice = Invoice;
 module.exports.LineItem = LineItem;
