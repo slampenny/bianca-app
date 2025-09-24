@@ -228,7 +228,10 @@ resource "aws_iam_role_policy" "staging_instance_policy" {
           "ses:GetSendQuota",
           "ses:SendEmail",
           "ses:SendRawEmail",
-          "ses:GetSendStatistics"
+          "ses:GetSendStatistics",
+          
+          # SNS permissions for emergency notifications
+          "sns:Publish"
         ]
         Resource = "*"
       }

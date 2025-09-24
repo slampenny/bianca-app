@@ -53,14 +53,24 @@ check_and_login_ecr() {
 
 echo "🚀 Deploying Bianca Staging Environment..."
 
-# Check for skip ECR flag
-if [ "$1" = "--skip-ecr" ]; then
-    echo "⚠️  Skipping ECR login checks (--skip-ecr flag provided)"
-    echo "   Make sure you've manually logged into ECR first!"
-    SKIP_ECR=true
-else
-    SKIP_ECR=false
-fi
+# Check for flags
+SKIP_ECR=false
+FORCE_CLEANUP=false
+
+for arg in "$@"; do
+    case $arg in
+        --skip-ecr)
+            echo "⚠️  Skipping ECR login checks (--skip-ecr flag provided)"
+            echo "   Make sure you've manually logged into ECR first!"
+            SKIP_ECR=true
+            ;;
+        --force-cleanup)
+            echo "⚠️  Force cleanup mode enabled (--force-cleanup flag provided)"
+            echo "   This will remove ALL containers including MongoDB!"
+            FORCE_CLEANUP=true
+            ;;
+    esac
+done
 
 # Step 1: Build and push Docker images (backend and frontend)
 echo "🐳 Building and pushing backend Docker image..."
@@ -157,26 +167,42 @@ if [ -n "$STAGING_IP" ]; then
       # Pull latest images
       docker-compose -f docker-compose.yml -f docker-compose.staging.yml pull
       
-      echo 'Stopping and removing all containers...'
-      
-      # Stop and remove all containers more aggressively
-      docker-compose -f docker-compose.yml -f docker-compose.staging.yml down || true
-      
-      # Force stop all running containers
-      docker stop \$(docker ps -q) 2>/dev/null || true
-      
-      # Force remove all containers
-      docker rm \$(docker ps -aq) 2>/dev/null || true
-      
-      # Remove any dangling containers
-      docker container prune -f
-      
-      # Clean up system
-      docker system prune -f
+      if [ '$FORCE_CLEANUP' = 'true' ]; then
+        echo 'Force cleanup: Stopping and removing ALL containers...'
+        
+        # Stop and remove all containers
+        docker-compose -f docker-compose.yml -f docker-compose.staging.yml down || true
+        
+        # Force stop all running containers
+        docker stop \$(docker ps -q) 2>/dev/null || true
+        
+        # Force remove all containers
+        docker rm \$(docker ps -aq) 2>/dev/null || true
+        
+        # Clean up everything
+        docker container prune -f
+        docker image prune -f
+        docker network prune -f
+        docker system prune -f
+      else
+        echo 'Stopping and removing application containers (preserving MongoDB)...'
+        
+        # Stop and remove only the application containers (not MongoDB)
+        docker-compose -f docker-compose.yml -f docker-compose.staging.yml stop backend frontend || true
+        docker-compose -f docker-compose.yml -f docker-compose.staging.yml rm -f backend frontend || true
+        
+        # Remove any orphaned containers with our project names
+        docker rm -f \$(docker ps -aq --filter 'name=staging_backend') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=staging_frontend') 2>/dev/null || true
+        
+        # Clean up unused images and networks
+        docker image prune -f
+        docker network prune -f
+      fi
       
       echo 'Starting new containers...'
       
-      # Start new containers
+      # Start new containers (MongoDB will continue running if it exists)
       docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d
     "
     
@@ -202,3 +228,9 @@ echo "🎉 Staging deployment complete!"
 echo "🌐 Staging API: https://staging-api.myphonefriend.com"
 echo "🌐 Staging Frontend: https://staging.myphonefriend.com"
 echo "🔗 SIP Endpoint: staging-sip.myphonefriend.com"
+echo ""
+echo "💡 Usage:"
+echo "   ./scripts/deploy-staging.sh                    # Normal deployment (preserves MongoDB)"
+echo "   ./scripts/deploy-staging.sh --skip-ecr         # Skip ECR login checks"
+echo "   ./scripts/deploy-staging.sh --force-cleanup    # Remove ALL containers including MongoDB"
+echo "   ./scripts/deploy-staging.sh --skip-ecr --force-cleanup  # Both flags"

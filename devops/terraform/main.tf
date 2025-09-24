@@ -1592,27 +1592,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_s3_debug_audio_attach" {
   policy_arn = aws_iam_policy.ecs_task_s3_debug_audio_policy.arn
 }
 
-# SNS Policy for Emergency Notifications
-resource "aws_iam_policy" "ecs_task_sns_policy" {
-  name        = "ECSTaskSNSPolicy"
-  description = "Allows ECS task to publish to SNS for emergency notifications"
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "sns:Publish",
-        "sns:GetTopicAttributes"
-      ]
-      Resource = aws_sns_topic.emergency_alerts.arn
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_sns_policy_attach" {
-  role       = aws_iam_role.ecs_task_role.name
-  policy_arn = aws_iam_policy.ecs_task_sns_policy.arn
-}
+# Old SNS policy removed - using new direct SMS policy below
 
 # CodeBuild and CodePipeline IAM roles
 data "aws_iam_policy_document" "codebuild_assume_role_policy" {
@@ -2449,40 +2429,36 @@ output "codebuild_role_arn" {
 # SNS EMERGENCY NOTIFICATIONS
 ################################################################################
 
-# SNS Topic for Emergency Notifications
-resource "aws_sns_topic" "emergency_alerts" {
-  name = "bianca-emergency-alerts"
-  
-  tags = {
-    Name        = "Bianca Emergency Alerts"
-    Purpose     = "Emergency notifications for patient alerts"
-    Environment = var.environment
-  }
-}
+# Note: SNS Topic removed - we now send SMS directly to phone numbers
+# This eliminates the need for phone number subscriptions
 
-# SNS Topic Policy to allow ECS task role to publish
-resource "aws_sns_topic_policy" "emergency_alerts_policy" {
-  arn = aws_sns_topic.emergency_alerts.arn
+# IAM Policy to allow ECS task role to publish SMS directly
+resource "aws_iam_policy" "ecs_task_sns_sms_policy" {
+  name        = "ecs-task-sns-sms-policy"
+  description = "Allow ECS task to send SMS via SNS"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"
-        Principal = {
-          AWS = aws_iam_role.ecs_task_role.arn
-        }
         Action = [
           "sns:Publish"
         ]
-        Resource = aws_sns_topic.emergency_alerts.arn
+        Resource = "*"  # Allow publishing to any phone number
       }
     ]
   })
 }
 
-# Output the SNS Topic ARN for environment variables
-output "emergency_sns_topic_arn" {
-  description = "ARN of the SNS topic for emergency notifications"
-  value       = aws_sns_topic.emergency_alerts.arn
+# Attach the SNS SMS policy to the ECS task role
+resource "aws_iam_role_policy_attachment" "ecs_task_sns_sms_policy_attachment" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.ecs_task_sns_sms_policy.arn
+}
+
+# Output for SNS SMS capability
+output "sns_sms_enabled" {
+  description = "SNS SMS notifications are enabled for direct phone number messaging"
+  value       = "SMS can be sent directly to any phone number without subscriptions"
 }

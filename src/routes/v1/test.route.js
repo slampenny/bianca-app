@@ -11102,5 +11102,199 @@ router.post('/push-notification', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/emergency:
+ *   post:
+ *     summary: Test emergency detection and alert workflow with first patient
+ *     description: Test emergency detection by sending a message in a specific language to the first patient in the database. Can optionally create actual alerts and send push notifications.
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - message
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 description: The message to test for emergency detection
+ *                 example: "I think I am having a heart attack"
+ *               language:
+ *                 type: string
+ *                 enum: [en, es, fr, de, zh, ja, pt, it, ru, ar]
+ *                 default: en
+ *                 description: Language code for the message
+ *                 example: en
+ *               createAlert:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Whether to create an actual alert and send push notifications (use with caution in production)
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Emergency detection test completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 patient:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     preferredLanguage:
+ *                       type: string
+ *                 message:
+ *                   type: string
+ *                 language:
+ *                   type: string
+ *                 createAlert:
+ *                   type: boolean
+ *                 result:
+ *                   type: object
+ *                   properties:
+ *                     shouldAlert:
+ *                       type: boolean
+ *                     alertData:
+ *                       type: object
+ *                     reason:
+ *                       type: string
+ *                     processing:
+ *                       type: object
+ *                 alertResult:
+ *                   type: object
+ *                   description: Result of alert creation (only present if createAlert is true)
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                     alert:
+ *                       type: object
+ *                     notificationResult:
+ *                       type: object
+ *                     patient:
+ *                       type: object
+ *       404:
+ *         description: No patients found in database
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/emergency', async (req, res) => {
+    try {
+        const { message, language = 'en', createAlert = false } = req.body;
+        
+        if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Message is required and must be a non-empty string'
+            });
+        }
+
+        // Validate language code
+        const validLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar'];
+        if (!validLanguages.includes(language)) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid language code. Must be one of: ${validLanguages.join(', ')}`
+            });
+        }
+
+        // Get the first patient from the database
+        const { Patient } = require('../../models');
+        const patient = await Patient.findOne().sort({ createdAt: 1 }).exec();
+        
+        if (!patient) {
+            logger.error('[Test] No patients found in database');
+            return res.status(404).json({
+                success: false,
+                error: 'No patients found in database. Create a patient first.'
+            });
+        }
+
+        // Temporarily update patient's preferred language for this test
+        const originalLanguage = patient.preferredLanguage;
+        patient.preferredLanguage = language;
+        await patient.save();
+
+        try {
+            // Import emergency processor
+            const { emergencyProcessor } = require('../../services/emergencyProcessor.service');
+            
+            // Process the utterance
+            const result = await emergencyProcessor.processUtterance(patient._id, message);
+            
+            let alertResult = null;
+            
+            // If createAlert is true and an emergency was detected, create the actual alert
+            if (createAlert && result.shouldAlert && result.alertData) {
+                logger.info(`[Test] Creating actual alert for patient ${patient._id} with message: "${message}"`);
+                alertResult = await emergencyProcessor.createAlert(patient._id, result.alertData, message);
+                
+                if (alertResult.success) {
+                    logger.info(`[Test] Alert created successfully:`, {
+                        alertId: alertResult.alert?._id,
+                        notificationSent: !!alertResult.notificationResult
+                    });
+                } else {
+                    logger.error(`[Test] Failed to create alert:`, alertResult.error);
+                }
+            }
+            
+            // Restore original language
+            patient.preferredLanguage = originalLanguage;
+            await patient.save();
+
+            logger.info(`[Test] Emergency test completed for patient ${patient._id}:`, {
+                message,
+                language,
+                createAlert,
+                shouldAlert: result.shouldAlert,
+                reason: result.reason,
+                alertCreated: alertResult?.success || false
+            });
+
+            const response = {
+                success: true,
+                patient: {
+                    id: patient._id,
+                    name: patient.name,
+                    preferredLanguage: originalLanguage
+                },
+                message,
+                language,
+                createAlert,
+                result
+            };
+
+            // Include alert result if alert was created
+            if (alertResult) {
+                response.alertResult = alertResult;
+            }
+
+            res.status(200).json(response);
+
+        } catch (processingError) {
+            // Restore original language even if processing fails
+            patient.preferredLanguage = originalLanguage;
+            await patient.save();
+            throw processingError;
+        }
+
+    } catch (error) {
+        logger.error('[Test] Emergency test failed:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Export the router
 module.exports = router;
