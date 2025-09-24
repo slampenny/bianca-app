@@ -132,8 +132,6 @@
     "@babel/plugin-transform-template-literals": "^7.0.0",
     "@babel/preset-env": "^7.20.0",
     "@babel/runtime": "^7.20.0",
-    "@cucumber/cucumber": "^12.2.0",
-    "@cucumber/playwright": "^3.1.0",
     "@expo/metro-config": "^0.17.8",
     "@playwright/test": "^1.52.0",
     "@react-native/babel-preset": "^0.79.0",
