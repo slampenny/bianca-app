@@ -32,6 +32,14 @@ MyPhoneFriend is a cross-platform mobile and web application that enables health
 - **Socket.io** - Real-time communication
 - **EAS Build** - Cloud-based builds and deployment
 
+## 📚 Documentation
+
+All technical documentation is organized in the [`docs/`](./docs/) directory:
+
+- **[📋 Documentation Index](./docs/INDEX.md)** - Complete list of all documentation
+- **[🚀 Deployment](./docs/DEPLOYMENT.md)** - Deployment procedures and configuration
+- **[📱 Google Play](./docs/GOOGLE_PLAY_CHECKLIST.md)** - Google Play Store submission checklist
+
 ## 🚀 Quick Start
 
 ### Prerequisites
