@@ -44,6 +44,38 @@ export const paymentApi = createApi({
         params: { status, dueDate },
       }),
     }),
+    getUnbilledCostsByOrg: builder.query<
+      {
+        orgId: string;
+        orgName: string;
+        totalUnbilledCost: number;
+        patientCosts: Array<{
+          patientId: string;
+          patientName: string;
+          conversationCount: number;
+          totalCost: number;
+          conversations: Array<{
+            conversationId: string;
+            startTime: string;
+            duration: number;
+            cost: number;
+            status: string;
+          }>;
+        }>;
+        period: {
+          days: number;
+          startDate: string;
+          endDate: string;
+        };
+      },
+      { orgId: string; days?: number }
+    >({
+      query: ({ orgId, days }) => ({
+        url: `/payments/orgs/${orgId}/unbilled-costs`,
+        method: "GET",
+        params: { days },
+      }),
+    }),
   }),
 })
 
@@ -51,4 +83,5 @@ export const {
   useCreateInvoiceFromConversationsMutation,
   useGetInvoicesByPatientQuery,
   useGetInvoicesByOrgQuery,
+  useGetUnbilledCostsByOrgQuery,
 } = paymentApi

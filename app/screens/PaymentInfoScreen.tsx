@@ -11,7 +11,7 @@ import { useSelector } from "react-redux"
 // Import getCurrentUser selector here
 import { getCurrentUser, getAuthTokens } from "../store/authSlice"
 import { getOrg } from "../store/orgSlice"
-import { useGetInvoicesByOrgQuery } from "../services/api/paymentApi"
+import { useGetInvoicesByOrgQuery, useGetUnbilledCostsByOrgQuery } from "../services/api/paymentApi"
 import { WebView } from "react-native-webview"
 import Config from "../config"
 import { colors, spacing } from "app/theme"
@@ -256,6 +256,150 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
 }
 
 // ================================================
+//         CurrentChargesScreen
+// ================================================
+function CurrentChargesScreen() {
+  const org = useSelector(getOrg)
+  
+  if (!org || !org.id) {
+    return (
+      <View style={styles.screenContainer} testID="current-charges-container">
+        <Text style={styles.emptyText}>No organization data available.</Text>
+      </View>
+    )
+  }
+
+  const queryParam = { orgId: org.id.toString(), days: 30 } // Last 30 days
+  const {
+    data: unbilledCosts,
+    error: unbilledCostsError,
+    isLoading: unbilledCostsLoading,
+  } = useGetUnbilledCostsByOrgQuery(queryParam, { skip: !org })
+
+  useEffect(() => {
+    if (unbilledCostsError) {
+      console.error("Error loading unbilled costs", unbilledCostsError)
+    }
+  }, [unbilledCostsError])
+
+  if (unbilledCostsLoading) {
+    return (
+      <View style={[styles.screenContainer, styles.centered]} testID="current-charges-container">
+        <ActivityIndicator size="large" color={colors.palette.secondary500} testID="charges-loading-indicator" />
+      </View>
+    )
+  }
+
+  if (unbilledCostsError) {
+    return (
+      <View style={styles.screenContainer} testID="current-charges-container">
+        <Text style={styles.emptyText}>Error loading current charges.</Text>
+      </View>
+    )
+  }
+
+  if (!unbilledCosts || unbilledCosts.patientCosts.length === 0) {
+    return (
+      <View style={styles.screenContainer} testID="current-charges-container">
+        <Card
+          preset="default"
+          style={styles.emptyChargesCard}
+          ContentComponent={
+            <View style={styles.emptyChargesContent}>
+              <Icon 
+                icon="check" 
+                size={48} 
+                color={colors.palette.accent500}
+                style={styles.emptyChargesIcon}
+              />
+              <Text preset="subheading" style={styles.emptyChargesTitle}>
+                No Pending Charges
+              </Text>
+              <Text style={styles.emptyChargesMessage} testID="no-charges-text">
+                All conversations have been billed. New charges will appear here as they accumulate.
+              </Text>
+            </View>
+          }
+        />
+      </View>
+    )
+  }
+
+  return (
+    <View style={styles.screenContainer} testID="current-charges-container">
+      {/* Summary Card */}
+      <Card
+        preset="default"
+        style={styles.chargesSummaryCard}
+        heading="Current Charges Summary"
+        ContentComponent={
+          <View style={styles.chargesSummaryContent}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total Unbilled Amount:</Text>
+              <Text preset="bold" style={styles.summaryAmount}>
+                {formatCurrency(unbilledCosts.totalUnbilledCost)}
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Period:</Text>
+              <Text style={styles.summaryValue}>
+                Last {unbilledCosts.period.days} days
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Patients with Charges:</Text>
+              <Text style={styles.summaryValue}>
+                {unbilledCosts.patientCosts.length} patient{unbilledCosts.patientCosts.length !== 1 ? 's' : ''}
+              </Text>
+            </View>
+          </View>
+        }
+      />
+
+      {/* Patient Charges List */}
+      <View style={styles.patientChargesSection}>
+        <Text preset="subheading" style={styles.patientChargesTitle}>
+          Charges by Patient
+        </Text>
+        <FlatList
+          data={unbilledCosts.patientCosts}
+          keyExtractor={(item) => item.patientId}
+          renderItem={({ item }) => (
+            <Card
+              preset="default"
+              style={styles.patientChargeCard}
+              ContentComponent={
+                <View style={styles.patientChargeContent}>
+                  <View style={styles.patientChargeHeader}>
+                    <Text preset="bold" style={styles.patientName}>
+                      {item.patientName}
+                    </Text>
+                    <Text preset="bold" style={styles.patientTotalCost}>
+                      {formatCurrency(item.totalCost)}
+                    </Text>
+                  </View>
+                  <View style={styles.patientChargeDetails}>
+                    <Text style={styles.patientChargeDetail}>
+                      {item.conversationCount} conversation{item.conversationCount !== 1 ? 's' : ''}
+                    </Text>
+                    <Text style={styles.patientChargeDetail}>
+                      Average: {formatCurrency(item.totalCost / item.conversationCount)}
+                    </Text>
+                  </View>
+                </View>
+              }
+            />
+          )}
+          contentContainerStyle={styles.patientChargesList}
+          testID="patient-charges-list"
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+    </View>
+  )
+}
+
+// ================================================
 //         BillingInfoScreen (No changes needed here, but keep user check for safety)
 // ================================================
 function BillingInfoScreen() {
@@ -348,6 +492,29 @@ function BillingInfoScreen() {
       {/* Latest Invoice */}
       {latestInvoice && (
         <LatestInvoiceCard invoice={latestInvoice} />
+      )}
+
+      {/* Total Billed Amount Summary */}
+      {sortedInvoices.length > 0 && (
+        <Card
+          preset="default"
+          style={styles.totalBilledCard}
+          ContentComponent={
+            <View style={styles.totalBilledContent}>
+              <View style={styles.totalBilledHeader}>
+                <Text preset="subheading" style={styles.totalBilledTitle}>
+                  Total Billed Amount
+                </Text>
+                <Text preset="bold" style={styles.totalBilledAmount}>
+                  {formatCurrency(sortedInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0))}
+                </Text>
+              </View>
+              <Text style={styles.totalBilledSubtext}>
+                Across {sortedInvoices.length} invoice{sortedInvoices.length !== 1 ? 's' : ''}
+              </Text>
+            </View>
+          }
+        />
       )}
 
       {/* Invoice History Section */}
@@ -471,6 +638,13 @@ export function PaymentInfoScreen() {
         testID="payment-tabs-navigator"
       >
         <Tab.Screen 
+          name="Current Charges" 
+          component={CurrentChargesScreen}
+          options={{
+            tabBarTestID: "current-charges-tab"
+          }}
+        />
+        <Tab.Screen 
           name="Payment Methods" 
           component={PaymentMethodsScreen}
           options={{
@@ -580,6 +754,34 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 2,
     borderColor: colors.palette.secondary200,
+  },
+
+  // Total Billed Card styles
+  totalBilledCard: {
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.palette.accent200,
+    backgroundColor: colors.palette.accent100,
+  },
+  totalBilledContent: {
+    gap: spacing.xs,
+  },
+  totalBilledHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  totalBilledTitle: {
+    color: colors.palette.neutral800,
+  },
+  totalBilledAmount: {
+    color: colors.palette.accent500,
+    fontSize: 20,
+  },
+  totalBilledSubtext: {
+    color: colors.palette.neutral600,
+    fontSize: 14,
+    textAlign: "center",
   },
   latestInvoiceHeader: {
     flexDirection: "row",
@@ -733,6 +935,99 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   emptyInvoiceMessage: {
+    color: colors.palette.neutral500,
+    textAlign: "center",
+    fontSize: 14,
+  },
+
+  // Current Charges styles
+  chargesSummaryCard: {
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.palette.secondary200,
+  },
+  chargesSummaryContent: {
+    gap: spacing.sm,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.xxs,
+  },
+  summaryLabel: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+  },
+  summaryValue: {
+    color: colors.palette.neutral800,
+    fontSize: 16,
+  },
+  summaryAmount: {
+    color: colors.palette.secondary500,
+    fontSize: 18,
+  },
+
+  // Patient Charges styles
+  patientChargesSection: {
+    marginBottom: spacing.md,
+  },
+  patientChargesTitle: {
+    color: colors.palette.neutral800,
+    marginBottom: spacing.sm,
+  },
+  patientChargesList: {
+    paddingBottom: spacing.sm,
+  },
+  patientChargeCard: {
+    marginBottom: spacing.sm,
+    backgroundColor: colors.palette.neutral100,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral300,
+  },
+  patientChargeContent: {
+    gap: spacing.xs,
+  },
+  patientChargeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  patientName: {
+    color: colors.palette.neutral800,
+    fontSize: 16,
+  },
+  patientTotalCost: {
+    color: colors.palette.secondary500,
+    fontSize: 16,
+  },
+  patientChargeDetails: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  patientChargeDetail: {
+    color: colors.palette.neutral600,
+    fontSize: 14,
+  },
+
+  // Empty Charges styles
+  emptyChargesCard: {
+    marginTop: spacing.lg,
+  },
+  emptyChargesContent: {
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyChargesIcon: {
+    marginBottom: spacing.xs,
+  },
+  emptyChargesTitle: {
+    color: colors.palette.accent500,
+    textAlign: "center",
+  },
+  emptyChargesMessage: {
     color: colors.palette.neutral500,
     textAlign: "center",
     fontSize: 14,
