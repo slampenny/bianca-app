@@ -114,6 +114,10 @@ interface CardProps extends TouchableOpacityProps {
    * Overrides all other `footer*` props.
    */
   FooterComponent?: ReactElement
+  /**
+   * Used to locate this view in end-to-end tests.
+   */
+  testID?: string
 }
 
 /**
@@ -147,6 +151,7 @@ export function Card(props: CardProps) {
     ContentTextProps,
     HeadingTextProps,
     FooterTextProps,
+    testID,
     ...WrapperProps
   } = props
 
@@ -193,6 +198,7 @@ export function Card(props: CardProps) {
       style={$containerStyle}
       activeOpacity={0.8}
       accessibilityRole={isPressable ? "button" : undefined}
+      testID={testID}
       {...WrapperProps}
     >
       {LeftComponent}

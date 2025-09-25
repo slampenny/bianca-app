@@ -1,4 +1,6 @@
 import { test as base, expect, Page } from '@playwright/test'
+
+export { expect }
 import { asyncStorageMockScript } from './asyncStorageMock'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {

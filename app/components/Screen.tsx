@@ -52,6 +52,10 @@ interface BaseScreenProps {
    * Pass any additional props directly to the KeyboardAvoidingView component.
    */
   KeyboardAvoidingViewProps?: KeyboardAvoidingViewProps
+  /**
+   * Used to locate this view in end-to-end tests.
+   */
+  testID?: string
 }
 
 interface FixedScreenProps extends BaseScreenProps {
@@ -233,12 +237,13 @@ export function Screen(props: ScreenProps) {
     safeAreaEdges,
     StatusBarProps,
     statusBarStyle = "dark",
+    testID,
   } = props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
 
   return (
-    <View style={[$containerStyle, { backgroundColor }, $containerInsets]}>
+    <View style={[$containerStyle, { backgroundColor }, $containerInsets]} testID={testID}>
       <StatusBar style={statusBarStyle} {...StatusBarProps} />
 
       <KeyboardAvoidingView

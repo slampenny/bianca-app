@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react"
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, Pressable, RefreshControl } from "react-native"
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, RefreshControl } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import { useGetConversationsByPatientQuery } from "../services/api/conversationApi"
 import { getPatient } from "../store/patientSlice"
@@ -9,6 +9,8 @@ import { Conversation, Message } from "../services/api/api.types"
 import { colors } from "app/theme/colors"
 import { SentimentIndicator } from "../components/SentimentIndicator"
 import { ConversationMessages } from "../components/ConversationMessages"
+import { Screen } from "../components/Screen"
+import { Card } from "../components/Card"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
@@ -152,45 +154,37 @@ export function ConversationsScreen() {
     const conversationDate = lastMessage?.createdAt || item.startTime || new Date().toISOString()
 
     return (
-      <View style={styles.conversationCard}>
-        <Pressable
-          style={styles.conversationHeader}
-          onPress={() => toggleConversation(item.id!)}
-          android_ripple={{ color: colors.palette.biancaButtonUnselected }}
-        >
-          <View style={styles.conversationInfo}>
-            <View style={styles.conversationHeaderRow}>
-              <Text style={styles.conversationTitle}>
-                Conversation {formatDate(conversationDate)}
-              </Text>
+      <Card 
+        style={styles.conversationCard} 
+        testID={`conversation-card-${item.id}`}
+        heading={`Conversation ${formatDate(conversationDate)}`}
+        content={`${getConversationPreview(item.messages || [])}\n${messageCount} message${messageCount !== 1 ? 's' : ''}`}
+        RightComponent={
+          <View style={styles.rightComponent}>
+            {item.sentiment && (
               <SentimentIndicator 
                 sentiment={item.sentiment} 
                 size="small" 
                 showScore={false}
                 showMood={false}
               />
-            </View>
-            <Text style={styles.conversationPreview}>
-              {getConversationPreview(item.messages || [])}
-            </Text>
-            <Text style={styles.messageCount}>
-              {messageCount} message{messageCount !== 1 ? 's' : ''}
-            </Text>
-          </View>
-          <View style={styles.expandIcon}>
+            )}
             <Text style={styles.expandIconText}>
               {isExpanded ? '▼' : '▶'}
             </Text>
           </View>
-        </Pressable>
-
-        {isExpanded && (
+        }
+        ContentComponent={
+          isExpanded ? (
             <ConversationMessages
               messages={item.messages || []}
               style={styles.messagesContainer}
+              data-testid={`messages-container-${item.id}`}
             />
-        )}
-      </View>
+          ) : undefined
+        }
+        onPress={() => toggleConversation(item.id!)}
+      />
     )
   }
 
@@ -207,10 +201,7 @@ export function ConversationsScreen() {
   const conversationsToRender = conversations
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <Header title="Conversations" />
-      
+    <Screen preset="scroll" testID="conversations-screen">
       {/* Debug info for active call */}
       {__DEV__ && activeCall && (
         <View style={{ padding: 10, backgroundColor: '#f0f0f0', margin: 10 }}>
@@ -266,7 +257,7 @@ export function ConversationsScreen() {
           }
         />
       )}
-    </View>
+    </Screen>
   )
 }
 
@@ -378,6 +369,11 @@ const styles = StyleSheet.create({
     color: colors.palette.neutral600,
     fontSize: 14,
     marginLeft: 8,
+  },
+  rightComponent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   loaderContainer: {
     padding: 20,

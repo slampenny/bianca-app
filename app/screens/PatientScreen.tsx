@@ -369,6 +369,8 @@ function PatientScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
+        accessibilityLabel="patient-screen"
+        testID="patient-screen"
       >
         {/* Display API Errors */}
         {apiError ? <Text style={styles.error}>{apiError}</Text> : null}

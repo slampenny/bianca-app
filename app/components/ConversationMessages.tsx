@@ -7,13 +7,15 @@ import { colors } from "../theme/colors"
 interface ConversationMessagesProps {
   messages: Message[]
   style?: ViewStyle
+  'data-testid'?: string
 }
 
-export function ConversationMessages({ messages, style }: ConversationMessagesProps) {
+export function ConversationMessages({ messages, style, 'data-testid': testId }: ConversationMessagesProps) {
 
   // Sort messages by creation time to ensure proper ordering
   const sortedMessages = React.useMemo(() => {
-    return messages.sort((a, b) => {
+    // Create a copy of the messages array to avoid mutating the original
+    return [...messages].sort((a, b) => {
       const timeA = new Date(a.createdAt || 0).getTime()
       const timeB = new Date(b.createdAt || 0).getTime()
       return timeA - timeB
@@ -53,6 +55,7 @@ export function ConversationMessages({ messages, style }: ConversationMessagesPr
                 styles.messageBubble,
                 isUser ? styles.userBubble : styles.assistantBubble,
               ]}
+              data-testid={`message-bubble-${message.id || index}`}
             >
               <Text style={[
                 styles.messageText,
@@ -60,10 +63,13 @@ export function ConversationMessages({ messages, style }: ConversationMessagesPr
               ]}>
                 {message.content}
               </Text>
-              <Text style={[
-                styles.messageTime,
-                isUser ? styles.userMessageTime : styles.assistantMessageTime,
-              ]}>
+              <Text 
+                style={[
+                  styles.messageTime,
+                  isUser ? styles.userMessageTime : styles.assistantMessageTime,
+                ]}
+                data-testid={`message-time-${message.id || index}`}
+              >
                 {formatDate(message.createdAt || new Date().toISOString())}
               </Text>
             </View>
@@ -74,7 +80,7 @@ export function ConversationMessages({ messages, style }: ConversationMessagesPr
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} data-testid={testId}>
       {sortedMessages.length > 0 ? (
         sortedMessages.map((message, index) => renderMessage(message, index))
       ) : (
