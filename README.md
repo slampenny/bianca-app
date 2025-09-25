@@ -54,6 +54,16 @@ MyPhoneFriend Backend is a comprehensive healthcare communication API that enabl
 - **Route53** - DNS management
 - **VPC** - Network isolation
 
+## 📚 Documentation
+
+All technical documentation is organized in the [`docs/`](./docs/) directory:
+
+- **[📋 Documentation Index](./docs/INDEX.md)** - Complete list of all documentation
+- **[🚨 Emergency System](./docs/EMERGENCY_SYSTEM.md)** - Emergency detection and notification system
+- **[📞 Call Workflows](./docs/CALL_WORKFLOW_README.md)** - Voice call handling and workflows
+- **[🧠 AI & Analysis](./docs/SENTIMENT_ANALYSIS_API.md)** - AI-powered analysis features
+- **[🧪 Testing](./docs/testing-strategy.md)** - Testing strategies and test suites
+
 ## 🚀 Quick Start
 
 ### Prerequisites

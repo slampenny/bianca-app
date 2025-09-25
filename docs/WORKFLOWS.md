@@ -14,7 +14,7 @@
 5. **Patient Management Workflow** - Care coordination and setup
 6. **Healthcare Analysis Workflow** - Reviewing AI insights
 7. **Alert Management Workflow** - Responding to patient alerts
-8. **Organization Management** - Multi-user coordination
+8. **Organization Management** - Mu lti-user coordination
 
 ### **Tier 3: Supporting User Workflows** (Medium Value)
 9. **Reporting & Analytics Workflow** - Business intelligence
