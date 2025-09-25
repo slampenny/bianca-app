@@ -43,7 +43,14 @@ async function addDecliningPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'declining_patient_seed', month: 1 },
     createdAt: month1Date,
-    updatedAt: month1Date
+    updatedAt: month1Date,
+    startTime: month1Date,
+    endTime: new Date(month1Date.getTime() + 30 * 60 * 1000), // 30 minutes later
+    duration: 30,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.30, // $0.30 for 30 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv1.save();
   
@@ -71,7 +78,14 @@ async function addDecliningPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'declining_patient_seed', month: 2 },
     createdAt: month2Date,
-    updatedAt: month2Date
+    updatedAt: month2Date,
+    startTime: month2Date,
+    endTime: new Date(month2Date.getTime() + 25 * 60 * 1000), // 25 minutes later
+    duration: 25,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.25, // $0.25 for 25 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv2.save();
   
@@ -97,7 +111,14 @@ async function addDecliningPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'declining_patient_seed', month: 3 },
     createdAt: month3Date,
-    updatedAt: month3Date
+    updatedAt: month3Date,
+    startTime: month3Date,
+    endTime: new Date(month3Date.getTime() + 35 * 60 * 1000), // 35 minutes later
+    duration: 35,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.35, // $0.35 for 35 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv3.save();
   
@@ -123,7 +144,14 @@ async function addDecliningPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'declining_patient_seed', month: 4 },
     createdAt: month4Date,
-    updatedAt: month4Date
+    updatedAt: month4Date,
+    startTime: month4Date,
+    endTime: new Date(month4Date.getTime() + 40 * 60 * 1000), // 40 minutes later
+    duration: 40,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.40, // $0.40 for 40 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv4.save();
   
@@ -149,7 +177,14 @@ async function addDecliningPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'declining_patient_seed', month: 5 },
     createdAt: month5Date,
-    updatedAt: month5Date
+    updatedAt: month5Date,
+    startTime: month5Date,
+    endTime: new Date(month5Date.getTime() + 45 * 60 * 1000), // 45 minutes later
+    duration: 45,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.45, // $0.45 for 45 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv5.save();
   
@@ -174,7 +209,14 @@ async function addDecliningPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'declining_patient_seed', month: 6 },
     createdAt: month6Date,
-    updatedAt: month6Date
+    updatedAt: month6Date,
+    startTime: month6Date,
+    endTime: new Date(month6Date.getTime() + 50 * 60 * 1000), // 50 minutes later
+    duration: 50,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.50, // $0.50 for 50 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv6.save();
   
@@ -214,7 +256,14 @@ async function addNormalPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'normal_patient_seed', month: 1 },
     createdAt: month1Date,
-    updatedAt: month1Date
+    updatedAt: month1Date,
+    startTime: month1Date,
+    endTime: new Date(month1Date.getTime() + 20 * 60 * 1000), // 20 minutes later
+    duration: 20,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.20, // $0.20 for 20 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv1.save();
   
@@ -240,7 +289,14 @@ async function addNormalPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'normal_patient_seed', month: 2 },
     createdAt: month2Date,
-    updatedAt: month2Date
+    updatedAt: month2Date,
+    startTime: month2Date,
+    endTime: new Date(month2Date.getTime() + 25 * 60 * 1000), // 25 minutes later
+    duration: 25,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.25, // $0.25 for 25 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv2.save();
   
@@ -266,7 +322,14 @@ async function addNormalPatientConversations(patientId) {
     analyzedData: {},
     metadata: { source: 'normal_patient_seed', month: 3 },
     createdAt: month3Date,
-    updatedAt: month3Date
+    updatedAt: month3Date,
+    startTime: month3Date,
+    endTime: new Date(month3Date.getTime() + 30 * 60 * 1000), // 30 minutes later
+    duration: 30,
+    status: 'completed',
+    callType: 'wellness-check',
+    cost: 0.30, // $0.30 for 30 minutes at $0.10/minute
+    lineItemId: null // Unbilled
   });
   await conv3.save();
   
@@ -599,7 +662,12 @@ async function seedDatabase() {
 
     // Insert conversations for patients.
     conversationOne.patientId = patient1._id;
+    conversationOne.cost = 0.30; // $0.30 for 30 minutes at $0.10/minute
+    conversationOne.lineItemId = null; // Unbilled
+    
     conversationTwo.patientId = patient2._id;
+    conversationTwo.cost = 0.45; // $0.45 for 45 minutes at $0.10/minute
+    conversationTwo.lineItemId = null; // Unbilled
     
     // Create additional conversations for patient1 to test autoload
     const conversationThree = {
@@ -613,6 +681,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 15, max: 45 }),
       status: 'completed',
       callType: 'wellness-check',
+      cost: 0.30, // $0.30 for 30 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationFour = {
@@ -626,6 +696,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 20, max: 60 }),
       status: 'completed',
       callType: 'follow-up',
+      cost: 0.45, // $0.45 for 45 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationFive = {
@@ -639,6 +711,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 10, max: 35 }),
       status: 'completed',
       callType: 'inbound',
+      cost: 0.25, // $0.25 for 25 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationSix = {
@@ -652,6 +726,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 15, max: 40 }),
       status: 'completed',
       callType: 'wellness-check',
+      cost: 0.35, // $0.35 for 35 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationSeven = {
@@ -665,6 +741,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 25, max: 55 }),
       status: 'completed',
       callType: 'follow-up',
+      cost: 0.50, // $0.50 for 50 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationEight = {
@@ -678,6 +756,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 10, max: 25 }),
       status: 'completed',
       callType: 'inbound',
+      cost: 0.20, // $0.20 for 20 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationNine = {
@@ -691,6 +771,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 20, max: 45 }),
       status: 'completed',
       callType: 'wellness-check',
+      cost: 0.40, // $0.40 for 40 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationTen = {
@@ -704,6 +786,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 15, max: 35 }),
       status: 'completed',
       callType: 'follow-up',
+      cost: 0.30, // $0.30 for 30 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationEleven = {
@@ -717,6 +801,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 30, max: 60 }),
       status: 'completed',
       callType: 'inbound',
+      cost: 0.55, // $0.55 for 55 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationTwelve = {
@@ -730,6 +816,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 10, max: 30 }),
       status: 'completed',
       callType: 'wellness-check',
+      cost: 0.25, // $0.25 for 25 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationThirteen = {
@@ -743,6 +831,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 20, max: 50 }),
       status: 'completed',
       callType: 'follow-up',
+      cost: 0.45, // $0.45 for 45 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationFourteen = {
@@ -756,6 +846,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 15, max: 40 }),
       status: 'completed',
       callType: 'inbound',
+      cost: 0.35, // $0.35 for 35 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const conversationFifteen = {
@@ -769,6 +861,8 @@ async function seedDatabase() {
       duration: faker.datatype.number({ min: 25, max: 55 }),
       status: 'completed',
       callType: 'wellness-check',
+      cost: 0.50, // $0.50 for 50 minutes at $0.10/minute
+      lineItemId: null, // Unbilled
     };
     
     const [conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8, conv9, conv10, conv11, conv12, conv13, conv14, conv15] = 
@@ -778,6 +872,107 @@ async function seedDatabase() {
         conversationEleven, conversationTwelve, conversationThirteen, conversationFourteen, conversationFifteen
       ]);
     console.log('Inserted conversations');
+
+    // Create some billed conversations to show billing history
+    console.log('Creating billed conversations with invoices...');
+    
+    // Create a sample invoice for the organization
+    const sampleInvoice = await Invoice.create({
+      org: org1._id,
+      invoiceNumber: 'INV-SEED-001', // Use SEED prefix to avoid conflicts with test data
+      issueDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
+      dueDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000 + 30 * 24 * 60 * 60 * 1000), // 30 days from issue
+      status: 'paid',
+      totalAmount: 2.50, // Total for billed conversations
+      notes: 'Sample billed conversations for testing',
+    });
+    
+    // Create line items for the invoice
+    const lineItem1 = await require('../models').LineItem.create({
+      patientId: patient1._id,
+      invoiceId: sampleInvoice._id,
+      amount: 1.20, // $1.20 for 2 conversations
+      description: 'Billed conversations - 2 conversation(s)',
+      periodStart: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+      periodEnd: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      quantity: 2,
+      unitPrice: 0.60
+    });
+    
+    const lineItem2 = await require('../models').LineItem.create({
+      patientId: patient2._id,
+      invoiceId: sampleInvoice._id,
+      amount: 1.30, // $1.30 for 2 conversations
+      description: 'Billed conversations - 2 conversation(s)',
+      periodStart: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+      periodEnd: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      quantity: 2,
+      unitPrice: 0.65
+    });
+    
+    // Create billed conversations for patient1
+    const billedConv1 = await Conversation.create({
+      patientId: patient1._id,
+      messages: [],
+      history: 'Billed conversation 1 - wellness check',
+      analyzedData: {},
+      metadata: {},
+      startTime: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000), // 18 days ago
+      endTime: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000), // 30 minutes later
+      duration: 30,
+      status: 'completed',
+      callType: 'wellness-check',
+      cost: 0.60, // $0.60 for 30 minutes at $0.10/minute
+      lineItemId: lineItem1._id, // Billed
+    });
+    
+    const billedConv2 = await Conversation.create({
+      patientId: patient1._id,
+      messages: [],
+      history: 'Billed conversation 2 - follow-up',
+      analyzedData: {},
+      metadata: {},
+      startTime: new Date(Date.now() - 16 * 24 * 60 * 60 * 1000), // 16 days ago
+      endTime: new Date(Date.now() - 16 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // 60 minutes later
+      duration: 60,
+      status: 'completed',
+      callType: 'follow-up',
+      cost: 0.60, // $0.60 for 60 minutes at $0.10/minute
+      lineItemId: lineItem1._id, // Billed
+    });
+    
+    // Create billed conversations for patient2
+    const billedConv3 = await Conversation.create({
+      patientId: patient2._id,
+      messages: [],
+      history: 'Billed conversation 3 - inbound call',
+      analyzedData: {},
+      metadata: {},
+      startTime: new Date(Date.now() - 17 * 24 * 60 * 60 * 1000), // 17 days ago
+      endTime: new Date(Date.now() - 17 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000), // 45 minutes later
+      duration: 45,
+      status: 'completed',
+      callType: 'inbound',
+      cost: 0.65, // $0.65 for 45 minutes at $0.10/minute
+      lineItemId: lineItem2._id, // Billed
+    });
+    
+    const billedConv4 = await Conversation.create({
+      patientId: patient2._id,
+      messages: [],
+      history: 'Billed conversation 4 - wellness check',
+      analyzedData: {},
+      metadata: {},
+      startTime: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
+      endTime: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000 + 65 * 60 * 1000), // 65 minutes later
+      duration: 65,
+      status: 'completed',
+      callType: 'wellness-check',
+      cost: 0.65, // $0.65 for 65 minutes at $0.10/minute
+      lineItemId: lineItem2._id, // Billed
+    });
+    
+    console.log('Created billed conversations and invoice:', sampleInvoice.invoiceNumber);
 
     // Add declining patient conversations for Agnes Alphabet (patient1)
     await addDecliningPatientConversations(patient1._id);
@@ -835,7 +1030,7 @@ async function seedDatabase() {
     // Create a dummy invoice for org1.
     const dummyInvoiceData = {
       org: org1._id,
-      invoiceNumber: 'INV-000001',
+      invoiceNumber: 'INV-SEED-002', // Use SEED prefix to avoid conflicts with test data
       issueDate: new Date(),
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       status: 'pending',

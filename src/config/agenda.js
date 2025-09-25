@@ -285,7 +285,16 @@ async function processOrgBilling(org) {
 async function createOrgInvoice(org, patientBilling, totalCost) {
   // Generate invoice number
   const lastInvoice = await require('../models').Invoice.findOne({}, {}, { sort: { createdAt: -1 } });
-  const nextNum = lastInvoice ? parseInt(lastInvoice.invoiceNumber.split('-')[1]) + 1 : 1;
+  let nextNum = 1;
+  if (lastInvoice && lastInvoice.invoiceNumber) {
+    const parts = lastInvoice.invoiceNumber.split('-');
+    if (parts.length >= 2) {
+      const parsed = parseInt(parts[1]);
+      if (!isNaN(parsed)) {
+        nextNum = parsed + 1;
+      }
+    }
+  }
   const invoiceNumber = `INV-${nextNum.toString().padStart(6, '0')}`;
   
   // Create invoice
