@@ -123,7 +123,14 @@ const baselineConfig = {
       w: 'majority'                      // Write concern for retryWrites
     }
   },
-  billing: { ratePerMinute: 0.1 }, // Example billing rate
+  billing: { 
+    ratePerMinute: 0.1, // Example billing rate
+    minimumBillableDuration: 30, // Minimum billable duration in seconds
+    enableDailyBilling: true, // Enable automatic daily billing
+    billingTime: '02:00', // Time to run daily billing (24-hour format)
+    autoCharge: true, // Automatically charge payment methods
+    gracePeriodDays: 30 // Days before invoice becomes overdue
+  },
   jwt: {
     secret: envVars.JWT_SECRET || 'default-secret-please-change', // Provide a default or ensure it's set via env/secrets
     accessExpirationMinutes: 30,

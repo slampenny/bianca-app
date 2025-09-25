@@ -21,6 +21,7 @@ MyPhoneFriend Backend is a comprehensive healthcare communication API that enabl
 - 📧 **Email Services** - HIPAA-compliant email notifications via AWS SES
 - 🏢 **Multi-Organization** - Support for healthcare organizations
 - 📊 **Analytics & Reporting** - Wellness check analytics and insights
+- 💳 **Automated Billing** - Real-time cost calculation and daily billing cycles
 - 🔒 **HIPAA Compliance** - End-to-end encryption and audit trails
 
 ## 🛠️ Technology Stack
@@ -117,10 +118,17 @@ src/
 - `GET /v1/wellness-checks` - Get wellness checks
 - `POST /v1/calls/initiate` - Initiate voice call
 
+### Billing & Payments
+- `GET /v1/payments/orgs/:orgId/unbilled-costs` - Get unbilled costs by organization
+- `POST /v1/payments/patients/:patientId/invoices` - Create invoice for patient
+- `GET /v1/payments/orgs/:orgId/invoices` - Get invoices by organization
+- `GET /v1/payments/patients/:patientId/invoices` - Get invoices by patient
+
 ## 📚 Documentation
 
 - **[Documentation Hub](docs/README.md)** - Complete documentation index
 - **[Workflows](docs/WORKFLOWS.md)** - System workflows sorted by business value
+- **[Billing System](docs/BILLING_SYSTEM.md)** - Automated billing and payment processing
 - **[AI Test Suite](docs/AI_TEST_SUITE.md)** - AI tests and diagnostic capabilities
 - **[Testing Strategy](docs/testing-strategy.md)** - Comprehensive testing approach
 - **[Medical Analysis API](docs/MEDICAL_ANALYSIS_API.md)** - Medical analysis endpoints

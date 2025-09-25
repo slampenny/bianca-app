@@ -11296,5 +11296,144 @@ router.post('/emergency', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/billing:
+ *   post:
+ *     summary: Test daily billing process
+ *     description: Manually trigger the daily billing process to test invoice creation and payment processing.
+ *     tags: [Test]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               orgId:
+ *                 type: string
+ *                 description: Specific organization ID to process billing for (optional, processes all orgs if not provided)
+ *               dryRun:
+ *                 type: boolean
+ *                 description: If true, only simulate the billing process without creating invoices
+ *                 default: false
+ *     responses:
+ *       "200":
+ *         description: Billing test completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 processedOrgs:
+ *                   type: number
+ *                 totalInvoices:
+ *                   type: number
+ *                 totalAmount:
+ *                   type: number
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       orgId:
+ *                         type: string
+ *                       orgName:
+ *                         type: string
+ *                       invoiceCount:
+ *                         type: number
+ *                       totalCost:
+ *                         type: number
+ *                       status:
+ *                         type: string
+ *       "500":
+ *         description: Internal server error
+ */
+router.post('/billing', async (req, res) => {
+    try {
+        const { orgId, dryRun = false } = req.body;
+        
+        logger.info(`[Test] Manual billing test triggered - orgId: ${orgId || 'all'}, dryRun: ${dryRun}`);
+        
+        if (dryRun) {
+            // Simulate billing process without creating actual invoices
+            const { Org, Patient, Conversation } = require('../../models');
+            
+            let orgs;
+            if (orgId) {
+                const org = await Org.findById(orgId);
+                orgs = org ? [org] : [];
+            } else {
+                orgs = await Org.find({});
+            }
+            
+            const results = [];
+            let totalInvoices = 0;
+            let totalAmount = 0;
+            
+            for (const org of orgs) {
+                const patients = await Patient.find({ org: org._id });
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                const unbilledConversations = await Conversation.find({
+                    patientId: { $in: patients.map(p => p._id) },
+                    lineItemId: null,
+                    endTime: { $gte: yesterday },
+                    cost: { $gt: 0 }
+                });
+                
+                const orgTotalCost = unbilledConversations.reduce((sum, conv) => sum + conv.cost, 0);
+                
+                if (orgTotalCost > 0) {
+                    totalInvoices++;
+                    totalAmount += orgTotalCost;
+                }
+                
+                results.push({
+                    orgId: org._id,
+                    orgName: org.name,
+                    invoiceCount: orgTotalCost > 0 ? 1 : 0,
+                    totalCost: orgTotalCost,
+                    status: 'simulated'
+                });
+            }
+            
+            return res.status(200).json({
+                success: true,
+                message: 'Billing simulation completed',
+                processedOrgs: orgs.length,
+                totalInvoices,
+                totalAmount,
+                results,
+                dryRun: true
+            });
+        } else {
+            // Run actual billing process
+            const { processDailyBilling } = require('../../config/agenda');
+            await processDailyBilling();
+            
+            return res.status(200).json({
+                success: true,
+                message: 'Daily billing process completed successfully',
+                dryRun: false
+            });
+        }
+        
+    } catch (error) {
+        logger.error('[Test] Billing test failed:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Export the router
 module.exports = router;

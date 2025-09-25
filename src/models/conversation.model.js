@@ -102,6 +102,18 @@ const conversationSchema = mongoose.Schema(
       // but will be adjusted to minimum billable duration (30 seconds) for failed calls
       // via the pre-save hook
     },
+    cost: {
+      type: Number,
+      default: 0,
+      min: [0, 'Cost cannot be negative'],
+      validate: {
+        validator: function(v) {
+          return v >= 0;
+        },
+        message: 'Cost must be non-negative'
+      }
+      // Cost calculated based on duration and billing rate
+    },
     // Add these fields to your conversationSchema:
 
     debugAudioUrls: [{

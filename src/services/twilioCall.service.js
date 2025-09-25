@@ -189,6 +189,18 @@ class TwilioCallService {
   }
 
   /**
+   * Calculate call cost based on duration and billing rate
+   * @param {number} duration - Call duration in seconds
+   * @returns {number} - Calculated cost
+   */
+  calculateCallCost(duration) {
+    const minimumBillableDuration = config.billing.minimumBillableDuration || 30; // Configurable minimum
+    const billableDuration = Math.max(duration, minimumBillableDuration);
+    const totalMinutes = billableDuration / 60;
+    return totalMinutes * config.billing.ratePerMinute;
+  }
+
+  /**
    * Update conversation status in the database
    * @param {string} callSid - The call SID
    * @param {string} status - New status
@@ -231,6 +243,9 @@ class TwilioCallService {
           conversation.duration = parseInt(CallDuration, 10) || 0;
           conversation.status = 'completed';
           
+          // Calculate cost based on duration and billing rate
+          conversation.cost = this.calculateCallCost(conversation.duration);
+          
           // Summarize the conversation if there are messages
           if (conversation.messages && conversation.messages.length > 0) {
             try {
@@ -252,6 +267,9 @@ class TwilioCallService {
           conversation.endTime = new Date();
           conversation.status = 'failed';
           conversation.failureReason = CallStatus;
+          
+          // Calculate cost for failed calls (minimum billable duration)
+          conversation.cost = this.calculateCallCost(conversation.duration);
           
           // Create alert for failed call
           try {

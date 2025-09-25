@@ -26,8 +26,15 @@ const listInvoicesByPatient = catchAsync(async (req, res) => {
   res.send(invoices);
 });
 
+const getUnbilledCostsByOrg = catchAsync(async (req, res) => {
+  const days = parseInt(req.query.days) || 7;
+  const unbilledCosts = await paymentService.getUnbilledCostsByOrg(req.params.orgId, days);
+  res.send(unbilledCosts);
+});
+
 module.exports = {
   createInvoiceFromConversations,
   listInvoicesByOrg,
   listInvoicesByPatient,
+  getUnbilledCostsByOrg,
 };

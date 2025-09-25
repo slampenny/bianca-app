@@ -19,6 +19,9 @@ This directory contains all the technical documentation for the Bianca App Backe
 - **[SENTIMENT_ANALYSIS_TESTS.md](./SENTIMENT_ANALYSIS_TESTS.md)** - Sentiment analysis testing
 - **[MEDICAL_ANALYSIS_API.md](./MEDICAL_ANALYSIS_API.md)** - Medical analysis API documentation
 
+### 💳 Billing & Payments
+- **[BILLING_SYSTEM.md](./BILLING_SYSTEM.md)** - Comprehensive billing system documentation
+
 ### 🧪 Testing
 - **[AI_TEST_SUITE.md](./AI_TEST_SUITE.md)** - AI testing suite documentation
 - **[MEDICAL_TEST_SUITE.md](./MEDICAL_TEST_SUITE.md)** - Medical testing suite documentation

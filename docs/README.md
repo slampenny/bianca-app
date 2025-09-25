@@ -8,6 +8,7 @@ Welcome to the comprehensive documentation for MyPhoneFriend Backend. This hub p
 
 ### 🏗️ **Architecture & Design**
 - [Workflows](WORKFLOWS.md) - **Complete system workflows sorted by business value**
+- [Billing System](BILLING_SYSTEM.md) - **Automated billing and payment processing system**
 - [Testing Strategy](testing-strategy.md) - Comprehensive testing approach and best practices
 - [Medical Analysis API](MEDICAL_ANALYSIS_API.md) - Medical analysis endpoints and functionality
 - [Emergency System](EMERGENCY_SYSTEM.md) - Emergency detection and response system
@@ -31,6 +32,7 @@ Welcome to the comprehensive documentation for MyPhoneFriend Backend. This hub p
 
 ### For Developers
 - [Workflows](WORKFLOWS.md) - **System workflows and business processes**
+- [Billing System](BILLING_SYSTEM.md) - **Automated billing implementation and API**
 - [Testing Strategy](testing-strategy.md) - How to write effective tests
 - [AI Test Suite](AI_TEST_SUITE.md) - Understanding AI test coverage
 - [Emergency System](EMERGENCY_SYSTEM.md) - Emergency detection implementation
@@ -50,6 +52,7 @@ Welcome to the comprehensive documentation for MyPhoneFriend Backend. This hub p
 | Document | Status | Last Updated | Maintainer |
 |----------|--------|--------------|------------|
 | [Workflows](WORKFLOWS.md) | ✅ Complete | 2024-01-XX | Architecture Team |
+| [Billing System](BILLING_SYSTEM.md) | ✅ Complete | 2024-01-XX | Backend Team |
 | [AI Test Suite](AI_TEST_SUITE.md) | ✅ Complete | 2024-01-XX | AI Team |
 | [Testing Strategy](testing-strategy.md) | ✅ Complete | 2024-01-XX | Dev Team |
 | [Medical Test Suite](MEDICAL_TEST_SUITE.md) | ✅ Complete | 2024-01-XX | AI Team |

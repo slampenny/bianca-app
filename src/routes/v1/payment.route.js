@@ -147,4 +147,78 @@ router
   .route('/orgs/:orgId/invoices')
   .get(auth('readAny:invoice'), validate(paymentValidation.listInvoicesByOrg), paymentController.listInvoicesByOrg);
 
+/**
+ * @swagger
+ * /payments/orgs/{orgId}/unbilled-costs:
+ *   get:
+ *     summary: Get current unbilled costs by patient for an organization
+ *     description: Retrieve current unbilled conversation costs grouped by patient, showing what will be charged in the next billing cycle.
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization id
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           default: 7
+ *         description: Number of days to look back for unbilled conversations
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 orgId:
+ *                   type: string
+ *                 orgName:
+ *                   type: string
+ *                 totalUnbilledCost:
+ *                   type: number
+ *                 patientCosts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       patientId:
+ *                         type: string
+ *                       patientName:
+ *                         type: string
+ *                       conversationCount:
+ *                         type: integer
+ *                       totalCost:
+ *                         type: number
+ *                       conversations:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             conversationId:
+ *                               type: string
+ *                             startTime:
+ *                               type: string
+ *                               format: date-time
+ *                             duration:
+ *                               type: integer
+ *                             cost:
+ *                               type: number
+ *                             status:
+ *                               type: string
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.get('/orgs/:orgId/unbilled-costs', auth('readAny:invoice'), paymentController.getUnbilledCostsByOrg);
+
 module.exports = router;
