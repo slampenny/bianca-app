@@ -27,6 +27,7 @@ import { LoadingScreen } from "./LoadingScreen"
 import { colors } from "app/theme/colors"
 import { Button, TextField } from "app/components"
 import { LANGUAGE_OPTIONS, getLanguageByCode, DEFAULT_LANGUAGE, LanguageOption } from "../constants/languages"
+import { translate } from "../i18n"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
@@ -157,7 +158,7 @@ function PatientScreen() {
   const validateEmail = (input: string) => {
     setEmail(input)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    setEmailError(emailRegex.test(input) ? "" : "Invalid email format")
+    setEmailError(emailRegex.test(input) ? "" : translate("errors.invalidEmail"))
     clearMessages() // Clear success/api errors on input change
   }
 
@@ -386,8 +387,8 @@ function PatientScreen() {
           />
 
           <TextField
-            label="Name *"
-            placeholder="Enter patient name"
+            label={translate("patientScreen.nameLabel")}
+            placeholder={translate("patientScreen.namePlaceholder")}
             value={name}
             onChangeText={handleNameChange}
             onFocus={clearMessages}
@@ -398,8 +399,8 @@ function PatientScreen() {
           />
 
           <TextField
-            label="Email *"
-            placeholder="Enter email address"
+            label={translate("patientScreen.emailLabel")}
+            placeholder={translate("patientScreen.emailPlaceholder")}
             value={email}
             onChangeText={validateEmail}
             keyboardType="email-address"
@@ -414,8 +415,8 @@ function PatientScreen() {
           />
 
           <TextField
-            label="Phone *"
-            placeholder="Enter phone number"
+            label={translate("patientScreen.phoneLabel")}
+            placeholder={translate("patientScreen.phonePlaceholder")}
             value={phone}
             onChangeText={validatePhone}
             keyboardType="phone-pad"
@@ -430,7 +431,7 @@ function PatientScreen() {
 
           {/* Language Picker Field */}
           <View style={styles.inputContainer}>
-            <Text style={styles.fieldLabel}>Preferred Language</Text>
+            <Text style={styles.fieldLabel}>{translate("patientScreen.preferredLanguageLabel")}</Text>
             <Pressable
               style={styles.languagePicker}
               onPress={() => setShowLanguagePicker(true)}
@@ -445,7 +446,7 @@ function PatientScreen() {
 
           {/* --- Action Buttons --- */}
           <Button
-            text={patient && patient.id ? "UPDATE PATIENT" : "CREATE PATIENT"}
+            text={patient && patient.id ? translate("patientScreen.updatePatient") : translate("patientScreen.createPatient")}
             onPress={handleSave}
             disabled={
               !canCreateOrEditPatient ||
@@ -466,7 +467,7 @@ function PatientScreen() {
           {patient && patient.id && (
             <>
               <Button
-                text="MANAGE SCHEDULES"
+                text={translate("patientScreen.manageSchedules")}
                 onPress={handleManageSchedules}
                 disabled={isLoading} // Disable while loading
                 testID="manage-schedules-button"
@@ -476,7 +477,7 @@ function PatientScreen() {
               />
 
               <Button
-                text="MANAGE CONVERSATIONS"
+                text={translate("patientScreen.manageConversations")}
                 onPress={handleManageConversations}
                 disabled={isLoading} // Disable while loading
                 testID="manage-conversations-button"
@@ -486,7 +487,7 @@ function PatientScreen() {
               />
 
               <Button
-                text="VIEW SENTIMENT ANALYSIS"
+                text={translate("patientScreen.viewSentimentAnalysis")}
                 onPress={() => navigation.navigate("SentimentAnalysis", {
                   patientId: patient.id!,
                   patientName: patient.name,
@@ -500,7 +501,7 @@ function PatientScreen() {
 
                           {canManageCaregivers && (
               <Button
-                text="MANAGE CAREGIVERS"
+                text={translate("patientScreen.manageCaregivers")}
                 onPress={() => setShowCaregiverModal(true)}
                 disabled={isLoading} // Disable while loading
                 testID="manage-caregivers-button"
@@ -511,7 +512,7 @@ function PatientScreen() {
             )}
 
               <Button
-              text={confirmDelete ? "CONFIRM DELETE" : "DELETE PATIENT"}
+              text={confirmDelete ? translate("patientScreen.confirmDelete") : translate("patientScreen.deletePatient")}
               onPress={handleDelete}
               disabled={isLoading}
               testID="delete-patient-button"
@@ -568,7 +569,7 @@ function PatientScreen() {
                   style={styles.languageList}
                 />
                 <Button
-                  text="Cancel"
+                  text={translate("common.cancel")}
                   onPress={() => setShowLanguagePicker(false)}
                   style={styles.modalCancelButton}
                   preset="default"

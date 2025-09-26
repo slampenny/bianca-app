@@ -6,6 +6,7 @@ import { useResetPasswordMutation } from "../services/api/authApi"
 import { Button, Text, TextField, Screen, Header } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { spacing } from "app/theme"
+import { translate } from "../i18n"
 
 type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
 
@@ -134,7 +135,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
       safeAreaEdges={["top"]}
     >
       <Header 
-        title="Reset Your Password"
+        title={translate("confirmResetScreen.title")}
         leftIcon="back"
         onLeftPress={() => navigation.goBack()}
       />
@@ -142,13 +143,13 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
       <View style={$content}>
         <Text 
           preset="heading" 
-          text="Reset Your Password" 
+          text={translate("confirmResetScreen.title")} 
           style={$title}
         />
         
         <Text 
           preset="default"
-          text="Enter your new password below. Make sure it's secure and easy for you to remember."
+          text={translate("confirmResetScreen.subtitle")}
           style={$subtitle}
         />
 
@@ -166,8 +167,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
               setNewPassword(text)
               setPasswordError("")
             }}
-            label="New Password"
-            placeholder="Enter your new password"
+            label={translate("confirmResetScreen.newPasswordLabel")}
+            placeholder={translate("confirmResetScreen.newPasswordPlaceholder")}
             secureTextEntry
             status={passwordError ? "error" : undefined}
             helper={passwordError}
@@ -180,8 +181,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
               setConfirmPassword(text)
               setConfirmPasswordError("")
             }}
-            label="Confirm New Password"
-            placeholder="Confirm your new password"
+            label={translate("confirmResetScreen.confirmPasswordLabel")}
+            placeholder={translate("confirmResetScreen.confirmPasswordPlaceholder")}
             secureTextEntry
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError}

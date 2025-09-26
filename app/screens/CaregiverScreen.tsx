@@ -14,6 +14,7 @@ import {
 } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
+import { translate } from "../i18n"
 import { LoadingButton, Button } from "app/components"
 import { PatientReassignmentModal } from "../components/PatientReassignmentModal"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
@@ -362,7 +363,7 @@ function CaregiverScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="Name"
+            placeholder={translate("caregiverScreen.namePlaceholder")}
             placeholderTextColor="#7f8c8d"
             value={name}
             onChangeText={setName}
@@ -370,7 +371,7 @@ function CaregiverScreen() {
           />
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder={translate("caregiverScreen.emailPlaceholder")}
             placeholderTextColor="#7f8c8d"
             value={email}
             onChangeText={validateEmail}
@@ -381,7 +382,7 @@ function CaregiverScreen() {
           {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
           <TextInput
             style={styles.input}
-            placeholder="Phone"
+            placeholder={translate("caregiverScreen.phonePlaceholder")}
             placeholderTextColor="#7f8c8d"
             value={phone}
             onChangeText={validatePhone}

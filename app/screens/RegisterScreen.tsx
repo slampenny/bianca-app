@@ -16,7 +16,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
       headerShown: true,
       header: () => (
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Register</Text>
+          <Text style={styles.headerTitle} tx="registerScreen.title" />
         </View>
       ),
     })

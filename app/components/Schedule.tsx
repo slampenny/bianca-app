@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Switch } from "react-native"
 import { Picker } from "@react-native-picker/picker"
 import { Toggle } from "."
 import { Schedule } from "../services/api/api.types"
+import { translate } from "../i18n"
 
 interface ScheduleScreenProps {
   initialSchedule: Schedule
@@ -42,23 +43,32 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   }
 
   const formatSchedule = (schedule: Schedule) => {
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    const days = [
+      translate("scheduleComponent.sunday"),
+      translate("scheduleComponent.monday"),
+      translate("scheduleComponent.tuesday"),
+      translate("scheduleComponent.wednesday"),
+      translate("scheduleComponent.thursday"),
+      translate("scheduleComponent.friday"),
+      translate("scheduleComponent.saturday")
+    ]
     switch (schedule.frequency) {
       case "daily":
-        return `Every day at ${schedule.time}`
+        return translate("scheduleComponent.everyDayAt", { time: schedule.time })
       case "weekly":
         if (schedule.intervals && schedule.intervals.length > 0) {
           const selectedDays = schedule.intervals
             .map((interval) => days[interval.day || 0])
             .join(", ")
-          return `Every ${selectedDays} at ${schedule.time}`
+          return translate("scheduleComponent.everyDaysAt", { days: selectedDays, time: schedule.time })
         } else {
-          return `Every week at ${schedule.time}`
+          return translate("scheduleComponent.everyWeekAt", { time: schedule.time })
         }
       case "monthly":
-        return `Every month on the ${
-          schedule.intervals.length > 0 ? schedule.intervals[0].day : 0
-        }th at ${schedule.time}`
+        return translate("scheduleComponent.everyMonthOn", { 
+          day: schedule.intervals.length > 0 ? schedule.intervals[0].day : 0,
+          time: schedule.time 
+        })
       default:
         return ""
     }
@@ -74,9 +84,9 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Schedule</Text>
+      <Text style={styles.title}>{translate("scheduleComponent.schedule")}</Text>
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Start Time</Text>
+        <Text style={styles.label}>{translate("scheduleComponent.startTime")}</Text>
         <View style={styles.pickerWrapper}>
           <Picker
             selectedValue={time}
@@ -92,7 +102,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Frequency</Text>
+        <Text style={styles.label}>{translate("scheduleComponent.frequency")}</Text>
         <View style={styles.pickerWrapper}>
           <Picker
             selectedValue={frequency}
@@ -100,16 +110,24 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
             style={styles.picker}
             itemStyle={styles.pickerItem}
           >
-            <Picker.Item label="Daily" value="daily" />
-            <Picker.Item label="Weekly" value="weekly" />
-            <Picker.Item label="Monthly" value="monthly" />
+            <Picker.Item label={translate("scheduleComponent.daily")} value="daily" />
+            <Picker.Item label={translate("scheduleComponent.weekly")} value="weekly" />
+            <Picker.Item label={translate("scheduleComponent.monthly")} value="monthly" />
           </Picker>
         </View>
       </View>
 
       {frequency === "weekly" && (
         <View style={styles.weeklyContainer}>
-          {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
+          {[
+            translate("scheduleComponent.sunday"),
+            translate("scheduleComponent.monday"),
+            translate("scheduleComponent.tuesday"),
+            translate("scheduleComponent.wednesday"),
+            translate("scheduleComponent.thursday"),
+            translate("scheduleComponent.friday"),
+            translate("scheduleComponent.saturday")
+          ].map(
             (day, index) => {
               const selectedDays = intervals.map((interval) => interval.day)
               return (
@@ -128,15 +146,15 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       )}
 
       <View style={styles.detailsCard}>
-        <Text style={styles.detailsTitle}>Schedule Details</Text>
+        <Text style={styles.detailsTitle}>{translate("scheduleComponent.scheduleDetails")}</Text>
         <Text style={styles.detailsText}>
-          Schedule: {formatSchedule({ id, patient, frequency, intervals, isActive, time })}
+          {translate("scheduleComponent.schedule")}: {formatSchedule({ id, patient, frequency, intervals, isActive, time })}
         </Text>
-        <Text style={styles.detailsText}>Frequency: {frequency}</Text>
+        <Text style={styles.detailsText}>{translate("scheduleComponent.frequency")}: {frequency}</Text>
       </View>
 
       <View style={styles.switchContainer}>
-        <Text style={styles.switchLabel}>Active:</Text>
+        <Text style={styles.switchLabel}>{translate("scheduleComponent.active")}:</Text>
         <Switch
           trackColor={{ false: "#767577", true: "#81b0ff" }}
           thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}

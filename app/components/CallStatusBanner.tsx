@@ -6,6 +6,7 @@ import { formatDuration } from "../utils/dateUtils"
 import { colors } from "app/theme/colors"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import { setCallStatus, updateCallStatus } from "../store/callSlice"
+import { translate } from "app/i18n"
 
 interface CallStatusBannerProps {
   conversationId: string
@@ -231,7 +232,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         
         {showEndCallButton && (
           <Button
-            text={isEndingCall ? "Ending..." : "End Call"}
+            text={isEndingCall ? translate("common.ending") : translate("common.endCall")}
             preset="secondary"
             onPress={handleEndCall}
             disabled={isEndingCall}

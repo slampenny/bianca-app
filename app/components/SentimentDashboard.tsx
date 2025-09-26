@@ -8,6 +8,7 @@ import { SentimentSummaryCard } from "./SentimentSummaryCard"
 import { SentimentRecentTrends } from "./SentimentRecentTrends"
 import { SentimentLastCall } from "./SentimentLastCall"
 import { SentimentTrend, SentimentSummary } from "../services/api/api.types"
+import { translate } from "../i18n"
 
 interface SentimentDashboardProps {
   patientId: string
@@ -38,9 +39,9 @@ export function SentimentDashboard({
   }
 
   const timeRangeButtons = [
-    { key: "lastCall" as const, label: isMobile ? "Last Call" : "Last Call" },
-    { key: "month" as const, label: isMobile ? "30 Days" : "Last 30 Days" },
-    { key: "lifetime" as const, label: isMobile ? "All Time" : "All Time" },
+    { key: "lastCall" as const, label: translate("sentimentAnalysis.lastCall") },
+    { key: "month" as const, label: translate("sentimentAnalysis.last30Days") },
+    { key: "lifetime" as const, label: translate("sentimentAnalysis.allTime") },
   ]
 
   return (
@@ -52,13 +53,13 @@ export function SentimentDashboard({
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Patient Sentiment Analysis</Text>
-        <Text style={styles.subtitle}>Emotional wellness insights and trends</Text>
+        <Text style={styles.title}>{translate("sentimentAnalysis.patientSentimentAnalysis")}</Text>
+        <Text style={styles.subtitle}>{translate("sentimentAnalysis.emotionalWellnessInsights")}</Text>
       </View>
 
       {/* Time range selector */}
       <View style={styles.timeRangeContainer}>
-        <Text style={styles.timeRangeLabel}>Time Range:</Text>
+        <Text style={styles.timeRangeLabel}>{translate("sentimentAnalysis.timeRange")}</Text>
         <View style={[styles.timeRangeButtons, isMobile && styles.timeRangeButtonsMobile]}>
           {timeRangeButtons.map((button) => (
             <Button
@@ -114,9 +115,9 @@ export function SentimentDashboard({
       {/* No data state */}
       {!trend && !summary && !isLoading && (
         <View style={styles.noDataContainer}>
-          <Text style={styles.noDataTitle}>No Sentiment Data Available</Text>
+          <Text style={styles.noDataTitle}>{translate("sentimentAnalysis.noSentimentDataAvailable")}</Text>
           <Text style={styles.noDataText}>
-            Sentiment analysis will appear here once the patient has completed conversations.
+            {translate("sentimentAnalysis.noSentimentDataMessage")}
           </Text>
         </View>
       )}
@@ -124,14 +125,14 @@ export function SentimentDashboard({
       {/* Loading state */}
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading sentiment analysis...</Text>
+          <Text style={styles.loadingText}>{translate("sentimentAnalysis.loadingSentimentAnalysis")}</Text>
         </View>
       )}
 
       {/* Footer info */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Sentiment analysis is automatically generated after each conversation using AI technology.
+          {translate("sentimentAnalysis.sentimentAnalysisFooter")}
         </Text>
       </View>
     </ScrollView>

@@ -3,6 +3,7 @@ import { View, ViewStyle, Dimensions } from "react-native"
 import { Text } from "./Text"
 import { colors } from "../theme/colors"
 import { SentimentTrend, SentimentTrendPoint } from "../services/api/api.types"
+import { translate } from "../i18n"
 
 interface SentimentTrendChartProps {
   trend: SentimentTrend
@@ -21,12 +22,12 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
   if (!hasData) {
     return (
       <View style={[styles.container, style]}>
-        <Text style={styles.title}>Sentiment Trend</Text>
+        <Text style={styles.title}>{translate("sentimentAnalysis.sentimentTrend")}</Text>
         <View style={[styles.emptyChart, { width: chartWidth, height: chartHeight }]}>
           <Text style={styles.emptyText}>
             {summary.analyzedConversations > 0 
-              ? `${summary.analyzedConversations} conversation${summary.analyzedConversations === 1 ? '' : 's'} analyzed, but no trend data available yet`
-              : "No sentiment data available"
+              ? translate("sentimentAnalysis.conversationsAnalyzedNoTrend", { s: summary.analyzedConversations === 1 ? '' : 's' })
+              : translate("sentimentAnalysis.noSentimentData")
             }
           </Text>
         </View>
@@ -56,10 +57,10 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
   return (
     <View style={[styles.container, style]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Sentiment Trend ({trend.timeRange})</Text>
+        <Text style={styles.title}>{translate("sentimentAnalysis.sentimentTrend")} ({trend.timeRange})</Text>
         <View style={styles.summaryContainer}>
           <Text style={styles.summaryText}>
-            Avg: {summary.averageSentiment > 0 ? "+" : ""}{summary.averageSentiment.toFixed(1)}
+            {translate("sentimentAnalysis.avg")} {summary.averageSentiment > 0 ? "+" : ""}{summary.averageSentiment.toFixed(1)}
           </Text>
           <Text style={[styles.trendText, getTrendStyle(summary.trendDirection)]}>
             {getTrendIcon(summary.trendDirection)} {summary.trendDirection}
@@ -123,17 +124,17 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
 
       {/* Chart labels */}
       <View style={styles.chartLabels}>
-        <Text style={styles.labelText}>Negative</Text>
-        <Text style={styles.labelText}>Positive</Text>
+        <Text style={styles.labelText}>{translate("sentimentAnalysis.negative")}</Text>
+        <Text style={styles.labelText}>{translate("sentimentAnalysis.positive")}</Text>
       </View>
 
       {/* Data summary */}
       <View style={styles.dataSummary}>
         <Text style={styles.dataText}>
-          {dataPoints.length} conversations analyzed
+          {dataPoints.length} {translate("sentimentAnalysis.conversationsAnalyzed")}
         </Text>
         <Text style={styles.dataText}>
-          Confidence: {Math.round(summary.confidence * 100)}%
+          {translate("sentimentAnalysis.confidence")}: {Math.round(summary.confidence * 100)}%
         </Text>
       </View>
     </View>

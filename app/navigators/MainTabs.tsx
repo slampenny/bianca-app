@@ -31,6 +31,8 @@ import { getOrg } from "app/store/orgSlice"
 import { selectUnreadAlertCount } from "app/store/alertSlice"
 import { Header } from "app/components/Header"
 import { Icon } from "app/components/Icon"
+import { translate } from "../i18n"
+import { useLanguage } from "../hooks/useLanguage"
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator<DrawerParamList>()
@@ -74,6 +76,8 @@ function CustomHeader({ route, navigation, options }: any) {
 }
 
 function HomeStack() {
+  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
+  
   return (
     <Stack.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -81,23 +85,25 @@ function HomeStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Patient" component={PatientScreen} />
-      <Stack.Screen name="Schedule" component={SchedulesScreen} />
-      <Stack.Screen name="Conversations" component={ConversationsScreen} />
-      <Stack.Screen name="Call" component={CallScreen} />
-      <Stack.Screen name="SentimentAnalysis" component={SentimentAnalysisScreen} options={{ title: "Sentiment Analysis" }} />
-      <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={{ title: "Medical Analysis" }} />
-      <Stack.Screen name="Profile" component={ProfileScreen} />
-      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: "Privacy Policy" }} />
-      <Stack.Screen name="Terms" component={TermsScreen} options={{ title: "Terms of Service" }} />
-      <Stack.Screen name="Logout" component={LogoutScreen} />
+      <Stack.Screen name="Home" component={HomeScreen} options={() => ({ title: translate("headers.home") })} />
+      <Stack.Screen name="Patient" component={PatientScreen} options={() => ({ title: translate("headers.patient") })} />
+      <Stack.Screen name="Schedule" component={SchedulesScreen} options={() => ({ title: translate("headers.schedule") })} />
+      <Stack.Screen name="Conversations" component={ConversationsScreen} options={() => ({ title: translate("headers.conversations") })} />
+      <Stack.Screen name="Call" component={CallScreen} options={() => ({ title: translate("headers.call") })} />
+      <Stack.Screen name="SentimentAnalysis" component={SentimentAnalysisScreen} options={() => ({ title: translate("headers.sentimentAnalysis") })} />
+      <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={() => ({ title: translate("headers.medicalAnalysis") })} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={() => ({ title: translate("headers.profile") })} />
+      <Stack.Screen name="Privacy" component={PrivacyScreen} options={() => ({ title: translate("headers.privacyPolicy") })} />
+      <Stack.Screen name="Terms" component={TermsScreen} options={() => ({ title: translate("headers.termsOfService") })} />
+      <Stack.Screen name="Logout" component={LogoutScreen} options={() => ({ title: translate("headers.logout") })} />
     </Stack.Navigator>
   )
 }
 
 
 function AlertStack() {
+  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
+  
   return (
     <Stack.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -105,12 +111,14 @@ function AlertStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Alert" component={AlertScreen} />
+      <Stack.Screen name="Alert" component={AlertScreen} options={() => ({ title: translate("headers.alerts") })} />
     </Stack.Navigator>
   )
 }
 
 function OrgStack() {
+  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
+  
   return (
     <Stack.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -118,18 +126,20 @@ function OrgStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Org" component={OrgScreen} />
-      <Stack.Screen name="Caregivers" component={CaregiversScreen} />
-      <Stack.Screen name="Caregiver" component={CaregiverScreen} />
-      <Stack.Screen name="CaregiverInvited">
+      <Stack.Screen name="Org" component={OrgScreen} options={() => ({ title: translate("headers.organization") })} />
+      <Stack.Screen name="Caregivers" component={CaregiversScreen} options={() => ({ title: translate("headers.caregivers") })} />
+      <Stack.Screen name="Caregiver" component={CaregiverScreen} options={() => ({ title: translate("headers.caregiver") })} />
+      <Stack.Screen name="CaregiverInvited" options={() => ({ title: translate("headers.caregiverInvited") })}>
         {(props) => <CaregiverInvitedScreen {...(props as any)} />}
       </Stack.Screen>
-      <Stack.Screen name="Payment" component={PaymentInfoScreen} />
+      <Stack.Screen name="Payment" component={PaymentInfoScreen} options={() => ({ title: translate("headers.payments") })} />
     </Stack.Navigator>
   )
 }
 
 function ReportsStack() {
+  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
+  
   return (
     <Stack.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -137,10 +147,10 @@ function ReportsStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Reports" component={ReportsScreen} />
-      <Stack.Screen name="SentimentReport" component={SentimentAnalysisScreen} options={{ title: "Sentiment Analysis" }} />
-      <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={{ title: "Medical Analysis" }} />
-      <Stack.Screen name="HealthReport" component={HealthReportScreen} options={{ title: "Mental Health Report" }} />
+      <Stack.Screen name="Reports" component={ReportsScreen} options={() => ({ title: translate("headers.reports") })} />
+      <Stack.Screen name="SentimentReport" component={SentimentAnalysisScreen} options={() => ({ title: translate("headers.sentimentAnalysis") })} />
+      <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={() => ({ title: translate("headers.medicalAnalysis") })} />
+      <Stack.Screen name="HealthReport" component={HealthReportScreen} options={() => ({ title: translate("headers.mentalHealthReport") })} />
     </Stack.Navigator>
   )
 }
@@ -179,7 +189,7 @@ export default function MainTabNavigator() {
         name="Home" 
         component={HomeStack} 
         options={{ 
-          tabBarLabel: "Home",
+          tabBarLabel: translate("tabs.home"),
           tabBarTestID: "tab-home" 
         }} 
       />
@@ -187,7 +197,7 @@ export default function MainTabNavigator() {
         name="Org" 
         component={OrgStack} 
         options={{ 
-          tabBarLabel: "Org",
+          tabBarLabel: translate("tabs.org"),
           tabBarTestID: "tab-org" 
         }} 
       />
@@ -195,7 +205,7 @@ export default function MainTabNavigator() {
         name="Reports" 
         component={ReportsStack} 
         options={{ 
-          tabBarLabel: "Reports",
+          tabBarLabel: translate("tabs.reports"),
           tabBarTestID: "tab-reports" 
         }} 
       />
@@ -203,7 +213,7 @@ export default function MainTabNavigator() {
         name="Alert"
         component={AlertStack}
         options={{
-          tabBarLabel: "Alerts",
+          tabBarLabel: translate("tabs.alerts"),
           tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
           tabBarTestID: "tab-alert",
         }}

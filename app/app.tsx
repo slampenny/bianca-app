@@ -33,6 +33,7 @@ import Config from "./config"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { ViewStyle } from "react-native"
 import useRefreshToken from "./effects/useRefreshToken"
+import { useLanguage } from "./hooks/useLanguage"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -73,6 +74,9 @@ function App(props: AppProps) {
   } = useNavigationPersistence(storage, NAVIGATION_PERSISTENCE_KEY)
 
   const [areFontsLoaded] = useFonts(customFontsToLoad)
+
+  // Set up language change listener to trigger app-wide re-renders
+  useLanguage()
 
   const onBeforeLiftPersistGate = () => {
     // If your initialization scripts run very fast, it's good to show the splash screen for just a bit longer to prevent flicker.

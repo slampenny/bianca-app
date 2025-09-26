@@ -5,6 +5,7 @@ import { colors } from "../theme/colors"
 import { useDebugSentimentAnalysisMutation, useDebugConversationDataMutation, useGetSentimentSummaryQuery, sentimentApi } from "../services/api/sentimentApi"
 import { useSelector, useDispatch } from "react-redux"
 import { getPatient } from "../store/patientSlice"
+import { translate } from "../i18n"
 
 interface SentimentDebugPanelProps {
   style?: any
@@ -41,14 +42,14 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       setDebugResult(result)
       
       Alert.alert(
-        "Debug Complete",
+        translate("sentimentAnalysis.debugComplete"),
         `Found ${result.summary.totalConversations} conversations. Successfully analyzed ${result.summary.successfullyAnalyzed}, failed ${result.summary.failedAnalyses}.`,
         [{ text: "OK" }]
       )
     } catch (error: any) {
       console.error("Debug sentiment analysis failed:", error)
       Alert.alert(
-        "Debug Failed",
+        translate("sentimentAnalysis.debugFailed"),
         error?.data?.message || error?.message || "Unknown error occurred",
         [{ text: "OK" }]
       )
@@ -57,7 +58,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
 
   const handleDebugConversationData = async () => {
     if (!currentPatient?.id) {
-      Alert.alert("No Patient", "Please select a patient first", [{ text: "OK" }])
+      Alert.alert(translate("sentimentAnalysis.noPatient"), translate("sentimentAnalysis.pleaseSelectPatient"), [{ text: "OK" }])
       return
     }
 
@@ -73,14 +74,14 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       console.log('=== END CONVERSATION DEBUG ===')
       
       Alert.alert(
-        "Conversation Debug Complete",
+        translate("sentimentAnalysis.conversationDebugComplete"),
         `Total: ${result.summary.totalConversations}, Recent: ${result.summary.recentConversations}, With Sentiment: ${result.summary.conversationsWithSentiment}, Test Found: ${result.summary.testConversationFound}`,
         [{ text: "OK" }]
       )
     } catch (error: any) {
       console.error("Debug conversation data failed:", error)
       Alert.alert(
-        "Debug Failed",
+        translate("sentimentAnalysis.debugFailed"),
         error?.data?.message || error?.message || "Unknown error occurred",
         [{ text: "OK" }]
       )
@@ -89,13 +90,13 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
 
   return (
     <View style={[styles.container, style]}>
-      <Text style={styles.title}>Sentiment Analysis Debug</Text>
+      <Text style={styles.title}>{translate("sentimentAnalysis.sentimentAnalysisDebug")}</Text>
       <Text style={styles.subtitle}>
-        Debug and fix missing sentiment analysis for recent conversations
+        {translate("sentimentAnalysis.debugSubtitle")}
       </Text>
       
       <Button
-        text={isDebugLoading ? "Debugging..." : "Debug Sentiment Analysis"}
+        text={isDebugLoading ? translate("sentimentAnalysis.debugging") : translate("sentimentAnalysis.debugSentimentAnalysis")}
         onPress={handleDebugSentiment}
         disabled={isDebugLoading}
         style={styles.debugButton}
@@ -103,7 +104,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       />
       
       <Button
-        text={isConversationDebugLoading ? "Loading..." : "Debug Conversation Data"}
+        text={isConversationDebugLoading ? translate("sentimentAnalysis.loading") : translate("sentimentAnalysis.debugConversationData")}
         onPress={handleDebugConversationData}
         disabled={isConversationDebugLoading || !currentPatient}
         style={[styles.debugButton, styles.conversationButton]}
@@ -111,7 +112,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       />
       
       <Button
-        text={isTestLoading ? "Testing..." : "Test Direct API Call"}
+        text={isTestLoading ? translate("sentimentAnalysis.testing") : translate("sentimentAnalysis.testDirectApiCall")}
         onPress={() => {
           console.log('=== DIRECT API TEST ===')
           console.log('Current Patient:', currentPatient)
@@ -119,7 +120,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           console.log('Test Error:', testError)
           console.log('=== END DIRECT TEST ===')
           Alert.alert(
-            "Direct API Test",
+            translate("sentimentAnalysis.directApiTest"),
             `Patient: ${currentPatient?.name || 'None'}\nLoading: ${isTestLoading}\nError: ${testError ? 'Yes' : 'No'}\nData: ${testSummaryData ? 'Received' : 'None'}\n\nSummary Data:\n${JSON.stringify(testSummaryData, null, 2)}`,
             [{ text: "OK" }]
           )
@@ -130,7 +131,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       />
       
       <Button
-        text="Force Refresh Cache"
+        text={translate("sentimentAnalysis.forceRefreshCache")}
         onPress={() => {
           console.log('=== FORCE REFRESH CACHE ===')
           
@@ -153,8 +154,8 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           console.log('=== END FORCE REFRESH ===')
           
           Alert.alert(
-            "Cache Refreshed",
-            "Sentiment analysis cache has been invalidated. The UI should refresh automatically.",
+            translate("sentimentAnalysis.cacheRefreshed"),
+            translate("sentimentAnalysis.cacheRefreshedMessage"),
             [{ text: "OK" }]
           )
         }}
@@ -165,36 +166,36 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       
       {/* Show current patient info */}
       <View style={styles.patientInfo}>
-        <Text style={styles.patientInfoTitle}>Current Patient:</Text>
+        <Text style={styles.patientInfoTitle}>{translate("sentimentAnalysis.currentPatient")}</Text>
         <Text style={styles.patientInfoText}>
-          {currentPatient ? `${currentPatient.name} (${currentPatient.id})` : 'No patient selected'}
+          {currentPatient ? `${currentPatient.name} (${currentPatient.id})` : translate("sentimentAnalysis.noPatientSelected")}
         </Text>
       </View>
 
       {debugResult && (
         <ScrollView style={styles.resultsContainer}>
-          <Text style={styles.resultsTitle}>Debug Results</Text>
+          <Text style={styles.resultsTitle}>{translate("sentimentAnalysis.debugResults")}</Text>
           
           <View style={styles.summaryContainer}>
             <Text style={styles.summaryText}>
-              Total Conversations: {debugResult.summary.totalConversations}
+              {translate("sentimentAnalysis.totalConversations")}: {debugResult.summary.totalConversations}
             </Text>
             <Text style={styles.summaryText}>
-              Without Sentiment: {debugResult.summary.conversationsWithoutSentiment}
+              {translate("sentimentAnalysis.withoutSentiment")}: {debugResult.summary.conversationsWithoutSentiment}
             </Text>
             <Text style={styles.summaryText}>
-              Successfully Analyzed: {debugResult.summary.successfullyAnalyzed}
+              {translate("sentimentAnalysis.successfullyAnalyzed")}: {debugResult.summary.successfullyAnalyzed}
             </Text>
             <Text style={styles.summaryText}>
-              Failed Analyses: {debugResult.summary.failedAnalyses}
+              {translate("sentimentAnalysis.failedAnalyses")}: {debugResult.summary.failedAnalyses}
             </Text>
           </View>
 
-          <Text style={styles.conversationsTitle}>Conversation Details</Text>
+          <Text style={styles.conversationsTitle}>{translate("sentimentAnalysis.conversationDetails")}</Text>
           {debugResult.conversations.map((conv: any, index: number) => (
             <View key={conv.conversationId} style={styles.conversationItem}>
               <Text style={styles.conversationHeader}>
-                {index + 1}. {conv.patientName} ({conv.messageCount} messages)
+                {index + 1}. {conv.patientName} ({conv.messageCount} {translate("sentimentAnalysis.messages")})
               </Text>
               <Text style={styles.conversationTime}>
                 {new Date(conv.endTime).toLocaleString()}
@@ -204,27 +205,27 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
                 conv.analysisResult.success ? (
                   <View style={styles.successResult}>
                     <Text style={styles.resultText}>
-                      ✅ Sentiment: {conv.analysisResult.sentiment} (Score: {conv.analysisResult.score})
+                      ✅ {translate("sentimentAnalysis.sentiment")}: {conv.analysisResult.sentiment} ({translate("sentimentAnalysis.score")}: {conv.analysisResult.score})
                     </Text>
                     <Text style={styles.resultText}>
-                      Mood: {conv.analysisResult.mood}
+                      {translate("sentimentAnalysis.mood")}: {conv.analysisResult.mood}
                     </Text>
                     <Text style={styles.resultText}>
-                      Emotions: {conv.analysisResult.emotions?.join(", ") || "N/A"}
+                      {translate("sentimentAnalysis.emotions")}: {conv.analysisResult.emotions?.join(", ") || "N/A"}
                     </Text>
                     <Text style={styles.resultText}>
-                      Concern Level: {conv.analysisResult.concernLevel}
+                      {translate("sentimentAnalysis.concernLevel")}: {conv.analysisResult.concernLevel}
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.errorResult}>
                     <Text style={styles.errorText}>
-                      ❌ Failed: {conv.analysisResult.error}
+                      ❌ {translate("sentimentAnalysis.failed")}: {conv.analysisResult.error}
                     </Text>
                   </View>
                 )
               ) : (
-                <Text style={styles.noResultText}>No analysis performed</Text>
+                <Text style={styles.noResultText}>{translate("sentimentAnalysis.noAnalysisPerformed")}</Text>
               )}
             </View>
           ))}

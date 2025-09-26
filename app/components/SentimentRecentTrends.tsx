@@ -4,6 +4,7 @@ import { Text } from "./Text"
 import { Icon } from "./Icon"
 import { colors } from "../theme/colors"
 import { SentimentTrendPoint, SentimentType } from "../services/api/api.types"
+import { translate } from "../i18n"
 
 interface SentimentRecentTrendsProps {
   recentTrend: SentimentTrendPoint[]
@@ -17,9 +18,9 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
   if (recentTrend.length === 0) {
     return (
       <View style={[styles.container, style]}>
-        <Text style={styles.title}>Recent Conversations</Text>
+        <Text style={styles.title}>{translate("sentimentAnalysis.recentConversationsTitle")}</Text>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No recent conversations with sentiment analysis</Text>
+          <Text style={styles.emptyText}>{translate("sentimentAnalysis.noRecentConversations")}</Text>
         </View>
       </View>
     )
@@ -27,9 +28,9 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
 
   return (
     <View style={[styles.container, style]}>
-      <Text style={styles.title}>Recent Conversations</Text>
+      <Text style={styles.title}>{translate("sentimentAnalysis.recentConversationsTitle")}</Text>
       <Text style={styles.subtitle}>
-        {recentTrend.length} conversation{recentTrend.length === 1 ? '' : 's'} with sentiment analysis
+        {recentTrend.length} {translate("sentimentAnalysis.conversationsWithSentiment", { s: recentTrend.length === 1 ? '' : 's' })}
       </Text>
       
       <ScrollView 
@@ -82,7 +83,7 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                 {/* Key emotions */}
                 {conversation.sentiment.keyEmotions && conversation.sentiment.keyEmotions.length > 0 && (
                   <View style={styles.emotionsContainer}>
-                    <Text style={styles.emotionsLabel}>Key Emotions:</Text>
+                    <Text style={styles.emotionsLabel}>{translate("sentimentAnalysis.keyEmotions")}</Text>
                     <View style={styles.emotionsList}>
                       {conversation.sentiment.keyEmotions.slice(0, 3).map((emotion, emotionIndex) => (
                         <View key={emotionIndex} style={styles.emotionTag}>
@@ -91,7 +92,7 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                       ))}
                       {conversation.sentiment.keyEmotions.length > 3 && (
                         <Text style={styles.moreEmotions}>
-                          +{conversation.sentiment.keyEmotions.length - 3} more
+                          +{conversation.sentiment.keyEmotions.length - 3} {translate("sentimentAnalysis.moreEmotions")}
                         </Text>
                       )}
                     </View>
@@ -101,7 +102,7 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                 {/* Patient mood */}
                 {conversation.sentiment.patientMood && (
                   <View style={styles.moodContainer}>
-                    <Text style={styles.moodLabel}>Patient Mood:</Text>
+                    <Text style={styles.moodLabel}>{translate("sentimentAnalysis.patientMood")}</Text>
                     <Text style={styles.moodText} numberOfLines={2}>
                       {conversation.sentiment.patientMood}
                     </Text>
@@ -121,7 +122,7 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                         styles.concernText,
                         { color: getConcernColor(conversation.sentiment.concernLevel) }
                       ]}>
-                        {conversation.sentiment.concernLevel} concern
+                        {conversation.sentiment.concernLevel} {translate("sentimentAnalysis.concern")}
                       </Text>
                     </View>
                   </View>
@@ -131,13 +132,13 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                 <View style={styles.confidenceContainer}>
                   <Icon icon="shield" size={12} color={colors.textDim} />
                   <Text style={styles.confidenceText}>
-                    {Math.round(conversation.sentiment.confidence * 100)}% confidence
+                    {Math.round(conversation.sentiment.confidence * 100)}% {translate("sentimentAnalysis.confidence")}
                   </Text>
                 </View>
               </View>
             ) : (
               <View style={styles.noSentimentContainer}>
-                <Text style={styles.noSentimentText}>No sentiment analysis available</Text>
+                <Text style={styles.noSentimentText}>{translate("sentimentAnalysis.noSentimentAnalysisAvailable")}</Text>
               </View>
             )}
           </View>

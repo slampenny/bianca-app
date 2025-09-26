@@ -7,6 +7,7 @@ import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
 import { getPatientsForCaregiver, setPatient } from "../store/patientSlice"
 import { Patient } from "../services/api/api.types"
+import { translate } from "../i18n"
 
 const { width } = Dimensions.get('window')
 const buttonSize = Math.min((width - 60) / 2, 160) // Max 160px width, responsive
@@ -55,14 +56,14 @@ export function ReportsScreen() {
     <View style={styles.container}>
       {/* Patient Selector */}
       <View style={styles.patientSelector}>
-        <Text style={styles.selectorLabel}>Select Patient:</Text>
+        <Text style={styles.selectorLabel}>{translate("reportsScreen.selectPatient")}</Text>
         <Pressable
           style={styles.patientPicker}
           onPress={() => setShowPatientPicker(true)}
           testID="patient-picker-button"
         >
           <Text style={styles.patientPickerText}>
-            {selectedPatient ? selectedPatient.name : "Choose a patient..."}
+            {selectedPatient ? selectedPatient.name : translate("reportsScreen.choosePatient")}
           </Text>
           <Ionicons name="chevron-down" size={20} color={colors.palette.neutral600} />
         </Pressable>
@@ -87,7 +88,7 @@ export function ReportsScreen() {
                 size={32} 
                 color={colors.palette.neutral100}
               />
-              <Text style={styles.buttonText}>Sentiment</Text>
+              <Text style={styles.buttonText}>{translate("reportsScreen.sentiment")}</Text>
             </View>
           </Pressable>
           
@@ -107,7 +108,7 @@ export function ReportsScreen() {
                 size={32} 
                 color={colors.palette.neutral100}
               />
-              <Text style={styles.buttonText}>Medical Analysis</Text>
+              <Text style={styles.buttonText}>{translate("reportsScreen.medicalAnalysis")}</Text>
             </View>
           </Pressable>
         </View>
@@ -125,7 +126,7 @@ export function ReportsScreen() {
                 size={32} 
                 color={colors.palette.neutral600}
               />
-              <Text style={[styles.buttonText, styles.comingSoonText]}>Coming Soon</Text>
+              <Text style={[styles.buttonText, styles.comingSoonText]}>{translate("reportsScreen.comingSoon")}</Text>
             </View>
           </Pressable>
           
@@ -140,7 +141,7 @@ export function ReportsScreen() {
                 size={32} 
                 color={colors.palette.neutral600}
               />
-              <Text style={[styles.buttonText, styles.comingSoonText]}>Coming Soon</Text>
+              <Text style={[styles.buttonText, styles.comingSoonText]}>{translate("reportsScreen.comingSoon")}</Text>
             </View>
           </Pressable>
         </View>
@@ -157,7 +158,7 @@ export function ReportsScreen() {
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Select Patient</Text>
+                <Text style={styles.modalTitle}>{translate("reportsScreen.modalTitle")}</Text>
                 <ScrollView style={styles.patientList}>
                   {patients.map((patient) => (
                     <Pressable
@@ -183,7 +184,7 @@ export function ReportsScreen() {
                   style={styles.modalCloseButton}
                   onPress={() => setShowPatientPicker(false)}
                 >
-                  <Text style={styles.modalCloseText}>Cancel</Text>
+                  <Text style={styles.modalCloseText}>{translate("reportsScreen.modalCancel")}</Text>
                 </Pressable>
               </View>
             </TouchableWithoutFeedback>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react"
 import { Platform, Image, View, StyleSheet, Pressable, Text } from "react-native"
 import * as ImagePicker from "expo-image-picker"
 import { colors } from "app/theme/colors"
+import { translate } from "../i18n"
+import { useLanguage } from "../hooks/useLanguage"
 
 interface AvatarPickerProps {
   initialAvatar: string | null
@@ -10,6 +12,9 @@ interface AvatarPickerProps {
 
 const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChanged }) => {
   const [image, setImage] = useState<string | null>(null)
+  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
+  
+  console.log("AvatarPicker rendered with language:", currentLanguage)
 
   useEffect(() => {
     if (initialAvatar) {
@@ -113,7 +118,7 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
         )}
       </View>
       <Pressable style={styles.selectButton} onPress={pickImage}>
-        <Text style={styles.selectButtonText}>Select Image</Text>
+        <Text style={styles.selectButtonText}>{translate("common.selectImage")}</Text>
       </Pressable>
 
       {/* Debug text to show the current image URI

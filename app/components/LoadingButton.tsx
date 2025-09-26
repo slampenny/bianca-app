@@ -1,15 +1,19 @@
 import React from "react"
 import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from "react-native"
 import { colors } from "app/theme/colors"
+import { translate } from "app/i18n"
 
 interface LoadingButtonProps {
   onPress: () => void
-  title: string
+  title?: string
+  tx?: string
+  txOptions?: any
   loading?: boolean
   disabled?: boolean
   style?: ViewStyle
   textStyle?: TextStyle
   loadingText?: string
+  loadingTx?: string
   testID?: string
   spinnerTestID?: string
 }
@@ -17,21 +21,42 @@ interface LoadingButtonProps {
 export const LoadingButton: React.FC<LoadingButtonProps> = ({
   onPress,
   title,
+  tx,
+  txOptions,
   loading = false,
   disabled = false,
   style,
   textStyle,
   loadingText,
+  loadingTx,
   testID,
   spinnerTestID,
 }) => {
   const isDisabled = disabled || loading
 
   const handlePress = () => {
-    console.log('LoadingButton pressed', { title, loading, disabled, isDisabled, testID })
+    console.log('LoadingButton pressed', { title, tx, loading, disabled, isDisabled, testID })
     if (!isDisabled && onPress) {
       onPress()
     }
+  }
+
+  // Get the display text based on props
+  const getDisplayText = () => {
+    if (tx) {
+      return translate(tx, txOptions)
+    }
+    return title || ""
+  }
+
+  const getLoadingText = () => {
+    if (loadingTx) {
+      return translate(loadingTx, txOptions)
+    }
+    if (loadingText) {
+      return loadingText
+    }
+    return getDisplayText()
   }
 
   return (
@@ -49,12 +74,12 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
         <>
           <ActivityIndicator size="small" color={colors.palette.neutral100} style={styles.spinner} testID={spinnerTestID} />
           <Text style={[styles.buttonText, textStyle]}>
-            {loadingText || title}
+            {getLoadingText()}
           </Text>
         </>
       ) : (
         <Text style={[styles.buttonText, textStyle]}>
-          {title}
+          {getDisplayText()}
         </Text>
       )}
     </Pressable>

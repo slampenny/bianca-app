@@ -12,6 +12,7 @@ import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Text, TextField, Button } from "app/components"
 import { useForgotPasswordMutation } from "../services/api/authApi"
 import { colors } from "app/theme/colors"
+import { translate } from "../i18n"
 
 export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
@@ -24,7 +25,7 @@ export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, 
     setEmail(text)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(text)) {
-      setEmailError("Please enter a valid email address")
+      setEmailError(translate("errors.invalidEmail"))
     } else {
       setEmailError("")
     }
@@ -37,9 +38,9 @@ export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, 
 
     try {
       await requestReset({ email }).unwrap()
-      setSuccessMessage("Reset code sent to your email!")
+      setSuccessMessage(translate("requestResetScreen.successMessage"))
     } catch (err) {
-      setEmailError("Request failed. Please check your email and try again.")
+      setEmailError(translate("requestResetScreen.requestFailed"))
     }
   }
 

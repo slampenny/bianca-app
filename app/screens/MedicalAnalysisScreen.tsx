@@ -5,6 +5,7 @@ import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { Screen } from "../components/Screen"
 import { colors } from "../theme/colors"
+import { translate } from "../i18n"
 import { Ionicons } from "@expo/vector-icons"
 import { 
   useGetMedicalAnalysisResultsQuery,
@@ -71,11 +72,11 @@ export function MedicalAnalysisScreen() {
   React.useEffect(() => {
     if (analysisError) {
       console.error('Error loading medical analysis results:', analysisError)
-      let errorMessage = 'Failed to load medical analysis results'
+      let errorMessage = translate('medicalAnalysis.loadFailed')
       if ('data' in analysisError && analysisError.data) {
         errorMessage = (analysisError.data as any)?.message || errorMessage
       }
-      Alert.alert('Error', errorMessage)
+      Alert.alert(translate('medicalAnalysis.error'), errorMessage)
     }
   }, [analysisError])
 
@@ -83,11 +84,11 @@ export function MedicalAnalysisScreen() {
   React.useEffect(() => {
     if (triggerError) {
       console.error('Error triggering medical analysis:', triggerError)
-      let errorMessage = 'Failed to trigger medical analysis'
+      let errorMessage = translate('medicalAnalysis.triggerFailed')
       if ('data' in triggerError && triggerError.data) {
         errorMessage = (triggerError.data as any)?.message || errorMessage
       }
-      Alert.alert('Error', errorMessage)
+      Alert.alert(translate('medicalAnalysis.error'), errorMessage)
     }
   }, [triggerError])
 
@@ -101,13 +102,13 @@ export function MedicalAnalysisScreen() {
       
       if (result.success) {
         Alert.alert(
-          'Success', 
-          'Medical analysis triggered successfully. Results will appear in about 10 seconds.'
+          translate('medicalAnalysis.success'), 
+          translate('medicalAnalysis.triggerSuccess')
         )
         // RTK Query will automatically refetch results after 10 seconds
         // No manual polling needed!
       } else {
-        Alert.alert('Error', result.message || 'Failed to trigger analysis')
+        Alert.alert(translate('medicalAnalysis.error'), result.message || translate('medicalAnalysis.triggerFailed'))
       }
     } catch (error) {
       // Error is handled by the useEffect above
@@ -121,8 +122,8 @@ export function MedicalAnalysisScreen() {
       <Screen preset="scroll" style={styles.container}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.palette.neutral600} />
-          <Text style={styles.errorText}>No patient selected</Text>
-          <Text style={styles.errorSubtext}>Please select a patient to view medical analysis</Text>
+          <Text style={styles.errorText}>{translate("medicalAnalysis.noPatientSelected")}</Text>
+          <Text style={styles.errorSubtext}>{translate("medicalAnalysis.selectPatientToView")}</Text>
         </View>
       </Screen>
     )
@@ -141,9 +142,9 @@ export function MedicalAnalysisScreen() {
   }
 
   const getRiskLevel = (score: number) => {
-    if (score >= 70) return { level: 'High', color: colors.palette.biancaError }
-    if (score >= 40) return { level: 'Medium', color: colors.palette.biancaWarning }
-    return { level: 'Low', color: colors.palette.biancaSuccess }
+    if (score >= 70) return { level: translate('medicalAnalysis.high'), color: colors.palette.biancaError }
+    if (score >= 40) return { level: translate('medicalAnalysis.medium'), color: colors.palette.biancaWarning }
+    return { level: translate('medicalAnalysis.low'), color: colors.palette.biancaSuccess }
   }
 
   const getTrendIcon = (trend: string) => {
@@ -165,7 +166,7 @@ export function MedicalAnalysisScreen() {
   return (
     <Screen preset="scroll" style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Medical Analysis</Text>
+        <Text style={styles.title}>{translate("medicalAnalysis.title")}</Text>
         <Text style={styles.patientName}>{patientName}</Text>
       </View>
 
@@ -189,7 +190,7 @@ export function MedicalAnalysisScreen() {
             />
           )}
           <Text style={styles.actionButtonText}>
-            {isTriggering ? 'Triggering...' : 'Trigger Analysis'}
+            {isTriggering ? translate('medicalAnalysis.triggering') : translate('medicalAnalysis.triggerAnalysis')}
           </Text>
         </Pressable>
 
@@ -197,13 +198,13 @@ export function MedicalAnalysisScreen() {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading analysis results...</Text>
+          <Text style={styles.loadingText}>{translate("medicalAnalysis.loadingResults")}</Text>
         </View>
       ) : analysisResults.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="analytics" size={48} color={colors.palette.neutral600} />
-          <Text style={styles.emptyText}>No analysis results available</Text>
-          <Text style={styles.emptySubtext}>Trigger an analysis to get started</Text>
+          <Text style={styles.emptyText}>{translate("medicalAnalysis.noResultsAvailable")}</Text>
+          <Text style={styles.emptySubtext}>{translate("medicalAnalysis.triggerToGetStarted")}</Text>
         </View>
       ) : (
         <ScrollView style={styles.resultsContainer}>
@@ -244,8 +245,8 @@ export function MedicalAnalysisScreen() {
               return (
                 <View style={styles.emptyContainer}>
                   <Ionicons name="analytics" size={48} color={colors.palette.neutral600} />
-                  <Text style={styles.emptyText}>No analysis results available</Text>
-                  <Text style={styles.emptySubtext}>Trigger an analysis to get started</Text>
+                  <Text style={styles.emptyText}>{translate("medicalAnalysis.noResultsAvailable")}</Text>
+                  <Text style={styles.emptySubtext}>{translate("medicalAnalysis.triggerToGetStarted")}</Text>
                 </View>
               )
             }
@@ -274,7 +275,7 @@ export function MedicalAnalysisScreen() {
               <View style={styles.metricsGrid}>
                 {/* Cognitive Metrics */}
                 <View style={styles.metricCard}>
-                  <Text style={styles.metricTitle}>Cognitive Health</Text>
+                  <Text style={styles.metricTitle}>{translate("medicalAnalysis.cognitiveHealth")}</Text>
                   <View style={styles.metricValue}>
                     <Text style={styles.metricNumber}>
                       {latestResult.cognitiveMetrics?.riskScore ?? '--'}
@@ -285,13 +286,13 @@ export function MedicalAnalysisScreen() {
                     styles.metricLevel, 
                     { color: getRiskLevel(latestResult.cognitiveMetrics?.riskScore ?? 0).color }
                   ]}>
-                    {getRiskLevel(latestResult.cognitiveMetrics?.riskScore ?? 0).level} Risk
+                    {getRiskLevel(latestResult.cognitiveMetrics?.riskScore ?? 0).level} {translate("medicalAnalysis.risk")}
                   </Text>
                 </View>
 
                 {/* Psychiatric Metrics */}
                 <View style={styles.metricCard}>
-                  <Text style={styles.metricTitle}>Mental Health</Text>
+                  <Text style={styles.metricTitle}>{translate("medicalAnalysis.mentalHealth")}</Text>
                   <View style={styles.metricValue}>
                     <Text style={styles.metricNumber}>
                       {latestResult.psychiatricMetrics?.overallRiskScore ?? '--'}
@@ -302,13 +303,13 @@ export function MedicalAnalysisScreen() {
                     styles.metricLevel, 
                     { color: getRiskLevel(latestResult.psychiatricMetrics?.overallRiskScore ?? 0).color }
                   ]}>
-                    {getRiskLevel(latestResult.psychiatricMetrics?.overallRiskScore ?? 0).level} Risk
+                    {getRiskLevel(latestResult.psychiatricMetrics?.overallRiskScore ?? 0).level} {translate("medicalAnalysis.risk")}
                   </Text>
                 </View>
 
                 {/* Vocabulary Metrics */}
                 <View style={styles.metricCard}>
-                  <Text style={styles.metricTitle}>Language</Text>
+                  <Text style={styles.metricTitle}>{translate("medicalAnalysis.language")}</Text>
                   <View style={styles.metricValue}>
                     <Text style={styles.metricNumber}>
                       {latestResult.vocabularyMetrics?.complexityScore ?? '--'}
@@ -319,8 +320,8 @@ export function MedicalAnalysisScreen() {
                     styles.metricLevel, 
                     { color: getRiskLevel(100 - (latestResult.vocabularyMetrics?.complexityScore ?? 0)).color }
                   ]}>
-                    {(latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 70 ? 'Good' : 
-                     (latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 40 ? 'Fair' : 'Poor'}
+                    {(latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 70 ? translate('medicalAnalysis.good') : 
+                     (latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 40 ? translate('medicalAnalysis.fair') : translate('medicalAnalysis.poor')}
                   </Text>
                 </View>
               </View>
@@ -328,7 +329,7 @@ export function MedicalAnalysisScreen() {
               {/* Warnings */}
               {latestResult.warnings && latestResult.warnings.length > 0 && (
                 <View style={styles.warningsContainer}>
-                  <Text style={styles.warningsTitle}>Warnings & Insights</Text>
+                  <Text style={styles.warningsTitle}>{translate("medicalAnalysis.warningsInsights")}</Text>
                   {latestResult.warnings.map((warning, warningIndex) => (
                     <View key={warningIndex} style={styles.warningItem}>
                       <Ionicons name="warning" size={16} color={colors.palette.biancaWarning} />
@@ -340,22 +341,22 @@ export function MedicalAnalysisScreen() {
 
               {/* Analysis Details */}
               <View style={styles.detailsContainer}>
-                <Text style={styles.detailsTitle}>Analysis Details</Text>
+                <Text style={styles.detailsTitle}>{translate("medicalAnalysis.analysisDetails")}</Text>
                 <View style={styles.detailsGrid}>
                   <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Conversations</Text>
+                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.conversations")}</Text>
                     <Text style={styles.detailValue}>{latestResult.conversationCount ?? '--'}</Text>
                   </View>
                   <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Messages</Text>
+                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.messages")}</Text>
                     <Text style={styles.detailValue}>{latestResult.messageCount ?? '--'}</Text>
                   </View>
                   <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Total Words</Text>
+                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.totalWords")}</Text>
                     <Text style={styles.detailValue}>{latestResult.totalWords ?? '--'}</Text>
                   </View>
                   <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Trigger</Text>
+                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.trigger")}</Text>
                     <Text style={styles.detailValue}>{latestResult.trigger ?? '--'}</Text>
                   </View>
                 </View>
@@ -365,11 +366,11 @@ export function MedicalAnalysisScreen() {
             {/* Time Series Chart */}
             {(trendData?.trend?.summary || timeSeriesData.length >= 1) && (
               <View style={styles.chartContainer}>
-                <Text style={styles.chartTitle}>Trends Over Time</Text>
+                <Text style={styles.chartTitle}>{translate("medicalAnalysis.trendsOverTime")}</Text>
                 {trendData?.trend?.summary ? (
                   <View style={styles.trendsContainer}>
                     <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>Cognitive Health</Text>
+                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.cognitiveHealth")}</Text>
                       <View style={styles.trendValue}>
                         <Ionicons 
                           name={getTrendIcon(trendData.trend.summary.cognitiveTrend)} 
@@ -383,7 +384,7 @@ export function MedicalAnalysisScreen() {
                     </View>
                     
                     <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>Mental Health</Text>
+                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.mentalHealth")}</Text>
                       <View style={styles.trendValue}>
                         <Ionicons 
                           name={getTrendIcon(trendData.trend.summary.psychiatricTrend)} 
@@ -397,7 +398,7 @@ export function MedicalAnalysisScreen() {
                     </View>
                     
                     <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>Language</Text>
+                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.language")}</Text>
                       <View style={styles.trendValue}>
                         <Ionicons 
                           name={getTrendIcon(trendData.trend.summary.vocabularyTrend)} 
@@ -411,10 +412,10 @@ export function MedicalAnalysisScreen() {
                     </View>
                     
                     <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>Overall Health</Text>
+                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.overallHealth")}</Text>
                       <View style={styles.trendValue}>
                         <Text style={styles.trendText}>
-                          {trendData.trend.totalAnalyses} analyses
+                          {trendData.trend.totalAnalyses} {translate("medicalAnalysis.analyses")}
                         </Text>
                       </View>
                     </View>
@@ -423,17 +424,17 @@ export function MedicalAnalysisScreen() {
                   <View style={styles.chartPlaceholder}>
                     <Ionicons name="trending-up" size={48} color={colors.palette.neutral400} />
                     <Text style={styles.chartPlaceholderText}>
-                      Trend analysis coming soon
+                      {translate("medicalAnalysis.trendAnalysisComingSoon")}
                     </Text>
                     <Text style={styles.chartSubtext}>
-                      {timeSeriesData.length} analysis results available
+                      {timeSeriesData.length} {translate("medicalAnalysis.analysisResultsAvailable")}
                     </Text>
                   </View>
                 )}
                 
                 {trendData?.trend?.totalAnalyses > 0 && (
                   <Text style={styles.chartSubtext}>
-                    Based on {trendData.trend.totalAnalyses} analysis results over {trendData.trend.timeRange}
+                    {translate("medicalAnalysis.basedOn")} {trendData.trend.totalAnalyses} {translate("medicalAnalysis.analysisResultsOver")} {trendData.trend.timeRange}
                   </Text>
                 )}
               </View>

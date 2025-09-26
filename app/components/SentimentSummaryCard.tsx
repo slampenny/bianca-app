@@ -4,6 +4,7 @@ import { Text } from "./Text"
 import { Icon } from "./Icon"
 import { colors } from "../theme/colors"
 import { SentimentSummary, SentimentType, TrendDirection } from "../services/api/api.types"
+import { translate } from "../i18n"
 
 interface SentimentSummaryCardProps {
   summary: SentimentSummary
@@ -16,7 +17,7 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
   return (
     <View style={[styles.container, style]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Sentiment Overview</Text>
+        <Text style={styles.title}>{translate("sentimentAnalysis.sentimentOverview")}</Text>
         <View style={styles.confidenceContainer}>
           <Icon icon="shield" size={16} color={colors.textDim} />
           <Text style={styles.confidenceText}>{Math.round(confidence * 100)}%</Text>
@@ -28,7 +29,7 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
         <Text style={[styles.mainScore, { color: getSentimentColor(averageSentiment) }]}>
           {averageSentiment > 0 ? "+" : ""}{averageSentiment.toFixed(1)}
         </Text>
-        <Text style={styles.mainScoreLabel}>Average Sentiment</Text>
+        <Text style={styles.mainScoreLabel}>{translate("sentimentAnalysis.averageSentiment")}</Text>
       </View>
 
       {/* Trend indicator */}
@@ -37,13 +38,13 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
           <Icon icon={getTrendIcon(trendDirection)} size={16} color={colors.palette.neutral100} />
         </View>
         <Text style={[styles.trendText, { color: getTrendColor(trendDirection) }]}>
-          {trendDirection.charAt(0).toUpperCase() + trendDirection.slice(1)} trend
+          {trendDirection.charAt(0).toUpperCase() + trendDirection.slice(1)} {translate("sentimentAnalysis.trend")}
         </Text>
       </View>
 
       {/* Sentiment distribution */}
       <View style={styles.distributionContainer}>
-        <Text style={styles.distributionTitle}>Recent Distribution</Text>
+        <Text style={styles.distributionTitle}>{translate("sentimentAnalysis.recentDistribution")}</Text>
         <View style={styles.distributionBars}>
           {Object.entries(sentimentDistribution).map(([sentiment, count]) => (
             <View key={sentiment} style={styles.distributionItem}>
@@ -68,7 +69,7 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
       {/* Key insights */}
       {keyInsights.length > 0 && (
         <View style={styles.insightsContainer}>
-          <Text style={styles.insightsTitle}>Key Insights</Text>
+          <Text style={styles.insightsTitle}>{translate("sentimentAnalysis.keyInsights")}</Text>
           {keyInsights.map((insight, index) => (
             <View key={index} style={styles.insightItem}>
               <Icon icon="lightbulb" size={14} color={colors.palette.accent500} />
@@ -82,11 +83,11 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
       <View style={styles.additionalInfo}>
         <View style={styles.infoRow}>
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Total Conversations</Text>
+            <Text style={styles.infoLabel}>{translate("sentimentAnalysis.totalConversations")}</Text>
             <Text style={styles.infoValue}>{summary.totalConversations}</Text>
           </View>
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Analysis Coverage</Text>
+            <Text style={styles.infoLabel}>{translate("sentimentAnalysis.analysisCoverage")}</Text>
             <Text style={styles.infoValue}>
               {summary.totalConversations > 0 
                 ? Math.round((summary.analyzedConversations / summary.totalConversations) * 100)
@@ -98,11 +99,11 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
         {summary.recentTrend && summary.recentTrend.length > 0 && (
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Recent Conversations</Text>
-              <Text style={styles.infoValue}>{summary.recentTrend.length} analyzed</Text>
+              <Text style={styles.infoLabel}>{translate("sentimentAnalysis.recentConversations")}</Text>
+              <Text style={styles.infoValue}>{summary.recentTrend.length} {translate("sentimentAnalysis.analyzed")}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Latest Analysis</Text>
+              <Text style={styles.infoLabel}>{translate("sentimentAnalysis.latestAnalysis")}</Text>
               <Text style={styles.infoValue}>
                 {summary.recentTrend[0]?.sentimentAnalyzedAt 
                   ? new Date(summary.recentTrend[0].sentimentAnalyzedAt).toLocaleDateString()
@@ -117,7 +118,7 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
       {/* Data summary */}
       <View style={styles.dataSummary}>
         <Text style={styles.dataText}>
-          {summary.analyzedConversations} of {summary.totalConversations} conversations analyzed
+          {summary.analyzedConversations} of {summary.totalConversations} {translate("sentimentAnalysis.conversationsAnalyzed")}
         </Text>
       </View>
     </View>

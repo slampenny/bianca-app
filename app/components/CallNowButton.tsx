@@ -7,6 +7,7 @@ import { initiateCall } from "../services/api/callWorkflowApi"
 import { colors } from "app/theme/colors"
 import { useAppDispatch } from "../store/store"
 import { setActiveCall, setCallStatus } from "../store/callSlice"
+import { translate } from "app/i18n"
 
 interface CallNowButtonProps {
   patientId: string
@@ -90,7 +91,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       )}
       
       <Button
-        text={isCalling ? "Calling..." : "Call Now"}
+        text={isCalling ? translate("common.calling") : translate("common.callNow")}
         preset="primary"
         onPress={handleCallNow}
         disabled={disabled || isCalling}

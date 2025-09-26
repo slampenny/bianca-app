@@ -13,6 +13,7 @@ import { getCurrentUser, getAuthTokens } from "../store/authSlice"
 import { getOrg } from "../store/orgSlice"
 import { useGetInvoicesByOrgQuery, useGetUnbilledCostsByOrgQuery } from "../services/api/paymentApi"
 import { WebView } from "react-native-webview"
+import { translate } from "../i18n"
 import Config from "../config"
 import { colors, spacing } from "app/theme"
 import { Text, Card, ListItem, Button, Icon } from "app/components"
@@ -24,15 +25,15 @@ const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
 const getInvoiceStatusInfo = (status: string) => {
   switch (status?.toLowerCase()) {
     case 'paid':
-      return { color: colors.palette.accent500, icon: 'check' as const, label: 'Paid' }
+      return { color: colors.palette.accent500, icon: 'check' as const, label: translate("paymentScreen.paid") }
     case 'pending':
-      return { color: colors.palette.secondary300, icon: 'view' as const, label: 'Pending' }
+      return { color: colors.palette.secondary300, icon: 'view' as const, label: translate("paymentScreen.pending") }
     case 'overdue':
-      return { color: colors.palette.angry500, icon: 'x' as const, label: 'Overdue' }
+      return { color: colors.palette.angry500, icon: 'x' as const, label: translate("paymentScreen.overdue") }
     case 'processing':
-      return { color: colors.palette.secondary500, icon: 'more' as const, label: 'Processing' }
+      return { color: colors.palette.secondary500, icon: 'more' as const, label: translate("paymentScreen.processing") }
     default:
-      return { color: colors.palette.neutral500, icon: 'more' as const, label: status || 'Unknown' }
+      return { color: colors.palette.neutral500, icon: 'more' as const, label: status || translate("paymentScreen.unknown") }
   }
 }
 
@@ -86,11 +87,11 @@ function LatestInvoiceCard({ invoice }: { invoice: any }) {
     <Card
       preset="default"
       style={styles.latestInvoiceCard}
-      heading="Latest Invoice"
+      heading={translate("paymentScreen.latestInvoice")}
       HeadingComponent={
         <View style={styles.latestInvoiceHeader}>
           <Text preset="subheading" style={styles.latestInvoiceTitle}>
-            Latest Invoice
+            {translate("paymentScreen.latestInvoice")}
           </Text>
           <InvoiceStatusBadge status={invoice.status} />
         </View>
@@ -98,26 +99,26 @@ function LatestInvoiceCard({ invoice }: { invoice: any }) {
       ContentComponent={
         <View style={styles.latestInvoiceContent}>
           <View style={styles.invoiceRow}>
-            <Text style={styles.invoiceLabel}>Amount:</Text>
+            <Text style={styles.invoiceLabel}>{translate("paymentScreen.amount")}</Text>
             <Text preset="bold" style={styles.invoiceAmount}>
               {formatCurrency(invoice.totalAmount)}
             </Text>
           </View>
           <View style={styles.invoiceRow}>
-            <Text style={styles.invoiceLabel}>Invoice Number:</Text>
+            <Text style={styles.invoiceLabel}>{translate("paymentScreen.invoiceNumber")}</Text>
             <Text style={styles.invoiceValue}>{invoice.invoiceNumber}</Text>
           </View>
           <View style={styles.invoiceRow}>
-            <Text style={styles.invoiceLabel}>Issue Date:</Text>
+            <Text style={styles.invoiceLabel}>{translate("paymentScreen.issueDate")}</Text>
             <Text style={styles.invoiceValue}>{formatDate(invoice.issueDate)}</Text>
           </View>
           <View style={styles.invoiceRow}>
-            <Text style={styles.invoiceLabel}>Due Date:</Text>
+            <Text style={styles.invoiceLabel}>{translate("paymentScreen.dueDate")}</Text>
             <Text style={styles.invoiceValue}>{formatDate(invoice.dueDate)}</Text>
           </View>
           {invoice.notes && (
             <View style={styles.invoiceNotesContainer}>
-              <Text style={styles.invoiceLabel}>Notes:</Text>
+              <Text style={styles.invoiceLabel}>{translate("paymentScreen.notes")}</Text>
               <Text style={styles.invoiceNotes}>{invoice.notes}</Text>
             </View>
           )}
@@ -138,7 +139,7 @@ function PaymentMethodsScreen() {
   if (!org || !org.id) {
     return (
       <View style={styles.screenContainer} testID="payment-methods-container">
-        <Text style={styles.emptyText}>No organization data available.</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.noOrganizationData")}</Text>
       </View>
     )
   }
@@ -146,7 +147,7 @@ function PaymentMethodsScreen() {
   if (!jwt) {
     return (
       <View style={styles.screenContainer} testID="payment-methods-container">
-        <Text style={styles.emptyText}>Authorization token not available.</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.authorizationTokenNotAvailable")}</Text>
       </View>
     )
   }
@@ -166,7 +167,7 @@ function PaymentMethodsScreen() {
             width: "100%",
             minHeight: 400, // fallback for web
           }}
-          title="Payment Method"
+          title={translate("paymentScreen.paymentMethod")}
           data-testid="payment-methods-iframe"
         />
       ) : (
@@ -222,11 +223,11 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
       {expanded && (
         <View style={styles.invoiceExpandedDetails} testID={`invoice-details-${invoice.id}`}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Invoice Number:</Text>
+            <Text style={styles.detailLabel}>{translate("paymentScreen.invoiceNumber")}</Text>
             <Text style={styles.detailValue}>{invoice.invoiceNumber}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Issue Date:</Text>
+            <Text style={styles.detailLabel}>{translate("paymentScreen.issueDate")}</Text>
             <Text style={styles.detailValue}>{formatDate(invoice.issueDate, { 
               weekday: 'short', 
               month: 'short', 
@@ -235,7 +236,7 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
             })}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Due Date:</Text>
+            <Text style={styles.detailLabel}>{translate("paymentScreen.dueDate")}</Text>
             <Text style={styles.detailValue}>{formatDate(invoice.dueDate, { 
               weekday: 'short', 
               month: 'short', 
@@ -245,7 +246,7 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
           </View>
           {invoice.notes && (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Notes:</Text>
+              <Text style={styles.detailLabel}>{translate("paymentScreen.notes")}</Text>
               <Text style={styles.detailValue}>{invoice.notes}</Text>
             </View>
           )}
@@ -264,7 +265,7 @@ function CurrentChargesScreen() {
   if (!org || !org.id) {
     return (
       <View style={styles.screenContainer} testID="current-charges-container">
-        <Text style={styles.emptyText}>No organization data available.</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.noOrganizationData")}</Text>
       </View>
     )
   }
@@ -293,7 +294,7 @@ function CurrentChargesScreen() {
   if (unbilledCostsError) {
     return (
       <View style={styles.screenContainer} testID="current-charges-container">
-        <Text style={styles.emptyText}>Error loading current charges.</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.errorLoadingCurrentCharges")}</Text>
       </View>
     )
   }
@@ -313,10 +314,10 @@ function CurrentChargesScreen() {
                 style={styles.emptyChargesIcon}
               />
               <Text preset="subheading" style={styles.emptyChargesTitle}>
-                No Pending Charges
+                {translate("paymentScreen.noPendingCharges")}
               </Text>
               <Text style={styles.emptyChargesMessage} testID="no-charges-text">
-                All conversations have been billed. New charges will appear here as they accumulate.
+                {translate("paymentScreen.allConversationsBilled")}
               </Text>
             </View>
           }
@@ -331,25 +332,25 @@ function CurrentChargesScreen() {
       <Card
         preset="default"
         style={styles.chargesSummaryCard}
-        heading="Current Charges Summary"
+        heading={translate("paymentScreen.currentChargesSummary")}
         ContentComponent={
           <View style={styles.chargesSummaryContent}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Total Unbilled Amount:</Text>
+              <Text style={styles.summaryLabel}>{translate("paymentScreen.totalUnbilledAmount")}</Text>
               <Text preset="bold" style={styles.summaryAmount}>
                 {formatCurrency(unbilledCosts.totalUnbilledCost)}
               </Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Period:</Text>
+              <Text style={styles.summaryLabel}>{translate("paymentScreen.period")}</Text>
               <Text style={styles.summaryValue}>
-                Last {unbilledCosts.period.days} days
+                {translate("paymentScreen.lastDays", { days: unbilledCosts.period.days })}
               </Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Patients with Charges:</Text>
+              <Text style={styles.summaryLabel}>{translate("paymentScreen.patientsWithCharges")}</Text>
               <Text style={styles.summaryValue}>
-                {unbilledCosts.patientCosts.length} patient{unbilledCosts.patientCosts.length !== 1 ? 's' : ''}
+                {unbilledCosts.patientCosts.length} {unbilledCosts.patientCosts.length !== 1 ? translate("paymentScreen.patients") : translate("paymentScreen.patient")}
               </Text>
             </View>
           </View>
@@ -359,7 +360,7 @@ function CurrentChargesScreen() {
       {/* Patient Charges List */}
       <View style={styles.patientChargesSection}>
         <Text preset="subheading" style={styles.patientChargesTitle}>
-          Charges by Patient
+          {translate("paymentScreen.chargesByPatient")}
         </Text>
         <FlatList
           data={unbilledCosts.patientCosts}
@@ -380,10 +381,10 @@ function CurrentChargesScreen() {
                   </View>
                   <View style={styles.patientChargeDetails}>
                     <Text style={styles.patientChargeDetail}>
-                      {item.conversationCount} conversation{item.conversationCount !== 1 ? 's' : ''}
+                      {item.conversationCount} {item.conversationCount !== 1 ? translate("paymentScreen.conversations") : translate("paymentScreen.conversation")}
                     </Text>
                     <Text style={styles.patientChargeDetail}>
-                      Average: {formatCurrency(item.totalCost / item.conversationCount)}
+                      {translate("paymentScreen.average")} {formatCurrency(item.totalCost / item.conversationCount)}
                     </Text>
                   </View>
                 </View>
@@ -413,14 +414,14 @@ function BillingInfoScreen() {
   if (!currentUser) {
     return (
       <View style={styles.screenContainer} testID="billing-info-container">
-        <Text style={styles.emptyText}>No user data available.</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.noUserData")}</Text>
       </View>
     )
   }
   if (!org || !org.id) {
     return (
       <View style={styles.screenContainer} testID="billing-info-container">
-        <Text style={styles.emptyText}>No organization data available.</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.noOrganizationData")}</Text>
       </View>
     )
   }
@@ -433,10 +434,10 @@ function BillingInfoScreen() {
   } = useGetInvoicesByOrgQuery(queryParam, { skip: !org })
 
   // Plan information - these fields don't exist in Org model yet, using fallbacks
-  const currentPlan = (org as any).planName || "Basic Plan" // TODO: Add planName field to Org model
+  const currentPlan = (org as any).planName || translate("paymentScreen.basicPlan") // TODO: Add planName field to Org model
   const nextBillingDate = (org as any).nextBillingDate 
     ? formatDate((org as any).nextBillingDate)
-    : "Contact Support" // TODO: Add nextBillingDate field to Org model
+    : translate("paymentScreen.contactSupport") // TODO: Add nextBillingDate field to Org model
 
   useEffect(() => {
     if (invoicesError) {
@@ -456,7 +457,7 @@ function BillingInfoScreen() {
     // Check specific error before assuming !invoices means error
     return (
       <View style={styles.screenContainer} testID="billing-info-container">
-        <Text style={styles.emptyText}>Error loading invoices.</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.errorLoadingCurrentCharges")}</Text>
       </View>
     )
   }
@@ -478,11 +479,11 @@ function BillingInfoScreen() {
         ContentComponent={
           <View style={styles.planInfoContent}>
             <View style={styles.planInfoRow}>
-              <Text style={styles.planInfoLabel}>Current Plan:</Text>
+              <Text style={styles.planInfoLabel}>{translate("paymentScreen.currentPlan")}</Text>
               <Text preset="bold" style={styles.planInfoValue}>{currentPlan}</Text>
             </View>
             <View style={styles.planInfoRow}>
-              <Text style={styles.planInfoLabel}>Next Billing Date:</Text>
+              <Text style={styles.planInfoLabel}>{translate("paymentScreen.nextBillingDate")}</Text>
               <Text preset="bold" style={styles.planInfoValue}>{nextBillingDate}</Text>
             </View>
           </View>
@@ -503,14 +504,14 @@ function BillingInfoScreen() {
             <View style={styles.totalBilledContent}>
               <View style={styles.totalBilledHeader}>
                 <Text preset="subheading" style={styles.totalBilledTitle}>
-                  Total Billed Amount
+                  {translate("paymentScreen.totalBilledAmount")}
                 </Text>
                 <Text preset="bold" style={styles.totalBilledAmount}>
                   {formatCurrency(sortedInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0))}
                 </Text>
               </View>
               <Text style={styles.totalBilledSubtext}>
-                Across {sortedInvoices.length} invoice{sortedInvoices.length !== 1 ? 's' : ''}
+                {translate("paymentScreen.acrossInvoices", { count: sortedInvoices.length, s: sortedInvoices.length !== 1 ? 's' : '' })}
               </Text>
             </View>
           }
@@ -522,7 +523,7 @@ function BillingInfoScreen() {
         <View style={styles.invoiceHistorySection}>
           <View style={styles.invoiceHistoryHeader}>
             <Text preset="subheading" style={styles.invoiceHistoryTitle}>
-              Invoice History ({previousInvoices.length})
+              {translate("paymentScreen.invoiceHistory", { count: previousInvoices.length })}
             </Text>
             <Button
               preset="default"
@@ -531,7 +532,7 @@ function BillingInfoScreen() {
               testID="toggle-invoice-history"
             >
               <Text size="sm" style={styles.toggleHistoryText}>
-                {showInvoiceHistory ? 'Hide' : 'Show'} History
+                {showInvoiceHistory ? translate("paymentScreen.hide") : translate("paymentScreen.show")} {translate("paymentScreen.history")}
               </Text>
               <Icon 
                 icon={showInvoiceHistory ? "caretLeft" : "caretRight"} 
@@ -569,10 +570,10 @@ function BillingInfoScreen() {
                 style={styles.emptyInvoiceIcon}
               />
               <Text preset="subheading" style={styles.emptyInvoiceTitle}>
-                No Invoices Yet
+                {translate("paymentScreen.noInvoicesYet")}
               </Text>
               <Text style={styles.emptyInvoiceMessage} testID="no-invoices-text">
-                Your invoices will appear here once billing begins.
+                {translate("paymentScreen.invoicesWillAppear")}
               </Text>
             </View>
           }
@@ -599,7 +600,7 @@ export function PaymentInfoScreen() {
     return (
       <View style={[styles.screenContainer, styles.centered]} testID="payment-info-container">
         <ActivityIndicator size="large" color="#3498db" />
-        <Text style={styles.emptyText}>Loading user information...</Text>
+        <Text style={styles.emptyText}>{translate("paymentScreen.loadingUserInformation")}</Text>
       </View>
     )
   }
@@ -613,12 +614,12 @@ export function PaymentInfoScreen() {
     // User is NOT authorized - Show the message
     return (
       <View style={styles.messageContainer} testID="payment-info-container">
-        <Text style={styles.messageTitle} testID="access-restricted-title">Access Restricted</Text>
+        <Text style={styles.messageTitle} testID="access-restricted-title">{translate("paymentScreen.accessRestricted")}</Text>
         <Text style={styles.messageText} testID="access-restricted-message">
-          You do not have the necessary permissions to view or manage payment information.
+          {translate("paymentScreen.accessRestrictedMessage")}
         </Text>
         <Text style={styles.messageText}>
-          Please contact your organization administrator for assistance.
+          {translate("paymentScreen.contactAdministrator")}
         </Text>
       </View>
     )
@@ -638,21 +639,21 @@ export function PaymentInfoScreen() {
         testID="payment-tabs-navigator"
       >
         <Tab.Screen 
-          name="Current Charges" 
+          name={translate("paymentScreen.currentCharges")} 
           component={CurrentChargesScreen}
           options={{
             tabBarTestID: "current-charges-tab"
           }}
         />
         <Tab.Screen 
-          name="Payment Methods" 
+          name={translate("paymentScreen.paymentMethods")} 
           component={PaymentMethodsScreen}
           options={{
             tabBarTestID: "payment-methods-tab"
           }}
         />
         <Tab.Screen 
-          name="Billing Info" 
+          name={translate("paymentScreen.billingInfo")} 
           component={BillingInfoScreen}
           options={{
             tabBarTestID: "billing-info-tab"

@@ -11,6 +11,7 @@ import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
 import { clearCaregiver } from "../store/caregiverSlice"
 import AvatarPicker from "../components/AvatarPicker"
+import { translate } from "../i18n"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
@@ -114,7 +115,7 @@ export function OrgScreen() {
 
         <TextInput
           style={[styles.input, !canEditOrg && styles.readonlyInput]}
-          placeholder="Name"
+          placeholder={translate("orgScreen.namePlaceholder")}
           value={name}
           onChangeText={setName}
           placeholderTextColor={colors.palette.neutral600}
@@ -122,7 +123,7 @@ export function OrgScreen() {
         />
         <TextInput
           style={[styles.input, !canEditOrg && styles.readonlyInput]}
-          placeholder="Email"
+          placeholder={translate("orgScreen.emailPlaceholder")}
           value={email}
           onChangeText={setEmail}
           placeholderTextColor={colors.palette.neutral600}
@@ -130,7 +131,7 @@ export function OrgScreen() {
         />
         <TextInput
           style={[styles.input, !canEditOrg && styles.readonlyInput]}
-          placeholder="Phone"
+          placeholder={translate("orgScreen.phonePlaceholder")}
           value={phone}
           onChangeText={setPhone}
           placeholderTextColor={colors.palette.neutral600}
@@ -138,20 +139,20 @@ export function OrgScreen() {
         />
         {canEditOrg && (
           <Pressable style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>SAVE</Text>
+            <Text style={styles.saveButtonText}>{translate("orgScreen.save")}</Text>
           </Pressable>
         )}
       </View>
       <Pressable style={styles.viewCaregiversButton} onPress={handleViewCaregivers} testID="view-caregivers-button">
-        <Text style={styles.viewCaregiversButtonText}>View Caregivers</Text>
+        <Text style={styles.viewCaregiversButtonText}>{translate("orgScreen.viewCaregivers")}</Text>
       </Pressable>
       {canInviteCaregivers && (
         <Pressable style={styles.inviteCaregiverButton} onPress={handleInviteCaregiver} testID="invite-caregiver-button">
-          <Text style={styles.inviteCaregiverButtonText}>Invite Caregiver</Text>
+          <Text style={styles.inviteCaregiverButtonText}>{translate("orgScreen.inviteCaregiver")}</Text>
         </Pressable>
       )}
       <Pressable style={styles.paymentButton} onPress={handlePaymentPress} testID="payment-button">
-        <Text style={styles.paymentButtonText}>Payments</Text>
+        <Text style={styles.paymentButtonText}>{translate("orgScreen.payments")}</Text>
       </Pressable>
     </ScrollView>
   )

@@ -7,6 +7,7 @@ import { Screen } from "../components/Screen"
 import { SentimentDashboard } from "../components/SentimentDashboard"
 import { SentimentDebugPanel } from "../components/SentimentDebugPanel"
 import { colors } from "../theme/colors"
+import { translate } from "../i18n"
 import {
   useGetSentimentTrendQuery,
   useGetSentimentSummaryQuery,
@@ -94,9 +95,9 @@ export function SentimentAnalysisScreen() {
         safeAreaEdges={["top"]}
       >
         <View style={styles.noPatientContainer}>
-          <Text style={styles.noPatientTitle}>No Patient Selected</Text>
+          <Text style={styles.noPatientTitle}>{translate("sentimentAnalysis.noPatientSelected")}</Text>
           <Text style={styles.noPatientMessage}>
-            Please select a patient from the Home screen to view their sentiment analysis.
+            {translate("sentimentAnalysis.selectPatientToView")}
           </Text>
         </View>
       </Screen>

@@ -13,6 +13,7 @@ import { LoadingScreen } from "./LoadingScreen"
 import { Schedule } from "app/services/api"
 import { getPatient } from "app/store/patientSlice"
 import { colors, spacing } from "app/theme"
+import { translate } from "../i18n"
 import { Text, Button, Card } from "app/components"
 
 export const SchedulesScreen = () => {
@@ -56,7 +57,7 @@ export const SchedulesScreen = () => {
   if (isUpdatingError || isCreatingError || isDeletingError) {
     return (
       <View style={styles.container}>
-        <Text>Error loading schedules.</Text>
+        <Text>{translate("schedulesScreen.errorLoadingSchedules")}</Text>
       </View>
     )
   }
@@ -65,14 +66,14 @@ export const SchedulesScreen = () => {
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Schedule Details</Text>
+        <Text style={styles.headerTitle}>{translate("schedulesScreen.scheduleDetails")}</Text>
       </View>
 
       {/* Schedule Selector Card */}
       {schedules && schedules.length > 0 ? (
         <Card
           style={styles.selectorCard}
-          heading="Select a schedule:"
+          heading={translate("schedulesScreen.selectSchedule")}
           headingStyle={styles.cardHeading}
           ContentComponent={
             <Picker
@@ -86,7 +87,7 @@ export const SchedulesScreen = () => {
               style={styles.picker}
             >
               {schedules.map((schedule, index) => (
-                <Picker.Item key={schedule.id} label={`Schedule ${index + 1}`} value={schedule.id} />
+                <Picker.Item key={schedule.id} label={`${translate("schedulesScreen.scheduleNumber")} ${index + 1}`} value={schedule.id} />
               ))}
             </Picker>
           }
@@ -94,7 +95,7 @@ export const SchedulesScreen = () => {
       ) : (
         <Card
           style={styles.emptyStateCard}
-          content="No schedules available. Please create a new one."
+          content={translate("schedulesScreen.noSchedulesAvailable")}
           contentStyle={styles.emptyStateText}
         />
       )}
@@ -102,7 +103,7 @@ export const SchedulesScreen = () => {
       {/* Schedule Configuration Card */}
       <Card
         style={styles.scheduleCard}
-        heading="Schedule Configuration"
+        heading={translate("scheduleScreen.heading")}
         headingStyle={styles.cardHeading}
         ContentComponent={
           <ScheduleComponent
@@ -115,13 +116,13 @@ export const SchedulesScreen = () => {
       {/* Action Buttons */}
       <View style={styles.buttonContainer}>
         <Button
-          text="Save Schedule"
+          text={translate("scheduleScreen.saveSchedule")}
           onPress={handleSave}
           style={styles.button}
           preset="primary"
         />
         <Button
-          text="Delete Schedule"
+          text={translate("scheduleScreen.deleteSchedule")}
           onPress={handleDelete}
           style={styles.button}
           preset="danger"

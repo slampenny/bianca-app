@@ -12,6 +12,7 @@ import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSli
 import { Alert, Caregiver, Patient } from "../services/api/api.types"
 import { getCurrentUser } from "app/store/authSlice"
 import { colors } from "app/theme/colors"
+import { translate } from "../i18n"
 
 export function AlertScreen() {
   const dispatch = useDispatch()
@@ -120,14 +121,14 @@ export function AlertScreen() {
         {/* Show patient information if alert is related to a patient */}
         {item.relatedPatient && (
           <Text style={styles.alertDetails}>
-            Patient: {getPatientName(item.relatedPatient)}
+            {translate("alertScreen.patient")} {getPatientName(item.relatedPatient)}
           </Text>
         )}
         
-        <Text style={styles.alertDetails}>Importance: {item.importance}</Text>
+        <Text style={styles.alertDetails}>{translate("alertScreen.importance")} {item.importance}</Text>
         {item.relevanceUntil && (
           <Text style={styles.alertDetails}>
-            Expires: {new Date(item.relevanceUntil).toLocaleString()}
+            {translate("alertScreen.expires")} {new Date(item.relevanceUntil).toLocaleString()}
           </Text>
         )}
       </View>
@@ -156,13 +157,13 @@ export function AlertScreen() {
       <View style={styles.contentContainer}>
         <View style={styles.tabRow}>
           <Button
-            text="Unread Alerts"
+            text={translate("alertScreen.unreadAlerts")}
             onPress={() => handleShowUnreadChange(true)}
             style={[styles.tabButton, showUnread ? styles.activeTab : styles.inactiveTab]}
             textStyle={showUnread ? styles.activeTabText : styles.inactiveTabText}
           />
           <Button
-            text="All Alerts"
+            text={translate("alertScreen.allAlerts")}
             onPress={() => handleShowUnreadChange(false)}
             style={[styles.tabButton, !showUnread ? styles.activeTab : styles.inactiveTab]}
             textStyle={!showUnread ? styles.activeTabText : styles.inactiveTabText}
@@ -172,7 +173,7 @@ export function AlertScreen() {
         {alerts.length > 0 && (
           <View style={styles.markAllContainer}>
             <Button
-              text="Mark all as read"
+              text={translate("alertScreen.markAllAsRead")}
               onPress={handleMarkAllAsRead}
               style={styles.refreshButton}
               testID="mark-all-checkbox"
@@ -181,7 +182,7 @@ export function AlertScreen() {
         )}
 
         {filteredAlerts.length === 0 ? (
-          <EmptyState style={styles.emptyState} content="No alerts" heading="So empty... so sad" testID="alert-empty-state" />
+          <EmptyState style={styles.emptyState} content={translate("alertScreen.noAlerts")} heading={translate("alertScreen.emptyHeading")} testID="alert-empty-state" />
         ) : (
           <FlatList
             data={filteredAlerts}
@@ -193,7 +194,7 @@ export function AlertScreen() {
         )}
 
         <Button
-          text={refreshing ? "Refreshing..." : "Refresh"}
+          text={refreshing ? translate("alertScreen.refreshing") : translate("alertScreen.refresh")}
           onPress={handleRefresh}
           style={styles.refreshButton}
         />

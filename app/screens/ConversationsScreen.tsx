@@ -11,6 +11,7 @@ import { SentimentIndicator } from "../components/SentimentIndicator"
 import { ConversationMessages } from "../components/ConversationMessages"
 import { Screen } from "../components/Screen"
 import { Card } from "../components/Card"
+import { translate } from "../i18n"
 
 export function ConversationsScreen() {
   const patient = useSelector(getPatient)
@@ -122,14 +123,14 @@ export function ConversationsScreen() {
     if (diffInHours < 24) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     } else if (diffInHours < 48) {
-      return 'Yesterday'
+      return translate("conversationsScreen.yesterday")
     } else {
       return date.toLocaleDateString()
     }
   }
 
   const getConversationPreview = (messages: Message[]) => {
-    if (messages.length === 0) return "No messages"
+    if (messages.length === 0) return translate("conversationsScreen.noMessages")
     const lastMessage = messages[messages.length - 1]
     return lastMessage.content.length > 50 
       ? lastMessage.content.substring(0, 50) + "..."
@@ -139,9 +140,9 @@ export function ConversationsScreen() {
   if (!patient) {
     return (
       <View style={styles.container}>
-        <Header title="Conversations" />
+        <Header title={translate("conversationsScreen.title")} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No patient selected</Text>
+          <Text style={styles.errorText}>{translate("conversationsScreen.noPatientSelected")}</Text>
         </View>
       </View>
     )
@@ -191,8 +192,8 @@ export function ConversationsScreen() {
   const renderEmpty = () => (
     <Text style={styles.noConversationsText}>
       {activeCall 
-        ? "No previous conversations found. This will be the first conversation with this patient." 
-        : "No conversations to display"
+        ? translate("conversationsScreen.firstConversation") 
+        : translate("conversationsScreen.noConversationsToDisplay")
       }
     </Text>
   )
@@ -222,8 +223,8 @@ export function ConversationsScreen() {
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
             {activeCall 
-              ? "No previous conversations found for this patient" 
-              : "Error fetching conversations"
+              ? translate("conversationsScreen.noPreviousConversations") 
+              : translate("conversationsScreen.errorFetchingConversations")
             }
           </Text>
         </View>
@@ -251,7 +252,7 @@ export function ConversationsScreen() {
             hasMore && !isLoading ? (
               <View style={styles.loadMoreContainer}>
                 <ActivityIndicator size="small" color={colors.palette.biancaButtonSelected} />
-                <Text style={styles.loadMoreText}>Loading more conversations...</Text>
+                <Text style={styles.loadMoreText}>{translate("conversationsScreen.loadingMoreConversations")}</Text>
               </View>
             ) : null
           }

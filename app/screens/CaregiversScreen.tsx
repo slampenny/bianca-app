@@ -9,6 +9,7 @@ import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { useSyncOrgCaregivers } from "app/utils/useSyncOrgCaregivers"
 import { colors } from "app/theme/colors"
+import { translate } from "app/i18n"
 
 export function CaregiversScreen() {
   const dispatch = useDispatch()
@@ -72,7 +73,7 @@ export function CaregiversScreen() {
             </Text>
             {isInvited && (
               <View style={styles.invitedBadge}>
-                <Text style={styles.invitedBadgeText}>Invited</Text>
+                <Text style={styles.invitedBadgeText}>{translate("caregiversScreen.invited")}</Text>
               </View>
             )}
           </View>
@@ -86,22 +87,22 @@ export function CaregiversScreen() {
           android_ripple={{ color: colors.palette.biancaButtonSelected }}
           testID="edit-caregiver-button"
         >
-          <Text style={styles.editButtonText}>Edit</Text>
+          <Text style={styles.editButtonText}>{translate("caregiversScreen.edit")}</Text>
         </Pressable>
       </View>
     )
   }
 
-  const ListEmpty = () => <Text style={styles.noCaregiversText}>No caregivers found</Text>
+  const ListEmpty = () => <Text style={styles.noCaregiversText}>{translate("caregiversScreen.noCaregiversFound")}</Text>
 
   // Show not authorized message (this should rarely happen now)
   if (!isAuthorized) {
     return (
       <View style={styles.container}>
         <View style={styles.notAuthorizedContainer}>
-          <Text style={styles.notAuthorizedTitle}>Not Authorized</Text>
+          <Text style={styles.notAuthorizedTitle}>{translate("caregiversScreen.notAuthorized")}</Text>
           <Text style={styles.notAuthorizedText}>
-            You don't have permission to view caregivers. Please contact your administrator.
+            {translate("caregiversScreen.noPermissionToView")}
           </Text>
         </View>
       </View>
@@ -119,7 +120,7 @@ export function CaregiversScreen() {
       />
 
       <Pressable style={styles.addButton} onPress={handleAddCaregiver} testID="add-caregiver-button">
-        <Text style={styles.addButtonText}>Add Caregiver</Text>
+        <Text style={styles.addButtonText}>{translate("caregiversScreen.addCaregiver")}</Text>
       </Pressable>
     </View>
   )

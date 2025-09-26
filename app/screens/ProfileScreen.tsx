@@ -11,6 +11,9 @@ import {
 import { useSelector } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { LegalLinks } from "app/components/LegalLinks"
+import { LanguageSelector } from "app/components/LanguageSelector"
+import { useLanguage } from "app/hooks/useLanguage"
+import { translate } from "app/i18n"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
@@ -21,6 +24,9 @@ import { navigationRef } from "app/navigators/navigationUtilities"
 
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
+  
+  // Use language hook to trigger re-renders on language change
+  useLanguage()
 
   // Get the current user (who is a caregiver)
   const currentUser = useSelector(getCaregiver)
@@ -57,7 +63,7 @@ function ProfileScreen() {
     setEmail(email)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      setEmailError("Invalid email format")
+      setEmailError(translate("errors.invalidEmail"))
     } else {
       setEmailError("")
     }
@@ -68,7 +74,7 @@ function ProfileScreen() {
     // Accept international format with +1 country code or 10 digits
     const phoneRegex = /^(\+1\d{10}|\d{10})$/
     if (!phoneRegex.test(phone)) {
-      setPhoneError("Invalid phone format (10 digits or +1XXXXXXXXXX)")
+      setPhoneError(translate("profileScreen.invalidPhoneFormat"))
     } else {
       setPhoneError("")
     }
@@ -119,14 +125,14 @@ function ProfileScreen() {
       }).unwrap()
 
       // Show success message
-      setSuccessMessage("Your profile was updated successfully!")
+      setSuccessMessage(translate("profileScreen.profileUpdatedSuccess"))
 
       // Navigate back after a brief delay to show the success message
       setTimeout(() => {
         navigation.goBack()
       }, 1000)
     } catch (error) {
-      setSuccessMessage("Failed to update profile. Please try again.")
+      setSuccessMessage(translate("profileScreen.profileUpdateFailed"))
       setTimeout(() => setSuccessMessage(""), 2000)
     }
   }
@@ -151,7 +157,7 @@ function ProfileScreen() {
         {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Your Profile</Text>
+          <Text style={styles.formTitle}>{translate("profileScreen.yourProfile")}</Text>
 
           <AvatarPicker
             initialAvatar={avatar}
@@ -163,14 +169,14 @@ function ProfileScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="Name"
+            placeholder={translate("profileScreen.namePlaceholder")}
             placeholderTextColor={colors.palette.neutral600}
             value={name}
             onChangeText={setName}
           />
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder={translate("profileScreen.emailPlaceholder")}
             placeholderTextColor={colors.palette.neutral600}
             value={email}
             onChangeText={validateEmail}
@@ -178,12 +184,14 @@ function ProfileScreen() {
           {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
           <TextInput
             style={styles.input}
-            placeholder="Phone"
+            placeholder={translate("profileScreen.phonePlaceholder")}
             placeholderTextColor={colors.palette.neutral600}
             value={phone}
             onChangeText={validatePhone}
           />
           {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
+
+          <LanguageSelector testID="language-selector" />
 
           <Pressable
             style={[
@@ -193,11 +201,11 @@ function ProfileScreen() {
             onPress={handleSave}
             disabled={!email || !phone || !!emailError || !!phoneError}
           >
-            <Text style={styles.buttonText}>UPDATE PROFILE</Text>
+            <Text style={styles.buttonText}>{translate("profileScreen.updateProfile")}</Text>
           </Pressable>
 
           <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button">
-            <Text style={styles.buttonText}>LOGOUT</Text>
+            <Text style={styles.buttonText}>{translate("profileScreen.logout")}</Text>
           </Pressable>
 
           {/* Legal Links */}

@@ -16,6 +16,7 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
   { code: 'it', label: 'Italian', nativeName: 'Italiano' },
   { code: 'ru', label: 'Russian', nativeName: 'Русский' },
   { code: 'ar', label: 'Arabic', nativeName: 'العربية' },
+  { code: 'ko', label: 'Korean', nativeName: '한국어' },
 ]
 
 export const getLanguageByCode = (code: string): LanguageOption => {

@@ -14,12 +14,15 @@ import { Caregiver, Patient } from "../services/api/api.types"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { RootState } from "../store/store"
 import { colors } from "app/theme/colors"
+import { translate } from "../i18n"
+import { useLanguage } from "../hooks/useLanguage"
 
 
 export function HomeScreen() {
   const dispatch = useDispatch()
   const currentUser: Caregiver | null = useSelector(getCurrentUser)
   const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
+  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   
   // Memoize the patients selector to prevent unnecessary re-renders
   const patientsSelector = React.useMemo(
@@ -47,7 +50,7 @@ export function HomeScreen() {
   // Staff users can only view patients
   const shouldDisableButton = isStaff
   
-  const tooltipMessage = "Only org admins and super admins can add patients"
+  const tooltipMessage = translate("homeScreen.adminOnlyMessage")
 
   const handlePatientPress = (patient: Patient) => {
     dispatch(setPatient(patient))
@@ -159,7 +162,7 @@ export function HomeScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle} testID="home-header">Welcome, {currentUser ? currentUser.name : "Guest"}</Text>
+        <Text style={styles.headerTitle} testID="home-header">{translate("homeScreen.welcome", { name: currentUser ? currentUser.name : translate("homeScreen.guest") })}</Text>
       </View>
 
       {/* Patient List */}
@@ -183,7 +186,7 @@ export function HomeScreen() {
           } : {})}
         >
           <Button
-            text="Add Patient"
+            text={translate("homeScreen.addPatient")}
             preset="primary"
             onPress={shouldDisableButton ? undefined : handleAddPatient}
             testID="add-patient-button"

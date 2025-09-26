@@ -4,6 +4,7 @@ import { Text } from "./Text"
 import { Icon } from "./Icon"
 import { colors } from "../theme/colors"
 import { SentimentTrendPoint, SentimentAnalysis, ConcernLevel } from "../services/api/api.types"
+import { translate } from "../i18n"
 
 interface SentimentLastCallProps {
   lastCall?: SentimentTrendPoint
@@ -17,12 +18,12 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
   if (!lastCall || !lastCall.sentiment) {
     return (
       <View style={[styles.container, style]}>
-        <Text style={styles.title}>Last Call Analysis</Text>
+        <Text style={styles.title}>{translate("sentimentAnalysis.lastCallAnalysis")}</Text>
         <View style={styles.emptyContainer}>
           <Icon icon="phoneOff" size={48} color={colors.textDim} />
-          <Text style={styles.emptyTitle}>No Recent Call</Text>
+          <Text style={styles.emptyTitle}>{translate("sentimentAnalysis.noRecentCall")}</Text>
           <Text style={styles.emptyText}>
-            The most recent conversation doesn't have sentiment analysis available yet.
+            {translate("sentimentAnalysis.noRecentCallMessage")}
           </Text>
         </View>
       </View>
@@ -33,7 +34,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
 
   return (
     <View style={[styles.container, style]}>
-      <Text style={styles.title}>Last Call Analysis</Text>
+      <Text style={styles.title}>{translate("sentimentAnalysis.lastCallAnalysis")}</Text>
       
       {/* Call Overview */}
       <View style={styles.callOverview}>
@@ -62,11 +63,11 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
         
         <View style={styles.callStats}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Duration</Text>
+            <Text style={styles.statLabel}>{translate("sentimentAnalysis.duration")}</Text>
             <Text style={styles.statValue}>{Math.round(lastCall.duration / 60)} minutes</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Analysis Date</Text>
+            <Text style={styles.statLabel}>{translate("sentimentAnalysis.analysisDate")}</Text>
             <Text style={styles.statValue}>
               {lastCall.sentimentAnalyzedAt 
                 ? new Date(lastCall.sentimentAnalyzedAt).toLocaleDateString()
@@ -80,7 +81,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       {/* Main Sentiment Score */}
       <View style={styles.mainSentimentCard}>
         <View style={styles.sentimentHeader}>
-          <Text style={styles.sentimentTitle}>Overall Sentiment</Text>
+          <Text style={styles.sentimentTitle}>{translate("sentimentAnalysis.overallSentiment")}</Text>
           <View style={[
             styles.sentimentBadge,
             { backgroundColor: getSentimentColor(sentiment.sentimentScore) }
@@ -99,14 +100,14 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
             {sentiment.sentimentScore > 0 ? "+" : ""}{sentiment.sentimentScore.toFixed(2)}
           </Text>
           <Text style={styles.sentimentScoreLabel}>
-            Score Range: -1.0 (Very Negative) to +1.0 (Very Positive)
+            {translate("sentimentAnalysis.scoreRange")}
           </Text>
         </View>
 
         <View style={styles.confidenceContainer}>
           <Icon icon="shield" size={16} color={colors.textDim} />
           <Text style={styles.confidenceText}>
-            Analysis Confidence: {Math.round(sentiment.confidence * 100)}%
+            {translate("sentimentAnalysis.analysisConfidence")} {Math.round(sentiment.confidence * 100)}%
           </Text>
         </View>
       </View>
@@ -114,7 +115,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       {/* Key Emotions */}
       {sentiment.keyEmotions && sentiment.keyEmotions.length > 0 && (
         <View style={styles.emotionsCard}>
-          <Text style={styles.cardTitle}>Key Emotions Detected</Text>
+          <Text style={styles.cardTitle}>{translate("sentimentAnalysis.keyEmotionsDetected")}</Text>
           <View style={styles.emotionsGrid}>
             {sentiment.keyEmotions.map((emotion, index) => (
               <View key={index} style={styles.emotionItem}>
@@ -133,7 +134,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       {/* Patient Mood */}
       {sentiment.patientMood && (
         <View style={styles.moodCard}>
-          <Text style={styles.cardTitle}>Patient Mood Assessment</Text>
+          <Text style={styles.cardTitle}>{translate("sentimentAnalysis.patientMoodAssessment")}</Text>
           <Text style={styles.moodText}>{sentiment.patientMood}</Text>
         </View>
       )}
@@ -141,7 +142,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       {/* Concern Level */}
       {sentiment.concernLevel && (
         <View style={styles.concernCard}>
-          <Text style={styles.cardTitle}>Concern Level</Text>
+          <Text style={styles.cardTitle}>{translate("sentimentAnalysis.concernLevel")}</Text>
           <View style={styles.concernLevelContainer}>
             <View style={[
               styles.concernLevelBadge,
@@ -153,7 +154,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
                 color={colors.palette.neutral100} 
               />
               <Text style={styles.concernLevelText}>
-                {sentiment.concernLevel.toUpperCase()} CONCERN
+                {sentiment.concernLevel.toUpperCase()} {translate("sentimentAnalysis.concern")}
               </Text>
             </View>
             <Text style={styles.concernDescription}>
@@ -166,13 +167,13 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       {/* Satisfaction Indicators */}
       {sentiment.satisfactionIndicators && (
         <View style={styles.satisfactionCard}>
-          <Text style={styles.cardTitle}>Satisfaction Indicators</Text>
+          <Text style={styles.cardTitle}>{translate("sentimentAnalysis.satisfactionIndicators")}</Text>
           
           {sentiment.satisfactionIndicators.positive && sentiment.satisfactionIndicators.positive.length > 0 && (
             <View style={styles.satisfactionSection}>
               <View style={styles.satisfactionHeader}>
                 <Icon icon="checkCircle" size={16} color={colors.palette.biancaSuccess} />
-                <Text style={styles.satisfactionSectionTitle}>Positive Indicators</Text>
+                <Text style={styles.satisfactionSectionTitle}>{translate("sentimentAnalysis.positiveIndicators")}</Text>
               </View>
               {sentiment.satisfactionIndicators.positive.map((indicator, index) => (
                 <View key={index} style={styles.satisfactionItem}>
@@ -187,7 +188,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
             <View style={styles.satisfactionSection}>
               <View style={styles.satisfactionHeader}>
                 <Icon icon="alertCircle" size={16} color={colors.error} />
-                <Text style={styles.satisfactionSectionTitle}>Areas of Concern</Text>
+                <Text style={styles.satisfactionSectionTitle}>{translate("sentimentAnalysis.areasOfConcern")}</Text>
               </View>
               {sentiment.satisfactionIndicators.negative.map((indicator, index) => (
                 <View key={index} style={styles.satisfactionItem}>
@@ -203,7 +204,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       {/* AI Summary */}
       {sentiment.summary && (
         <View style={styles.summaryCard}>
-          <Text style={styles.cardTitle}>AI Summary</Text>
+          <Text style={styles.cardTitle}>{translate("sentimentAnalysis.aiSummary")}</Text>
           <Text style={styles.summaryText}>{sentiment.summary}</Text>
         </View>
       )}
@@ -211,7 +212,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       {/* Recommendations */}
       {sentiment.recommendations && (
         <View style={styles.recommendationsCard}>
-          <Text style={styles.cardTitle}>Recommendations</Text>
+          <Text style={styles.cardTitle}>{translate("sentimentAnalysis.recommendations")}</Text>
           <Text style={styles.recommendationsText}>{sentiment.recommendations}</Text>
         </View>
       )}
@@ -268,11 +269,11 @@ function getConcernColor(level: ConcernLevel): string {
 function getConcernDescription(level: ConcernLevel): string {
   switch (level) {
     case "low":
-      return "The patient appears to be in good spirits with minimal concerns."
+      return translate("sentimentAnalysis.lowConcernDescription")
     case "medium":
-      return "Some areas of concern were noted during the conversation."
+      return translate("sentimentAnalysis.mediumConcernDescription")
     case "high":
-      return "Significant concerns were identified that may require attention."
+      return translate("sentimentAnalysis.highConcernDescription")
   }
 }
 

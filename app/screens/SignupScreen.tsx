@@ -7,6 +7,7 @@ import { Button, Text, TextField, Screen, Header } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { spacing } from "app/theme"
+import { translate } from "../i18n"
 
 type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
@@ -112,7 +113,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       safeAreaEdges={["top"]}
     >
       <Header 
-        title="Complete Your Invitation"
+        title={translate("signupScreen.title")}
         leftIcon="back"
         onLeftPress={() => navigation.goBack()}
       />
@@ -141,8 +142,8 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
           <TextField
             value={name}
             onChangeText={setName}
-            label="Full Name"
-            placeholder="Your full name"
+            label={translate("signupScreen.fullNameLabel")}
+            placeholder={translate("signupScreen.fullNamePlaceholder")}
             editable={false}
             containerStyle={$textField}
           />
@@ -150,8 +151,8 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
           <TextField
             value={email}
             onChangeText={setEmail}
-            label="Email Address"
-            placeholder="your.email@example.com"
+            label={translate("signupScreen.emailLabel")}
+            placeholder={translate("signupScreen.emailPlaceholder")}
             keyboardType="email-address"
             autoCapitalize="none"
             editable={false}
@@ -161,8 +162,8 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
           <TextField
             value={phone}
             onChangeText={setPhone}
-            label="Phone Number"
-            placeholder="(555) 123-4567"
+            label={translate("signupScreen.phoneLabel")}
+            placeholder={translate("signupScreen.phonePlaceholder")}
             keyboardType="phone-pad"
             editable={false}
             containerStyle={$textField}
@@ -174,8 +175,8 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
               setPassword(text)
               setPasswordError("")
             }}
-            label="Password"
-            placeholder="Enter your password"
+            label={translate("signupScreen.passwordLabel")}
+            placeholder={translate("signupScreen.passwordPlaceholder")}
             secureTextEntry
             status={passwordError ? "error" : undefined}
             helper={passwordError}
@@ -188,8 +189,8 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
               setConfirmPassword(text)
               setConfirmPasswordError("")
             }}
-            label="Confirm Password"
-            placeholder="Confirm your password"
+            label={translate("signupScreen.confirmPasswordLabel")}
+            placeholder={translate("signupScreen.confirmPasswordPlaceholder")}
             secureTextEntry
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError}
