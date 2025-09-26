@@ -1,0 +1,38 @@
+# Production override - uses production environment with AWS secrets
+services:
+  app:
+    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production
+    environment:
+      - NODE_ENV=production
+      - AWS_REGION=us-east-2
+      - AWS_SECRET_ID=MySecretsManagerSecret
+      # Base URLs for production
+      - API_BASE_URL=https://api.myphonefriend.com
+      - FRONTEND_URL=https://app.myphonefriend.com
+      - WEBSOCKET_URL=wss://api.myphonefriend.com
+      # MongoDB for production (using containerized version)
+      - MONGODB_URL=mongodb://mongodb:27017/bianca-service
+    # Mount AWS credentials for secrets access
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    ports:
+      - "3000:3000"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    networks:
+      - node-network
+
+  mongodb:
+    volumes:
+      - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
+
+  asterisk:
+    volumes:
+      # Mount recordings for production debugging
+      - ./devops/asterisk/recordings:/var/spool/asterisk/recording
+
+# Define networks at the top level
+networks:
+  node-network:
+    driver: bridge
