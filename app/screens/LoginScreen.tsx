@@ -7,6 +7,21 @@ import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail } from ".
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Button, Header, Screen, Text, TextField } from "app/components"
 import { colors } from "app/theme/colors"
+// import { SSOLoginButtons } from "../components/SSOLoginButtons"
+
+// Temporary interfaces to avoid import issues
+// interface SSOUser {
+//   id: string;
+//   email: string;
+//   name: string;
+//   picture?: string;
+//   provider: 'google' | 'microsoft';
+// }
+
+// interface SSOError {
+//   error: string;
+//   description?: string;
+// }
 
 type LoginScreenNavigationProp = StackNavigationProp<LoginStackParamList, "Login">
 
@@ -25,6 +40,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const [authPassword, setAuthPassword] = useState("")
   const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
   // useLayoutEffect(() => {
   //   navigation.setOptions({
@@ -42,12 +58,15 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
 
   const handleLoginPress = async () => {
     if (validationError) return
+    setIsLoading(true)
     try {
       const result = await loginAPI({ email: authEmail, password: authPassword }).unwrap()
       dispatch(setAuthTokens(result.tokens))
     } catch (error) {
       console.error(error)
       setErrorMessage("Failed to log in. Please check your email and password.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -60,6 +79,33 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     // Navigate to the Forgot Password screen
     navigation.navigate("RequestReset")
   }
+
+  // const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any }) => {
+  //   setIsLoading(true)
+  //   try {
+  //     if (user.tokens && user.backendUser) {
+  //       // SSO login successful - set tokens and user data
+  //       dispatch(setAuthTokens(user.tokens));
+  //       dispatch(setAuthEmail(user.email));
+  //       setErrorMessage(""); // Clear any previous errors
+  //       console.log('SSO login successful:', user.backendUser);
+  //     } else {
+  //       // Fallback for development/testing
+  //       dispatch(setAuthEmail(user.email));
+  //       setErrorMessage("SSO login successful but backend integration incomplete. Please use email/password login.");
+  //     }
+  //   } catch (error) {
+  //     console.error('SSO login error:', error);
+  //     setErrorMessage("SSO login failed. Please try again or use email/password login.");
+  //   } finally {
+  //     setIsLoading(false)
+  //   }
+  // }
+
+  // const handleSSOError = (error: SSOError) => {
+  //   console.error('SSO error:', error);
+  //   setErrorMessage(`SSO login failed: ${error.description || error.error}`);
+  // }
 
   // When you want to focus the password input after submitting the email
   const focusPasswordInput = () => {
@@ -110,7 +156,17 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         style={styles.loginButton}
         textStyle={styles.loginButtonText}
         preset="filled"
+        disabled={isLoading}
       />
+      
+      {/* Temporarily disabled SSO buttons for debugging */}
+      {/* <SSOLoginButtons
+        onSSOSuccess={handleSSOSuccess}
+        onSSOError={handleSSOError}
+        disabled={isLoading}
+        showGenericSSO={true}
+      /> */}
+      
       <Button
         testID="register-button"
         tx="loginScreen.register"

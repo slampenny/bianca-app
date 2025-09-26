@@ -44,6 +44,7 @@ export function ConversationMessages({ messages, style, 'data-testid': testId }:
       <View key={`${message.id || index}`} style={styles.messageContainer}>
         
         {/* Regular message (user or assistant) */}
+        {(
           <View
             style={[
               styles.messageContainer,

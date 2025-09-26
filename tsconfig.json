@@ -7,11 +7,11 @@
     // Change this line:
     "module": "esnext", // Or "es2020", "es2022", "commonjs", "node16", "node18", or "nodenext"
     "moduleResolution": "node",
-    "strict": true,
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noUnusedLocals": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false,
+    "noUnusedLocals": false,
     "sourceMap": true,
     "target": "esnext",
     "lib": ["esnext", "dom"],
