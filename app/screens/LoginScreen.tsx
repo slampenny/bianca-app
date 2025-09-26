@@ -22,7 +22,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const validationError = useSelector(getValidationError)
   const authEmail = useSelector(getAuthEmail)
 
-  const [authPassword, setAuthPassword] = useState("Password1")
+  const [authPassword, setAuthPassword] = useState("")
   const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
 
@@ -34,11 +34,9 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   // }, [])
 
   useEffect(() => {
-    dispatch(setAuthEmail("admin@example.org"))
-    setAuthPassword("Password1")
+    // No default credentials for production
     return () => {
       setAuthPassword("")
-      dispatch(setAuthEmail(""))
     }
   }, [])
 

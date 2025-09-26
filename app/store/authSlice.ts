@@ -12,7 +12,7 @@ interface AuthState {
 
 const initialState: AuthState = {
   tokens: null,
-  authEmail: "fake@example.org",
+  authEmail: "",
   currentUser: null,
 }
 
