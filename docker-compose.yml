@@ -34,6 +34,8 @@ services:
       - '27017:27017'
     volumes:
       - dbdata:/data/db
+      - ./mongod.conf:/etc/mongod.conf:ro
+    command: ["mongod", "--config", "/etc/mongod.conf"]
     networks:
       - node-network
     # Optional: Add healthcheck for better container orchestration

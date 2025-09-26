@@ -37,11 +37,11 @@ const orgSchema = mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       lowercase: true,
       validate(value) {
-        if (!validator.isMobilePhone(value)) {
+        if (value && !validator.isMobilePhone(value)) {
           throw new Error('Invalid phone number');
         }
       },

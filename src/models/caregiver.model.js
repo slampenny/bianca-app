@@ -33,10 +33,12 @@ const caregiverSchema = mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
+      required: function required() {
+        return !this.ssoProvider;
+      },
       trim: true,
       validate(value) {
-        if (!validator.isMobilePhone(value)) {
+        if (value && !validator.isMobilePhone(value)) {
           throw new Error('Invalid phone number');
         }
       },
@@ -44,16 +46,27 @@ const caregiverSchema = mongoose.Schema(
     password: {
       type: String,
       required: function required() {
-        return this.role !== 'invited';
+        return this.role !== 'invited' && !this.ssoProvider;
       },
       trim: true,
       minlength: 8,
       validate(value) {
-        if (!value.match(/\d/) || !value.match(/[a-zA-Z]/)) {
+        if (value && (!value.match(/\d/) || !value.match(/[a-zA-Z]/))) {
           throw new Error('Password must contain at least one letter and one number');
         }
       },
       private: true, // used by the toJSON plugin
+    },
+    // SSO fields
+    ssoProvider: {
+      type: String,
+      enum: ['google', 'microsoft'],
+      required: false,
+    },
+    ssoProviderId: {
+      type: String,
+      required: false,
+      trim: true,
     },
     role: {
       type: String,
