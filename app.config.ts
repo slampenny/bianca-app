@@ -27,8 +27,8 @@ module.exports = ({ config }: ConfigContext): Partial<ExpoConfig> => {
         projectId: "fb5ec1ef-180c-455a-8b64-2c41f9c8ca2d"
       },
       // OAuth Configuration
-      googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || "your-google-client-id-here",
-      microsoftClientId: process.env.EXPO_PUBLIC_MICROSOFT_CLIENT_ID || "your-microsoft-client-id-here",
+      googleClientId: "959208772047-srq01jpg8sq31afovfb38afsroee0o53.apps.googleusercontent.com",
+      microsoftClientId: "28288cd7-df50-4587-9f58-5c97ff54e65c",
       microsoftTenantId: process.env.EXPO_PUBLIC_MICROSOFT_TENANT_ID || "common",
     },
     owner: "negascout",

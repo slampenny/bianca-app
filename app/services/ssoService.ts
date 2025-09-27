@@ -2,17 +2,19 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { DEFAULT_API_CONFIG } from './api/api';
 
 // Complete the auth session in the browser
 WebBrowser.maybeCompleteAuthSession();
 
 // OAuth configuration from app config
-const GOOGLE_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId || 'your-google-client-id';
-const MICROSOFT_CLIENT_ID = Constants.expoConfig?.extra?.microsoftClientId || 'your-microsoft-client-id';
+const GOOGLE_CLIENT_ID = 'REMOVED_GOOGLE_CLIENT_ID';
+const MICROSOFT_CLIENT_ID = '28288cd7-df50-4587-9f58-5c97ff54e65c';
 const MICROSOFT_TENANT_ID = Constants.expoConfig?.extra?.microsoftTenantId || 'common';
 
 // Redirect URI for OAuth
 const redirectUri = AuthSession.makeRedirectUri();
+console.log('OAuth Redirect URI:', redirectUri);
 
 export interface SSOUser {
   id: string;
@@ -34,9 +36,10 @@ class SSOService {
       clientId: GOOGLE_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
-      responseType: AuthSession.ResponseType.Code,
+      responseType: AuthSession.ResponseType.Token, // Use implicit flow for web
       extraParams: {},
       prompt: AuthSession.Prompt.SelectAccount,
+      usePKCE: false, // Disable PKCE for implicit flow
     });
   }
 
@@ -46,11 +49,12 @@ class SSOService {
       clientId: MICROSOFT_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
-      responseType: AuthSession.ResponseType.Code,
+      responseType: AuthSession.ResponseType.Token, // Use implicit flow for web
       extraParams: {
         tenant: MICROSOFT_TENANT_ID,
       },
       prompt: AuthSession.Prompt.SelectAccount,
+      usePKCE: false, // Disable PKCE for implicit flow
     });
   }
 
@@ -89,19 +93,18 @@ class SSOService {
       const result = await request.promptAsync(endpoints);
       
       if (result.type === 'success') {
-        // Exchange code for tokens
-        const tokenResult = await AuthSession.exchangeCodeAsync(
-          {
-            clientId: GOOGLE_CLIENT_ID,
-            code: result.params.code,
-            redirectUri,
-            extraParams: {},
-          },
-          endpoints
-        );
+        // With implicit flow, we get the access token directly
+        const accessToken = result.params.access_token;
+        
+        if (!accessToken) {
+          return {
+            error: 'Authentication failed',
+            description: 'No access token received from Google',
+          };
+        }
 
         // Get user info from Google
-        const userInfo = await this.fetchGoogleUserInfo(tokenResult.accessToken);
+        const userInfo = await this.fetchGoogleUserInfo(accessToken);
         
         // Send to backend for authentication
         const backendResponse = await this.authenticateWithBackend(userInfo);
@@ -138,21 +141,18 @@ class SSOService {
       const result = await request.promptAsync(endpoints);
       
       if (result.type === 'success') {
-        // Exchange code for tokens
-        const tokenResult = await AuthSession.exchangeCodeAsync(
-          {
-            clientId: MICROSOFT_CLIENT_ID,
-            code: result.params.code,
-            redirectUri,
-            extraParams: {
-              tenant: MICROSOFT_TENANT_ID,
-            },
-          },
-          endpoints
-        );
+        // With implicit flow, we get the access token directly
+        const accessToken = result.params.access_token;
+        
+        if (!accessToken) {
+          return {
+            error: 'Authentication failed',
+            description: 'No access token received from Microsoft',
+          };
+        }
 
         // Get user info from Microsoft
-        const userInfo = await this.fetchMicrosoftUserInfo(tokenResult.accessToken);
+        const userInfo = await this.fetchMicrosoftUserInfo(accessToken);
         
         // Send to backend for authentication
         const backendResponse = await this.authenticateWithBackend(userInfo);
@@ -221,7 +221,7 @@ class SSOService {
   // Authenticate with backend
   private async authenticateWithBackend(userInfo: SSOUser): Promise<SSOUser | SSOError> {
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.myphonefriend.com'}/v1/sso/login`, {
+      const response = await fetch(`${DEFAULT_API_CONFIG.url}sso/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

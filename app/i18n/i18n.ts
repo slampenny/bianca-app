@@ -6,37 +6,50 @@ import { notifyLanguageChange } from "../hooks/languageNotifications"
 
 // if English isn't your default language, move Translations to the appropriate language file.
 import en, { Translations } from "./en"
-import ar from "./ar"
-import ko from "./ko"
-import fr from "./fr"
-import es from "./es"
-import de from "./de"
-import zh from "./zh"
-import ja from "./ja"
-import pt from "./pt"
-import it from "./it"
-import ru from "./ru"
+
+// Lazy load other languages to improve initial app load time
+const languageModules = {
+  ar: () => import("./ar"),
+  ko: () => import("./ko"),
+  fr: () => import("./fr"),
+  es: () => import("./es"),
+  de: () => import("./de"),
+  zh: () => import("./zh"),
+  ja: () => import("./ja"),
+  pt: () => import("./pt"),
+  it: () => import("./it"),
+  ru: () => import("./ru"),
+}
 
 i18n.fallbacks = true
 
 // to use regional locales use { "en-US": enUS } etc
+// Start with only English loaded for faster initial load
 i18n.translations = { 
-  ar, 
   en, 
   "en-US": en, 
-  ko, 
-  fr, 
-  es, 
-  de, 
-  zh, 
-  ja, 
-  pt, 
-  it, 
-  ru 
 }
 
 const fallbackLocale = "en-US"
 const LANGUAGE_STORAGE_KEY = "user_selected_language"
+
+// Function to lazy load a language module
+const loadLanguage = async (locale: string): Promise<void> => {
+  if (i18n.translations[locale]) {
+    return // Already loaded
+  }
+
+  const moduleLoader = languageModules[locale as keyof typeof languageModules]
+  if (moduleLoader) {
+    try {
+      const module = await moduleLoader()
+      i18n.translations[locale] = module.default
+      console.log(`Loaded language: ${locale}`)
+    } catch (error) {
+      console.error(`Failed to load language ${locale}:`, error)
+    }
+  }
+}
 
 // Function to initialize language with user preference or system default
 export const initializeLanguage = async () => {
@@ -50,8 +63,16 @@ export const initializeLanguage = async () => {
     const savedLanguage = await storage.load(LANGUAGE_STORAGE_KEY)
     console.log("Saved language from storage:", savedLanguage)
     
-    if (savedLanguage && Object.prototype.hasOwnProperty.call(i18n.translations, savedLanguage)) {
-      console.log("Setting language from saved preference:", savedLanguage)
+    if (savedLanguage && savedLanguage !== "en" && savedLanguage !== "en-US") {
+      // Load the saved language if it's not English
+      await loadLanguage(savedLanguage)
+      if (i18n.translations[savedLanguage]) {
+        console.log("Setting language from saved preference:", savedLanguage)
+        i18n.locale = savedLanguage
+        return
+      }
+    } else if (savedLanguage === "en" || savedLanguage === "en-US") {
+      console.log("Using saved English preference")
       i18n.locale = savedLanguage
       return
     }
@@ -64,7 +85,10 @@ export const initializeLanguage = async () => {
   const systemLocaleTag = systemLocale?.languageTag ?? "en-US"
   console.log("System locale detected:", systemLocaleTag)
 
-  if (Object.prototype.hasOwnProperty.call(i18n.translations, systemLocaleTag)) {
+  if (systemLocaleTag === "en" || systemLocaleTag === "en-US") {
+    console.log("System locale is English, using it")
+    i18n.locale = systemLocaleTag
+  } else if (Object.prototype.hasOwnProperty.call(i18n.translations, systemLocaleTag)) {
     // if specific locales like en-FI or en-US is available, set it
     console.log("Setting language from system locale:", systemLocaleTag)
     i18n.locale = systemLocaleTag
@@ -72,11 +96,18 @@ export const initializeLanguage = async () => {
     // otherwise try to fallback to the general locale (dropping the -XX suffix)
     const generalLocale = systemLocaleTag.split("-")[0]
     console.log("Trying general locale:", generalLocale)
-    if (Object.prototype.hasOwnProperty.call(i18n.translations, generalLocale)) {
-      console.log("Setting language from general locale:", generalLocale)
-      i18n.locale = generalLocale
+    
+    if (generalLocale !== "en") {
+      // Load the language if it's not English
+      await loadLanguage(generalLocale)
+      if (i18n.translations[generalLocale]) {
+        console.log("Setting language from general locale:", generalLocale)
+        i18n.locale = generalLocale
+      } else {
+        console.log("General locale not available, defaulting to English")
+        i18n.locale = "en"
+      }
     } else {
-      // Default to English if system language is not supported
       console.log("Defaulting to English")
       i18n.locale = "en"
     }
@@ -89,7 +120,12 @@ export const changeLanguage = async (languageCode: string) => {
   console.log("changeLanguage called with:", languageCode)
   console.log("Available translations:", Object.keys(i18n.translations))
   
-  if (Object.prototype.hasOwnProperty.call(i18n.translations, languageCode)) {
+  // Load the language if it's not already loaded
+  if (!i18n.translations[languageCode]) {
+    await loadLanguage(languageCode)
+  }
+  
+  if (i18n.translations[languageCode]) {
     console.log("Setting i18n.locale to:", languageCode)
     i18n.locale = languageCode
     console.log("i18n.locale is now:", i18n.locale)
@@ -123,16 +159,12 @@ export const changeLanguage = async (languageCode: string) => {
 const systemLocale = Localization.getLocales()[0]
 const systemLocaleTag = systemLocale?.languageTag ?? "en-US"
 
-// Set a default locale immediately
-if (Object.prototype.hasOwnProperty.call(i18n.translations, systemLocaleTag)) {
+// Set a default locale immediately (only English is loaded initially)
+if (systemLocaleTag === "en" || systemLocaleTag === "en-US") {
   i18n.locale = systemLocaleTag
 } else {
-  const generalLocale = systemLocaleTag.split("-")[0]
-  if (Object.prototype.hasOwnProperty.call(i18n.translations, generalLocale)) {
-    i18n.locale = generalLocale
-  } else {
-    i18n.locale = fallbackLocale
-  }
+  // For non-English locales, default to English and load the actual locale asynchronously
+  i18n.locale = fallbackLocale
 }
 
 // Initialize language with user preference (async)

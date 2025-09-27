@@ -1,20 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Text, Alert, ActivityIndicator } from 'react-native';
 import { colors } from 'app/theme/colors';
-
-// Temporary interfaces to avoid import issues
-interface SSOUser {
-  id: string;
-  email: string;
-  name: string;
-  picture?: string;
-  provider: 'google' | 'microsoft';
-}
-
-interface SSOError {
-  error: string;
-  description?: string;
-}
+import { ssoService, SSOUser, SSOError } from '../services/ssoService';
 
 interface SSOLoginButtonsProps {
   onSSOSuccess: (user: SSOUser) => void;
@@ -27,7 +14,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
   onSSOSuccess,
   onSSOError,
   disabled = false,
-  showGenericSSO = true,
+  showGenericSSO = false,
 }) => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false);
@@ -38,8 +25,19 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     
     setIsGoogleLoading(true);
     try {
-      // Temporary mock implementation
-      Alert.alert('Google SSO', 'Google SSO is not configured yet. Please contact your administrator.');
+      const result = await ssoService.signInWithGoogle();
+      
+      if ('error' in result) {
+        onSSOError?.(result);
+        // Show different alerts based on error type
+        if (result.error.includes('not configured')) {
+          Alert.alert('SSO Not Available', result.description || result.error);
+        } else {
+          Alert.alert('Sign In Failed', result.description || result.error);
+        }
+      } else {
+        onSSOSuccess(result);
+      }
     } catch (error) {
       const errorResult: SSOError = {
         error: 'Google sign-in failed',
@@ -57,8 +55,19 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     
     setIsMicrosoftLoading(true);
     try {
-      // Temporary mock implementation
-      Alert.alert('Microsoft SSO', 'Microsoft SSO is not configured yet. Please contact your administrator.');
+      const result = await ssoService.signInWithMicrosoft();
+      
+      if ('error' in result) {
+        onSSOError?.(result);
+        // Show different alerts based on error type
+        if (result.error.includes('not configured')) {
+          Alert.alert('SSO Not Available', result.description || result.error);
+        } else {
+          Alert.alert('Sign In Failed', result.description || result.error);
+        }
+      } else {
+        onSSOSuccess(result);
+      }
     } catch (error) {
       const errorResult: SSOError = {
         error: 'Microsoft sign-in failed',

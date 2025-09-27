@@ -7,21 +7,21 @@ import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail } from ".
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Button, Header, Screen, Text, TextField } from "app/components"
 import { colors } from "app/theme/colors"
-// import { SSOLoginButtons } from "../components/SSOLoginButtons"
+import { SSOLoginButtons } from "../components/SSOLoginButtons"
 
 // Temporary interfaces to avoid import issues
-// interface SSOUser {
-//   id: string;
-//   email: string;
-//   name: string;
-//   picture?: string;
-//   provider: 'google' | 'microsoft';
-// }
+interface SSOUser {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  provider: 'google' | 'microsoft';
+}
 
-// interface SSOError {
-//   error: string;
-//   description?: string;
-// }
+interface SSOError {
+  error: string;
+  description?: string;
+}
 
 type LoginScreenNavigationProp = StackNavigationProp<LoginStackParamList, "Login">
 
@@ -80,32 +80,32 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     navigation.navigate("RequestReset")
   }
 
-  // const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any }) => {
-  //   setIsLoading(true)
-  //   try {
-  //     if (user.tokens && user.backendUser) {
-  //       // SSO login successful - set tokens and user data
-  //       dispatch(setAuthTokens(user.tokens));
-  //       dispatch(setAuthEmail(user.email));
-  //       setErrorMessage(""); // Clear any previous errors
-  //       console.log('SSO login successful:', user.backendUser);
-  //     } else {
-  //       // Fallback for development/testing
-  //       dispatch(setAuthEmail(user.email));
-  //       setErrorMessage("SSO login successful but backend integration incomplete. Please use email/password login.");
-  //     }
-  //   } catch (error) {
-  //     console.error('SSO login error:', error);
-  //     setErrorMessage("SSO login failed. Please try again or use email/password login.");
-  //   } finally {
-  //     setIsLoading(false)
-  //   }
-  // }
+  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any }) => {
+    setIsLoading(true)
+    try {
+      if (user.tokens && user.backendUser) {
+        // SSO login successful - set tokens and user data
+        dispatch(setAuthTokens(user.tokens));
+        dispatch(setAuthEmail(user.email));
+        setErrorMessage(""); // Clear any previous errors
+        console.log('SSO login successful:', user.backendUser);
+      } else {
+        // Fallback for development/testing
+        dispatch(setAuthEmail(user.email));
+        setErrorMessage("SSO login successful but backend integration incomplete. Please use email/password login.");
+      }
+    } catch (error) {
+      console.error('SSO login error:', error);
+      setErrorMessage("SSO login failed. Please try again or use email/password login.");
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-  // const handleSSOError = (error: SSOError) => {
-  //   console.error('SSO error:', error);
-  //   setErrorMessage(`SSO login failed: ${error.description || error.error}`);
-  // }
+  const handleSSOError = (error: SSOError) => {
+    console.error('SSO error:', error);
+    setErrorMessage(`SSO login failed: ${error.description || error.error}`);
+  }
 
   // When you want to focus the password input after submitting the email
   const focusPasswordInput = () => {
@@ -159,13 +159,12 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         disabled={isLoading}
       />
       
-      {/* Temporarily disabled SSO buttons for debugging */}
-      {/* <SSOLoginButtons
+      <SSOLoginButtons
         onSSOSuccess={handleSSOSuccess}
         onSSOError={handleSSOError}
         disabled={isLoading}
-        showGenericSSO={true}
-      /> */}
+        showGenericSSO={false}
+      />
       
       <Button
         testID="register-button"
