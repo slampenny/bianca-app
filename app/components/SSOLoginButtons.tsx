@@ -114,6 +114,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
           style={[styles.ssoButton, styles.googleButton, disabled && styles.disabledButton]}
           onPress={handleGoogleSignIn}
           disabled={disabled || isLoading}
+          testID="google-sso-button"
         >
           {isGoogleLoading ? (
             <ActivityIndicator color={colors.palette.neutral100} size="small" />
@@ -130,6 +131,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
           style={[styles.ssoButton, styles.microsoftButton, disabled && styles.disabledButton]}
           onPress={handleMicrosoftSignIn}
           disabled={disabled || isLoading}
+          testID="microsoft-sso-button"
         >
           {isMicrosoftLoading ? (
             <ActivityIndicator color={colors.palette.neutral100} size="small" />
