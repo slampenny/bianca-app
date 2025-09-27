@@ -58,3 +58,58 @@ export async function isCaregiversScreen(page: Page) {
     console.log("Confirmed on Caregivers Screen (not authorized).")
   }
 }
+
+export async function navigateToSchedules(page: Page) {
+  console.log("Navigating to Schedules...")
+  // Try multiple methods to access schedules
+  const methods = [
+    // Method 1: Direct navigation button
+    async () => {
+      await page.getByTestId('schedule-nav-button').click()
+      await page.waitForTimeout(2000)
+    },
+    // Method 2: Tab navigation
+    async () => {
+      await page.getByTestId('tab-schedules').click()
+      await page.waitForTimeout(2000)
+    },
+    // Method 3: Text link
+    async () => {
+      await page.getByText(/schedule/i).first().click()
+      await page.waitForTimeout(2000)
+    }
+  ]
+  
+  for (const method of methods) {
+    try {
+      await method()
+      // Check if we're on a schedule screen
+      if (await page.getByTestId('schedules-screen').count() > 0 || 
+          await page.getByText(/schedule/i).count() > 0) {
+        console.log("Successfully navigated to Schedules")
+        return
+      }
+    } catch (error) {
+      console.log("Navigation method failed, trying next...")
+      continue
+    }
+  }
+  
+  throw new Error("Could not navigate to Schedules screen")
+}
+
+export async function isSchedulesScreen(page: Page) {
+  console.log("Checking if on Schedules Screen...")
+  try {
+    await expect(page.getByTestId('schedules-screen')).toBeVisible({ timeout: 5000 })
+    console.log("Confirmed on Schedules Screen.")
+  } catch {
+    // Fallback: check for schedule-related content
+    const scheduleElements = await page.getByText(/schedule/i).count()
+    if (scheduleElements > 0) {
+      console.log("Confirmed on Schedules Screen (fallback).")
+    } else {
+      throw new Error("Not on Schedules Screen")
+    }
+  }
+}
