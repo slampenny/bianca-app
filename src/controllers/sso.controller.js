@@ -5,6 +5,7 @@ const Org = require('../models/org.model');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const { tokenService } = require('../services');
+const { tokenTypes } = require('../config/tokens');
 
 const login = async (req, res) => {
   try {
@@ -54,29 +55,43 @@ const login = async (req, res) => {
       }
     }
 
-    // Generate JWT tokens
+    // Generate JWT tokens with correct structure
     const accessToken = jwt.sign(
-      { 
-        userId: caregiver._id, 
-        email: caregiver.email,
-        role: caregiver.role 
+      {
+        type: tokenTypes.ACCESS,
+        sub: caregiver._id,
+        iat: Math.floor(Date.now() / 1000)
       },
       config.jwt.secret,
       { expiresIn: '1h' }
     );
 
     const refreshToken = jwt.sign(
-      { userId: caregiver._id },
+      {
+        type: tokenTypes.REFRESH,
+        sub: caregiver._id,
+        iat: Math.floor(Date.now() / 1000)
+      },
       config.jwt.secret,
       { expiresIn: '7d' }
     );
+
+    // Calculate expiration dates
+    const accessExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+    const refreshExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
     res.json({
       success: true,
       message: 'SSO login successful',
       tokens: {
-        accessToken,
-        refreshToken
+        access: {
+          token: accessToken,
+          expires: accessExpires,
+        },
+        refresh: {
+          token: refreshToken,
+          expires: refreshExpires,
+        },
       },
       user: {
         id: caregiver._id,
