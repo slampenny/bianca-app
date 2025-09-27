@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useRef } from 'react'
+import React, { useState, forwardRef, useRef, useEffect } from 'react'
 import { View, StyleSheet, TextInput, Platform } from 'react-native'
 import { colors, spacing, typography } from 'app/theme'
 import { translate } from 'app/i18n'
@@ -57,6 +57,11 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
     const [validationError, setValidationError] = useState<string | null>(null)
     
     const inputRef = useRef<TextInput>(null)
+    
+    // Sync internalValue with value prop when it changes
+    useEffect(() => {
+      setInternalValue(value || '')
+    }, [value])
     
     const handleChangeText = (text: string) => {
       setInternalValue(text)

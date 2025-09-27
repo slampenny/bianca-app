@@ -95,7 +95,9 @@ function PatientScreen() {
     if (patient) {
       setName(patient.name)
       setEmail(patient.email)
-      setPhone(patient.phone)
+      // Format phone number for display (remove +1 country code if present)
+      const formattedPhone = patient.phone?.replace(/^\+1/, '').replace(/\D/g, '')
+      setPhone(formattedPhone || '')
       setAvatar(patient.avatar || defaultAvatarUrl) // Ensure default if avatar is null/empty
       setPreferredLanguage(patient.preferredLanguage || DEFAULT_LANGUAGE)
       // Reset errors and success message when patient changes

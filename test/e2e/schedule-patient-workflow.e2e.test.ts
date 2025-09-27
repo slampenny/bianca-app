@@ -32,6 +32,11 @@ test.describe("Schedule Patient Workflow", () => {
       }
       console.log('Patient screen elements:', patientScreenElements)
       
+      // Check if phone number is populated in the input field
+      const phoneInput = page.getByTestId('patient-phone-input')
+      const phoneValue = await phoneInput.inputValue()
+      console.log('Phone input value:', phoneValue)
+      
       // Look for the Manage Schedules button
       const scheduleButton = await page.getByTestId('manage-schedules-button').count()
       console.log('Manage Schedules button found:', scheduleButton)
