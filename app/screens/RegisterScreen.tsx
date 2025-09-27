@@ -3,7 +3,6 @@ import { StyleSheet, View, Pressable, Platform, Dimensions } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField, PhoneInputWeb } from "app/components"
-import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
 
@@ -210,6 +209,23 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         </Text>
 
         {/* Form Fields */}
+        {accountType === "organization" && (
+          <View style={styles.fieldContainer}>
+            <TextField
+              testID="register-org-name"
+              placeholderTx="registerScreen.organizationNameFieldPlaceholder"
+              labelTx="registerScreen.organizationNameFieldLabel"
+              value={organizationName}
+              onChangeText={(text) => {
+                setOrganizationName(text)
+                clearFieldError("organizationName")
+              }}
+              status={organizationNameError ? "error" : undefined}
+              helper={organizationNameError || undefined}
+            />
+          </View>
+        )}
+
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-name"
@@ -248,6 +264,22 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         </View>
 
         <View style={styles.fieldContainer}>
+          <PhoneInputWeb
+            testID="register-phone"
+            placeholderTx="registerScreen.phoneFieldPlaceholder"
+            labelTx="registerScreen.phoneFieldLabel"
+            value={phone}
+            onChangeText={(text) => {
+              setPhone(text)
+              clearFieldError("phone")
+            }}
+            status={phoneError ? "error" : undefined}
+            helper={phoneError || undefined}
+          />
+          {/* {phoneError ? <Text style={styles.fieldErrorText}>{phoneError}</Text> : null} */}
+        </View>
+
+        <View style={styles.fieldContainer}>
           <TextField
             testID="register-password"
             placeholderTx="registerScreen.passwordFieldPlaceholder"
@@ -281,39 +313,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           {/* {confirmPasswordError ? (<Text style={styles.fieldErrorText}>{confirmPasswordError}</Text>) : null} */}
         </View>
 
-        <View style={styles.fieldContainer}>
-          <PhoneInputWeb
-            testID="register-phone"
-            placeholderTx="registerScreen.phoneFieldPlaceholder"
-            labelTx="registerScreen.phoneFieldLabel"
-            value={phone}
-            onChangeText={(text) => {
-              setPhone(text)
-              clearFieldError("phone")
-            }}
-            status={phoneError ? "error" : undefined}
-            helper={phoneError || undefined}
-          />
-          {/* {phoneError ? <Text style={styles.fieldErrorText}>{phoneError}</Text> : null} */}
-        </View>
 
-        {accountType === "organization" && (
-          <View style={styles.fieldContainer}>
-            <TextField
-              testID="register-org-name"
-              placeholderTx="registerScreen.organizationNameFieldPlaceholder"
-              labelTx="registerScreen.organizationNameFieldLabel"
-              value={organizationName}
-              onChangeText={(text) => {
-                setOrganizationName(text)
-                clearFieldError("organizationName")
-              }}
-              status={organizationNameError ? "error" : undefined}
-              helper={organizationNameError || undefined}
-            />
-            {/* {organizationNameError ? (<Text style={styles.fieldErrorText}>{organizationNameError}</Text>) : null} */}
-          </View>
-        )}
 
         {/* MOVED General Error / Success Message HERE */}
         {generalError ? (
@@ -354,10 +354,6 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           <Text style={styles.linkButtonText} tx="registerScreen.goBack" />
         </Pressable>
 
-        {/* Legal Links */}
-        <View style={styles.legalLinksContainer}>
-          <LegalLinks style={styles.legalLinks} />
-        </View>
 
         {/* Add extra space at the bottom to ensure scrollability */}
         <div style={{ height: "100px" }}></div>
@@ -447,13 +443,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     textAlign: "center",
     width: "100%",
-  },
-  legalLinksContainer: {
-    marginTop: 20,
-    paddingBottom: 20,
-  },
-  legalLinks: {
-    // Add any specific styles for LegalLinks if needed
   },
   consentContainer: {
     marginTop: 20,

@@ -84,11 +84,32 @@ test.describe("Register Screen", () => {
     await expect(page.getByText(/organization name cannot be empty/i)).toBeVisible()
   })
 
-  test("shows success message after valid submission", async ({ page }) => {
+  test("shows success message after valid individual registration", async ({ page }) => {
     const registrationData = generateRegistrationData();
     
     // Ensure we're registering as an individual (not organization)
     await page.getByTestId("register-individual-toggle").click();
+    
+    await page.getByTestId("register-name").fill(registrationData.name)
+    await page.getByTestId("register-email").fill(registrationData.email)
+    await page.getByTestId("register-password").fill(registrationData.password)
+    await page.getByTestId("register-confirm-password").fill(registrationData.confirmPassword)
+    await page.getByTestId("register-phone").fill(registrationData.phone)
+
+    await page.getByTestId("register-submit").click()
+    
+    // Wait for successful registration and navigation to home screen
+    await isHomeScreen(page);
+  })
+
+  test("shows success message after valid organization registration", async ({ page }) => {
+    const registrationData = generateRegistrationData();
+    
+    // Register as an organization
+    await page.getByTestId("register-organization-toggle").click();
+    
+    // Fill organization name first (now at the top)
+    await page.getByTestId("register-org-name").fill("Test Organization")
     
     await page.getByTestId("register-name").fill(registrationData.name)
     await page.getByTestId("register-email").fill(registrationData.email)

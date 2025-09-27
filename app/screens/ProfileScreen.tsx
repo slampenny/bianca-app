@@ -189,7 +189,6 @@ function ProfileScreen() {
         )}
 
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>{translate("profileScreen.yourProfile")}</Text>
 
           <AvatarPicker
             initialAvatar={avatar}
