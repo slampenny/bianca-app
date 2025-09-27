@@ -1,15 +1,24 @@
 import React, { useState, forwardRef, useRef } from 'react'
-import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native'
-import { colors, spacing } from 'app/theme'
+import { View, StyleSheet, TextInput, Platform } from 'react-native'
+import { colors, spacing, typography } from 'app/theme'
+import { translate } from 'app/i18n'
+import { Text } from './Text'
 
 interface PhoneInputProps {
   value?: string
   onChangeText?: (text: string) => void
   placeholder?: string
+  placeholderTx?: string
+  placeholderTxOptions?: any
+  label?: string
+  labelTx?: string
+  labelTxOptions?: any
   error?: string
   disabled?: boolean
   testID?: string
   style?: any
+  containerStyle?: any
+  inputWrapperStyle?: any
 }
 
 // Simple phone number validation and formatting
@@ -17,13 +26,12 @@ const formatPhoneNumber = (value: string): string => {
   // Remove all non-digit characters
   const phoneNumber = value.replace(/\D/g, '')
   
-  // Format as +1XXXXXXXXXX for US numbers
+  // Return raw 10-digit format for backend compatibility
   if (phoneNumber.length === 10) {
-    return `+1${phoneNumber}`
-  } else if (phoneNumber.length === 11 && phoneNumber.startsWith('1')) {
-    return `+${phoneNumber}`
-  } else if (phoneNumber.startsWith('+1') && phoneNumber.length === 12) {
     return phoneNumber
+  } else if (phoneNumber.length === 11 && phoneNumber.startsWith('1')) {
+    // Remove leading 1 and return 10-digit format
+    return phoneNumber.slice(1)
   }
   
   return value
@@ -34,24 +42,16 @@ const validatePhoneNumber = (value: string): string | null => {
   
   const phoneNumber = value.replace(/\D/g, '')
   
-  // US phone number validation
-  if (value.startsWith('+1')) {
-    if (phoneNumber.length === 11 && phoneNumber.startsWith('1')) {
-      return null // Valid
-    }
-    return 'Invalid US phone number format'
-  }
-  
-  // 10-digit US number
+  // Accept 10-digit numbers
   if (phoneNumber.length === 10) {
     return null // Valid
   }
   
-  return 'Phone number must be 10 digits or +1XXXXXXXXXX format'
+  return 'Phone number must be 10 digits'
 }
 
 export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
-  ({ value, onChangeText, placeholder, error, disabled, testID, style }, ref) => {
+  ({ value, onChangeText, placeholder, placeholderTx, placeholderTxOptions, label, labelTx, labelTxOptions, error, disabled, testID, style, containerStyle, inputWrapperStyle }, ref) => {
     const [isFocused, setIsFocused] = useState(false)
     const [internalValue, setInternalValue] = useState(value || '')
     const [validationError, setValidationError] = useState<string | null>(null)
@@ -75,21 +75,33 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
     }
     
     const displayError = error || validationError
+    const placeholderContent = placeholderTx
+      ? translate(placeholderTx, placeholderTxOptions)
+      : placeholder
     
     return (
-      <View style={[styles.container, style]}>
+      <View style={[styles.container, containerStyle]}>
+        {!!(label || labelTx) && (
+          <Text
+            preset="formLabel"
+            text={label || (labelTx ? translate(labelTx, labelTxOptions) : undefined)}
+            style={styles.label}
+          />
+        )}
+        
         <View style={[
-          styles.inputContainer,
-          isFocused && styles.inputContainerFocused,
-          displayError && styles.inputContainerError,
-          disabled && styles.inputContainerDisabled
+          styles.inputWrapper,
+          isFocused && styles.inputWrapperFocused,
+          displayError && styles.inputWrapperError,
+          disabled && styles.inputWrapperDisabled,
+          inputWrapperStyle
         ]}>
           <TextInput
             ref={ref || inputRef}
             value={internalValue}
             onChangeText={handleChangeText}
-            placeholder={placeholder || 'Enter phone number (e.g., +15551234567)'}
-            style={styles.textInput}
+            placeholder={placeholderContent || 'Enter phone number (e.g., 5551234567)'}
+            style={[styles.input, style]}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             editable={!disabled}
@@ -98,14 +110,10 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
             testID={testID}
           />
         </View>
+        
         {displayError && (
-          <Text style={styles.errorText} testID={`${testID}-error`}>
+          <Text style={styles.errorText}>
             {displayError}
-          </Text>
-        )}
-        {!displayError && internalValue && (
-          <Text style={styles.helpText} testID={`${testID}-help`}>
-            Valid phone number format
           </Text>
         )}
       </View>
@@ -117,41 +125,60 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: spacing.sm,
   },
-  inputContainer: {
-    borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-    borderRadius: 8,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.palette.neutral100,
-    minHeight: 48,
+  label: {
+    marginBottom: spacing.xs,
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#2c3e50",
   },
-  inputContainerFocused: {
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.md,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  inputWrapperFocused: {
     borderColor: colors.palette.primary500,
     borderWidth: 2,
   },
-  inputContainerError: {
-    borderColor: colors.palette.angry500,
+  inputWrapperError: {
+    borderColor: colors.error,
   },
-  inputContainerDisabled: {
+  inputWrapperDisabled: {
     backgroundColor: colors.palette.neutral200,
     opacity: 0.6,
   },
-  textInput: {
-    fontSize: 18, // md size
-    color: colors.palette.neutral900,
-    padding: 0,
-    margin: 0,
+  input: {
     flex: 1,
+    fontFamily: typography.primary.normal,
+    color: "#2c3e50",
+    fontSize: 16,
+    lineHeight: 20,
+    height: undefined,
+    marginVertical: 0,
+    marginHorizontal: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    ...(Platform.OS === "web" && {
+      outlineStyle: "none",
+      outlineWidth: 0,
+      outlineColor: "transparent",
+      boxShadow: "none",
+    }),
   },
   errorText: {
-    color: colors.palette.angry500,
-    fontSize: 16, // sm size
     marginTop: spacing.xs,
-  },
-  helpText: {
-    color: colors.palette.neutral600,
-    fontSize: 16, // sm size
-    marginTop: spacing.xs,
+    fontSize: 14,
+    color: colors.error,
   },
 })

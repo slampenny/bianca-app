@@ -44,6 +44,10 @@ export const authSlice = createSlice({
       state.currentUser = payload.caregiver
       state.tokens = payload.tokens
     })
+    builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
+      state.currentUser = payload.caregiver
+      state.tokens = payload.tokens
+    })
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
       state.tokens = null
       state.authEmail = ""

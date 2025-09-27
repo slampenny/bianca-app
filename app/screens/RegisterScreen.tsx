@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
 import { StyleSheet, View, Pressable, Platform, Dimensions } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
-import { Button, Text, TextField } from "app/components"
+import { Button, Text, TextField, PhoneInputWeb } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
@@ -282,7 +282,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         </View>
 
         <View style={styles.fieldContainer}>
-          <TextField
+          <PhoneInputWeb
             testID="register-phone"
             placeholderTx="registerScreen.phoneFieldPlaceholder"
             labelTx="registerScreen.phoneFieldLabel"
@@ -291,7 +291,6 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
               setPhone(text)
               clearFieldError("phone")
             }}
-            keyboardType="phone-pad"
             status={phoneError ? "error" : undefined}
             helper={phoneError || undefined}
           />

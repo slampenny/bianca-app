@@ -15,7 +15,7 @@ import {
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
-import { LoadingButton, Button } from "app/components"
+import { LoadingButton, Button, PhoneInputWeb } from "app/components"
 import { PatientReassignmentModal } from "../components/PatientReassignmentModal"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
@@ -380,14 +380,14 @@ function CaregiverScreen() {
             autoCapitalize="none"
           />
           {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
-          <TextInput
+          <PhoneInputWeb
             style={styles.input}
+            label={translate("caregiverScreen.phoneLabel")}
             placeholder={translate("caregiverScreen.phonePlaceholder")}
             placeholderTextColor="#7f8c8d"
             value={phone}
             onChangeText={validatePhone}
             testID="caregiver-phone-input"
-            keyboardType="phone-pad"
           />
           {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 

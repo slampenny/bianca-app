@@ -230,13 +230,12 @@ test.describe('Invite User Workflow', () => {
   test('Invalid invite token handling', async ({ page }) => {
     const invalidToken = 'invalid_token_123'
 
-    // Mock invalid token verification
-    await page.route('**/v1/auth/verify-invite*', async (route) => {
+    // Mock failed registration with invalid token
+    await page.route('**/v1/auth/registerWithInvite', async (route) => {
       route.fulfill({
         status: 400,
         contentType: 'application/json',
         body: JSON.stringify({
-          valid: false,
           message: 'Invalid or expired invite token'
         })
       })
@@ -244,24 +243,33 @@ test.describe('Invite User Workflow', () => {
 
     // Navigate to invite registration page with invalid token
     await page.goto(`/signup?token=${invalidToken}`)
+    await page.waitForSelector('[data-testid="signup-screen"]')
+
+    // Fill in the form to trigger the error
+    await page.getByTestId('register-name').fill('Test User')
+    await page.getByTestId('register-password').fill('StrongPassword123!')
+    await page.getByTestId('register-confirm-password').fill('StrongPassword123!')
+
+    // Submit the form
+    await page.getByTestId('register-submit').click()
 
     // Should see error message
-    await expect(page.getByText('Invalid or expired invite token')).toBeVisible()
+    await expect(page.getByTestId('signup-error')).toBeVisible()
+    await expect(page.getByTestId('signup-error')).toContainText('Invalid or expired invite token')
 
-    // Should be redirected to login page
-    await page.waitForSelector('[data-testid="email-input"]', { timeout: 10000 })
+    // Should stay on signup page to show the error
+    expect(page.url()).toContain('/signup')
   })
 
   test('Expired invite token handling', async ({ page }) => {
     const expiredToken = 'expired_token_123'
 
-    // Mock expired token verification
-    await page.route('**/v1/auth/verify-invite*', async (route) => {
+    // Mock failed registration with expired token
+    await page.route('**/v1/auth/registerWithInvite', async (route) => {
       route.fulfill({
         status: 400,
         contentType: 'application/json',
         body: JSON.stringify({
-          valid: false,
           message: 'Invite token has expired'
         })
       })
@@ -269,12 +277,22 @@ test.describe('Invite User Workflow', () => {
 
     // Navigate to invite registration page with expired token
     await page.goto(`/signup?token=${expiredToken}`)
+    await page.waitForSelector('[data-testid="signup-screen"]')
+
+    // Fill in the form to trigger the error
+    await page.getByTestId('register-name').fill('Test User')
+    await page.getByTestId('register-password').fill('StrongPassword123!')
+    await page.getByTestId('register-confirm-password').fill('StrongPassword123!')
+
+    // Submit the form
+    await page.getByTestId('register-submit').click()
 
     // Should see error message
-    await expect(page.getByText('Invite token has expired')).toBeVisible()
+    await expect(page.getByTestId('signup-error')).toBeVisible()
+    await expect(page.getByTestId('signup-error')).toContainText('Invite token has expired')
 
-    // Should be redirected to login page
-    await page.waitForSelector('[data-testid="email-input"]', { timeout: 10000 })
+    // Should stay on signup page to show the error
+    expect(page.url()).toContain('/signup')
   })
 
   test('Invite registration form validation', async ({ page }) => {
@@ -286,7 +304,40 @@ test.describe('Invite User Workflow', () => {
         body: JSON.stringify({
           valid: true,
           email: testData.email,
+          name: testData.name,
+          phone: '+15551234567',
           orgName: 'Test Organization'
+        })
+      })
+    })
+
+    // Mock successful registration
+    await page.route('**/v1/auth/registerWithInvite', async (route) => {
+      route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          caregiver: {
+            id: MOCK_INVITED_CAREGIVER_ID,
+            email: testData.email,
+            name: testData.name,
+            role: 'staff',
+            avatar: '',
+            phone: '+15551234567',
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          tokens: {
+            access: {
+              token: 'mock_jwt_token',
+              expires: new Date(Date.now() + 3600000).toISOString()
+            },
+            refresh: {
+              token: 'mock_refresh_token',
+              expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }
         })
       })
     })
@@ -295,12 +346,42 @@ test.describe('Invite User Workflow', () => {
     await page.goto(`/signup?token=${inviteToken}`)
     await page.waitForSelector('[data-testid="signup-screen"]')
 
-    // Fill in valid password data first to enable the button
+    // Debug: Check if fields are present
+    console.log('Checking for register-name field...')
+    const nameField = page.getByTestId('register-name')
+    await expect(nameField).toBeVisible()
+    
+    // Fill in required fields (email and phone should be prefilled from invite token)
+    await nameField.fill(testData.name)
     await page.getByTestId('register-password').fill('StrongPassword123!')
     await page.getByTestId('register-confirm-password').fill('StrongPassword123!')
 
+    // Wait for the button to become enabled
+    await page.getByTestId('register-submit').waitFor({ state: 'visible' })
+    await expect(page.getByTestId('register-submit')).toBeEnabled()
+
+    // Debug: Check button state
+    console.log('Button should be enabled now, clicking...')
+    
     // Now the button should be enabled and we can test validation
     await page.getByTestId('register-submit').click()
+    
+    // Debug: Wait a bit and check what happened
+    await page.waitForTimeout(2000)
+    console.log('After clicking submit, current URL:', page.url())
+    
+    // Check for any error messages on the page
+    const errorElement = page.getByTestId('signup-error')
+    if (await errorElement.isVisible()) {
+      const errorText = await errorElement.textContent()
+      console.log('Error message found:', errorText)
+    }
+    
+    // Check console logs for any errors
+    const logs = await page.evaluate(() => {
+      return window.console._logs || []
+    })
+    console.log('Console logs:', logs)
 
     // Should see success or navigate to main app
     await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
@@ -386,6 +467,14 @@ test.describe('Invite User Workflow', () => {
     // Send invite
     await page.getByTestId('invite-caregiver-button').click()
     await page.getByTestId('caregiver-email-input').fill(testData.email)
+    
+    // Fill phone field (required for the button to be enabled)
+    await page.getByTestId('caregiver-phone-input').fill('(555) 123-4567')
+    
+    // Wait for the button to become enabled
+    await page.getByTestId('caregiver-save-button').waitFor({ state: 'visible' })
+    await expect(page.getByTestId('caregiver-save-button')).toBeEnabled()
+    
     await page.getByTestId('caregiver-save-button').click()
 
     // Step 2: Simulate the email link click
@@ -415,11 +504,10 @@ test.describe('Invite User Workflow', () => {
     await invitePage.goto(`/signup?token=${inviteToken}`)
     await invitePage.waitForSelector('[data-testid="signup-screen"]')
 
-    // Complete the registration
+    // Complete the registration (email and phone should be prefilled from invite token)
     await invitePage.getByTestId('register-name').fill(testData.name)
     await invitePage.getByTestId('register-password').fill('StrongPassword123!')
     await invitePage.getByTestId('register-confirm-password').fill('StrongPassword123!')
-    await invitePage.getByTestId('register-phone').fill(testData.phone)
 
     // Mock successful registration
     await invitePage.route('**/v1/auth/registerWithInvite', async (route) => {

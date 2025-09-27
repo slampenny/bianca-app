@@ -3,7 +3,7 @@ import { View, ViewStyle, StyleSheet } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useRegisterWithInviteMutation } from "../services/api/authApi"
-import { Button, Text, TextField, Screen, Header } from "app/components"
+import { Button, Text, TextField, Screen, Header, PhoneInputWeb } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { colors } from "app/theme/colors"
@@ -94,7 +94,9 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       const result = await registerWithInvite({
         token,
         password,
-        // The backend will get name, email, phone from the token
+        name,
+        email,
+        phone,
       }).unwrap()
 
       console.log("Signup successful:", result)
@@ -114,8 +116,9 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       }
       
       // For specific token errors, don't navigate away
-      if (error?.data?.message?.includes("Invalid or expired invite token") || 
-          error?.data?.message?.includes("Invite token has expired")) {
+      const errorMessage = error?.data?.message || error?.message || ""
+      if (errorMessage.includes("Invalid or expired invite token") || 
+          errorMessage.includes("Invite token has expired")) {
         return // Stay on the page to show the error
       }
     }
@@ -135,13 +138,13 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         onChangeText={setName}
         labelTx="signupScreen.fullNameLabel"
         placeholderTx="signupScreen.fullNamePlaceholder"
-        editable={false}
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
       />
 
       <TextField
+        testID="register-email"
         value={email}
         onChangeText={setEmail}
         labelTx="signupScreen.emailLabel"
@@ -154,13 +157,12 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         style={styles.input}
       />
 
-      <TextField
+      <PhoneInputWeb
         testID="register-phone"
         value={phone}
         onChangeText={setPhone}
         labelTx="signupScreen.phoneLabel"
         placeholderTx="signupScreen.phonePlaceholder"
-        keyboardType="phone-pad"
         editable={false}
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}

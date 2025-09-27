@@ -25,7 +25,7 @@ import {
 } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { colors } from "app/theme/colors"
-import { Button, TextField } from "app/components"
+import { Button, TextField, PhoneInputWeb } from "app/components"
 import { LANGUAGE_OPTIONS, getLanguageByCode, DEFAULT_LANGUAGE, LanguageOption } from "../constants/languages"
 import { translate } from "../i18n"
 
@@ -414,12 +414,11 @@ function PatientScreen() {
             style={styles.input}
           />
 
-          <TextField
+          <PhoneInputWeb
             label={translate("patientScreen.phoneLabel")}
             placeholder={translate("patientScreen.phonePlaceholder")}
             value={phone}
             onChangeText={validatePhone}
-            keyboardType="phone-pad"
             onFocus={clearMessages}
             testID="patient-phone-input"
             status={phoneError ? "error" : undefined}
