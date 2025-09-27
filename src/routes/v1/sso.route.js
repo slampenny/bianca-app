@@ -11,4 +11,7 @@ router.post('/login', validate(ssoValidation.login), ssoController.login);
 // Verify SSO token endpoint (for backend verification)
 router.post('/verify', validate(ssoValidation.verify), ssoController.verify);
 
+// Get OAuth configuration for frontend
+router.get('/config', ssoController.getConfig);
+
 module.exports = router;

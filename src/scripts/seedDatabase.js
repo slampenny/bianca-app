@@ -1044,6 +1044,75 @@ async function seedDatabase() {
     const invoiceRecord = await Invoice.create(dummyInvoiceData);
     console.log('Seeded Invoice:', invoiceRecord);
 
+    // Add sentiment analysis to seeded conversations
+    console.log('Adding sentiment analysis to seeded conversations...');
+    try {
+      const { getOpenAISentimentServiceInstance } = require('../services/openai.sentiment.service');
+      const sentimentService = getOpenAISentimentServiceInstance();
+      
+      // Get all conversations for sentiment analysis
+      const allConversations = await Conversation.find({
+        status: 'completed',
+        messages: { $exists: true, $ne: [] }
+      }).populate('messages');
+      
+      console.log(`Found ${allConversations.length} conversations to analyze for sentiment`);
+      
+      // Analyze sentiment for each conversation
+      for (const conversation of allConversations) {
+        try {
+          // Check if already has sentiment analysis
+          if (conversation.analyzedData?.sentiment) {
+            console.log(`Conversation ${conversation._id} already has sentiment analysis, skipping`);
+            continue;
+          }
+          
+          // Format conversation text from messages
+          const conversationText = conversation.messages
+            .map(msg => {
+              const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+              return `${speaker}: ${msg.content}`;
+            })
+            .join('\n');
+          
+          if (!conversationText.trim()) {
+            console.log(`Conversation ${conversation._id} has no text content, skipping`);
+            continue;
+          }
+          
+          // Perform sentiment analysis
+          const analysisResult = await sentimentService.analyzeSentiment(conversationText, {
+            detailed: true
+          });
+          
+          if (analysisResult.success) {
+            // Update conversation with sentiment analysis
+            await Conversation.findByIdAndUpdate(conversation._id, {
+              $set: {
+                'analyzedData.sentiment': analysisResult.data,
+                'analyzedData.sentimentAnalyzedAt': new Date()
+              }
+            });
+            
+            console.log(`Added sentiment analysis to conversation ${conversation._id}: ${analysisResult.data.overallSentiment} (${analysisResult.data.sentimentScore})`);
+          } else {
+            console.warn(`Failed to analyze sentiment for conversation ${conversation._id}: ${analysisResult.error}`);
+          }
+          
+          // Add small delay to avoid overwhelming the API
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+        } catch (error) {
+          console.warn(`Error analyzing sentiment for conversation ${conversation._id}:`, error.message);
+        }
+      }
+      
+      console.log('Sentiment analysis completed for seeded conversations');
+    } catch (error) {
+      console.warn('Failed to add sentiment analysis to seeded data:', error.message);
+      // Don't fail the entire seeding process if sentiment analysis fails
+    }
+
     // Run medical analysis on the seeded patient data
     console.log('Running medical analysis on seeded patient data...');
     try {

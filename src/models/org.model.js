@@ -37,7 +37,7 @@ const orgSchema = mongoose.Schema(
     },
     phone: {
       type: String,
-      required: false,
+      required: false, // Phone number will be set when user completes profile
       trim: true,
       lowercase: true,
       validate(value) {

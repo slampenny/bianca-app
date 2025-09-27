@@ -76,6 +76,17 @@ const envVarsSchema = Joi.object({
   }),
   STRIPE_SECRET_KEY: Joi.string(),
   STRIPE_PUBLISHABLE_KEY: Joi.string(),
+  // OAuth Client IDs
+  GOOGLE_OAUTH_CLIENTID: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().optional() // Optional in dev/test environments
+  }),
+  MICROSOFT_OAUTH_CLIENTID: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().optional() // Optional in dev/test environments
+  }),
   // **NEW:** Realtime API specific variables
   OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
@@ -212,6 +223,14 @@ const baselineConfig = {
     publishableKey: envVars.STRIPE_PUBLISHABLE_KEY,
     // Determine Stripe mode based on key prefix
     mode: envVars.STRIPE_SECRET_KEY?.startsWith('sk_test_') ? 'test' : 'live'
+  },
+  oauth: {
+    google: {
+      clientId: envVars.GOOGLE_OAUTH_CLIENTID
+    },
+    microsoft: {
+      clientId: envVars.MICROSOFT_OAUTH_CLIENTID
+    }
   }
 };
 
@@ -343,6 +362,9 @@ baselineConfig.loadSecrets = async () => {
       baselineConfig.stripe.mode = secrets.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'live';
     }
     if (secrets.STRIPE_PUBLISHABLE_KEY) baselineConfig.stripe.publishableKey = secrets.STRIPE_PUBLISHABLE_KEY;
+    // OAuth Client IDs
+    if (secrets.GOOGLE_OAUTH_CLIENTID) baselineConfig.oauth.google.clientId = secrets.GOOGLE_OAUTH_CLIENTID;
+    if (secrets.MICROSOFT_OAUTH_CLIENTID) baselineConfig.oauth.microsoft.clientId = secrets.MICROSOFT_OAUTH_CLIENTID;
     // Mongoose URL
     // if (secrets.MONGODB_URL) {
     //     baselineConfig.mongoose.url = secrets.MONGODB_URL + (baselineConfig.env === 'test' ? '-test' : '');

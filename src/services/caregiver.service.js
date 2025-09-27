@@ -102,6 +102,19 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
   if (updateBody.email && (await Caregiver.isEmailTaken(updateBody.email, caregiverId))) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
+  
+  // If this is an unverified user completing their profile with a phone number, promote them to orgAdmin
+  if (caregiver.role === 'unverified' && updateBody.phone) {
+    updateBody.role = 'orgAdmin';
+    
+    // Also update the organization's phone number if it's not set
+    const org = await Org.findById(caregiver.org);
+    if (org && !org.phone) {
+      org.phone = updateBody.phone;
+      await org.save();
+    }
+  }
+  
   Object.assign(caregiver, updateBody);
   await caregiver.save();
   return caregiver;

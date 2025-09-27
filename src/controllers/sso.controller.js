@@ -4,8 +4,9 @@ const Caregiver = require('../models/caregiver.model');
 const Org = require('../models/org.model');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
-const { tokenService } = require('../services');
+const { tokenService, orgService, emailService } = require('../services');
 const { tokenTypes } = require('../config/tokens');
+const { CaregiverDTO } = require('../dtos');
 
 const login = async (req, res) => {
   try {
@@ -16,33 +17,36 @@ const login = async (req, res) => {
     let caregiver = await Caregiver.findOne({ email });
 
     if (!caregiver) {
-      // Create new caregiver for SSO
-      caregiver = new Caregiver({
-        email,
-        name,
-        ssoProvider: provider,
-        ssoProviderId: providerId,
-        avatar: picture,
-        isEmailVerified: true, // SSO users are pre-verified
-        role: 'orgAdmin', // SSO users become org admins by default
-        // phone is optional for SSO users
-      });
+      // Create new user through the proper registration workflow
+      const org = await orgService.createOrg(
+        {
+          email: email,
+          name: `${name}'s Organization`,
+          // phone will be set later when user completes profile
+        },
+        {
+          email: email,
+          name: name,
+          // phone will be set later when user completes profile
+          password: null, // SSO users don't have passwords
+          ssoProvider: provider,
+          ssoProviderId: providerId,
+          avatar: picture,
+          isEmailVerified: true, // SSO users are pre-verified
+          role: 'unverified', // SSO users start as unverified until they complete profile
+        }
+      );
 
-      await caregiver.save();
-
-      // Create default organization for the caregiver
-      const organization = new Org({
-        name: `${name}'s Organization`,
-        email: email,
-        // phone is optional
-        caregivers: [caregiver._id]
-      });
-
-      await organization.save();
-
-      // Update caregiver with organization
-      caregiver.org = organization._id;
-      await caregiver.save();
+      caregiver = org.caregivers[0];
+      
+      // Send verification email automatically after registration (even though SSO users are pre-verified)
+      try {
+        const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+      } catch (emailError) {
+        // Log the error but don't fail the registration
+        console.error('Failed to send verification email during SSO registration:', emailError);
+      }
     } else {
       // Update existing caregiver with SSO info if not already set
       if (!caregiver.ssoProvider) {
@@ -93,14 +97,7 @@ const login = async (req, res) => {
           expires: refreshExpires,
         },
       },
-      user: {
-        id: caregiver._id,
-        email: caregiver.email,
-        name: caregiver.name,
-        role: caregiver.role,
-        avatar: caregiver.avatar,
-        organization: caregiver.org
-      }
+      user: CaregiverDTO(caregiver)
     });
 
   } catch (error) {
@@ -163,7 +160,27 @@ const verify = async (req, res) => {
   }
 };
 
+const getConfig = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      config: {
+        google: {
+          clientId: config.oauth.google.clientId
+        },
+        microsoft: {
+          clientId: config.oauth.microsoft.clientId
+        }
+      }
+    });
+  } catch (error) {
+    console.error('SSO config error:', error);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Internal server error');
+  }
+};
+
 module.exports = {
   login,
   verify,
+  getConfig,
 };

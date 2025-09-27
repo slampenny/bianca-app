@@ -34,7 +34,7 @@ const caregiverSchema = mongoose.Schema(
     phone: {
       type: String,
       required: function required() {
-        return !this.ssoProvider;
+        return this.role !== 'unverified';
       },
       trim: true,
       validate(value) {
