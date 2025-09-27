@@ -82,7 +82,7 @@ export function OrgScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} testID="org-screen">
       {isError && (
         <Text style={styles.errorText}>
           {"status" in error && "data" in error

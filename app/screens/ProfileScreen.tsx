@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   View,
+  Alert,
 } from "react-native"
 import { useSelector } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
@@ -30,6 +31,9 @@ function ProfileScreen() {
 
   // Get the current user (who is a caregiver)
   const currentUser = useSelector(getCaregiver)
+  
+  // Check if user is unverified and needs to complete profile
+  const isUnverified = currentUser?.role === 'unverified'
 
   // Mutations for editing profile
   const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
@@ -86,6 +90,25 @@ function ProfileScreen() {
       navigationRef.navigate("Logout")
     }
   }
+
+  // Prevent navigation away from profile screen for unverified users
+  useEffect(() => {
+    if (isUnverified) {
+      const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+        // Prevent default behavior of leaving the screen
+        e.preventDefault()
+        
+        // Show alert to user
+        Alert.alert(
+          'Complete Your Profile',
+          'Please complete your profile by adding a phone number before continuing.',
+          [{ text: 'OK' }]
+        )
+      })
+
+      return unsubscribe
+    }
+  }, [navigation, isUnverified])
 
   const handleSave = async () => {
     if (!currentUser || !currentUser.id) return
@@ -155,6 +178,15 @@ function ProfileScreen() {
         )}
 
         {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+
+        {isUnverified && (
+          <View style={styles.unverifiedBanner}>
+            <Text style={styles.unverifiedTitle}>Complete Your Profile</Text>
+            <Text style={styles.unverifiedText}>
+              Please add your phone number to complete your profile and access all features.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.formCard}>
           <Text style={styles.formTitle}>{translate("profileScreen.yourProfile")}</Text>
@@ -270,6 +302,25 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
+  unverifiedBanner: {
+    backgroundColor: colors.palette.biancaWarning || '#ffa500',
+    borderRadius: 8,
+    marginBottom: 20,
+    padding: 16,
+  },
+  unverifiedTitle: {
+    color: colors.palette.neutral100,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  unverifiedText: {
+    color: colors.palette.neutral100,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   legalLinks: {
     marginTop: 20,
     alignSelf: "center",

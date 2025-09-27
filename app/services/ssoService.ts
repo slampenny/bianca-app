@@ -1,15 +1,15 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { DEFAULT_API_CONFIG } from './api/api';
 
 // Complete the auth session in the browser
 WebBrowser.maybeCompleteAuthSession();
 
-// OAuth configuration from app config
-const GOOGLE_CLIENT_ID = 'REMOVED_GOOGLE_CLIENT_ID';
-const MICROSOFT_CLIENT_ID = '28288cd7-df50-4587-9f58-5c97ff54e65c';
+// OAuth configuration - loaded from backend config
+let GOOGLE_CLIENT_ID: string | undefined;
+let MICROSOFT_CLIENT_ID: string | undefined;
 const MICROSOFT_TENANT_ID = Constants.expoConfig?.extra?.microsoftTenantId || 'common';
 
 // Redirect URI for OAuth
@@ -30,6 +30,28 @@ export interface SSOError {
 }
 
 class SSOService {
+  private configLoaded = false;
+
+  // Load OAuth configuration from backend
+  private async loadConfig(): Promise<void> {
+    if (this.configLoaded) return;
+
+    try {
+      const response = await fetch(`${DEFAULT_API_CONFIG.url}sso/config`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.config) {
+          GOOGLE_CLIENT_ID = data.config.google?.clientId;
+          MICROSOFT_CLIENT_ID = data.config.microsoft?.clientId;
+          this.configLoaded = true;
+          console.log('OAuth configuration loaded from backend');
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load OAuth config from backend:', error);
+    }
+  }
+
   // Google OAuth configuration
   private getGoogleAuthRequest() {
     return new AuthSession.AuthRequest({
@@ -79,8 +101,11 @@ class SSOService {
   // Sign in with Google
   async signInWithGoogle(): Promise<SSOUser | SSOError> {
     try {
+      // Load OAuth configuration from backend
+      await this.loadConfig();
+
       // Check if Google client ID is configured
-      if (GOOGLE_CLIENT_ID === 'your-google-client-id' || !GOOGLE_CLIENT_ID) {
+      if (!GOOGLE_CLIENT_ID) {
         return {
           error: 'Google SSO not configured',
           description: 'Please contact your administrator to set up Google SSO.',
@@ -127,8 +152,11 @@ class SSOService {
   // Sign in with Microsoft
   async signInWithMicrosoft(): Promise<SSOUser | SSOError> {
     try {
+      // Load OAuth configuration from backend
+      await this.loadConfig();
+
       // Check if Microsoft client ID is configured
-      if (MICROSOFT_CLIENT_ID === 'your-microsoft-client-id' || !MICROSOFT_CLIENT_ID) {
+      if (!MICROSOFT_CLIENT_ID) {
         return {
           error: 'Microsoft SSO not configured',
           description: 'Please contact your administrator to set up Microsoft SSO.',

@@ -186,6 +186,8 @@ const en = {
     passwordPlaceholder: "Enter your password",
     confirmPasswordLabel: "Confirm Password",
     confirmPasswordPlaceholder: "Confirm your password",
+    completeRegistration: "Complete Registration",
+    preconfiguredMessage: "Your name, email, and organization details have been pre-configured by your administrator.",
   },
   confirmResetScreen: {
     title: "Reset Your Password",
@@ -315,6 +317,7 @@ const en = {
     noRecentCallMessage: "The most recent conversation doesn't have sentiment analysis available yet.",
     duration: "Duration",
     analysisDate: "Analysis Date",
+    conversationId: "Conversation ID",
     overallSentiment: "Overall Sentiment",
     scoreRange: "Score Range: -1.0 (Very Negative) to +1.0 (Very Positive)",
     analysisConfidence: "Analysis Confidence:",

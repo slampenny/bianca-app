@@ -20,9 +20,9 @@ export const sentimentApi = createApi({
     // Get sentiment trend for a patient over time
     getSentimentTrend: builder.query<
       SentimentTrend,
-      { patientId: string; timeRange?: "month" | "year" | "lifetime" }
+      { patientId: string; timeRange?: "lastCall" | "month" | "lifetime" }
     >({
-      query: ({ patientId, timeRange = "month" }) => ({
+      query: ({ patientId, timeRange = "lastCall" }) => ({
         url: `/sentiment/patient/${patientId}/trend`,
         params: { timeRange },
       }),

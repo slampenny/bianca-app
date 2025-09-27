@@ -275,6 +275,8 @@ const ko: Translations = {
     passwordPlaceholder: "비밀번호를 입력하세요",
     confirmPasswordLabel: "비밀번호 확인",
     confirmPasswordPlaceholder: "비밀번호를 확인하세요",
+    completeRegistration: "등록 완료",
+    preconfiguredMessage: "귀하의 이름, 이메일 및 조직 세부 정보는 관리자에 의해 미리 구성되었습니다.",
   },
   confirmResetScreen: {
     title: "비밀번호 재설정",

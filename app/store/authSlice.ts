@@ -26,6 +26,14 @@ export const authSlice = createSlice({
     setAuthEmail(state, action: PayloadAction<string>) {
       state.authEmail = action.payload
     },
+    setCurrentUser(state, action: PayloadAction<Caregiver>) {
+      state.currentUser = action.payload
+    },
+    clearAuth(state) {
+      state.tokens = null
+      state.authEmail = ""
+      state.currentUser = null
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.register.matchFulfilled, (state, { payload }) => {
@@ -63,7 +71,7 @@ export const authSlice = createSlice({
   },
 })
 
-export const { setAuthTokens, setAuthEmail } = authSlice.actions
+export const { setAuthTokens, setAuthEmail, setCurrentUser, clearAuth } = authSlice.actions
 
 export const isAuthenticated = (state: RootState) => {
   return !!state.auth.tokens

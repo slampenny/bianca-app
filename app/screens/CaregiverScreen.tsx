@@ -335,7 +335,7 @@ function CaregiverScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={handleCancelDelete}>
-      <View style={styles.container}>
+      <View style={styles.container} testID="caregiver-screen">
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {(updateError || deleteError || inviteError) && (
           <Text style={styles.error}>

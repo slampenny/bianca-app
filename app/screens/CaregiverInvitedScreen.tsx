@@ -21,7 +21,7 @@ export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
   }
 
   return (
-    <Screen preset="fixed" style={styles.screen}>
+    <Screen preset="fixed" style={styles.screen} testID="caregiver-invited-screen">
       <View style={styles.container}>
         <View style={styles.content}>
           <Text style={styles.icon}>✅</Text>

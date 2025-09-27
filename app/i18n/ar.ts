@@ -272,6 +272,8 @@ const ar: Translations = {
     passwordPlaceholder: "ادخل كلمة المرور",
     confirmPasswordLabel: "تأكيد كلمة المرور",
     confirmPasswordPlaceholder: "أكد كلمة المرور",
+    completeRegistration: "إكمال التسجيل",
+    preconfiguredMessage: "تم تكوين اسمك وبريدك الإلكتروني وتفاصيل المؤسسة مسبقاً من قبل مديرك.",
   },
   confirmResetScreen: {
     title: "إعادة تعيين كلمة المرور",

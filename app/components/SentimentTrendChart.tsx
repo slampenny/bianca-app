@@ -136,7 +136,23 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
         <Text style={styles.dataText}>
           {translate("sentimentAnalysis.confidence")}: {Math.round(summary.confidence * 100)}%
         </Text>
+        <Text style={styles.dataText}>
+          {translate("sentimentAnalysis.avg")}: {summary.averageSentiment > 0 ? "+" : ""}{summary.averageSentiment.toFixed(2)}
+        </Text>
       </View>
+
+      {/* Trend insights */}
+      {summary.keyInsights && summary.keyInsights.length > 0 && (
+        <View style={styles.insightsContainer}>
+          <Text style={styles.insightsTitle}>{translate("sentimentAnalysis.keyInsights")}</Text>
+          {summary.keyInsights.map((insight, index) => (
+            <View key={index} style={styles.insightItem}>
+              <Text style={styles.insightBullet}>•</Text>
+              <Text style={styles.insightText}>{insight}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   )
 }
@@ -260,10 +276,41 @@ const styles = {
   dataSummary: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
+    flexWrap: "wrap" as const,
+    gap: 8,
   },
   dataText: {
     fontSize: 12,
     color: colors.textDim,
+  },
+  insightsContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: colors.palette.neutral200,
+    borderRadius: 8,
+  },
+  insightsTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: colors.text,
+    marginBottom: 8,
+  },
+  insightItem: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    marginBottom: 4,
+    gap: 8,
+  },
+  insightBullet: {
+    fontSize: 14,
+    color: colors.textDim,
+    marginTop: 2,
+  },
+  insightText: {
+    fontSize: 13,
+    color: colors.text,
+    flex: 1,
+    lineHeight: 18,
   },
 }
 

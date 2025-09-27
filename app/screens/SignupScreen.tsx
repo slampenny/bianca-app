@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react"
-import { View, ViewStyle, Alert } from "react-native"
+import { View, ViewStyle, StyleSheet } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useRegisterWithInviteMutation } from "../services/api/authApi"
 import { Button, Text, TextField, Screen, Header } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
-import { spacing } from "app/theme"
-import { translate } from "../i18n"
+import { colors } from "app/theme/colors"
 
 type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
@@ -35,11 +34,11 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   // Check if we have an invite token
   useEffect(() => {
     if (!token) {
-      Alert.alert(
-        "Invalid Invitation",
-        "This invitation link is invalid or has expired. Please contact your organization administrator.",
-        [{ text: "OK", onPress: () => navigation.navigate("Login") }]
-      )
+      setGeneralError("Invalid or expired invite token")
+      // Navigate to login after a short delay to show the error
+      setTimeout(() => {
+        navigation.navigate("Login")
+      }, 2000)
       return
     }
 
@@ -47,6 +46,16 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
     // For now, we'll let the backend handle token validation
     console.log("Signup with invite token:", token)
   }, [token, navigation])
+
+  // Handle backend error messages for different token states
+  useEffect(() => {
+    // Check if we have specific error messages from the backend
+    if (generalError.includes("Invalid or expired invite token") || 
+        generalError.includes("Invite token has expired")) {
+      // Don't navigate immediately, let the error be visible
+      return
+    }
+  }, [generalError])
 
   const validateForm = () => {
     let isValid = true
@@ -103,164 +112,179 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       } else {
         setGeneralError("An error occurred during signup. Please try again.")
       }
+      
+      // For specific token errors, don't navigate away
+      if (error?.data?.message?.includes("Invalid or expired invite token") || 
+          error?.data?.message?.includes("Invite token has expired")) {
+        return // Stay on the page to show the error
+      }
     }
   }
 
   return (
-    <Screen 
-      preset="auto" 
-      contentContainerStyle={$screenContentContainer}
-      safeAreaEdges={["top"]}
-    >
-      <Header 
-        title={translate("signupScreen.title")}
-        leftIcon="back"
-        onLeftPress={() => navigation.goBack()}
-      />
+    <Screen style={styles.container} testID="signup-screen">
+      <Header titleTx="signupScreen.title" />
       
-      <View style={$content}>
-        <Text 
-          preset="heading" 
-          text="Welcome to My Phone Friend!" 
-          style={$title}
-        />
-        
-        <Text 
-          preset="default"
-          text="You've been invited to join your organization's account. Complete your registration below."
-          style={$subtitle}
-        />
+      {generalError ? (
+        <Text testID="signup-error" style={styles.error}>{generalError}</Text>
+      ) : null}
 
-        {generalError ? (
-          <Text 
-            text={generalError}
-            style={$errorText}
-          />
-        ) : null}
+      <TextField
+        testID="register-name"
+        value={name}
+        onChangeText={setName}
+        labelTx="signupScreen.fullNameLabel"
+        placeholderTx="signupScreen.fullNamePlaceholder"
+        editable={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+      />
 
-        <View style={$form}>
-          <TextField
-            value={name}
-            onChangeText={setName}
-            label={translate("signupScreen.fullNameLabel")}
-            placeholder={translate("signupScreen.fullNamePlaceholder")}
-            editable={false}
-            containerStyle={$textField}
-          />
+      <TextField
+        value={email}
+        onChangeText={setEmail}
+        labelTx="signupScreen.emailLabel"
+        placeholderTx="signupScreen.emailPlaceholder"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        editable={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+      />
 
-          <TextField
-            value={email}
-            onChangeText={setEmail}
-            label={translate("signupScreen.emailLabel")}
-            placeholder={translate("signupScreen.emailPlaceholder")}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={false}
-            containerStyle={$textField}
-          />
+      <TextField
+        testID="register-phone"
+        value={phone}
+        onChangeText={setPhone}
+        labelTx="signupScreen.phoneLabel"
+        placeholderTx="signupScreen.phonePlaceholder"
+        keyboardType="phone-pad"
+        editable={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+      />
 
-          <TextField
-            value={phone}
-            onChangeText={setPhone}
-            label={translate("signupScreen.phoneLabel")}
-            placeholder={translate("signupScreen.phonePlaceholder")}
-            keyboardType="phone-pad"
-            editable={false}
-            containerStyle={$textField}
-          />
+      <TextField
+        testID="register-password"
+        value={password}
+        onChangeText={(text) => {
+          setPassword(text)
+          setPasswordError("")
+        }}
+        labelTx="signupScreen.passwordLabel"
+        placeholderTx="signupScreen.passwordPlaceholder"
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+      />
+      {passwordError ? <Text style={styles.fieldError}>{passwordError}</Text> : null}
 
-          <TextField
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text)
-              setPasswordError("")
-            }}
-            label={translate("signupScreen.passwordLabel")}
-            placeholder={translate("signupScreen.passwordPlaceholder")}
-            secureTextEntry
-            status={passwordError ? "error" : undefined}
-            helper={passwordError}
-            containerStyle={$textField}
-          />
+      <TextField
+        testID="register-confirm-password"
+        value={confirmPassword}
+        onChangeText={(text) => {
+          setConfirmPassword(text)
+          setConfirmPasswordError("")
+        }}
+        labelTx="signupScreen.confirmPasswordLabel"
+        placeholderTx="signupScreen.confirmPasswordPlaceholder"
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+      />
+      {confirmPasswordError ? <Text style={styles.fieldError}>{confirmPasswordError}</Text> : null}
 
-          <TextField
-            value={confirmPassword}
-            onChangeText={(text) => {
-              setConfirmPassword(text)
-              setConfirmPasswordError("")
-            }}
-            label={translate("signupScreen.confirmPasswordLabel")}
-            placeholder={translate("signupScreen.confirmPasswordPlaceholder")}
-            secureTextEntry
-            status={confirmPasswordError ? "error" : undefined}
-            helper={confirmPasswordError}
-            containerStyle={$textField}
-          />
+      <Button
+        testID="register-submit"
+        tx="signupScreen.completeRegistration"
+        onPress={handleSignup}
+        style={styles.signupButton}
+        textStyle={styles.signupButtonText}
+        preset="filled"
+        disabled={isLoading || !password || !confirmPassword}
+      />
 
-          <Button
-            text={isLoading ? "Creating Account..." : "Complete Registration"}
-            onPress={handleSignup}
-            disabled={isLoading || !password || !confirmPassword}
-            style={$signupButton}
-          />
+      <Text 
+        style={styles.infoText}
+        tx="signupScreen.preconfiguredMessage"
+      />
 
-          <Text 
-            size="sm"
-            text="Your name, email, and organization details have been pre-configured by your administrator."
-            style={$infoText}
-          />
-        </View>
-
-        <LegalLinks />
-      </View>
+      <LegalLinks />
     </Screen>
   )
 }
 
-const $screenContentContainer: ViewStyle = {
-  flexGrow: 1,
-}
-
-const $content: ViewStyle = {
-  flex: 1,
-  paddingHorizontal: spacing.lg,
-  paddingTop: spacing.md,
-  paddingBottom: spacing.lg,
-}
-
-const $title = {
-  textAlign: "center" as const,
-  marginBottom: spacing.sm,
-}
-
-const $subtitle = {
-  textAlign: "center" as const,
-  marginBottom: spacing.xl,
-  lineHeight: 24,
-}
-
-const $form: ViewStyle = {
-  flex: 1,
-}
-
-const $textField: ViewStyle = {
-  marginBottom: spacing.md,
-}
-
-const $signupButton: ViewStyle = {
-  marginTop: spacing.lg,
-  marginBottom: spacing.md,
-}
-
-const $errorText = {
-  textAlign: "center" as const,
-  marginBottom: spacing.md,
-  paddingHorizontal: spacing.sm,
-}
-
-const $infoText = {
-  textAlign: "center" as const,
-  fontStyle: "italic" as const,
-  marginTop: spacing.md,
-  lineHeight: 20,
-}
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    backgroundColor: colors.palette.biancaBackground,
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
+  error: {
+    color: colors.palette.biancaError,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  fieldError: {
+    color: colors.palette.biancaError,
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  input: {
+    color: colors.palette.biancaHeader,
+    fontSize: 16,
+  },
+  inputContainer: {
+    marginBottom: 16,
+    width: "100%",
+  },
+  inputWrapper: {
+    backgroundColor: colors.palette.neutral100,
+    borderColor: colors.palette.biancaBorder,
+    borderRadius: 6,
+    borderWidth: 1,
+    elevation: 1,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    shadowColor: colors.palette.neutral900,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  signupButton: {
+    backgroundColor: colors.palette.biancaButtonSelected,
+    borderRadius: 5,
+    marginBottom: 16,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    width: "100%",
+  },
+  signupButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  infoText: {
+    color: colors.palette.neutral600,
+    fontSize: 14,
+    fontStyle: "italic",
+    marginBottom: 20,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+})

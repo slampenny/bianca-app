@@ -25,7 +25,7 @@ export interface CaregiverPages {
   totalResults: number
 }
 
-export type CaregiverRole = "admin" | "staff" | "orgAdmin" | "superAdmin"
+export type CaregiverRole = "admin" | "staff" | "orgAdmin" | "superAdmin" | "unverified"
 
 export interface Caregiver {
   id?: string

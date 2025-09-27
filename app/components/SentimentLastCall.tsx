@@ -75,6 +75,10 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
               }
             </Text>
           </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>{translate("sentimentAnalysis.conversationId")}</Text>
+            <Text style={styles.statValue}>{lastCall.conversationId?.slice(-8) || 'N/A'}</Text>
+          </View>
         </View>
       </View>
 
@@ -348,6 +352,8 @@ const styles = {
   callStats: {
     flexDirection: "row" as const,
     justifyContent: "space-around" as const,
+    flexWrap: "wrap" as const,
+    gap: 8,
   },
   statItem: {
     alignItems: "center" as const,

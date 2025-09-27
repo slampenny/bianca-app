@@ -3,7 +3,8 @@ import { TextInput, View, StyleSheet, Pressable } from "react-native"
 import { useDispatch, useSelector } from "react-redux"
 import { StackNavigationProp } from "@react-navigation/stack"
 import { useLoginMutation } from "../services/api/authApi"
-import { setAuthEmail, setAuthTokens, getValidationError, getAuthEmail } from "../store/authSlice"
+import { setAuthEmail, setAuthTokens, setCurrentUser, getValidationError, getAuthEmail } from "../store/authSlice"
+import { setCaregiver } from "../store/caregiverSlice"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Button, Header, Screen, Text, TextField } from "app/components"
 import { colors } from "app/theme/colors"
@@ -87,6 +88,8 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         // SSO login successful - set tokens and user data
         dispatch(setAuthTokens(user.tokens));
         dispatch(setAuthEmail(user.email));
+        dispatch(setCurrentUser(user.backendUser));
+        dispatch(setCaregiver(user.backendUser));
         setErrorMessage(""); // Clear any previous errors
         console.log('SSO login successful:', user.backendUser);
       } else {

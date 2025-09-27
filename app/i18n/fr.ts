@@ -282,6 +282,8 @@ const fr: Translations = {
     passwordPlaceholder: "Entrez votre mot de passe",
     confirmPasswordLabel: "Confirmer le mot de passe",
     confirmPasswordPlaceholder: "Confirmez votre mot de passe",
+    completeRegistration: "Compléter l'inscription",
+    preconfiguredMessage: "Votre nom, e-mail et détails de l'organisation ont été préconfigurés par votre administrateur.",
   },
   confirmResetScreen: {
     title: "Réinitialiser votre mot de passe",
