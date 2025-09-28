@@ -97,7 +97,7 @@ orgSchema.statics.createOrgAndCaregiver = async function (orgBody, caregiverBody
   if (await Caregiver.isEmailTaken(caregiverBody.email)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Caregiver Email already taken');
   }
-  const caregiver = await Caregiver.create({ ...caregiverBody, role: 'orgAdmin' });
+  const caregiver = await Caregiver.create({ ...caregiverBody, role: caregiverBody.role || 'orgAdmin' });
   const org = await this.create({ ...orgBody, caregivers: [caregiver] });
   caregiver.org = org.id;
   await caregiver.save();

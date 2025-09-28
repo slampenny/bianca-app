@@ -119,7 +119,7 @@ caregiverSchema.methods.isPasswordMatch = async function (password) {
 // Pre-save middleware to hash password
 caregiverSchema.pre('save', async function (next) {
   const caregiver = this;
-  if (caregiver.isModified('password')) {
+  if (caregiver.isModified('password') && caregiver.password) {
     caregiver.password = await bcrypt.hash(caregiver.password, 8);
   }
   next();

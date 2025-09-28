@@ -11,12 +11,14 @@ const { CaregiverDTO } = require('../dtos');
 const login = async (req, res) => {
   try {
     const { provider, email, name, id: providerId, picture } = req.body;
-    
+    console.log('SSO login attempt:', { provider, email, name, id: providerId });
 
     // Check if caregiver exists with this email
     let caregiver = await Caregiver.findOne({ email });
+    console.log('Caregiver found:', !!caregiver);
 
     if (!caregiver) {
+      console.log('Creating new org and caregiver...');
       // Create new user through the proper registration workflow
       const org = await orgService.createOrg(
         {
@@ -40,13 +42,14 @@ const login = async (req, res) => {
       caregiver = org.caregivers[0];
       
       // Send verification email automatically after registration (even though SSO users are pre-verified)
-      try {
-        const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
-      } catch (emailError) {
-        // Log the error but don't fail the registration
-        console.error('Failed to send verification email during SSO registration:', emailError);
-      }
+      // Temporarily disabled to fix crash
+      // try {
+      //   const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+      //   await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+      // } catch (emailError) {
+      //   // Log the error but don't fail the registration
+      //   console.error('Failed to send verification email during SSO registration:', emailError);
+      // }
     } else {
       // Update existing caregiver with SSO info if not already set
       if (!caregiver.ssoProvider) {
