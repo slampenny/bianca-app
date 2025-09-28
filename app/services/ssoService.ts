@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId;
 const MICROSOFT_CLIENT_ID = Constants.expoConfig?.extra?.microsoftClientId;
 const MICROSOFT_TENANT_ID = Constants.expoConfig?.extra?.microsoftTenantId || 'common';
 
-// Redirect URI for OAuth
+// Redirect URI for OAuth - Use AuthSession.makeRedirectUri() for now
 const redirectUri = AuthSession.makeRedirectUri();
 console.log('OAuth Redirect URI:', redirectUri);
 console.log('OAuth Client IDs:', {
@@ -227,7 +227,7 @@ class SSOService {
   // Authenticate with backend
   private async authenticateWithBackend(userInfo: SSOUser): Promise<SSOUser | SSOError> {
     try {
-      const response = await fetch(`${DEFAULT_API_CONFIG.url}sso/login`, {
+      const response = await fetch(`${DEFAULT_API_CONFIG.url}/sso/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

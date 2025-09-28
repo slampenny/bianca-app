@@ -22,8 +22,10 @@ This guide will help you set up Google and Microsoft SSO authentication for your
    - Click "Create Credentials" > "OAuth 2.0 Client IDs"
    - Choose "Web application"
    - Add authorized redirect URIs:
-     - For development: `https://auth.expo.io/@your-expo-username/bianca`
-     - For production: `https://auth.expo.io/@your-expo-username/bianca`
+     - For development: `http://localhost:19006`
+     - For staging: `https://staging.app.myphonefriend.com`
+     - For production: `https://app.myphonefriend.com`
+     - For mobile: `https://auth.expo.io/@negascout/bianca`
 5. Copy the Client ID
 
 ### Step 2: Configure Frontend
@@ -45,7 +47,7 @@ EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id-here
 4. Fill in the details:
    - Name: "Bianca App"
    - Supported account types: "Accounts in any organizational directory and personal Microsoft accounts"
-   - Redirect URI: Platform "Web", URI: `https://auth.expo.io/@your-expo-username/bianca`
+   - Redirect URI: Platform "Web", URI: `https://app.myphonefriend.com`
 5. After creation, note down:
    - Application (client) ID
    - Directory (tenant) ID
@@ -132,7 +134,8 @@ curl -X POST https://api.myphonefriend.com/v1/sso/login \
 
 1. **"Invalid redirect URI" error**:
    - Check that redirect URIs in OAuth providers match your app configuration
-   - For Expo, use the format: `https://auth.expo.io/@username/app-slug`
+   - For web apps: Use the actual domain (e.g., `https://app.myphonefriend.com`)
+   - For mobile: Use the format: `https://auth.expo.io/@username/app-slug`
 
 2. **"Client ID not found" error**:
    - Verify environment variables are set correctly
