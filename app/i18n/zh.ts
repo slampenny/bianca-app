@@ -17,6 +17,8 @@ const zh: Translations = {
     unreadAlerts: "未读提醒",
     allAlerts: "所有提醒",
     noAlerts: "无提醒",
+    noAlertsTitle: "全部完成！",
+    noAlertsSubtitle: "您没有未读提醒。保持最新状态做得很好！",
     emptyHeading: "空空如也...好难过",
     refreshing: "刷新中...",
     refresh: "刷新",

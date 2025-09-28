@@ -4,6 +4,8 @@ const en = {
     unreadAlerts: "Unread Alerts",
     allAlerts: "All Alerts",
     noAlerts: "No alerts",
+    noAlertsTitle: "All caught up!",
+    noAlertsSubtitle: "You have no unread alerts. Great job staying on top of things!",
     emptyHeading: "So empty... so sad",
     refreshing: "Refreshing...",
     refresh: "Refresh",

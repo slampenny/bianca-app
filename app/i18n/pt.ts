@@ -17,6 +17,8 @@ const pt: Translations = {
     unreadAlerts: "Alertas não lidos",
     allAlerts: "Todos os alertas",
     noAlerts: "Nenhum alerta",
+    noAlertsTitle: "Tudo em dia!",
+    noAlertsSubtitle: "Você não tem alertas não lidos. Ótimo trabalho em se manter atualizado!",
     emptyHeading: "Tão vazio... tão triste",
     refreshing: "Atualizando...",
     refresh: "Atualizar",

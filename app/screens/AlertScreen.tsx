@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { FlatList, View, Text, StyleSheet, ActivityIndicator } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
 import { Toggle, Button, EmptyState, ListItem } from "../components"
 import {
   useMarkAllAsReadMutation,
@@ -182,7 +183,13 @@ export function AlertScreen() {
         )}
 
         {filteredAlerts.length === 0 ? (
-          <EmptyState style={styles.emptyState} content={translate("alertScreen.noAlerts")} heading={translate("alertScreen.emptyHeading")} testID="alert-empty-state" />
+          <View style={styles.emptyStateContainer} testID="alert-empty-state">
+            <View style={styles.emptyStateIcon}>
+              <Ionicons name="checkmark-circle-outline" size={64} color={colors.palette.biancaButtonSelected} />
+            </View>
+            <Text style={styles.emptyStateTitle}>{translate("alertScreen.noAlertsTitle")}</Text>
+            <Text style={styles.emptyStateSubtitle}>{translate("alertScreen.noAlertsSubtitle")}</Text>
+          </View>
         ) : (
           <FlatList
             data={filteredAlerts}
@@ -251,6 +258,35 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     marginTop: 40,
+  },
+  emptyStateContainer: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 64,
+  },
+  emptyStateIcon: {
+    alignItems: "center",
+    backgroundColor: colors.palette.biancaBackground,
+    borderRadius: 40,
+    height: 80,
+    justifyContent: "center",
+    marginBottom: 24,
+    width: 80,
+  },
+  emptyStateTitle: {
+    color: colors.palette.biancaHeader,
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  emptyStateSubtitle: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+    lineHeight: 22,
+    textAlign: "center",
   },
   inactiveTab: {
     backgroundColor: colors.palette.biancaButtonUnselected,

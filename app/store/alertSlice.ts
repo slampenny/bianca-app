@@ -81,13 +81,14 @@ export const getAlerts = (state: RootState) => state.alert.alerts
 
 export const selectUnreadAlertCount = (state: RootState) => {
   const currentUser = getCurrentUser(state) // Get the current user
+  
   if (!currentUser || !currentUser.id) {
     // Check if currentUser and currentUser.id exist
     return 0 // If no current user or no user ID, no unread alerts
   }
 
   return state.alert.alerts.filter((alert) => {
-    return !alert.readBy.includes(currentUser.id!) // Use non-null assertion to ensure currentUser.id is a string
+    return !alert.readBy?.includes(currentUser.id!) // Use optional chaining to handle undefined readBy arrays
   }).length
 }
 

@@ -17,6 +17,8 @@ const ja: Translations = {
     unreadAlerts: "未読アラート",
     allAlerts: "すべてのアラート",
     noAlerts: "アラートなし",
+    noAlertsTitle: "すべて完了！",
+    noAlertsSubtitle: "未読のアラートはありません。最新の状態を保つ良い仕事をしました！",
     emptyHeading: "空っぽ...悲しい",
     refreshing: "更新中...",
     refresh: "更新",

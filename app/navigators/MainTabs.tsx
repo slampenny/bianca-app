@@ -215,6 +215,13 @@ export default function MainTabNavigator() {
         options={{
           tabBarLabel: translate("tabs.alerts"),
           tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
+          tabBarBadgeStyle: {
+            maxWidth: 'auto', // Allows the badge to expand based on content
+            minWidth: 20,     // Ensures a minimum width for single-digit numbers
+            paddingHorizontal: 6, // Adds horizontal padding for better spacing
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
           tabBarTestID: "tab-alert",
         }}
       />

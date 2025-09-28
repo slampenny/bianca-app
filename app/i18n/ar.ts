@@ -12,6 +12,8 @@ const ar: Translations = {
     unreadAlerts: "التنبيهات غير المقروءة",
     allAlerts: "جميع التنبيهات",
     noAlerts: "لا توجد تنبيهات",
+    noAlertsTitle: "تم كل شيء!",
+    noAlertsSubtitle: "ليس لديك تنبيهات غير مقروءة. عمل رائع في البقاء محدثاً!",
     emptyHeading: "فارغ جداً... حزين جداً",
     refreshing: "جاري التحديث...",
     refresh: "تحديث",

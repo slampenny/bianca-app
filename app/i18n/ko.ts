@@ -12,6 +12,8 @@ const ko: Translations = {
     unreadAlerts: "읽지 않은 알림",
     allAlerts: "모든 알림",
     noAlerts: "알림 없음",
+    noAlertsTitle: "모두 완료!",
+    noAlertsSubtitle: "읽지 않은 알림이 없습니다. 최신 상태를 유지하는 좋은 일을 했습니다!",
     emptyHeading: "너무 비어있어... 너무 슬퍼",
     refreshing: "새로고침 중...",
     refresh: "새로고침",

@@ -17,6 +17,8 @@ const ru: Translations = {
     unreadAlerts: "Непрочитанные уведомления",
     allAlerts: "Все уведомления",
     noAlerts: "Нет уведомлений",
+    noAlertsTitle: "Все готово!",
+    noAlertsSubtitle: "У вас нет непрочитанных уведомлений. Отличная работа по поддержанию актуальности!",
     emptyHeading: "Так пусто... так грустно",
     refreshing: "Обновление...",
     refresh: "Обновить",
