@@ -188,14 +188,15 @@ if [ -n "$PRODUCTION_IP" ]; then
         docker network prune -f
         docker system prune -f
       else
-        
+        echo 'Stopping and removing application containers (preserving MongoDB)...'
         
         # Stop and remove only the application containers (not MongoDB)
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml stop backend frontend || true
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml rm -f backend frontend || true
+        # Note: docker-compose uses service names, not container names
+        docker-compose -f docker-compose.yml -f docker-compose.production.yml stop app frontend || true
+        docker-compose -f docker-compose.yml -f docker-compose.production.yml rm -f app frontend || true
         
         # Remove any orphaned containers with our project names
-        docker rm -f \$(docker ps -aq --filter 'name=production_backend') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=production_app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=production_frontend') 2>/dev/null || true
         
         # Clean up unused images and networks
@@ -205,8 +206,16 @@ if [ -n "$PRODUCTION_IP" ]; then
       
       echo 'Starting new containers...'
       
-      # Start new containers (MongoDB will continue running if it exists)
-      docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+      # Check if MongoDB container already exists (running or stopped)
+      if docker ps -aq --filter 'name=production_mongodb' | grep -q .; then
+        echo 'MongoDB container already exists, starting only app and frontend...'
+        # Start only the app and frontend services, skip MongoDB
+        docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d --no-deps app frontend
+      else
+        echo 'Starting all containers (including MongoDB)...'
+        # Start all containers (MongoDB will be created)
+        docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+      fi
     "
     
     if [ $? -eq 0 ]; then

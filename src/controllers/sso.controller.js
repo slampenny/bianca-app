@@ -160,27 +160,7 @@ const verify = async (req, res) => {
   }
 };
 
-const getConfig = async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      config: {
-        google: {
-          clientId: config.oauth.google.clientId
-        },
-        microsoft: {
-          clientId: config.oauth.microsoft.clientId
-        }
-      }
-    });
-  } catch (error) {
-    console.error('SSO config error:', error);
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Internal server error');
-  }
-};
-
 module.exports = {
   login,
   verify,
-  getConfig,
 };
