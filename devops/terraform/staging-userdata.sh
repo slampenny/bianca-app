@@ -1,5 +1,6 @@
 #!/bin/bash
 # Simple, working staging setup script
+# SECRETS ARE LOADED AT RUNTIME BY THE APPLICATION, NOT HARDCODED HERE
 
 set -e
 exec > >(tee /var/log/user-data.log) 2>&1
@@ -80,18 +81,7 @@ else
     echo "Warning: EBS volume /dev/sdf not found"
 fi
 
-
-
-# Get secrets
-echo "Fetching secrets..."
-SECRET_JSON=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id MySecretsManagerSecret --query SecretString --output text)
-ARI_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.ARI_PASSWORD')
-BIANCA_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.BIANCA_PASSWORD')
-TWILIO_AUTHTOKEN=$(echo $${SECRET_JSON} | jq -r '.TWILIO_AUTHTOKEN')
-GOOGLE_OAUTH_CLIENTID=$(echo $${SECRET_JSON} | jq -r '.GOOGLE_OAUTH_CLIENTID')
-MICROSOFT_OAUTH_CLIENTID=$(echo $${SECRET_JSON} | jq -r '.MICROSOFT_OAUTH_CLIENTID')
-
-# Create docker-compose.yml
+# Create docker-compose.yml - NO SECRETS HARDCODED
 cat > docker-compose.yml <<EOF
 version: '3.8'
 
@@ -120,8 +110,6 @@ services:
     environment:
       - EXTERNAL_ADDRESS=$${PUBLIC_IP}
       - PRIVATE_ADDRESS=$${PRIVATE_IP}
-      - ARI_PASSWORD=$${ARI_PASSWORD}
-      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
       - RTP_START_PORT=10000
       - RTP_END_PORT=10100
     volumes:
@@ -135,11 +123,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-
     command: ["yarn", "dev:staging"]
-
     environment:
       - AWS_REGION=$${AWS_REGION}
+      - AWS_SECRET_ID=MySecretsManagerSecret
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - NODE_ENV=staging
       - API_BASE_URL=https://staging-api.myphonefriend.com
@@ -152,7 +139,6 @@ services:
       - EMAIL_FROM=staging@myphonefriend.com
       - TWILIO_PHONENUMBER=+19285758645
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
-      - TWILIO_AUTHTOKEN=$${TWILIO_AUTHTOKEN}
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
       - RTP_LISTENER_HOST=0.0.0.0
       - RTP_BIANCA_HOST=staging_app
@@ -160,11 +146,9 @@ services:
       - USE_PRIVATE_NETWORK_FOR_RTP=true
       - NETWORK_MODE=DOCKER_COMPOSE
       - APP_RTP_PORT_RANGE=20002-30000
-      - ARI_PASSWORD=$${ARI_PASSWORD}
-      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
-      - GOOGLE_OAUTH_CLIENTID=$${GOOGLE_OAUTH_CLIENTID}
-      - MICROSOFT_OAUTH_CLIENTID=$${MICROSOFT_OAUTH_CLIENTID}
       - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:$${AWS_REGION}:$${AWS_ACCOUNT_ID}:bianca-emergency-alerts
+    volumes:
+      - ~/.aws:/root/.aws:ro
     depends_on:
       - mongodb
       - asterisk
@@ -242,22 +226,9 @@ EOF
 echo "Logging into ECR..."
 aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
 
-
-
-
-
-
-
 # Pull and start containers
 echo "Starting containers..."
 docker-compose pull
-
-
-
-
-
-
-
 docker-compose up -d
 
 # Copy source code to host for editing (after containers are running)
