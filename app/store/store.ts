@@ -43,12 +43,19 @@ const persistConfig = {
   storage: AsyncStorage,
 }
 
+// Custom persist configuration for auth slice to exclude authEmail
+const authPersistConfig = {
+  key: "auth",
+  storage: AsyncStorage,
+  blacklist: ["authEmail"], // Exclude authEmail from persistence to prevent fake@example.org from appearing in production
+}
+
 const rootReducer = combineReducers({
   org: orgReducer,
   caregiver: caregiverReducer,
   patient: patientReducer,
   schedule: scheduleReducer,
-  auth: authReducer,
+  auth: persistReducer(authPersistConfig, authReducer),
   alert: alertReducer,
   conversation: conversationReducer,
   call: callReducer,

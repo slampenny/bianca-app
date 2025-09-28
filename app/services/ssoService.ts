@@ -7,14 +7,19 @@ import { DEFAULT_API_CONFIG } from './api/api';
 // Complete the auth session in the browser
 WebBrowser.maybeCompleteAuthSession();
 
-// OAuth configuration - loaded from backend config
-let GOOGLE_CLIENT_ID: string | undefined;
-let MICROSOFT_CLIENT_ID: string | undefined;
+// OAuth configuration - loaded from Expo config
+const GOOGLE_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId;
+const MICROSOFT_CLIENT_ID = Constants.expoConfig?.extra?.microsoftClientId;
 const MICROSOFT_TENANT_ID = Constants.expoConfig?.extra?.microsoftTenantId || 'common';
 
 // Redirect URI for OAuth
 const redirectUri = AuthSession.makeRedirectUri();
 console.log('OAuth Redirect URI:', redirectUri);
+console.log('OAuth Client IDs:', {
+  google: GOOGLE_CLIENT_ID ? 'configured' : 'missing',
+  microsoft: MICROSOFT_CLIENT_ID ? 'configured' : 'missing',
+  tenant: MICROSOFT_TENANT_ID
+});
 
 export interface SSOUser {
   id: string;
@@ -30,27 +35,6 @@ export interface SSOError {
 }
 
 class SSOService {
-  private configLoaded = false;
-
-  // Load OAuth configuration from backend
-  private async loadConfig(): Promise<void> {
-    if (this.configLoaded) return;
-
-    try {
-      const response = await fetch(`${DEFAULT_API_CONFIG.url}sso/config`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.config) {
-          GOOGLE_CLIENT_ID = data.config.google?.clientId;
-          MICROSOFT_CLIENT_ID = data.config.microsoft?.clientId;
-          this.configLoaded = true;
-          console.log('OAuth configuration loaded from backend');
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load OAuth config from backend:', error);
-    }
-  }
 
   // Google OAuth configuration
   private getGoogleAuthRequest() {
@@ -101,9 +85,6 @@ class SSOService {
   // Sign in with Google
   async signInWithGoogle(): Promise<SSOUser | SSOError> {
     try {
-      // Load OAuth configuration from backend
-      await this.loadConfig();
-
       // Check if Google client ID is configured
       if (!GOOGLE_CLIENT_ID) {
         return {
@@ -152,9 +133,6 @@ class SSOService {
   // Sign in with Microsoft
   async signInWithMicrosoft(): Promise<SSOUser | SSOError> {
     try {
-      // Load OAuth configuration from backend
-      await this.loadConfig();
-
       // Check if Microsoft client ID is configured
       if (!MICROSOFT_CLIENT_ID) {
         return {
