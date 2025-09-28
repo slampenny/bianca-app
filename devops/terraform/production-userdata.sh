@@ -36,6 +36,15 @@ unzip awscliv2.zip
 mkdir -p /opt/bianca-production
 cd /opt/bianca-production
 
+# Get secrets from AWS Secrets Manager
+echo "Fetching secrets from AWS Secrets Manager..."
+SECRET_JSON=$(aws secretsmanager get-secret-value --region $${REGION} --secret-id MySecretsManagerSecret --query SecretString --output text)
+ARI_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.ARI_PASSWORD')
+BIANCA_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.BIANCA_PASSWORD')
+TWILIO_AUTHTOKEN=$(echo $${SECRET_JSON} | jq -r '.TWILIO_AUTHTOKEN')
+GOOGLE_OAUTH_CLIENTID=$(echo $${SECRET_JSON} | jq -r '.GOOGLE_OAUTH_CLIENTID')
+MICROSOFT_OAUTH_CLIENTID=$(echo $${SECRET_JSON} | jq -r '.MICROSOFT_OAUTH_CLIENTID')
+
 # Create docker-compose.yml
 cat > docker-compose.yml <<EOF
 version: '3.8'
@@ -65,8 +74,8 @@ services:
     environment:
       - EXTERNAL_ADDRESS=$${PUBLIC_IP}
       - PRIVATE_ADDRESS=$${PRIVATE_IP}
-      - ARI_PASSWORD=production_ari_password_123
-      - BIANCA_PASSWORD=production_bianca_password_123
+      - ARI_PASSWORD=$${ARI_PASSWORD}
+      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
       - RTP_START_PORT=10000
       - RTP_END_PORT=10100
     volumes:
@@ -97,7 +106,7 @@ services:
       - EMAIL_FROM=production@myphonefriend.com
       - TWILIO_PHONENUMBER=+19285758645
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
-      - TWILIO_AUTHTOKEN=production_twilio_token_123
+      - TWILIO_AUTHTOKEN=$${TWILIO_AUTHTOKEN}
       - STRIPE_PUBLISHABLE_KEY=pk_live_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
       - RTP_LISTENER_HOST=0.0.0.0
       - RTP_BIANCA_HOST=production_app
@@ -105,8 +114,10 @@ services:
       - USE_PRIVATE_NETWORK_FOR_RTP=true
       - NETWORK_MODE=DOCKER_COMPOSE
       - APP_RTP_PORT_RANGE=20002-30000
-      - ARI_PASSWORD=production_ari_password_123
-      - BIANCA_PASSWORD=production_bianca_password_123
+      - ARI_PASSWORD=$${ARI_PASSWORD}
+      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
+      - GOOGLE_OAUTH_CLIENTID=$${GOOGLE_OAUTH_CLIENTID}
+      - MICROSOFT_OAUTH_CLIENTID=$${MICROSOFT_OAUTH_CLIENTID}
       - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:us-east-2:730335291008:bianca-emergency-alerts
     depends_on:
       - mongodb

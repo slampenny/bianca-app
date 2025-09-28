@@ -140,6 +140,7 @@ cd ../bianca-app-backend
 
 # Step 2: Deploy staging infrastructure (preserves database)
 echo "🚀 Deploying staging infrastructure..."
+echo "📋 Using default terraform environment (staging)..."
 yarn terraform:deploy
 
 echo "✅ Staging infrastructure deployed!"

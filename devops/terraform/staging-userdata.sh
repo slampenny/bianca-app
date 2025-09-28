@@ -88,6 +88,8 @@ SECRET_JSON=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secr
 ARI_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.ARI_PASSWORD')
 BIANCA_PASSWORD=$(echo $${SECRET_JSON} | jq -r '.BIANCA_PASSWORD')
 TWILIO_AUTHTOKEN=$(echo $${SECRET_JSON} | jq -r '.TWILIO_AUTHTOKEN')
+GOOGLE_OAUTH_CLIENTID=$(echo $${SECRET_JSON} | jq -r '.GOOGLE_OAUTH_CLIENTID')
+MICROSOFT_OAUTH_CLIENTID=$(echo $${SECRET_JSON} | jq -r '.MICROSOFT_OAUTH_CLIENTID')
 
 # Create docker-compose.yml
 cat > docker-compose.yml <<EOF
@@ -160,6 +162,8 @@ services:
       - APP_RTP_PORT_RANGE=20002-30000
       - ARI_PASSWORD=$${ARI_PASSWORD}
       - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
+      - GOOGLE_OAUTH_CLIENTID=$${GOOGLE_OAUTH_CLIENTID}
+      - MICROSOFT_OAUTH_CLIENTID=$${MICROSOFT_OAUTH_CLIENTID}
       - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:$${AWS_REGION}:$${AWS_ACCOUNT_ID}:bianca-emergency-alerts
     depends_on:
       - mongodb

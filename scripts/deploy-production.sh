@@ -136,8 +136,10 @@ cd ../bianca-app-backend
 
 # Step 2: Deploy production infrastructure (preserves database)
 echo "🚀 Deploying production infrastructure..."
-yarn terraform:plan
-docker run --rm -v "$(pwd):/app" -v "/home/jordanlapp/.aws:/root/.aws" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 hashicorp/terraform:latest apply --auto-approve
+echo "📋 Setting terraform environment to production..."
+export TF_VAR_environment=production
+docker run --rm -v "$(pwd):/app" -v "/home/jordanlapp/.aws:/root/.aws" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 -e TF_VAR_environment=production hashicorp/terraform:latest plan -no-color -input=false
+docker run --rm -v "$(pwd):/app" -v "/home/jordanlapp/.aws:/root/.aws" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 -e TF_VAR_environment=production hashicorp/terraform:latest apply --auto-approve
 
 # Step 2.5: If userdata changes were made, recreate the instance
 echo "🔄 Checking if instance needs to be recreated due to userdata changes..."
