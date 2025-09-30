@@ -24,7 +24,7 @@ test.describe('Working Alert Workflows - Real Backend Integration', () => {
     ]
     
     let alertSystemFound = false
-    let foundElement = null
+    let foundElement: { name: string; selector: any } | null = null
     
     for (const element of alertElements) {
       const count = await element.selector.count()
@@ -105,4 +105,5 @@ test.describe('Working Alert Workflows - Real Backend Integration', () => {
     expect(allTestIds.length).toBeGreaterThanOrEqual(0)
     console.log('✓ Navigation workflow exploration completed')
   })
+
 })

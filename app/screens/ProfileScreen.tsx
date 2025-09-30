@@ -91,11 +91,16 @@ function ProfileScreen() {
     }
   }
 
-  // Prevent navigation away from profile screen for unverified users
+  // Prevent navigation away from profile screen for unverified users (except logout)
   useEffect(() => {
     if (isUnverified) {
       const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-        // Prevent default behavior of leaving the screen
+        // Allow logout navigation
+        if (e.data.action.type === 'NAVIGATE' && e.data.action.payload?.name === 'Logout') {
+          return // Allow the navigation
+        }
+        
+        // Prevent default behavior of leaving the screen for other navigations
         e.preventDefault()
         
         // Show alert to user
