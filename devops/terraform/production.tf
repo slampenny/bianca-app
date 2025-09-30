@@ -252,7 +252,7 @@ resource "aws_launch_template" "production" {
   }
 }
 
-# Production EC2 Instance
+# Production EC2 Instance - ON-DEMAND FOR RELIABILITY
 resource "aws_instance" "production" {
   launch_template {
     id      = aws_launch_template.production.id
@@ -261,14 +261,16 @@ resource "aws_instance" "production" {
 
   subnet_id = aws_subnet.production_public.id
 
-  # Spot instance configuration for cost savings (same as staging)
-  instance_market_options {
-    market_type = "spot"
-    spot_options {
-      max_price                      = "0.01"
-      spot_instance_type            = "one-time"
-      instance_interruption_behavior = "terminate"
-    }
+  # NO SPOT INSTANCE FOR PRODUCTION - Use on-demand for 24/7 availability
+  # REMOVED spot configuration - production must stay up
+
+  # Enable detailed monitoring for auto-recovery
+  monitoring = true
+
+  # Enable auto-recovery if instance fails health checks
+  # This will automatically restart the instance if it becomes impaired
+  maintenance_options {
+    auto_recovery = "default"
   }
 
   tags = {

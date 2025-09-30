@@ -293,11 +293,11 @@ resource "aws_instance" "staging" {
 
   subnet_id = aws_subnet.staging_public.id
 
-  # Spot instance configuration
+  # Spot instance configuration - increased bid for better availability
   instance_market_options {
     market_type = "spot"
     spot_options {
-      max_price                      = "0.01"
+      max_price                      = "0.015"  # ~70% of on-demand, much more stable
       spot_instance_type            = "one-time"
       instance_interruption_behavior = "terminate"
     }

@@ -154,9 +154,29 @@ PRODUCTION_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianc
 if [ -n "$PRODUCTION_IP" ]; then
     echo "Updating containers on production instance: $PRODUCTION_IP"
     
+    # Wait for instance to finish initialization
+    echo "⏳ Waiting for instance to finish initialization (userdata script)..."
+    MAX_WAIT=300  # 5 minutes
+    ELAPSED=0
+    while [ $ELAPSED -lt $MAX_WAIT ]; do
+        if ssh -i ~/.ssh/bianca-key-pair.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$PRODUCTION_IP "test -d /opt/bianca-production && test -f /opt/bianca-production/docker-compose.yml" 2>/dev/null; then
+            echo "✅ Instance initialization complete!"
+            break
+        fi
+        echo "Still waiting for userdata script to complete... ($ELAPSED seconds)"
+        sleep 10
+        ELAPSED=$((ELAPSED + 10))
+    done
+    
+    if [ $ELAPSED -ge $MAX_WAIT ]; then
+        echo "❌ Instance initialization timed out after $MAX_WAIT seconds"
+        echo "You may need to check the instance manually or wait longer"
+        exit 1
+    fi
+    
     # Copy production override file to the instance
     echo "Copying production override configuration..."
-    scp -i ~/.ssh/bianca-key-pair.pem docker-compose.production.yml ec2-user@$PRODUCTION_IP:~/ && ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$PRODUCTION_IP "sudo mv ~/docker-compose.production.yml /opt/bianca-production/ && sudo chown root:root /opt/bianca-production/docker-compose.production.yml"
+    scp -i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no docker-compose.production.yml ec2-user@$PRODUCTION_IP:~/ && ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$PRODUCTION_IP "sudo mv ~/docker-compose.production.yml /opt/bianca-production/ && sudo chown root:root /opt/bianca-production/docker-compose.production.yml"
     
     ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$PRODUCTION_IP "
       cd /opt/bianca-production
@@ -190,14 +210,16 @@ if [ -n "$PRODUCTION_IP" ]; then
       else
         echo 'Stopping and removing application containers (preserving MongoDB)...'
         
-        # Stop and remove only the application containers (not MongoDB)
+        # Stop and remove all containers EXCEPT MongoDB (preserve database)
         # Note: docker-compose uses service names, not container names
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml stop app frontend || true
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml rm -f app frontend || true
+        docker-compose -f docker-compose.yml -f docker-compose.production.yml stop app frontend asterisk nginx || true
+        docker-compose -f docker-compose.yml -f docker-compose.production.yml rm -f app frontend asterisk nginx || true
         
-        # Remove any orphaned containers with our project names
+        # Remove any orphaned containers with our project names (but NOT mongodb)
         docker rm -f \$(docker ps -aq --filter 'name=production_app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=production_frontend') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=production_asterisk') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=production_nginx') 2>/dev/null || true
         
         # Clean up unused images and networks
         docker image prune -f
@@ -208,9 +230,9 @@ if [ -n "$PRODUCTION_IP" ]; then
       
       # Check if MongoDB container already exists (running or stopped)
       if docker ps -aq --filter 'name=production_mongodb' | grep -q .; then
-        echo 'MongoDB container already exists, starting only app and frontend...'
-        # Start only the app and frontend services, skip MongoDB
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d --no-deps app frontend
+        echo 'MongoDB container already exists, starting all other services...'
+        # Start only the non-MongoDB services
+        docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d --no-deps app frontend asterisk nginx
       else
         echo 'Starting all containers (including MongoDB)...'
         # Start all containers (MongoDB will be created)

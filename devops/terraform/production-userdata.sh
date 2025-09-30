@@ -239,24 +239,51 @@ EOF
 cat > /opt/bianca-production/monitor.sh <<'EOF'
 #!/bin/bash
 
-# Simple health check script
+# Aggressive health check and recovery script
 HEALTH_URL="http://localhost:3000/health"
 LOG_FILE="/var/log/bianca-production.log"
+MAX_FAILURES=3
+FAILURE_COUNT_FILE="/tmp/health_check_failures"
 
-if curl -f -s "$HEALTH_URL" > /dev/null; then
-    echo "$(date): Health check passed" >> "$LOG_FILE"
-else
-    echo "$(date): Health check failed" >> "$LOG_FILE"
-    # Restart services
+# Initialize failure count
+if [ ! -f "$FAILURE_COUNT_FILE" ]; then
+    echo "0" > "$FAILURE_COUNT_FILE"
+fi
+
+# Check if containers are running
+if ! docker ps | grep -q "production_app"; then
+    echo "$(date): CRITICAL - App container not running! Restarting all services..." >> "$LOG_FILE"
     cd /opt/bianca-production
-    docker-compose restart
+    docker-compose up -d
+    echo "0" > "$FAILURE_COUNT_FILE"
+    exit 0
+fi
+
+# Health check
+if curl -f -s --max-time 5 "$HEALTH_URL" > /dev/null 2>&1; then
+    # Health check passed - reset failure count
+    echo "0" > "$FAILURE_COUNT_FILE"
+else
+    # Health check failed - increment failure count
+    FAILURES=$(cat "$FAILURE_COUNT_FILE")
+    FAILURES=$((FAILURES + 1))
+    echo "$FAILURES" > "$FAILURE_COUNT_FILE"
+    
+    echo "$(date): Health check failed ($FAILURES/$MAX_FAILURES)" >> "$LOG_FILE"
+    
+    if [ "$FAILURES" -ge "$MAX_FAILURES" ]; then
+        echo "$(date): Max failures reached. Restarting services..." >> "$LOG_FILE"
+        cd /opt/bianca-production
+        docker-compose restart app
+        echo "0" > "$FAILURE_COUNT_FILE"
+    fi
 fi
 EOF
 
 chmod +x /opt/bianca-production/monitor.sh
 
-# Add cron job for monitoring
-echo "*/5 * * * * /opt/bianca-production/monitor.sh" | crontab -u ec2-user -
+# Add cron job for monitoring - check every minute
+echo "* * * * * /opt/bianca-production/monitor.sh" | crontab -u ec2-user -
 
 # Create backup script
 cat > /opt/bianca-production/backup.sh <<'EOF'

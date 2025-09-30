@@ -44,6 +44,14 @@ echo "Instance: $${INSTANCE_ID}"
 echo "Private IP: $${PRIVATE_IP}"
 echo "Public IP: $${PUBLIC_IP}"
 
+# Fetch secrets from AWS Secrets Manager
+echo "Fetching secrets from AWS Secrets Manager..."
+SECRET_ID="MySecretsManagerSecret"
+ARI_PASSWORD=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_ID} --query SecretString --output text | jq -r .ARI_PASSWORD)
+BIANCA_PASSWORD=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_ID} --query SecretString --output text | jq -r .BIANCA_PASSWORD)
+
+echo "Secrets fetched successfully"
+
 # Create app directory
 mkdir -p /opt/bianca-staging
 cd /opt/bianca-staging
@@ -112,6 +120,9 @@ services:
       - PRIVATE_ADDRESS=$${PRIVATE_IP}
       - RTP_START_PORT=10000
       - RTP_END_PORT=10100
+      - ARI_PASSWORD=$${ARI_PASSWORD}
+      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
+      - ASTERISK_USERNAME=myphonefriend
     volumes:
       - asterisk_logs:/var/log/asterisk
     networks:

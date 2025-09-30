@@ -1043,13 +1043,14 @@ resource "aws_lb_target_group" "app_tg" {
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
+  deregistration_delay = 30  # Drain connections faster when stopping tasks
 
   health_check {
     path                = "/health"
-    interval            = 30        # Reduced for faster health detection
-    timeout             = 10        # Reduced timeout
-    healthy_threshold   = 2         # Keep at 2 for stability
-    unhealthy_threshold = 3         # Reduced to fail faster during deployment
+    interval            = 10        # Check every 10 seconds for faster detection
+    timeout             = 5         # 5 second timeout
+    healthy_threshold   = 2         # 2 successful checks = healthy (20 seconds)
+    unhealthy_threshold = 2         # 2 failed checks = unhealthy (20 seconds)
     matcher             = "200"
     port                = "traffic-port"
     protocol            = "HTTP"
@@ -1266,10 +1267,10 @@ resource "aws_ecs_task_definition" "app_task" {
       },
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
-        interval    = 30
-        timeout     = 10        # Increased from 5
-        retries     = 5         # Reduced from 10 to fail faster during deployment
-        startPeriod = 180       # Increased to give more time for startup
+        interval    = 10        # Check every 10 seconds
+        timeout     = 5         # 5 second timeout
+        retries     = 3         # 3 failed checks = unhealthy (30 seconds to detect)
+        startPeriod = 180       # Still give 3 minutes for startup
       }
       # REMOVED: dependsOn MongoDB
     }
@@ -1286,9 +1287,9 @@ resource "aws_ecs_service" "app_service" {
   task_definition = aws_ecs_task_definition.app_task.arn
   launch_type = "FARGATE"
   platform_version                   = "LATEST"
-  desired_count = 1
-  deployment_maximum_percent         = 200  # Allow 2 tasks during deployment
-  deployment_minimum_healthy_percent = 0    # FIXED: Allow 0 healthy during deployment to prevent race condition
+  desired_count = 2  # Run 2 tasks for true HA - if one crashes, other stays up
+  deployment_maximum_percent         = 200  # Allow 4 tasks during deployment
+  deployment_minimum_healthy_percent = 100  # Keep at least 2 healthy tasks during deployment
   enable_execute_command             = true
   health_check_grace_period_seconds  = 300  # Increased from 120
 

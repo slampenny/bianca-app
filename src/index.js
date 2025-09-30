@@ -146,8 +146,9 @@ async function startServer() {
 function setupShutdownHandlers(server) {
   // Handler for unexpected errors
   const unexpectedErrorHandler = (error) => {
-    logger.error('Unexpected Error:', error);
-    gracefulShutdown(server);
+    logger.error('Unexpected Error (not exiting):', error);
+    // DON'T exit - let the app continue running and ECS health checks will handle it
+    // Only exit on intentional signals like SIGTERM/SIGINT
   };
 
   // Handler for graceful shutdown

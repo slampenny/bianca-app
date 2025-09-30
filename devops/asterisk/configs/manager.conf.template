@@ -13,3 +13,8 @@ write=all
 secret=${BIANCA_PASSWORD}
 read=all
 write=all
+
+[myphonefriend]
+secret=${ARI_PASSWORD}
+read=all
+write=all
