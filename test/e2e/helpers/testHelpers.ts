@@ -247,29 +247,30 @@ export async function getVisibleAlertMessages(page: Page): Promise<string[]> {
 }
 
 export async function ensureUserRegisteredAndLoggedInViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
-  // Try to login
-  await page.getByTestId('email-input').fill(email)
-  await page.getByTestId('password-input').fill(password)
-  await page.getByTestId('login-button').click()
+  // Try to login using aria-label (React Native Web compatibility)
+  await page.fill('[aria-label="email-input"]', email)
+  await page.fill('[aria-label="password-input"]', password)
+  await page.click('[aria-label="login-button"]')
+  
   // Wait for either home screen or login error
   try {
-    await page.waitForSelector('[data-testid="home-header"]', { timeout: 5000 })
+    await page.waitForSelector('[aria-label="home-header"]', { timeout: 5000 })
     // Login successful
     return
   } catch {
     // Login failed, check for error and register
     if (await page.getByText(/Failed to log in/i).isVisible()) {
       // Go to register screen
-      if (await page.getByTestId('register-name').count() === 0) {
-        await page.getByTestId('register-link').click()
+      if (await page.locator('[aria-label="register-name"]').count() === 0) {
+        await page.click('[aria-label="register-link"]')
       }
-      await page.getByTestId('register-name').fill(name)
-      await page.getByTestId('register-email').fill(email)
-      await page.getByTestId('register-password').fill(password)
-      await page.getByTestId('register-confirm-password').fill(password)
-      await page.getByTestId('register-phone').fill(phone)
-      await page.getByTestId('register-submit').click()
-      await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+      await page.fill('[aria-label="register-name"]', name)
+      await page.fill('[aria-label="register-email"]', email)
+      await page.fill('[aria-label="register-password"]', password)
+      await page.fill('[aria-label="register-confirm-password"]', password)
+      await page.fill('[aria-label="register-phone"]', phone)
+      await page.click('[aria-label="register-submit"]')
+      await page.waitForSelector('[aria-label="home-header"]', { timeout: 10000 })
     } else {
       throw new Error('Login failed for unknown reason')
     }
@@ -283,8 +284,8 @@ export async function logoutViaUI(page: Page): Promise<void> {
   await page.waitForTimeout(1000)
   
   try {
-    // Try to click the profile button if it's visible
-    const profileButton = page.getByTestId('profile-button')
+    // Try to click the profile button if it's visible (using aria-label)
+    const profileButton = page.locator('[aria-label="profile-button"]')
     console.log(`Profile button count: ${await profileButton.count()}`)
     
     if (await profileButton.count() > 0 && await profileButton.first().isVisible()) {
@@ -292,21 +293,21 @@ export async function logoutViaUI(page: Page): Promise<void> {
       await profileButton.first().click()
       
       // Wait for profile screen to load
-      await page.waitForSelector('[data-testid="profile-logout-button"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="profile-logout-button"]', { timeout: 5000 })
       
       // On profile screen, click the logout button (which navigates to logout screen)
-      await page.getByTestId('profile-logout-button').click()
+      await page.click('[aria-label="profile-logout-button"]')
       
       // Wait for logout screen to load
-      await page.waitForSelector('[data-testid="logout-button"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="logout-button"]', { timeout: 5000 })
       
       // On logout screen, click the logout button (which actually performs logout)
-      await page.getByTestId('logout-button').click()
+      await page.click('[aria-label="logout-button"]')
     } else {
       console.log('Profile button not found or not visible, trying alternative logout methods...')
       
       // Try to find logout button directly
-      const logoutButton = page.getByTestId('logout-button')
+      const logoutButton = page.locator('[aria-label="logout-button"]')
       if (await logoutButton.count() > 0 && await logoutButton.first().isVisible()) {
         console.log('Found logout button directly, clicking...')
         await logoutButton.first().click()
@@ -324,7 +325,7 @@ export async function logoutViaUI(page: Page): Promise<void> {
   
   // Wait for login screen to appear
   try {
-    await page.waitForSelector('[data-testid="email-input"]', { timeout: 5000 })
+    await page.waitForSelector('[aria-label="email-input"]', { timeout: 5000 })
     console.log('Successfully reached login screen')
   } catch (error) {
     console.log('Failed to reach login screen, but continuing...')
