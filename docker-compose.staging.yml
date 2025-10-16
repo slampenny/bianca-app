@@ -27,11 +27,13 @@ services:
       - NET_ADMIN
 
   mongodb:
+    network_mode: host
     volumes:
       - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
 
   asterisk:
     image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+    network_mode: host
     environment:
       # These come from host environment (set by staging-userdata.sh from AWS Secrets)
       - ARI_PASSWORD=${ARI_PASSWORD}
@@ -44,7 +46,6 @@ services:
       # Mount recordings for staging debugging
       - /opt/asterisk-recordings:/var/spool/asterisk/recording
 
-# Define networks at the top level
-networks:
-  node-network:
-    driver: bridge
+# Note: Using host network mode for all services
+# This allows containers to access EC2 metadata service for IAM credentials
+# and simplifies networking between containers (localhost communication)
