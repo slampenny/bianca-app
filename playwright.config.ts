@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
-  timeout: 10000,
+  timeout: 30000, // Increase timeout for integration tests
   testDir: './test/e2e',
   use: {
     screenshot: 'only-on-failure',

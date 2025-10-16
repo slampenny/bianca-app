@@ -247,6 +247,10 @@ export async function getVisibleAlertMessages(page: Page): Promise<string[]> {
 }
 
 export async function ensureUserRegisteredAndLoggedInViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
+  // Navigate to login page first
+  await page.goto('http://localhost:8082/')
+  await page.waitForTimeout(1000)
+  
   // Try to login using aria-label (React Native Web compatibility)
   await page.fill('[aria-label="email-input"]', email)
   await page.fill('[aria-label="password-input"]', password)

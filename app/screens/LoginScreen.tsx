@@ -174,6 +174,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       
       <Button
         testID="register-button"
+        accessibilityLabel="register-link"
         tx="loginScreen.register"
         onPress={handleRegisterPress}
         style={styles.registerButton}

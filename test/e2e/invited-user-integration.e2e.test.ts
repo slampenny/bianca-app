@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
 import { ensureUserRegisteredAndLoggedInViaUI, logoutViaUI } from './helpers/testHelpers'
-import { generateUniqueTestData } from './fixtures/testData'
+import { generateRegistrationData } from './fixtures/testData'
 
 /**
  * Integration tests for invited user authentication issues
@@ -15,7 +15,7 @@ import { generateUniqueTestData } from './fixtures/testData'
 test.describe('Invited User Integration Tests', () => {
   
   test('User can log in and log out successfully', async ({ page }) => {
-    const testData = generateUniqueTestData('logout-test')
+    const testData = generateRegistrationData()
     
     // Register and log in through the UI (real flow)
     await ensureUserRegisteredAndLoggedInViaUI(
@@ -38,7 +38,7 @@ test.describe('Invited User Integration Tests', () => {
   })
 
   test('Logout works even when backend logout API fails', async ({ page }) => {
-    const testData = generateUniqueTestData('logout-api-fail')
+    const testData = generateRegistrationData()
     
     // Register and log in
     await ensureUserRegisteredAndLoggedInViaUI(
@@ -69,7 +69,7 @@ test.describe('Invited User Integration Tests', () => {
   })
 
   test('Logout works when refresh token is invalid', async ({ page }) => {
-    const testData = generateUniqueTestData('logout-invalid-token')
+    const testData = generateRegistrationData()
     
     // Register and log in
     await ensureUserRegisteredAndLoggedInViaUI(
@@ -100,7 +100,7 @@ test.describe('Invited User Integration Tests', () => {
   })
 
   test('User cannot perform actions after tokens expire', async ({ page }) => {
-    const testData = generateUniqueTestData('token-expire-test')
+    const testData = generateRegistrationData()
     
     // Register and log in
     await ensureUserRegisteredAndLoggedInViaUI(
@@ -157,7 +157,7 @@ test.describe('Invited User Integration Tests', () => {
 
   test('Invited user can complete signup and access app', async ({ page }) => {
     const inviteToken = `test_invite_token_${Date.now()}`
-    const testData = generateUniqueTestData('invited-user')
+    const testData = generateRegistrationData()
     
     // Mock invite verification endpoint
     await page.route('**/v1/orgs/verifyInvite*', async (route) => {
@@ -253,7 +253,7 @@ test.describe('Invited User Integration Tests', () => {
 
   test('Invited user who returns to profile screen is redirected to signup', async ({ page }) => {
     const inviteToken = `test_invite_token_${Date.now()}`
-    const testData = generateUniqueTestData('invited-profile')
+    const testData = generateRegistrationData()
     
     // Mock invite verification
     await page.route('**/v1/orgs/verifyInvite*', async (route) => {
@@ -311,7 +311,7 @@ test.describe('Invited User Integration Tests', () => {
   })
 
   test('Multiple logout attempts are handled gracefully', async ({ page }) => {
-    const testData = generateUniqueTestData('multi-logout')
+    const testData = generateRegistrationData()
     
     // Register and log in
     await ensureUserRegisteredAndLoggedInViaUI(
@@ -348,7 +348,7 @@ test.describe('Invited User Integration Tests', () => {
   })
 
   test('User can navigate after login and logout works', async ({ page }) => {
-    const testData = generateUniqueTestData('nav-logout')
+    const testData = generateRegistrationData()
     
     // Register and log in
     await ensureUserRegisteredAndLoggedInViaUI(

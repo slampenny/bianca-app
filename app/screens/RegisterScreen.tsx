@@ -229,6 +229,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-name"
+            accessibilityLabel="register-name"
             placeholderTx="registerScreen.nameFieldPlaceholder"
             labelTx="registerScreen.nameFieldLabel"
             value={name}
@@ -248,6 +249,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-email"
+            accessibilityLabel="register-email"
             placeholderTx="registerScreen.emailFieldPlaceholder"
             labelTx="registerScreen.emailFieldLabel"
             value={email}
@@ -266,6 +268,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <PhoneInputWeb
             testID="register-phone"
+            accessibilityLabel="register-phone"
             placeholderTx="registerScreen.phoneFieldPlaceholder"
             labelTx="registerScreen.phoneFieldLabel"
             value={phone}
@@ -282,6 +285,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-password"
+            accessibilityLabel="register-password"
             placeholderTx="registerScreen.passwordFieldPlaceholder"
             labelTx="registerScreen.passwordFieldLabel"
             secureTextEntry
@@ -299,6 +303,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-confirm-password"
+            accessibilityLabel="register-confirm-password"
             placeholderTx="registerScreen.confirmPasswordFieldPlaceholder"
             labelTx="registerScreen.confirmPasswordFieldLabel"
             secureTextEntry
@@ -328,6 +333,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         {/* Submit Button */}
         <Button
           testID="register-submit"
+          accessibilityLabel="register-submit"
           onPress={handleRegister}
           disabled={isLoading}
           tx="registerScreen.title" // Make sure this tx key exists
