@@ -14,14 +14,12 @@ services:
       - FRONTEND_URL=https://staging.myphonefriend.com
       - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
       # MongoDB for staging (using containerized version)
-      - MONGODB_URL=mongodb://mongodb:27017/bianca-service
+      - MONGODB_URL=mongodb://localhost:27017/bianca-service
       # Enable EC2 metadata service for IAM role credentials
       - AWS_EC2_METADATA_DISABLED=false
     # Don't mount ~/.aws - use EC2 instance IAM role via metadata service
-    # The --network host below allows container to access EC2 metadata at 169.254.169.254
+    # Using host network to access EC2 metadata at 169.254.169.254
     network_mode: host
-    ports:
-      - "3000:3000"
     cap_add:
       - NET_RAW
       - NET_ADMIN
@@ -46,6 +44,6 @@ services:
       # Mount recordings for staging debugging
       - /opt/asterisk-recordings:/var/spool/asterisk/recording
 
-# Note: Using host network mode for all services
+# Note: Using host network mode for all services (overrides base docker-compose.yml networks)
 # This allows containers to access EC2 metadata service for IAM credentials
-# and simplifies networking between containers (localhost communication)
+# and enables localhost communication between containers
