@@ -32,6 +32,14 @@ services:
 
   asterisk:
     image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+    environment:
+      # These come from host environment (set by staging-userdata.sh from AWS Secrets)
+      - ARI_PASSWORD=${ARI_PASSWORD}
+      - BIANCA_PASSWORD=${BIANCA_PASSWORD}
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
+      - RTP_START_PORT=10000
+      - RTP_END_PORT=10100
+      - ASTERISK_USERNAME=myphonefriend
     volumes:
       # Mount recordings for staging debugging
       - /opt/asterisk-recordings:/var/spool/asterisk/recording
