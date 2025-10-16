@@ -3,6 +3,8 @@ import { View, ViewStyle, StyleSheet } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useRegisterWithInviteMutation } from "../services/api/authApi"
+import { useDispatch } from "react-redux"
+import { setInviteToken } from "app/store/authSlice"
 import { Button, Text, TextField, Screen, Header, PhoneInputWeb } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
@@ -14,8 +16,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   const { navigation } = props
   const route = useRoute()
   const token = (route.params as any)?.token
-
-
+  const dispatch = useDispatch()
 
   const [registerWithInvite, { isLoading }] = useRegisterWithInviteMutation()
 
@@ -31,9 +32,13 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   const [confirmPasswordError, setConfirmPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
 
-  // Check if we have an invite token
+  // Check if we have an invite token and persist it
   useEffect(() => {
-    if (!token) {
+    if (token) {
+      // Store the invite token in Redux so it persists across navigation
+      dispatch(setInviteToken(token))
+      console.log("Signup with invite token:", token)
+    } else {
       setGeneralError("Invalid or expired invite token")
       // Navigate to login after a short delay to show the error
       setTimeout(() => {
@@ -44,8 +49,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
     // TODO: Decode token to prefill user information
     // For now, we'll let the backend handle token validation
-    console.log("Signup with invite token:", token)
-  }, [token, navigation])
+  }, [token, navigation, dispatch])
 
   // Handle backend error messages for different token states
   useEffect(() => {

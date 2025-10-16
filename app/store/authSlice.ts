@@ -8,12 +8,14 @@ interface AuthState {
   tokens: AuthTokens | null // This is the JWT token
   authEmail: string
   currentUser: Caregiver | null
+  inviteToken: string | null // Store invite token for invited users
 }
 
 const initialState: AuthState = {
   tokens: null,
   authEmail: "",
   currentUser: null,
+  inviteToken: null,
 }
 
 export const authSlice = createSlice({
@@ -33,6 +35,10 @@ export const authSlice = createSlice({
       state.tokens = null
       state.authEmail = ""
       state.currentUser = null
+      state.inviteToken = null
+    },
+    setInviteToken(state, action: PayloadAction<string | null>) {
+      state.inviteToken = action.payload
     },
   },
   extraReducers: (builder) => {
@@ -47,6 +53,7 @@ export const authSlice = createSlice({
     builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
       state.currentUser = payload.caregiver
       state.tokens = payload.tokens
+      state.inviteToken = null // Clear invite token after successful registration
     })
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
       state.tokens = null
@@ -75,7 +82,7 @@ export const authSlice = createSlice({
   },
 })
 
-export const { setAuthTokens, setAuthEmail, setCurrentUser, clearAuth } = authSlice.actions
+export const { setAuthTokens, setAuthEmail, setCurrentUser, clearAuth, setInviteToken } = authSlice.actions
 
 export const isAuthenticated = (state: RootState) => {
   return !!state.auth.tokens
@@ -93,6 +100,9 @@ export const getCurrentUser = (state: RootState) => state.auth.currentUser
 export const getAuthEmail = (state: { auth: AuthState }) => state.auth.authEmail
 export const getAuthTokens = (state: { auth: AuthState }) => {
   return state.auth.tokens
+}
+export const getInviteToken = (state: RootState) => {
+  return state.auth.inviteToken
 }
 
 export default authSlice.reducer

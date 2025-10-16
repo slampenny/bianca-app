@@ -9,7 +9,7 @@ import {
   View,
   Alert,
 } from "react-native"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LanguageSelector } from "app/components/LanguageSelector"
@@ -18,6 +18,7 @@ import { translate } from "app/i18n"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
+import { getInviteToken } from "../store/authSlice"
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { colors } from "app/theme/colors"
@@ -25,12 +26,14 @@ import { navigationRef } from "app/navigators/navigationUtilities"
 
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
+  const dispatch = useDispatch()
   
   // Use language hook to trigger re-renders on language change
   useLanguage()
 
   // Get the current user (who is a caregiver)
   const currentUser = useSelector(getCaregiver)
+  const inviteToken = useSelector(getInviteToken)
   
   // Check if user is unverified and needs to complete profile
   const isUnverified = currentUser?.role === 'unverified'
@@ -62,6 +65,15 @@ function ProfileScreen() {
       setPhone(currentUser.phone || "")
     }
   }, [currentUser])
+
+  // Handle invited users who got stuck on profile screen
+  useEffect(() => {
+    if (!currentUser && inviteToken) {
+      // User has invite token but no current user - redirect to signup
+      console.log("Redirecting invited user to signup screen")
+      navigation.navigate("Signup", { token: inviteToken })
+    }
+  }, [currentUser, inviteToken, navigation])
 
   const validateEmail = (email: string) => {
     setEmail(email)
@@ -167,6 +179,23 @@ function ProfileScreen() {
 
   if (isUpdating || isUploading) {
     return <LoadingScreen />
+  }
+
+  // If user is not authenticated and has no invite token, show error
+  if (!currentUser && !inviteToken) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.error}>
+          Error: Please authenticate. Please log in to access your profile.
+        </Text>
+        <Pressable
+          style={styles.button}
+          onPress={() => navigation.navigate("Login")}
+        >
+          <Text style={styles.buttonText}>Go to Login</Text>
+        </Pressable>
+      </ScrollView>
+    )
   }
 
   return (

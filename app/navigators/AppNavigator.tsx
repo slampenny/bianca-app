@@ -2,7 +2,7 @@ import React, { useEffect } from "react"
 import { NavigationContainer } from "@react-navigation/native"
 import { useColorScheme } from "react-native"
 import { useSelector } from "react-redux"
-import { isAuthenticated, getCurrentUser } from "app/store/authSlice"
+import { isAuthenticated, getCurrentUser, getInviteToken } from "app/store/authSlice"
 import {
   navigationRef,
   useBackButtonHandler,
@@ -17,6 +17,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   const { linking, initialState, onStateChange, ...otherProps } = props
   const isLoggedIn = useSelector(isAuthenticated)
   const currentUser = useSelector(getCurrentUser)
+  const inviteToken = useSelector(getInviteToken)
   const colorScheme = useColorScheme()
 
   // Define back button behavior
@@ -40,6 +41,14 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
       }
     }
   }, [isLoggedIn, currentUser])
+
+  // Redirect invited users to signup screen
+  useEffect(() => {
+    if (!isLoggedIn && inviteToken && navigationRef.isReady()) {
+      // User has an invite token but isn't logged in, redirect to signup
+      navigationRef.navigate('Signup', { token: inviteToken })
+    }
+  }, [isLoggedIn, inviteToken])
 
   // Navigation state persistence setup
   const navigationPersistenceKey = "navigationState"
