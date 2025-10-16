@@ -219,14 +219,14 @@ if [ -n "$STAGING_IP" ]; then
       # Create MongoDB data directory
       sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
       
-      # Pull latest images
-      docker-compose -f docker-compose.yml -f docker-compose.staging.yml pull
+      # Pull latest images (use only the userdata-created docker-compose.yml)
+      docker-compose pull
       
       if [ '$FORCE_CLEANUP' = 'true' ]; then
         echo 'Force cleanup: Stopping and removing ALL containers...'
         
         # Stop and remove all containers
-        docker-compose -f docker-compose.yml -f docker-compose.staging.yml down || true
+        docker-compose down || true
         
         # Force stop all running containers
         docker stop \$(docker ps -q) 2>/dev/null || true
@@ -244,8 +244,8 @@ if [ -n "$STAGING_IP" ]; then
         
         # Stop and remove only the application containers (not MongoDB)
         # Note: docker-compose uses service names, not container names
-        docker-compose -f docker-compose.yml -f docker-compose.staging.yml stop bianca-app asterisk || true
-        docker-compose -f docker-compose.yml -f docker-compose.staging.yml rm -f bianca-app asterisk || true
+        docker-compose stop app asterisk || true
+        docker-compose rm -f app asterisk || true
         
         # Remove any orphaned containers with our project names
         docker rm -f \$(docker ps -aq --filter 'name=staging_bianca-app') 2>/dev/null || true
@@ -261,13 +261,13 @@ if [ -n "$STAGING_IP" ]; then
       
       # Check if MongoDB container already exists (running or stopped)
       if docker ps -aq --filter 'name=staging_mongodb' | grep -q .; then
-        echo 'MongoDB container already exists, starting only bianca-app and asterisk...'
-        # Start only the bianca-app and asterisk services, skip MongoDB
-        docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d --no-deps bianca-app asterisk
+        echo 'MongoDB container already exists, starting only app and asterisk...'
+        # Start only the app and asterisk services, skip MongoDB
+        docker-compose up -d --no-deps app asterisk
       else
         echo 'Starting all containers (including MongoDB)...'
         # Start all containers (MongoDB will be created)
-        docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+        docker-compose up -d
       fi
     "
     
