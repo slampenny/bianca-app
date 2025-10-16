@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
+const { minimumNecessaryMiddleware } = require('../../middlewares/minimumNecessary');
 const config = require('../../config/config');
 
 const upload = multer({ dest: config.multer.dest });
@@ -17,11 +18,21 @@ router
     validate(patientValidation.createPatient),
     patientController.createPatient
   )
-  .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatients), patientController.getPatients);
+  .get(
+    auth('readOwn:patient', 'readAny:patient'),
+    minimumNecessaryMiddleware('patient'), // HIPAA: Minimum necessary data access
+    validate(patientValidation.getPatients),
+    patientController.getPatients
+  );
 
 router
   .route('/:patientId')
-  .get(auth('readOwn:patient', 'readAny:patient'), validate(patientValidation.getPatient), patientController.getPatient)
+  .get(
+    auth('readOwn:patient', 'readAny:patient'),
+    minimumNecessaryMiddleware('patient'), // HIPAA: Minimum necessary data access
+    validate(patientValidation.getPatient),
+    patientController.getPatient
+  )
   .patch(
     auth('updateOwn:patient', 'updateAny:patient'),
     validate(patientValidation.updatePatient),

@@ -14,6 +14,8 @@ const config = require('./config/config');
 const morgan = require('./config/morgan');
 const { jwtStrategy } = require('./config/passport');
 const { authLimiter } = require('./middlewares/rateLimiter');
+const { auditMiddleware } = require('./middlewares/auditLog');
+const { sessionTimeoutMiddleware } = require('./middlewares/sessionTimeout');
 const routes = require('./routes/v1');
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
@@ -186,6 +188,14 @@ app.use(helmet({
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+// HIPAA Compliance: Session timeout (automatic logoff after 15 min idle)
+// Must be placed AFTER authentication (passport)
+app.use('/v1', sessionTimeoutMiddleware);
+
+// HIPAA Compliance: Audit logging for all PHI access
+// Must be placed AFTER authentication (passport) and BEFORE routes
+app.use('/v1', auditMiddleware);
 
 // v1 API routes
 app.use('/v1', routes);

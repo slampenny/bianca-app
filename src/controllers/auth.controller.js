@@ -1,8 +1,10 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const config = require('../config/config');
-const { authService, caregiverService, orgService, tokenService, emailService, alertService } = require('../services');
+const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService } = require('../services');
 const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
+const { auditAuthFailure } = require('../middlewares/auditLog');
+const { AuditLog } = require('../models');
 
 const register = catchAsync(async (req, res, next) => {
   const org = await orgService.createOrg(
@@ -44,19 +46,109 @@ const registerWithInvite = catchAsync(async (req, res) => {
 });
 
 const login = catchAsync(async (req, res, next) => {
-  const { email, password } = req.body;
-  const { caregiver, patients } = await authService.loginCaregiverWithEmailAndPassword(email, password);
+  const { email, password, mfaToken } = req.body;
+  
+  try {
+    // Step 1: Validate credentials
+    const { caregiver, patients } = await authService.loginCaregiverWithEmailAndPassword(email, password);
 
-  const alerts = await alertService.getAlerts(caregiver.id);
-  const alertDTOs = alerts.map((alert) => AlertDTO(alert));
-  const patientDTOs = patients.map((patient) => PatientDTO(patient));
-  const caregiverDTO = CaregiverDTO(caregiver);
-  const tokens = await tokenService.generateAuthTokens(caregiver);
-  res.send({ org: OrgDTO(caregiver.org), caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
+    // Check if account is locked
+    if (caregiver.accountLocked) {
+      throw new Error(`Account is locked: ${caregiver.lockedReason || 'Contact support for assistance'}`);
+    }
+
+    // Step 2: Check MFA requirement
+    if (caregiver.mfaEnabled) {
+      // If MFA is enabled but no token provided, return requireMFA flag
+      if (!mfaToken) {
+        // Generate a temporary token for MFA verification
+        const tempToken = await tokenService.generateToken(
+          caregiver.id,
+          require('moment')().add(5, 'minutes'),
+          'MFA_TEMP'
+        );
+
+        return res.status(200).send({
+          requireMFA: true,
+          tempToken,
+          message: 'MFA verification required'
+        });
+      }
+      
+      // Verify MFA token
+      const mfaValid = await mfaService.verifyMFAToken(caregiver.id, mfaToken);
+      if (!mfaValid) {
+        // Log failed MFA attempt
+        await auditAuthFailure(
+          email,
+          req.ip || req.connection.remoteAddress,
+          req.get('user-agent'),
+          'Invalid MFA token'
+        );
+        throw new Error('Invalid MFA token');
+      }
+    }
+    
+    // Step 3: Reset failed login attempts on successful login
+    if (caregiver.failedLoginAttempts > 0) {
+      await caregiverService.updateCaregiverById(caregiver.id, {
+        failedLoginAttempts: 0,
+        lastFailedLogin: null
+      });
+    }
+
+    // Step 4: Create session and audit log
+    const alerts = await alertService.getAlerts(caregiver.id);
+    const alertDTOs = alerts.map((alert) => AlertDTO(alert));
+    const patientDTOs = patients.map((patient) => PatientDTO(patient));
+    const caregiverDTO = CaregiverDTO(caregiver);
+    const tokens = await tokenService.generateAuthTokens(caregiver);
+    
+    // Create audit log for successful login
+    await AuditLog.create({
+      timestamp: new Date(),
+      userId: caregiver.id,
+      userRole: caregiver.role,
+      action: 'LOGIN',
+      resource: 'session',
+      resourceId: caregiver.id,
+      outcome: 'SUCCESS',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('user-agent'),
+      complianceFlags: {
+        phiAccessed: false,
+        highRiskAction: false,
+        requiresReview: false
+      }
+    });
+    
+    res.send({ org: OrgDTO(caregiver.org), caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
+  } catch (error) {
+    // HIPAA Compliance: Log failed authentication attempts
+    await auditAuthFailure(
+      email,
+      req.ip || req.connection.remoteAddress,
+      req.get('user-agent'),
+      error.message
+    );
+    throw error; // Re-throw to be handled by error middleware
+  }
 });
 
 const logout = catchAsync(async (req, res) => {
+  const { logoutSession } = require('../middlewares/sessionTimeout');
+  
   await authService.logout(req.body.refreshToken);
+  
+  // HIPAA Compliance: Expire session and create audit log
+  if (req.caregiver && req.caregiver._id) {
+    await logoutSession(
+      req.caregiver._id.toString(),
+      req.ip || req.connection.remoteAddress,
+      req.get('user-agent')
+    );
+  }
+  
   res.status(httpStatus.NO_CONTENT).send();
 });
 

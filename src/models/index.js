@@ -18,3 +18,7 @@ module.exports.MedicalBaseline = require('./medicalBaseline.model');
 module.exports.PaymentMethod = require('./paymentMethod.model');
 module.exports.Report = require('./report.model');
 module.exports.Schedule = require('./schedule.model');
+
+// HIPAA Compliance
+module.exports.AuditLog = require('./auditLog.model');
+module.exports.BreachLog = require('./breachLog.model');

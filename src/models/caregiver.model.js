@@ -77,6 +77,40 @@ const caregiverSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // HIPAA Compliance: Multi-Factor Authentication
+    mfaEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    mfaSecret: {
+      type: String,
+      private: true, // Exclude from toJSON
+    },
+    mfaBackupCodes: {
+      type: [String],
+      private: true, // Exclude from toJSON
+    },
+    mfaEnrolledAt: {
+      type: Date,
+    },
+    // HIPAA Compliance: Account Security
+    accountLocked: {
+      type: Boolean,
+      default: false,
+    },
+    lockedReason: {
+      type: String,
+    },
+    lockedAt: {
+      type: Date,
+    },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lastFailedLogin: {
+      type: Date,
+    },
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
   {

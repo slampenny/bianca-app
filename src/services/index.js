@@ -14,3 +14,7 @@ module.exports.scheduleService = require('./schedule.service');
 module.exports.testService = require('./test.service');
 module.exports.tokenService = require('./token.service');
 module.exports.twilioCallService = require('./twilioCall.service');
+
+// HIPAA Compliance Services
+module.exports.mfaService = require('./mfa.service');
+module.exports.breachDetectionService = require('./breachDetection.service');
