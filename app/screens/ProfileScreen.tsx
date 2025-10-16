@@ -184,13 +184,15 @@ function ProfileScreen() {
   // If user is not authenticated and has no invite token, show error
   if (!currentUser && !inviteToken) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.error}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
+        <Text style={styles.error} accessibilityLabel="error-message">
           Error: Please authenticate. Please log in to access your profile.
         </Text>
         <Pressable
           style={styles.button}
           onPress={() => navigation.navigate("Login")}
+          accessibilityLabel="go-to-login-button"
+          accessible={true}
         >
           <Text style={styles.buttonText}>Go to Login</Text>
         </Pressable>
@@ -200,7 +202,7 @@ function ProfileScreen() {
 
   return (
     <TouchableWithoutFeedback>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
         {(updateError || uploadError) && (
           <Text style={styles.error}>
             {updateError && "data" in updateError
@@ -269,7 +271,7 @@ function ProfileScreen() {
             <Text style={styles.buttonText}>{translate("profileScreen.updateProfile")}</Text>
           </Pressable>
 
-          <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button">
+          <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button" accessibilityLabel="profile-logout-button" accessible={true}>
             <Text style={styles.buttonText}>{translate("profileScreen.logout")}</Text>
           </Pressable>
 

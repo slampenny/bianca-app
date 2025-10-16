@@ -118,11 +118,12 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <Screen style={styles.container} testID="login-form">
+    <Screen style={styles.container} testID="login-form" accessibilityLabel="login-screen">
       <Header titleTx="loginScreen.signIn" />
       {errorMessage ? <Text testID="login-error" style={styles.error}>{errorMessage}</Text> : null}
       <TextField
         testID="email-input"
+        accessibilityLabel="email-input"
         value={authEmail}
         onChangeText={(value) => dispatch(setAuthEmail(value))}
         placeholderTx="loginScreen.emailFieldLabel"
@@ -138,6 +139,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       />
       <TextField
         testID="password-input"
+        accessibilityLabel="password-input"
         ref={authPasswordInput}
         value={authPassword}
         onChangeText={setAuthPassword}
@@ -154,6 +156,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       />
       <Button
         testID="login-button"
+        accessibilityLabel="login-button"
         tx="loginScreen.signIn"
         onPress={handleLoginPress}
         style={styles.loginButton}

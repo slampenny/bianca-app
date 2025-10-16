@@ -24,7 +24,7 @@ export const LogoutScreen = () => {
   }
 
   return (
-    <Screen style={styles.container}>
+    <Screen style={styles.container} accessibilityLabel="logout-screen">
       <Text style={styles.title} tx="logoutScreen.logoutMessage" />
       <Button
         tx="logoutScreen.logoutButton"
@@ -33,6 +33,7 @@ export const LogoutScreen = () => {
         textStyle={styles.logoutButtonText}
         preset="filled"
         testID="logout-button"
+        accessibilityLabel="logout-button"
       />
     </Screen>
   )
