@@ -23,12 +23,14 @@ services:
     cap_add:
       - NET_RAW
       - NET_ADMIN
+    networks: {}
 
   mongodb:
     network_mode: host
     command: ["mongod", "--config", "/etc/mongod.conf"]
     volumes:
       - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
+    networks: {}
 
   asterisk:
     image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
