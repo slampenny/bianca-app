@@ -201,9 +201,46 @@ if [ -n "$PRODUCTION_IP" ]; then
     
     # Copy production override file to the instance
     echo "Copying production override configuration..."
-    scp -i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no docker-compose.production.yml ec2-user@$PRODUCTION_IP:~/ && ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$PRODUCTION_IP "sudo mv ~/docker-compose.production.yml /opt/bianca-production/ && sudo chown root:root /opt/bianca-production/docker-compose.production.yml"
     
-    ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$PRODUCTION_IP "
+    # Add SSH options to avoid host key verification prompts
+    SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    
+    # Ensure the files exist before copying
+    if [ ! -f "docker-compose.yml" ]; then
+        echo "❌ docker-compose.yml not found in $(pwd)"
+        exit 1
+    fi
+    
+    if [ ! -f "docker-compose.production.yml" ]; then
+        echo "❌ docker-compose.production.yml not found in $(pwd)"
+        exit 1
+    fi
+    
+    # Copy both docker-compose files
+    echo "  Copying docker-compose.yml..."
+    scp $SSH_OPTS docker-compose.yml ec2-user@$PRODUCTION_IP:~/
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to copy docker-compose.yml to production instance"
+        exit 1
+    fi
+    
+    echo "  Copying docker-compose.production.yml..."
+    scp $SSH_OPTS docker-compose.production.yml ec2-user@$PRODUCTION_IP:~/
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to copy docker-compose.production.yml to production instance"
+        exit 1
+    fi
+    
+    # Move them to the correct location
+    ssh $SSH_OPTS ec2-user@$PRODUCTION_IP "sudo mkdir -p /opt/bianca-production && sudo mv ~/docker-compose.yml ~/docker-compose.production.yml /opt/bianca-production/ && sudo chown root:root /opt/bianca-production/*.yml"
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to move docker-compose files to /opt/bianca-production/"
+        exit 1
+    fi
+    
+    echo "✅ Configuration files copied successfully"
+    
+    ssh $SSH_OPTS ec2-user@$PRODUCTION_IP "
       cd /opt/bianca-production
       
       # Login to ECR
