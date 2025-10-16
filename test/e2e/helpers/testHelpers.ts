@@ -289,8 +289,9 @@ export async function logoutViaUI(page: Page): Promise<void> {
   
   try {
     // Navigate directly to profile screen (more reliable than clicking button)
+    // Profile is in HomeStack, not OrgStack
     console.log('Navigating to profile screen...')
-    await page.goto('http://localhost:8082/MainTabs/Org/Profile')
+    await page.goto('http://localhost:8082/MainTabs/Home/Profile')
     await page.waitForTimeout(1000)
     
     // Wait for profile screen to load
