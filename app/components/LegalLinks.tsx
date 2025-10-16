@@ -7,12 +7,14 @@ import { translate } from "../i18n"
 interface LegalLinksProps {
   showPrivacyPolicy?: boolean
   showTermsOfService?: boolean
+  showPrivacyPractices?: boolean
   style?: any
 }
 
 export const LegalLinks: React.FC<LegalLinksProps> = ({
   showPrivacyPolicy = true,
   showTermsOfService = true,
+  showPrivacyPractices = true,
   style
 }) => {
   const navigation = useNavigation()
@@ -25,11 +27,20 @@ export const LegalLinks: React.FC<LegalLinksProps> = ({
     navigation.navigate("Terms" as never)
   }
 
+  const openPrivacyPractices = () => {
+    navigation.navigate("PrivacyPractices" as never)
+  }
+
   return (
     <View style={[styles.container, style]}>
       {showPrivacyPolicy && (
         <Pressable onPress={openPrivacyPolicy} style={styles.linkContainer}>
           <Text style={styles.linkText}>{translate("legalLinks.privacyPolicy")}</Text>
+        </Pressable>
+      )}
+      {showPrivacyPractices && (
+        <Pressable onPress={openPrivacyPractices} style={styles.linkContainer}>
+          <Text style={styles.linkText}>{translate("legalLinks.privacyPractices")}</Text>
         </Pressable>
       )}
       {showTermsOfService && (

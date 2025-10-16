@@ -5,6 +5,7 @@ export type AppStackParamList = {
   MainTabs: undefined
   Profile: undefined
   Privacy: undefined
+  PrivacyPractices: undefined
   Terms: undefined
   EmailVerified: undefined
 }
@@ -33,12 +34,14 @@ export type HomeStackParamList = {
     patientName?: string
   } | undefined
   Privacy: undefined
+  PrivacyPractices: undefined
   Terms: undefined
 }
 
 export type ProfileStackParamList = {
   Profile: undefined
   Privacy: undefined
+  PrivacyPractices: undefined
   Terms: undefined
 }
 
@@ -74,6 +77,7 @@ export type LoginStackParamList = {
   RequestReset: undefined
   ConfirmReset: { token?: string }
   Privacy: undefined
+  PrivacyPractices: undefined
   Terms: undefined
   EmailVerified: undefined
   Signup: { token?: string }

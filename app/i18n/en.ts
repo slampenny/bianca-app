@@ -222,6 +222,7 @@ const en = {
   legalLinks: {
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
+    privacyPractices: "HIPAA Privacy Practices",
   },
   headers: {
     home: "Home",
