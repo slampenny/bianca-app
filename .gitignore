@@ -12,7 +12,7 @@ terraform.*.backup
 # yarn error logs
 yarn-error.log
 
-# Environment varibales
+# Environment variables
 .env*
 !.env*.example
 
@@ -23,6 +23,52 @@ coverage
 -[a-zA-Z0-9]
 -[a-zA-Z0-9]*
 test_results.json
+
+# Deployment logs and temporary files
+deployment.log
+*.deployment.log
+deploy-*.log
+*.tmp
+*.temp
+*.cache
+
+# Docker build cache and temporary files
+.dockerignore.tmp
+docker-compose.override.yml
+
+# AWS and deployment artifacts
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Process files
+*.pid
+*.sock
+*.pid.lock
+
+# Backup files
+*.bak
+*.backup
+*.orig
 
 ./credentials/google.api.json
 devops/asterisk/recordings
