@@ -159,10 +159,10 @@ export function HomeScreen() {
   const ListEmpty = () => <Text style={styles.noUsersText} testID="home-no-patients">No patients found</Text>
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} accessibilityLabel="home-screen">
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle} testID="home-header">{translate("homeScreen.welcome", { name: currentUser ? currentUser.name : translate("homeScreen.guest") })}</Text>
+        <Text style={styles.headerTitle} testID="home-header" accessibilityLabel="home-header">{translate("homeScreen.welcome", { name: currentUser ? currentUser.name : translate("homeScreen.guest") })}</Text>
       </View>
 
       {/* Patient List */}
