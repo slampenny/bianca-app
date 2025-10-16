@@ -300,9 +300,10 @@ export async function simulateTokenExpiration(page: Page) {
 
 /**
  * Waits for navigation to complete and verifies the target screen
+ * Note: React Native Web uses accessibilityLabel which maps to aria-label in the DOM
  */
-export async function waitForScreen(page: Page, screenTestId: string, timeout: number = 5000) {
-  await page.waitForSelector(`[data-testid="${screenTestId}"]`, { timeout })
+export async function waitForScreen(page: Page, screenLabel: string, timeout: number = 5000) {
+  await page.waitForSelector(`[aria-label="${screenLabel}"]`, { timeout })
 }
 
 /**
@@ -333,18 +334,19 @@ export async function verifyNotAuthenticated(page: Page) {
 
 /**
  * Performs logout through the UI
+ * Note: Uses aria-label selectors for React Native Web compatibility
  */
 export async function performLogout(page: Page) {
   // Navigate to profile screen
   await page.goto('/profile')
   await waitForScreen(page, 'profile-screen')
   
-  // Click logout button
-  await page.getByTestId('profile-logout-button').click()
+  // Click logout button using aria-label
+  await page.click('[aria-label="profile-logout-button"]')
   await waitForScreen(page, 'logout-screen')
   
   // Confirm logout
-  await page.getByTestId('logout-button').click()
+  await page.click('[aria-label="logout-button"]')
   
   // Wait for redirect to login
   await waitForScreen(page, 'login-screen')

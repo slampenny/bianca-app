@@ -35,17 +35,17 @@ test.describe('Invited User Logout Issues', () => {
 
     // Navigate to profile screen
     await page.goto('/profile')
-    await page.waitForSelector('[data-testid="profile-screen"]')
+    await page.waitForSelector('[aria-label="profile-screen"]')
 
     // Verify user can see profile (currentUser is in Redux)
-    expect(await page.isVisible('[data-testid="profile-screen"]')).toBe(true)
+    expect(await page.isVisible('[aria-label="profile-screen"]')).toBe(true)
 
     // Click logout button
-    await page.getByTestId('profile-logout-button').click()
-    await page.waitForSelector('[data-testid="logout-screen"]')
+    await page.getByLabel('profile-logout-button').click()
+    await page.waitForSelector('[aria-label="logout-screen"]')
 
     // Click the actual logout button
-    await page.getByTestId('logout-button').click()
+    await page.getByLabel('logout-button').click()
 
     // Wait for any API calls to complete
     await page.waitForTimeout(2000)
@@ -53,8 +53,8 @@ test.describe('Invited User Logout Issues', () => {
     // The issue: logout button might not work properly with expired tokens
     // Check if we're still on logout screen or if we were redirected
     const currentUrl = page.url()
-    const isOnLogoutScreen = await page.isVisible('[data-testid="logout-screen"]')
-    const isOnLoginScreen = await page.isVisible('[data-testid="login-screen"]')
+    const isOnLogoutScreen = await page.isVisible('[aria-label="logout-screen"]')
+    const isOnLoginScreen = await page.isVisible('[aria-label="login-screen"]')
 
     console.log('Current URL:', currentUrl)
     console.log('On logout screen:', isOnLogoutScreen)
@@ -98,7 +98,7 @@ test.describe('Invited User Logout Issues', () => {
     await performLogout(page)
 
     // Verify we're on login screen
-    await page.waitForSelector('[data-testid="login-screen"]')
+    await page.waitForSelector('[aria-label="login-screen"]')
 
     // Verify auth state is cleared
     await verifyNotAuthenticated(page)
@@ -126,12 +126,12 @@ test.describe('Invited User Logout Issues', () => {
 
     // Navigate to profile and attempt logout
     await page.goto('/profile')
-    await page.waitForSelector('[data-testid="profile-screen"]')
+    await page.waitForSelector('[aria-label="profile-screen"]')
     
-    await page.getByTestId('profile-logout-button').click()
-    await page.waitForSelector('[data-testid="logout-screen"]')
+    await page.getByLabel('profile-logout-button').click()
+    await page.waitForSelector('[aria-label="logout-screen"]')
     
-    await page.getByTestId('logout-button').click()
+    await page.getByLabel('logout-button').click()
 
     // Wait for any error handling
     await page.waitForTimeout(3000)
@@ -142,7 +142,7 @@ test.describe('Invited User Logout Issues', () => {
     expect(authState.currentUser).toBeNull()
 
     // Should be redirected to login screen
-    await page.waitForSelector('[data-testid="login-screen"]')
+    await page.waitForSelector('[aria-label="login-screen"]')
   })
 
   test('Invited user can logout after completing signup', async ({ page }) => {
@@ -163,15 +163,15 @@ test.describe('Invited User Logout Issues', () => {
 
     // Navigate to signup (should be redirected from profile)
     await page.goto('/profile')
-    await page.waitForSelector('[data-testid="signup-screen"]')
+    await page.waitForSelector('[aria-label="signup-screen"]')
 
     // Complete signup
-    await page.getByTestId('signup-password-input').fill('StrongPassword123!')
-    await page.getByTestId('signup-confirm-password-input').fill('StrongPassword123!')
-    await page.getByTestId('signup-submit-button').click()
+    await page.getByLabel('signup-password-input').fill('StrongPassword123!')
+    await page.getByLabel('signup-confirm-password-input').fill('StrongPassword123!')
+    await page.getByLabel('signup-submit-button').click()
 
     // Wait for successful registration
-    await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    await page.waitForSelector('[aria-label="home-header"]', { timeout: 10000 })
 
     // Verify user is authenticated
     const authState = await getCurrentAuthState(page)
@@ -187,7 +187,7 @@ test.describe('Invited User Logout Issues', () => {
     await performLogout(page)
 
     // Verify logout worked
-    await page.waitForSelector('[data-testid="login-screen"]')
+    await page.waitForSelector('[aria-label="login-screen"]')
     await verifyNotAuthenticated(page)
   })
 
@@ -208,20 +208,20 @@ test.describe('Invited User Logout Issues', () => {
 
     // Navigate to profile
     await page.goto('/profile')
-    await page.waitForSelector('[data-testid="profile-screen"]')
+    await page.waitForSelector('[aria-label="profile-screen"]')
 
     // Try to logout
-    await page.getByTestId('profile-logout-button').click()
-    await page.waitForSelector('[data-testid="logout-screen"]')
+    await page.getByLabel('profile-logout-button').click()
+    await page.waitForSelector('[aria-label="logout-screen"]')
     
-    await page.getByTestId('logout-button').click()
+    await page.getByLabel('logout-button').click()
 
     // Should handle gracefully - either redirect to login or clear state
     await page.waitForTimeout(2000)
 
     // Check what happened
-    const isOnLoginScreen = await page.isVisible('[data-testid="login-screen"]')
-    const isOnLogoutScreen = await page.isVisible('[data-testid="logout-screen"]')
+    const isOnLoginScreen = await page.isVisible('[aria-label="login-screen"]')
+    const isOnLogoutScreen = await page.isVisible('[aria-label="logout-screen"]')
 
     if (isOnLogoutScreen) {
       console.warn('⚠️ Logout button may be stuck on logout screen with no tokens')
@@ -254,21 +254,21 @@ test.describe('Invited User Logout Issues', () => {
 
     // First logout attempt
     await page.goto('/profile')
-    await page.waitForSelector('[data-testid="profile-screen"]')
+    await page.waitForSelector('[aria-label="profile-screen"]')
     
-    await page.getByTestId('profile-logout-button').click()
-    await page.waitForSelector('[data-testid="logout-screen"]')
+    await page.getByLabel('profile-logout-button').click()
+    await page.waitForSelector('[aria-label="logout-screen"]')
     
     // Click logout button multiple times quickly
-    await page.getByTestId('logout-button').click()
-    await page.getByTestId('logout-button').click()
-    await page.getByTestId('logout-button').click()
+    await page.getByLabel('logout-button').click()
+    await page.getByLabel('logout-button').click()
+    await page.getByLabel('logout-button').click()
 
     // Should handle multiple clicks gracefully
     await page.waitForTimeout(2000)
 
     // Should end up on login screen
-    await page.waitForSelector('[data-testid="login-screen"]')
+    await page.waitForSelector('[aria-label="login-screen"]')
     await verifyNotAuthenticated(page)
   })
 
@@ -295,12 +295,12 @@ test.describe('Invited User Logout Issues', () => {
 
     // Attempt logout
     await page.goto('/profile')
-    await page.waitForSelector('[data-testid="profile-screen"]')
+    await page.waitForSelector('[aria-label="profile-screen"]')
     
-    await page.getByTestId('profile-logout-button').click()
-    await page.waitForSelector('[data-testid="logout-screen"]')
+    await page.getByLabel('profile-logout-button').click()
+    await page.waitForSelector('[aria-label="logout-screen"]')
     
-    await page.getByTestId('logout-button').click()
+    await page.getByLabel('logout-button').click()
 
     // Wait for logout to complete
     await page.waitForTimeout(2000)
@@ -312,6 +312,6 @@ test.describe('Invited User Logout Issues', () => {
     expect(authState.inviteToken).toBeNull()
 
     // Should be on login screen
-    await page.waitForSelector('[data-testid="login-screen"]')
+    await page.waitForSelector('[aria-label="login-screen"]')
   })
 })

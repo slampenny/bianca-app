@@ -34,15 +34,15 @@ test.describe('Invited User Authentication Workflow', () => {
       await expect(page.getByText('Please log in to access your profile.')).toBeVisible()
       
       // Should see the "Go to Login" button
-      const goToLoginButton = page.getByTestId('go-to-login-button')
+      const goToLoginButton = page.getByLabel('go-to-login-button')
       await expect(goToLoginButton).toBeVisible()
       
       // Click the "Go to Login" button
       await goToLoginButton.click()
       
       // Should be redirected to login screen
-      await page.waitForSelector('[data-testid="email-input"]', { timeout: 5000 })
-      await expect(page.getByTestId('login-screen')).toBeVisible()
+      await page.waitForSelector('[aria-label="email-input"]', { timeout: 5000 })
+      await expect(page.getByLabel('login-screen')).toBeVisible()
     })
 
     test('Invited user with invite token gets redirected to signup', async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe('Invited User Authentication Workflow', () => {
       await page.goto('/profile')
       
       // Should be redirected to signup screen with token
-      await page.waitForSelector('[data-testid="signup-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="signup-screen"]', { timeout: 5000 })
       
       // Verify the invite token is stored in Redux
       const reduxState = await page.evaluate(() => {
@@ -114,11 +114,11 @@ test.describe('Invited User Authentication Workflow', () => {
 
       // Navigate to profile screen (should redirect to signup)
       await page.goto('/profile')
-      await page.waitForSelector('[data-testid="signup-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="signup-screen"]', { timeout: 5000 })
 
       // Fill in signup form
-      await page.getByTestId('signup-password-input').fill('StrongPassword123!')
-      await page.getByTestId('signup-confirm-password-input').fill('StrongPassword123!')
+      await page.getByLabel('signup-password-input').fill('StrongPassword123!')
+      await page.getByLabel('signup-confirm-password-input').fill('StrongPassword123!')
 
       // Mock successful signup
       await page.route('**/v1/auth/registerWithInvite', async (route) => {
@@ -151,17 +151,17 @@ test.describe('Invited User Authentication Workflow', () => {
       })
 
       // Submit signup
-      await page.getByTestId('signup-submit-button').click()
+      await page.getByLabel('signup-submit-button').click()
 
       // Should be redirected to home screen
-      await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+      await page.waitForSelector('[aria-label="home-header"]', { timeout: 10000 })
       
       // Verify user is authenticated
-      await expect(page.getByTestId('home-header')).toBeVisible()
+      await expect(page.getByLabel('home-header')).toBeVisible()
       
       // Navigate to profile to verify access
-      await page.getByTestId('profile-button').click()
-      await page.waitForSelector('[data-testid="profile-screen"]')
+      await page.getByLabel('profile-button').click()
+      await page.waitForSelector('[aria-label="profile-screen"]')
       
       // Should see profile content, not error message
       await expect(page.getByText('Error: Please authenticate')).not.toBeVisible()
@@ -221,18 +221,18 @@ test.describe('Invited User Authentication Workflow', () => {
       await page.goto('/profile')
       
       // Should see profile content (currentUser is in Redux state)
-      await page.waitForSelector('[data-testid="profile-screen"]')
+      await page.waitForSelector('[aria-label="profile-screen"]')
       
       // Click logout button
-      const logoutButton = page.getByTestId('profile-logout-button')
+      const logoutButton = page.getByLabel('profile-logout-button')
       await expect(logoutButton).toBeVisible()
       await logoutButton.click()
       
       // Should navigate to logout screen
-      await page.waitForSelector('[data-testid="logout-screen"]')
+      await page.waitForSelector('[aria-label="logout-screen"]')
       
       // Click the actual logout button
-      const confirmLogoutButton = page.getByTestId('logout-button')
+      const confirmLogoutButton = page.getByLabel('logout-button')
       await expect(confirmLogoutButton).toBeVisible()
       await confirmLogoutButton.click()
       
@@ -252,7 +252,7 @@ test.describe('Invited User Authentication Workflow', () => {
       
       // Even if logout API fails, the local state should be cleared
       // Check that we're redirected to login screen
-      await page.waitForSelector('[data-testid="login-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="login-screen"]', { timeout: 5000 })
       
       // Verify Redux state is cleared
       const reduxState = await page.evaluate(() => {
@@ -308,17 +308,17 @@ test.describe('Invited User Authentication Workflow', () => {
 
       // Navigate to profile screen
       await page.goto('/profile')
-      await page.waitForSelector('[data-testid="profile-screen"]')
+      await page.waitForSelector('[aria-label="profile-screen"]')
       
       // Click logout button
-      await page.getByTestId('profile-logout-button').click()
-      await page.waitForSelector('[data-testid="logout-screen"]')
+      await page.getByLabel('profile-logout-button').click()
+      await page.waitForSelector('[aria-label="logout-screen"]')
       
       // Click confirm logout
-      await page.getByTestId('logout-button').click()
+      await page.getByLabel('logout-button').click()
       
       // Should be redirected to login screen
-      await page.waitForSelector('[data-testid="login-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="login-screen"]', { timeout: 5000 })
       
       // Verify Redux state is cleared
       const reduxState = await page.evaluate(() => {
@@ -376,17 +376,17 @@ test.describe('Invited User Authentication Workflow', () => {
 
       // Navigate to profile screen
       await page.goto('/profile')
-      await page.waitForSelector('[data-testid="profile-screen"]')
+      await page.waitForSelector('[aria-label="profile-screen"]')
       
       // Click logout button
-      await page.getByTestId('profile-logout-button').click()
-      await page.waitForSelector('[data-testid="logout-screen"]')
+      await page.getByLabel('profile-logout-button').click()
+      await page.waitForSelector('[aria-label="logout-screen"]')
       
       // Click confirm logout
-      await page.getByTestId('logout-button').click()
+      await page.getByLabel('logout-button').click()
       
       // Even with network error, should clear local state and redirect to login
-      await page.waitForSelector('[data-testid="login-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="login-screen"]', { timeout: 5000 })
       
       // Verify Redux state is cleared despite API failure
       const reduxState = await page.evaluate(() => {
@@ -450,13 +450,13 @@ test.describe('Invited User Authentication Workflow', () => {
 
       // User can still navigate to different screens because currentUser is in Redux
       await page.goto('/')
-      await expect(page.getByTestId('home-header')).toBeVisible()
+      await expect(page.getByLabel('home-header')).toBeVisible()
       
       await page.goto('/profile')
-      await expect(page.getByTestId('profile-screen')).toBeVisible()
+      await expect(page.getByLabel('profile-screen')).toBeVisible()
       
       await page.goto('/alerts')
-      await expect(page.getByTestId('alerts-screen')).toBeVisible()
+      await expect(page.getByLabel('alerts-screen')).toBeVisible()
       
       // But any API calls should fail
       await page.waitForTimeout(1000)
@@ -521,7 +521,7 @@ test.describe('Invited User Authentication Workflow', () => {
       await page.waitForTimeout(10000)
       
       // Should be redirected to login screen after failed refresh
-      await page.waitForSelector('[data-testid="login-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="login-screen"]', { timeout: 5000 })
       
       // Verify Redux state is cleared
       const reduxState = await page.evaluate(() => {
@@ -565,10 +565,10 @@ test.describe('Invited User Authentication Workflow', () => {
       await expect(page.getByText('Please log in to access your profile.')).toBeVisible()
       
       // Click "Go to Login" button
-      await page.getByTestId('go-to-login-button').click()
+      await page.getByLabel('go-to-login-button').click()
       
       // Should be redirected to login screen
-      await page.waitForSelector('[data-testid="login-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="login-screen"]', { timeout: 5000 })
     })
   })
 
@@ -591,11 +591,11 @@ test.describe('Invited User Authentication Workflow', () => {
       await page.goto('/')
       
       // Should be redirected to signup screen
-      await page.waitForSelector('[data-testid="signup-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="signup-screen"]', { timeout: 5000 })
       
       // Navigate away and back
       await page.goto('/profile')
-      await page.waitForSelector('[data-testid="signup-screen"]', { timeout: 5000 })
+      await page.waitForSelector('[aria-label="signup-screen"]', { timeout: 5000 })
       
       // Verify invite token is still in Redux
       const reduxState = await page.evaluate(() => {
@@ -633,11 +633,11 @@ test.describe('Invited User Authentication Workflow', () => {
 
       // Navigate to signup screen
       await page.goto('/signup')
-      await page.waitForSelector('[data-testid="signup-screen"]')
+      await page.waitForSelector('[aria-label="signup-screen"]')
 
       // Fill in signup form
-      await page.getByTestId('signup-password-input').fill('StrongPassword123!')
-      await page.getByTestId('signup-confirm-password-input').fill('StrongPassword123!')
+      await page.getByLabel('signup-password-input').fill('StrongPassword123!')
+      await page.getByLabel('signup-confirm-password-input').fill('StrongPassword123!')
 
       // Mock successful registration
       await page.route('**/v1/auth/registerWithInvite', async (route) => {
@@ -670,10 +670,10 @@ test.describe('Invited User Authentication Workflow', () => {
       })
 
       // Submit signup
-      await page.getByTestId('signup-submit-button').click()
+      await page.getByLabel('signup-submit-button').click()
 
       // Should be redirected to home screen
-      await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+      await page.waitForSelector('[aria-label="home-header"]', { timeout: 10000 })
 
       // Verify invite token is cleared from Redux
       const reduxState = await page.evaluate(() => {

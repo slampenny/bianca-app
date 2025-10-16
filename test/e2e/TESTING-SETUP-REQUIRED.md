@@ -2,49 +2,49 @@
 
 ## Status
 
-The Playwright tests for invited user authentication have been created but **cannot run yet** because the required `testID` attributes are missing from the React Native components.
+The Playwright tests for invited user authentication have been created but **cannot run yet** because the required `accessibilityLabel` attributes are missing from the React Native components.
 
 ## Why Tests Are Failing
 
 The tests fail with errors like:
 ```
 TimeoutError: page.waitForSelector: Timeout 5000ms exceeded.
-waiting for locator('[data-testid="profile-screen"]') to be visible
+waiting for locator('[aria-label="profile-screen"]') to be visible
 ```
 
-This is because the components don't have the necessary `testID` props that Playwright uses to locate elements in the web version of the app.
+This is because React Native Web uses **`accessibilityLabel`** (which maps to `aria-label` in web) to locate elements, not `testID`.
 
-## Required TestIDs
+## Required Accessibility Labels
 
-To make these tests work, you need to add `testID` attributes to the following components:
+To make these tests work, you need to add `accessibilityLabel` attributes to the following components:
 
 ### Screens
-- `testID="login-screen"` - LoginScreen main container
-- `testID="signup-screen"` - SignupScreen main container
-- `testID="profile-screen"` - ProfileScreen main container
-- `testID="logout-screen"` - LogoutScreen main container
-- `testID="home-screen"` - HomeScreen main container
-- `testID="alerts-screen"` - AlertsScreen main container
+- `accessibilityLabel="login-screen"` - LoginScreen main container
+- `accessibilityLabel="signup-screen"` - SignupScreen main container
+- `accessibilityLabel="profile-screen"` - ProfileScreen main container
+- `accessibilityLabel="logout-screen"` - LogoutScreen main container
+- `accessibilityLabel="home-screen"` - HomeScreen main container
+- `accessibilityLabel="alerts-screen"` - AlertsScreen main container
 
 ### Buttons
-- `testID="logout-button"` - Actual logout confirmation button on LogoutScreen
-- `testID="profile-logout-button"` - Navigate to logout button on ProfileScreen
-- `testID="go-to-login-button"` - Go to login button (on error screens)
-- `testID="signup-submit-button"` - Signup form submit button
-- `testID="login-button"` - Login form submit button
-- `testID="profile-button"` - Profile navigation button
-- `testID="update-profile-button"` - Update profile button
+- `accessibilityLabel="logout-button"` - Actual logout confirmation button on LogoutScreen
+- `accessibilityLabel="profile-logout-button"` - Navigate to logout button on ProfileScreen
+- `accessibilityLabel="go-to-login-button"` - Go to login button (on error screens)
+- `accessibilityLabel="signup-submit-button"` - Signup form submit button
+- `accessibilityLabel="login-button"` - Login form submit button
+- `accessibilityLabel="profile-button"` - Profile navigation button
+- `accessibilityLabel="update-profile-button"` - Update profile button
 
 ### Input Fields
-- `testID="email-input"` - Email input field
-- `testID="password-input"` - Password input field  
-- `testID="signup-password-input"` - Signup password input
-- `testID="signup-confirm-password-input"` - Confirm password input
+- `accessibilityLabel="email-input"` - Email input field
+- `accessibilityLabel="password-input"` - Password input field  
+- `accessibilityLabel="signup-password-input"` - Signup password input
+- `accessibilityLabel="signup-confirm-password-input"` - Confirm password input
 
 ### Other Elements
-- `testID="home-header"` - Home screen header
-- `testID="error-message"` - Error message display
-- `testID="loading-spinner"` - Loading indicator
+- `accessibilityLabel="home-header"` - Home screen header
+- `accessibilityLabel="error-message"` - Error message display
+- `accessibilityLabel="loading-spinner"` - Loading indicator
 
 ## Example Implementation
 
@@ -55,14 +55,15 @@ function ProfileScreen() {
     <ScrollView 
       style={styles.container} 
       contentContainerStyle={styles.contentContainer}
-      testID="profile-screen"  // ADD THIS
+      accessibilityLabel="profile-screen"  // ADD THIS
     >
       {/* ... content ... */}
       
       <Pressable
         style={styles.button}
         onPress={handleLogout}
-        testID="profile-logout-button"  // ADD THIS
+        accessibilityLabel="profile-logout-button"  // ADD THIS
+        accessible={true}
       >
         <Text style={styles.buttonText}>Logout</Text>
       </Pressable>
@@ -77,7 +78,7 @@ export const LogoutScreen = () => {
   return (
     <Screen 
       style={styles.container}
-      testID="logout-screen"  // ADD THIS
+      accessibilityLabel="logout-screen"  // ADD THIS
     >
       <Text style={styles.title} tx="logoutScreen.logoutMessage" />
       <Button
@@ -86,7 +87,7 @@ export const LogoutScreen = () => {
         style={styles.logoutButton}
         textStyle={styles.logoutButtonText}
         preset="filled"
-        testID="logout-button"  // ALREADY EXISTS
+        accessibilityLabel="logout-button"  // ADD THIS
       />
     </Screen>
   )
@@ -97,32 +98,37 @@ export const LogoutScreen = () => {
 ```typescript
 export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   return (
-    <Screen style={styles.container} testID="login-screen">  // ADD THIS
+    <Screen 
+      style={styles.container} 
+      accessibilityLabel="login-screen"  // ADD THIS
+    >
       {/* ... content ... */}
       
       <TextField
         value={authEmail}
         onChangeText={handleEmailChange}
-        testID="email-input"  // ADD THIS
+        accessibilityLabel="email-input"  // ADD THIS
         // ... other props
       />
       
       <TextField
         value={authPassword}
         onChangeText={setAuthPassword}
-        testID="password-input"  // ADD THIS
+        accessibilityLabel="password-input"  // ADD THIS
         // ... other props
       />
       
       <Button
         onPress={handleLoginPress}
-        testID="login-button"  // ADD THIS
+        accessibilityLabel="login-button"  // ADD THIS
         // ... other props
       />
     </Screen>
   )
 }
 ```
+
+**Note**: React Native Web automatically maps `accessibilityLabel` to `aria-label` in the DOM, which Playwright can find.
 
 ## Alternative Approach: Integration Tests
 

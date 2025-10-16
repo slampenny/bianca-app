@@ -54,14 +54,14 @@ test.describe('Token Expiration and Navigation Issues', () => {
     await page.waitForTimeout(2000)
     
     // Check for any error indicators in the UI
-    const hasErrorMessages = await page.isVisible('[data-testid="error-message"]')
-    const hasLoadingSpinners = await page.isVisible('[data-testid="loading-spinner"]')
+    const hasErrorMessages = await page.isVisible('[aria-label="error-message"]')
+    const hasLoadingSpinners = await page.isVisible('[aria-label="loading-spinner"]')
     
     console.log('Has error messages:', hasErrorMessages)
     console.log('Has loading spinners:', hasLoadingSpinners)
     
     // This demonstrates the UX issue: user can navigate but functionality is broken
-    expect(await page.isVisible('[data-testid="home-screen"]')).toBe(true)
+    expect(await page.isVisible('[aria-label="home-screen"]')).toBe(true)
   })
 
   test('API calls fail with expired tokens but UI navigation works', async ({ page }) => {
@@ -180,7 +180,7 @@ test.describe('Token Expiration and Navigation Issues', () => {
     await expect(page.getByText('Please log in to access your profile.')).toBeVisible()
 
     // Click "Go to Login" button
-    await page.getByTestId('go-to-login-button').click()
+    await page.getByLabel('go-to-login-button').click()
 
     // Should be redirected to login screen
     await waitForScreen(page, 'login-screen')
@@ -286,14 +286,14 @@ test.describe('Token Expiration and Navigation Issues', () => {
     await page.waitForTimeout(12000)
 
     // Try to perform an action (like updating profile)
-    await page.getByTestId('update-profile-button').click()
+    await page.getByLabel('update-profile-button').click()
 
     // Should handle token expiration gracefully
     await page.waitForTimeout(2000)
 
     // Check if user was redirected to login or if error was shown
-    const isOnLoginScreen = await page.isVisible('[data-testid="login-screen"]')
-    const hasErrorMessage = await page.isVisible('[data-testid="error-message"]')
+    const isOnLoginScreen = await page.isVisible('[aria-label="login-screen"]')
+    const hasErrorMessage = await page.isVisible('[aria-label="error-message"]')
 
     console.log('Redirected to login:', isOnLoginScreen)
     console.log('Shows error message:', hasErrorMessage)
