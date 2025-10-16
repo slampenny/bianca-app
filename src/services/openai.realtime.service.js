@@ -539,6 +539,7 @@ class OpenAIRealtimeService {
       _userHasSpoken: false, // Track if user has spoken to trigger first response
       _waitingForInitialGreeting: true, // Track if we're waiting for Bianca's initial greeting
       _initialGreetingTriggered: false, // Prevent multiple initial greeting triggers
+      _initialGreetingCompletedAt: null, // Track when initial greeting finished (to prevent lingering audio from triggering response)
 
       // CRITICAL: Speech end detection variables
       lastSpeechTime: null, // When we last heard speech
@@ -1147,8 +1148,10 @@ class OpenAIRealtimeService {
 
             // Clear the initial greeting flag - Bianca has now spoken
             if (conn._waitingForInitialGreeting) {
-              logger.info(`[OpenAI Realtime] Initial greeting complete for ${callId} - now accepting user input`);
+              logger.info(`[OpenAI Realtime] Initial greeting complete for ${callId} - grace period before accepting user input`);
               conn._waitingForInitialGreeting = false;
+              conn._initialGreetingCompletedAt = Date.now(); // Track when greeting completed
+              logger.info(`[OpenAI Realtime] Grace period active for ${callId} - will ignore lingering audio for 3 seconds`);
             }
 
             // MESSAGE FLOW: Save AI transcript when AI finishes speaking
@@ -1228,6 +1231,21 @@ class OpenAIRealtimeService {
             // CRITICAL: Only trigger AI response if user has finished speaking
             // and AI is not already speaking
             if (!conn._aiIsSpeaking) {
+              // FIX: Check if we're in grace period after initial greeting
+              const timeSinceGreeting = conn._initialGreetingCompletedAt 
+                ? Date.now() - conn._initialGreetingCompletedAt 
+                : Infinity;
+              const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+              if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                logger.info(
+                  `[OpenAI Realtime] Ignoring speech_stopped for ${callId} - in grace period ` +
+                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms). ` +
+                  `This prevents lingering audio from "hello" or transfer message from triggering response.`
+                );
+                return; // Don't trigger response - this is likely lingering audio
+              }
+
               logger.info(`[OpenAI Realtime] User finished speaking - will trigger AI response for ${callId}`);
 
               // Small delay to ensure audio processing is complete
