@@ -15,16 +15,16 @@ services:
       - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
       # MongoDB for staging (using containerized version)
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
-    # Mount AWS credentials for secrets access
-    volumes:
-      - ~/.aws:/root/.aws:ro
+      # Enable EC2 metadata service for IAM role credentials
+      - AWS_EC2_METADATA_DISABLED=false
+    # Don't mount ~/.aws - use EC2 instance IAM role via metadata service
+    # The --network host below allows container to access EC2 metadata at 169.254.169.254
+    network_mode: host
     ports:
       - "3000:3000"
     cap_add:
       - NET_RAW
       - NET_ADMIN
-    networks:
-      - node-network
 
   mongodb:
     volumes:
