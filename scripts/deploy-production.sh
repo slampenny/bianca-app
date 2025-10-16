@@ -134,7 +134,32 @@ fi
 
 cd ../bianca-app-backend
 
-# Step 2: Deploy production infrastructure (preserves database)
+# Step 2: Build Lambda packages for HIPAA backups (if directories exist)
+if [ -d "devops/terraform/lambda-backup" ]; then
+    echo "📦 Building Lambda packages for HIPAA backups..."
+    
+    cd devops/terraform/lambda-backup
+    yarn install --production --frozen-lockfile 2>/dev/null || yarn install --production
+    cd ..
+    zip -q -r lambda-backup.zip lambda-backup/node_modules lambda-backup/index.js lambda-backup/package.json
+    echo "  ✅ lambda-backup.zip created"
+    
+    cd lambda-verify
+    yarn install --production --frozen-lockfile 2>/dev/null || yarn install --production
+    cd ..
+    zip -q -r lambda-verify-backup.zip lambda-verify/node_modules lambda-verify/verify.js lambda-verify/package.json
+    echo "  ✅ lambda-verify-backup.zip created"
+    
+    cd lambda-restore
+    yarn install --production --frozen-lockfile 2>/dev/null || yarn install --production
+    cd ..
+    zip -q -r lambda-restore.zip lambda-restore/node_modules lambda-restore/restore.js lambda-restore/package.json
+    echo "  ✅ lambda-restore.zip created"
+    
+    cd ../..
+fi
+
+# Step 3: Deploy production infrastructure (preserves database)
 echo "🚀 Deploying production infrastructure..."
 echo "📋 Setting terraform environment to production..."
 export TF_VAR_environment=production
