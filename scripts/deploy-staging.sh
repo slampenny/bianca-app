@@ -202,46 +202,13 @@ STAGING_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-s
 if [ -n "$STAGING_IP" ]; then
     echo "Updating containers on staging instance: $STAGING_IP"
     
-    # Copy staging override file to the instance
-    echo "Copying staging override configuration..."
+    # NOTE: Do NOT copy docker-compose files!
+    # The staging-userdata.sh script creates docker-compose.yml dynamically
+    # with secrets from AWS Secrets Manager. Copying local files would overwrite these.
+    echo "ℹ️  Using docker-compose.yml created by instance userdata (contains AWS secrets)"
     
     # Add SSH options to avoid host key verification prompts
     SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    
-    # Ensure the files exist before copying
-    if [ ! -f "docker-compose.yml" ]; then
-        echo "❌ docker-compose.yml not found in $(pwd)"
-        exit 1
-    fi
-    
-    if [ ! -f "docker-compose.staging.yml" ]; then
-        echo "❌ docker-compose.staging.yml not found in $(pwd)"
-        exit 1
-    fi
-    
-    # Copy both docker-compose files
-    echo "  Copying docker-compose.yml..."
-    scp $SSH_OPTS docker-compose.yml ec2-user@$STAGING_IP:~/
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to copy docker-compose.yml to staging instance"
-        exit 1
-    fi
-    
-    echo "  Copying docker-compose.staging.yml..."
-    scp $SSH_OPTS docker-compose.staging.yml ec2-user@$STAGING_IP:~/
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to copy docker-compose.staging.yml to staging instance"
-        exit 1
-    fi
-    
-    # Move them to the correct location
-    ssh $SSH_OPTS ec2-user@$STAGING_IP "sudo mkdir -p /opt/bianca-staging && sudo mv ~/docker-compose.yml ~/docker-compose.staging.yml /opt/bianca-staging/ && sudo chown root:root /opt/bianca-staging/*.yml"
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to move docker-compose files to /opt/bianca-staging/"
-        exit 1
-    fi
-    
-    echo "✅ Configuration files copied successfully"
     
     ssh $SSH_OPTS ec2-user@$STAGING_IP "
       cd /opt/bianca-staging
