@@ -26,11 +26,14 @@ services:
 
   mongodb:
     network_mode: host
+    command: ["mongod", "--config", "/etc/mongod.conf"]
     volumes:
       - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
 
   asterisk:
     image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+    container_name: asterisk
+    restart: always
     network_mode: host
     environment:
       # These come from host environment (set by staging-userdata.sh from AWS Secrets)
@@ -43,6 +46,8 @@ services:
     volumes:
       # Mount recordings for staging debugging
       - /opt/asterisk-recordings:/var/spool/asterisk/recording
+    # Explicitly set networks to null to override base compose file
+    networks: {}
 
 # Note: Using host network mode for all services (overrides base docker-compose.yml networks)
 # This allows containers to access EC2 metadata service for IAM credentials
