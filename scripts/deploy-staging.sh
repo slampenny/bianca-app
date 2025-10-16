@@ -72,7 +72,7 @@ for arg in "$@"; do
     esac
 done
 
-# Step 1: Build and push Docker images (backend and frontend)
+# Step 1: Build and push Docker images (backend, frontend, and asterisk)
 echo "🐳 Building and pushing backend Docker image..."
 docker build -t bianca-app-backend:staging .
 
@@ -106,6 +106,31 @@ docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:stag
 
 if [ $? -ne 0 ]; then
     echo "❌ Backend docker push failed. Please check the error above."
+    exit 1
+fi
+
+echo "🐳 Building and pushing asterisk Docker image..."
+docker build -t bianca-app-asterisk:staging ./devops/asterisk
+
+if [ $? -ne 0 ]; then
+    echo "❌ Asterisk docker build failed. Please check the error above."
+    exit 1
+fi
+
+docker tag bianca-app-asterisk:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+
+# Check and login to ECR for asterisk
+if [ "$SKIP_ECR" = false ]; then
+    check_and_login_ecr "asterisk push" || exit 1
+else
+    echo "⏭️  Skipping ECR login for asterisk push"
+fi
+
+echo "📦 Pushing asterisk image to ECR..."
+docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+
+if [ $? -ne 0 ]; then
+    echo "❌ Asterisk docker push failed. Please check the error above."
     exit 1
 fi
 

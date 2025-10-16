@@ -31,9 +31,7 @@ services:
       - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
 
   asterisk:
-    build:
-      context: ./devops/asterisk
-      dockerfile: Dockerfile
+    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
     volumes:
       # Mount recordings for staging debugging
       - /opt/asterisk-recordings:/var/spool/asterisk/recording
