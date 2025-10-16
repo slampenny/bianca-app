@@ -187,7 +187,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "hipaa_backups" {
 
     transition {
       days          = 180
-      storage_class = "GLACIER_FLEXIBLE_RETRIEVAL"
+      storage_class = "GLACIER" # Glacier Flexible Retrieval (old name in Terraform)
     }
 
     expiration {
@@ -206,7 +206,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "hipaa_backups" {
 
     transition {
       days          = 365
-      storage_class = "GLACIER_DEEP_ARCHIVE" # Lowest cost for long-term
+      storage_class = "DEEP_ARCHIVE" # Lowest cost for long-term (not GLACIER_DEEP_ARCHIVE)
     }
 
     expiration {
