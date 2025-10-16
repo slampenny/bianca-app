@@ -107,7 +107,7 @@ services:
       - bianca-network
 
   asterisk:
-    image: $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com/bianca-app-asterisk:latest
+    image: $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com/bianca-app-asterisk:staging
     container_name: staging_asterisk
     restart: unless-stopped
     ports:
