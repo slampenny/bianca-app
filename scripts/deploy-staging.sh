@@ -110,6 +110,12 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "🐳 Building and pushing frontend Docker image..."
+
+# FIX: Pre-pull base images to avoid WSL2 credential helper issues
+echo "📥 Pre-pulling base Docker images (WSL2 credential helper workaround)..."
+docker pull node:18-alpine 2>/dev/null || echo "⚠️  Warning: Could not pre-pull node:18-alpine"
+docker pull nginx:alpine 2>/dev/null || echo "⚠️  Warning: Could not pre-pull nginx:alpine"
+
 cd ../bianca-app-frontend
 # Build frontend with staging config for proper environment
 docker build -t bianca-app-frontend:staging -f devops/Dockerfile --build-arg BUILD_ENV=staging .
