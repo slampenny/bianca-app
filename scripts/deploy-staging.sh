@@ -183,29 +183,40 @@ if [ -n "$STAGING_IP" ]; then
     # Add SSH options to avoid host key verification prompts
     SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     
-    # Ensure the file exists before copying
-    if [ ! -f "docker-compose.staging.yml" ]; then
-        echo "❌ docker-compose.staging.yml not found in $(pwd)"
-        echo "Looking for file..."
-        find . -name "docker-compose.staging.yml" -type f
+    # Ensure the files exist before copying
+    if [ ! -f "docker-compose.yml" ]; then
+        echo "❌ docker-compose.yml not found in $(pwd)"
         exit 1
     fi
     
-    # Copy the file
+    if [ ! -f "docker-compose.staging.yml" ]; then
+        echo "❌ docker-compose.staging.yml not found in $(pwd)"
+        exit 1
+    fi
+    
+    # Copy both docker-compose files
+    echo "  Copying docker-compose.yml..."
+    scp $SSH_OPTS docker-compose.yml ec2-user@$STAGING_IP:~/
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to copy docker-compose.yml to staging instance"
+        exit 1
+    fi
+    
+    echo "  Copying docker-compose.staging.yml..."
     scp $SSH_OPTS docker-compose.staging.yml ec2-user@$STAGING_IP:~/
     if [ $? -ne 0 ]; then
         echo "❌ Failed to copy docker-compose.staging.yml to staging instance"
         exit 1
     fi
     
-    # Move it to the correct location
-    ssh $SSH_OPTS ec2-user@$STAGING_IP "sudo mkdir -p /opt/bianca-staging && sudo mv ~/docker-compose.staging.yml /opt/bianca-staging/ && sudo chown root:root /opt/bianca-staging/docker-compose.staging.yml"
+    # Move them to the correct location
+    ssh $SSH_OPTS ec2-user@$STAGING_IP "sudo mkdir -p /opt/bianca-staging && sudo mv ~/docker-compose.yml ~/docker-compose.staging.yml /opt/bianca-staging/ && sudo chown root:root /opt/bianca-staging/*.yml"
     if [ $? -ne 0 ]; then
-        echo "❌ Failed to move docker-compose.staging.yml to /opt/bianca-staging/"
+        echo "❌ Failed to move docker-compose files to /opt/bianca-staging/"
         exit 1
     fi
     
-    echo "✅ Configuration file copied successfully"
+    echo "✅ Configuration files copied successfully"
     
     ssh $SSH_OPTS ec2-user@$STAGING_IP "
       cd /opt/bianca-staging
