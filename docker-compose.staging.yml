@@ -1,7 +1,10 @@
 # Staging override - uses staging environment with AWS secrets
 services:
-  app:
+  bianca-app:
     image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
+    build:  # Disable build, use pre-built ECR image
+      context: .
+      dockerfile: Dockerfile
     environment:
       - NODE_ENV=staging
       - AWS_REGION=us-east-2
@@ -28,9 +31,12 @@ services:
       - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
 
   asterisk:
+    build:
+      context: ./devops/asterisk
+      dockerfile: Dockerfile
     volumes:
       # Mount recordings for staging debugging
-      - ./devops/asterisk/recordings:/var/spool/asterisk/recording
+      - /opt/asterisk-recordings:/var/spool/asterisk/recording
 
 # Define networks at the top level
 networks:
