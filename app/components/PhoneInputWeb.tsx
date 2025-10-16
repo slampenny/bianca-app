@@ -15,7 +15,11 @@ interface PhoneInputProps {
   labelTxOptions?: any
   error?: string
   disabled?: boolean
+  editable?: boolean
   testID?: string
+  accessibilityLabel?: string
+  status?: 'error' | 'disabled' | undefined
+  helper?: string
   style?: any
   containerStyle?: any
   inputWrapperStyle?: any
@@ -51,7 +55,7 @@ const validatePhoneNumber = (value: string): string | null => {
 }
 
 export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
-  ({ value, onChangeText, placeholder, placeholderTx, placeholderTxOptions, label, labelTx, labelTxOptions, error, disabled, testID, style, containerStyle, inputWrapperStyle }, ref) => {
+  ({ value, onChangeText, placeholder, placeholderTx, placeholderTxOptions, label, labelTx, labelTxOptions, error, disabled, editable, testID, accessibilityLabel, status, helper, style, containerStyle, inputWrapperStyle }, ref) => {
     const [isFocused, setIsFocused] = useState(false)
     const [internalValue, setInternalValue] = useState(value || '')
     const [validationError, setValidationError] = useState<string | null>(null)
@@ -79,10 +83,12 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
       }
     }
     
-    const displayError = error || validationError
+    const displayError = error || validationError || (status === 'error' ? helper : null)
     const placeholderContent = placeholderTx
       ? translate(placeholderTx, placeholderTxOptions)
       : placeholder
+    
+    const isEditable = editable !== false && !disabled
     
     return (
       <View style={[styles.container, containerStyle]}>
@@ -98,7 +104,7 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
           styles.inputWrapper,
           isFocused && styles.inputWrapperFocused,
           displayError && styles.inputWrapperError,
-          disabled && styles.inputWrapperDisabled,
+          (disabled || !isEditable) && styles.inputWrapperDisabled,
           inputWrapperStyle
         ]}>
           <TextInput
@@ -109,10 +115,11 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
             style={[styles.input, style]}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            editable={!disabled}
+            editable={isEditable}
             keyboardType="phone-pad"
             autoComplete="tel"
             testID={testID}
+            accessibilityLabel={accessibilityLabel}
           />
         </View>
         

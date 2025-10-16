@@ -129,7 +129,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   }
 
   return (
-    <Screen style={styles.container} testID="signup-screen">
+    <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
       <Header titleTx="signupScreen.title" />
       
       {generalError ? (
@@ -138,6 +138,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
       <TextField
         testID="register-name"
+        accessibilityLabel="signup-name-input"
         value={name}
         onChangeText={setName}
         labelTx="signupScreen.fullNameLabel"
@@ -149,6 +150,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
       <TextField
         testID="register-email"
+        accessibilityLabel="signup-email-input"
         value={email}
         onChangeText={setEmail}
         labelTx="signupScreen.emailLabel"
@@ -163,6 +165,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
       <PhoneInputWeb
         testID="register-phone"
+        accessibilityLabel="signup-phone-input"
         value={phone}
         onChangeText={setPhone}
         labelTx="signupScreen.phoneLabel"
@@ -175,6 +178,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
       <TextField
         testID="register-password"
+        accessibilityLabel="signup-password-input"
         value={password}
         onChangeText={(text) => {
           setPassword(text)
@@ -193,6 +197,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
       <TextField
         testID="register-confirm-password"
+        accessibilityLabel="signup-confirm-password-input"
         value={confirmPassword}
         onChangeText={(text) => {
           setConfirmPassword(text)
@@ -211,6 +216,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
       <Button
         testID="register-submit"
+        accessibilityLabel="signup-submit-button"
         tx="signupScreen.completeRegistration"
         onPress={handleSignup}
         style={styles.signupButton}

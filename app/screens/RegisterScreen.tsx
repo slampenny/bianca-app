@@ -278,6 +278,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
             }}
             status={phoneError ? "error" : undefined}
             helper={phoneError || undefined}
+            editable={true}
           />
           {/* {phoneError ? <Text style={styles.fieldErrorText}>{phoneError}</Text> : null} */}
         </View>
