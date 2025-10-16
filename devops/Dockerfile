@@ -1,5 +1,6 @@
 # Multi-stage build for frontend
-FROM node:18-alpine AS builder
+# Use Amazon ECR Public Gallery to avoid Docker Hub credential issues in WSL2
+FROM public.ecr.aws/docker/library/node:18-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -30,7 +31,8 @@ RUN if [ "$BUILD_ENV" = "staging" ]; then \
     fi
 
 # Production stage
-FROM nginx:alpine
+# Use Amazon ECR Public Gallery to avoid Docker Hub credential issues in WSL2
+FROM public.ecr.aws/docker/library/nginx:alpine
 
 # Remove default nginx static assets
 RUN rm -rf /usr/share/nginx/html/*
