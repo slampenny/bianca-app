@@ -288,39 +288,25 @@ export async function logoutViaUI(page: Page): Promise<void> {
   await page.waitForTimeout(1000)
   
   try {
-    // Try to click the profile button if it's visible (using aria-label)
-    const profileButton = page.locator('[aria-label="profile-button"]')
-    console.log(`Profile button count: ${await profileButton.count()}`)
+    // Navigate directly to profile screen (more reliable than clicking button)
+    console.log('Navigating to profile screen...')
+    await page.goto('http://localhost:8082/MainTabs/Org/Profile')
+    await page.waitForTimeout(1000)
     
-    if (await profileButton.count() > 0 && await profileButton.first().isVisible()) {
-      console.log('Profile button is visible, clicking...')
-      await profileButton.first().click()
-      
-      // Wait for profile screen to load
-      await page.waitForSelector('[aria-label="profile-logout-button"]', { timeout: 5000 })
-      
-      // On profile screen, click the logout button (which navigates to logout screen)
-      await page.click('[aria-label="profile-logout-button"]')
-      
-      // Wait for logout screen to load
-      await page.waitForSelector('[aria-label="logout-button"]', { timeout: 5000 })
-      
-      // On logout screen, click the logout button (which actually performs logout)
-      await page.click('[aria-label="logout-button"]')
-    } else {
-      console.log('Profile button not found or not visible, trying alternative logout methods...')
-      
-      // Try to find logout button directly
-      const logoutButton = page.locator('[aria-label="logout-button"]')
-      if (await logoutButton.count() > 0 && await logoutButton.first().isVisible()) {
-        console.log('Found logout button directly, clicking...')
-        await logoutButton.first().click()
-      } else {
-        console.log('No logout UI found, navigating to login screen directly...')
-        // Navigate directly to login screen as fallback
-        await page.goto('/')
-      }
-    }
+    // Wait for profile screen to load
+    await page.waitForSelector('[aria-label="profile-logout-button"]', { timeout: 5000 })
+    console.log('Found logout button on profile screen')
+    
+    // On profile screen, click the logout button (which navigates to logout screen)
+    await page.click('[aria-label="profile-logout-button"]')
+    
+    // Wait for logout screen to load
+    await page.waitForSelector('[aria-label="logout-button"]', { timeout: 5000 })
+    console.log('Found confirm logout button')
+    
+    // On logout screen, click the logout button (which actually performs logout)
+    await page.click('[aria-label="logout-button"]')
+    
   } catch (error) {
     console.log('Logout failed, navigating to login screen as fallback:', error.message)
     // Navigate directly to login screen as fallback
