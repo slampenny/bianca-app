@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: './test/e2e',
   use: {
     screenshot: 'only-on-failure',
-    baseURL: 'http://localhost:8081',
+    baseURL: 'http://localhost:8082',
     headless: false,
     browserName: 'chromium',
     viewport: { width: 1280, height: 720 },
