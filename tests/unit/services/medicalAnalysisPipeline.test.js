@@ -1,12 +1,12 @@
 // Import integration setup FIRST to ensure proper mocking
 require('../../utils/integration-setup');
 
-// tests/integration/medicalAnalysisPipeline.test.js
-const MedicalPatternAnalyzer = require('../../src/services/ai/medicalPatternAnalyzer.service');
-const medicalAnalysisScheduler = require('../../src/services/ai/medicalAnalysisScheduler.service');
-const baselineManager = require('../../src/services/ai/baselineManager.service');
-const conversationService = require('../../src/services/conversation.service');
-const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
+// tests/unit/services/medicalAnalysisPipeline.test.js
+const MedicalPatternAnalyzer = require('../../../src/services/ai/medicalPatternAnalyzer.service');
+const medicalAnalysisScheduler = require('../../../src/services/ai/medicalAnalysisScheduler.service');
+const baselineManager = require('../../../src/services/ai/baselineManager.service');
+const conversationService = require('../../../src/services/conversation.service');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../../utils/mongodb-memory-server');
 const {
   medicalPatients,
   cognitiveDeclineConversations,
