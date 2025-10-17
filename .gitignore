@@ -32,6 +32,11 @@ deploy-*.log
 *.temp
 *.cache
 
+# Test and development logs
+test-output.txt
+docker-dev.log
+*.test.log
+
 # Docker build cache and temporary files
 .dockerignore.tmp
 docker-compose.override.yml
