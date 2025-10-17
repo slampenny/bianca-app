@@ -246,3 +246,4 @@ async function sendNotification({ subject, message }) {
   await snsClient.send(command);
 }
 
+
