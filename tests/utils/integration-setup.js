@@ -270,12 +270,13 @@ jest.mock('twilio', () => {
   return mockTwilio;
 });
 
-jest.mock('../../src/services/emergencyProcessor.service', () => ({
-  processEmergency: jest.fn().mockResolvedValue({
-    processed: true
-  }),
-  initialize: jest.fn().mockResolvedValue()
-}));
+// Don't mock emergencyProcessor - integration tests need the real implementation
+// jest.mock('../../src/services/emergencyProcessor.service', () => ({
+//   processEmergency: jest.fn().mockResolvedValue({
+//     processed: true
+//   }),
+//   initialize: jest.fn().mockResolvedValue()
+// }));
 
 // Set required environment variables for tests
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-testing';

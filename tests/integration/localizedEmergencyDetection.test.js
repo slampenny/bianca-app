@@ -341,6 +341,10 @@ describe('Localized Emergency Detection', () => {
     let patientId;
 
     beforeEach(async () => {
+      // Create test user ID for phrases
+      const mongoose = require('mongoose');
+      const testUserId = new mongoose.Types.ObjectId();
+      
       // Create test phrases
       await EmergencyPhrase.create([
         {
@@ -349,8 +353,8 @@ describe('Localized Emergency Detection', () => {
           severity: 'CRITICAL',
           category: 'Medical',
           pattern: '\\b(heart\\s+attack|heartattack)\\b',
-          createdBy: '000000000000000000000000',
-          lastModifiedBy: '000000000000000000000000'
+          createdBy: testUserId,
+          lastModifiedBy: testUserId
         },
         {
           phrase: 'ataque al corazón',
@@ -358,10 +362,13 @@ describe('Localized Emergency Detection', () => {
           severity: 'CRITICAL',
           category: 'Medical',
           pattern: '\\b(ataque\\s+al\\s+corazón|infarto)\\b',
-          createdBy: '000000000000000000000000',
-          lastModifiedBy: '000000000000000000000000'
+          createdBy: testUserId,
+          lastModifiedBy: testUserId
         }
       ]);
+
+      // Reload emergency phrases in the detector
+      await localizedEmergencyDetector.loadPhrases();
 
       // Create a test patient
       const { Patient } = require('../../src/models');
