@@ -70,5 +70,10 @@ Thumbs.db
 *.backup
 *.orig
 
+# Lambda deployment packages (build artifacts)
+devops/terraform/lambda-backup.zip
+devops/terraform/lambda-restore.zip
+devops/terraform/lambda-verify-backup.zip
+
 ./credentials/google.api.json
 devops/asterisk/recordings
