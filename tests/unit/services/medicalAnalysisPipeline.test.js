@@ -1,5 +1,6 @@
-// Import integration setup FIRST to ensure proper mocking
-require('../../utils/integration-setup');
+// DON'T import integration-setup here - these are UNIT tests for our own medical analysis services
+// We should only mock EXTERNAL services (OpenAI, Twilio, etc), not our own business logic
+// require('../../utils/integration-setup');
 
 // tests/unit/services/medicalAnalysisPipeline.test.js
 const MedicalPatternAnalyzer = require('../../../src/services/ai/medicalPatternAnalyzer.service');
