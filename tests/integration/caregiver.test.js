@@ -64,6 +64,9 @@ describe('Caregiver routes', () => {
         org: caregiver.org.toHexString(),
         patients: expect.any(Array),
         isEmailVerified: false,
+        mfaEnabled: false,
+        accountLocked: false,
+        failedLoginAttempts: 0,
       });
     });
 
@@ -287,6 +290,9 @@ describe('Caregiver routes', () => {
         org: caregiver.org.toHexString(),
         patients: expect.any(Array),
         isEmailVerified: false,
+        mfaEnabled: false,
+        accountLocked: false,
+        failedLoginAttempts: 0,
       });
     });
 

@@ -200,18 +200,17 @@ describe('Patient routes', () => {
         .send()
         .expect(httpStatus.OK);
 
-      expect(res.body).toEqual({
-        id: patient.id,
-        org: null,
-        name: patient.name,
-        email: patient.email,
-        phone: patient.phone,
-        org: patient.org.toString(),
-        isEmailVerified: patient.isEmailVerified,
-        preferredLanguage: "en",
-        caregivers: expect.arrayContaining([]),
-        schedules: expect.arrayContaining([]),
-      });
+      // Staff role can only see very limited patient fields (minimum necessary)
+      // Based on FIELD_ACCESS_RULES in minimumNecessary.js, staff only get:
+      // '_id', 'name', 'preferredName', 'avatar', 'language', 'lastContact', 'status', 'assignedCaregivers'
+      expect(res.body).toHaveProperty('name', patient.name);
+      
+      // Staff should NOT see sensitive fields like email, phone, caregivers list, schedules, etc.
+      expect(res.body).not.toHaveProperty('email');
+      expect(res.body).not.toHaveProperty('phone');
+      expect(res.body).not.toHaveProperty('isEmailVerified');
+      expect(res.body).not.toHaveProperty('caregivers');
+      expect(res.body).not.toHaveProperty('schedules');
     });
   });
 

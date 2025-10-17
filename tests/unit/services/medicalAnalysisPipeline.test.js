@@ -1,5 +1,5 @@
 // Import integration setup FIRST to ensure proper mocking
-require('../utils/integration-setup');
+require('../../utils/integration-setup');
 
 // tests/integration/medicalAnalysisPipeline.test.js
 const MedicalPatternAnalyzer = require('../../src/services/ai/medicalPatternAnalyzer.service');
