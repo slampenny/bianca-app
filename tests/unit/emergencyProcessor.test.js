@@ -32,11 +32,44 @@ describe('Emergency Processor', () => {
     processor = new EmergencyProcessor();
     
     // Create actual Patient and Caregiver documents in the database
-    const { Patient, Caregiver } = require('../../src/models');
+    const { Patient, Caregiver, EmergencyPhrase } = require('../../src/models');
     
     // Clear existing documents
     await Patient.deleteMany({});
     await Caregiver.deleteMany({});
+    await EmergencyPhrase.deleteMany({});
+    
+    // Create test emergency phrases for detection
+    await EmergencyPhrase.create([
+      {
+        phrase: "heart attack",
+        language: "en",
+        category: "Medical",
+        severity: "CRITICAL",
+        description: "Cardiac emergency",
+        caseSensitive: false
+      },
+      {
+        phrase: "having a.*heart attack",
+        language: "en",
+        category: "Medical",
+        severity: "CRITICAL",
+        description: "Heart attack in progress",
+        caseSensitive: false
+      },
+      {
+        phrase: "call 911",
+        language: "en",
+        category: "General",
+        severity: "HIGH",
+        description: "Emergency services request",
+        caseSensitive: false
+      }
+    ]);
+    
+    // Force reload of emergency phrases
+    const { localizedEmergencyDetector } = require('../../src/services/localizedEmergencyDetector.service');
+    await localizedEmergencyDetector.loadPhrases();
     
     // Create caregivers first
     const caregiver1 = await Caregiver.create({

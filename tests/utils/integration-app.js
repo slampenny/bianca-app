@@ -27,6 +27,7 @@ const callWorkflowRoute = require('../../src/routes/v1/callWorkflow.route');
 const sentimentRoute = require('../../src/routes/v1/sentiment.route');
 const docsRoute = require('../../src/routes/v1/docs.route');
 const medicalAnalysisRoute = require('../../src/routes/v1/medicalAnalysis.route');
+const emergencyPhraseRoute = require('../../src/routes/v1/emergencyPhrase.route');
 // const testRoute = require('../../src/routes/v1/test.route'); // Skip test route to avoid timeout issues
 
 const app = express();
@@ -93,6 +94,7 @@ router.use('/calls', callWorkflowRoute);
 router.use('/sentiment', sentimentRoute);
 router.use('/docs', docsRoute);
 router.use('/medical-analysis', medicalAnalysisRoute);
+router.use('/emergency-phrases', emergencyPhraseRoute);
 // router.use('/test', testRoute); // Skip test route to avoid timeout issues
 
 app.use('/v1', router);

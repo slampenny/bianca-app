@@ -73,6 +73,9 @@ describe('Auth routes', () => {
         org: expect.anything(),
         patients: [],
         isEmailVerified: false,
+        mfaEnabled: false,
+        accountLocked: false,
+        failedLoginAttempts: 0,
       });
 
       const dbCaregiver = await Caregiver.findById(caregiver.id);
