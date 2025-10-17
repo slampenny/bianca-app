@@ -232,3 +232,4 @@ If a test fails:
 - ✅ Easy to debug (can see what's happening)
 - ✅ Reliable (not dependent on mock timing)
 - ✅ Maintainable (follows existing test patterns)
+

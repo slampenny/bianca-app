@@ -135,3 +135,4 @@ test('User can log in and log out', async ({ page }) => {
 The accessibility labels are in place and working. The test infrastructure is ready. The mock-based approach just doesn't work with React Native Web + Redux Persist.
 
 **Next step**: Rewrite tests as integration tests that actually log in through the UI, or set up a proper API mock server with MSW.
+

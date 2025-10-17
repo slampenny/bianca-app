@@ -78,3 +78,4 @@ echo ""
 echo "🔍 For more detailed output, run with --reporter=html"
 echo "🐛 For debugging, run with --debug flag"
 echo "👁️  For visual debugging, run with --headed flag"
+

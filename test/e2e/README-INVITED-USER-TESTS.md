@@ -198,3 +198,4 @@ These tests address the following user-reported issues:
 - Invited users getting stuck on profile screen
 - Token expiration not handled gracefully
 - Mixed authentication states causing confusion
+
