@@ -40,6 +40,7 @@ describe('Emergency Processor', () => {
     await EmergencyPhrase.deleteMany({});
     
     // Create test emergency phrases for detection
+    const testUserId = new (require('mongoose')).Types.ObjectId();
     await EmergencyPhrase.create([
       {
         phrase: "heart attack",
@@ -47,15 +48,21 @@ describe('Emergency Processor', () => {
         category: "Medical",
         severity: "CRITICAL",
         description: "Cardiac emergency",
-        caseSensitive: false
+        pattern: "\\b(heart\\s+attack|heartattack)\\b",
+        caseSensitive: false,
+        createdBy: testUserId,
+        lastModifiedBy: testUserId
       },
       {
-        phrase: "having a.*heart attack",
+        phrase: "having a heart attack",
         language: "en",
         category: "Medical",
         severity: "CRITICAL",
         description: "Heart attack in progress",
-        caseSensitive: false
+        pattern: "\\b(having\\s+a\\s+heart\\s+attack)\\b",
+        caseSensitive: false,
+        createdBy: testUserId,
+        lastModifiedBy: testUserId
       },
       {
         phrase: "call 911",
@@ -63,7 +70,10 @@ describe('Emergency Processor', () => {
         category: "General",
         severity: "HIGH",
         description: "Emergency services request",
-        caseSensitive: false
+        pattern: "\\b(call\\s+911)\\b",
+        caseSensitive: false,
+        createdBy: testUserId,
+        lastModifiedBy: testUserId
       }
     ]);
     
