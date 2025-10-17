@@ -14,7 +14,7 @@ const {
   mixedDeclineConversations,
   stablePatientConversations,
   createConversationsFromFixture
-} = require('../fixtures/medicalConversations.fixture');
+} = require('../../fixtures/medicalConversations.fixture');
 
 describe('Medical Analysis Pipeline Integration', () => {
   let analyzer;
