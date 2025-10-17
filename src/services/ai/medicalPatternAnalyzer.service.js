@@ -109,9 +109,12 @@ class MedicalPatternAnalyzer {
     
     for (const conversation of conversations) {
       if (conversation.messages && Array.isArray(conversation.messages)) {
-        // Check if messages are populated objects or just IDs
-        if (conversation.messages.length > 0 && typeof conversation.messages[0] === 'string') {
-          // Messages are IDs, need to populate them
+        // Check if messages are populated objects or just IDs/ObjectIds
+        const firstMessage = conversation.messages[0];
+        const isPopulated = firstMessage && firstMessage.role !== undefined && firstMessage.content !== undefined;
+        
+        if (!isPopulated && conversation.messages.length > 0) {
+          // Messages are IDs/ObjectIds, need to populate them
           const populatedMessages = await Message.find({ _id: { $in: conversation.messages } });
           populatedMessages.forEach(message => {
             if (message.role === 'patient' && message.content && message.content.trim()) {
