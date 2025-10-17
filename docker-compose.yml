@@ -7,6 +7,8 @@ services:
       cache_from:
         - bianca-app:latest
     image: bianca-app
+    env_file:
+      - .env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/bianca-app
       - NODE_ENV=development
