@@ -10,6 +10,7 @@ const app = require('../utils/integration-app');
 const { setupMongoMemoryServer, teardownMongoMemoryServer } = require('../utils/mongodb-memory-server');
 const { localizedEmergencyDetector } = require('../../src/services/localizedEmergencyDetector.service');
 const { emergencyPhraseService } = require('../../src/services');
+const { emergencyProcessor } = require('../../src/services/emergencyProcessor.service');
 
 beforeAll(async () => {
   await setupMongoMemoryServer();
@@ -21,34 +22,46 @@ afterAll(async () => {
 
 describe('Localized Emergency Detection', () => {
   beforeEach(async () => {
-    // Clear emergency phrases before each test
+    // Clear emergency phrases, users, and patients before each test
+    const { Org, Caregiver, Patient } = require('../../src/models');
     await EmergencyPhrase.deleteMany();
+    await Org.deleteMany();
+    await Caregiver.deleteMany();
+    await Patient.deleteMany();
   });
 
   afterEach(async () => {
     // Clean up after each test
+    const { Org, Caregiver, Patient } = require('../../src/models');
     await EmergencyPhrase.deleteMany();
+    await Org.deleteMany();
+    await Caregiver.deleteMany();
+    await Patient.deleteMany();
   });
 
   describe('Emergency Phrase Management API', () => {
     let adminToken;
+    const { insertCaregiversAndAddToOrg, superAdmin } = require('../fixtures/caregiver.fixture');
+    const { insertOrgs, orgOne } = require('../fixtures/org.fixture');
 
     beforeEach(async () => {
-      // Create an admin user for testing
-      const adminUser = {
-        name: 'Admin User',
-        email: `admin${Date.now()}@test.com`,
-        phone: '1234567890',
-        password: 'password123'
-      };
+      // Create a superAdmin user for testing emergency phrase management
+      // (requires 'manageAny:emergencyPhrase' permission)
+      const [org] = await insertOrgs([orgOne]);
+      const caregivers = await insertCaregiversAndAddToOrg(org, [superAdmin]);
+      const adminUser = caregivers[0];
 
+      // Login to get token
       const res = await request(app)
-        .post('/v1/auth/register')
-        .send(adminUser);
+        .post('/v1/auth/login')
+        .send({
+          email: superAdmin.email,
+          password: 'Password1'
+        });
 
-      if (res.status !== 201) {
-        console.log('Registration failed:', res.body);
-        throw new Error(`Registration failed: ${res.status} - ${JSON.stringify(res.body)}`);
+      if (res.status !== 200) {
+        console.log('Login failed:', res.body);
+        throw new Error(`Login failed: ${res.status} - ${JSON.stringify(res.body)}`);
       }
 
       adminToken = res.body.tokens.access.token;
@@ -363,8 +376,6 @@ describe('Localized Emergency Detection', () => {
     });
 
     test('should process utterance with patient language preference', async () => {
-      const { emergencyProcessor } = require('../../src/services/emergencyProcessor.service');
-      
       const result = await emergencyProcessor.processUtterance(
         patientId,
         'Creo que estoy teniendo un ataque al corazón'
