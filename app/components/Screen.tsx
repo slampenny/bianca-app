@@ -56,6 +56,10 @@ interface BaseScreenProps {
    * Used to locate this view in end-to-end tests.
    */
   testID?: string
+  /**
+   * Accessibility label for the screen (maps to aria-label on web).
+   */
+  accessibilityLabel?: string
 }
 
 interface FixedScreenProps extends BaseScreenProps {
@@ -238,12 +242,13 @@ export function Screen(props: ScreenProps) {
     StatusBarProps,
     statusBarStyle = "dark",
     testID,
+    accessibilityLabel,
   } = props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
 
   return (
-    <View style={[$containerStyle, { backgroundColor }, $containerInsets]} testID={testID}>
+    <View style={[$containerStyle, { backgroundColor }, $containerInsets]} testID={testID} accessibilityLabel={accessibilityLabel}>
       <StatusBar style={statusBarStyle} {...StatusBarProps} />
 
       <KeyboardAvoidingView

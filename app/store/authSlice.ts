@@ -59,6 +59,16 @@ export const authSlice = createSlice({
       state.tokens = null
       state.authEmail = ""
       state.currentUser = null
+      state.inviteToken = null
+    })
+    // Also clear local state if logout fails (e.g., network error, expired token)
+    // This ensures users can always log out locally even if the API is down
+    builder.addMatcher(authApi.endpoints.logout.matchRejected, (state) => {
+      console.log('[authSlice] Logout API failed, clearing local state anyway')
+      state.tokens = null
+      state.authEmail = ""
+      state.currentUser = null
+      state.inviteToken = null
     })
     builder.addMatcher(authApi.endpoints.refreshTokens.matchFulfilled, (state, { payload }) => {
       console.log("refreshed tokens", JSON.stringify(payload.tokens))

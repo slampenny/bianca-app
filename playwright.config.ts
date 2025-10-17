@@ -9,6 +9,8 @@ export default defineConfig({
     headless: false,
     browserName: 'chromium',
     viewport: { width: 1280, height: 720 },
+    trace: 'on-first-retry',
+    video: 'retain-on-failure',
   },
   projects: [
     {

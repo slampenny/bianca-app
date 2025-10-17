@@ -36,15 +36,16 @@ if (process.env.NODE_ENV === 'test' ||
     PLAYWRIGHT_TEST: process.env.PLAYWRIGHT_TEST,
     JEST_WORKER_ID: process.env.JEST_WORKER_ID,
     expo_environment: Constants.expoConfig?.extra?.environment || 'undefined',
-    Constants_full: JSON.stringify(Constants, null, 2),
-    Constants_expoConfig: JSON.stringify(Constants.expoConfig, null, 2),
-    Constants_manifest: JSON.stringify(Constants.manifest, null, 2),
-    Constants_manifest2: JSON.stringify(Constants.manifest2, null, 2),
     window_location: typeof window !== 'undefined' ? window.location.hostname : 'undefined'
   });
 
+  // For web: if running on localhost, use dev config (for local testing and Playwright tests)
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    ExtraConfig = DevConfig
+    console.log('Using DEV config (localhost detected)');
+  }
   // Use dev config for development
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  else if (typeof __DEV__ !== 'undefined' && __DEV__) {
     ExtraConfig = DevConfig
     console.log('Using DEV config');
   }
