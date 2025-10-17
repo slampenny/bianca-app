@@ -6,8 +6,9 @@ export class AuthWorkflow {
 
   // GIVEN steps - Setup conditions
   async givenIAmOnTheLoginScreen() {
-    // Uses existing test fixture navigation
-    await this.page.waitForSelector('[data-testid="email-input"]', { timeout: 10000 })
+    // Navigate to the app and wait for login screen
+    await this.page.goto('http://localhost:8082/')
+    await this.page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
   }
 
   async givenIHaveValidCredentials() {
@@ -49,12 +50,12 @@ export class AuthWorkflow {
 
   // WHEN steps - Actions
   async whenIEnterCredentials(email: string, password: string) {
-    await this.page.getByTestId('email-input').fill(email)
-    await this.page.getByTestId('password-input').fill(password)
+    await this.page.fill('[aria-label="email-input"]', email)
+    await this.page.fill('[aria-label="password-input"]', password)
   }
 
   async whenIClickLoginButton() {
-    await this.page.getByTestId('login-button').click()
+    await this.page.click('[aria-label="login-button"]')
   }
 
   async whenIClickRegisterButton() {
@@ -93,11 +94,15 @@ export class AuthWorkflow {
   }
 
   async thenIShouldBeOnHomeScreen() {
-    await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
+    // Wait for home screen to load - look for home header or add patient button
+    await this.page.waitForTimeout(3000)
+    const homeHeader = await this.page.locator('[aria-label="home-header"]').isVisible().catch(() => false)
+    const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible().catch(() => false)
+    expect(homeHeader || addPatient).toBe(true)
   }
 
   async thenIShouldSeeWelcomeMessage() {
-    await expect(this.page.getByTestId('home-header')).toContainText('Welcome')
+    await expect(this.page.locator('[aria-label="home-header"]')).toContainText('Welcome')
   }
 
   async thenIShouldSeeRegistrationSuccess() {

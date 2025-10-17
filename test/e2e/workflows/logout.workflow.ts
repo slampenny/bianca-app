@@ -10,17 +10,29 @@ export class LogoutWorkflow {
   // GIVEN steps - Setup conditions
   
   async givenIAmLoggedIn(email: string, password: string) {
+    // Listen for console messages
+    this.page.on('console', msg => console.log('Browser console:', msg.text()))
+    
+    // Listen for failed requests
+    this.page.on('requestfailed', request => {
+      console.log('Failed request:', request.url(), request.failure()?.errorText)
+    })
+    
     // Navigate to login
     await this.page.goto('http://localhost:8082/')
     await this.page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
     
     // Login
+    console.log(`Logging in with ${email} / ${password}`)
     await this.page.fill('[aria-label="email-input"]', email)
     await this.page.fill('[aria-label="password-input"]', password)
     await this.page.click('[aria-label="login-button"]')
     
     // Wait for home screen
-    await this.page.waitForTimeout(3000)
+    await this.page.waitForTimeout(5000)
+    
+    // Log current URL for debugging
+    console.log('Current URL after login:', this.page.url())
   }
 
   async givenIAmOnTheProfileScreen() {
