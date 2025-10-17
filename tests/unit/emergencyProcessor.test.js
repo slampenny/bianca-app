@@ -67,7 +67,7 @@ describe('Emergency Processor', () => {
       {
         phrase: "call 911",
         language: "en",
-        category: "General",
+        category: "Request",
         severity: "HIGH",
         description: "Emergency services request",
         pattern: "\\b(call\\s+911)\\b",
