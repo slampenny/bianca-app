@@ -244,12 +244,15 @@ if [ -n "$STAGING_IP" ]; then
         
         # Stop and remove only the application containers (not MongoDB)
         # Note: docker-compose uses service names, not container names
-        docker-compose stop app asterisk || true
-        docker-compose rm -f app asterisk || true
+        docker-compose stop app asterisk frontend nginx || true
+        docker-compose rm -f app asterisk frontend nginx || true
         
         # Remove any orphaned containers with our project names
-        docker rm -f \$(docker ps -aq --filter 'name=staging_bianca-app') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=staging_app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=staging_asterisk') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=staging_frontend') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=staging_nginx') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=staging_bianca-app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=bianca-app') 2>/dev/null || true
         
         # Clean up unused images and networks
@@ -261,9 +264,9 @@ if [ -n "$STAGING_IP" ]; then
       
       # Check if MongoDB container already exists (running or stopped)
       if docker ps -aq --filter 'name=staging_mongodb' | grep -q .; then
-        echo 'MongoDB container already exists, starting only app and asterisk...'
-        # Start only the app and asterisk services, skip MongoDB
-        docker-compose up -d --no-deps app asterisk
+        echo 'MongoDB container already exists, starting only app, asterisk, frontend, and nginx...'
+        # Start only the application services, skip MongoDB
+        docker-compose up -d --no-deps app asterisk frontend nginx
       else
         echo 'Starting all containers (including MongoDB)...'
         # Start all containers (MongoDB will be created)
