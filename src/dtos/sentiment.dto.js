@@ -39,6 +39,13 @@ const SentimentTrendPointDTO = (conversation) => {
     analyzedData
   } = conversation;
 
+  console.log(`[SentimentTrendPointDTO] Processing conversation:`, {
+    _id,
+    analyzedData,
+    hasSentiment: !!analyzedData?.sentiment,
+    sentimentValue: analyzedData?.sentiment
+  });
+
   return {
     conversationId: _id,
     date: endTime || startTime,

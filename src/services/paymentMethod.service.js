@@ -240,12 +240,37 @@ const setDefaultPaymentMethod = async (orgId, paymentMethodId) => {
   }
 
   try {
-    // First set as default in Stripe
-    await stripe.customers.update(org.stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: paymentMethod.stripePaymentMethodId,
-      },
-    });
+    // Ensure the org has a Stripe customer ID
+    if (!org.stripeCustomerId) {
+      // Create a customer in Stripe if needed
+      const customer = await stripe.customers.create({
+        name: org.name,
+        metadata: {
+          orgId: org.id,
+        },
+      });
+      org.stripeCustomerId = customer.id;
+      await org.save();
+      logger.info(`Created Stripe customer for org: ${org.name} (${org.id})`);
+    }
+
+    // First set as default in Stripe (if the payment method exists)
+    try {
+      await stripe.customers.update(org.stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethod.stripePaymentMethodId,
+        },
+      });
+    } catch (stripeError) {
+      // If the payment method doesn't exist in Stripe, log a warning but continue
+      if (stripeError.type === 'StripeInvalidRequestError' && 
+          stripeError.code === 'resource_missing') {
+        logger.warn(`Payment method ${paymentMethod.stripePaymentMethodId} not found in Stripe, proceeding with local update only`);
+      } else {
+        // For other Stripe errors, re-throw
+        throw stripeError;
+      }
+    }
 
     // Then update in our database
     await PaymentMethod.updateMany({ org: orgId }, { $set: { isDefault: false } });
@@ -391,6 +416,48 @@ const getDefaultPaymentMethod = async (orgId) => {
   return PaymentMethod.findOne({ org: orgId, isDefault: true });
 };
 
+/**
+ * Create a SetupIntent for adding payment methods (mobile)
+ * @param {string} orgId - The organization ID
+ * @returns {Promise<Object>} The SetupIntent with client secret
+ */
+const createSetupIntent = async (orgId) => {
+  const org = await Org.findById(orgId);
+  if (!org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
+  }
+
+  try {
+    // Ensure the org has a Stripe customer ID
+    if (!org.stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        name: org.name,
+        metadata: {
+          orgId: org.id,
+        },
+      });
+      org.stripeCustomerId = customer.id;
+      await org.save();
+      logger.info(`Created Stripe customer for org: ${org.name} (${org.id})`);
+    }
+
+    // Create a SetupIntent
+    const setupIntent = await stripe.setupIntents.create({
+      customer: org.stripeCustomerId,
+      payment_method_types: ['card'],
+      usage: 'off_session', // For future payments
+    });
+
+    return {
+      clientSecret: setupIntent.client_secret,
+      id: setupIntent.id,
+    };
+  } catch (error) {
+    logger.error(`Error creating SetupIntent for org ${orgId}:`, error);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error creating setup intent');
+  }
+};
+
 module.exports = {
   attachPaymentMethod,
   createPaymentMethod,
@@ -403,4 +470,5 @@ module.exports = {
   detachPaymentMethod,
   deletePaymentMethod,
   getDefaultPaymentMethod,
+  createSetupIntent,
 };
