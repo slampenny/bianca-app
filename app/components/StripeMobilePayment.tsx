@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { View, StyleSheet, Alert } from 'react-native'
-import { useStripe } from '@stripe/stripe-react-native'
 import { Text, Button, Card, ListItem } from 'app/components'
 import { colors, spacing } from 'app/theme'
 import { useGetPaymentMethodsQuery, useSetDefaultPaymentMethodMutation, useDetachPaymentMethodMutation, useCreateSetupIntentMutation } from 'app/services/api/paymentMethodApi'
@@ -32,8 +31,27 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
   onPaymentMethodAdded,
   onError,
 }) => {
-  const { initPaymentSheet, presentPaymentSheet } = useStripe()
+  const [stripeHook, setStripeHook] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [stripeLoading, setStripeLoading] = useState(true)
+
+  // Dynamically load the Stripe hook
+  useEffect(() => {
+    const loadStripe = async () => {
+      try {
+        const stripeModule = await import('@stripe/stripe-react-native')
+        setStripeHook(stripeModule.useStripe())
+        setStripeLoading(false)
+      } catch (error) {
+        console.error('Failed to load Stripe hook:', error)
+        setStripeLoading(false)
+        onError?.('Failed to load payment system')
+      }
+    }
+    loadStripe()
+  }, [onError])
+
+  const { initPaymentSheet, presentPaymentSheet } = stripeHook || {}
   const [message, setMessage] = useState('')
   const [isPaymentSheetReady, setIsPaymentSheetReady] = useState(false)
 
@@ -41,6 +59,24 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
   const [setDefaultPaymentMethod] = useSetDefaultPaymentMethodMutation()
   const [detachPaymentMethod] = useDetachPaymentMethodMutation()
   const [createSetupIntent] = useCreateSetupIntentMutation()
+
+  // Show loading while Stripe is loading
+  if (stripeLoading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Loading payment system...</Text>
+      </View>
+    )
+  }
+
+  // Show error if Stripe failed to load
+  if (!stripeHook) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Failed to load payment system</Text>
+      </View>
+    )
+  }
 
   // Initialize payment sheet
   useEffect(() => {
