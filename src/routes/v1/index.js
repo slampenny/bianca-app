@@ -15,6 +15,7 @@ const reportRoute = require('./report.route');
 const scheduleRoute = require('./schedule.route');
 const sentimentRoute = require('./sentiment.route');
 const ssoRoute = require('./sso.route');
+const stripeRoute = require('./stripe.route');
 const testRoute = require('./test.route');
 const twilioRoute = require('./twilioCall.route');
 const callWorkflowRoute = require('./callWorkflow.route');
@@ -90,6 +91,10 @@ const defaultRoutes = [
   {
     path: '/sso',
     route: ssoRoute,
+  },
+  {
+    path: '/stripe',
+    route: stripeRoute,
   },
   {
     path: '/twilio',

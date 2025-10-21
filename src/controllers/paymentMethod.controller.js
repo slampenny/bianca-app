@@ -54,10 +54,20 @@ const detachPaymentMethod = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+/**
+ * Create a SetupIntent for adding payment methods (mobile)
+ * @route POST /orgs/:orgId/setup-intent
+ */
+const createSetupIntent = catchAsync(async (req, res) => {
+  const setupIntent = await paymentMethodService.createSetupIntent(req.params.orgId);
+  res.status(httpStatus.CREATED).send(setupIntent);
+});
+
 module.exports = {
   attachPaymentMethod,
   getOrgPaymentMethods,
   getPaymentMethod,
   setDefaultPaymentMethod,
   detachPaymentMethod,
+  createSetupIntent,
 };

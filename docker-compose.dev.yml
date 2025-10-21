@@ -6,7 +6,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-      target: build  # Use build stage for development
+      target: dependencies  # Use dependencies stage for development
     env_file:
       - .env
     environment:
@@ -14,6 +14,7 @@ services:
     volumes:
       - .:/usr/src/bianca-app
       - /usr/src/bianca-app/node_modules  # Exclude node_modules from volume mount
+    working_dir: /usr/src/bianca-app
     command: ["yarn", "dev"]  # Use development command with hot reloading
     ports:
       - "9229:9229"

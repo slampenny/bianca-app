@@ -495,14 +495,11 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
       endTime: { $gte: startDate, $lte: now }
     });
 
-    // Process sentiment data
-    const dataPoints = conversations.map(conv => ({
-      conversationId: conv._id,
-      date: conv.endTime || conv.startTime,
-      duration: conv.duration,
-      sentiment: conv.analyzedData.sentiment,
-      sentimentAnalyzedAt: conv.analyzedData.sentimentAnalyzedAt
-    }));
+    // Return raw conversation data for DTO transformation
+    const dataPoints = conversations; // Return raw conversations, let DTO handle transformation
+
+    console.log(`[SentimentTrend] Sample raw conversation:`, dataPoints[0]);
+    console.log(`[SentimentTrend] Sample sentiment:`, dataPoints[0]?.analyzedData?.sentiment);
 
     // Calculate summary statistics
     const sentimentScores = conversations
@@ -520,21 +517,47 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
       return dist;
     }, {});
 
-    // Calculate trend direction
+    // Calculate trend direction using linear regression
     let trendDirection = 'stable';
-    if (dataPoints.length >= 2) {
-      const firstHalf = dataPoints.slice(0, Math.floor(dataPoints.length / 2));
-      const secondHalf = dataPoints.slice(Math.floor(dataPoints.length / 2));
+    let confidence = 0;
+    
+    console.log(`[SentimentTrend] Processing ${dataPoints.length} data points for patient ${patientId}`);
+    
+    if (dataPoints.length >= 3) {
+      // Sort data points by date (oldest first) for proper trend calculation
+      const sortedDataPoints = dataPoints.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const sentimentScores = sortedDataPoints.map(point => point.sentiment?.sentimentScore || 0);
       
-      const firstAvg = firstHalf.reduce((sum, point) => sum + (point.sentiment?.sentimentScore || 0), 0) / firstHalf.length;
-      const secondAvg = secondHalf.reduce((sum, point) => sum + (point.sentiment?.sentimentScore || 0), 0) / secondHalf.length;
+      console.log(`[SentimentTrend] Sorted sentiment scores:`, sentimentScores);
       
-      if (secondAvg > firstAvg + 0.1) trendDirection = 'improving';
-      else if (secondAvg < firstAvg - 0.1) trendDirection = 'declining';
+      // Use linear regression to calculate trend
+      trendDirection = calculateLinearTrend(sentimentScores);
+      
+      console.log(`[SentimentTrend] Calculated trend direction:`, trendDirection);
+      
+      // Calculate confidence based on data quality and quantity
+      const scoreVariance = calculateVariance(sentimentScores);
+      const dataQuality = Math.min(1, dataPoints.length / 8); // Max at 8+ data points
+      const trendStrength = Math.min(1, scoreVariance * 2); // Higher variance = stronger trend
+      confidence = Math.min(0.95, (dataQuality + trendStrength) / 2);
+    } else if (dataPoints.length >= 2) {
+      // For 2 data points, use simple comparison with lower threshold
+      const sortedDataPoints = dataPoints.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const firstScore = sortedDataPoints[0].sentiment?.sentimentScore || 0;
+      const lastScore = sortedDataPoints[sortedDataPoints.length - 1].sentiment?.sentimentScore || 0;
+      const difference = lastScore - firstScore;
+      
+      console.log(`[SentimentTrend] 2-point comparison: first=${firstScore}, last=${lastScore}, difference=${difference}`);
+      
+      if (difference > 0.05) trendDirection = 'improving';
+      else if (difference < -0.05) trendDirection = 'declining';
+      
+      console.log(`[SentimentTrend] 2-point trend direction:`, trendDirection);
+      
+      confidence = Math.min(0.6, dataPoints.length / 5); // Lower confidence for small datasets
+    } else {
+      confidence = 0.2; // Very low confidence for single data point
     }
-
-    // Calculate confidence based on number of data points
-    const confidence = Math.min(1, dataPoints.length / 10); // Max confidence at 10+ data points
 
     // Generate key insights
     const keyInsights = [];
@@ -996,7 +1019,7 @@ const calculateTrends = async (patientId, currentTimeSeriesData) => {
 
 /**
  * Calculate linear trend from a series of values
- * @param {Array} values - Array of numeric values (most recent first)
+ * @param {Array} values - Array of numeric values (oldest first)
  * @returns {string} 'improving', 'stable', or 'declining'
  */
 const calculateLinearTrend = (values) => {
@@ -1014,14 +1037,25 @@ const calculateLinearTrend = (values) => {
   
   const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
   
-  // Determine trend based on slope
-  // For cognitive/mental health: higher scores = worse, so positive slope = declining
-  // For language/overall: higher scores = better, so positive slope = improving
-  if (Math.abs(slope) < 0.1) return 'stable';
+  // For sentiment scores: positive slope = improving, negative slope = declining
+  if (Math.abs(slope) < 0.02) return 'stable'; // Lower threshold for sentiment
   
-  // For cognitive and mental health scores, positive slope means declining
-  // For language and overall scores, positive slope means improving
-  return slope > 0 ? 'declining' : 'improving';
+  return slope > 0 ? 'improving' : 'declining';
+};
+
+/**
+ * Calculate variance of a dataset
+ * @param {Array} values - Array of numeric values
+ * @returns {number} Variance of the values
+ */
+const calculateVariance = (values) => {
+  if (values.length < 2) return 0;
+  
+  const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+  const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
+  const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / values.length;
+  
+  return variance;
 };
 
 module.exports = {

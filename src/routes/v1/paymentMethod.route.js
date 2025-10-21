@@ -217,4 +217,49 @@ router
     paymentMethodController.detachPaymentMethod
   );
 
+/**
+ * @swagger
+ * /payment-methods/orgs/{orgId}/setup-intent:
+ *   post:
+ *     summary: Create a SetupIntent for adding payment methods
+ *     description: Create a Stripe SetupIntent for adding payment methods (mobile). Returns client secret for use with Stripe mobile SDK.
+ *     tags: [PaymentMethods]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization id
+ *     responses:
+ *       "201":
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 clientSecret:
+ *                   type: string
+ *                   description: Stripe SetupIntent client secret
+ *                 id:
+ *                   type: string
+ *                   description: Stripe SetupIntent ID
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router
+  .route('/orgs/:orgId/setup-intent')
+  .post(
+    auth('createAny:paymentMethod'),
+    validate(paymentMethodValidation.getOrgPaymentMethods), // Reuse existing validation
+    paymentMethodController.createSetupIntent
+  );
+
 module.exports = router;

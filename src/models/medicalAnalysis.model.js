@@ -157,7 +157,7 @@ const medicalAnalysisSchema = new mongoose.Schema({
         enum: ['low', 'medium', 'high']
       },
       message: String,
-      details: String
+      details: mongoose.Schema.Types.Mixed
     }]
   },
   
@@ -224,7 +224,7 @@ const medicalAnalysisSchema = new mongoose.Schema({
         enum: ['low', 'medium', 'high', 'critical']
       },
       message: String,
-      details: String
+      details: mongoose.Schema.Types.Mixed
     }]
   },
   
