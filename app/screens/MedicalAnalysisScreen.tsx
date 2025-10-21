@@ -232,6 +232,17 @@ export function MedicalAnalysisScreen() {
               .sort((a, b) => new Date(a.analysisDate).getTime() - new Date(b.analysisDate).getTime()) // Sort chronologically for chart
             
             console.log('Latest result:', latestResult)
+            console.log('Latest result cognitive metrics:', latestResult?.cognitiveMetrics)
+            console.log('Latest result psychiatric metrics:', latestResult?.psychiatricMetrics)
+            console.log('Latest result vocabulary metrics:', latestResult?.vocabularyMetrics)
+            console.log('Cognitive risk score:', latestResult?.cognitiveMetrics?.riskScore)
+            console.log('Psychiatric overall risk score:', latestResult?.psychiatricMetrics?.overallRiskScore)
+            console.log('Vocabulary complexity score:', latestResult?.vocabularyMetrics?.complexityScore)
+            
+            // Debug: Show all properties of each metric object
+            console.log('Cognitive metrics keys:', latestResult?.cognitiveMetrics ? Object.keys(latestResult.cognitiveMetrics) : 'no cognitive metrics')
+            console.log('Psychiatric metrics keys:', latestResult?.psychiatricMetrics ? Object.keys(latestResult.psychiatricMetrics) : 'no psychiatric metrics')
+            console.log('Vocabulary metrics keys:', latestResult?.vocabularyMetrics ? Object.keys(latestResult.vocabularyMetrics) : 'no vocabulary metrics')
             console.log('Time series data points:', timeSeriesData.length)
             console.log('Trend data:', trendData)
             console.log('Trend data structure:', {

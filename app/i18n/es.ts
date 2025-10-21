@@ -127,6 +127,8 @@ const es: Translations = {
     totalUnbilledAmount: "Cantidad total sin facturar:",
     period: "Período:",
     lastDays: "Últimos {days} días",
+    day: "día",
+    days: "días",
     patientsWithCharges: "Pacientes con cargos:",
     patient: "paciente",
     patients: "pacientes",

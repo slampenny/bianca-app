@@ -248,7 +248,7 @@ export async function getVisibleAlertMessages(page: Page): Promise<string[]> {
 
 export async function ensureUserRegisteredAndLoggedInViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
   // Navigate to login page first
-  await page.goto('http://localhost:8082/')
+  await page.goto('http://localhost:8081/')
   await page.waitForTimeout(1000)
   
   // Try to login using aria-label (React Native Web compatibility)
@@ -291,7 +291,7 @@ export async function logoutViaUI(page: Page): Promise<void> {
     // Navigate directly to profile screen (more reliable than clicking button)
     // Profile is in HomeStack, not OrgStack
     console.log('Navigating to profile screen...')
-    await page.goto('http://localhost:8082/MainTabs/Home/Profile')
+    await page.goto('http://localhost:8081/MainTabs/Home/Profile')
     await page.waitForTimeout(1000)
     
     // Wait for profile screen to load

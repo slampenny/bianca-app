@@ -7,7 +7,7 @@ export class AuthWorkflow {
   // GIVEN steps - Setup conditions
   async givenIAmOnTheLoginScreen() {
     // Navigate to the app and wait for login screen
-    await this.page.goto('http://localhost:8082/')
+    await this.page.goto('http://localhost:8081/')
     await this.page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
   }
 

@@ -29,7 +29,7 @@ export function SentimentDashboard({
   onTimeRangeChange,
   style,
 }: SentimentDashboardProps) {
-  const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("lastCall")
+  const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("month")
   const screenWidth = Dimensions.get("window").width
   const isMobile = screenWidth < 768
 

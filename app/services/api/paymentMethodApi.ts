@@ -53,6 +53,15 @@ export const paymentMethodApi = createApi({
         method: "DELETE",
       }),
     }),
+    createSetupIntent: builder.mutation<
+      { clientSecret: string; id: string },
+      { orgId: string }
+    >({
+      query: ({ orgId }) => ({
+        url: `/payment-methods/orgs/${orgId}/setup-intent`,
+        method: "POST",
+      }),
+    }),
   }),
 })
 
@@ -62,4 +71,5 @@ export const {
   useGetPaymentMethodQuery,
   useSetDefaultPaymentMethodMutation,
   useDetachPaymentMethodMutation,
+  useCreateSetupIntentMutation,
 } = paymentMethodApi

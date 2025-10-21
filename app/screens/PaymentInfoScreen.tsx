@@ -5,6 +5,7 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from "react-native"
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs"
 import { useSelector } from "react-redux"
@@ -17,6 +18,7 @@ import { translate } from "../i18n"
 import Config from "../config"
 import { colors, spacing } from "app/theme"
 import { Text, Card, ListItem, Button, Icon } from "app/components"
+import StripePayment from "app/components/StripePayment"
 
 // --- Define the required roles ---
 const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
@@ -129,7 +131,7 @@ function LatestInvoiceCard({ invoice }: { invoice: any }) {
 }
 
 // ================================================
-//         PaymentMethodsScreen (No changes needed here)
+//         PaymentMethodsScreen (Updated to use native Stripe components)
 // ================================================
 function PaymentMethodsScreen() {
   const org = useSelector(getOrg)
@@ -153,35 +155,24 @@ function PaymentMethodsScreen() {
   }
 
   const orgId = org.id.toString()
-  // console.log('React Native JWT:', jwt); // Consider removing in production
-  const paymentPageUrl = `${Config.paymentMethodGatewayUrl}/${orgId}/${jwt}`
+
+  const handlePaymentMethodAdded = () => {
+    // Refresh payment methods or show success message
+    console.log('Payment method added successfully')
+  }
+
+  const handleError = (error: string) => {
+    console.error('Payment error:', error)
+    // You could show a toast or alert here
+  }
 
   return (
     <View style={styles.screenContainer} testID="payment-methods-container">
-      {Platform.OS === "web" ? (
-        <iframe
-          src={paymentPageUrl}
-          style={{
-            border: "none",
-            height: "100%",
-            width: "100%",
-            minHeight: 400, // fallback for web
-          }}
-          title={translate("paymentScreen.paymentMethod")}
-          data-testid="payment-methods-iframe"
-        />
-      ) : (
-        <WebView
-          source={{ uri: paymentPageUrl }}
-          style={styles.webview}
-          testID="payment-methods-webview"
-          // Add error handling for WebView if needed
-          // onError={(syntheticEvent) => {
-          //   const { nativeEvent } = syntheticEvent;
-          //   console.warn('WebView error: ', nativeEvent);
-          // }}
-        />
-      )}
+      <StripePayment
+        orgId={orgId}
+        onPaymentMethodAdded={handlePaymentMethodAdded}
+        onError={handleError}
+      />
     </View>
   )
 }
@@ -344,7 +335,7 @@ function CurrentChargesScreen() {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{translate("paymentScreen.period")}</Text>
               <Text style={styles.summaryValue}>
-                {translate("paymentScreen.lastDays", { days: unbilledCosts.period.days })}
+                {unbilledCosts.period.days} {unbilledCosts.period.days !== 1 ? translate("paymentScreen.days") : translate("paymentScreen.day")}
               </Text>
             </View>
             <View style={styles.summaryRow}>
@@ -511,7 +502,7 @@ function BillingInfoScreen() {
                 </Text>
               </View>
               <Text style={styles.totalBilledSubtext}>
-                {translate("paymentScreen.acrossInvoices", { count: sortedInvoices.length, s: sortedInvoices.length !== 1 ? 's' : '' })}
+                Across {sortedInvoices.length} invoice{sortedInvoices.length !== 1 ? 's' : ''}
               </Text>
             </View>
           }
@@ -523,7 +514,7 @@ function BillingInfoScreen() {
         <View style={styles.invoiceHistorySection}>
           <View style={styles.invoiceHistoryHeader}>
             <Text preset="subheading" style={styles.invoiceHistoryTitle}>
-              {translate("paymentScreen.invoiceHistory", { count: previousInvoices.length })}
+              Invoice History ({previousInvoices.length})
             </Text>
             <Button
               preset="default"
@@ -627,17 +618,22 @@ export function PaymentInfoScreen() {
 
   // *** 5. User IS authorized - Render the Tab Navigator ***
   return (
-    <View testID="payment-info-container">
-      <Tab.Navigator
-        screenOptions={{
-          tabBarActiveTintColor: colors.palette.biancaButtonSelected,
-          tabBarInactiveTintColor: colors.palette.neutral600,
-          tabBarLabelStyle: { fontSize: 16, fontWeight: "600" },
-          tabBarStyle: { backgroundColor: colors.palette.neutral100 },
-          tabBarIndicatorStyle: { backgroundColor: colors.palette.biancaButtonSelected },
-        }}
-        testID="payment-tabs-navigator"
+    <View style={styles.mainContainer} testID="payment-info-container">
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
+        <Tab.Navigator
+          screenOptions={{
+            tabBarActiveTintColor: colors.palette.biancaButtonSelected,
+            tabBarInactiveTintColor: colors.palette.neutral600,
+            tabBarLabelStyle: { fontSize: 16, fontWeight: "600" },
+            tabBarStyle: { backgroundColor: colors.palette.neutral100 },
+            tabBarIndicatorStyle: { backgroundColor: colors.palette.biancaButtonSelected },
+          }}
+          testID="payment-tabs-navigator"
+        >
         <Tab.Screen 
           name={translate("paymentScreen.currentCharges")} 
           component={CurrentChargesScreen}
@@ -659,7 +655,8 @@ export function PaymentInfoScreen() {
             tabBarTestID: "billing-info-tab"
           }}
         />
-      </Tab.Navigator>
+        </Tab.Navigator>
+      </ScrollView>
     </View>
   )
 }
@@ -678,10 +675,19 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: "center",
   },
+  mainContainer: {
+    flex: 1,
+    backgroundColor: colors.palette.neutral200,
+  },
   screenContainer: {
     flex: 1,
-    padding: spacing.md,
     backgroundColor: colors.palette.neutral200,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   webview: {
     flex: 1,
@@ -943,73 +949,108 @@ const styles = StyleSheet.create({
 
   // Current Charges styles
   chargesSummaryCard: {
-    marginBottom: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.palette.secondary200,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral200,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   chargesSummaryContent: {
-    gap: spacing.sm,
+    gap: spacing.md,
+    padding: spacing.sm,
   },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: spacing.xxs,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.palette.neutral100,
   },
   summaryLabel: {
     color: colors.palette.neutral600,
     fontSize: 16,
+    fontWeight: '500',
   },
   summaryValue: {
     color: colors.palette.neutral800,
     fontSize: 16,
+    fontWeight: '600',
   },
   summaryAmount: {
     color: colors.palette.secondary500,
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 
   // Patient Charges styles
   patientChargesSection: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   patientChargesTitle: {
     color: colors.palette.neutral800,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    fontSize: 18,
+    fontWeight: '600',
   },
   patientChargesList: {
     paddingBottom: spacing.sm,
   },
   patientChargeCard: {
-    marginBottom: spacing.sm,
-    backgroundColor: colors.palette.neutral100,
+    marginBottom: spacing.md,
+    backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: colors.palette.neutral300,
+    borderColor: colors.palette.neutral200,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   patientChargeContent: {
-    gap: spacing.xs,
+    gap: spacing.sm,
+    padding: spacing.sm,
   },
   patientChargeHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.palette.neutral100,
   },
   patientName: {
     color: colors.palette.neutral800,
     fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
   },
   patientTotalCost: {
     color: colors.palette.secondary500,
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   patientChargeDetails: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingTop: spacing.xs,
   },
   patientChargeDetail: {
     color: colors.palette.neutral600,
     fontSize: 14,
+    fontWeight: '500',
   },
 
   // Empty Charges styles

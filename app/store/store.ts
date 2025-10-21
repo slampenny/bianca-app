@@ -23,6 +23,7 @@ import {
   callWorkflowApi,
   sentimentApi,
   medicalAnalysisApi,
+  stripeApi,
 } from "../services/api/"
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import {
@@ -74,6 +75,7 @@ const rootReducer = combineReducers({
   [callWorkflowApi.reducerPath]: callWorkflowApi.reducer,
   [sentimentApi.reducerPath]: sentimentApi.reducer,
   [medicalAnalysisApi.reducerPath]: medicalAnalysisApi.reducer,
+  [stripeApi.reducerPath]: stripeApi.reducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)
@@ -98,6 +100,7 @@ export const store = configureStore({
       callWorkflowApi.middleware,
       sentimentApi.middleware,
       medicalAnalysisApi.middleware,
+      stripeApi.middleware,
     ),
 })
 

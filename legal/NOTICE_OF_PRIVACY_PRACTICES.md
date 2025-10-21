@@ -982,3 +982,6 @@ If you have questions about this Notice of Privacy Practices or want to exercise
 This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.520)
 
 
+
+
+

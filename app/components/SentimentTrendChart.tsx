@@ -13,11 +13,22 @@ interface SentimentTrendChartProps {
 export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) {
   const { dataPoints, summary } = trend
   const screenWidth = Dimensions.get("window").width
-  const chartWidth = screenWidth - 40 // Account for padding
+  const chartWidth = screenWidth - 40 // Use full screen width minus small padding
   const chartHeight = 120
+
+  // Debug logging
+  console.log('[SentimentChart] Received trend data:', {
+    trend,
+    dataPoints,
+    summary,
+    dataPointsLength: dataPoints?.length,
+    firstDataPoint: dataPoints?.[0]
+  })
 
   // Use dataPoints if available, otherwise show message
   const hasData = dataPoints.length > 0
+  const hasEnoughData = dataPoints.length >= 2
+  const isLowConfidence = summary.confidence < 0.5
 
   if (!hasData) {
     return (
@@ -35,6 +46,22 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
     )
   }
 
+  if (!hasEnoughData) {
+    return (
+      <View style={[styles.container, style]}>
+        <Text style={styles.title}>{translate("sentimentAnalysis.sentimentTrend")} ({trend.timeRange})</Text>
+        <View style={[styles.emptyChart, { width: chartWidth, height: chartHeight }]}>
+          <Text style={styles.emptyText}>
+            {translate("sentimentAnalysis.insufficientDataForTrend")}
+          </Text>
+          <Text style={styles.emptySubtext}>
+            {translate("sentimentAnalysis.needMoreConversations")}
+          </Text>
+        </View>
+      </View>
+    )
+  }
+
   // Calculate chart dimensions and data
   const maxScore = 1
   const minScore = -1
@@ -46,13 +73,25 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
     const x = index * pointWidth
     const score = point.sentiment?.sentimentScore || 0
     const y = chartHeight - ((score - minScore) / scoreRange) * chartHeight
+    
+    // Debug logging
+    console.log(`[SentimentChart] Point ${index}:`, {
+      point,
+      sentiment: point.sentiment,
+      sentimentScore: point.sentiment?.sentimentScore,
+      calculatedScore: score,
+      x,
+      y
+    })
+    
     return { x, y, score, point }
   })
 
-  // Create SVG path for the trend line
-  const pathData = trendPoints
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ")
+  // Create SVG path for the trend line - ensure continuous line
+  const pathData = trendPoints.length > 0 
+    ? `M ${trendPoints[0].x} ${trendPoints[0].y} ` + 
+      trendPoints.slice(1).map(point => `L ${point.x} ${point.y}`).join(" ")
+    : ""
 
   return (
     <View style={[styles.container, style]}>
@@ -62,9 +101,16 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
           <Text style={styles.summaryText}>
             {translate("sentimentAnalysis.avg")} {summary.averageSentiment > 0 ? "+" : ""}{summary.averageSentiment.toFixed(1)}
           </Text>
-          <Text style={[styles.trendText, getTrendStyle(summary.trendDirection)]}>
-            {getTrendIcon(summary.trendDirection)} {summary.trendDirection}
-          </Text>
+          <View style={styles.trendContainer}>
+            <Text style={[styles.trendText, getTrendStyle(summary.trendDirection)]}>
+              {getTrendIcon(summary.trendDirection)} {summary.trendDirection}
+            </Text>
+            {isLowConfidence && (
+              <Text style={styles.lowConfidenceWarning}>
+                {translate("sentimentAnalysis.lowConfidence")}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -96,30 +142,21 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
           />
         ))}
 
-        {/* Trend line (simplified as connected dots) */}
-        {trendPoints.map((point, index) => {
-          if (index === 0) return null
-          const prevPoint = trendPoints[index - 1]
-          const distance = Math.sqrt(
-            Math.pow(point.x - prevPoint.x, 2) + Math.pow(point.y - prevPoint.y, 2)
-          )
-          const angle = Math.atan2(point.y - prevPoint.y, point.x - prevPoint.x) * (180 / Math.PI)
-          
-          return (
-            <View
-              key={`line-${index}`}
-              style={[
-                styles.trendLine,
-                {
-                  left: prevPoint.x,
-                  top: prevPoint.y,
-                  width: distance,
-                  transform: [{ rotate: `${angle}deg` }],
-                },
-              ]}
-            />
-          )
-        })}
+        {/* Trend line using SVG for proper continuous line */}
+        {pathData && (
+          <View style={styles.svgContainer}>
+            <svg width={chartWidth} height={chartHeight} style={styles.svg}>
+              <path
+                d={pathData}
+                stroke="#8B4513"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </View>
+        )}
       </View>
 
       {/* Chart labels */}
@@ -191,6 +228,7 @@ const styles = {
     backgroundColor: colors.palette.neutral100,
     borderRadius: 12,
     marginVertical: 8,
+    overflow: "hidden" as const,
   },
   header: {
     flexDirection: "row" as const,
@@ -211,9 +249,18 @@ const styles = {
     fontWeight: "500" as const,
     color: colors.text,
   },
+  trendContainer: {
+    alignItems: "flex-end" as const,
+  },
   trendText: {
     fontSize: 12,
     fontWeight: "500" as const,
+  },
+  lowConfidenceWarning: {
+    fontSize: 10,
+    color: colors.palette.angry500,
+    fontStyle: "italic" as const,
+    marginTop: 2,
   },
   chartContainer: {
     position: "relative" as const,
@@ -254,6 +301,18 @@ const styles = {
     backgroundColor: colors.palette.primary500,
     opacity: 0.7,
   },
+  svgContainer: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+  },
+  svg: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+  },
   emptyChart: {
     justifyContent: "center" as const,
     alignItems: "center" as const,
@@ -263,6 +322,11 @@ const styles = {
   emptyText: {
     color: colors.textDim,
     fontSize: 14,
+  },
+  emptySubtext: {
+    color: colors.textDim,
+    fontSize: 12,
+    marginTop: 4,
   },
   chartLabels: {
     flexDirection: "row" as const,

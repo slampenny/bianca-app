@@ -19,6 +19,7 @@ module.exports = ({ config }: ConfigContext): Partial<ExpoConfig> => {
     ...config,
     plugins: [
       ...existingPlugins,
+      "expo-router",
       require("./plugins/withSplashScreen").withSplashScreen,
       require("./plugins/withFlipperDisabled").withFlipperDisabled,
     ],

@@ -215,6 +215,8 @@ const ar: Translations = {
     totalUnbilledAmount: "إجمالي المبلغ غير المفوتر:",
     period: "الفترة:",
     lastDays: "آخر {days} أيام",
+    day: "يوم",
+    days: "أيام",
     patientsWithCharges: "المرضى مع الرسوم:",
     patient: "مريض",
     patients: "مرضى",

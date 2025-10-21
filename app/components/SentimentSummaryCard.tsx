@@ -53,7 +53,7 @@ export function SentimentSummaryCard({ summary, style }: SentimentSummaryCardPro
                   style={[
                     styles.distributionBar,
                     {
-                      height: (count / Math.max(...Object.values(sentimentDistribution))) * 40,
+                      height: (count / Math.max(...Object.values(sentimentDistribution))) * 30,
                       backgroundColor: getSentimentTypeColor(sentiment as SentimentType),
                     },
                   ]}
@@ -243,34 +243,36 @@ const styles = {
   },
   distributionBars: {
     flexDirection: "row" as const,
-    justifyContent: "space-around" as const,
+    justifyContent: "center" as const,
     alignItems: "flex-end" as const,
-    height: 60,
+    height: 50,
+    gap: 16,
   },
   distributionItem: {
     alignItems: "center" as const,
-    flex: 1,
+    minWidth: 50,
   },
   distributionBarContainer: {
-    height: 40,
+    height: 30,
     justifyContent: "flex-end" as const,
-    marginBottom: 4,
+    marginBottom: 6,
+    alignItems: "center" as const,
   },
   distributionBar: {
-    width: 20,
-    borderRadius: 2,
+    width: 28,
+    borderRadius: 4,
     minHeight: 2,
   },
   distributionLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: colors.textDim,
     textTransform: "capitalize" as const,
+    marginBottom: 2,
   },
   distributionCount: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600" as const,
     color: colors.text,
-    marginTop: 2,
   },
   insightsContainer: {
     marginBottom: 16,
