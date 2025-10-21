@@ -4,7 +4,6 @@ import { Text } from 'app/components'
 import { colors, spacing } from 'app/theme'
 import PlatformUtils from 'app/utils/platform'
 import { useGetStripeConfigQuery } from 'app/services/api/stripeApi'
-import { useStripeMobile } from 'app/hooks/useStripeMobile'
 import StripeWebPayment from './StripeWebPayment'
 
 interface StripePaymentProps {
@@ -13,13 +12,87 @@ interface StripePaymentProps {
   onError?: (error: string) => void
 }
 
+// Mobile-specific component that will only be loaded on mobile
+const StripeMobileWrapper: React.FC<StripePaymentProps & { publishableKey: string }> = ({
+  orgId,
+  publishableKey,
+  onPaymentMethodAdded,
+  onError,
+}) => {
+  const [mobileComponents, setMobileComponents] = React.useState({
+    StripeProvider: null,
+    StripeMobilePayment: null,
+    isLoaded: false,
+    error: null,
+  })
+
+  React.useEffect(() => {
+    const loadMobileComponents = async () => {
+      try {
+        // Dynamic import of Stripe React Native
+        const stripeReactNative = await import('@stripe/stripe-react-native')
+        
+        // Dynamic import of our mobile payment component
+        const mobilePaymentModule = await import('./StripeMobilePayment')
+        
+        setMobileComponents({
+          StripeProvider: stripeReactNative.StripeProvider,
+          StripeMobilePayment: mobilePaymentModule.default,
+          isLoaded: true,
+          error: null,
+        })
+      } catch (error) {
+        console.error('Failed to load mobile Stripe components:', error)
+        setMobileComponents(prev => ({
+          ...prev,
+          isLoaded: true,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }))
+      }
+    }
+
+    loadMobileComponents()
+  }, [])
+
+  const { StripeProvider, StripeMobilePayment, isLoaded, error } = mobileComponents
+
+  if (!isLoaded) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={colors.palette.accent500} />
+        <Text style={styles.loadingText}>Loading mobile payment system...</Text>
+      </View>
+    )
+  }
+
+  if (error || !StripeProvider || !StripeMobilePayment) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorMessage}>
+          Mobile payment system unavailable. Please use the web version.
+          {error && `\nError: ${error}`}
+        </Text>
+      </View>
+    )
+  }
+
+  return (
+    <StripeProvider publishableKey={publishableKey}>
+      <StripeMobilePayment
+        orgId={orgId}
+        onPaymentMethodAdded={onPaymentMethodAdded}
+        onError={onError}
+      />
+    </StripeProvider>
+  )
+}
+
 const StripePayment: React.FC<StripePaymentProps> = ({
   orgId,
   onPaymentMethodAdded,
   onError,
 }) => {
   const { data: stripeConfig, isLoading, error } = useGetStripeConfigQuery()
-  const { StripeProvider, StripeMobilePayment, isLoaded: mobileLoaded, error: mobileError } = useStripeMobile()
 
 
   // Show loading state
@@ -57,37 +130,13 @@ const StripePayment: React.FC<StripePaymentProps> = ({
 
   // Render mobile version for mobile platforms (iOS/Android)
   if (PlatformUtils.isMobile()) {
-    // Show loading while mobile components are loading
-    if (!mobileLoaded) {
-      return (
-        <View style={styles.container}>
-          <ActivityIndicator size="large" color={colors.palette.accent500} />
-          <Text style={styles.loadingText}>Loading mobile payment system...</Text>
-        </View>
-      )
-    }
-
-    // Show error if mobile components failed to load
-    if (mobileError || !StripeProvider || !StripeMobilePayment) {
-      return (
-        <View style={styles.container}>
-          <Text style={styles.errorMessage}>
-            Mobile payment system unavailable. Please use the web version.
-            {mobileError && `\nError: ${mobileError}`}
-          </Text>
-        </View>
-      )
-    }
-
-    // Render mobile Stripe components
     return (
-      <StripeProvider publishableKey={stripeConfig.publishableKey}>
-        <StripeMobilePayment
-          orgId={orgId}
-          onPaymentMethodAdded={onPaymentMethodAdded}
-          onError={onError}
-        />
-      </StripeProvider>
+      <StripeMobileWrapper
+        orgId={orgId}
+        publishableKey={stripeConfig.publishableKey}
+        onPaymentMethodAdded={onPaymentMethodAdded}
+        onError={onError}
+      />
     )
   }
 

@@ -10,6 +10,11 @@ config.resolver = {
   },
   // Ensure proper resolution of React Native modules
   platforms: ['ios', 'android', 'native', 'web'],
+  // Exclude mobile-only packages from web builds
+  blockList: [
+    // Block @stripe/stripe-react-native from web builds
+    /node_modules\/@stripe\/stripe-react-native\/.*/,
+  ],
 };
 
 module.exports = config;
