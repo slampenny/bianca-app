@@ -1856,8 +1856,9 @@ class OpenAIRealtimeService {
     if (currentState === CONVERSATION_STATES.GREETING_ACTIVE) {
       // Initial greeting completed
       conn._initialGreetingCompletedAt = Date.now();
+      conn._waitingForInitialGreeting = false; // Clear the flag to allow user input
       this.transitionState(callId, CONVERSATION_STATES.GREETING_COMPLETE, 'initial_greeting_completed');
-      logger.info(`[OpenAI Realtime] Initial greeting completed for ${callId} - entering grace period`);
+      logger.info(`[OpenAI Realtime] Initial greeting completed for ${callId} - entering grace period and allowing user input`);
     } else if (currentState === CONVERSATION_STATES.AI_RESPONDING) {
       // Regular AI response completed
       this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_completed');
