@@ -222,6 +222,7 @@ class OpenAIRealtimeService {
   canAIRespond(callId) {
     const state = this.getConversationState(callId);
     return [
+      CONVERSATION_STATES.WAITING_FOR_GREETING,
       CONVERSATION_STATES.GREETING_COMPLETE,
       CONVERSATION_STATES.CONVERSATION_ACTIVE
     ].includes(state);
@@ -820,8 +821,8 @@ class OpenAIRealtimeService {
     }
 
     // STATE MACHINE: Check if we can create a response in current state
-    const currentState = this.getConversationState(callId);
-    if (![CONVERSATION_STATES.WAITING_FOR_GREETING, CONVERSATION_STATES.AI_RESPONDING].includes(currentState)) {
+    if (!this.canAIRespond(callId)) {
+      const currentState = this.getConversationState(callId);
       logger.warn(`[OpenAI Realtime] Cannot create response in state ${currentState} for ${callId}`);
       return;
     }
@@ -840,6 +841,14 @@ class OpenAIRealtimeService {
       connection._responseStartTime = Date.now(); // Track when response was created
       logger.info(`[OpenAI Realtime] SUCCESS: Sent response.create for ${callId}`);
       logger.debug(`[OpenAI Realtime] Response.create payload: ${messageStr}`);
+
+      // STATE MACHINE: Transition to appropriate state based on current state
+      const currentState = this.getConversationState(callId);
+      if (currentState === CONVERSATION_STATES.WAITING_FOR_GREETING) {
+        this.transitionState(callId, CONVERSATION_STATES.GREETING_ACTIVE, 'initial_greeting_triggered');
+      } else if (currentState === CONVERSATION_STATES.GREETING_COMPLETE || currentState === CONVERSATION_STATES.CONVERSATION_ACTIVE) {
+        this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'ai_response_triggered');
+      }
 
       // Add timeout to reset response flag if it gets stuck
       setTimeout(() => {
@@ -1667,7 +1676,6 @@ class OpenAIRealtimeService {
           // STATE MACHINE: Transition to waiting for greeting and trigger initial greeting
           if (this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'session_ready')) {
             await this.sendResponseCreate(callId);
-            this.transitionState(callId, CONVERSATION_STATES.GREETING_ACTIVE, 'initial_greeting_triggered');
             logger.info(`[OpenAI Realtime] Initial greeting triggered for ${callId}`);
           } else {
             logger.warn(`[OpenAI Realtime] Cannot transition to WAITING_FOR_GREETING state for ${callId}`);
@@ -1779,12 +1787,12 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Handle audio transcript done - Update placeholder AI message with transcript
+   * Handle audio transcript done - Store transcript for later saving
    * 
    * MESSAGE FLOW LOGIC:
    * This handles the final audio transcript from the AI (response.audio_transcript.done).
-   * We update the existing placeholder message to preserve the timestamp of when AI started speaking.
-   * This ensures consistent timing with user messages - both get timestamps when they started speaking.
+   * We store the transcript but don't save it yet - it will be saved when response.done fires.
+   * This ensures AI messages get timestamps when AI finishes speaking, not when transcript is ready.
    */
   async handleResponseAudioTranscriptDone(callId, message) {
     if (!message.transcript) return;
@@ -1794,30 +1802,9 @@ class OpenAIRealtimeService {
 
     logger.info(`[OpenAI Realtime] AI audio transcript completed for ${callId}: "${message.transcript}"`);
 
-    // Update the existing placeholder message to preserve timestamp
-    if (conn.activeAssistantMessageId) {
-      try {
-        const { Message } = require('../models');
-        await Message.findByIdAndUpdate(
-          conn.activeAssistantMessageId,
-          { 
-            content: message.transcript.trim(),
-            messageType: 'assistant_response'
-          },
-          { timestamps: false, runValidators: false } // Preserve original timestamp
-        );
-        logger.info(`[OpenAI Realtime] Updated assistant placeholder message with transcript: "${message.transcript}"`);
-        conn.activeAssistantMessageId = null; // Clear the active message ID
-      } catch (err) {
-        logger.error(`[OpenAI Realtime] Failed to update assistant message: ${err.message}`);
-        // Fallback: create new message if update fails
-        await this.saveCompleteMessage(callId, 'assistant', message.transcript);
-      }
-    } else {
-      // Fallback: create new message if no placeholder exists
-      await this.saveCompleteMessage(callId, 'assistant', message.transcript);
-      logger.info(`[OpenAI Realtime] Created new assistant message with transcript: "${message.transcript}"`);
-    }
+    // Store the transcript for saving when AI finishes speaking (response.done)
+    conn.pendingAssistantTranscript = message.transcript.trim();
+    logger.info(`[OpenAI Realtime] Stored assistant transcript for later saving: "${message.transcript}"`);
   }
 
   /**
@@ -1844,8 +1831,12 @@ class OpenAIRealtimeService {
       conn.activeAssistantMessageId = null;
     }
 
-    // AI text is now saved immediately when transcript is complete
-    // No need to save here since we handle it in handleResponseAudioTranscriptDone
+    // Save AI transcript now that AI has finished speaking
+    if (conn.pendingAssistantTranscript && conn.pendingAssistantTranscript.trim()) {
+      logger.info(`[OpenAI Realtime] Saving AI transcript now that AI finished speaking: "${conn.pendingAssistantTranscript}"`);
+      await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
+      conn.pendingAssistantTranscript = ''; // Clear the pending transcript
+    }
 
     // Reset response flag so new commits can trigger new responses
     conn._aiIsSpeaking = false;
