@@ -885,14 +885,14 @@ class OpenAIRealtimeService {
             }
           }, 1000);
         }
-      }, 10000); // 10 second timeout
+      }, 20000); // 20 second timeout
 
       // Add a more aggressive timeout check every 5 seconds
       const aggressiveTimeout = setInterval(() => {
         const currentConn = this.connections.get(callId);
         if (currentConn && currentConn._responseCreated && currentConn._responseStartTime) {
           const responseAge = Date.now() - currentConn._responseStartTime;
-          if (responseAge > 15000) { // 15 seconds
+          if (responseAge > 30000) { // 30 seconds
             logger.warn(`[OpenAI Realtime] Aggressive timeout for ${callId} - response stuck for ${responseAge}ms, forcing reset`);
             currentConn._responseCreated = false;
             currentConn._responseStartTime = null;
@@ -1355,33 +1355,6 @@ class OpenAIRealtimeService {
 
         case 'response.done':
           logger.info(`[OpenAI Realtime] AI FINISHED SPEAKING for ${callId}`);
-
-          if (conn) {
-            conn._aiIsSpeaking = false;
-            conn._lastAiSpeechEnd = Date.now();
-            conn._responseCreated = false;
-
-            // Clear the initial greeting flag - Bianca has now spoken
-            if (conn._waitingForInitialGreeting) {
-              logger.info(`[OpenAI Realtime] Initial greeting complete for ${callId} - grace period before accepting user input`);
-              conn._waitingForInitialGreeting = false;
-              conn._initialGreetingCompletedAt = Date.now(); // Track when greeting completed
-              logger.info(`[OpenAI Realtime] Grace period active for ${callId} - will ignore lingering audio for 3 seconds`);
-            }
-
-            // MESSAGE FLOW: Save AI transcript when AI finishes speaking
-            // This ensures AI messages get timestamps reflecting when AI actually finished speaking
-            if (conn.pendingAssistantTranscript) {
-              logger.info(`[OpenAI Realtime] Saving AI transcript for ${callId}: "${conn.pendingAssistantTranscript}"`);
-              await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
-              conn.pendingAssistantTranscript = '';
-            } else {
-              logger.warn(`[OpenAI Realtime] No pending AI transcript to save for ${callId}`);
-            }
-
-            logger.info(`[OpenAI Realtime] AI turn complete for ${callId} - ready for user input`);
-          }
-
           await this.handleResponseDone(callId);
           break;
 
@@ -1437,6 +1410,13 @@ class OpenAIRealtimeService {
           if (conn) {
             conn._userIsSpeaking = false;
             conn._lastUserSpeechEnd = Date.now();
+
+            // Save user transcript now that user has finished speaking
+            if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
+              logger.info(`[OpenAI Realtime] Saving user transcript now that user finished speaking: "${conn.pendingUserTranscript}"`);
+              await this.saveCompleteMessage(callId, 'patient', conn.pendingUserTranscript);
+              conn.pendingUserTranscript = ''; // Clear the pending transcript
+            }
 
             // Clean up any placeholder message if user stops speaking without transcript
             if (conn.activeUserMessageId) {
@@ -1825,17 +1805,45 @@ class OpenAIRealtimeService {
       return;
     }
 
-    // Clear the active assistant message ID since AI finished speaking
-    if (conn.activeAssistantMessageId) {
-      logger.info(`[OpenAI Realtime] Cleared active assistant message ID for ${callId}`);
-      conn.activeAssistantMessageId = null;
-    }
-
     // Save AI transcript now that AI has finished speaking
     if (conn.pendingAssistantTranscript && conn.pendingAssistantTranscript.trim()) {
       logger.info(`[OpenAI Realtime] Saving AI transcript now that AI finished speaking: "${conn.pendingAssistantTranscript}"`);
-      await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
+      
+      // Update the existing placeholder message if it exists
+      if (conn.activeAssistantMessageId) {
+        try {
+          const { Message } = require('../models');
+          await Message.findByIdAndUpdate(
+            conn.activeAssistantMessageId,
+            { 
+              content: conn.pendingAssistantTranscript.trim(),
+              messageType: 'assistant_response'
+            },
+            { timestamps: false, runValidators: false } // Preserve original timestamp
+          );
+          logger.info(`[OpenAI Realtime] Updated placeholder assistant message with transcript: "${conn.pendingAssistantTranscript}"`);
+          conn.activeAssistantMessageId = null; // Clear the active message ID
+        } catch (err) {
+          logger.error(`[OpenAI Realtime] Failed to update placeholder assistant message: ${err.message}`);
+          // Fallback: create new message if update fails
+          await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
+        }
+      } else {
+        // No placeholder exists, create new message
+        await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
+      }
+      
       conn.pendingAssistantTranscript = ''; // Clear the pending transcript
+    } else if (conn.activeAssistantMessageId) {
+      // No transcript but placeholder exists - remove the placeholder
+      try {
+        const { Message } = require('../models');
+        await Message.findByIdAndDelete(conn.activeAssistantMessageId);
+        logger.info(`[OpenAI Realtime] Removed placeholder assistant message with no transcript for ${callId}`);
+        conn.activeAssistantMessageId = null;
+      } catch (err) {
+        logger.error(`[OpenAI Realtime] Failed to remove placeholder assistant message: ${err.message}`);
+      }
     }
 
     // Reset response flag so new commits can trigger new responses
@@ -2101,15 +2109,9 @@ class OpenAIRealtimeService {
       }
     }
 
-    // Save user message using the conversation service for proper handling
-    // Note: This transcript IS what the assistant thinks the user said - no need for separate debug messages
-    await this.saveCompleteMessage(callId, 'patient', message.transcript);
-    logger.info(`[OpenAI Realtime] Saved user message with transcript: "${message.transcript}"`);
-    
-    // Clear any active user message ID since we've saved the message
-    if (conn.activeUserMessageId) {
-      conn.activeUserMessageId = null;
-    }
+    // Store the transcript for saving when user stops speaking
+    conn.pendingUserTranscript = message.transcript.trim();
+    logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${message.transcript}"`);
   }
 
   /**
