@@ -265,3 +265,10 @@ test.describe('Payment Methods Interactions', () => {
     expect(removeMessage).toContain('Failed to remove payment method')
   })
 })
+
+
+
+
+
+
+

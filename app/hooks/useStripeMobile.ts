@@ -56,3 +56,10 @@ export const useStripeMobile = (): StripeMobileComponents => {
 
   return components
 }
+
+
+
+
+
+
+
