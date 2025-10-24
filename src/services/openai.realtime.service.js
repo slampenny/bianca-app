@@ -38,6 +38,37 @@ const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw
 const { emergencyProcessor } = require('./emergencyProcessor.service');
 
 /**
+ * Conversation State Machine
+ * Handles the flow of conversation states to prevent race conditions and dual responses
+ */
+const CONVERSATION_STATES = {
+  INITIALIZING: 'initializing',           // Call setup, WebSocket connecting
+  WAITING_FOR_GREETING: 'waiting_for_greeting', // Initial greeting being generated
+  GREETING_ACTIVE: 'greeting_active',     // AI is speaking the initial greeting
+  GREETING_COMPLETE: 'greeting_complete', // Greeting finished, waiting for user
+  USER_SPEAKING: 'user_speaking',         // User is speaking
+  AI_RESPONDING: 'ai_responding',         // AI is generating/playing response
+  CONVERSATION_ACTIVE: 'conversation_active', // Normal conversation flow
+  CALL_ENDING: 'call_ending',             // Call is being terminated
+  ERROR: 'error'                          // Error state
+};
+
+/**
+ * State transition rules - what states can transition to what
+ */
+const STATE_TRANSITIONS = {
+  [CONVERSATION_STATES.INITIALIZING]: [CONVERSATION_STATES.WAITING_FOR_GREETING, CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.WAITING_FOR_GREETING]: [CONVERSATION_STATES.GREETING_ACTIVE, CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.GREETING_ACTIVE]: [CONVERSATION_STATES.GREETING_COMPLETE, CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.GREETING_COMPLETE]: [CONVERSATION_STATES.USER_SPEAKING, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.USER_SPEAKING]: [CONVERSATION_STATES.AI_RESPONDING, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.AI_RESPONDING]: [CONVERSATION_STATES.CONVERSATION_ACTIVE, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.CONVERSATION_ACTIVE]: [CONVERSATION_STATES.USER_SPEAKING, CONVERSATION_STATES.AI_RESPONDING, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.CALL_ENDING]: [CONVERSATION_STATES.ERROR],
+  [CONVERSATION_STATES.ERROR]: [CONVERSATION_STATES.INITIALIZING] // Can recover from error
+};
+
+/**
  * Constants for configuration
  */
 const CONSTANTS = {
@@ -58,6 +89,7 @@ const CONSTANTS = {
   MAX_CONSECUTIVE_SILENCE_CHUNKS: 50,
   SPEECH_END_SILENCE_MS: 1200, // Conservative: 1200ms instead of 800ms
   MIN_SPEECH_DURATION_MS: 800, // Conservative: 800ms instead of 500ms
+  GRACE_PERIOD_MS: 3000, // Grace period after greeting completion
 };
 
 const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
@@ -102,7 +134,119 @@ class OpenAIRealtimeService {
 
     this.notifyCallback = null;
 
-    logger.info('[OpenAI Realtime] Service initialized with BATCH COMMIT optimization');
+    logger.info('[OpenAI Realtime] Service initialized with BATCH COMMIT optimization and STATE MACHINE');
+  }
+
+  /**
+   * STATE MACHINE METHODS
+   * These methods manage conversation state transitions to prevent race conditions
+   */
+
+  /**
+   * Initialize conversation state for a new call
+   */
+  initializeConversationState(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn) return;
+
+    conn.conversationState = CONVERSATION_STATES.INITIALIZING;
+    conn.stateHistory = [{
+      state: CONVERSATION_STATES.INITIALIZING,
+      timestamp: Date.now(),
+      reason: 'call_initialized'
+    }];
+    
+    logger.info(`[State Machine] Initialized conversation state for ${callId}: ${conn.conversationState}`);
+  }
+
+  /**
+   * Transition to a new conversation state with validation
+   */
+  transitionState(callId, newState, reason = 'unknown') {
+    const conn = this.connections.get(callId);
+    if (!conn) {
+      logger.error(`[State Machine] Cannot transition state for ${callId} - no connection`);
+      return false;
+    }
+
+    const currentState = conn.conversationState;
+    const allowedTransitions = STATE_TRANSITIONS[currentState] || [];
+
+    if (!allowedTransitions.includes(newState)) {
+      logger.warn(`[State Machine] Invalid state transition for ${callId}: ${currentState} -> ${newState}. Allowed: ${allowedTransitions.join(', ')}`);
+      return false;
+    }
+
+    const previousState = conn.conversationState;
+    conn.conversationState = newState;
+    conn.stateHistory = conn.stateHistory || [];
+    conn.stateHistory.push({
+      state: newState,
+      timestamp: Date.now(),
+      reason: reason,
+      previousState: previousState
+    });
+
+    // Keep only last 10 state transitions to prevent memory bloat
+    if (conn.stateHistory.length > 10) {
+      conn.stateHistory = conn.stateHistory.slice(-10);
+    }
+
+    logger.info(`[State Machine] ${callId}: ${previousState} -> ${newState} (${reason})`);
+    return true;
+  }
+
+  /**
+   * Check if a state transition is allowed
+   */
+  canTransitionTo(callId, newState) {
+    const conn = this.connections.get(callId);
+    if (!conn) return false;
+
+    const currentState = conn.conversationState;
+    const allowedTransitions = STATE_TRANSITIONS[currentState] || [];
+    return allowedTransitions.includes(newState);
+  }
+
+  /**
+   * Get current conversation state
+   */
+  getConversationState(callId) {
+    const conn = this.connections.get(callId);
+    return conn ? conn.conversationState : null;
+  }
+
+  /**
+   * Check if we're in a state where AI can respond
+   */
+  canAIRespond(callId) {
+    const state = this.getConversationState(callId);
+    return [
+      CONVERSATION_STATES.GREETING_COMPLETE,
+      CONVERSATION_STATES.CONVERSATION_ACTIVE
+    ].includes(state);
+  }
+
+  /**
+   * Check if we're in a state where user can speak
+   */
+  canUserSpeak(callId) {
+    const state = this.getConversationState(callId);
+    return [
+      CONVERSATION_STATES.GREETING_COMPLETE,
+      CONVERSATION_STATES.CONVERSATION_ACTIVE
+    ].includes(state);
+  }
+
+  /**
+   * Check if we're in the grace period after greeting completion
+   */
+  isInGracePeriod(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn || !conn._initialGreetingCompletedAt) return false;
+
+    const timeSinceGreeting = Date.now() - conn._initialGreetingCompletedAt;
+    return timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS;
   }
 
   /**
@@ -545,10 +689,17 @@ class OpenAIRealtimeService {
       lastSpeechTime: null, // When we last heard speech
       hasHeardSpeech: false, // Whether we've heard any speech yet
       firstSpeechTime: null, // When speech started for current utterance
+
+      // State machine properties
+      conversationState: null,
+      stateHistory: []
     });
     this.reconnectAttempts.set(callId, 0);
     this.isReconnecting.set(callId, false);
     this.pendingAudio.set(callId, []); // Initialize buffer
+
+    // Initialize conversation state
+    this.initializeConversationState(callId);
 
     try {
       await this.connect(callId);
@@ -646,6 +797,7 @@ class OpenAIRealtimeService {
    * Send response.create to trigger OpenAI to generate responses - ENHANCED with diagnostics
    */
   async sendResponseCreate(callId) {
+    logger.info(`[OpenAI Realtime] DEBUG: sendResponseCreate called for ${callId}`);
     const connection = this.connections.get(callId);
     if (!connection) {
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no connection object for ${callId}`);
@@ -664,6 +816,13 @@ class OpenAIRealtimeService {
 
     if (!connection.sessionReady) {
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - session not ready for ${callId}`);
+      return;
+    }
+
+    // STATE MACHINE: Check if we can create a response in current state
+    const currentState = this.getConversationState(callId);
+    if (![CONVERSATION_STATES.WAITING_FOR_GREETING, CONVERSATION_STATES.AI_RESPONDING].includes(currentState)) {
+      logger.warn(`[OpenAI Realtime] Cannot create response in state ${currentState} for ${callId}`);
       return;
     }
 
@@ -693,6 +852,23 @@ class OpenAIRealtimeService {
           // Force a new response generation after timeout
           setTimeout(async () => {
             try {
+              // Check grace period to prevent dual responses after initial greeting
+              const currentConn = this.connections.get(callId);
+              if (currentConn) {
+                const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
+                  ? Date.now() - currentConn._initialGreetingCompletedAt 
+                  : Infinity;
+                const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+                if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                  logger.info(
+                    `[OpenAI Realtime] Skipping timeout recovery for ${callId} - in grace period ` +
+                    `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                  );
+                  return;
+                }
+              }
+              
               logger.info(`[OpenAI Realtime] Attempting to generate new response after timeout for ${callId}`);
               await this.sendResponseCreate(callId);
             } catch (err) {
@@ -716,6 +892,23 @@ class OpenAIRealtimeService {
             // Force a new response generation
             setTimeout(async () => {
               try {
+                // Check grace period to prevent dual responses after initial greeting
+                const currentConn = this.connections.get(callId);
+                if (currentConn) {
+                  const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
+                    ? Date.now() - currentConn._initialGreetingCompletedAt 
+                    : Infinity;
+                  const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+                  if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                    logger.info(
+                      `[OpenAI Realtime] Skipping aggressive timeout recovery for ${callId} - in grace period ` +
+                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                    );
+                    return;
+                  }
+                }
+                
                 logger.info(`[OpenAI Realtime] Attempting to generate new response after aggressive timeout for ${callId}`);
                 await this.sendResponseCreate(callId);
               } catch (err) {
@@ -964,8 +1157,21 @@ class OpenAIRealtimeService {
             // After flushing, automatically trigger response generation if we have audio
             const currentConn = this.connections.get(callId);
             if (currentConn && currentConn.validAudioChunksSent > 0) {
-              logger.info(`[OpenAI Realtime] Auto-triggering response generation after recovery for ${callId}`);
-              await this.sendResponseCreate(callId);
+              // Check grace period to prevent dual responses after initial greeting
+              const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
+                ? Date.now() - currentConn._initialGreetingCompletedAt 
+                : Infinity;
+              const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+              if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                logger.info(
+                  `[OpenAI Realtime] Skipping reconnection recovery for ${callId} - in grace period ` +
+                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                );
+              } else {
+                logger.info(`[OpenAI Realtime] Auto-triggering response generation after recovery for ${callId}`);
+                await this.sendResponseCreate(callId);
+              }
             }
           } catch (flushErr) {
             logger.error(`[OpenAI Realtime] Error flushing audio after reconnection for ${callId}: ${flushErr.message}`);
@@ -1189,6 +1395,11 @@ class OpenAIRealtimeService {
             conn._userIsSpeaking = true;
             conn._lastUserSpeechStart = Date.now();
 
+            // STATE MACHINE: Transition to user speaking state
+            if (this.canUserSpeak(callId)) {
+              this.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, 'user_started_speaking');
+            }
+
             // Create placeholder message when user starts speaking
             // This ensures the timestamp reflects when user actually started speaking
             await this.createPlaceholderUserMessage(callId);
@@ -1200,6 +1411,8 @@ class OpenAIRealtimeService {
                 // Cancel any ongoing AI response
                 await this.sendJsonMessage(callId, { type: 'response.cancel' });
                 conn._aiIsSpeaking = false;
+                // Transition back to conversation active since AI was interrupted
+                this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
               } catch (err) {
                 logger.error(`[OpenAI Realtime] Failed to cancel AI response: ${err.message}`);
               }
@@ -1228,43 +1441,48 @@ class OpenAIRealtimeService {
               }
             }
 
-            // CRITICAL: Only trigger AI response if user has finished speaking
-            // and AI is not already speaking
-            if (!conn._aiIsSpeaking) {
-              // FIX: Check if we're in grace period after initial greeting
-              const timeSinceGreeting = conn._initialGreetingCompletedAt 
-                ? Date.now() - conn._initialGreetingCompletedAt 
-                : Infinity;
-              const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
-
-              if (timeSinceGreeting < GRACE_PERIOD_MS) {
+            // STATE MACHINE: Only trigger AI response if we're in the right state
+            if (!conn._aiIsSpeaking && this.canAIRespond(callId)) {
+              // Check if we're in grace period after initial greeting
+              if (this.isInGracePeriod(callId)) {
+                const timeSinceGreeting = Date.now() - conn._initialGreetingCompletedAt;
                 logger.info(
                   `[OpenAI Realtime] Ignoring speech_stopped for ${callId} - in grace period ` +
-                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms). ` +
+                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms). ` +
                   `This prevents lingering audio from "hello" or transfer message from triggering response.`
                 );
                 return; // Don't trigger response - this is likely lingering audio
               }
 
-              logger.info(`[OpenAI Realtime] User finished speaking - will trigger AI response for ${callId}`);
+              // Transition to AI_RESPONDING state
+              if (this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_finished_speaking')) {
+                logger.info(`[OpenAI Realtime] User finished speaking - will trigger AI response for ${callId}`);
 
-              // Small delay to ensure audio processing is complete
-              setTimeout(async () => {
-                const currentConn = this.connections.get(callId);
-                if (currentConn && !currentConn._userIsSpeaking && !currentConn._aiIsSpeaking && !currentConn._waitingForInitialGreeting) {
-                  try {
-                    await this.sendResponseCreate(callId);
-                    currentConn._aiIsSpeaking = true;
-                    logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
-                  } catch (err) {
-                    logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
+                // Small delay to ensure audio processing is complete
+                setTimeout(async () => {
+                  const currentConn = this.connections.get(callId);
+                  if (currentConn && this.getConversationState(callId) === CONVERSATION_STATES.AI_RESPONDING) {
+                    try {
+                      logger.info(`[OpenAI Realtime] DEBUG: About to trigger response for ${callId} - _responseCreated: ${currentConn._responseCreated}, _responseStartTime: ${currentConn._responseStartTime}`);
+                      await this.sendResponseCreate(callId);
+                      currentConn._aiIsSpeaking = true;
+                      logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
+                    } catch (err) {
+                      logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
+                      // Revert state on error
+                      this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
+                    }
+                  } else {
+                    logger.info(`[OpenAI Realtime] Skipping auto-response trigger for ${callId} - state changed or connection lost`);
                   }
-                } else if (currentConn && currentConn._waitingForInitialGreeting) {
-                  logger.info(`[OpenAI Realtime] Skipping auto-response trigger for ${callId} - still waiting for initial greeting`);
-                }
-              }, 200);
-            } else {
+                }, 200);
+              } else {
+                logger.warn(`[OpenAI Realtime] Cannot transition to AI_RESPONDING state for ${callId}`);
+              }
+            } else if (conn._aiIsSpeaking) {
               logger.info(`[OpenAI Realtime] User finished speaking but AI is already speaking for ${callId}`);
+            } else {
+              logger.info(`[OpenAI Realtime] User finished speaking but cannot respond in current state: ${this.getConversationState(callId)}`);
             }
           }
 
@@ -1446,9 +1664,14 @@ class OpenAIRealtimeService {
           conn._initialGreetingTriggered = true;
           conn._waitingForInitialGreeting = true;
           
-          // Trigger the initial greeting
-          await this.sendResponseCreate(callId);
-          logger.info(`[OpenAI Realtime] Initial greeting triggered for ${callId}`);
+          // STATE MACHINE: Transition to waiting for greeting and trigger initial greeting
+          if (this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'session_ready')) {
+            await this.sendResponseCreate(callId);
+            this.transitionState(callId, CONVERSATION_STATES.GREETING_ACTIVE, 'initial_greeting_triggered');
+            logger.info(`[OpenAI Realtime] Initial greeting triggered for ${callId}`);
+          } else {
+            logger.warn(`[OpenAI Realtime] Cannot transition to WAITING_FOR_GREETING state for ${callId}`);
+          }
         } else {
           logger.info(`[OpenAI Realtime] Initial greeting already triggered for ${callId}, skipping`);
         }
@@ -1625,8 +1848,23 @@ class OpenAIRealtimeService {
     // No need to save here since we handle it in handleResponseAudioTranscriptDone
 
     // Reset response flag so new commits can trigger new responses
+    conn._aiIsSpeaking = false;
     conn._responseCreated = false;
     conn._responseStartTime = null; // Clear timeout tracking
+
+    // STATE MACHINE: Transition based on current state
+    const currentState = this.getConversationState(callId);
+    if (currentState === CONVERSATION_STATES.GREETING_ACTIVE) {
+      // Initial greeting completed
+      conn._initialGreetingCompletedAt = Date.now();
+      this.transitionState(callId, CONVERSATION_STATES.GREETING_COMPLETE, 'initial_greeting_completed');
+      logger.info(`[OpenAI Realtime] Initial greeting completed for ${callId} - entering grace period`);
+    } else if (currentState === CONVERSATION_STATES.AI_RESPONDING) {
+      // Regular AI response completed
+      this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_completed');
+      logger.info(`[OpenAI Realtime] AI response completed for ${callId} - ready for user input`);
+    }
+
     logger.info(`[OpenAI Realtime] Reset response flag for ${callId} - ready for new responses`);
 
     this.notify(callId, 'response_done', {});
@@ -2782,8 +3020,21 @@ class OpenAIRealtimeService {
 
           // Try to generate a response if we have audio
           if (conn.validAudioChunksSent > 0) {
-            logger.info(`[OpenAI Realtime] Auto-triggering response generation after force recovery for ${callId}`);
-            await this.sendResponseCreate(callId);
+            // Check grace period to prevent dual responses after initial greeting
+            const timeSinceGreeting = conn._initialGreetingCompletedAt 
+              ? Date.now() - conn._initialGreetingCompletedAt 
+              : Infinity;
+            const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+            if (timeSinceGreeting < GRACE_PERIOD_MS) {
+              logger.info(
+                `[OpenAI Realtime] Skipping force recovery for ${callId} - in grace period ` +
+                `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+              );
+            } else {
+              logger.info(`[OpenAI Realtime] Auto-triggering response generation after force recovery for ${callId}`);
+              await this.sendResponseCreate(callId);
+            }
           }
         }
       }
