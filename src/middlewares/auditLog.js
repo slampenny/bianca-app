@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { AuditLog } = require('../models');
 const logger = require('../config/logger');
 
@@ -129,8 +130,8 @@ const auditMiddleware = async (req, res, next) => {
       
       const auditData = {
         timestamp: new Date(),
-        userId: req.caregiver?._id || req.caregiver?.id || 'system',
-        userRole: req.caregiver?.role || 'unauthenticated',
+        userId: req.caregiver?._id || req.caregiver?.id || new mongoose.Types.ObjectId(),
+        userRole: req.caregiver?.role || 'unverified',
         action: auditConfig.action,
         resource: auditConfig.resource,
         resourceId: resourceId.toString(),
@@ -222,10 +223,13 @@ const auditMiddleware = async (req, res, next) => {
  */
 const auditAuthFailure = async (email, ipAddress, userAgent, errorMessage) => {
   try {
+    // Create a system ObjectId for failed logins
+    const systemUserId = new mongoose.Types.ObjectId();
+    
     await AuditLog.createLog({
       timestamp: new Date(),
-      userId: 'system', // No user ID for failed login
-      userRole: 'unauthenticated',
+      userId: systemUserId, // Use ObjectId for system
+      userRole: 'unverified', // Failed logins are from unverified users
       userEmail: email, // Will be hashed by pre-save hook
       action: 'LOGIN_FAILED',
       resource: 'session',

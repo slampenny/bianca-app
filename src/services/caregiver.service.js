@@ -103,15 +103,35 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
   
-  // If this is an unverified user completing their profile with a phone number, promote them to orgAdmin
-  if (caregiver.role === 'unverified' && updateBody.phone) {
-    updateBody.role = 'orgAdmin';
+  // If this is an unverified or invited user completing their profile with a phone number, promote them appropriately
+  if ((caregiver.role === 'unverified' || caregiver.role === 'invited') && updateBody.phone) {
+    // Set phone first before changing role (to avoid validation issues)
+    caregiver.phone = updateBody.phone;
     
-    // Also update the organization's phone number if it's not set
-    const org = await Org.findById(caregiver.org);
-    if (org && !org.phone) {
-      org.phone = updateBody.phone;
-      await org.save();
+    // Also set password before changing role if it's provided (required when becoming staff)
+    if (updateBody.password) {
+      caregiver.password = updateBody.password;
+      delete updateBody.password; // Remove from updateBody to avoid duplicate assignment
+    }
+    
+    delete updateBody.phone; // Remove from updateBody to avoid duplicate assignment
+    
+    if (caregiver.role === 'invited') {
+      // Invited user - promote to staff
+      updateBody.role = 'staff';
+    } else if (caregiver.ssoProvider) {
+      // SSO user who created their own org - promote to orgAdmin
+      updateBody.role = 'orgAdmin';
+      
+      // Also update the organization's phone number if it's not set
+      const org = await Org.findById(caregiver.org);
+      if (org && !org.phone) {
+        org.phone = caregiver.phone;
+        await org.save();
+      }
+    } else {
+      // Unverified user without SSO (shouldn't happen in normal flow, but handle gracefully)
+      updateBody.role = 'staff';
     }
   }
   

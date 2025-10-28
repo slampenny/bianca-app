@@ -35,22 +35,41 @@ check_and_login_ecr() {
     local context=$1
     echo "🔐 Checking ECR login for $context..."
     
-    if aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
-        echo "✅ ECR login successful for $context"
+    # Try multiple approaches for ECR login
+    echo "🔄 Attempting ECR login..."
+    
+    # Method 1: Standard AWS CLI with profile
+    if aws ecr get-login-password --region us-east-2 --profile jordan 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
+        echo "✅ ECR login successful for $context (method 1)"
         return 0
-    else
-        echo "❌ ECR login failed for $context. This is a known WSL2 issue."
-        echo "💡 Try running this command manually:"
-        echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
-        echo "   Then run the deployment script again."
-        return 1
     fi
+    
+    # Method 2: Try without profile (uses default credentials)
+    if aws ecr get-login-password --region us-east-2 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
+        echo "✅ ECR login successful for $context (method 2)"
+        return 0
+    fi
+    
+    # Method 3: Try with explicit credentials
+    if AWS_PROFILE=jordan aws ecr get-login-password --region us-east-2 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
+        echo "✅ ECR login successful for $context (method 3)"
+        return 0
+    fi
+    
+    echo "❌ ECR login failed for $context after trying multiple methods."
+    echo "💡 This is a known WSL2 issue. Try running this command manually:"
+    echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+    echo "   Then run the deployment script again."
+    echo "⚠️  Continuing deployment without ECR push (images will be built locally only)"
+    return 1
 }
 
 echo "🚀 Deploying Bianca Production Environment..."
 
 # Check for flags
 SKIP_ECR=false
+SKIP_BACKEND_PUSH=false
+SKIP_FRONTEND_PUSH=false
 FORCE_CLEANUP=false
 
 for arg in "$@"; do
@@ -70,6 +89,11 @@ done
 
 # Step 1: Build and push Docker images (backend and frontend)
 echo "🐳 Building and pushing backend Docker image..."
+
+# Logout from Docker Hub to avoid credential issues in WSL2
+echo "🔓 Logging out from Docker Hub to avoid credential issues..."
+docker logout docker.io 2>/dev/null || true
+
 docker build -t bianca-app-backend:production .
 
 if [ $? -ne 0 ]; then
@@ -92,21 +116,33 @@ echo "✅ AWS credentials are valid"
 
 # Check and login to ECR for backend
 if [ "$SKIP_ECR" = false ]; then
-    check_and_login_ecr "backend push" || exit 1
+    if ! check_and_login_ecr "backend push"; then
+        echo "⚠️  Skipping backend ECR push due to login failure"
+        SKIP_BACKEND_PUSH=true
+    fi
 else
     echo "⏭️  Skipping ECR login for backend push"
 fi
 
-echo "📦 Pushing backend image to ECR..."
-docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production
+if [ "$SKIP_BACKEND_PUSH" != true ]; then
+    echo "📦 Pushing backend image to ECR..."
+    docker tag bianca-app-backend:production 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production
+    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production
 
-if [ $? -ne 0 ]; then
-    echo "❌ Backend docker push failed. Please check the error above."
-    exit 1
+    if [ $? -ne 0 ]; then
+        echo "❌ Backend docker push failed. Please check the error above."
+        exit 1
+    fi
+else
+    echo "⏭️  Skipping backend ECR push"
 fi
 
 echo "🐳 Building and pushing frontend Docker image..."
 cd ../bianca-app-frontend
+
+# Logout from Docker Hub again before frontend build (in case we logged back in for ECR)
+docker logout docker.io 2>/dev/null || true
+
 # Build frontend with production config for proper environment
 docker build -t bianca-app-frontend:production -f devops/Dockerfile --build-arg BUILD_ENV=production .
 
@@ -119,17 +155,24 @@ docker tag bianca-app-frontend:production 730335291008.dkr.ecr.us-east-2.amazona
 
 # Check and login to ECR for frontend (credentials might have expired)
 if [ "$SKIP_ECR" = false ]; then
-    check_and_login_ecr "frontend push" || exit 1
+    if ! check_and_login_ecr "frontend push"; then
+        echo "⚠️  Skipping frontend ECR push due to login failure"
+        SKIP_FRONTEND_PUSH=true
+    fi
 else
     echo "⏭️  Skipping ECR login for frontend push"
 fi
 
-echo "📦 Pushing frontend image to ECR..."
-docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:production
+if [ "$SKIP_FRONTEND_PUSH" != true ]; then
+    echo "📦 Pushing frontend image to ECR..."
+    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:production
 
-if [ $? -ne 0 ]; then
-    echo "❌ Frontend docker push failed. Please check the error above."
-    exit 1
+    if [ $? -ne 0 ]; then
+        echo "❌ Frontend docker push failed. Please check the error above."
+        exit 1
+    fi
+else
+    echo "⏭️  Skipping frontend ECR push"
 fi
 
 cd ../bianca-app-backend
@@ -163,8 +206,9 @@ fi
 echo "🚀 Deploying production infrastructure..."
 echo "📋 Setting terraform environment to production..."
 export TF_VAR_environment=production
-docker run --rm -v "$(pwd):/app" -v "/home/jordanlapp/.aws:/root/.aws" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 -e TF_VAR_environment=production hashicorp/terraform:latest plan -no-color -input=false
-docker run --rm -v "$(pwd):/app" -v "/home/jordanlapp/.aws:/root/.aws" -w /app/devops/terraform -e AWS_PROFILE=jordan -e AWS_SDK_LOAD_CONFIG=1 -e AWS_DEFAULT_REGION=us-east-2 -e TF_VAR_environment=production hashicorp/terraform:latest apply --auto-approve
+
+# Use yarn terraform:deploy like staging does
+yarn terraform:deploy
 
 # Step 2.5: If userdata changes were made, recreate the instance
 echo "🔄 Checking if instance needs to be recreated due to userdata changes..."
@@ -199,46 +243,13 @@ if [ -n "$PRODUCTION_IP" ]; then
         exit 1
     fi
     
-    # Copy production override file to the instance
-    echo "Copying production override configuration..."
+    # NOTE: Do NOT copy docker-compose files!
+    # The production-userdata.sh script creates docker-compose.yml dynamically
+    # with secrets from AWS Secrets Manager. Copying local files would overwrite these.
+    echo "ℹ️  Using docker-compose.yml created by instance userdata (contains AWS secrets)"
     
     # Add SSH options to avoid host key verification prompts
     SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    
-    # Ensure the files exist before copying
-    if [ ! -f "docker-compose.yml" ]; then
-        echo "❌ docker-compose.yml not found in $(pwd)"
-        exit 1
-    fi
-    
-    if [ ! -f "docker-compose.production.yml" ]; then
-        echo "❌ docker-compose.production.yml not found in $(pwd)"
-        exit 1
-    fi
-    
-    # Copy both docker-compose files
-    echo "  Copying docker-compose.yml..."
-    scp $SSH_OPTS docker-compose.yml ec2-user@$PRODUCTION_IP:~/
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to copy docker-compose.yml to production instance"
-        exit 1
-    fi
-    
-    echo "  Copying docker-compose.production.yml..."
-    scp $SSH_OPTS docker-compose.production.yml ec2-user@$PRODUCTION_IP:~/
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to copy docker-compose.production.yml to production instance"
-        exit 1
-    fi
-    
-    # Move them to the correct location
-    ssh $SSH_OPTS ec2-user@$PRODUCTION_IP "sudo mkdir -p /opt/bianca-production && sudo mv ~/docker-compose.yml ~/docker-compose.production.yml /opt/bianca-production/ && sudo chown root:root /opt/bianca-production/*.yml"
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to move docker-compose files to /opt/bianca-production/"
-        exit 1
-    fi
-    
-    echo "✅ Configuration files copied successfully"
     
     ssh $SSH_OPTS ec2-user@$PRODUCTION_IP "
       cd /opt/bianca-production
@@ -249,14 +260,14 @@ if [ -n "$PRODUCTION_IP" ]; then
       # Create MongoDB data directory
       sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
       
-      # Pull latest images
-      docker-compose -f docker-compose.yml -f docker-compose.production.yml pull
+      # Pull latest images (use only the userdata-created docker-compose.yml)
+      docker-compose pull
       
       if [ '$FORCE_CLEANUP' = 'true' ]; then
         echo 'Force cleanup: Stopping and removing ALL containers...'
         
         # Stop and remove all containers
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml down || true
+        docker-compose down || true
         
         # Force stop all running containers
         docker stop \$(docker ps -q) 2>/dev/null || true
@@ -272,16 +283,18 @@ if [ -n "$PRODUCTION_IP" ]; then
       else
         echo 'Stopping and removing application containers (preserving MongoDB)...'
         
-        # Stop and remove all containers EXCEPT MongoDB (preserve database)
+        # Stop and remove only the application containers (not MongoDB)
         # Note: docker-compose uses service names, not container names
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml stop app frontend asterisk nginx || true
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml rm -f app frontend asterisk nginx || true
+        docker-compose stop app asterisk frontend nginx || true
+        docker-compose rm -f app asterisk frontend nginx || true
         
-        # Remove any orphaned containers with our project names (but NOT mongodb)
+        # Remove any orphaned containers with our project names
         docker rm -f \$(docker ps -aq --filter 'name=production_app') 2>/dev/null || true
-        docker rm -f \$(docker ps -aq --filter 'name=production_frontend') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=production_asterisk') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=production_frontend') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=production_nginx') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=production_bianca-app') 2>/dev/null || true
+        docker rm -f \$(docker ps -aq --filter 'name=bianca-app') 2>/dev/null || true
         
         # Clean up unused images and networks
         docker image prune -f
@@ -292,13 +305,13 @@ if [ -n "$PRODUCTION_IP" ]; then
       
       # Check if MongoDB container already exists (running or stopped)
       if docker ps -aq --filter 'name=production_mongodb' | grep -q .; then
-        echo 'MongoDB container already exists, starting all other services...'
-        # Start only the non-MongoDB services
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d --no-deps app frontend asterisk nginx
+        echo 'MongoDB container already exists, starting only app, asterisk, frontend, and nginx...'
+        # Start only the application services, skip MongoDB
+        docker-compose up -d --no-deps app asterisk frontend nginx
       else
         echo 'Starting all containers (including MongoDB)...'
         # Start all containers (MongoDB will be created)
-        docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+        docker-compose up -d
       fi
     "
     
