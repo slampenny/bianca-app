@@ -9,52 +9,45 @@
 
 # Helper function to check and login to ECR
 check_and_login_ecr() {
-    local context="$1"
-    echo "🔐 Checking ECR access for $context..."
+    local context=$1
+    echo "🔐 Checking ECR login for $context..."
     
-    # Check if Docker is already logged into ECR
-    if docker info | grep -q "730335291008.dkr.ecr.us-east-2.amazonaws.com" 2>/dev/null; then
-        echo "✅ ECR credentials are still valid for $context, skipping login"
+    # Try multiple approaches for ECR login
+    echo "🔄 Attempting ECR login..."
+    
+    # Method 1: Standard AWS CLI with profile
+    if aws ecr get-login-password --region us-east-2 --profile jordan 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
+        echo "✅ ECR login successful for $context (method 1)"
         return 0
     fi
     
-    echo "🔐 Logging into ECR for $context..."
-    
-    # Try multiple approaches for WSL2 compatibility
-    local login_success=false
-    
-    # Approach 1: Direct pipe (most common)
-    if aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com 2>/dev/null; then
-        login_success=true
-    else
-        echo "⚠️  Direct pipe failed, trying alternative approach..."
-        
-        # Approach 2: Save password to temp file (WSL2 workaround)
-        local temp_password_file=$(mktemp)
-        if aws ecr get-login-password --region us-east-2 --profile jordan > "$temp_password_file" 2>/dev/null; then
-            if docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com < "$temp_password_file" 2>/dev/null; then
-                login_success=true
-            fi
-            rm -f "$temp_password_file"
-        fi
-    fi
-    
-    if [ "$login_success" = true ]; then
-        echo "✅ ECR login successful for $context"
+    # Method 2: Try without profile (uses default credentials)
+    if aws ecr get-login-password --region us-east-2 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
+        echo "✅ ECR login successful for $context (method 2)"
         return 0
-    else
-        echo "❌ ECR login failed for $context. This is a known WSL2 issue."
-        echo "💡 Try running this command manually:"
-        echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
-        echo "   Then run the deployment script again."
-        return 1
     fi
+    
+    # Method 3: Try with explicit credentials
+    if AWS_PROFILE=jordan aws ecr get-login-password --region us-east-2 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
+        echo "✅ ECR login successful for $context (method 3)"
+        return 0
+    fi
+    
+    echo "❌ ECR login failed for $context after trying multiple methods."
+    echo "💡 This is a known WSL2 issue. Try running this command manually:"
+    echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+    echo "   Then run the deployment script again."
+    echo "⚠️  Continuing deployment without ECR push (images will be built locally only)"
+    return 1
 }
 
 echo "🚀 Deploying Bianca Staging Environment..."
 
 # Check for flags
 SKIP_ECR=false
+SKIP_BACKEND_PUSH=false
+SKIP_FRONTEND_PUSH=false
+SKIP_ASTERISK_PUSH=false
 FORCE_CLEANUP=false
 
 for arg in "$@"; do
@@ -74,6 +67,11 @@ done
 
 # Step 1: Build and push Docker images (backend, frontend, and asterisk)
 echo "🐳 Building and pushing backend Docker image..."
+
+# Logout from Docker Hub to avoid credential issues in WSL2
+echo "🔓 Logging out from Docker Hub to avoid credential issues..."
+docker logout docker.io 2>/dev/null || true
+
 docker build -t bianca-app-backend:staging .
 
 if [ $? -ne 0 ]; then
@@ -96,17 +94,23 @@ echo "✅ AWS credentials are valid"
 
 # Check and login to ECR for backend
 if [ "$SKIP_ECR" = false ]; then
-    check_and_login_ecr "backend push" || exit 1
+    if ! check_and_login_ecr "backend push"; then
+        echo "⚠️  Skipping backend ECR push due to login failure"
+        SKIP_BACKEND_PUSH=true
+    fi
 else
     echo "⏭️  Skipping ECR login for backend push"
 fi
 
-echo "📦 Pushing backend image to ECR..."
-docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
-
-if [ $? -ne 0 ]; then
-    echo "❌ Backend docker push failed. Please check the error above."
-    exit 1
+if [ "$SKIP_BACKEND_PUSH" != true ]; then
+    echo "📦 Pushing backend image to ECR..."
+    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
+    if [ $? -ne 0 ]; then
+        echo "❌ Backend docker push failed. Please check the error above."
+        exit 1
+    fi
+else
+    echo "⏭️  Skipping backend ECR push"
 fi
 
 echo "🐳 Building and pushing asterisk Docker image..."
@@ -121,21 +125,32 @@ docker tag bianca-app-asterisk:staging 730335291008.dkr.ecr.us-east-2.amazonaws.
 
 # Check and login to ECR for asterisk
 if [ "$SKIP_ECR" = false ]; then
-    check_and_login_ecr "asterisk push" || exit 1
+    if ! check_and_login_ecr "asterisk push"; then
+        echo "⚠️  Skipping asterisk ECR push due to login failure"
+        SKIP_ASTERISK_PUSH=true
+    fi
 else
     echo "⏭️  Skipping ECR login for asterisk push"
 fi
 
-echo "📦 Pushing asterisk image to ECR..."
-docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
-
-if [ $? -ne 0 ]; then
-    echo "❌ Asterisk docker push failed. Please check the error above."
-    exit 1
+if [ "$SKIP_ASTERISK_PUSH" != true ]; then
+    echo "📦 Pushing asterisk image to ECR..."
+    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+    if [ $? -ne 0 ]; then
+        echo "❌ Asterisk docker push failed. Please check the error above."
+        exit 1
+    fi
+else
+    echo "⏭️  Skipping asterisk ECR push"
 fi
 
 echo "🐳 Building and pushing frontend Docker image..."
 cd ../bianca-app-frontend
+
+# Logout from Docker Hub to avoid credential issues in WSL2
+echo "🔓 Logging out from Docker Hub to avoid credential issues..."
+docker logout docker.io 2>/dev/null || true
+
 # Build frontend with staging config for proper environment
 docker build -t bianca-app-frontend:staging -f devops/Dockerfile --build-arg BUILD_ENV=staging .
 
@@ -148,17 +163,23 @@ docker tag bianca-app-frontend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.
 
 # Check and login to ECR for frontend (credentials might have expired)
 if [ "$SKIP_ECR" = false ]; then
-    check_and_login_ecr "frontend push" || exit 1
+    if ! check_and_login_ecr "frontend push"; then
+        echo "⚠️  Skipping frontend ECR push due to login failure"
+        SKIP_FRONTEND_PUSH=true
+    fi
 else
     echo "⏭️  Skipping ECR login for frontend push"
 fi
 
-echo "📦 Pushing frontend image to ECR..."
-docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
-
-if [ $? -ne 0 ]; then
-    echo "❌ Frontend docker push failed. Please check the error above."
-    exit 1
+if [ "$SKIP_FRONTEND_PUSH" != true ]; then
+    echo "📦 Pushing frontend image to ECR..."
+    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
+    if [ $? -ne 0 ]; then
+        echo "❌ Frontend docker push failed. Please check the error above."
+        exit 1
+    fi
+else
+    echo "⏭️  Skipping frontend ECR push"
 fi
 
 cd ../bianca-app-backend
