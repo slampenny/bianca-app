@@ -44,6 +44,13 @@ const getConversationById = async (id) => {
   if (!conversation) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
+  
+  // Debug logging for message retrieval
+  logger.info(`[Conversation Service] Retrieved conversation ${id} with ${conversation.messages?.length || 0} messages`);
+  if (conversation.messages && conversation.messages.length > 0) {
+    logger.info(`[Conversation Service] Latest message: ${conversation.messages[conversation.messages.length - 1]?.content?.substring(0, 50)}...`);
+  }
+  
   return conversation;
 };
 
@@ -250,7 +257,7 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
       }
     );
 
-    logger.debug(`[Realtime Message] Saved ${role} message to conversation ${conversationId}`);
+    logger.info(`[Realtime Message] Successfully saved ${role} message to conversation ${conversationId}: "${content.substring(0, 100)}..."`);
     return message;
   } catch (err) {
     logger.error(`[Realtime Message] Error saving message: ${err.message}`);
