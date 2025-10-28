@@ -163,7 +163,7 @@ test.describe('SSO Email Verification Workflow', () => {
       };
 
       // First register with email
-      await page.click('[data-testid="register-button"]');
+      await page.click('[accessibilityLabel="register-link"]');
       await page.fill('[data-testid="name-input"]', testUser.name);
       await page.fill('[data-testid="email-input"]', testUser.email);
       await page.fill('[data-testid="password-input"]', testUser.password);
@@ -234,7 +234,7 @@ test.describe('SSO Email Verification Workflow', () => {
       await expect(page).toHaveURL(/.*login/);
 
       // Try to register with same email
-      await page.click('[data-testid="register-button"]');
+      await page.click('[accessibilityLabel="register-link"]');
       await page.fill('[data-testid="name-input"]', 'SSO First User');
       await page.fill('[data-testid="email-input"]', 'sso-first@example.com');
       await page.fill('[data-testid="password-input"]', 'Password123');
