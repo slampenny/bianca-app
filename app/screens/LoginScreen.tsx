@@ -5,6 +5,8 @@ import { StackNavigationProp } from "@react-navigation/stack"
 import { useLoginMutation } from "../services/api/authApi"
 import { setAuthEmail, setAuthTokens, setCurrentUser, getValidationError, getAuthEmail } from "../store/authSlice"
 import { setCaregiver } from "../store/caregiverSlice"
+import { setOrg } from "../store/orgSlice"
+import { orgApi } from "../services/api/orgApi"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Button, Header, Screen, Text, TextField } from "app/components"
 import { colors } from "app/theme/colors"
@@ -90,6 +92,21 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         dispatch(setAuthEmail(user.email));
         dispatch(setCurrentUser(user.backendUser));
         dispatch(setCaregiver(user.backendUser));
+        
+        // Fetch and set org data if the user has an org
+        if (user.backendUser.org) {
+          try {
+            const orgResponse = await dispatch(orgApi.endpoints.getOrg.initiate({ orgId: user.backendUser.org }));
+            if (orgResponse.data) {
+              dispatch(setOrg(orgResponse.data));
+              console.log('SSO login successful - org loaded:', orgResponse.data);
+            }
+          } catch (orgError) {
+            console.error('Failed to load org data after SSO login:', orgError);
+            // Don't fail the login if org loading fails
+          }
+        }
+        
         setErrorMessage(""); // Clear any previous errors
         console.log('SSO login successful:', user.backendUser);
       } else {

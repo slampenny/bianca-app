@@ -20,7 +20,7 @@ export type DrawerParamList = {
 }
 
 export type HomeStackParamList = {
-  Home: undefined
+  HomeDetail: undefined
   Patient: undefined
   Schedule: undefined
   Conversations: undefined
@@ -50,7 +50,7 @@ export type AlertStackParamList = {
 }
 
 export type OrgStackParamList = {
-  Org: undefined
+  Organization: undefined
   Caregivers: undefined
   Caregiver: undefined
   CaregiverInvited: {

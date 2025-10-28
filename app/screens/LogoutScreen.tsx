@@ -1,12 +1,16 @@
 import React from "react"
 import { StyleSheet } from "react-native"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { useLogoutMutation } from "../services/api/authApi"
-import { getAuthTokens } from "../store/authSlice"
+import { getAuthTokens, clearAuth } from "../store/authSlice"
+import { clearOrg } from "../store/orgSlice"
+import { clearCaregivers } from "../store/caregiverSlice"
+import { clearPatients } from "../store/patientSlice"
 import { Button, Screen, Text } from "app/components"
 import { colors } from "app/theme/colors"
 
 export const LogoutScreen = () => {
+  const dispatch = useDispatch()
   const [logout] = useLogoutMutation()
 
   const tokens = useSelector(getAuthTokens)
@@ -15,12 +19,21 @@ export const LogoutScreen = () => {
     if (tokens) {
       try {
         await logout({ refreshToken: tokens.refresh.token }).unwrap()
-        // Perform any additional actions needed after successful logout
+        console.log("Logout successful")
       } catch (error) {
-        console.error("Logout failed", error)
-        // Handle logout failure (e.g., display a message or log the error)
+        console.log("Logout API failed (this is normal if token was already expired):", error)
+        // Don't treat 404 as an error - it means the token was already invalid
       }
     }
+    
+    // Always clear local state regardless of API response
+    dispatch(clearAuth())
+    dispatch(clearOrg())
+    dispatch(clearCaregivers())
+    dispatch(clearPatients())
+    
+    // Navigate to login screen or handle logout completion
+    // The navigation will be handled by the auth state change
   }
 
   return (

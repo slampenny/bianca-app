@@ -1,6 +1,6 @@
 # Multi-stage build for frontend
 # Use Amazon ECR Public Gallery to avoid Docker Hub credential issues in WSL2
-FROM public.ecr.aws/docker/library/node:18-alpine AS builder
+FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app

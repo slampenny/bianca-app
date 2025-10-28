@@ -85,7 +85,7 @@ function HomeStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Home" component={HomeScreen} options={() => ({ title: translate("headers.home") })} />
+      <Stack.Screen name="HomeDetail" component={HomeScreen} options={() => ({ title: translate("headers.home") })} />
       <Stack.Screen name="Patient" component={PatientScreen} options={() => ({ title: translate("headers.patient") })} />
       <Stack.Screen name="Schedule" component={SchedulesScreen} options={() => ({ title: translate("headers.schedule") })} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} options={() => ({ title: translate("headers.conversations") })} />
@@ -126,7 +126,7 @@ function OrgStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Org" component={OrgScreen} options={() => ({ title: translate("headers.organization") })} />
+      <Stack.Screen name="Organization" component={OrgScreen} options={() => ({ title: translate("headers.organization") })} />
       <Stack.Screen name="Caregivers" component={CaregiversScreen} options={() => ({ title: translate("headers.caregivers") })} />
       <Stack.Screen name="Caregiver" component={CaregiverScreen} options={() => ({ title: translate("headers.caregiver") })} />
       <Stack.Screen name="CaregiverInvited" options={() => ({ title: translate("headers.caregiverInvited") })}>
