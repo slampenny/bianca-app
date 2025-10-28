@@ -57,11 +57,15 @@ const envVarsSchema = Joi.object({
   // Note: SMTP_FROM was present in user's original, but EMAIL_FROM is now the primary 'from' address.
 
   TWILIO_PHONENUMBER: Joi.string(),
-  TWILIO_ACCOUNTSID: Joi.string().required(),
+  TWILIO_ACCOUNTSID: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().optional() // Optional in dev/test environments (can use placeholder values)
+  }),
   TWILIO_AUTHTOKEN: Joi.string().when('NODE_ENV', {
     is: Joi.string().valid('staging', 'production'),
     then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
-    otherwise: Joi.string().required() // Required in dev/test environments
+    otherwise: Joi.string().optional() // Optional in dev/test environments (can use placeholder values)
   }),
   TWILIO_VOICEURL: Joi.string(), // Keep if used elsewhere
   PUBLIC_TUNNEL_URL: Joi.string(), // Used for twilio.apiUrl in dev/testing
@@ -74,8 +78,8 @@ const envVarsSchema = Joi.object({
     then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
     otherwise: Joi.string().optional() // Optional in dev/test environments
   }),
-  STRIPE_SECRET_KEY: Joi.string(),
-  STRIPE_PUBLISHABLE_KEY: Joi.string(),
+  STRIPE_SECRET_KEY: Joi.string().optional(),
+  STRIPE_PUBLISHABLE_KEY: Joi.string().optional(),
   // **NEW:** Realtime API specific variables
   OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
