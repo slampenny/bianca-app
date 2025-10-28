@@ -101,6 +101,20 @@ const deleteCaregiver = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+const updateThemePreference = catchAsync(async (req, res) => {
+  const { themePreference } = req.body;
+  const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
+  // Check if trying to access another caregiver's resource
+  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+
+  if (hasRestrictedAccess && isAccessingOthersResource) {
+    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
+  }
+
+  const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, { themePreference });
+  res.send(CaregiverDTO(caregiver));
+});
+
 const addPatient = catchAsync(async (req, res) => {
   const { caregiverId, patientId } = req.params;
   const updatedCaregiver = await caregiverService.addPatient(caregiverId, patientId);
@@ -144,6 +158,7 @@ module.exports = {
   updateCaregiver,
   uploadCaregiverAvatar,
   deleteCaregiver,
+  updateThemePreference,
   addPatient,
   removePatient,
   updatePatient,
