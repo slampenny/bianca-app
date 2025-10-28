@@ -289,12 +289,12 @@ const styles = StyleSheet.create({
   warningContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff3cd',
+    backgroundColor: colors.palette.warning100,
     borderBottomWidth: 1,
-    borderColor: '#ffeaa7',
+    borderColor: colors.palette.warning300,
   },
   warningText: {
-    color: '#856404',
+    color: colors.palette.warning800,
     fontSize: 14,
     textAlign: 'center',
     fontStyle: 'italic',

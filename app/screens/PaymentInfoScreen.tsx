@@ -590,7 +590,7 @@ export function PaymentInfoScreen() {
     // Show a loading indicator or a generic message while user data is loading
     return (
       <View style={[styles.screenContainer, styles.centered]} testID="payment-info-container">
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.palette.primary500} />
         <Text style={styles.emptyText}>{translate("paymentScreen.loadingUserInformation")}</Text>
       </View>
     )
@@ -953,7 +953,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.palette.neutral200,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: colors.palette.neutral900,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.palette.neutral200,
     borderRadius: 8,
-    shadowColor: '#000',
+    shadowColor: colors.palette.neutral900,
     shadowOffset: {
       width: 0,
       height: 1,

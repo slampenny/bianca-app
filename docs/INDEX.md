@@ -8,6 +8,9 @@ This directory contains all the technical documentation for the Bianca App Front
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Deployment procedures and configuration
 - **[GOOGLE_PLAY_CHECKLIST.md](./GOOGLE_PLAY_CHECKLIST.md)** - Google Play Store submission checklist
 
+### 🎨 Design System
+- **[THEME_GUIDE.md](./THEME_GUIDE.md)** - Healthcare-focused theme system and design guidelines
+
 ### 📖 General
 - **Main README**: See `../README.md` for setup and development instructions
 

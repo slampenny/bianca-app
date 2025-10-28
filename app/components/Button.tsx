@@ -220,7 +220,7 @@ const $viewPresets = {
   primary: [
     $baseViewStyle,
     { 
-      backgroundColor: colors.palette.biancaButtonSelected,
+      backgroundColor: colors.palette.primary500,
       borderWidth: 0,
     },
   ] as StyleProp<ViewStyle>,
@@ -228,7 +228,7 @@ const $viewPresets = {
   success: [
     $baseViewStyle,
     { 
-      backgroundColor: colors.palette.biancaSuccess,
+      backgroundColor: colors.palette.success500,
       borderWidth: 0,
     },
   ] as StyleProp<ViewStyle>,
@@ -236,7 +236,23 @@ const $viewPresets = {
   danger: [
     $baseViewStyle,
     { 
-      backgroundColor: colors.palette.angry500,
+      backgroundColor: colors.palette.error500,
+      borderWidth: 0,
+    },
+  ] as StyleProp<ViewStyle>,
+
+  warning: [
+    $baseViewStyle,
+    { 
+      backgroundColor: colors.palette.warning500,
+      borderWidth: 0,
+    },
+  ] as StyleProp<ViewStyle>,
+
+  medical: [
+    $baseViewStyle,
+    { 
+      backgroundColor: colors.palette.medical500,
       borderWidth: 0,
     },
   ] as StyleProp<ViewStyle>,
@@ -249,6 +265,8 @@ const $textPresets: Record<Presets, StyleProp<TextStyle>> = {
   primary: [$baseTextStyle, { color: colors.palette.neutral100 }],
   success: [$baseTextStyle, { color: colors.palette.neutral100 }],
   danger: [$baseTextStyle, { color: colors.palette.neutral100 }],
+  warning: [$baseTextStyle, { color: colors.palette.neutral100 }],
+  medical: [$baseTextStyle, { color: colors.palette.neutral100 }],
 }
 
 const $pressedViewPresets: Record<Presets, StyleProp<ViewStyle>> = {
@@ -258,6 +276,8 @@ const $pressedViewPresets: Record<Presets, StyleProp<ViewStyle>> = {
   primary: { opacity: 0.8 },
   success: { opacity: 0.8 },
   danger: { opacity: 0.8 },
+  warning: { opacity: 0.8 },
+  medical: { opacity: 0.8 },
 }
 
 const $pressedTextPresets: Record<Presets, StyleProp<TextStyle>> = {
@@ -267,4 +287,6 @@ const $pressedTextPresets: Record<Presets, StyleProp<TextStyle>> = {
   primary: { opacity: 0.9 },
   success: { opacity: 0.9 },
   danger: { opacity: 0.9 },
+  warning: { opacity: 0.9 },
+  medical: { opacity: 0.9 },
 }

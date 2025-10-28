@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   tooltip: {
     position: "absolute",
     bottom: 60,
-    backgroundColor: "#333",
+    backgroundColor: colors.palette.neutral800,
     padding: 8,
     borderRadius: 6,
     zIndex: 100,
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   tooltipText: {
-    color: "#fff",
+    color: colors.palette.neutral100,
     fontSize: 14,
     textAlign: "center",
   },

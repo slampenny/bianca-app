@@ -1,7 +1,7 @@
 // Healthcare-focused color palette for MyPhoneFriend
 // Designed for medical professionals, caregivers, and healthcare environments
 
-const palette = {
+const healthcarePalette = {
   // Neutral colors - clean, professional grays
   neutral100: "#FFFFFF",      // Pure white for backgrounds
   neutral200: "#F8FAFC",      // Very light gray for subtle backgrounds
@@ -114,19 +114,15 @@ const palette = {
   biancaSuccessBackground: "rgba(34, 197, 94, 0.1)", // Updated success background
   biancaExplanation: "#64748B",          // Updated to match neutral500
   biancaBorder: "#E2E8F0",              // Updated to match neutral300
-
-  // Legacy angry colors (for backward compatibility)
-  angry100: "#FEE2E2",        // Updated to match error100
-  angry500: "#EF4444",        // Updated to match error500
 } as const
 
-export const colors = {
+export const healthcareColors = {
   /**
-   * The palette is available to use, but prefer using the name.
+   * The palette is available to use, but prefer using the semantic names.
    * This is only included for rare, one-off cases. Try to use
    * semantic names as much as possible.
    */
-  palette,
+  palette: healthcarePalette,
   
   /**
    * A helper for making something see-thru.
@@ -136,80 +132,80 @@ export const colors = {
   /**
    * The default text color in many components.
    */
-  text: palette.neutral800,
+  text: healthcarePalette.neutral800,
   
   /**
    * Secondary text information.
    */
-  textDim: palette.neutral500,
+  textDim: healthcarePalette.neutral500,
   
   /**
    * The default color of the screen background.
    */
-  background: palette.neutral200,
+  background: healthcarePalette.neutral200,
   
   /**
    * The default border color.
    */
-  border: palette.neutral300,
+  border: healthcarePalette.neutral300,
   
   /**
    * The main tinting color - medical blue.
    */
-  tint: palette.primary500,
+  tint: healthcarePalette.primary500,
   
   /**
    * A subtle color used for lines and separators.
    */
-  separator: palette.neutral300,
+  separator: healthcarePalette.neutral300,
   
   /**
    * Error messages and critical states.
    */
-  error: palette.error500,
+  error: healthcarePalette.error500,
   
   /**
    * Error background for error states.
    */
-  errorBackground: palette.error100,
+  errorBackground: healthcarePalette.error100,
   
   /**
    * Success messages and positive states.
    */
-  success: palette.success500,
+  success: healthcarePalette.success500,
   
   /**
    * Success background for success states.
    */
-  successBackground: palette.success100,
+  successBackground: healthcarePalette.success100,
   
   /**
    * Warning messages and caution states.
    */
-  warning: palette.warning500,
+  warning: healthcarePalette.warning500,
   
   /**
    * Warning background for warning states.
    */
-  warningBackground: palette.warning100,
+  warningBackground: healthcarePalette.warning100,
   
   /**
    * Info messages and informational states.
    */
-  info: palette.info500,
+  info: healthcarePalette.info500,
   
   /**
    * Info background for info states.
    */
-  infoBackground: palette.info100,
+  infoBackground: healthcarePalette.info100,
   
   /**
    * Medical/healthcare specific color.
    */
-  medical: palette.medical500,
+  medical: healthcarePalette.medical500,
   
   /**
    * Medical background for healthcare-specific elements.
    */
-  medicalBackground: palette.medical100,
+  medicalBackground: healthcarePalette.medical100,
 }

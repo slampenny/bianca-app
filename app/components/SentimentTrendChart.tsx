@@ -148,7 +148,7 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
             <svg width={chartWidth} height={chartHeight} style={styles.svg}>
               <path
                 d={pathData}
-                stroke="#8B4513"
+                stroke={colors.palette.accent700}
                 strokeWidth="2"
                 fill="none"
                 strokeLinecap="round"

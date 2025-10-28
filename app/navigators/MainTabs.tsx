@@ -165,8 +165,8 @@ export default function MainTabNavigator() {
       initialRouteName="Home"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: "#3498db",
-        tabBarInactiveTintColor: "#7f8c8d",
+        tabBarActiveTintColor: colors.palette.primary500,
+        tabBarInactiveTintColor: colors.palette.neutral500,
         tabBarShowLabel: true, // Show labels
         tabBarIcon: ({ focused, color, size }) => {
           let iconName
