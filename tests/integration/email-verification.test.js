@@ -1,16 +1,28 @@
+// Import integration setup FIRST to ensure proper mocking
+require('../utils/integration-setup');
+
 const request = require('supertest');
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const app = require('../../app');
-const setupTestDB = require('../utils/setupTestDB');
-const { Caregiver, Org, Token } = require('../../models');
-const { tokenTypes } = require('../../config/tokens');
+const app = require('../utils/integration-app');
+const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
+const { Caregiver, Org, Token } = require('../../src/models');
+const { tokenTypes } = require('../../src/config/tokens');
 const { caregiverOne, caregiverTwo, insertCaregivers, insertOrgs } = require('../fixtures/caregiver.fixture');
 const { orgOne } = require('../fixtures/org.fixture');
 
-setupTestDB();
-
 describe('Email verification workflow', () => {
+  beforeAll(async () => {
+    await setupMongoMemoryServer();
+  });
+
+  afterAll(async () => {
+    await teardownMongoMemoryServer();
+  });
+
+  beforeEach(async () => {
+    await clearDatabase();
+  });
   describe('POST /v1/auth/register', () => {
     let newCaregiver;
     let newOrg;
@@ -20,12 +32,12 @@ describe('Email verification workflow', () => {
         name: 'Test User',
         email: 'test@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
       newOrg = {
         name: 'Test Organization',
         email: 'test@example.com',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
     });
 
@@ -62,7 +74,7 @@ describe('Email verification workflow', () => {
 
     test('should fail registration if email verification sending fails', async () => {
       // Mock email service to throw error
-      const emailService = require('../../services/email.service');
+      const emailService = require('../../src/services/email.service');
       const originalSendVerificationEmail = emailService.sendVerificationEmail;
       emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
 
@@ -134,7 +146,7 @@ describe('Email verification workflow', () => {
 
     test('should handle email verification sending failure gracefully', async () => {
       // Mock email service to throw error
-      const emailService = require('../../services/email.service');
+      const emailService = require('../../src/services/email.service');
       const originalSendVerificationEmail = emailService.sendVerificationEmail;
       emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
 
@@ -222,7 +234,7 @@ describe('Email verification workflow', () => {
 
     test('should handle email sending failure', async () => {
       // Mock email service to throw error
-      const emailService = require('../../services/email.service');
+      const emailService = require('../../src/services/email.service');
       const originalSendVerificationEmail = emailService.sendVerificationEmail;
       emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
 
@@ -247,7 +259,7 @@ describe('Email verification workflow', () => {
     beforeEach(async () => {
       await insertCaregivers([caregiverOne]);
       // Create a verification token
-      const tokenService = require('../../services/token.service');
+      const tokenService = require('../../src/services/token.service');
       verificationToken = await tokenService.generateVerifyEmailToken(caregiverOne);
     });
 
@@ -308,7 +320,7 @@ describe('Email verification workflow', () => {
         name: 'Integration Test User',
         email: 'integration@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       // Step 1: Register user
@@ -363,7 +375,7 @@ describe('Email verification workflow', () => {
         name: 'Resend Test User',
         email: 'resend@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       // Step 1: Register user

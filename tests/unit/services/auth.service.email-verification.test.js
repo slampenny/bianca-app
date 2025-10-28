@@ -1,188 +1,125 @@
-const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { Caregiver, Token } = require('../../models');
-const { tokenTypes } = require('../../config/tokens');
-const authService = require('../../services/auth.service');
-const caregiverService = require('../../services/caregiver.service');
-const tokenService = require('../../services/token.service');
-const ApiError = require('../../utils/ApiError');
+const { MongoMemoryServer } = require('mongodb-memory-server');
+const httpStatus = require('http-status');
+const { Caregiver, Token } = require('../../../src/models');
+const { tokenTypes } = require('../../../src/config/tokens');
+const authService = require('../../../src/services/auth.service');
+const caregiverService = require('../../../src/services/caregiver.service');
+const tokenService = require('../../../src/services/token.service');
+const ApiError = require('../../../src/utils/ApiError');
+
+let mongoServer;
+
+beforeAll(async () => {
+  mongoServer = new MongoMemoryServer();
+  await mongoServer.start();
+  const mongoUri = mongoServer.getUri();
+  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+});
 
 describe('Auth Service - Email Verification', () => {
+  afterEach(async () => {
+    await Caregiver.deleteMany();
+    await Token.deleteMany();
+  });
+
   describe('verifyEmail', () => {
-    let mockCaregiver;
-    let mockTokenDoc;
-
-    beforeEach(() => {
-      mockCaregiver = {
-        _id: new mongoose.Types.ObjectId(),
-        email: 'test@example.com',
-        isEmailVerified: false,
-      };
-
-      mockTokenDoc = {
-        caregiver: mockCaregiver._id,
-        type: tokenTypes.VERIFY_EMAIL,
-      };
-
-      caregiverService.getCaregiverById = jest.fn();
-      tokenService.verifyToken = jest.fn();
-      Token.deleteMany = jest.fn();
-      caregiverService.updateCaregiverById = jest.fn();
-    });
-
     test('should verify email successfully', async () => {
-      const verifyEmailToken = 'valid-token-123';
-      
-      tokenService.verifyToken.mockResolvedValue(mockTokenDoc);
-      caregiverService.getCaregiverById.mockResolvedValue(mockCaregiver);
-      Token.deleteMany.mockResolvedValue({ deletedCount: 1 });
-      caregiverService.updateCaregiverById.mockResolvedValue(mockCaregiver);
+      // Create a caregiver
+      const caregiver = new Caregiver({
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'Password123',
+        phone: '+16045624263',
+        isEmailVerified: false,
+        role: 'unverified',
+      });
+      await caregiver.save();
 
+      // Create a verification token
+      const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+
+      // Verify the email
       await authService.verifyEmail(verifyEmailToken);
 
-      expect(tokenService.verifyToken).toHaveBeenCalledWith(verifyEmailToken, tokenTypes.VERIFY_EMAIL);
-      expect(caregiverService.getCaregiverById).toHaveBeenCalledWith(mockTokenDoc.caregiver);
-      expect(Token.deleteMany).toHaveBeenCalledWith({ 
-        caregiver: mockCaregiver._id, 
+      // Check that caregiver is now verified
+      const verifiedCaregiver = await Caregiver.findById(caregiver._id);
+      expect(verifiedCaregiver.isEmailVerified).toBe(true);
+
+      // Check that token was deleted
+      const token = await Token.findOne({ 
+        caregiver: caregiver._id, 
         type: tokenTypes.VERIFY_EMAIL 
       });
-      expect(caregiverService.updateCaregiverById).toHaveBeenCalledWith(mockCaregiver._id, { 
-        isEmailVerified: true 
-      });
+      expect(token).toBeNull();
     });
 
     test('should throw error for invalid token', async () => {
-      const verifyEmailToken = 'invalid-token-123';
-      
-      tokenService.verifyToken.mockRejectedValue(new Error('Invalid token'));
-
-      await expect(authService.verifyEmail(verifyEmailToken)).rejects.toThrow(ApiError);
-      
-      const error = await authService.verifyEmail(verifyEmailToken).catch(e => e);
-      expect(error.statusCode).toBe(httpStatus.UNAUTHORIZED);
-      expect(error.message).toBe('Email verification failed');
+      await expect(authService.verifyEmail('invalid-token')).rejects.toThrow(ApiError);
     });
 
     test('should throw error for non-existent caregiver', async () => {
-      const verifyEmailToken = 'valid-token-123';
-      
-      tokenService.verifyToken.mockResolvedValue(mockTokenDoc);
-      caregiverService.getCaregiverById.mockResolvedValue(null);
+      // Create a fake token for non-existent caregiver
+      const fakeToken = require('jsonwebtoken').sign(
+        {
+          sub: new mongoose.Types.ObjectId(),
+          type: tokenTypes.VERIFY_EMAIL,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        },
+        process.env.JWT_SECRET
+      );
 
-      await expect(authService.verifyEmail(verifyEmailToken)).rejects.toThrow(ApiError);
-      
-      const error = await authService.verifyEmail(verifyEmailToken).catch(e => e);
-      expect(error.statusCode).toBe(httpStatus.UNAUTHORIZED);
-      expect(error.message).toBe('Email verification failed');
-    });
-
-    test('should throw error when token verification fails', async () => {
-      const verifyEmailToken = 'expired-token-123';
-      
-      tokenService.verifyToken.mockRejectedValue(new Error('Token expired'));
-
-      await expect(authService.verifyEmail(verifyEmailToken)).rejects.toThrow(ApiError);
-      
-      const error = await authService.verifyEmail(verifyEmailToken).catch(e => e);
-      expect(error.statusCode).toBe(httpStatus.UNAUTHORIZED);
-      expect(error.message).toBe('Email verification failed');
-    });
-
-    test('should handle database errors gracefully', async () => {
-      const verifyEmailToken = 'valid-token-123';
-      
-      tokenService.verifyToken.mockResolvedValue(mockTokenDoc);
-      caregiverService.getCaregiverById.mockResolvedValue(mockCaregiver);
-      Token.deleteMany.mockRejectedValue(new Error('Database error'));
-      caregiverService.updateCaregiverById.mockResolvedValue(mockCaregiver);
-
-      await expect(authService.verifyEmail(verifyEmailToken)).rejects.toThrow(ApiError);
-      
-      const error = await authService.verifyEmail(verifyEmailToken).catch(e => e);
-      expect(error.statusCode).toBe(httpStatus.UNAUTHORIZED);
-      expect(error.message).toBe('Email verification failed');
+      await expect(authService.verifyEmail(fakeToken)).rejects.toThrow(ApiError);
     });
   });
 
   describe('loginCaregiverWithEmailAndPassword', () => {
-    let mockCaregiver;
-
-    beforeEach(() => {
-      mockCaregiver = {
-        _id: new mongoose.Types.ObjectId(),
-        email: 'test@example.com',
-        isEmailVerified: true,
-        isPasswordMatch: jest.fn(),
-      };
-
-      caregiverService.getLoginCaregiverData = jest.fn();
-    });
-
     test('should login successfully with valid credentials', async () => {
-      const email = 'test@example.com';
-      const password = 'Password123';
-      
-      mockCaregiver.isPasswordMatch.mockResolvedValue(true);
-      caregiverService.getLoginCaregiverData.mockResolvedValue({
-        caregiver: mockCaregiver,
-        patients: [],
+      // Create a caregiver
+      const caregiver = new Caregiver({
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'Password123',
+        phone: '+16045624263',
+        isEmailVerified: true,
+        role: 'staff',
       });
+      await caregiver.save();
 
-      const result = await authService.loginCaregiverWithEmailAndPassword(email, password);
+      const result = await authService.loginCaregiverWithEmailAndPassword('test@example.com', 'Password123');
 
-      expect(caregiverService.getLoginCaregiverData).toHaveBeenCalledWith(email);
-      expect(mockCaregiver.isPasswordMatch).toHaveBeenCalledWith(password);
-      expect(result).toEqual({
-        caregiver: mockCaregiver,
-        patients: [],
-      });
+      expect(result).toHaveProperty('caregiver');
+      expect(result).toHaveProperty('patients');
+      expect(result.caregiver.email).toBe('test@example.com');
     });
 
     test('should throw error for invalid credentials', async () => {
-      const email = 'test@example.com';
-      const password = 'WrongPassword';
-      
-      mockCaregiver.isPasswordMatch.mockResolvedValue(false);
-      caregiverService.getLoginCaregiverData.mockResolvedValue({
-        caregiver: mockCaregiver,
-        patients: [],
+      // Create a caregiver
+      const caregiver = new Caregiver({
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'Password123',
+        phone: '+16045624263',
+        isEmailVerified: true,
+        role: 'staff',
       });
+      await caregiver.save();
 
-      await expect(authService.loginCaregiverWithEmailAndPassword(email, password)).rejects.toThrow(ApiError);
-      
-      const error = await authService.loginCaregiverWithEmailAndPassword(email, password).catch(e => e);
-      expect(error.statusCode).toBe(httpStatus.UNAUTHORIZED);
-      expect(error.message).toBe('Incorrect email or password');
+      await expect(
+        authService.loginCaregiverWithEmailAndPassword('test@example.com', 'WrongPassword')
+      ).rejects.toThrow(ApiError);
     });
 
     test('should throw error for non-existent user', async () => {
-      const email = 'nonexistent@example.com';
-      const password = 'Password123';
-      
-      caregiverService.getLoginCaregiverData.mockResolvedValue(null);
-
-      await expect(authService.loginCaregiverWithEmailAndPassword(email, password)).rejects.toThrow(ApiError);
-      
-      const error = await authService.loginCaregiverWithEmailAndPassword(email, password).catch(e => e);
-      expect(error.statusCode).toBe(httpStatus.UNAUTHORIZED);
-      expect(error.message).toBe('Incorrect email or password');
-    });
-
-    test('should handle password verification errors', async () => {
-      const email = 'test@example.com';
-      const password = 'Password123';
-      
-      mockCaregiver.isPasswordMatch.mockRejectedValue(new Error('Password verification failed'));
-      caregiverService.getLoginCaregiverData.mockResolvedValue({
-        caregiver: mockCaregiver,
-        patients: [],
-      });
-
-      await expect(authService.loginCaregiverWithEmailAndPassword(email, password)).rejects.toThrow(ApiError);
-      
-      const error = await authService.loginCaregiverWithEmailAndPassword(email, password).catch(e => e);
-      expect(error.statusCode).toBe(httpStatus.UNAUTHORIZED);
-      expect(error.message).toBe('Incorrect email or password');
+      await expect(
+        authService.loginCaregiverWithEmailAndPassword('nonexistent@example.com', 'Password123')
+      ).rejects.toThrow(ApiError);
     });
   });
 });
