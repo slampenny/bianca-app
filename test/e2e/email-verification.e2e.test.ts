@@ -13,22 +13,22 @@ test.describe('Email Verification Workflow', () => {
         name: 'Test User',
         email: 'test@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       // Navigate to registration
-      await page.click('[data-testid="register-button"]');
+      await page.click('[accessibilityLabel="register-button"]');
       await expect(page).toHaveURL(/.*register/);
 
       // Fill registration form
-      await page.fill('[data-testid="name-input"]', testUser.name);
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.fill('[data-testid="confirm-password-input"]', testUser.password);
-      await page.fill('[data-testid="phone-input"]', testUser.phone);
+      await page.fill('[accessibilityLabel="register-name"]', testUser.name);
+      await page.fill('[accessibilityLabel="register-email"]', testUser.email);
+      await page.fill('[accessibilityLabel="register-password"]', testUser.password);
+      await page.fill('[accessibilityLabel="register-confirm-password"]', testUser.password);
+      await page.fill('[accessibilityLabel="register-phone"]', testUser.phone);
 
       // Submit registration
-      await page.click('[data-testid="register-submit-button"]');
+      await page.click('[accessibilityLabel="register-submit"]');
 
       // Should redirect to email verification screen
       await expect(page).toHaveURL(/.*email-verification-required/);
@@ -41,7 +41,7 @@ test.describe('Email Verification Workflow', () => {
         name: 'Test User 2',
         email: 'test2@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       // Complete registration
@@ -78,7 +78,7 @@ test.describe('Email Verification Workflow', () => {
         name: 'Verification Test User',
         email: 'verification@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       await page.click('[data-testid="register-button"]');
@@ -150,7 +150,7 @@ test.describe('Email Verification Workflow', () => {
         name: 'Unverified User',
         email: 'unverified@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       await page.click('[data-testid="register-button"]');
@@ -290,7 +290,7 @@ test.describe('Email Verification Workflow', () => {
         name: 'Complete Flow User',
         email: 'complete@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       // Step 1: Register user
@@ -405,7 +405,7 @@ test.describe('Email Verification Workflow', () => {
         name: 'Error Test User',
         email: 'error@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       await page.click('[data-testid="register-button"]');

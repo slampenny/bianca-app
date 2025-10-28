@@ -135,7 +135,7 @@ test.describe('SSO Email Verification Workflow', () => {
               id: '123',
               email: 'sso-profile@example.com',
               name: 'SSO Profile User',
-              phone: '+1234567890',
+              phone: '+16045624263',
               isEmailVerified: true,
               role: 'orgAdmin', // Promoted to orgAdmin
               ssoProvider: 'google',
@@ -159,7 +159,7 @@ test.describe('SSO Email Verification Workflow', () => {
         name: 'Mixed User',
         email: 'mixed@example.com',
         password: 'Password123',
-        phone: '+1234567890',
+        phone: '+16045624263',
       };
 
       // First register with email

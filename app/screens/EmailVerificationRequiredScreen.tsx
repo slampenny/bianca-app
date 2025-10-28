@@ -68,6 +68,7 @@ export const EmailVerificationRequiredScreen = () => {
             onPress={handleResendEmail}
             disabled={isLoading}
             style={$resendButton}
+            accessibilityLabel="resend-verification-button"
           />
           
           <Button
@@ -75,6 +76,7 @@ export const EmailVerificationRequiredScreen = () => {
             onPress={handleBackToLogin}
             preset="default"
             style={$backButton}
+            accessibilityLabel="back-to-login-button"
           />
         </View>
       </View>

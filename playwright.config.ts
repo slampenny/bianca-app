@@ -11,6 +11,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     trace: 'on-first-retry',
     video: 'retain-on-failure',
+    testIdAttribute: 'accessibilityLabel', // Use accessibilityLabel for React Native Web
   },
   projects: [
     {
