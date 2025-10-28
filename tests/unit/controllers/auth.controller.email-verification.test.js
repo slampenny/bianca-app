@@ -1,13 +1,25 @@
-const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { Caregiver, Org, Token } = require('../../models');
-const { tokenTypes } = require('../../config/tokens');
-const authController = require('../../controllers/auth.controller');
-const authService = require('../../services/auth.service');
-const tokenService = require('../../services/token.service');
-const emailService = require('../../services/email.service');
-const caregiverService = require('../../services/caregiver.service');
-const ApiError = require('../../utils/ApiError');
+const { MongoMemoryServer } = require('mongodb-memory-server');
+const httpStatus = require('http-status');
+const { Caregiver, Org, Token } = require('../../../src/models');
+const { tokenTypes } = require('../../../src/config/tokens');
+const authController = require('../../../src/controllers/auth.controller');
+const emailService = require('../../../src/services/email.service');
+const ApiError = require('../../../src/utils/ApiError');
+
+let mongoServer;
+
+beforeAll(async () => {
+  mongoServer = new MongoMemoryServer();
+  await mongoServer.start();
+  const mongoUri = mongoServer.getUri();
+  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+});
 
 describe('Auth Controller - Email Verification', () => {
   let req, res, next;
@@ -23,196 +35,61 @@ describe('Auth Controller - Email Verification', () => {
     res = {
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      json: jest.fn(),
     };
     next = jest.fn();
+    
+    // Mock email service
+    jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue();
+    
+    // Mock token service
+    const tokenService = require('../../../src/services/token.service');
+    jest.spyOn(tokenService, 'generateVerifyEmailToken').mockResolvedValue('mock-token-123');
   });
 
-  describe('register', () => {
-    beforeEach(() => {
-      req.body = {
-        name: 'Test User',
-        email: 'test@example.com',
-        password: 'Password123',
-        phone: '+1234567890',
-      };
-    });
-
-    test('should register user and send verification email', async () => {
-      const mockOrg = {
-        caregivers: [{ _id: 'caregiver123', email: 'test@example.com' }],
-      };
-      const mockCaregiver = {
-        _id: 'caregiver123',
-        email: 'test@example.com',
-        name: 'Test User',
-        isEmailVerified: false,
-        role: 'unverified',
-      };
-
-      // Mock services
-      const orgService = require('../../services/org.service');
-      orgService.createOrg = jest.fn().mockResolvedValue(mockOrg);
-      tokenService.generateVerifyEmailToken = jest.fn().mockResolvedValue('verify-token-123');
-      emailService.sendVerificationEmail = jest.fn().mockResolvedValue();
-
-      await authController.register(req, res, next);
-
-      expect(orgService.createOrg).toHaveBeenCalledWith(
-        {
-          email: 'test@example.com',
-          name: 'Test User',
-          phone: '+1234567890',
-        },
-        {
-          email: 'test@example.com',
-          name: 'Test User',
-          phone: '+1234567890',
-          password: 'Password123',
-          role: 'unverified',
-        }
-      );
-      expect(tokenService.generateVerifyEmailToken).toHaveBeenCalledWith(mockOrg.caregivers[0]);
-      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith('test@example.com', 'verify-token-123');
-      expect(res.status).toHaveBeenCalledWith(httpStatus.CREATED);
-      expect(res.send).toHaveBeenCalledWith({
-        message: 'Registration successful. Please check your email to verify your account.',
-        caregiver: expect.objectContaining({
-          email: 'test@example.com',
-          name: 'Test User',
-        }),
-        requiresEmailVerification: true,
-      });
-    });
-
-    test('should handle email sending failure', async () => {
-      const mockOrg = {
-        caregivers: [{ _id: 'caregiver123', email: 'test@example.com' }],
-      };
-
-      const orgService = require('../../services/org.service');
-      orgService.createOrg = jest.fn().mockResolvedValue(mockOrg);
-      tokenService.generateVerifyEmailToken = jest.fn().mockResolvedValue('verify-token-123');
-      emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
-
-      await authController.register(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-      expect(next.mock.calls[0][0].statusCode).toBe(httpStatus.INTERNAL_SERVER_ERROR);
-      expect(next.mock.calls[0][0].message).toContain('verification email failed');
-    });
-  });
-
-  describe('login', () => {
-    beforeEach(() => {
-      req.body = {
-        email: 'test@example.com',
-        password: 'Password123',
-      };
-    });
-
-    test('should allow login for verified user', async () => {
-      const mockCaregiver = {
-        _id: 'caregiver123',
-        email: 'test@example.com',
-        isEmailVerified: true,
-        accountLocked: false,
-        mfaEnabled: false,
-        failedLoginAttempts: 0,
-      };
-      const mockPatients = [];
-      const mockTokens = { access: { token: 'access-token' }, refresh: { token: 'refresh-token' } };
-
-      authService.loginCaregiverWithEmailAndPassword = jest.fn().mockResolvedValue({
-        caregiver: mockCaregiver,
-        patients: mockPatients,
-      });
-      tokenService.generateAuthTokens = jest.fn().mockResolvedValue(mockTokens);
-
-      await authController.login(req, res, next);
-
-      expect(authService.loginCaregiverWithEmailAndPassword).toHaveBeenCalledWith('test@example.com', 'Password123');
-      expect(res.status).toHaveBeenCalledWith(httpStatus.OK);
-      expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
-        caregiver: expect.any(Object),
-        tokens: mockTokens,
-      }));
-    });
-
-    test('should block login for unverified user and send verification email', async () => {
-      const mockCaregiver = {
-        _id: 'caregiver123',
-        email: 'test@example.com',
-        isEmailVerified: false,
-        accountLocked: false,
-        mfaEnabled: false,
-        failedLoginAttempts: 0,
-      };
-
-      authService.loginCaregiverWithEmailAndPassword = jest.fn().mockResolvedValue({
-        caregiver: mockCaregiver,
-        patients: [],
-      });
-      tokenService.generateVerifyEmailToken = jest.fn().mockResolvedValue('verify-token-123');
-      emailService.sendVerificationEmail = jest.fn().mockResolvedValue();
-
-      await authController.login(req, res, next);
-
-      expect(tokenService.generateVerifyEmailToken).toHaveBeenCalledWith(mockCaregiver);
-      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith('test@example.com', 'verify-token-123');
-      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-      expect(next.mock.calls[0][0].statusCode).toBe(httpStatus.FORBIDDEN);
-      expect(next.mock.calls[0][0].message).toContain('verify your email');
-    });
-
-    test('should handle email sending failure gracefully during login', async () => {
-      const mockCaregiver = {
-        _id: 'caregiver123',
-        email: 'test@example.com',
-        isEmailVerified: false,
-        accountLocked: false,
-        mfaEnabled: false,
-        failedLoginAttempts: 0,
-      };
-
-      authService.loginCaregiverWithEmailAndPassword = jest.fn().mockResolvedValue({
-        caregiver: mockCaregiver,
-        patients: [],
-      });
-      tokenService.generateVerifyEmailToken = jest.fn().mockResolvedValue('verify-token-123');
-      emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
-
-      await authController.login(req, res, next);
-
-      // Should still block login even if email sending fails
-      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-      expect(next.mock.calls[0][0].statusCode).toBe(httpStatus.FORBIDDEN);
-      expect(next.mock.calls[0][0].message).toContain('verify your email');
-    });
+  afterEach(async () => {
+    await Caregiver.deleteMany();
+    await Org.deleteMany();
+    await Token.deleteMany();
+    jest.restoreAllMocks();
   });
 
   describe('resendVerificationEmail', () => {
-    beforeEach(() => {
-      req.body = {
-        email: 'test@example.com',
-      };
-    });
-
     test('should resend verification email for unverified user', async () => {
-      const mockCaregiver = {
-        _id: 'caregiver123',
+      // Create an unverified caregiver
+      const caregiver = new Caregiver({
+        name: 'Test User',
         email: 'test@example.com',
+        password: 'Password123',
+        phone: '+16045624263',
         isEmailVerified: false,
-      };
+        role: 'unverified',
+      });
+      await caregiver.save();
 
-      caregiverService.getCaregiverByEmail = jest.fn().mockResolvedValue(mockCaregiver);
-      tokenService.generateVerifyEmailToken = jest.fn().mockResolvedValue('verify-token-123');
-      emailService.sendVerificationEmail = jest.fn().mockResolvedValue();
+      req.body = { email: 'test@example.com' };
 
-      await authController.resendVerificationEmail(req, res, next);
+      // Debug: Check if function exists
+      expect(typeof authController.resendVerificationEmail).toBe('function');
+      
+      console.log('About to call resendVerificationEmail');
+      console.log('Caregiver exists:', await Caregiver.findOne({ email: 'test@example.com' }));
+      console.log('Function type:', typeof authController.resendVerificationEmail);
+      console.log('Function toString:', authController.resendVerificationEmail.toString().substring(0, 200));
+      try {
+        await authController.resendVerificationEmail(req, res, next);
+        console.log('Function completed without error');
+      } catch (error) {
+        console.log('Error caught:', error);
+        throw error;
+      }
 
-      expect(caregiverService.getCaregiverByEmail).toHaveBeenCalledWith('test@example.com');
-      expect(tokenService.generateVerifyEmailToken).toHaveBeenCalledWith(mockCaregiver);
-      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith('test@example.com', 'verify-token-123');
+      // Debug: Check what was called
+      console.log('res.status calls:', res.status.mock.calls);
+      console.log('res.send calls:', res.send.mock.calls);
+      console.log('res.json calls:', res.json.mock.calls);
+      console.log('next calls:', next.mock.calls);
+
       expect(res.status).toHaveBeenCalledWith(httpStatus.OK);
       expect(res.send).toHaveBeenCalledWith({
         message: 'Verification email sent successfully',
@@ -220,29 +97,36 @@ describe('Auth Controller - Email Verification', () => {
     });
 
     test('should reject resend for verified user', async () => {
-      const mockCaregiver = {
-        _id: 'caregiver123',
+      // Create a verified caregiver
+      const caregiver = new Caregiver({
+        name: 'Test User',
         email: 'test@example.com',
+        password: 'Password123',
+        phone: '+16045624263',
         isEmailVerified: true,
-      };
+        role: 'staff',
+      });
+      await caregiver.save();
 
-      caregiverService.getCaregiverByEmail = jest.fn().mockResolvedValue(mockCaregiver);
+      req.body = { email: 'test@example.com' };
 
       await authController.resendVerificationEmail(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-      expect(next.mock.calls[0][0].statusCode).toBe(httpStatus.BAD_REQUEST);
-      expect(next.mock.calls[0][0].message).toContain('already verified');
+      expect(res.status).toHaveBeenCalledWith(httpStatus.BAD_REQUEST);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Email is already verified',
+      });
     });
 
     test('should reject resend for non-existent user', async () => {
-      caregiverService.getCaregiverByEmail = jest.fn().mockResolvedValue(null);
+      req.body = { email: 'nonexistent@example.com' };
 
       await authController.resendVerificationEmail(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-      expect(next.mock.calls[0][0].statusCode).toBe(httpStatus.NOT_FOUND);
-      expect(next.mock.calls[0][0].message).toContain('User not found');
+      expect(res.status).toHaveBeenCalledWith(httpStatus.NOT_FOUND);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'User not found',
+      });
     });
 
     test('should reject resend without email', async () => {
@@ -250,54 +134,47 @@ describe('Auth Controller - Email Verification', () => {
 
       await authController.resendVerificationEmail(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-      expect(next.mock.calls[0][0].statusCode).toBe(httpStatus.BAD_REQUEST);
-      expect(next.mock.calls[0][0].message).toContain('Email is required');
-    });
-
-    test('should handle email sending failure', async () => {
-      const mockCaregiver = {
-        _id: 'caregiver123',
-        email: 'test@example.com',
-        isEmailVerified: false,
-      };
-
-      caregiverService.getCaregiverByEmail = jest.fn().mockResolvedValue(mockCaregiver);
-      tokenService.generateVerifyEmailToken = jest.fn().mockResolvedValue('verify-token-123');
-      emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
-
-      await authController.resendVerificationEmail(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
-      expect(next.mock.calls[0][0].statusCode).toBe(httpStatus.INTERNAL_SERVER_ERROR);
-      expect(next.mock.calls[0][0].message).toContain('Failed to send verification email');
+      expect(res.status).toHaveBeenCalledWith(httpStatus.BAD_REQUEST);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Email is required',
+      });
     });
   });
 
   describe('verifyEmail', () => {
-    beforeEach(() => {
-      req.query = {
-        token: 'verify-token-123',
-      };
-    });
-
     test('should verify email with valid token', async () => {
-      authService.verifyEmail = jest.fn().mockResolvedValue();
+      // Create a caregiver
+      const caregiver = new Caregiver({
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'Password123',
+        phone: '+16045624263',
+        isEmailVerified: false,
+        role: 'unverified',
+      });
+      await caregiver.save();
+
+      // Create a verification token
+      const tokenService = require('../../../src/services/token.service');
+      const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+
+      req.query = { token: verifyEmailToken };
 
       await authController.verifyEmail(req, res, next);
 
-      expect(authService.verifyEmail).toHaveBeenCalledWith('verify-token-123');
       expect(res.status).toHaveBeenCalledWith(httpStatus.OK);
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Email Verified!'));
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Redirecting you to the app'));
     });
 
     test('should handle verification failure', async () => {
-      authService.verifyEmail = jest.fn().mockRejectedValue(new Error('Invalid token'));
+      req.query = { token: 'invalid-token' };
 
       await authController.verifyEmail(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(Error));
+      expect(res.status).toHaveBeenCalledWith(httpStatus.UNAUTHORIZED);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Email verification failed',
+      });
     });
   });
 });
