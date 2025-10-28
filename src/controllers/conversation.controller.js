@@ -26,11 +26,14 @@ const getConversation = catchAsync(async (req, res) => {
   }
   
   // Check if the caregiver has access to this conversation
-  // For staff users, they can only access conversations of their own patients
+  // For staff users, they can only access conversations of their own patients OR conversations they initiated
   // For orgAdmin users, they can access any conversation in their org
   if (req.caregiver.role === 'staff') {
     const caregiver = await Caregiver.findById(req.caregiver.id);
-    if (!caregiver.patients.includes(conversation.patientId)) {
+    const hasPatientAccess = caregiver.patients.includes(conversation.patientId);
+    const isCallAgent = conversation.agentId && conversation.agentId.toString() === req.caregiver.id;
+    
+    if (!hasPatientAccess && !isCallAgent) {
       throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this conversation');
     }
   }

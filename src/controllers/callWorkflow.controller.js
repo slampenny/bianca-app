@@ -97,6 +97,32 @@ const getCallStatus = catchAsync(async (req, res) => {
   await conversation.populate('patientId', 'name phone');
   await conversation.populate('agentId', 'name');
   
+  // Get AI speaking status from OpenAI realtime service
+  let aiSpeakingStatus = {
+    isSpeaking: false,
+    userIsSpeaking: false,
+    conversationState: 'unknown'
+  };
+  
+  try {
+    const openAIService = require('../services/openai.realtime.service');
+    // Find the connection by conversationId (callSid)
+    for (const [callId, conn] of openAIService.connections.entries()) {
+      if (conn.conversationId === conversationId) {
+        aiSpeakingStatus = {
+          isSpeaking: conn._aiIsSpeaking || false,
+          userIsSpeaking: conn._userIsSpeaking || false,
+          conversationState: conn.status || 'unknown',
+          lastAiSpeechStart: conn._lastAiSpeechStart || null,
+          lastUserSpeechStart: conn._lastUserSpeechStart || null
+        };
+        break;
+      }
+    }
+  } catch (error) {
+    logger.warn(`[CallStatus] Could not get AI speaking status: ${error.message}`);
+  }
+  
   const status = {
     conversationId: conversation._id,
     status: conversation.status,
@@ -104,7 +130,11 @@ const getCallStatus = catchAsync(async (req, res) => {
     endTime: conversation.endTime,
     duration: conversation.duration,
     patient: conversation.patientId,
-    agent: conversation.agentId
+    agent: conversation.agentId,
+    // Include messages for live call display
+    messages: conversation.messages || [],
+    // Include AI speaking status
+    aiSpeaking: aiSpeakingStatus
   };
   
   res.status(httpStatus.OK).send({ data: status });
