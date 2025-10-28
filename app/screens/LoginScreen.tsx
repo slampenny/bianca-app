@@ -65,9 +65,17 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     try {
       const result = await loginAPI({ email: authEmail, password: authPassword }).unwrap()
       dispatch(setAuthTokens(result.tokens))
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      setErrorMessage("Failed to log in. Please check your email and password.")
+      
+      // Check for email verification error
+      if (error?.data?.message?.includes('verify your email')) {
+        setErrorMessage("Please check your email and click the verification link before logging in.")
+        // Optionally navigate to verification screen
+        navigation.navigate("EmailVerificationRequired" as never)
+      } else {
+        setErrorMessage("Failed to log in. Please check your email and password.")
+      }
     } finally {
       setIsLoading(false)
     }

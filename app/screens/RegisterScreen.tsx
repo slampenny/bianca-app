@@ -132,12 +132,12 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
     const registerUser = async () => {
       try {
         const result = await register({ name, email, password, phone }).unwrap()
-        // Assuming 'result' indicates success. Adjust if your API returns differently.
-        if (result) {
+        // Handle the new registration response format
+        if (result && result.requiresEmailVerification) {
+          // Navigate to email verification required screen
+          navigation.navigate("EmailVerificationRequired" as never)
+        } else {
           setGeneralError("Registration successful! Please check your email for verification instructions.")
-          // IMPORTANT: Navigation should happen AFTER setting state or be handled elsewhere
-          // For example, navigation could be triggered by this success state in another useEffect or saga
-          // navigation.navigate("Home"); // Example: Navigate on success
         }
       } catch (error) {
         // Handle specific errors if possible, otherwise show generic message

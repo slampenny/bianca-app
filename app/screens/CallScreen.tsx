@@ -60,6 +60,30 @@ export function CallScreen() {
       conversationErrorStatus: (conversationError as any)?.status,
     })
     
+    // Log AI speaking status
+    if (callStatusData?.data?.aiSpeaking) {
+      console.log('🎤 CallScreen - AI Speaking Status:', {
+        isSpeaking: callStatusData.data.aiSpeaking.isSpeaking,
+        userIsSpeaking: callStatusData.data.aiSpeaking.userIsSpeaking,
+        conversationState: callStatusData.data.aiSpeaking.conversationState,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Log message count
+    if (callStatusData?.data?.messages) {
+      console.log('💬 CallScreen - Messages from call status:', {
+        messageCount: callStatusData.data.messages.length,
+        messages: callStatusData.data.messages.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content?.substring(0, 50) + '...',
+          createdAt: m.createdAt
+        })),
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     // Log specific 404 errors with more context
     if ((conversationError as any)?.status === 404) {
       console.warn('⚠️ CallScreen - Conversation not found (404), but call status is working:', {
@@ -76,7 +100,7 @@ export function CallScreen() {
   const conversationToDisplay = liveConversationData || 
     (callStatusData?.data ? {
       id: callStatusData.data.conversationId,
-      messages: [], // Call status API doesn't include messages, so we'll show empty for now
+      messages: callStatusData.data.messages || [], // Now includes messages from call status API
       startTime: callStatusData.data.startTime,
       endTime: callStatusData.data.endTime,
       duration: callStatusData.data.duration,
@@ -220,6 +244,12 @@ export function CallScreen() {
             {isConversationFetching && (
               <Text style={styles.liveIndicator}> 🔄</Text>
             )}
+            {callStatusData?.data?.aiSpeaking?.isSpeaking && (
+              <Text style={styles.speakingIndicator}> 🎤 AI Speaking...</Text>
+            )}
+            {callStatusData?.data?.aiSpeaking?.userIsSpeaking && (
+              <Text style={styles.speakingIndicator}> 👤 User Speaking...</Text>
+            )}
           </Text>
           
         <ConversationMessages
@@ -295,6 +325,12 @@ const styles = StyleSheet.create({
   liveIndicator: {
     color: colors.palette.biancaSuccess,
     fontSize: 16,
+  },
+  speakingIndicator: {
+    color: colors.palette.biancaPrimary,
+    fontSize: 14,
+    fontWeight: "500",
+    marginLeft: 8,
   },
   infoRow: {
     flexDirection: "row",

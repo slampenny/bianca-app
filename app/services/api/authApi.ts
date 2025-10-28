@@ -9,7 +9,7 @@ export const authApi = createApi({
   }),
   endpoints: (builder) => ({
     register: builder.mutation<
-      { org: Org; caregiver: Caregiver; tokens: any },
+      { message: string; caregiver: Caregiver; requiresEmailVerification: boolean },
       { name: string; email: string; password: string; phone: string }
     >({
       query: (data) => ({
@@ -75,6 +75,13 @@ export const authApi = createApi({
         body: { caregiver },
       }),
     }),
+    resendVerificationEmail: builder.mutation<{ message: string }, { email: string }>({
+      query: (data) => ({
+        url: "/auth/resend-verification-email",
+        method: "POST",
+        body: data,
+      }),
+    }),
   }),
 })
 
@@ -87,4 +94,5 @@ export const {
   useResetPasswordMutation,
   useForgotPasswordMutation,
   useSendVerificationEmailMutation,
+  useResendVerificationEmailMutation,
 } = authApi

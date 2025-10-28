@@ -8,6 +8,7 @@ export type AppStackParamList = {
   PrivacyPractices: undefined
   Terms: undefined
   EmailVerified: undefined
+  EmailVerificationRequired: undefined
 }
 
 export type DrawerParamList = {
@@ -80,6 +81,7 @@ export type LoginStackParamList = {
   PrivacyPractices: undefined
   Terms: undefined
   EmailVerified: undefined
+  EmailVerificationRequired: undefined
   Signup: { token?: string }
 }
 
