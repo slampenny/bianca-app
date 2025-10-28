@@ -44,6 +44,7 @@ const updateCaregiver = {
       phone: Joi.string().optional(),
       isEmailVerified: Joi.boolean().optional(),
       password: Joi.string().required().custom(password).optional(),
+      themePreference: Joi.string().valid('healthcare', 'colorblind').optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)),
     })
     .min(1)
@@ -76,6 +77,15 @@ const removePatient = {
   }),
 };
 
+const updateThemePreference = {
+  params: Joi.object().keys({
+    caregiverId: Joi.required().custom(objectId),
+  }),
+  body: Joi.object().keys({
+    themePreference: Joi.string().valid('healthcare', 'colorblind').required(),
+  }),
+};
+
 const getPatientsByCaregiver = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
@@ -98,5 +108,6 @@ module.exports = {
   deleteCaregiver,
   addPatient,
   removePatient,
+  updateThemePreference,
   getPatientsByCaregiver,
 };
