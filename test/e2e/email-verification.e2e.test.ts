@@ -31,6 +31,18 @@ test.describe('Email Verification Workflow', () => {
     const bodyText = await page.textContent('body');
     console.log(`Body text preview: ${bodyText?.substring(0, 200)}...`);
     
+    // Monitor console errors
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        console.log('Console error:', msg.text());
+      }
+    });
+    
+    // Monitor page errors
+    page.on('pageerror', error => {
+      console.log('Page error:', error.message);
+    });
+    
     // Take a screenshot for debugging
     await page.screenshot({ path: 'debug-page.png' });
   });
@@ -39,8 +51,8 @@ test.describe('Email Verification Workflow', () => {
     test('should register user and redirect to email verification screen', async ({ page }) => {
       const testUser = {
         name: 'Test User',
-        email: 'test@example.com',
-        password: 'Password123',
+        email: 'test1@example.com',
+        password: 'Password123!',
         phone: '+16045624263',
       };
 
@@ -67,24 +79,36 @@ test.describe('Email Verification Workflow', () => {
       // Check for any error messages
       const errorText = await page.textContent('body');
       console.log(`Page content after submit: ${errorText?.substring(0, 300)}...`);
+      
+      // Check for network requests
+      const requests = await page.evaluate(() => {
+        return window.performance.getEntriesByType('resource')
+          .filter((entry: any) => entry.name.includes('/auth/register'))
+          .map((entry: any) => ({
+            url: entry.name,
+            status: entry.responseStatus || 'unknown',
+            duration: entry.duration
+          }));
+      });
+      console.log('Registration API requests:', requests);
     });
 
     test('should show registration success message', async ({ page }) => {
       const testUser = {
         name: 'Test User 2',
-        email: 'test2@example.com',
-        password: 'Password123',
-        phone: '+16045624263',
+        email: 'test11@example.com',
+        password: 'Password123!',
+        phone: '+16045624273',
       };
 
       // Complete registration
-      await page.click('[data-testid="register-button"]');
-      await page.fill('[data-testid="name-input"]', testUser.name);
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.fill('[data-testid="confirm-password-input"]', testUser.password);
-      await page.fill('[data-testid="phone-input"]', testUser.phone);
-      await page.click('[data-testid="register-submit-button"]');
+      await page.locator('[aria-label="register-link"]').click();
+      await page.locator('[aria-label="register-name"]').fill(testUser.name);
+      await page.locator('[aria-label="register-email"]').fill(testUser.email);
+      await page.locator('[aria-label="register-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-confirm-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-phone"]').fill(testUser.phone);
+      await page.locator('[aria-label="register-submit"]').click();
 
       // Check for success message
       await expect(page.locator('text=Registration successful')).toBeVisible();
@@ -92,10 +116,10 @@ test.describe('Email Verification Workflow', () => {
     });
 
     test('should validate registration form fields', async ({ page }) => {
-      await page.click('[data-testid="register-button"]');
+      await page.locator('[aria-label="register-link"]').click();
 
       // Try to submit empty form
-      await page.click('[data-testid="register-submit-button"]');
+      await page.locator('[aria-label="register-submit"]').click();
 
       // Should show validation errors
       await expect(page.locator('text=Name cannot be empty')).toBeVisible();
@@ -110,17 +134,17 @@ test.describe('Email Verification Workflow', () => {
       const testUser = {
         name: 'Verification Test User',
         email: 'verification@example.com',
-        password: 'Password123',
+        password: 'Password123!',
         phone: '+16045624263',
       };
 
-      await page.click('[data-testid="register-button"]');
-      await page.fill('[data-testid="name-input"]', testUser.name);
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.fill('[data-testid="confirm-password-input"]', testUser.password);
-      await page.fill('[data-testid="phone-input"]', testUser.phone);
-      await page.click('[data-testid="register-submit-button"]');
+      await page.locator('[aria-label="register-link"]').click();
+      await page.locator('[aria-label="register-name"]').fill(testUser.name);
+      await page.locator('[aria-label="register-email"]').fill(testUser.email);
+      await page.locator('[aria-label="register-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-confirm-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-phone"]').fill(testUser.phone);
+      await page.locator('[aria-label="register-submit"]').click();
 
       // Should be on email verification screen
       await expect(page).toHaveURL(/.*email-verification-required/);
@@ -133,15 +157,15 @@ test.describe('Email Verification Workflow', () => {
     });
 
     test('should have resend verification email button', async ({ page }) => {
-      await expect(page.locator('[data-testid="resend-verification-button"]')).toBeVisible();
+      await expect(page.locator('[aria-label="resend-verification-button"]')).toBeVisible();
     });
 
     test('should have back to login button', async ({ page }) => {
-      await expect(page.locator('[data-testid="back-to-login-button"]')).toBeVisible();
+      await expect(page.locator('[aria-label="back-to-login-button"]')).toBeVisible();
     });
 
     test('should navigate back to login when clicking back button', async ({ page }) => {
-      await page.click('[data-testid="back-to-login-button"]');
+      await page.locator('[aria-label="back-to-login-button"]').click();
       await expect(page).toHaveURL(/.*login/);
     });
 
@@ -155,7 +179,7 @@ test.describe('Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="resend-verification-button"]');
+      await page.locator('[aria-label="resend-verification-button"]').click();
       
       await expect(page.locator('text=Verification email sent successfully')).toBeVisible();
     });
@@ -170,7 +194,7 @@ test.describe('Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="resend-verification-button"]');
+      await page.locator('[aria-label="resend-verification-button"]').click();
       
       await expect(page.locator('text=Failed to send verification email')).toBeVisible();
     });
@@ -182,20 +206,20 @@ test.describe('Email Verification Workflow', () => {
       const testUser = {
         name: 'Unverified User',
         email: 'unverified@example.com',
-        password: 'Password123',
+        password: 'Password123!',
         phone: '+16045624263',
       };
 
-      await page.click('[data-testid="register-button"]');
-      await page.fill('[data-testid="name-input"]', testUser.name);
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.fill('[data-testid="confirm-password-input"]', testUser.password);
-      await page.fill('[data-testid="phone-input"]', testUser.phone);
-      await page.click('[data-testid="register-submit-button"]');
+      await page.locator('[aria-label="register-link"]').click();
+      await page.locator('[aria-label="register-name"]').fill(testUser.name);
+      await page.locator('[aria-label="register-email"]').fill(testUser.email);
+      await page.locator('[aria-label="register-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-confirm-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-phone"]').fill(testUser.phone);
+      await page.locator('[aria-label="register-submit"]').click();
 
       // Navigate back to login
-      await page.click('[data-testid="back-to-login-button"]');
+      await page.locator('[aria-label="back-to-login-button"]').click();
     });
 
     test('should block login for unverified email and show error message', async ({ page }) => {
@@ -210,9 +234,9 @@ test.describe('Email Verification Workflow', () => {
         });
       });
 
-      await page.fill('[data-testid="email-input"]', 'unverified@example.com');
-      await page.fill('[data-testid="password-input"]', 'Password123');
-      await page.click('[data-testid="login-button"]');
+      await page.locator('[aria-label="email-input"]').fill('unverified@example.com');
+      await page.locator('[aria-label="password-input"]').fill('Password123');
+      await page.locator('[aria-label="login-button"]').click();
 
       await expect(page.locator('text=verify your email')).toBeVisible();
       await expect(page.locator('text=verification link')).toBeVisible();
@@ -230,9 +254,9 @@ test.describe('Email Verification Workflow', () => {
         });
       });
 
-      await page.fill('[data-testid="email-input"]', 'unverified@example.com');
-      await page.fill('[data-testid="password-input"]', 'Password123');
-      await page.click('[data-testid="login-button"]');
+      await page.locator('[aria-label="email-input"]').fill('unverified@example.com');
+      await page.locator('[aria-label="password-input"]').fill('Password123');
+      await page.locator('[aria-label="login-button"]').click();
 
       // Should redirect to email verification screen
       await expect(page).toHaveURL(/.*email-verification-required/);
@@ -259,9 +283,9 @@ test.describe('Email Verification Workflow', () => {
         });
       });
 
-      await page.fill('[data-testid="email-input"]', 'verified@example.com');
-      await page.fill('[data-testid="password-input"]', 'Password123');
-      await page.click('[data-testid="login-button"]');
+      await page.locator('[aria-label="email-input"]').fill('verified@example.com');
+      await page.locator('[aria-label="password-input"]').fill('Password123');
+      await page.locator('[aria-label="login-button"]').click();
 
       // Should navigate to main app
       await expect(page).toHaveURL(/.*main-tabs/);
@@ -322,24 +346,24 @@ test.describe('Email Verification Workflow', () => {
       const testUser = {
         name: 'Complete Flow User',
         email: 'complete@example.com',
-        password: 'Password123',
+        password: 'Password123!',
         phone: '+16045624263',
       };
 
       // Step 1: Register user
-      await page.click('[data-testid="register-button"]');
-      await page.fill('[data-testid="name-input"]', testUser.name);
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.fill('[data-testid="confirm-password-input"]', testUser.password);
-      await page.fill('[data-testid="phone-input"]', testUser.phone);
-      await page.click('[data-testid="register-submit-button"]');
+      await page.locator('[aria-label="register-link"]').click();
+      await page.locator('[aria-label="register-name"]').fill(testUser.name);
+      await page.locator('[aria-label="register-email"]').fill(testUser.email);
+      await page.locator('[aria-label="register-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-confirm-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-phone"]').fill(testUser.phone);
+      await page.locator('[aria-label="register-submit"]').click();
 
       // Should be on email verification screen
       await expect(page).toHaveURL(/.*email-verification-required/);
 
       // Step 2: Try to login (should fail)
-      await page.click('[data-testid="back-to-login-button"]');
+      await page.locator('[aria-label="back-to-login-button"]').click();
       
       await page.route('**/auth/login', async route => {
         await route.fulfill({
@@ -351,9 +375,9 @@ test.describe('Email Verification Workflow', () => {
         });
       });
 
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.click('[data-testid="login-button"]');
+      await page.locator('[aria-label="email-input"]').fill(testUser.email);
+      await page.locator('[aria-label="password-input"]').fill(testUser.password);
+      await page.locator('[aria-label="login-button"]').click();
 
       // Should redirect back to verification screen
       await expect(page).toHaveURL(/.*email-verification-required/);
@@ -404,9 +428,9 @@ test.describe('Email Verification Workflow', () => {
       });
 
       await page.goto('/');
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.click('[data-testid="login-button"]');
+      await page.locator('[aria-label="email-input"]').fill(testUser.email);
+      await page.locator('[aria-label="password-input"]').fill(testUser.password);
+      await page.locator('[aria-label="login-button"]').click();
 
       // Should successfully login
       await expect(page).toHaveURL(/.*main-tabs/);
@@ -420,13 +444,13 @@ test.describe('Email Verification Workflow', () => {
         await route.abort('Failed');
       });
 
-      await page.click('[data-testid="register-button"]');
-      await page.fill('[data-testid="name-input"]', 'Test User');
-      await page.fill('[data-testid="email-input"]', 'test@example.com');
-      await page.fill('[data-testid="password-input"]', 'Password123');
-      await page.fill('[data-testid="confirm-password-input"]', 'Password123');
-      await page.fill('[data-testid="phone-input"]', '+1234567890');
-      await page.click('[data-testid="register-submit-button"]');
+      await page.locator('[aria-label="register-link"]').click();
+      await page.locator('[aria-label="register-name"]').fill('Test User');
+      await page.locator('[aria-label="register-email"]').fill('test@example.com');
+      await page.locator('[aria-label="register-password"]').fill('Password123');
+      await page.locator('[aria-label="register-confirm-password"]').fill('Password123');
+      await page.locator('[aria-label="register-phone"]').fill('+1234567890');
+      await page.locator('[aria-label="register-submit"]').click();
 
       // Should show error message
       await expect(page.locator('text=Registration Failed')).toBeVisible();
@@ -437,17 +461,17 @@ test.describe('Email Verification Workflow', () => {
       const testUser = {
         name: 'Error Test User',
         email: 'error@example.com',
-        password: 'Password123',
+        password: 'Password123!',
         phone: '+16045624263',
       };
 
-      await page.click('[data-testid="register-button"]');
-      await page.fill('[data-testid="name-input"]', testUser.name);
-      await page.fill('[data-testid="email-input"]', testUser.email);
-      await page.fill('[data-testid="password-input"]', testUser.password);
-      await page.fill('[data-testid="confirm-password-input"]', testUser.password);
-      await page.fill('[data-testid="phone-input"]', testUser.phone);
-      await page.click('[data-testid="register-submit-button"]');
+      await page.locator('[aria-label="register-link"]').click();
+      await page.locator('[aria-label="register-name"]').fill(testUser.name);
+      await page.locator('[aria-label="register-email"]').fill(testUser.email);
+      await page.locator('[aria-label="register-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-confirm-password"]').fill(testUser.password);
+      await page.locator('[aria-label="register-phone"]').fill(testUser.phone);
+      await page.locator('[aria-label="register-submit"]').click();
 
       // Mock server error for resend
       await page.route('**/auth/resend-verification-email', async route => {
@@ -458,7 +482,7 @@ test.describe('Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="resend-verification-button"]');
+      await page.locator('[aria-label="resend-verification-button"]').click();
       
       await expect(page.locator('text=Internal server error')).toBeVisible();
     });
