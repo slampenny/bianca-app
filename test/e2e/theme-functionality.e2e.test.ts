@@ -33,10 +33,10 @@ test.describe('Theme Selection and Verification', () => {
     // Verify both themes are available in the modal (use more specific selectors)
     const modal = page.locator('text=Select Theme').locator('..')
     await expect(modal.locator('text=Healthcare')).toBeVisible()
-    await expect(modal.locator('text=Color-Blind Friendly')).toBeVisible()
+    await expect(modal.locator('text=Color-Blind Friendly').first()).toBeVisible()
     
     // Select the Color-Blind Friendly theme
-    await modal.locator('text=Color-Blind Friendly').click()
+    await modal.locator('text=Color-Blind Friendly').first().click()
     
     // Wait for modal to close
     await page.waitForSelector('text=Select Theme', { state: 'hidden', timeout: 5000 })
@@ -71,7 +71,7 @@ test.describe('Theme Selection and Verification', () => {
     await expect(modal.locator('text=Professional medical theme with blue and green colors')).toBeVisible()
     
     // Color-Blind Friendly theme
-    await expect(modal.locator('text=Color-Blind Friendly')).toBeVisible()
+    await expect(modal.locator('text=Color-Blind Friendly').first()).toBeVisible()
     await expect(modal.locator('text=High contrast theme optimized for color vision deficiency')).toBeVisible()
     
     console.log('✅ Theme descriptions are displayed correctly')
@@ -98,7 +98,7 @@ test.describe('Theme Selection and Verification', () => {
     await page.click('[data-testid="theme-selector"]')
     await page.waitForSelector('text=Select Theme', { timeout: 5000 })
     const modal = page.locator('text=Select Theme').locator('..')
-    await modal.locator('text=Color-Blind Friendly').click()
+    await modal.locator('text=Color-Blind Friendly').first().click()
     await page.waitForSelector('text=Select Theme', { state: 'hidden', timeout: 5000 })
     await expect(themeSelector).toContainText('Color-Blind Friendly')
     

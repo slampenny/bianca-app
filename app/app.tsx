@@ -29,6 +29,7 @@ import { AppNavigator, useNavigationPersistence } from "./navigators"
 import { ErrorBoundary } from "./screens/ErrorScreen/ErrorBoundary"
 import * as storage from "./utils/storage"
 import { customFontsToLoad } from "./theme"
+import { ThemeProvider } from "./theme/ThemeContext"
 import Config from "./config"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { ViewStyle } from "react-native"
@@ -114,12 +115,14 @@ function App(props: AppProps) {
               onBeforeLift={onBeforeLiftPersistGate}
               persistor={persistor}
             >
-              <AppNavigator
-                linking={linking}
-                initialState={initialNavigationState}
-                onStateChange={onNavigationStateChange}
-              />
-              <InnerApp />
+              <ThemeProvider>
+                <AppNavigator
+                  linking={linking}
+                  initialState={initialNavigationState}
+                  onStateChange={onNavigationStateChange}
+                />
+                <InnerApp />
+              </ThemeProvider>
             </PersistGate>
           </Provider>
         </GestureHandlerRootView>

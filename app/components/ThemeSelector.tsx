@@ -1,56 +1,37 @@
 import React, { useState } from "react"
 import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from "react-native"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
+import { themes, ThemeType } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 
 export function ThemeSelector({ testID }: { testID?: string }) {
+  const { currentTheme, setTheme, themeInfo, colors, isLoading } = useTheme()
   const [modalVisible, setModalVisible] = useState(false)
-  const [currentTheme, setCurrentTheme] = useState("healthcare")
 
-  const themes = [
-    {
-      key: "healthcare",
-      name: "Healthcare",
-      description: "Professional medical theme with blue and green colors",
-      colors: {
-        primary: colors.palette.primary500,
-        success: colors.palette.success500,
-        error: colors.palette.error500,
-      }
-    },
-    {
-      key: "colorblind",
-      name: "Color-Blind Friendly", 
-      description: "High contrast theme optimized for color vision deficiency",
-      colors: {
-        primary: "#0066CC", // Distinct blue
-        success: "#00CC00", // Distinct green
-        error: "#CC0000", // Distinct red
-      }
-    }
-  ]
-
-  const handleThemeChange = (themeKey: string) => {
-    setCurrentTheme(themeKey)
-    setModalVisible(false)
-    // TODO: Implement actual theme switching
-    console.log("Theme changed to:", themeKey)
+  if (isLoading) {
+    return null
   }
 
-  const currentThemeData = themes.find(t => t.key === currentTheme) || themes[0]
+  const handleThemeChange = (theme: ThemeType) => {
+    setTheme(theme)
+    setModalVisible(false)
+  }
 
   return (
     <View style={styles.container} testID={testID}>
-      <Text style={styles.label}>{translate("profileScreen.theme")}</Text>
+      <Text style={[styles.label, { color: colors.palette.neutral800 }]}>{translate("profileScreen.theme")}</Text>
       <Pressable 
-        style={styles.selectorButton} 
+        style={[styles.selectorButton, { 
+          borderColor: colors.palette.neutral300, 
+          backgroundColor: colors.palette.neutral100 
+        }]} 
         onPress={() => setModalVisible(true)}
       >
-        <Text style={styles.selectorText}>{currentThemeData.name}</Text>
+        <Text style={styles.selectorText}>{themeInfo.name}</Text>
         <View style={styles.currentThemeSwatchContainer}>
-          <View style={[styles.colorSwatch, { backgroundColor: currentThemeData.colors.primary }]} />
-          <View style={[styles.colorSwatch, { backgroundColor: currentThemeData.colors.success }]} />
-          <View style={[styles.colorSwatch, { backgroundColor: currentThemeData.colors.error }]} />
+          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.primary500 }]} />
+          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.success500 }]} />
+          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.error500 }]} />
         </View>
       </Pressable>
 
@@ -61,45 +42,72 @@ export function ThemeSelector({ testID }: { testID?: string }) {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{translate("profileScreen.selectTheme")}</Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.palette.neutral100 }]}>
+            <Text style={[styles.modalTitle, { color: colors.palette.neutral800 }]}>{translate("profileScreen.selectTheme")}</Text>
             <ScrollView>
-              {themes.map((theme) => (
+              {Object.entries(themes).map(([key, theme]) => (
                 <Pressable
-                  key={theme.key}
+                  key={key}
                   style={[
                     styles.themeOption,
-                    currentTheme === theme.key && styles.selectedThemeOption
+                    {
+                      borderColor: colors.palette.neutral300,
+                      backgroundColor: currentTheme === key ? colors.palette.primary500 : colors.palette.neutral100,
+                    },
                   ]}
-                  onPress={() => handleThemeChange(theme.key)}
+                  onPress={() => handleThemeChange(key as ThemeType)}
                 >
                   <View style={styles.themeHeader}>
                     <Text style={[
-                      styles.themeName,
-                      currentTheme === theme.key && styles.selectedThemeText
+                      styles.themeName, 
+                      { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral800 }
                     ]}>
                       {theme.name}
                     </Text>
                     <View style={styles.themeSwatches}>
-                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.primary }]} />
-                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.success }]} />
-                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.error }]} />
+                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.primary500 }]} />
+                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.success500 }]} />
+                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.error500 }]} />
                     </View>
                   </View>
                   <Text style={[
                     styles.themeDescription,
-                    currentTheme === theme.key && styles.selectedThemeText
+                    { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
                   ]}>
                     {theme.description}
                   </Text>
+                  <View style={styles.accessibilityInfo}>
+                    <Text style={[
+                      styles.accessibilityText,
+                      { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                    ]}>
+                      WCAG Level: {theme.accessibility.wcagLevel}
+                    </Text>
+                    {theme.accessibility.colorblindFriendly && (
+                      <Text style={[
+                        styles.accessibilityText,
+                        { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                      ]}>
+                        Color-blind friendly
+                      </Text>
+                    )}
+                    {theme.accessibility.highContrast && (
+                      <Text style={[
+                        styles.accessibilityText,
+                        { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                      ]}>
+                        High contrast
+                      </Text>
+                    )}
+                  </View>
                 </Pressable>
               ))}
             </ScrollView>
             <Pressable 
-              style={styles.closeButton} 
+              style={[styles.closeButton, { backgroundColor: colors.palette.primary500 }]} 
               onPress={() => setModalVisible(false)}
             >
-              <Text style={styles.closeButtonText}>{translate("common.close")}</Text>
+              <Text style={[styles.closeButtonText, { color: colors.palette.neutral100 }]}>{translate("common.close")}</Text>
             </Pressable>
           </View>
         </View>
@@ -115,7 +123,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.palette.neutral800,
     marginBottom: 8,
   },
   selectorButton: {
@@ -123,14 +130,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 16,
-    backgroundColor: colors.palette.neutral100,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.palette.neutral300,
   },
   selectorText: {
     fontSize: 16,
-    color: colors.palette.neutral800,
   },
   currentThemeSwatchContainer: {
     flexDirection: "row",
@@ -148,7 +152,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: colors.palette.neutral100,
     borderRadius: 12,
     padding: 20,
     width: "90%",
@@ -157,7 +160,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: colors.palette.neutral800,
     marginBottom: 16,
     textAlign: "center",
   },
@@ -165,13 +167,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-    backgroundColor: colors.palette.neutral100,
     marginBottom: 12,
-  },
-  selectedThemeOption: {
-    backgroundColor: colors.palette.primary500,
-    borderColor: colors.palette.primary500,
   },
   themeHeader: {
     flexDirection: "row",
@@ -182,10 +178,6 @@ const styles = StyleSheet.create({
   themeName: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.palette.neutral800,
-  },
-  selectedThemeText: {
-    color: colors.palette.neutral100,
   },
   themeSwatches: {
     flexDirection: "row",
@@ -193,16 +185,23 @@ const styles = StyleSheet.create({
   },
   themeDescription: {
     fontSize: 14,
-    color: colors.palette.neutral500,
+    marginBottom: 8,
+  },
+  accessibilityInfo: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  accessibilityText: {
+    fontSize: 12,
+    fontStyle: "italic",
   },
   closeButton: {
-    backgroundColor: colors.palette.primary500,
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
   },
   closeButtonText: {
-    color: colors.palette.neutral100,
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
