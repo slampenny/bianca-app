@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { createStackNavigator } from "@react-navigation/stack"
 import { Ionicons } from "@expo/vector-icons"
 import { View, Image } from "react-native"
+import { colors } from "app/theme"
 import {
   HomeScreen,
   PatientScreen,
