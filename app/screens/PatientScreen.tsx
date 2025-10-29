@@ -69,14 +69,12 @@ function PatientScreen() {
   const [successMessage, setSuccessMessage] = useState("")
   const [apiError, setApiError] = useState("") // Consolidated API error state
   const [showCaregiverModal, setShowCaregiverModal] = useState(false)
-  const { colors, isLoading: themeLoading } = useTheme()
 
   // Ref to store the timeout ID
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Get current user for role-based access control
   const currentUser = useSelector(getCurrentUser)
-  const { colors, isLoading: themeLoading } = useTheme()
   
   // Check if user has permission to create or edit patients
   const canCreateOrEditPatient = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
