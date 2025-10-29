@@ -13,6 +13,7 @@ import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LanguageSelector } from "app/components/LanguageSelector"
+import { ThemeSelector } from "app/components/ThemeSelector"
 import { useLanguage } from "app/hooks/useLanguage"
 import { translate } from "app/i18n"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
@@ -259,6 +260,7 @@ function ProfileScreen() {
           {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
           <LanguageSelector testID="language-selector" />
+          <ThemeSelector testID="theme-selector" />
 
           <Pressable
             style={[

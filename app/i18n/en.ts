@@ -215,6 +215,7 @@ const en = {
   },
   common: {
     cancel: "Cancel",
+    close: "Close",
     selectImage: "Select Image",
     calling: "Calling...",
     callNow: "Call Now",
@@ -417,6 +418,8 @@ const en = {
   profileScreen: {
     languageSelector: "Language / Idioma",
     selectLanguage: "Select Language",
+    theme: "Theme",
+    selectTheme: "Select Theme",
     namePlaceholder: "Name",
     emailPlaceholder: "Email",
     phonePlaceholder: "Phone",
