@@ -1,9 +1,17 @@
 import React from "react"
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native"
+import { View, StyleSheet, ActivityIndicator } from "react-native"
 import { useTheme } from "app/theme/ThemeContext"
+import { Text } from "app/components"
 
 export function LoadingScreen({ message }: { message?: string }) {
   const { colors, isLoading: themeLoading } = useTheme()
+  
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+  
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.palette.biancaButtonSelected} />

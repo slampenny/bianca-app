@@ -1,5 +1,5 @@
 import React from "react"
-import { View, StyleSheet, FlatList, Pressable, Platform } from "react-native"
+import { View, StyleSheet, FlatList, Platform } from "react-native"
 import { AutoImage, Card, Button, Text } from "app/components"
 import { Ionicons } from "@expo/vector-icons"
 import { useSelector, useDispatch } from "react-redux"
@@ -127,30 +127,38 @@ export function HomeScreen() {
         ContentTextProps={{ testID: `patient-name-${item.name}` }}
         RightComponent={
           <View style={styles.buttonContainer}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.callButton,
-                { opacity: pressed ? 0.7 : 1 }
-              ]}
+            <Button
+              preset="primary"
+              text="" // Empty text for icon-only button
               onPress={() => handleCallNow(item)}
               testID={`call-now-${item.name}`}
               accessibilityLabel={`Call ${item.name}`}
-              accessibilityRole="button"
-            >
-              <Ionicons name="call" size={20} color={colors.palette.neutral100} />
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.editButton,
-                { opacity: pressed ? 0.7 : 1 }
-              ]}
+              style={styles.callButton}
+              textStyle={styles.callButtonText}
+              LeftAccessory={(props) => (
+                <Ionicons 
+                  name="call" 
+                  size={20} 
+                  color={colors.palette.neutral100 || colors.palette.neutral900 || "#FFFFFF"}
+                />
+              )}
+            />
+            <Button
+              preset="primary"
+              text="" // Empty text for icon-only button
               onPress={() => handlePatientPress(item)}
               testID={`edit-patient-button-${item.name}`}
               accessibilityLabel={`Edit ${item.name}`}
-              accessibilityRole="button"
-            >
-              <Ionicons name="create-outline" size={20} color={colors.palette.neutral100} />
-            </Pressable>
+              style={styles.editButton}
+              textStyle={styles.editButtonText}
+              LeftAccessory={(props) => (
+                <Ionicons 
+                  name="create-outline" 
+                  size={20} 
+                  color={colors.palette.neutral100 || colors.palette.neutral900 || "#FFFFFF"}
+                />
+              )}
+            />
           </View>
         }
       />
@@ -231,25 +239,37 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   editButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
     minWidth: 44,
     minHeight: 44,
+    // Button component handles theming automatically
   },
   callButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginRight: 8,
-    alignItems: "center",
-    justifyContent: "center",
     minWidth: 44,
     minHeight: 44,
+    // Button component handles theming automatically
+  },
+  callButtonText: {
+    // Hide text since we're using icon-only buttons
+    fontSize: 0,
+    lineHeight: 0,
+    width: 0,
+    padding: 0,
+    margin: 0,
+  },
+  editButtonText: {
+    // Hide text since we're using icon-only buttons
+    fontSize: 0,
+    lineHeight: 0,
+    width: 0,
+    padding: 0,
+    margin: 0,
   },
   header: {
     alignItems: "center",

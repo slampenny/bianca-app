@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from "react"
 import {
-  Text,
-  TextInput,
   ScrollView,
   Pressable,
   StyleSheet,
@@ -12,6 +10,7 @@ import {
   Animated,
   Dimensions,
 } from "react-native"
+import { Text, TextField } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
@@ -330,6 +329,12 @@ function CaregiverScreen() {
     }
   }
 
+  if (themeLoading) {
+    return <LoadingScreen />
+  }
+
+  const styles = createStyles(colors)
+
   if (isUpdating || isDeleting || isInviting) {
     return <LoadingScreen />
   }
@@ -362,47 +367,52 @@ function CaregiverScreen() {
             }}
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder={translate("caregiverScreen.namePlaceholder")}
-            placeholderTextColor="#7f8c8d"
+          <TextField
+            placeholderTx="caregiverScreen.namePlaceholder"
             value={name}
             onChangeText={setName}
             testID="caregiver-name-input"
-          />
-          <TextInput
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
             style={styles.input}
-            placeholder={translate("caregiverScreen.emailPlaceholder")}
-            placeholderTextColor="#7f8c8d"
+          />
+          <TextField
+            placeholderTx="caregiverScreen.emailPlaceholder"
             value={email}
             onChangeText={validateEmail}
-            testID="caregiver-email-input"
             keyboardType="email-address"
             autoCapitalize="none"
+            testID="caregiver-email-input"
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
+            style={styles.input}
+            status={emailError ? "error" : undefined}
+            helper={emailError || undefined}
           />
-          {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
           <PhoneInputWeb
             style={styles.input}
             label={translate("caregiverScreen.phoneLabel")}
             placeholder={translate("caregiverScreen.phonePlaceholder")}
-            placeholderTextColor="#7f8c8d"
             value={phone}
             onChangeText={validatePhone}
             testID="caregiver-phone-input"
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
+            status={phoneError ? "error" : undefined}
+            helper={phoneError || undefined}
           />
-          {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
           <Button
             text={caregiver && caregiver.id ? "SAVE" : "INVITE"}
             onPress={handleSave}
             disabled={!email || !phone || !!emailError || !!phoneError || isUpdating || isInviting}
             testID="caregiver-save-button"
+            preset="primary"
             style={[
               styles.button,
               (!email || !phone || emailError || phoneError || isUpdating || isInviting) ? styles.buttonDisabled : undefined
             ]}
             textStyle={styles.buttonText}
-            preset="filled"
           />
 
           {caregiver && caregiver.id && (
@@ -411,13 +421,13 @@ function CaregiverScreen() {
               onPress={handleDelete}
               disabled={isDeleting}
               testID="delete-caregiver-button"
+              preset="danger"
               style={[
                 styles.button,
                 styles.deleteButton,
                 isDeleting ? styles.buttonDisabled : undefined
               ]}
               textStyle={styles.buttonText}
-              preset="filled"
             />
           )}
 
@@ -428,13 +438,13 @@ function CaregiverScreen() {
               onPress={handleAssignUnassignedPatients}
               disabled={isLoadingUnassigned}
               testID="assign-unassigned-patients-button"
+              preset="success"
               style={[
                 styles.button,
                 styles.assignButton,
                 isLoadingUnassigned ? styles.buttonDisabled : undefined
               ]}
               textStyle={styles.buttonText}
-              preset="filled"
             />
           )}
         </View>
@@ -519,22 +529,22 @@ function CaregiverScreen() {
                       onPress={handleAssignSelectedPatients}
                       disabled={selectedPatients.length === 0 || isAssigning}
                       testID="assign-selected-patients-button"
+                      preset="success"
                       style={[
                         styles.panelButton,
                         styles.assignButton,
                         (selectedPatients.length === 0 || isAssigning) ? styles.buttonDisabled : undefined
                       ]}
                       textStyle={styles.panelButtonText}
-                      preset="filled"
                     />
                     
                     <Button
                       text="Cancel"
                       onPress={closeUnassignedPanel}
                       testID="cancel-unassigned-panel-button"
+                      preset="default"
                       style={[styles.panelButton, styles.cancelButton]}
                       textStyle={styles.panelButtonText}
-                      preset="filled"
                     />
                   </View>
                 </>
@@ -563,26 +573,36 @@ function CaregiverScreen() {
 
 const createStyles = (colors: any) => StyleSheet.create({
   assignButton: {
-    backgroundColor: colors.palette.biancaSuccess,
+    // success preset handles background - only override if needed
   },
   button: {
     alignItems: "center",
-    backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
     marginBottom: 15,
     paddingVertical: 15,
+    // Button preset handles background color - only override if needed
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: colors.palette.neutral100, fontSize: 18, fontWeight: "600" },
+  // CRITICAL: Button text must always be white for colored button presets
+  // The Button component's preset handles text color automatically
+  // But we override to ensure white text on all colored backgrounds
+  buttonText: { 
+    fontSize: 18, 
+    fontWeight: "600",
+    // Always use white text for colored buttons (primary, danger, success presets)
+    color: "#FFFFFF",
+  },
   cancelButton: {
-    backgroundColor: colors.palette.neutral400,
+    // Default preset handles background automatically
     borderRadius: 5,
     padding: 10,
   },
   container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
   scrollView: { flex: 1 },
   contentContainer: { padding: 20 },
-  deleteButton: { backgroundColor: colors.palette.angry500 },
+  deleteButton: {
+    // danger preset handles background - only override if needed
+  },
   error: { color: colors.palette.biancaError, marginBottom: 10, textAlign: "center" },
   fieldError: { color: colors.palette.biancaError, fontSize: 14, marginBottom: 10 },
   formCard: {
@@ -596,39 +616,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
-  input: {
-    borderColor: colors.palette.neutral300,
-    borderRadius: 5,
-    borderWidth: 1,
-    color: colors.palette.biancaHeader,
-    fontSize: 16,
-    height: 45,
-    marginBottom: 15,
-    paddingHorizontal: 10,
-  },
   inputContainer: {
     marginBottom: 15,
   },
   inputWrapper: {
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-    backgroundColor: colors.palette.neutral100,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    // TextField handles most styling automatically
+  },
+  input: {
+    // TextField handles text color automatically via theme
   },
   loadingText: {
     marginBottom: 10,
   },
   panelButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
+    // Button preset handles background automatically
     borderRadius: 5,
     padding: 10,
   },
   panelButtonText: {
-    color: colors.palette.neutral100,
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
+    // Button preset handles text color automatically
+    // Success preset = white text
+    // Default preset = theme-aware text
   },
   panelButtons: {
     flexDirection: "row",
@@ -675,7 +685,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.palette.overlay50 || "rgba(0, 0, 0, 0.5)",
     height: "100%",
     justifyContent: "flex-end",
   },

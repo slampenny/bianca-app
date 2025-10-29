@@ -16,7 +16,8 @@ import { useGetInvoicesByOrgQuery, useGetUnbilledCostsByOrgQuery } from "../serv
 import { WebView } from "react-native-webview"
 import { translate } from "../i18n"
 import Config from "../config"
-import { colors, spacing } from "app/theme"
+import { spacing } from "app/theme"
+import { useTheme } from "app/theme/ThemeContext"
 import { Text, Card, ListItem, Button, Icon } from "app/components"
 import StripePayment from "app/components/StripePayment"
 
@@ -24,7 +25,7 @@ import StripePayment from "app/components/StripePayment"
 const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
 
 // --- Helper functions ---
-const getInvoiceStatusInfo = (status: string) => {
+const getInvoiceStatusInfo = (status: string, colors: any) => {
   switch (status?.toLowerCase()) {
     case 'paid':
       return { color: colors.palette.accent500, icon: 'check' as const, label: translate("paymentScreen.paid") }
@@ -60,8 +61,8 @@ const formatDate = (dateString: string, options?: Intl.DateTimeFormatOptions) =>
 // ================================================
 
 // Status Badge Component
-function InvoiceStatusBadge({ status }: { status: string }) {
-  const statusInfo = getInvoiceStatusInfo(status)
+function InvoiceStatusBadge({ status, colors, styles }: { status: string; colors: any; styles: any }) {
+  const statusInfo = getInvoiceStatusInfo(status, colors)
   
   return (
     <View style={[styles.statusBadge, { backgroundColor: `${statusInfo.color}15` }]}>
@@ -83,6 +84,8 @@ function InvoiceStatusBadge({ status }: { status: string }) {
 
 // Latest Invoice Card Component
 function LatestInvoiceCard({ invoice }: { invoice: any }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   if (!invoice) return null
   
   return (
@@ -95,7 +98,7 @@ function LatestInvoiceCard({ invoice }: { invoice: any }) {
           <Text preset="subheading" style={styles.latestInvoiceTitle}>
             {translate("paymentScreen.latestInvoice")}
           </Text>
-          <InvoiceStatusBadge status={invoice.status} />
+          <InvoiceStatusBadge status={invoice.status} colors={colors} styles={styles} />
         </View>
       }
       ContentComponent={
@@ -138,6 +141,7 @@ function PaymentMethodsScreen() {
   const tokens = useSelector(getAuthTokens)
   const jwt = tokens?.access?.token
   const { colors, isLoading: themeLoading } = useTheme()
+  const styles = createStyles(colors)
 
   if (!org || !org.id) {
     return (
@@ -184,6 +188,7 @@ function PaymentMethodsScreen() {
 function ExpandableInvoice({ invoice }: { invoice: any }) {
   const [expanded, setExpanded] = useState(false)
   const { colors, isLoading: themeLoading } = useTheme()
+  const styles = createStyles(colors)
   
   return (
     <ListItem
@@ -202,7 +207,7 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
       }
       RightComponent={
         <View style={styles.invoiceRightContent}>
-          <InvoiceStatusBadge status={invoice.status} />
+          <InvoiceStatusBadge status={invoice.status} colors={colors} styles={styles} />
           <Icon 
             icon={expanded ? "caretLeft" : "caretRight"} 
             size={16} 
@@ -255,6 +260,7 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
 function CurrentChargesScreen() {
   const org = useSelector(getOrg)
   const { colors, isLoading: themeLoading } = useTheme()
+  const styles = createStyles(colors)
   
   if (!org || !org.id) {
     return (
@@ -400,11 +406,11 @@ function CurrentChargesScreen() {
 function BillingInfoScreen() {
   const [showInvoiceHistory, setShowInvoiceHistory] = useState(false)
   const { colors, isLoading: themeLoading } = useTheme()
+  const styles = createStyles(colors)
   
   // Keep this check as a safety measure in case this screen is somehow accessed directly
   const currentUser = useSelector(getCurrentUser)
   const org = useSelector(getOrg)
-  const { colors, isLoading: themeLoading } = useTheme()
 
   // Although the parent checks authorization, keep these basic checks
   if (!currentUser) {
@@ -590,6 +596,12 @@ export function PaymentInfoScreen() {
   // *** 1. Get the current user in the main component ***
   const currentUser = useSelector(getCurrentUser)
   const { colors, isLoading: themeLoading } = useTheme()
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   // *** 2. Handle loading state for user ***
   if (!currentUser) {
@@ -1011,7 +1023,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   patientChargeCard: {
     marginBottom: spacing.md,
-    backgroundColor: 'white',
+    backgroundColor: colors.palette.neutral100,
     borderWidth: 1,
     borderColor: colors.palette.neutral200,
     borderRadius: 8,

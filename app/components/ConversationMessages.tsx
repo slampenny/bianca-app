@@ -2,7 +2,7 @@ import React from "react"
 import { View, StyleSheet, ViewStyle } from "react-native"
 import { Text } from "./Text"
 import { Message } from "../services/api/api.types"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 
 interface ConversationMessagesProps {
   messages: Message[]
@@ -11,6 +11,7 @@ interface ConversationMessagesProps {
 }
 
 export function ConversationMessages({ messages, style, 'data-testid': testId }: ConversationMessagesProps) {
+  const { colors } = useTheme()
 
   // Sort messages by creation time to ensure proper ordering
   const sortedMessages = React.useMemo(() => {
@@ -80,22 +81,7 @@ export function ConversationMessages({ messages, style, 'data-testid': testId }:
     )
   }
 
-  return (
-    <View style={[styles.container, style]} data-testid={testId}>
-      {sortedMessages.length > 0 ? (
-        sortedMessages.map((message, index) => renderMessage(message, index))
-      ) : (
-        <View style={styles.noMessagesContainer}>
-          <Text style={styles.noMessagesText}>
-            No messages yet. The conversation will appear here as it unfolds...
-          </Text>
-        </View>
-      )}
-    </View>
-  )
-}
-
-const styles = StyleSheet.create({
+  const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -128,18 +114,20 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   userBubble: {
-    backgroundColor: colors.palette.biancaButtonSelected, // Blue for user
+    // Use theme-aware colored background
+    backgroundColor: colors.palette?.biancaButtonSelected || colors.palette?.primary500 || colors.tint || "#0EA5E9",
     borderBottomRightRadius: 4, // WhatsApp-style tail
   },
   assistantBubble: {
-    backgroundColor: colors.palette.biancaSuccess, // Green for assistant
+    // Use theme-aware colored background  
+    backgroundColor: colors.palette?.biancaSuccess || colors.palette?.success500 || colors.success || "#22C55E",
     borderBottomLeftRadius: 4, // WhatsApp-style tail
   },
   debugUserBubble: {
-    backgroundColor: '#fff3cd', // Light yellow background
+    backgroundColor: colors.palette?.warning100 || "#FEF9C3", // Light yellow/warning background
     borderBottomRightRadius: 4, // WhatsApp-style tail
     borderWidth: 1,
-    borderColor: '#ffeaa7', // Yellow border
+    borderColor: colors.palette?.warning300 || "#FDE047", // Warning border
   },
   messageText: {
     fontSize: 16,
@@ -147,13 +135,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   userMessageText: {
-    color: colors.palette.neutral100, // White text on blue
+    // CRITICAL: Text on colored backgrounds (blue bubbles) must always be white for visibility
+    // Both in dark and light mode, white text provides best contrast on blue/green backgrounds
+    color: "#FFFFFF",
   },
   assistantMessageText: {
-    color: colors.palette.neutral100, // White text on green
+    // CRITICAL: Text on colored backgrounds (green bubbles) must always be white for visibility
+    // Both in dark and light mode, white text provides best contrast on blue/green backgrounds
+    color: "#FFFFFF",
   },
   debugUserMessageText: {
-    color: '#856404', // Dark yellow text
+    color: colors.palette.warning800, // Dark warning text
     fontSize: 14,
     lineHeight: 18,
     marginBottom: 4,
@@ -164,15 +156,17 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   userMessageTime: {
-    color: colors.palette.neutral100,
+    // CRITICAL: Text on colored backgrounds (blue bubbles) must always be white for visibility
+    color: "#FFFFFF",
     textAlign: "right",
   },
   assistantMessageTime: {
-    color: colors.palette.neutral100,
+    // CRITICAL: Text on colored backgrounds (green bubbles) must always be white for visibility
+    color: "#FFFFFF",
     textAlign: "left",
   },
   debugUserMessageTime: {
-    color: '#856404',
+    color: colors.palette.warning800,
     textAlign: "right",
     fontSize: 10,
   },
@@ -180,10 +174,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 20,
   },
-  noMessagesText: {
-    color: colors.palette.neutral400,
+    noMessagesText: {
+    // Use theme-aware text color with fallbacks
+    color: colors.textDim || colors.palette?.neutral600 || colors.palette?.neutral400 || "#666666",
     fontSize: 16,
     fontStyle: "italic",
     textAlign: "center",
   },
-})
+  })
+  
+  const styles = createStyles(colors)
+  
+  return (
+    <View style={[styles.container, style]} data-testid={testId}>
+      {sortedMessages.length > 0 ? (
+        sortedMessages.map((message, index) => renderMessage(message, index))
+      ) : (
+        <View style={styles.noMessagesContainer}>
+          <Text style={styles.noMessagesText}>
+            No messages yet. The conversation will appear here as it unfolds...
+          </Text>
+        </View>
+      )}
+    </View>
+  )
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { View, ViewStyle, Alert } from "react-native"
+import { View, ViewStyle, Alert, StyleSheet } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useResetPasswordMutation } from "../services/api/authApi"
@@ -7,6 +7,35 @@ import { Button, Text, TextField, Screen, Header } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { spacing } from "app/theme"
 import { translate } from "../i18n"
+import { useTheme } from "app/theme/ThemeContext"
+
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.palette.neutral100,
+    padding: spacing.lg,
+  },
+  title: {
+    color: colors.palette.neutral800,
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: spacing.md,
+  },
+  message: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  formContainer: {
+    marginBottom: spacing.lg,
+  },
+  buttonContainer: {
+    marginTop: spacing.lg,
+  },
+})
 
 type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
 
@@ -14,11 +43,15 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const { navigation } = props
   const route = useRoute()
   const token = (route.params as any)?.token
+  const { colors, isLoading: themeLoading } = useTheme()
 
+  if (themeLoading) {
+    return null
+  }
 
+  const styles = createStyles(colors)
 
   const [resetPassword, { isLoading }] = useResetPasswordMutation()
-
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [passwordError, setPasswordError] = useState("")
@@ -100,28 +133,28 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
     return (
       <Screen 
         preset="fixed" 
-        style={$container}
-        contentContainerStyle={$contentContainer}
+        style={styles.container}
+        contentContainerStyle={styles.container}
       >
-        <View style={$successContainer}>
-          <Text style={$successIcon}>✓</Text>
+        <View style={styles.container}>
+          <Text style={styles.title}>✓</Text>
           
           <Text 
             preset="heading" 
             text="Password Reset Successful!" 
-            style={$successTitle}
+            style={styles.title}
           />
           
           <Text 
             preset="default"
             text="Your password has been updated successfully. You can now log in with your new password."
-            style={$successMessage}
+            style={styles.message}
           />
           
           <Text 
             size="sm"
             text="Redirecting to login..."
-            style={$redirectText}
+            style={styles.message}
           />
         </View>
       </Screen>
@@ -199,7 +232,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
           <Button
             text="Back to Login"
             onPress={() => navigation.navigate("Login")}
-            preset="secondary"
+            preset="default"
             style={$backButton}
           />
         </View>
@@ -208,89 +241,3 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   )
 }
 
-const $container: ViewStyle = {
-  flex: 1,
-  justifyContent: "center",
-  alignItems: "center",
-  paddingHorizontal: spacing.lg,
-}
-
-const $contentContainer: ViewStyle = {
-  flex: 1,
-  justifyContent: "center",
-  alignItems: "center",
-}
-
-const $screenContentContainer: ViewStyle = {
-  flexGrow: 1,
-}
-
-const $content: ViewStyle = {
-  flex: 1,
-  paddingHorizontal: spacing.lg,
-  paddingTop: spacing.md,
-  paddingBottom: spacing.lg,
-}
-
-const $title = {
-  textAlign: "center" as const,
-  marginBottom: spacing.sm,
-}
-
-const $subtitle = {
-  textAlign: "center" as const,
-  marginBottom: spacing.xl,
-  lineHeight: 24,
-}
-
-const $form: ViewStyle = {
-  flex: 1,
-}
-
-const $textField: ViewStyle = {
-  marginBottom: spacing.md,
-}
-
-const $resetButton: ViewStyle = {
-  marginTop: spacing.lg,
-  marginBottom: spacing.md,
-}
-
-const $backButton: ViewStyle = {
-  marginTop: spacing.sm,
-}
-
-const $errorText = {
-  textAlign: "center" as const,
-  marginBottom: spacing.md,
-  paddingHorizontal: spacing.sm,
-}
-
-const $successContainer: ViewStyle = {
-  alignItems: "center",
-  justifyContent: "center",
-  flex: 1,
-  maxWidth: 320,
-  width: "100%",
-}
-
-const $successIcon = {
-  fontSize: 60,
-  marginBottom: spacing.md,
-}
-
-const $successTitle = {
-  textAlign: "center" as const,
-  marginBottom: spacing.sm,
-}
-
-const $successMessage = {
-  textAlign: "center" as const,
-  lineHeight: 24,
-  marginBottom: spacing.lg,
-}
-
-const $redirectText = {
-  textAlign: "center" as const,
-  fontStyle: "italic" as const,
-}

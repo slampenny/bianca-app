@@ -49,3 +49,4 @@ for file in "${FILES[@]}"; do
 done
 
 echo "🎉 All duplicate declarations fixed!"
+

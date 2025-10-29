@@ -45,6 +45,12 @@ export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, 
     }
   }
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   return (
     <div
       style={{

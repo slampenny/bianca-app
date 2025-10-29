@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react"
 import {
-  Text,
-  TextInput,
   ScrollView,
   Pressable,
   StyleSheet,
@@ -9,6 +7,7 @@ import {
   View,
   Alert,
 } from "react-native"
+import { Text, TextField } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { LegalLinks } from "app/components/LegalLinks"
@@ -183,8 +182,20 @@ function ProfileScreen() {
     return <LoadingScreen />
   }
 
+  if (themeLoading) {
+    return <LoadingScreen />
+  }
+
+  const styles = createStyles(colors)
+
   // If user is not authenticated and has no invite token, show error
   if (!currentUser && !inviteToken) {
+    const handleGoToLogin = () => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("Login")
+      }
+    }
+    
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
         <Text style={styles.error} accessibilityLabel="error-message">
@@ -192,7 +203,7 @@ function ProfileScreen() {
         </Text>
         <Pressable
           style={styles.button}
-          onPress={() => navigation.navigate("Login")}
+          onPress={handleGoToLogin}
           accessibilityLabel="go-to-login-button"
           accessible={true}
         >
@@ -201,12 +212,6 @@ function ProfileScreen() {
       </ScrollView>
     )
   }
-
-  if (themeLoading) {
-    return <LoadingScreen />
-  }
-
-  const styles = createStyles(colors)
 
   return (
     <TouchableWithoutFeedback>
@@ -242,29 +247,37 @@ function ProfileScreen() {
             }}
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder={translate("profileScreen.namePlaceholder")}
-            placeholderTextColor={colors.palette.neutral600}
+          <TextField
+            placeholderTx="profileScreen.namePlaceholder"
             value={name}
             onChangeText={setName}
-          />
-          <TextInput
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
             style={styles.input}
-            placeholder={translate("profileScreen.emailPlaceholder")}
-            placeholderTextColor={colors.palette.neutral600}
+          />
+          <TextField
+            placeholderTx="profileScreen.emailPlaceholder"
             value={email}
             onChangeText={validateEmail}
-          />
-          {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
-          <TextInput
+            keyboardType="email-address"
+            autoCapitalize="none"
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
             style={styles.input}
-            placeholder={translate("profileScreen.phonePlaceholder")}
-            placeholderTextColor={colors.palette.neutral600}
+            status={emailError ? "error" : undefined}
+            helper={emailError || undefined}
+          />
+          <TextField
+            placeholderTx="profileScreen.phonePlaceholder"
             value={phone}
             onChangeText={validatePhone}
+            keyboardType="phone-pad"
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={styles.inputWrapper}
+            style={styles.input}
+            status={phoneError ? "error" : undefined}
+            helper={phoneError || undefined}
           />
-          {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
           <LanguageSelector testID="language-selector" />
           <ThemeSelector testID="theme-selector" />
@@ -329,15 +342,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
-  input: {
-    borderColor: colors.palette.neutral300,
-    borderRadius: 5,
-    borderWidth: 1,
-    color: colors.palette.biancaHeader,
-    fontSize: 16,
-    height: 45,
+  inputContainer: {
     marginBottom: 15,
-    paddingHorizontal: 10,
+  },
+  inputWrapper: {
+    // TextField handles most styling automatically
+  },
+  input: {
+    // TextField handles text color automatically via theme
   },
   logoutButton: {
     alignItems: "center",
@@ -347,7 +359,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
   unverifiedBanner: {
-    backgroundColor: colors.palette.biancaWarning || '#ffa500',
+    backgroundColor: colors.palette.warning500 || colors.palette.biancaWarning,
     borderRadius: 8,
     marginBottom: 20,
     padding: 16,

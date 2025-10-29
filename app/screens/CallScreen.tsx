@@ -1,5 +1,6 @@
 import React from "react"
-import { View, Text, StyleSheet, ScrollView } from "react-native"
+import { View, StyleSheet, ScrollView } from "react-native"
+import { Text } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
 import { getPatient } from "../store/patientSlice"
 import { getConversation, setConversation } from "../store/conversationSlice"
@@ -141,7 +142,11 @@ export function CallScreen() {
     }
   }, [activeCall, dispatch])
 
+  if (themeLoading) {
+    return null
+  }
 
+  const styles = createStyles(colors)
 
   if (!patient) {
     return (
@@ -194,7 +199,7 @@ export function CallScreen() {
           <Text style={styles.debugText}>Debug: live conversation messages = {conversationToDisplay?.messages?.length || 0}</Text>
           <Text style={styles.debugText}>Debug: using call status data = {!!callStatusData && !liveConversationData ? 'YES' : 'NO'}</Text>
           {(conversationError as any)?.status === 404 && callStatusData && (
-            <Text style={[styles.debugText, { color: 'orange' }]}>
+            <Text style={styles.debugTextWarning}>
               Debug: Conversation API 404, but call status working - using fallback
             </Text>
           )}
@@ -382,6 +387,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   debugText: {
     color: colors.palette.neutral600,
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  debugTextWarning: {
+    color: colors.palette.warning500,
     fontSize: 12,
     fontFamily: 'monospace',
   },

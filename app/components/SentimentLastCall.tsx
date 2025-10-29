@@ -1,8 +1,8 @@
 import React from "react"
-import { View, ViewStyle, ScrollView, Dimensions } from "react-native"
+import { View, ViewStyle, ScrollView, Dimensions, StyleSheet } from "react-native"
 import { Text } from "./Text"
 import { Icon } from "./Icon"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 import { SentimentTrendPoint, SentimentAnalysis, ConcernLevel } from "../services/api/api.types"
 import { translate } from "../i18n"
 
@@ -12,15 +12,17 @@ interface SentimentLastCallProps {
 }
 
 export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
+  const { colors } = useTheme()
   const screenWidth = Dimensions.get("window").width
   const isMobile = screenWidth < 768
+  const styles = createStyles(colors)
 
   if (!lastCall || !lastCall.sentiment) {
     return (
       <View style={[styles.container, style]}>
         <Text style={styles.title}>{translate("sentimentAnalysis.lastCallAnalysis")}</Text>
         <View style={styles.emptyContainer}>
-          <Icon icon="phoneOff" size={48} color={colors.textDim} />
+          <Icon icon="phoneOff" size={48} color={colors.textDim || colors.palette.neutral600} />
           <Text style={styles.emptyTitle}>{translate("sentimentAnalysis.noRecentCall")}</Text>
           <Text style={styles.emptyText}>
             {translate("sentimentAnalysis.noRecentCallMessage")}
@@ -40,7 +42,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
       <View style={styles.callOverview}>
         <View style={styles.callHeader}>
           <View style={styles.callDateContainer}>
-            <Icon icon="calendar" size={16} color={colors.textDim} />
+            <Icon icon="calendar" size={16} color={colors.textDim || colors.palette.neutral600} />
             <Text style={styles.callDate}>
               {new Date(lastCall.date).toLocaleDateString('en-US', {
                 weekday: 'long',
@@ -51,7 +53,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
             </Text>
           </View>
           <View style={styles.callTimeContainer}>
-            <Icon icon="clock" size={16} color={colors.textDim} />
+            <Icon icon="clock" size={16} color={colors.textDim || colors.palette.neutral600} />
             <Text style={styles.callTime}>
               {new Date(lastCall.date).toLocaleTimeString('en-US', {
                 hour: 'numeric',
@@ -88,7 +90,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
           <Text style={styles.sentimentTitle}>{translate("sentimentAnalysis.overallSentiment")}</Text>
           <View style={[
             styles.sentimentBadge,
-            { backgroundColor: getSentimentColor(sentiment.sentimentScore) }
+            { backgroundColor: getSentimentColor(sentiment.sentimentScore, colors) }
           ]}>
             <Text style={styles.sentimentBadgeText}>
               {sentiment.overallSentiment.toUpperCase()}
@@ -99,7 +101,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
         <View style={styles.sentimentScoreContainer}>
           <Text style={[
             styles.sentimentScore,
-            { color: getSentimentColor(sentiment.sentimentScore) }
+            { color: getSentimentColor(sentiment.sentimentScore, colors) }
           ]}>
             {sentiment.sentimentScore > 0 ? "+" : ""}{sentiment.sentimentScore.toFixed(2)}
           </Text>
@@ -109,7 +111,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
         </View>
 
         <View style={styles.confidenceContainer}>
-          <Icon icon="shield" size={16} color={colors.textDim} />
+          <Icon icon="shield" size={16} color={colors.textDim || colors.palette.neutral600} />
           <Text style={styles.confidenceText}>
             {translate("sentimentAnalysis.analysisConfidence")} {Math.round(sentiment.confidence * 100)}%
           </Text>
@@ -126,7 +128,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
                 <Icon 
                   icon={getEmotionIcon(emotion)} 
                   size={20} 
-                  color={getEmotionColor(emotion)} 
+                  color={getEmotionColor(emotion, colors)} 
                 />
                 <Text style={styles.emotionText}>{emotion}</Text>
               </View>
@@ -150,7 +152,7 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
           <View style={styles.concernLevelContainer}>
             <View style={[
               styles.concernLevelBadge,
-              { backgroundColor: getConcernColor(sentiment.concernLevel) }
+              { backgroundColor: getConcernColor(sentiment.concernLevel, colors) }
             ]}>
               <Icon 
                 icon={getConcernIcon(sentiment.concernLevel)} 
@@ -224,10 +226,10 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
   )
 }
 
-function getSentimentColor(score: number): string {
+function getSentimentColor(score: number, colors: any): string {
   if (score > 0.3) return colors.palette.biancaSuccess
   if (score < -0.3) return colors.error
-  return colors.textDim
+  return colors.textDim || colors.palette.neutral600
 }
 
 function getEmotionIcon(emotion: string): "smile" | "frown" | "meh" | "heart" | "zap" | "target" {
@@ -240,11 +242,11 @@ function getEmotionIcon(emotion: string): "smile" | "frown" | "meh" | "heart" | 
   return "target"
 }
 
-function getEmotionColor(emotion: string): string {
+function getEmotionColor(emotion: string, colors: any): string {
   const emotionLower = emotion.toLowerCase()
   if (emotionLower.includes('happy') || emotionLower.includes('joy') || emotionLower.includes('positive')) return colors.palette.biancaSuccess
   if (emotionLower.includes('sad') || emotionLower.includes('negative') || emotionLower.includes('frustrated')) return colors.error
-  if (emotionLower.includes('neutral') || emotionLower.includes('calm')) return colors.textDim
+  if (emotionLower.includes('neutral') || emotionLower.includes('calm')) return colors.textDim || colors.palette.neutral600
   return colors.palette.accent500
 }
 
@@ -259,7 +261,7 @@ function getConcernIcon(level: ConcernLevel): "shield" | "alertCircle" | "alertT
   }
 }
 
-function getConcernColor(level: ConcernLevel): string {
+function getConcernColor(level: ConcernLevel, colors: any): string {
   switch (level) {
     case "low":
       return colors.palette.biancaSuccess
@@ -281,13 +283,13 @@ function getConcernDescription(level: ConcernLevel): string {
   }
 }
 
-const styles = {
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.neutral100,
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
-    shadowColor: colors.palette.neutral800,
+    shadowColor: colors.palette.neutral800 || colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -295,27 +297,27 @@ const styles = {
   },
   title: {
     fontSize: 20,
-    fontWeight: "700" as const,
-    color: colors.text,
+    fontWeight: "700",
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 16,
   },
   emptyContainer: {
     padding: 32,
-    alignItems: "center" as const,
+    alignItems: "center",
     backgroundColor: colors.palette.neutral200,
     borderRadius: 12,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: colors.textDim,
-    textAlign: "center" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    textAlign: "center",
     lineHeight: 20,
   },
   callOverview: {
@@ -325,48 +327,48 @@ const styles = {
     marginBottom: 16,
   },
   callHeader: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   callDateContainer: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   callDate: {
     fontSize: 14,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
   },
   callTimeContainer: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   callTime: {
     fontSize: 14,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
   },
   callStats: {
-    flexDirection: "row" as const,
-    justifyContent: "space-around" as const,
-    flexWrap: "wrap" as const,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    flexWrap: "wrap",
     gap: 8,
   },
   statItem: {
-    alignItems: "center" as const,
+    alignItems: "center",
   },
   statLabel: {
     fontSize: 12,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     marginBottom: 4,
   },
   statValue: {
     fontSize: 14,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
   },
   mainSentimentCard: {
     backgroundColor: colors.palette.neutral200,
@@ -375,15 +377,15 @@ const styles = {
     marginBottom: 16,
   },
   sentimentHeader: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   sentimentTitle: {
     fontSize: 16,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
   },
   sentimentBadge: {
     paddingHorizontal: 12,
@@ -396,29 +398,29 @@ const styles = {
     color: colors.palette.neutral100,
   },
   sentimentScoreContainer: {
-    alignItems: "center" as const,
+    alignItems: "center",
     marginBottom: 12,
   },
   sentimentScore: {
     fontSize: 48,
-    fontWeight: "800" as const,
+    fontWeight: "800",
     marginBottom: 8,
   },
   sentimentScoreLabel: {
     fontSize: 12,
-    color: colors.textDim,
-    textAlign: "center" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    textAlign: "center",
   },
   confidenceContainer: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
   },
   confidenceText: {
     fontSize: 14,
-    color: colors.textDim,
-    fontWeight: "500" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    fontWeight: "500",
   },
   emotionsCard: {
     backgroundColor: colors.palette.neutral200,
@@ -428,18 +430,18 @@ const styles = {
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 12,
   },
   emotionsGrid: {
-    flexDirection: "row" as const,
-    flexWrap: "wrap" as const,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   emotionItem: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.palette.neutral300,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -448,9 +450,9 @@ const styles = {
   },
   emotionText: {
     fontSize: 14,
-    fontWeight: "500" as const,
-    color: colors.text,
-    textTransform: "capitalize" as const,
+    fontWeight: "500",
+    color: colors.palette.biancaHeader || colors.text,
+    textTransform: "capitalize",
   },
   moodCard: {
     backgroundColor: colors.palette.neutral200,
@@ -460,7 +462,7 @@ const styles = {
   },
   moodText: {
     fontSize: 14,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     lineHeight: 20,
   },
   concernCard: {
@@ -470,12 +472,12 @@ const styles = {
     marginBottom: 16,
   },
   concernLevelContainer: {
-    alignItems: "center" as const,
+    alignItems: "center",
     gap: 8,
   },
   concernLevelBadge: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -483,13 +485,13 @@ const styles = {
   },
   concernLevelText: {
     fontSize: 12,
-    fontWeight: "700" as const,
+    fontWeight: "700",
     color: colors.palette.neutral100,
   },
   concernDescription: {
     fontSize: 12,
-    color: colors.textDim,
-    textAlign: "center" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    textAlign: "center",
     lineHeight: 16,
   },
   satisfactionCard: {
@@ -502,30 +504,30 @@ const styles = {
     marginBottom: 16,
   },
   satisfactionHeader: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
     gap: 6,
   },
   satisfactionSectionTitle: {
     fontSize: 14,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
   },
   satisfactionItem: {
-    flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginBottom: 4,
     gap: 8,
   },
   satisfactionBullet: {
     fontSize: 14,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     marginTop: 2,
   },
   satisfactionText: {
     fontSize: 13,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     flex: 1,
     lineHeight: 18,
   },
@@ -537,7 +539,7 @@ const styles = {
   },
   summaryText: {
     fontSize: 14,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     lineHeight: 20,
   },
   recommendationsCard: {
@@ -548,8 +550,8 @@ const styles = {
   },
   recommendationsText: {
     fontSize: 14,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     lineHeight: 20,
   },
-}
+})
 

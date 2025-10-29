@@ -12,7 +12,8 @@ import { getSchedules, setSchedule, getSchedule } from "../store/scheduleSlice"
 import { LoadingScreen } from "./LoadingScreen"
 import { Schedule } from "app/services/api"
 import { getPatient } from "app/store/patientSlice"
-import { colors, spacing } from "app/theme"
+import { spacing } from "app/theme"
+import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { Text, Button, Card } from "app/components"
 
@@ -51,6 +52,12 @@ export const SchedulesScreen = () => {
     dispatch(setSchedule(newSchedule))
   }
 
+  if (themeLoading) {
+    return <LoadingScreen />
+  }
+
+  const styles = createStyles(colors)
+
   if (isUpdating || isCreating || isDeleting) {
     return <LoadingScreen /> // use the LoadingScreen component
   }
@@ -78,7 +85,7 @@ export const SchedulesScreen = () => {
           headingStyle={styles.cardHeading}
           ContentComponent={
             <Picker
-              selectedValue={selectedSchedule.id}
+              selectedValue={selectedSchedule?.id}
               onValueChange={(itemValue) => {
                 const selected = schedules.find((schedule) => schedule.id === itemValue)
                 if (selected) {
@@ -86,9 +93,16 @@ export const SchedulesScreen = () => {
                 }
               }}
               style={styles.picker}
+              dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+              itemStyle={styles.pickerItem}
             >
               {schedules.map((schedule, index) => (
-                <Picker.Item key={schedule.id} label={`${translate("schedulesScreen.scheduleNumber")} ${index + 1}`} value={schedule.id} />
+                <Picker.Item 
+                  key={schedule.id} 
+                  label={`${translate("schedulesScreen.scheduleNumber")} ${index + 1}`} 
+                  value={schedule.id}
+                  color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+                />
               ))}
             </Picker>
           }
@@ -146,7 +160,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 
   cardHeading: {
-    color: colors.palette.biancaHeader,
+    // Use theme-aware text color with fallbacks
+    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
     fontSize: 18,
     fontWeight: "600",
   },
@@ -162,7 +177,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.md,
   },
   emptyStateText: {
-    color: colors.palette.neutral600,
+    // Use theme-aware text color with fallbacks
+    color: colors.textDim || colors.palette?.neutral600 || colors.palette?.neutral700 || "#666666",
     fontSize: 16,
     textAlign: "center",
   },
@@ -170,14 +186,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.lg,
   },
   headerTitle: {
-    color: colors.palette.biancaHeader,
+    // Use theme-aware text color with fallbacks
+    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
     fontSize: 28,
     fontWeight: "bold",
   },
   picker: {
-    backgroundColor: colors.palette.neutral100,
+    // CRITICAL: Use theme-aware background
+    backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
     borderRadius: 8,
     height: 50,
+    // Note: Picker text color is set via Picker.Item color prop
+    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+  },
+  pickerItem: {
+    // Picker.Item color prop has limited support, but we try to set it
+    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
   },
 
   scheduleCard: {

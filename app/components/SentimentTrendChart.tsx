@@ -1,7 +1,7 @@
 import React from "react"
-import { View, ViewStyle, Dimensions } from "react-native"
+import { View, ViewStyle, Dimensions, StyleSheet } from "react-native"
 import { Text } from "./Text"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 import { SentimentTrend, SentimentTrendPoint } from "../services/api/api.types"
 import { translate } from "../i18n"
 
@@ -11,10 +11,12 @@ interface SentimentTrendChartProps {
 }
 
 export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) {
+  const { colors } = useTheme()
   const { dataPoints, summary } = trend
   const screenWidth = Dimensions.get("window").width
   const chartWidth = screenWidth - 40 // Use full screen width minus small padding
   const chartHeight = 120
+  const styles = createStyles(colors)
 
   // Debug logging
   console.log('[SentimentChart] Received trend data:', {
@@ -102,7 +104,7 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
             {translate("sentimentAnalysis.avg")} {summary.averageSentiment > 0 ? "+" : ""}{summary.averageSentiment.toFixed(1)}
           </Text>
           <View style={styles.trendContainer}>
-            <Text style={[styles.trendText, getTrendStyle(summary.trendDirection)]}>
+            <Text style={[styles.trendText, getTrendStyle(summary.trendDirection, colors)]}>
               {getTrendIcon(summary.trendDirection)} {summary.trendDirection}
             </Text>
             {isLowConfidence && (
@@ -136,7 +138,7 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
               {
                 left: point.x - 4,
                 top: point.y - 4,
-                backgroundColor: getSentimentColor(point.score),
+                backgroundColor: getSentimentColor(point.score, colors),
               },
             ]}
           />
@@ -148,7 +150,7 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
             <svg width={chartWidth} height={chartHeight} style={styles.svg}>
               <path
                 d={pathData}
-                stroke={colors.palette.accent700}
+                stroke={colors.palette.accent700 || colors.palette.primary500}
                 strokeWidth="2"
                 fill="none"
                 strokeLinecap="round"
@@ -194,20 +196,20 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
   )
 }
 
-function getSentimentColor(score: number): string {
+function getSentimentColor(score: number, colors: any): string {
   if (score > 0.3) return colors.palette.biancaSuccess
   if (score < -0.3) return colors.error
-  return colors.textDim
+  return colors.textDim || colors.palette.neutral600
 }
 
-function getTrendStyle(trend: string) {
+function getTrendStyle(trend: string, colors: any) {
   switch (trend) {
     case "improving":
       return { color: colors.palette.biancaSuccess }
     case "declining":
       return { color: colors.error }
     default:
-      return { color: colors.textDim }
+      return { color: colors.textDim || colors.palette.neutral600 }
   }
 }
 
@@ -222,73 +224,73 @@ function getTrendIcon(trend: string): string {
   }
 }
 
-const styles = {
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: 16,
     backgroundColor: colors.palette.neutral100,
     borderRadius: 12,
     marginVertical: 8,
-    overflow: "hidden" as const,
+    overflow: "hidden",
   },
   header: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   title: {
     fontSize: 16,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
   },
   summaryContainer: {
-    alignItems: "flex-end" as const,
+    alignItems: "flex-end",
   },
   summaryText: {
     fontSize: 14,
-    fontWeight: "500" as const,
-    color: colors.text,
+    fontWeight: "500",
+    color: colors.palette.biancaHeader || colors.text,
   },
   trendContainer: {
-    alignItems: "flex-end" as const,
+    alignItems: "flex-end",
   },
   trendText: {
     fontSize: 12,
-    fontWeight: "500" as const,
+    fontWeight: "500",
   },
   lowConfidenceWarning: {
     fontSize: 10,
-    color: colors.palette.angry500,
-    fontStyle: "italic" as const,
+    color: colors.palette.angry500 || colors.error,
+    fontStyle: "italic",
     marginTop: 2,
   },
   chartContainer: {
-    position: "relative" as const,
+    position: "relative",
     marginBottom: 8,
   },
   chartBackground: {
-    position: "absolute" as const,
+    position: "absolute",
     width: "100%",
     height: "100%",
   },
   zeroLine: {
-    position: "absolute" as const,
+    position: "absolute",
     width: "100%",
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: colors.palette.biancaBorder || colors.border,
   },
   positiveArea: {
-    position: "absolute" as const,
+    position: "absolute",
     width: "100%",
-    backgroundColor: colors.palette.biancaSuccessBackground,
+    backgroundColor: colors.palette.biancaSuccessBackground || "rgba(34, 197, 94, 0.1)",
   },
   negativeArea: {
-    position: "absolute" as const,
+    position: "absolute",
     width: "100%",
-    backgroundColor: colors.palette.biancaErrorBackground,
+    backgroundColor: colors.palette.biancaErrorBackground || "rgba(239, 68, 68, 0.1)",
   },
   dataPoint: {
-    position: "absolute" as const,
+    position: "absolute",
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -296,56 +298,56 @@ const styles = {
     borderColor: colors.palette.neutral100,
   },
   trendLine: {
-    position: "absolute" as const,
+    position: "absolute",
     height: 2,
     backgroundColor: colors.palette.primary500,
     opacity: 0.7,
   },
   svgContainer: {
-    position: "absolute" as const,
+    position: "absolute",
     top: 0,
     left: 0,
     width: "100%",
     height: "100%",
   },
   svg: {
-    position: "absolute" as const,
+    position: "absolute",
     top: 0,
     left: 0,
   },
   emptyChart: {
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: colors.palette.neutral200,
     borderRadius: 8,
   },
   emptyText: {
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     fontSize: 14,
   },
   emptySubtext: {
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     fontSize: 12,
     marginTop: 4,
   },
   chartLabels: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
   labelText: {
     fontSize: 12,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
   },
   dataSummary: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    flexWrap: "wrap" as const,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 8,
   },
   dataText: {
     fontSize: 12,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
   },
   insightsContainer: {
     marginTop: 16,
@@ -355,26 +357,26 @@ const styles = {
   },
   insightsTitle: {
     fontSize: 14,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 8,
   },
   insightItem: {
-    flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginBottom: 4,
     gap: 8,
   },
   insightBullet: {
     fontSize: 14,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     marginTop: 2,
   },
   insightText: {
     fontSize: 13,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     flex: 1,
     lineHeight: 18,
   },
-}
+})
 

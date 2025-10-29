@@ -7,10 +7,26 @@ import {
   TextStyle,
   ViewStyle,
 } from "react-native"
-import { colors, spacing, typography } from "../theme"
+import { spacing, typography } from "../theme"
+import { useTheme } from "../theme/ThemeContext"
 import { Text, TextProps } from "./Text"
 
-type Presets = keyof typeof $viewPresets
+/**
+ * Button Preset Guide - Consistent Button Color System
+ * 
+ * Use presets to maintain consistent button styling across the app:
+ * 
+ * - **primary**: Main actions (Save, Invite, Submit, Call, Create) - Blue/Indigo
+ * - **default**: Secondary actions (View, Navigate, Browse, Cancel) - Outlined/Gray
+ * - **success**: Success/Assign actions (Assign, Confirm positive actions) - Green/Emerald
+ * - **danger**: Destructive actions (Delete, Remove, Logout, Confirm delete) - Red/Rose
+ * - **warning**: Warning actions (Caution, Alert) - Amber/Yellow
+ * - **filled**: Avoid - Use "default" instead for neutral secondary actions
+ * - **reversed**: Dark themed buttons (rarely needed)
+ * - **medical**: Healthcare-specific actions (rarely needed)
+ */
+type PresetNames = "default" | "filled" | "reversed" | "primary" | "success" | "danger" | "warning" | "medical"
+type Presets = PresetNames
 
 export interface ButtonAccessoryProps {
   style: StyleProp<any>
@@ -98,6 +114,8 @@ export interface ButtonProps extends PressableProps {
  * />
  */
 export function Button(props: ButtonProps) {
+  const { colors } = useTheme()
+  
   const {
     tx,
     text,
@@ -117,6 +135,13 @@ export function Button(props: ButtonProps) {
   } = props
 
   const preset: Presets = props.preset ?? "default"
+  
+  // Create presets dynamically based on current theme colors
+  const $viewPresets = getViewPresets(colors)
+  const $textPresets = getTextPresets(colors)
+  const $pressedViewPresets = getPressedViewPresets(colors)
+  const $pressedTextPresets = getPressedTextPresets(colors)
+  
   /**
    * @param {PressableStateCallbackType} root0 - The root object containing the pressed state.
    * @param {boolean} root0.pressed - The pressed state.
@@ -200,93 +225,113 @@ const $baseTextStyle: TextStyle = {
 const $rightAccessoryStyle: ViewStyle = { marginStart: spacing.xs, zIndex: 1 }
 const $leftAccessoryStyle: ViewStyle = { marginEnd: spacing.xs, zIndex: 1 }
 
-const $viewPresets = {
-  default: [
-    $baseViewStyle,
-    {
-      borderWidth: 1,
-      borderColor: colors.palette.neutral400,
-      backgroundColor: colors.palette.neutral100,
-    },
-  ] as StyleProp<ViewStyle>,
+function getViewPresets(colors: any): Record<PresetNames, StyleProp<ViewStyle>> {
+  return {
+    default: [
+      $baseViewStyle,
+      {
+        borderWidth: 1,
+        borderColor: colors.palette.neutral400,
+        backgroundColor: colors.palette.neutral100,
+      },
+    ] as StyleProp<ViewStyle>,
 
-  filled: [$baseViewStyle, { backgroundColor: colors.palette.neutral300 }] as StyleProp<ViewStyle>,
+    // CRITICAL: filled preset uses a neutral background that's theme-aware
+    // In dark mode: neutral300 = dark gray (#262626)
+    // In light mode: neutral300 = light gray (#F0F0F0)
+    filled: [$baseViewStyle, { backgroundColor: colors.palette?.neutral300 || colors.palette?.neutral200 }] as StyleProp<ViewStyle>,
 
-  reversed: [
-    $baseViewStyle,
-    { backgroundColor: colors.palette.neutral800 },
-  ] as StyleProp<ViewStyle>,
+    reversed: [
+      $baseViewStyle,
+      { backgroundColor: colors.palette.neutral800 },
+    ] as StyleProp<ViewStyle>,
 
-  primary: [
-    $baseViewStyle,
-    { 
-      backgroundColor: colors.palette.primary500,
-      borderWidth: 0,
-    },
-  ] as StyleProp<ViewStyle>,
+    primary: [
+      $baseViewStyle,
+      { 
+        backgroundColor: colors.palette.primary500,
+        borderWidth: 0,
+      },
+    ] as StyleProp<ViewStyle>,
 
-  success: [
-    $baseViewStyle,
-    { 
-      backgroundColor: colors.palette.success500,
-      borderWidth: 0,
-    },
-  ] as StyleProp<ViewStyle>,
+    success: [
+      $baseViewStyle,
+      { 
+        backgroundColor: colors.palette.success500,
+        borderWidth: 0,
+      },
+    ] as StyleProp<ViewStyle>,
 
-  danger: [
-    $baseViewStyle,
-    { 
-      backgroundColor: colors.palette.error500,
-      borderWidth: 0,
-    },
-  ] as StyleProp<ViewStyle>,
+    danger: [
+      $baseViewStyle,
+      { 
+        backgroundColor: colors.palette.error500,
+        borderWidth: 0,
+      },
+    ] as StyleProp<ViewStyle>,
 
-  warning: [
-    $baseViewStyle,
-    { 
-      backgroundColor: colors.palette.warning500,
-      borderWidth: 0,
-    },
-  ] as StyleProp<ViewStyle>,
+    warning: [
+      $baseViewStyle,
+      { 
+        backgroundColor: colors.palette.warning500,
+        borderWidth: 0,
+      },
+    ] as StyleProp<ViewStyle>,
 
-  medical: [
-    $baseViewStyle,
-    { 
-      backgroundColor: colors.palette.medical500,
-      borderWidth: 0,
-    },
-  ] as StyleProp<ViewStyle>,
+    medical: [
+      $baseViewStyle,
+      { 
+        backgroundColor: colors.palette.medical500,
+        borderWidth: 0,
+      },
+    ] as StyleProp<ViewStyle>,
+  }
 }
 
-const $textPresets: Record<Presets, StyleProp<TextStyle>> = {
-  default: $baseTextStyle,
-  filled: $baseTextStyle,
-  reversed: [$baseTextStyle, { color: colors.palette.neutral100 }],
-  primary: [$baseTextStyle, { color: colors.palette.neutral100 }],
-  success: [$baseTextStyle, { color: colors.palette.neutral100 }],
-  danger: [$baseTextStyle, { color: colors.palette.neutral100 }],
-  warning: [$baseTextStyle, { color: colors.palette.neutral100 }],
-  medical: [$baseTextStyle, { color: colors.palette.neutral100 }],
+function getTextPresets(colors: any): Record<PresetNames, StyleProp<TextStyle>> {
+  return {
+    // Default preset uses border, so text should be theme-aware
+    default: [$baseTextStyle, { color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 }],
+    // CRITICAL: filled preset uses neutral300 background
+    // In dark mode: neutral300 = #262626 (dark gray), so use light text
+    // In light mode: neutral300 = #F0F0F0 (light gray), so use dark text
+    // Use theme's text color which automatically adjusts for light/dark mode
+    filled: [$baseTextStyle, { 
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 
+    }],
+    // Reversed uses dark background (neutral800), so always use light text
+    reversed: [$baseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    // Colored presets always use white/light text for contrast
+    primary: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
+    success: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
+    danger: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
+    warning: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
+    medical: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
+  }
 }
 
-const $pressedViewPresets: Record<Presets, StyleProp<ViewStyle>> = {
-  default: { backgroundColor: colors.palette.neutral200 },
-  filled: { backgroundColor: colors.palette.neutral400 },
-  reversed: { backgroundColor: colors.palette.neutral700 },
-  primary: { opacity: 0.8 },
-  success: { opacity: 0.8 },
-  danger: { opacity: 0.8 },
-  warning: { opacity: 0.8 },
-  medical: { opacity: 0.8 },
+function getPressedViewPresets(colors: any): Record<PresetNames, StyleProp<ViewStyle>> {
+  return {
+    default: { backgroundColor: colors.palette.neutral200 },
+    filled: { backgroundColor: colors.palette.neutral400 },
+    reversed: { backgroundColor: colors.palette.neutral700 },
+    primary: { opacity: 0.8 },
+    success: { opacity: 0.8 },
+    danger: { opacity: 0.8 },
+    warning: { opacity: 0.8 },
+    medical: { opacity: 0.8 },
+  }
 }
 
-const $pressedTextPresets: Record<Presets, StyleProp<TextStyle>> = {
-  default: { opacity: 0.9 },
-  filled: { opacity: 0.9 },
-  reversed: { opacity: 0.9 },
-  primary: { opacity: 0.9 },
-  success: { opacity: 0.9 },
-  danger: { opacity: 0.9 },
-  warning: { opacity: 0.9 },
-  medical: { opacity: 0.9 },
+function getPressedTextPresets(colors: any): Record<PresetNames, StyleProp<TextStyle>> {
+  return {
+    default: { opacity: 0.9 },
+    filled: { opacity: 0.9 },
+    reversed: { opacity: 0.9 },
+    primary: { opacity: 0.9 },
+    success: { opacity: 0.9 },
+    danger: { opacity: 0.9 },
+    warning: { opacity: 0.9 },
+    medical: { opacity: 0.9 },
+  }
 }

@@ -233,7 +233,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         {showEndCallButton && (
           <Button
             text={isEndingCall ? translate("common.ending") : translate("common.endCall")}
-            preset="secondary"
+            preset="danger"
             onPress={handleEndCall}
             disabled={isEndingCall}
             testID="end-call-button"

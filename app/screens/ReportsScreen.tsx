@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react"
-import { View, Text, StyleSheet, Pressable, Dimensions, Modal, TouchableWithoutFeedback, ScrollView } from "react-native"
+import { View, StyleSheet, Pressable, Dimensions, Modal, TouchableWithoutFeedback, ScrollView } from "react-native"
 import { useTheme } from "app/theme/ThemeContext"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
@@ -8,6 +8,7 @@ import { getCurrentUser } from "../store/authSlice"
 import { getPatientsForCaregiver, setPatient } from "../store/patientSlice"
 import { Patient } from "../services/api/api.types"
 import { translate } from "../i18n"
+import { Button, Text } from "app/components"
 
 const { width } = Dimensions.get('window')
 const buttonSize = Math.min((width - 60) / 2, 160) // Max 160px width, responsive
@@ -29,7 +30,6 @@ export function ReportsScreen() {
     [currentUser?.id]
   )
   const patients = useSelector(patientsSelector)
-  const { colors, isLoading: themeLoading } = useTheme()
 
   const handleSentimentPress = () => {
     if (selectedPatient) {
@@ -54,8 +54,14 @@ export function ReportsScreen() {
     console.log("Coming soon pressed")
   }
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="reports-screen" accessibilityLabel="reports-screen">
       {/* Patient Selector */}
       <View style={styles.patientSelector}>
         <Text style={styles.selectorLabel}>{translate("reportsScreen.selectPatient")}</Text>
@@ -74,7 +80,8 @@ export function ReportsScreen() {
       <View style={styles.grid}>
         {/* Top Row */}
         <View style={styles.row}>
-          <Pressable 
+          <Button 
+            preset="primary"
             style={[
               styles.button, 
               { width: buttonSize, height: buttonSize },
@@ -92,9 +99,10 @@ export function ReportsScreen() {
               />
               <Text style={styles.buttonText}>{translate("reportsScreen.sentiment")}</Text>
             </View>
-          </Pressable>
+          </Button>
           
-          <Pressable 
+          <Button 
+            preset="primary"
             style={[
               styles.button, 
               { width: buttonSize, height: buttonSize },
@@ -112,12 +120,13 @@ export function ReportsScreen() {
               />
               <Text style={styles.buttonText}>{translate("reportsScreen.medicalAnalysis")}</Text>
             </View>
-          </Pressable>
+          </Button>
         </View>
 
         {/* Bottom Row */}
         <View style={styles.row}>
-          <Pressable 
+          <Button 
+            preset="default"
             style={[styles.button, styles.comingSoonButton, { width: buttonSize, height: buttonSize }]} 
             onPress={handleComingSoonPress}
             testID="coming-soon-button-1"
@@ -130,9 +139,10 @@ export function ReportsScreen() {
               />
               <Text style={[styles.buttonText, styles.comingSoonText]}>{translate("reportsScreen.comingSoon")}</Text>
             </View>
-          </Pressable>
+          </Button>
           
-          <Pressable 
+          <Button 
+            preset="default"
             style={[styles.button, styles.comingSoonButton, { width: buttonSize, height: buttonSize }]} 
             onPress={handleComingSoonPress}
             testID="coming-soon-button-2"
@@ -145,7 +155,7 @@ export function ReportsScreen() {
               />
               <Text style={[styles.buttonText, styles.comingSoonText]}>{translate("reportsScreen.comingSoon")}</Text>
             </View>
-          </Pressable>
+          </Button>
         </View>
       </View>
 
@@ -182,12 +192,12 @@ export function ReportsScreen() {
                     </Pressable>
                   ))}
                 </ScrollView>
-                <Pressable
-                  style={styles.modalCloseButton}
+                  <Button
+                  preset="default"
+                  text={translate("reportsScreen.modalCancel")}
                   onPress={() => setShowPatientPicker(false)}
-                >
-                  <Text style={styles.modalCloseText}>{translate("reportsScreen.modalCancel")}</Text>
-                </Pressable>
+                  style={styles.modalCloseButton}
+                />
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -278,7 +288,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.palette.overlay50 || 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

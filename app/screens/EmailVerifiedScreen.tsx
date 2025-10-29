@@ -1,15 +1,45 @@
 import React, { useEffect } from "react"
-import { View, ViewStyle } from "react-native"
+import { View, ViewStyle, StyleSheet } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "app/store/authSlice"
 import { Screen, Text } from "app/components"
-import { colors, spacing } from "app/theme"
+import { spacing } from "app/theme"
+import { useTheme } from "app/theme/ThemeContext"
+
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.palette.neutral100,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.lg,
+  },
+  successText: {
+    color: colors.palette.success500,
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: spacing.md,
+  },
+  messageText: {
+    color: colors.palette.neutral800,
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+})
 
 export const EmailVerifiedScreen = () => {
   const navigation = useNavigation()
   const isLoggedIn = useSelector(isAuthenticated)
   const { colors, isLoading: themeLoading } = useTheme()
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   useEffect(() => {
     // Show success message for 3 seconds, then navigate
@@ -29,83 +59,30 @@ export const EmailVerifiedScreen = () => {
   return (
     <Screen 
       preset="fixed" 
-      style={$container}
-      contentContainerStyle={$contentContainer}
+      style={styles.container}
+      contentContainerStyle={styles.container}
     >
-      <View style={$successCard}>
-        <Text style={$checkmark}>✓</Text>
+      <View style={styles.container}>
+        <Text style={styles.successText}>✓</Text>
         
         <Text 
           preset="heading" 
           text="Email Verified!" 
-          style={$title}
+          style={styles.successText}
         />
         
         <Text 
           preset="default"
           text="Your My Phone Friend account has been successfully verified."
-          style={$message}
+          style={styles.messageText}
         />
         
         <Text 
           size="sm"
           text="Redirecting you to the app..."
-          style={$redirectText}
+          style={styles.messageText}
         />
       </View>
     </Screen>
   )
-}
-
-const $container: ViewStyle = {
-  flex: 1,
-  justifyContent: "center",
-  alignItems: "center",
-  paddingHorizontal: spacing.lg,
-}
-
-const $contentContainer: ViewStyle = {
-  flex: 1,
-  justifyContent: "center",
-  alignItems: "center",
-}
-
-const $successCard: ViewStyle = {
-  backgroundColor: colors.palette.neutral100,
-  padding: spacing.xl,
-  borderRadius: spacing.md,
-  alignItems: "center",
-  shadowColor: colors.palette.neutral800,
-  shadowOffset: {
-    width: 0,
-    height: 2,
-  },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 5,
-  maxWidth: 320,
-  width: "100%",
-}
-
-const $checkmark = {
-  fontSize: 60,
-  color: colors.palette.accent500,
-  marginBottom: spacing.md,
-}
-
-const $title = {
-  textAlign: "center" as const,
-  marginBottom: spacing.md,
-}
-
-const $message = {
-  textAlign: "center" as const,
-  marginBottom: spacing.lg,
-  lineHeight: 24,
-}
-
-const $redirectText = {
-  textAlign: "center" as const,
-  color: colors.textDim,
-  fontStyle: "italic" as const,
 }

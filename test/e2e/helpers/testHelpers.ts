@@ -19,16 +19,26 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
   console.log(`Attempting to login with email: ${email}`)
   
-  // Wait for login form to be visible
-  await page.waitForSelector('[data-testid="email-input"]', { timeout: 10000 })
+  // Wait for login form to be visible - try both testID and accessibilityLabel
+  try {
+    await page.waitForSelector('[data-testid="email-input"], [aria-label="email-input"]', { timeout: 10000 })
+  } catch {
+    // If that fails, wait for any login-related element
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+  }
   
-  // Fill in login form
-  await page.getByTestId('email-input').fill(email)
-  await page.getByTestId('password-input').fill(password)
-  await expect(page.getByTestId('login-button')).toBeVisible();
+  // Fill in login form - try testID first, then accessibilityLabel
+  const emailInput = page.getByTestId('email-input').or(page.getByLabel('email-input'))
+  const passwordInput = page.getByTestId('password-input').or(page.getByLabel('password-input'))
+  
+  await emailInput.fill(email)
+  await passwordInput.fill(password)
+  
+  const loginButton = page.getByTestId('login-button').or(page.getByLabel('login-button'))
+  await expect(loginButton).toBeVisible();
   
   // Click login button
-  await page.getByTestId('login-button').click()
+  await loginButton.click()
   
   // Wait for either success or error
   try {

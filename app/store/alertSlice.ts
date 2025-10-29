@@ -65,10 +65,21 @@ export const alertSlice = createSlice({
     builder.addMatcher(alertApi.endpoints.markAlertAsRead.matchFulfilled, (state, { payload }) => {
       // Find the index of the alert in state.alerts that matches the current alert's ID
       const index = state.alerts.findIndex((alertInState) => alertInState.id === payload.id)
-      // If a matching alert is found, replace it
+      // CRITICAL: Replace the alert in-place to preserve it in the array
+      // This ensures the alert remains visible on "All Alerts" tab
       if (index !== -1) {
+        console.log('[AlertSlice] Updating alert in state (preserving in array):', { 
+          alertId: payload.id, 
+          oldReadBy: state.alerts[index].readBy,
+          newReadBy: payload.readBy 
+        })
         state.alerts[index] = payload
+      } else {
+        // If alert not found, add it to preserve all alerts
+        console.warn('[AlertSlice] Alert not found in state array, adding it:', payload.id)
+        state.alerts.push(payload)
       }
+      // DO NOT filter or remove alerts - keep ALL alerts in the array
     })
   },
 })

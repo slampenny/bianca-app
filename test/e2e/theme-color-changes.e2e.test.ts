@@ -21,7 +21,7 @@ test.describe('Theme Color Changes', () => {
     
     // Get initial colors (Healthcare theme)
     const themeSelector = page.locator('[data-testid="theme-selector"]')
-    const initialPrimarySwatch = themeSelector.locator('.colorSwatch').first()
+    const initialPrimarySwatch = themeSelector.locator('[data-testid="colorSwatch-primary"]').first()
     const initialPrimaryColor = await initialPrimarySwatch.evaluate(el => 
       window.getComputedStyle(el).backgroundColor
     )
@@ -34,11 +34,13 @@ test.describe('Theme Color Changes', () => {
     await modal.locator('text=Color-Blind Friendly').first().click()
     await page.waitForSelector('text=Select Theme', { state: 'hidden', timeout: 5000 })
     
-    // Wait a moment for theme to apply
+    // Wait a moment for theme to apply and re-find the selector
     await page.waitForTimeout(1000)
+    await page.waitForSelector('[data-testid="theme-selector"]', { timeout: 5000 })
     
     // Get new colors (Color-Blind Friendly theme)
-    const newPrimarySwatch = themeSelector.locator('.colorSwatch').first()
+    const newThemeSelector = page.locator('[data-testid="theme-selector"]')
+    const newPrimarySwatch = newThemeSelector.locator('[data-testid="colorSwatch-primary"]').first()
     const newPrimaryColor = await newPrimarySwatch.evaluate(el => 
       window.getComputedStyle(el).backgroundColor
     )
@@ -85,7 +87,13 @@ test.describe('Theme Color Changes', () => {
     // Reload the page
     await page.reload()
     
-    // Wait for page to load and navigate back to profile
+    // After reload, user needs to log in again
+    await page.waitForSelector('[data-testid="email-input"]', { timeout: 15000 })
+    await page.fill('[data-testid="email-input"]', 'fake@example.org')
+    await page.fill('[data-testid="password-input"]', 'Password1')
+    await page.click('[data-testid="login-button"]')
+    
+    // Wait for login to complete and navigate back to profile
     await page.waitForSelector('[data-testid="profile-button"]', { timeout: 15000 })
     await page.click('[data-testid="profile-button"]')
     await page.waitForSelector('[data-testid="theme-selector"]', { timeout: 10000 })
@@ -97,3 +105,4 @@ test.describe('Theme Color Changes', () => {
     console.log('✅ Theme selection persisted across page reload!')
   })
 })
+

@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { createStackNavigator } from "@react-navigation/stack"
 import { Ionicons } from "@expo/vector-icons"
 import { View, Image } from "react-native"
-import { colors } from "app/theme"
+import { useTheme } from "app/theme/ThemeContext"
 import {
   HomeScreen,
   PatientScreen,
@@ -41,6 +41,10 @@ const Tab = createBottomTabNavigator<DrawerParamList>()
 // Custom header component that includes org logo
 function CustomHeader({ route, navigation, options }: any) {
   const currentOrg = useSelector(getOrg)
+  const { colors } = useTheme()
+  
+  // Theme-aware icon color for back button
+  const backButtonColor = (colors.palette as any).biancaHeader || colors.text || colors.tint || colors.palette.primary500
   
   // Create logo component for left side
   const LogoComponent = currentOrg?.logo ? (
@@ -54,6 +58,7 @@ function CustomHeader({ route, navigation, options }: any) {
         <Icon
           icon="caretLeft"
           size={24}
+          color={backButtonColor}
           onPress={navigation.goBack}
           style={{ marginLeft: 4 }}
         />
@@ -63,6 +68,7 @@ function CustomHeader({ route, navigation, options }: any) {
     <Icon
       icon="caretLeft"
       size={24}
+      color={backButtonColor}
       onPress={navigation.goBack}
     />
   ) : undefined
@@ -160,6 +166,7 @@ function ReportsStack() {
 
 export default function MainTabNavigator() {
   const unreadAlertCount = useSelector(selectUnreadAlertCount) // Get unread alert count
+  const { colors } = useTheme()
 
   return (
     <Tab.Navigator
@@ -168,6 +175,11 @@ export default function MainTabNavigator() {
         headerShown: false,
         tabBarActiveTintColor: colors.palette.primary500,
         tabBarInactiveTintColor: colors.palette.neutral500,
+        tabBarStyle: {
+          backgroundColor: colors.palette.neutral100,
+          borderTopColor: (colors.palette as any).biancaBorder || colors.palette.neutral300,
+          borderTopWidth: 1,
+        },
         tabBarShowLabel: true, // Show labels
         tabBarIcon: ({ focused, color, size }) => {
           let iconName
@@ -191,7 +203,8 @@ export default function MainTabNavigator() {
         component={HomeStack} 
         options={{ 
           tabBarLabel: translate("tabs.home"),
-          tabBarTestID: "tab-home" 
+          tabBarTestID: "tab-home",
+          tabBarAccessibilityLabel: "Home tab",
         }} 
       />
       <Tab.Screen 
@@ -199,7 +212,8 @@ export default function MainTabNavigator() {
         component={OrgStack} 
         options={{ 
           tabBarLabel: translate("tabs.org"),
-          tabBarTestID: "tab-org" 
+          tabBarTestID: "tab-org",
+          tabBarAccessibilityLabel: "Organization tab",
         }} 
       />
       <Tab.Screen 
@@ -207,7 +221,8 @@ export default function MainTabNavigator() {
         component={ReportsStack} 
         options={{ 
           tabBarLabel: translate("tabs.reports"),
-          tabBarTestID: "tab-reports" 
+          tabBarTestID: "tab-reports",
+          tabBarAccessibilityLabel: "Reports tab",
         }} 
       />
       <Tab.Screen
@@ -224,6 +239,7 @@ export default function MainTabNavigator() {
             alignItems: 'center',
           },
           tabBarTestID: "tab-alert",
+          tabBarAccessibilityLabel: "Alerts tab",
         }}
       />
     </Tab.Navigator>

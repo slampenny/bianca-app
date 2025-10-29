@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react"
-import { View, StyleSheet, Text } from "react-native"
+import { View, StyleSheet } from "react-native"
 import { useRoute, RouteProp } from "@react-navigation/native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
@@ -7,6 +7,7 @@ import { Screen } from "../components/Screen"
 import { SentimentDashboard } from "../components/SentimentDashboard"
 import { SentimentDebugPanel } from "../components/SentimentDebugPanel"
 import { useTheme } from "../theme/ThemeContext"
+import { Text } from "../components"
 import { translate } from "../i18n"
 import {
   useGetSentimentTrendQuery,
@@ -32,7 +33,6 @@ export function SentimentAnalysisScreen() {
   const patientName = routePatientName || selectedPatient?.name
 
   const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("lastCall")
-  const { colors, isLoading: themeLoading } = useTheme()
 
   // Only fetch sentiment data if we have a patient
   const shouldFetchData = !!patientId
@@ -88,6 +88,12 @@ export function SentimentAnalysisScreen() {
 
   const isLoading = isTrendLoading || isSummaryLoading
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   // Show message if no patient is selected
   if (!patientId) {
     return (
@@ -130,7 +136,7 @@ export function SentimentAnalysisScreen() {
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.palette.biancaBackground,
   },
   noPatientContainer: {
     flex: 1,

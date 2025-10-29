@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react"
-import { View, StyleSheet, Text, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native"
+import { View, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native"
 import { useRoute, RouteProp } from "@react-navigation/native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
@@ -7,6 +7,7 @@ import { Screen } from "../components/Screen"
 import { useTheme } from "../theme/ThemeContext"
 import { translate } from "../i18n"
 import { Ionicons } from "@expo/vector-icons"
+import { Text } from "../components"
 import { 
   useGetMedicalAnalysisResultsQuery,
   useGetMedicalAnalysisTrendQuery,
@@ -117,6 +118,11 @@ export function MedicalAnalysisScreen() {
     }
   }, [patientId, triggerAnalysis])
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   if (!patientId) {
     return (

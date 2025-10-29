@@ -22,6 +22,6 @@ export default defineConfig({
   globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
   reporter: [
     ['list'],
-    ['html']
+    ['html', { open: 'never' }] // Don't automatically open HTML report server
   ],
 })

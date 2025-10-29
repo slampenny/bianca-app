@@ -14,8 +14,13 @@ export const LogoutScreen = () => {
   const [logout] = useLogoutMutation()
   const { colors, isLoading: themeLoading } = useTheme()
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   const tokens = useSelector(getAuthTokens)
-  const { colors, isLoading: themeLoading } = useTheme()
 
   const handleLogoutPress = async () => {
     if (tokens) {
@@ -44,9 +49,9 @@ export const LogoutScreen = () => {
       <Button
         tx="logoutScreen.logoutButton"
         onPress={handleLogoutPress}
+        preset="danger"
         style={styles.logoutButton}
         textStyle={styles.logoutButtonText}
-        preset="filled"
         testID="logout-button"
         accessibilityLabel="logout-button"
       />

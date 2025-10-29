@@ -1,7 +1,7 @@
 import React from "react"
-import { View, StyleSheet, Text } from "react-native"
+import { View, StyleSheet } from "react-native"
 import { useNavigation, NavigationProp, RouteProp } from "@react-navigation/native"
-import { Screen, LoadingButton } from "app/components"
+import { Screen, LoadingButton, Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 
@@ -15,6 +15,12 @@ export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
   const { colors, isLoading: themeLoading } = useTheme()
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const { caregiver } = route.params
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   const handleContinue = () => {
     // Navigate back to the caregivers list
@@ -49,7 +55,7 @@ export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
 
 const createStyles = (colors: any) => StyleSheet.create({
   screen: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.palette.biancaBackground,
   },
   container: {
     flex: 1,
@@ -67,13 +73,13 @@ const createStyles = (colors: any) => StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: colors.text,
+    color: colors.palette.biancaHeader,
     marginBottom: 16,
     textAlign: "center",
   },
   message: {
     fontSize: 16,
-    color: colors.text,
+    color: colors.palette.biancaHeader,
     textAlign: "center",
     marginBottom: 12,
     lineHeight: 24,

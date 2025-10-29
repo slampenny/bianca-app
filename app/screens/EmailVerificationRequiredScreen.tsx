@@ -1,9 +1,49 @@
 import React, { useState } from "react"
-import { View, ViewStyle, Alert } from "react-native"
+import { View, ViewStyle, Alert, StyleSheet } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { Screen, Text, Button } from "app/components"
-import { colors, spacing } from "app/theme"
+import { spacing } from "app/theme"
 import { useResendVerificationEmailMutation } from "app/services/api/authApi"
+import { useTheme } from "app/theme/ThemeContext"
+
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.palette.neutral100,
+    padding: spacing.lg,
+    justifyContent: "center",
+  },
+  title: {
+    color: colors.palette.neutral800,
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: spacing.md,
+  },
+  message: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  input: {
+    backgroundColor: colors.palette.neutral100,
+    borderColor: colors.palette.neutral300,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    fontSize: 16,
+    color: colors.palette.neutral800,
+  },
+  successMessage: {
+    color: colors.palette.success500,
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: spacing.lg,
+  },
+})
 
 export const EmailVerificationRequiredScreen = () => {
   const navigation = useNavigation()
@@ -11,6 +51,12 @@ export const EmailVerificationRequiredScreen = () => {
   const [email, setEmail] = useState("")
   const [emailSent, setEmailSent] = useState(false)
   const { colors, isLoading: themeLoading } = useTheme()
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   const handleResendEmail = async () => {
     if (!email.trim()) {
@@ -36,39 +82,39 @@ export const EmailVerificationRequiredScreen = () => {
   return (
     <Screen 
       preset="fixed" 
-      style={$container}
-      contentContainerStyle={$contentContainer}
+      style={styles.container}
+      contentContainerStyle={styles.container}
     >
-      <View style={$card}>
-        <Text preset="heading" text="Check Your Email" style={$title} />
+      <View style={styles.container}>
+        <Text preset="heading" text="Check Your Email" style={styles.title} />
         
         <Text 
           preset="default"
           text="We've sent a verification link to your email address. Please click the link to verify your account before logging in."
-          style={$message}
+          style={styles.message}
         />
         
-        <View style={$emailSection}>
-          <Text preset="formLabel" text="Email Address" style={$emailLabel} />
+        <View style={styles.container}>
+          <Text preset="formLabel" text="Email Address" style={styles.title} />
           <Text 
             preset="default"
             text={email || "Enter your email address"}
-            style={$emailText}
+            style={styles.message}
           />
         </View>
 
         {emailSent && (
-          <View style={$successSection}>
-            <Text preset="default" text="✓ Verification email sent!" style={$successText} />
+          <View style={styles.container}>
+            <Text preset="default" text="✓ Verification email sent!" style={styles.successMessage} />
           </View>
         )}
 
-        <View style={$buttonContainer}>
+        <View style={styles.container}>
           <Button
             text="Resend Verification Email"
             onPress={handleResendEmail}
             disabled={isLoading}
-            style={$resendButton}
+            style={styles.container}
             accessibilityLabel="resend-verification-button"
           />
           
@@ -76,87 +122,11 @@ export const EmailVerificationRequiredScreen = () => {
             text="Back to Login"
             onPress={handleBackToLogin}
             preset="default"
-            style={$backButton}
+            style={styles.container}
             accessibilityLabel="back-to-login-button"
           />
         </View>
       </View>
     </Screen>
   )
-}
-
-const $container: ViewStyle = {
-  flex: 1,
-  justifyContent: "center",
-  backgroundColor: colors.background,
-}
-
-const $contentContainer: ViewStyle = {
-  paddingHorizontal: spacing.lg,
-}
-
-const $card: ViewStyle = {
-  backgroundColor: colors.palette.neutral100,
-  borderRadius: 12,
-  padding: spacing.xl,
-  alignItems: "center",
-  shadowColor: colors.palette.neutral900,
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 8,
-  elevation: 4,
-}
-
-const $title: ViewStyle = {
-  marginBottom: spacing.md,
-  textAlign: "center",
-  color: colors.palette.neutral900,
-}
-
-const $message: ViewStyle = {
-  marginBottom: spacing.lg,
-  textAlign: "center",
-  color: colors.palette.neutral700,
-  lineHeight: 20,
-}
-
-const $emailSection: ViewStyle = {
-  width: "100%",
-  marginBottom: spacing.lg,
-}
-
-const $emailLabel: ViewStyle = {
-  marginBottom: spacing.xs,
-  color: colors.palette.neutral800,
-}
-
-const $emailText: ViewStyle = {
-  padding: spacing.sm,
-  backgroundColor: colors.palette.neutral200,
-  borderRadius: 8,
-  color: colors.palette.neutral600,
-  fontStyle: "italic",
-}
-
-const $successSection: ViewStyle = {
-  marginBottom: spacing.lg,
-}
-
-const $successText: ViewStyle = {
-  color: colors.palette.success500,
-  textAlign: "center",
-  fontWeight: "600",
-}
-
-const $buttonContainer: ViewStyle = {
-  width: "100%",
-  gap: spacing.md,
-}
-
-const $resendButton: ViewStyle = {
-  backgroundColor: colors.palette.primary500,
-}
-
-const $backButton: ViewStyle = {
-  backgroundColor: colors.palette.neutral300,
 }

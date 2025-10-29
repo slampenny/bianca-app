@@ -191,9 +191,9 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         accessibilityLabel="login-button"
         tx="loginScreen.signIn"
         onPress={handleLoginPress}
+        preset="primary"
         style={styles.loginButton}
         textStyle={styles.loginButtonText}
-        preset="filled"
         disabled={isLoading}
       />
       
@@ -213,9 +213,14 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         textStyle={styles.registerButtonText}
         preset="default"
       />
-      <Pressable testID="forgot-password-link" style={styles.linkButton} onPress={handleForgotPasswordPress}>
+      <Button 
+        testID="forgot-password-link" 
+        style={styles.linkButton} 
+        onPress={handleForgotPasswordPress}
+        preset="default"
+      >
         <Text style={styles.linkButtonText} tx="loginScreen.forgotPassword" />
-      </Pressable>
+      </Button>
     </Screen>
   )
 }

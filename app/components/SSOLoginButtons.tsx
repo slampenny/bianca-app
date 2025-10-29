@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Text, Alert, ActivityIndicator } from 'react-native';
-import { colors } from 'app/theme/colors';
+import { useTheme } from 'app/theme/ThemeContext';
 import { ssoService, SSOUser, SSOError } from '../services/ssoService';
 
 interface SSOLoginButtonsProps {
@@ -16,9 +16,75 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
   disabled = false,
   showGenericSSO = false,
 }) => {
+  const { colors } = useTheme();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false);
   const [isGenericSSOLoading, setIsGenericSSOLoading] = useState(false);
+  
+  const createStyles = (colors: any) => StyleSheet.create({
+    container: {
+      marginVertical: 20,
+    },
+    dividerText: {
+      textAlign: 'center',
+      color: colors.palette.neutral600,
+      fontSize: 14,
+      marginBottom: 15,
+    },
+    buttonContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    ssoButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.palette.neutral300,
+    },
+    googleButton: {
+      backgroundColor: colors.palette.neutral100, // Theme-aware instead of #ffffff
+      borderColor: colors.palette.neutral300, // Theme-aware instead of #dadce0
+    },
+    microsoftButton: {
+      backgroundColor: '#0078d4', // Microsoft brand color - keep as-is
+      borderColor: '#0078d4', // Microsoft brand color - keep as-is
+    },
+    genericSSOButton: {
+      backgroundColor: colors.palette.neutral600, // Theme-aware instead of #6B7280
+      borderColor: colors.palette.neutral600, // Theme-aware instead of #6B7280
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    ssoButtonText: {
+      fontSize: 16,
+      fontWeight: '500',
+      marginLeft: 8,
+      color: colors.palette.biancaHeader, // Theme-aware text color
+    },
+    googleIcon: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#4285f4', // Google brand blue - keep as-is
+    },
+    microsoftIcon: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.palette.neutral100,
+    },
+    genericSSOIcon: {
+      fontSize: 18,
+      color: colors.palette.neutral100,
+    },
+  });
+  
+  const styles = createStyles(colors);
 
   const handleGoogleSignIn = async () => {
     if (disabled || isGoogleLoading) return;
@@ -116,8 +182,8 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
           disabled={disabled || isLoading}
           testID="google-sso-button"
         >
-          {isGoogleLoading ? (
-            <ActivityIndicator color={colors.palette.neutral100} size="small" />
+            {isGoogleLoading ? (
+            <ActivityIndicator color={colors.palette.neutral800} size="small" />
           ) : (
             <>
               <Text style={styles.googleIcon}>G</Text>
@@ -164,65 +230,3 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginVertical: 20,
-  },
-  dividerText: {
-    textAlign: 'center',
-    color: colors.palette.neutral600,
-    fontSize: 14,
-    marginBottom: 15,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  ssoButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-  },
-  googleButton: {
-    backgroundColor: '#ffffff',
-    borderColor: '#dadce0',
-  },
-  microsoftButton: {
-    backgroundColor: '#0078d4',
-    borderColor: '#0078d4',
-  },
-  genericSSOButton: {
-    backgroundColor: '#6B7280', // Gray for generic SSO
-    borderColor: '#6B7280',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  ssoButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  googleIcon: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4285f4',
-  },
-  microsoftIcon: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.palette.neutral100,
-  },
-  genericSSOIcon: {
-    fontSize: 18,
-    color: colors.palette.neutral100,
-  },
-});

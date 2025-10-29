@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react"
-import { Platform, Image, View, StyleSheet, Pressable, Text } from "react-native"
+import { Platform, Image, View, StyleSheet, Pressable } from "react-native"
+import { Text } from "app/components"
 import * as ImagePicker from "expo-image-picker"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
 
@@ -11,6 +12,7 @@ interface AvatarPickerProps {
 }
 
 const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChanged }) => {
+  const { colors } = useTheme()
   const [image, setImage] = useState<string | null>(null)
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   
@@ -102,6 +104,8 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
     }
   }
 
+  const styles = createStyles(colors)
+  
   return (
     <View style={styles.container}>
       <View style={styles.avatarContainer}>
@@ -131,10 +135,10 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   avatarContainer: {
     alignItems: "center",
-    backgroundColor: "#eee",
+    backgroundColor: colors.palette.neutral200,
     borderRadius: 60,
     height: 120,
     justifyContent: "center",
@@ -157,7 +161,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   placeholderIcon: {
-    color: "#bdc3c7",
+    color: colors.palette.neutral400,
     fontSize: 48,
   },
   selectButton: {
@@ -167,7 +171,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   selectButtonText: {
-    color: colors.palette.neutral100,
+    // Use neutral900 which is white in dark mode, white in light mode for contrast on colored buttons
+    color: colors.palette.neutral900 || colors.palette.neutral100,
     fontSize: 16,
     fontWeight: "600",
   },

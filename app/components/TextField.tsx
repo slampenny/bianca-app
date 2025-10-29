@@ -10,6 +10,7 @@ import {
 } from "react-native"
 import { isRTL, translate } from "../i18n"
 import { colors, spacing, typography } from "../theme"
+import { useTheme } from "../theme/ThemeContext"
 import { Text, TextProps } from "./Text"
 
 export interface TextFieldAccessoryProps {
@@ -63,6 +64,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     ...TextInputProps
   } = props
 
+  const { colors: themeColors } = useTheme()
   const input = useRef<TextInput>(null)
   const disabled = TextInputProps.editable === false || status === "disabled"
   const placeholderContent = placeholderTx
@@ -79,11 +81,23 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     },
   ]
 
-  const $labelStyles = [$labelStyle, LabelTextProps?.style]
+  const $labelStyles = [
+    { ...$labelStyle, color: themeColors.palette.biancaHeader },
+    LabelTextProps?.style,
+  ]
 
   const $inputWrapperStyles = [
-    $inputWrapperStyle,
-    status === "error" && { borderColor: colors.error },
+    {
+      ...$inputWrapperStyle,
+      // CRITICAL: Use theme-aware background with proper fallbacks
+      // In dark mode: neutral100 = #000000 (black)
+      // In light mode: neutral100 = #FFFFFF (white)
+      backgroundColor: themeColors.palette?.neutral100 || themeColors.background || "#FFFFFF",
+      // CRITICAL: Border color should have good contrast
+      borderColor: themeColors.palette?.neutral300 || themeColors.palette?.biancaBorder || themeColors.border || "#E2E8F0",
+      shadowColor: themeColors.palette?.neutral900 || "#000000",
+    },
+    status === "error" && { borderColor: themeColors.error || colors.error },
     TextInputProps.multiline && { minHeight: 112 },
     LeftAccessory && { paddingStart: 0 },
     RightAccessory && { paddingEnd: 0 },
@@ -91,8 +105,14 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   ]
 
   const $inputStyles: StyleProp<TextStyle> = [
-    $inputStyle,
-    disabled && { color: colors.textDim },
+    {
+      ...$inputStyle,
+      // CRITICAL: Use theme-aware text color with fallbacks
+      // In dark mode: text = neutral800 (#CCCCCC - light gray)
+      // In light mode: text = neutral800 (#1E293B - dark gray)
+      color: themeColors.text || themeColors.palette?.biancaHeader || themeColors.palette?.neutral800 || "#000000",
+    },
+    disabled && { color: themeColors.textDim || themeColors.palette?.neutral600 },
     isRTL && { textAlign: "right" as TextStyle["textAlign"] },
     TextInputProps.multiline && { height: "auto" },
     $inputStyleOverride,
@@ -105,8 +125,11 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   ]
 
   const $helperStyles = [
-    $helperStyle,
-    status === "error" && { color: colors.error },
+    {
+      ...$helperStyle,
+      color: themeColors.textDim,
+    },
+    status === "error" && { color: themeColors.error || colors.error },
     HelperTextProps?.style,
   ]
 
@@ -139,7 +162,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
           underlineColorAndroid={colors.transparent}
           textAlignVertical="top"
           placeholder={placeholderContent}
-          placeholderTextColor={colors.textDim}
+          placeholderTextColor={themeColors.textDim}
           {...TextInputProps}
           editable={!disabled}
           style={$inputStyles}
@@ -170,24 +193,22 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   )
 })
 
+// Static styles are now overridden with theme colors in the component
+// Keeping these as fallback defaults, but they should not be used directly
 const $labelStyle: TextStyle = {
   marginBottom: spacing.xs,
   fontSize: 16,
   fontWeight: "500",
-  color: "#2c3e50",
 }
 
 const $inputWrapperStyle: ViewStyle = {
   flexDirection: "row",
   alignItems: "center",
   marginBottom: spacing.md,
-  backgroundColor: "#fff",
   borderWidth: 1,
-  borderColor: "#ccc",
   borderRadius: 6,
   paddingHorizontal: 12,
   paddingVertical: 12,
-  shadowColor: "#000",
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.1,
   shadowRadius: 3,
@@ -197,7 +218,6 @@ const $inputWrapperStyle: ViewStyle = {
 const $inputStyle: TextStyle = {
   flex: 1,
   fontFamily: typography.primary.normal,
-  color: "#2c3e50",
   fontSize: 16,
   lineHeight: 20,
   height: undefined,
@@ -210,7 +230,6 @@ const $inputStyle: TextStyle = {
 const $helperStyle: TextStyle = {
   marginTop: spacing.xs,
   fontSize: 14,
-  color: "#7f8c8d",
 }
 
 const $rightAccessoryStyle: ViewStyle = {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react"
-import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native"
+import { View, StyleSheet, ScrollView, Dimensions } from "react-native"
 import { useTheme } from "app/theme/ThemeContext"
 import { Ionicons } from "@expo/vector-icons"
+import { Text } from "app/components"
 
 const { width } = Dimensions.get('window')
 
@@ -83,6 +84,12 @@ export function HealthReportScreen() {
   }
 
   const metrics = ['mood', 'energy', 'sleep', 'anxiety']
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>

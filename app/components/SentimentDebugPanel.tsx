@@ -1,7 +1,7 @@
 import React, { useState } from "react"
-import { View, Text, StyleSheet, ScrollView, Alert } from "react-native"
-import { Button } from "./Button"
-import { colors } from "../theme/colors"
+import { View, StyleSheet, ScrollView, Alert } from "react-native"
+import { Button, Text } from "./"
+import { useTheme } from "../theme/ThemeContext"
 import { useDebugSentimentAnalysisMutation, useDebugConversationDataMutation, useGetSentimentSummaryQuery, sentimentApi } from "../services/api/sentimentApi"
 import { useSelector, useDispatch } from "react-redux"
 import { getPatient } from "../store/patientSlice"
@@ -12,6 +12,7 @@ interface SentimentDebugPanelProps {
 }
 
 export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
+  const { colors } = useTheme()
   const [debugResult, setDebugResult] = useState<any>(null)
   const [conversationDebugResult, setConversationDebugResult] = useState<any>(null)
   const [debugSentimentAnalysis, { isLoading: isDebugLoading }] = useDebugSentimentAnalysisMutation()
@@ -20,6 +21,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
   
   // Get current patient for testing
   const currentPatient = useSelector(getPatient)
+  const styles = createStyles(colors)
   
   // Test the sentiment summary query directly
   const {
@@ -235,7 +237,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.neutral100,
     borderRadius: 12,
@@ -245,12 +247,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette.neutral600,
     marginBottom: 16,
     lineHeight: 20,
   },
@@ -259,13 +261,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   testButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
+    backgroundColor: colors.palette.biancaButtonSelected || colors.palette.primary500,
   },
   conversationButton: {
-    backgroundColor: colors.palette.biancaError,
+    backgroundColor: colors.palette.biancaError || colors.error,
   },
   refreshButton: {
-    backgroundColor: colors.palette.biancaPrimary,
+    backgroundColor: colors.palette.biancaPrimary || colors.palette.primary500,
   },
   patientInfo: {
     backgroundColor: colors.palette.neutral200,
@@ -276,12 +278,12 @@ const styles = StyleSheet.create({
   patientInfoTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 4,
   },
   patientInfoText: {
     fontSize: 12,
-    color: colors.palette.neutral700,
+    color: colors.textDim || colors.palette.neutral700 || colors.palette.neutral600,
   },
   resultsContainer: {
     maxHeight: 400,
@@ -289,7 +291,7 @@ const styles = StyleSheet.create({
   resultsTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 12,
   },
   summaryContainer: {
@@ -300,13 +302,13 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 14,
-    color: colors.palette.neutral700,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 4,
   },
   conversationsTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 8,
   },
   conversationItem: {
@@ -318,36 +320,36 @@ const styles = StyleSheet.create({
   conversationHeader: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 4,
   },
   conversationTime: {
     fontSize: 12,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette.neutral600,
     marginBottom: 8,
   },
   successResult: {
-    backgroundColor: colors.palette.biancaSuccessBackground,
+    backgroundColor: colors.palette.biancaSuccessBackground || "rgba(34, 197, 94, 0.1)",
     borderRadius: 6,
     padding: 8,
   },
   errorResult: {
-    backgroundColor: colors.palette.biancaErrorBackground,
+    backgroundColor: colors.palette.biancaErrorBackground || "rgba(239, 68, 68, 0.1)",
     borderRadius: 6,
     padding: 8,
   },
   resultText: {
     fontSize: 12,
-    color: colors.palette.neutral700,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 2,
   },
   errorText: {
     fontSize: 12,
-    color: colors.palette.biancaError,
+    color: colors.palette.biancaError || colors.error,
   },
   noResultText: {
     fontSize: 12,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette.neutral600,
     fontStyle: "italic",
   },
 })

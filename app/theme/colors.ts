@@ -1,119 +1,119 @@
-// Healthcare-focused color palette for MyPhoneFriend
-// Designed for medical professionals, caregivers, and healthcare environments
+// Modern 2025 color palette
+// Designed with contemporary design principles: soft gradients, warm undertones, sophisticated colors
 
 const palette = {
-  // Neutral colors - clean, professional grays
+  // Neutral colors - warm, sophisticated grays with subtle undertones
   neutral100: "#FFFFFF",      // Pure white for backgrounds
-  neutral200: "#F8FAFC",      // Very light gray for subtle backgrounds
-  neutral300: "#E2E8F0",      // Light gray for borders and dividers
-  neutral400: "#94A3B8",      // Medium gray for secondary text
-  neutral500: "#64748B",      // Darker gray for muted text
-  neutral600: "#475569",      // Dark gray for body text
-  neutral700: "#334155",      // Very dark gray for headings
-  neutral800: "#1E293B",      // Almost black for primary text
-  neutral900: "#0F172A",      // Pure black for high contrast
+  neutral200: "#FAFAFA",      // Very light warm gray (slightly warmer than pure white)
+  neutral300: "#F0F0F0",      // Light warm gray for subtle backgrounds
+  neutral400: "#E5E5E5",      // Warm gray for borders and dividers
+  neutral500: "#A3A3A3",      // Medium warm gray for secondary text
+  neutral600: "#737373",      // Dark warm gray for muted text
+  neutral700: "#525252",      // Darker gray for body text
+  neutral800: "#404040",      // Very dark gray for headings
+  neutral900: "#171717",      // Almost black with warm undertone
 
-  // Primary colors - medical blue theme
-  primary100: "#E0F2FE",      // Very light blue for backgrounds
-  primary200: "#BAE6FD",      // Light blue for hover states
-  primary300: "#7DD3FC",      // Medium light blue
-  primary400: "#38BDF8",      // Medium blue
-  primary500: "#0EA5E9",      // Primary blue - main brand color
-  primary600: "#0284C7",      // Darker blue for pressed states
-  primary700: "#0369A1",      // Dark blue for emphasis
-  primary800: "#075985",      // Very dark blue
-  primary900: "#0C4A6E",      // Darkest blue
+  // Primary colors - modern sophisticated blue (inspired by Linear, Vercel)
+  primary100: "#EEF2FF",      // Very light indigo-blue
+  primary200: "#E0E7FF",      // Light indigo
+  primary300: "#C7D2FE",      // Medium light indigo
+  primary400: "#A5B4FC",      // Medium indigo
+  primary500: "#6366F1",      // Primary indigo - modern, sophisticated
+  primary600: "#4F46E5",      // Darker indigo for pressed states
+  primary700: "#4338CA",      // Dark indigo for emphasis
+  primary800: "#3730A3",      // Very dark indigo
+  primary900: "#312E81",      // Darkest indigo
 
-  // Secondary colors - healthcare green
-  secondary100: "#DCFCE7",    // Very light green for success backgrounds
-  secondary200: "#BBF7D0",    // Light green
-  secondary300: "#86EFAC",    // Medium light green
-  secondary400: "#4ADE80",    // Medium green
-  secondary500: "#22C55E",    // Primary green - success, healthy states
-  secondary600: "#16A34A",    // Darker green
-  secondary700: "#15803D",    // Dark green
-  secondary800: "#166534",    // Very dark green
-  secondary900: "#14532D",    // Darkest green
+  // Secondary colors - modern emerald green (softer, more sophisticated)
+  secondary100: "#D1FAE5",    // Very light emerald
+  secondary200: "#A7F3D0",    // Light emerald
+  secondary300: "#6EE7B7",    // Medium light emerald
+  secondary400: "#34D399",    // Medium emerald
+  secondary500: "#10B981",    // Primary emerald - modern, balanced
+  secondary600: "#059669",    // Darker emerald
+  secondary700: "#047857",    // Dark emerald
+  secondary800: "#065F46",    // Very dark emerald
+  secondary900: "#064E3B",    // Darkest emerald
 
-  // Accent colors - warm orange for alerts and calls
-  accent100: "#FEF3C7",       // Very light orange for warning backgrounds
-  accent200: "#FDE68A",       // Light orange
-  accent300: "#FCD34D",       // Medium light orange
-  accent400: "#FBBF24",       // Medium orange
-  accent500: "#F59E0B",       // Primary orange - warnings, calls
-  accent600: "#D97706",       // Darker orange
-  accent700: "#B45309",       // Dark orange
-  accent800: "#92400E",       // Very dark orange
-  accent900: "#78350F",       // Darkest orange
+  // Accent colors - modern amber (warmer, more sophisticated)
+  accent100: "#FEF3C7",       // Very light amber
+  accent200: "#FDE68A",       // Light amber
+  accent300: "#FCD34D",       // Medium light amber
+  accent400: "#FBBF24",       // Medium amber
+  accent500: "#F59E0B",       // Primary amber - modern, warm
+  accent600: "#D97706",       // Darker amber
+  accent700: "#B45309",       // Dark amber
+  accent800: "#92400E",       // Very dark amber
+  accent900: "#78350F",       // Darkest amber
 
-  // Status colors - medical status indicators
-  success100: "#D1FAE5",      // Very light green for success backgrounds
-  success200: "#A7F3D0",      // Light green
-  success300: "#6EE7B7",      // Medium light green
-  success400: "#34D399",      // Medium green
-  success500: "#10B981",      // Primary green - success states
-  success600: "#059669",      // Darker green
-  success700: "#047857",      // Dark green
-  success800: "#065F46",      // Very dark green
-  success900: "#064E3B",      // Darkest green
+  // Status colors - modern, balanced system
+  success100: "#D1FAE5",      // Very light emerald for success backgrounds
+  success200: "#A7F3D0",      // Light emerald
+  success300: "#6EE7B7",      // Medium light emerald
+  success400: "#34D399",      // Medium emerald
+  success500: "#10B981",      // Primary emerald - modern success
+  success600: "#059669",      // Darker emerald
+  success700: "#047857",      // Dark emerald
+  success800: "#065F46",      // Very dark emerald
+  success900: "#064E3B",      // Darkest emerald
 
-  warning100: "#FEF3C7",      // Very light yellow for warning backgrounds
-  warning200: "#FDE68A",      // Light yellow
-  warning300: "#FCD34D",      // Medium light yellow
-  warning400: "#FBBF24",      // Medium yellow
-  warning500: "#F59E0B",      // Primary yellow - warnings
-  warning600: "#D97706",      // Darker yellow
-  warning700: "#B45309",      // Dark yellow
-  warning800: "#92400E",      // Very dark yellow
-  warning900: "#78350F",      // Darkest yellow
+  warning100: "#FEF3C7",      // Very light amber for warning backgrounds
+  warning200: "#FDE68A",      // Light amber
+  warning300: "#FCD34D",      // Medium light amber
+  warning400: "#FBBF24",      // Medium amber
+  warning500: "#F59E0B",      // Primary amber - modern warnings
+  warning600: "#D97706",      // Darker amber
+  warning700: "#B45309",      // Dark amber
+  warning800: "#92400E",      // Very dark amber
+  warning900: "#78350F",      // Darkest amber
 
-  error100: "#FEE2E2",        // Very light red for error backgrounds
-  error200: "#FECACA",        // Light red
-  error300: "#FCA5A5",        // Medium light red
-  error400: "#F87171",        // Medium red
-  error500: "#EF4444",        // Primary red - errors, critical states
-  error600: "#DC2626",        // Darker red
-  error700: "#B91C1C",        // Dark red
-  error800: "#991B1B",        // Very dark red
-  error900: "#7F1D1D",        // Darkest red
+  error100: "#FEE2E2",        // Very light rose for error backgrounds
+  error200: "#FECACA",        // Light rose
+  error300: "#FCA5A5",        // Medium light rose
+  error400: "#F87171",        // Medium rose
+  error500: "#EF4444",        // Primary rose - modern errors
+  error600: "#DC2626",        // Darker rose
+  error700: "#B91C1C",        // Dark rose
+  error800: "#991B1B",        // Very dark rose
+  error900: "#7F1D1D",        // Darkest rose
 
   info100: "#DBEAFE",         // Very light blue for info backgrounds
   info200: "#BFDBFE",         // Light blue
   info300: "#93C5FD",         // Medium light blue
   info400: "#60A5FA",         // Medium blue
-  info500: "#3B82F6",         // Primary blue - info states
+  info500: "#3B82F6",         // Primary blue - modern info
   info600: "#2563EB",         // Darker blue
   info700: "#1D4ED8",         // Dark blue
   info800: "#1E40AF",         // Very dark blue
   info900: "#1E3A8A",         // Darkest blue
 
-  // Healthcare-specific colors
-  medical100: "#F0F9FF",      // Very light medical blue
-  medical200: "#E0F2FE",       // Light medical blue
-  medical300: "#BAE6FD",       // Medium light medical blue
-  medical400: "#7DD3FC",       // Medium medical blue
-  medical500: "#38BDF8",       // Primary medical blue
-  medical600: "#0EA5E9",       // Darker medical blue
-  medical700: "#0284C7",       // Dark medical blue
-  medical800: "#0369A1",       // Very dark medical blue
-  medical900: "#075985",       // Darkest medical blue
+  // Healthcare-specific colors - modern teal/cyan
+  medical100: "#F0FDFA",      // Very light teal
+  medical200: "#CCFBF1",      // Light teal
+  medical300: "#99F6E4",      // Medium light teal
+  medical400: "#5EEAD4",      // Medium teal
+  medical500: "#14B8A6",      // Primary teal - modern healthcare
+  medical600: "#0D9488",      // Darker teal
+  medical700: "#0F766E",      // Dark teal
+  medical800: "#115E59",      // Very dark teal
+  medical900: "#134E4A",      // Darkest teal
 
-  // Overlay colors for modals and overlays
-  overlay20: "rgba(15, 23, 42, 0.2)",    // 20% black overlay
-  overlay50: "rgba(15, 23, 42, 0.5)",    // 50% black overlay
-  overlay80: "rgba(15, 23, 42, 0.8)",    // 80% black overlay
+  // Overlay colors for modals and overlays - modern warm overlays
+  overlay20: "rgba(23, 23, 23, 0.2)",    // 20% warm black overlay
+  overlay50: "rgba(23, 23, 23, 0.5)",    // 50% warm black overlay
+  overlay80: "rgba(23, 23, 23, 0.8)",    // 80% warm black overlay
 
-  // Legacy Bianca colors (for backward compatibility)
-  biancaBackground: "#F8FAFC",           // Updated to match neutral200
-  biancaHeader: "#1E293B",               // Updated to match neutral800
-  biancaButtonSelected: "#0EA5E9",        // Updated to match primary500
-  biancaButtonUnselected: "#E2E8F0",      // Updated to match neutral300
-  biancaError: "#EF4444",                // Updated to match error500
-  biancaErrorBackground: "rgba(239, 68, 68, 0.1)", // Updated error background
-  biancaSuccess: "#22C55E",              // Updated to match success500
-  biancaSuccessBackground: "rgba(34, 197, 94, 0.1)", // Updated success background
-  biancaExplanation: "#64748B",          // Updated to match neutral500
-  biancaBorder: "#E2E8F0",              // Updated to match neutral300
+  // Legacy Bianca colors (for backward compatibility) - updated to modern palette
+  biancaBackground: "#FAFAFA",           // Modern warm white
+  biancaHeader: "#171717",               // Modern dark text
+  biancaButtonSelected: "#6366F1",       // Modern indigo primary
+  biancaButtonUnselected: "#E5E5E5",     // Modern warm gray
+  biancaError: "#EF4444",                // Modern rose error
+  biancaErrorBackground: "rgba(239, 68, 68, 0.1)", // Modern error background
+  biancaSuccess: "#10B981",              // Modern emerald success
+  biancaSuccessBackground: "rgba(16, 185, 129, 0.1)", // Modern success background
+  biancaExplanation: "#737373",          // Modern warm gray
+  biancaBorder: "#E5E5E5",              // Modern warm gray border
 
   // Legacy angry colors (for backward compatibility)
   angry100: "#FEE2E2",        // Updated to match error100
@@ -136,12 +136,12 @@ export const colors = {
   /**
    * The default text color in many components.
    */
-  text: palette.neutral800,
+  text: palette.neutral900,
   
   /**
    * Secondary text information.
    */
-  textDim: palette.neutral500,
+  textDim: palette.neutral600,
   
   /**
    * The default color of the screen background.
@@ -154,7 +154,7 @@ export const colors = {
   border: palette.neutral300,
   
   /**
-   * The main tinting color - medical blue.
+   * The main tinting color - modern indigo.
    */
   tint: palette.primary500,
   

@@ -1,15 +1,15 @@
 import React, { useEffect } from "react"
 import { NavigationContainer } from "@react-navigation/native"
-import { useColorScheme } from "react-native"
 import { useSelector } from "react-redux"
 import { isAuthenticated, getCurrentUser, getInviteToken } from "app/store/authSlice"
+import { useTheme } from "app/theme/ThemeContext"
 import {
   navigationRef,
   useBackButtonHandler,
   useNavigationPersistence,
 } from "./navigationUtilities"
 import { AuthStack, UnauthStack } from "./AppNavigators"
-import { navigationThemes } from "./NavigationConfig"
+import { getNavigationTheme } from "./NavigationConfig"
 import { NavigationProps } from "./navigationTypes"
 import * as storage from "../utils/storage" // Ensure this import is correct
 
@@ -18,7 +18,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   const isLoggedIn = useSelector(isAuthenticated)
   const currentUser = useSelector(getCurrentUser)
   const inviteToken = useSelector(getInviteToken)
-  const colorScheme = useColorScheme()
+  const { currentTheme, colors } = useTheme()
 
   // Define back button behavior
   useBackButtonHandler((routeName) => {
@@ -26,11 +26,16 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   })
 
   // Clear navigation state when logging in/out to ensure we start at the correct screen
+  // Also clear in test mode
+  const isTestMode = process.env.NODE_ENV === 'test' || 
+                     process.env.PLAYWRIGHT_TEST === '1' || 
+                     process.env.JEST_WORKER_ID
+  
   useEffect(() => {
-    if (__DEV__) {
+    if (__DEV__ || isTestMode) {
       storage.remove("navigationState")
     }
-  }, [isLoggedIn])
+  }, [isLoggedIn, isTestMode])
 
   // Redirect unverified users to profile screen
   useEffect(() => {
@@ -64,10 +69,13 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
     }
   }
 
+  // Get navigation theme based on current app theme
+  const navigationTheme = getNavigationTheme(currentTheme, colors)
+
   return (
     <NavigationContainer
       ref={navigationRef}
-      theme={navigationThemes[colorScheme === "dark" ? "dark" : "light"]}
+      theme={navigationTheme}
       linking={linking}
       initialState={initialState || navigationPersistenceProps.initialState}
       onStateChange={onStateChange || navigationPersistenceProps.onStateChange}

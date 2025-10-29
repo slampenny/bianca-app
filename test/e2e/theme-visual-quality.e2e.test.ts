@@ -63,3 +63,4 @@ test.describe('Theme Visual Quality Check', () => {
     console.log('Dark Mode:', darkBg)
   })
 })
+

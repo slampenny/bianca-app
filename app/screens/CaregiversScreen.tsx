@@ -1,6 +1,6 @@
 import React, { useState } from "react"
-import { View, Text, StyleSheet, Pressable, FlatList } from "react-native"
-import { AutoImage } from "app/components"
+import { View, StyleSheet, FlatList } from "react-native"
+import { AutoImage, Text, Button, Screen } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
 import { getCaregivers, setCaregiver, clearCaregiver } from "app/store/caregiverSlice"
 import { getCurrentUser } from "app/store/authSlice"
@@ -79,39 +79,45 @@ export function CaregiversScreen() {
             )}
           </View>
         </View>
-        <Pressable
+        <Button
+          text={translate("caregiversScreen.edit")}
+          onPress={() => handleCaregiverPress(item)}
+          preset={isInvited ? "default" : "primary"}
           style={[
             styles.editButton,
             isInvited && styles.invitedEditButton
           ]}
-          onPress={() => handleCaregiverPress(item)}
-          android_ripple={{ color: colors.palette.biancaButtonSelected }}
+          textStyle={styles.editButtonText}
           testID="edit-caregiver-button"
-        >
-          <Text style={styles.editButtonText}>{translate("caregiversScreen.edit")}</Text>
-        </Pressable>
+        />
       </View>
     )
   }
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   const ListEmpty = () => <Text style={styles.noCaregiversText}>{translate("caregiversScreen.noCaregiversFound")}</Text>
 
   // Show not authorized message (this should rarely happen now)
   if (!isAuthorized) {
     return (
-      <View style={styles.container}>
+      <Screen preset="fixed" testID="caregivers-screen">
         <View style={styles.notAuthorizedContainer}>
           <Text style={styles.notAuthorizedTitle}>{translate("caregiversScreen.notAuthorized")}</Text>
           <Text style={styles.notAuthorizedText}>
             {translate("caregiversScreen.noPermissionToView")}
           </Text>
         </View>
-      </View>
+      </Screen>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <Screen preset="scroll" testID="caregivers-screen">
       <FlatList
         data={orgCaregivers}
         keyExtractor={(item, index) => item.id || String(index)}
@@ -120,22 +126,27 @@ export function CaregiversScreen() {
         ListEmptyComponent={ListEmpty}
       />
 
-      <Pressable style={styles.addButton} onPress={handleAddCaregiver} testID="add-caregiver-button">
-        <Text style={styles.addButtonText}>{translate("caregiversScreen.addCaregiver")}</Text>
-      </Pressable>
-    </View>
+      <Button
+        text={translate("caregiversScreen.addCaregiver")}
+        onPress={handleAddCaregiver}
+        preset="success"
+        style={styles.addButton}
+        textStyle={styles.addButtonText}
+        testID="add-caregiver-button"
+      />
+    </Screen>
   )
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
   addButton: {
-    alignItems: "center",
-    backgroundColor: colors.palette.biancaSuccess,
-    borderRadius: 6,
     margin: 16,
-    paddingVertical: 16,
   },
-  addButtonText: { color: colors.palette.neutral100, fontSize: 18, fontWeight: "600" },
+  addButtonText: { 
+    fontSize: 18, 
+    fontWeight: "600",
+    // Button component handles text color automatically based on preset
+  },
   avatar: { backgroundColor: colors.palette.neutral300, borderRadius: 24, height: 48, marginRight: 12, width: 48 },
   caregiverCard: {
     alignItems: "center",
@@ -153,14 +164,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   caregiverInfo: { alignItems: "center", flexDirection: "row" },
   caregiverName: { color: colors.palette.biancaHeader, flexShrink: 1, fontSize: 16 },
-  container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
+  // Container removed - Screen component handles background
   editButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 5,
+    minHeight: 40,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  editButtonText: { color: colors.palette.neutral100, fontSize: 16 },
+  editButtonText: { 
+    fontSize: 16,
+    // Button component handles text color automatically based on preset
+  },
   infoTextContainer: { flexDirection: "column" },
   invitedBadge: {
     alignSelf: "flex-start",
@@ -170,7 +183,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
-  invitedBadgeText: { color: colors.palette.neutral100, fontSize: 12 },
+  invitedBadgeText: { 
+    // CRITICAL: Text on colored badge must always be white for visibility
+    color: "#FFFFFF", 
+    fontSize: 12 
+  },
   invitedCaregiverCard: {
     backgroundColor: colors.palette.accent100,
     borderColor: colors.palette.accent400,
@@ -180,10 +197,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.palette.accent500,
   },
   invitedEditButton: {
-    backgroundColor: colors.palette.accent400,
+    // Button preset will handle styling, but we can override if needed
   },
   listContentContainer: { paddingHorizontal: 16, paddingVertical: 20 },
-  noCaregiversText: { color: colors.palette.neutral600, fontSize: 16, marginTop: 20, textAlign: "center" },
+  noCaregiversText: { 
+    color: colors.textDim || colors.palette?.neutral600 || "#666666", 
+    fontSize: 16, 
+    marginTop: 20, 
+    textAlign: "center" 
+  },
   notAuthorizedContainer: {
     alignItems: "center",
     flex: 1,
@@ -191,7 +213,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: 20,
   },
   notAuthorizedText: {
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette?.neutral600 || "#666666",
     fontSize: 16,
     lineHeight: 24,
     textAlign: "center",

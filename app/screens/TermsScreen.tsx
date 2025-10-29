@@ -1,8 +1,9 @@
 import React from "react"
 import { StyleSheet, View, ScrollView, TouchableWithoutFeedback } from "react-native"
 import { useNavigation } from "@react-navigation/native"
-import { colors, spacing, typography } from "app/theme"
+import { spacing, typography } from "app/theme"
 import { Text } from "app/components"
+import { useTheme } from "app/theme/ThemeContext"
 import Markdown from 'react-native-markdown-display'
 
 const TERMS_MD = `
@@ -101,7 +102,15 @@ If you have any questions about these Terms, please contact us:
 
 export const TermsScreen = () => {
   const navigation = useNavigation()
-  
+  const { colors, isLoading: themeLoading } = useTheme()
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+  const markdownStyles = createMarkdownStyles(colors)
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -141,7 +150,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 })
 
-const markdownStyles = {
+const createMarkdownStyles = (colors: any) => ({
   body: {
     color: colors.palette.neutral800,
     fontSize: 16,
@@ -179,4 +188,4 @@ const markdownStyles = {
   bullet_list: {
     marginBottom: spacing.md,
   },
-} 
+}) 

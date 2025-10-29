@@ -27,13 +27,11 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const { colors, isLoading: themeLoading } = useTheme()
 
   // Error states
   const [passwordError, setPasswordError] = useState("")
   const [confirmPasswordError, setConfirmPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
-  const { colors, isLoading: themeLoading } = useTheme()
 
   // Check if we have an invite token and persist it
   useEffect(() => {
@@ -131,6 +129,12 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
     }
   }
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   return (
     <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
       <Header titleTx="signupScreen.title" />
@@ -222,9 +226,9 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         accessibilityLabel="signup-submit-button"
         tx="signupScreen.completeRegistration"
         onPress={handleSignup}
+        preset="primary"
         style={styles.signupButton}
         textStyle={styles.signupButtonText}
-        preset="filled"
         disabled={isLoading || !password || !confirmPassword}
       />
 

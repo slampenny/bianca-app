@@ -1,6 +1,7 @@
 import React, { useState } from "react"
-import { View, Text, Pressable, Modal, StyleSheet, FlatList } from "react-native"
-import { colors } from "app/theme/colors"
+import { View, Pressable, Modal, StyleSheet, FlatList } from "react-native"
+import { Text } from "app/components"
+import { useTheme } from "app/theme/ThemeContext"
 import { Icon } from "./Icon"
 import { translate } from "../i18n"
 import { LANGUAGE_OPTIONS } from "../constants/languages"
@@ -12,11 +13,97 @@ interface LanguageSelectorProps {
 }
 
 export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
+  const { colors } = useTheme()
   const [isModalVisible, setIsModalVisible] = useState(false)
   const { currentLanguage: currentLocale, changeLanguage } = useLanguage()
 
   // Get current language option
   const currentLanguage = LANGUAGE_OPTIONS.find(lang => lang.code === currentLocale) || LANGUAGE_OPTIONS[0]
+  
+  const createStyles = (colors: any) => StyleSheet.create({
+    container: {
+      marginBottom: 15,
+    },
+    selector: {
+      backgroundColor: colors.palette.neutral100,
+      borderRadius: 5,
+      borderWidth: 1,
+      borderColor: colors.palette.neutral300,
+      paddingHorizontal: 10,
+      paddingVertical: 12,
+    },
+    selectorLabel: {
+      color: colors.palette.biancaHeader || colors.text,
+      fontSize: 14,
+      marginBottom: 5,
+    },
+    selectorContent: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    currentLanguage: {
+      color: colors.palette.biancaHeader,
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.palette.overlay50 || "rgba(0, 0, 0, 0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: colors.palette.neutral100,
+      borderRadius: 10,
+      width: "100%",
+      maxHeight: "70%",
+      elevation: 5,
+      shadowColor: colors.palette.neutral900,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.palette.neutral300,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.palette.biancaHeader,
+    },
+    languageList: {
+      maxHeight: 300,
+    },
+    languageItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.palette.neutral200,
+    },
+    selectedLanguageItem: {
+      backgroundColor: colors.palette.biancaButtonSelected + "10", // 10% opacity
+    },
+    languageText: {
+      fontSize: 16,
+      color: colors.palette.biancaHeader,
+    },
+    selectedLanguageText: {
+      fontWeight: "600",
+      color: colors.palette.biancaButtonSelected,
+    },
+  })
+  
+  const styles = createStyles(colors)
 
   const handleLanguageSelect = async (languageCode: string) => {
     console.log("Selecting language:", languageCode)
@@ -122,86 +209,3 @@ export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 15,
-  },
-  selector: {
-    backgroundColor: colors.palette.neutral100,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
-  },
-  selectorLabel: {
-    color: colors.palette.neutral600,
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  selectorContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  currentLanguage: {
-    color: colors.palette.biancaHeader,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.palette.neutral100,
-    borderRadius: 10,
-    width: "100%",
-    maxHeight: "70%",
-    elevation: 5,
-    shadowColor: colors.palette.neutral900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.palette.neutral300,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: colors.palette.biancaHeader,
-  },
-  languageList: {
-    maxHeight: 300,
-  },
-  languageItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.palette.neutral200,
-  },
-  selectedLanguageItem: {
-    backgroundColor: colors.palette.biancaButtonSelected + "10", // 10% opacity
-  },
-  languageText: {
-    fontSize: 16,
-    color: colors.palette.biancaHeader,
-  },
-  selectedLanguageText: {
-    fontWeight: "600",
-    color: colors.palette.biancaButtonSelected,
-  },
-})

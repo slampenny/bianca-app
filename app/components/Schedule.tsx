@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react"
-import { View, Text, StyleSheet, Switch } from "react-native"
+import { View, StyleSheet, Switch } from "react-native"
 import { Picker } from "@react-native-picker/picker"
-import { Toggle } from "."
+import { Toggle, Text } from "."
 import { Schedule } from "../services/api/api.types"
 import { translate } from "../i18n"
+import { useTheme } from "../theme/ThemeContext"
 
 interface ScheduleScreenProps {
   initialSchedule: Schedule
@@ -14,12 +15,125 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   initialSchedule,
   onScheduleChange,
 }) => {
+  const { colors } = useTheme()
   const [id, setId] = useState(initialSchedule.id)
   const [patient, setPatient] = useState(initialSchedule.patient)
   const [frequency, setFrequency] = useState(initialSchedule.frequency)
   const [intervals, setIntervals] = useState(initialSchedule.intervals)
   const [isActive, setIsActive] = useState(initialSchedule.isActive)
   const [time, setTime] = useState(initialSchedule.time)
+  
+  const createStyles = (colors: any) => StyleSheet.create({
+    container: {
+      backgroundColor: colors.palette.biancaBackground,
+      flex: 1,
+      padding: 20,
+    },
+    dayLabel: {
+      // Use theme-aware text color with fallbacks
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+      fontSize: 16,
+    },
+    dayRow: {
+      alignItems: "center",
+      borderBottomColor: colors.palette.neutral300,
+      borderBottomWidth: 1,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 8,
+    },
+    detailsCard: {
+      // CRITICAL: Use theme-aware background
+      backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
+      borderRadius: 5,
+      elevation: 2,
+      marginBottom: 20,
+      padding: 20,
+      shadowColor: colors.palette?.neutral900 || "#000000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+    },
+    detailsText: {
+      // Use theme-aware text color with fallbacks
+      color: colors.textDim || colors.palette?.neutral600 || colors.palette?.neutral700 || "#666666",
+      fontSize: 16,
+      marginBottom: 5,
+    },
+    detailsTitle: {
+      // Use theme-aware text color with fallbacks
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+      fontSize: 22,
+      fontWeight: "bold",
+      marginBottom: 10,
+    },
+    formGroup: {
+      marginBottom: 20,
+    },
+    label: {
+      // Use theme-aware text color with fallbacks
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+      fontSize: 18,
+      marginBottom: 8,
+    },
+    picker: {
+      height: 50,
+      width: "100%",
+      backgroundColor: "transparent",
+      // Note: Picker text color is limited on web, but we try to set it
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+    },
+    pickerItem: {
+      height: 50,
+      // Note: Picker.Item style prop has limited support on web/iOS
+      // The picker wrapper background provides contrast
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+    },
+    pickerWrapper: {
+      // CRITICAL: Use theme-aware background
+      backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
+      // CRITICAL: Border should have good contrast
+      borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
+      borderRadius: 5,
+      borderWidth: 1,
+      overflow: "hidden",
+    },
+    switchContainer: {
+      alignItems: "center",
+      // CRITICAL: Use theme-aware background and border
+      backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
+      borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
+      borderRadius: 5,
+      borderWidth: 1,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      padding: 15,
+    },
+    switchLabel: {
+      // Use theme-aware text color with fallbacks
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+      fontSize: 18,
+    },
+    title: {
+      // Use theme-aware text color with fallbacks
+      color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+      fontSize: 26,
+      fontWeight: "bold",
+      marginBottom: 20,
+      textAlign: "center",
+    },
+    weeklyContainer: {
+      // CRITICAL: Use theme-aware background and border
+      backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
+      borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
+      borderRadius: 5,
+      borderWidth: 1,
+      marginBottom: 20,
+      padding: 10,
+    },
+  })
+  
+  const styles = createStyles(colors)
 
   useEffect(() => {
     setId(initialSchedule.id)
@@ -93,9 +207,15 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
             onValueChange={(itemValue) => setTime(itemValue)}
             style={styles.picker}
             itemStyle={styles.pickerItem}
+            dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
           >
             {times.map((t, index) => (
-              <Picker.Item key={index} label={t} value={t} />
+              <Picker.Item 
+                key={index} 
+                label={t} 
+                value={t}
+                color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+              />
             ))}
           </Picker>
         </View>
@@ -109,10 +229,23 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
             onValueChange={setFrequency}
             style={styles.picker}
             itemStyle={styles.pickerItem}
+            dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
           >
-            <Picker.Item label={translate("scheduleComponent.daily")} value="daily" />
-            <Picker.Item label={translate("scheduleComponent.weekly")} value="weekly" />
-            <Picker.Item label={translate("scheduleComponent.monthly")} value="monthly" />
+            <Picker.Item 
+              label={translate("scheduleComponent.daily")} 
+              value="daily"
+              color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+            />
+            <Picker.Item 
+              label={translate("scheduleComponent.weekly")} 
+              value="weekly"
+              color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+            />
+            <Picker.Item 
+              label={translate("scheduleComponent.monthly")} 
+              value="monthly"
+              color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+            />
           </Picker>
         </View>
       </View>
@@ -156,9 +289,9 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       <View style={styles.switchContainer}>
         <Text style={styles.switchLabel}>{translate("scheduleComponent.active")}:</Text>
         <Switch
-          trackColor={{ false: "#767577", true: "#81b0ff" }}
-          thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}
-          ios_backgroundColor="#3e3e3e"
+          trackColor={{ false: colors.palette.neutral400, true: colors.palette.primary500 }}
+          thumbColor={isActive ? colors.palette.warning500 : colors.palette.neutral200}
+          ios_backgroundColor={colors.palette.neutral600}
           onValueChange={setIsActive}
           value={isActive}
         />
@@ -166,98 +299,5 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#ecf0f1",
-    flex: 1,
-    padding: 20,
-  },
-  dayLabel: {
-    color: "#2c3e50",
-    fontSize: 16,
-  },
-  dayRow: {
-    alignItems: "center",
-    borderBottomColor: "#ecf0f1",
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  detailsCard: {
-    backgroundColor: "#fff",
-    borderRadius: 5,
-    elevation: 2,
-    marginBottom: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  detailsText: {
-    color: "#7f8c8d",
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  detailsTitle: {
-    color: "#2c3e50",
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    color: "#7f8c8d",
-    fontSize: 18,
-    marginBottom: 8,
-  },
-  picker: {
-    height: 50,
-    width: "100%",
-  },
-  pickerItem: {
-    height: 50,
-  },
-  pickerWrapper: {
-    backgroundColor: "#fff",
-    borderColor: "#bdc3c7",
-    borderRadius: 5,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  switchContainer: {
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderColor: "#bdc3c7",
-    borderRadius: 5,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 15,
-  },
-  switchLabel: {
-    color: "#2c3e50",
-    fontSize: 18,
-  },
-  title: {
-    color: "#2c3e50",
-    fontSize: 26,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  weeklyContainer: {
-    backgroundColor: "#fff",
-    borderColor: "#bdc3c7",
-    borderRadius: 5,
-    borderWidth: 1,
-    marginBottom: 20,
-    padding: 10,
-  },
-})
 
 export default ScheduleComponent

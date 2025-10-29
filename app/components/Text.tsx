@@ -2,7 +2,8 @@ import i18n from "i18n-js"
 import React from "react"
 import { StyleProp, Text as RNText, TextProps as RNTextProps, TextStyle } from "react-native"
 import { isRTL, translate, TxKeyPath } from "../i18n"
-import { colors, typography } from "../theme"
+import { typography } from "../theme"
+import { useTheme } from "../theme/ThemeContext"
 
 type Sizes = keyof typeof $sizeStyles
 type Weights = keyof typeof typography.primary
@@ -54,13 +55,14 @@ export interface TextProps extends RNTextProps {
 export function Text(props: TextProps) {
   const { weight, size, tx, txOptions, text, children, style: $styleOverride, ...rest } = props
 
+  const { colors } = useTheme()
   const i18nText = tx && translate(tx, txOptions)
   const content = i18nText || text || children
 
   const preset: Presets = props.preset ?? "default"
   const $styles: StyleProp<TextStyle> = [
     $rtlStyle,
-    $presets[preset],
+    getPresetStyle(preset, colors),
     weight && $fontWeightStyles[weight],
     size && $sizeStyles[size],
     $styleOverride,
@@ -71,6 +73,30 @@ export function Text(props: TextProps) {
       {content}
     </RNText>
   )
+}
+
+const getPresetStyle = (preset: Presets, colors: any): StyleProp<TextStyle> => {
+  // Use text color that's properly theme-aware
+  // In dark mode: colors.text = neutral800 (#CCCCCC - light gray)
+  // In light mode: colors.text = neutral800 (#1E293B - dark gray)
+  const textColor = colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800
+  
+  const baseStyle: StyleProp<TextStyle> = [
+    $sizeStyles.sm,
+    $fontWeightStyles.normal,
+    { color: textColor },
+  ]
+
+  const presets = {
+    default: baseStyle,
+    bold: [baseStyle, $fontWeightStyles.bold] as StyleProp<TextStyle>,
+    heading: [baseStyle, $sizeStyles.xxl, $fontWeightStyles.bold] as StyleProp<TextStyle>,
+    subheading: [baseStyle, $sizeStyles.lg, $fontWeightStyles.medium] as StyleProp<TextStyle>,
+    formLabel: [baseStyle, $fontWeightStyles.medium] as StyleProp<TextStyle>,
+    formHelper: [baseStyle, $sizeStyles.sm, $fontWeightStyles.normal] as StyleProp<TextStyle>,
+  }
+
+  return presets[preset]
 }
 
 const $sizeStyles = {
@@ -86,25 +112,5 @@ const $sizeStyles = {
 const $fontWeightStyles = Object.entries(typography.primary).reduce((acc, [weight, fontFamily]) => {
   return { ...acc, [weight]: { fontFamily } }
 }, {}) as Record<Weights, TextStyle>
-
-const $baseStyle: StyleProp<TextStyle> = [
-  $sizeStyles.sm,
-  $fontWeightStyles.normal,
-  { color: colors.text },
-]
-
-const $presets = {
-  default: $baseStyle,
-
-  bold: [$baseStyle, $fontWeightStyles.bold] as StyleProp<TextStyle>,
-
-  heading: [$baseStyle, $sizeStyles.xxl, $fontWeightStyles.bold] as StyleProp<TextStyle>,
-
-  subheading: [$baseStyle, $sizeStyles.lg, $fontWeightStyles.medium] as StyleProp<TextStyle>,
-
-  formLabel: [$baseStyle, $fontWeightStyles.medium] as StyleProp<TextStyle>,
-
-  formHelper: [$baseStyle, $sizeStyles.sm, $fontWeightStyles.normal] as StyleProp<TextStyle>,
-}
 
 const $rtlStyle: TextStyle = isRTL ? { writingDirection: "rtl" } : {}

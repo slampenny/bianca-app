@@ -1,30 +1,36 @@
 import { DefaultTheme, DarkTheme } from "@react-navigation/native"
-import { colors } from "app/theme"
+import { ThemeType } from "app/theme/ThemeContext"
 
-// Define custom navigation themes using detailed color palette
-export const navigationThemes = {
-  light: {
-    ...DefaultTheme,
-    colors: {
-      ...DefaultTheme.colors,
-      primary: colors.tint, // Main tinting color
-      background: colors.background, // Default screen background color
-      card: colors.palette.neutral100, // Background for card-like elements
-      text: colors.text, // Default text color
-      border: colors.border, // Default border color
-    },
-  },
-  dark: {
-    ...DarkTheme,
-    colors: {
-      ...DarkTheme.colors,
-      primary: colors.palette.primary600, // Darker primary color for better contrast in dark mode
-      background: colors.palette.neutral800, // Dark background for dark theme
-      card: colors.palette.neutral900, // Dark card background
-      text: colors.palette.neutral100, // Light text color for readability in dark mode
-      border: colors.palette.neutral600, // Slightly lighter border for contrast
-    },
-  },
+// Get navigation theme based on current app theme and colors
+export function getNavigationTheme(currentTheme: ThemeType, colors: any) {
+  const isDarkTheme = currentTheme === "dark"
+  
+  if (isDarkTheme) {
+    return {
+      ...DarkTheme,
+      colors: {
+        ...DarkTheme.colors,
+        primary: colors.palette.primary500,
+        background: colors.palette.biancaBackground || colors.background, // Use theme-aware background
+        card: colors.palette.neutral100, // Card background (black in dark mode)
+        text: colors.text || colors.palette.biancaHeader, // Theme-aware text
+        border: colors.palette.biancaBorder || colors.border, // Theme-aware border
+      },
+    }
+  } else {
+    // Light themes (healthcare, colorblind)
+    return {
+      ...DefaultTheme,
+      colors: {
+        ...DefaultTheme.colors,
+        primary: colors.tint || colors.palette.primary500,
+        background: colors.palette.biancaBackground || colors.background, // Use theme-aware background
+        card: colors.palette.neutral100, // Card background (white in light mode)
+        text: colors.text || colors.palette.biancaHeader, // Theme-aware text
+        border: colors.palette.biancaBorder || colors.border, // Theme-aware border
+      },
+    }
+  }
 }
 
 export const screenOptions = {

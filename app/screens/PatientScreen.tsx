@@ -347,6 +347,12 @@ function PatientScreen() {
     }
   }
 
+  if (themeLoading) {
+    return <LoadingScreen />
+  }
+
+  const styles = createStyles(colors)
+
   // --- Render Logic ---
   const isLoading = isCreating || isUpdating || isDeleting || isUploading
   if (isLoading) {
@@ -460,9 +466,9 @@ function PatientScreen() {
               isLoading
             }
             testID="save-patient-button"
+            preset="primary"
             style={[styles.button, styles.saveButton, (!canCreateOrEditPatient || !name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined]}
             textStyle={styles.buttonText}
-            preset="filled"
           />
 
           {/* Show Delete, Schedules, Conversations only for existing patients */}
@@ -471,21 +477,21 @@ function PatientScreen() {
               <Button
                 text={translate("patientScreen.manageSchedules")}
                 onPress={handleManageSchedules}
-                disabled={isLoading} // Disable while loading
+                disabled={isLoading}
                 testID="manage-schedules-button"
+                preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
-                preset="filled"
               />
 
               <Button
                 text={translate("patientScreen.manageConversations")}
                 onPress={handleManageConversations}
-                disabled={isLoading} // Disable while loading
+                disabled={isLoading}
                 testID="manage-conversations-button"
+                preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
-                preset="filled"
               />
 
               <Button
@@ -496,32 +502,32 @@ function PatientScreen() {
                 })}
                 disabled={isLoading}
                 testID="view-sentiment-analysis-button"
+                preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
-                preset="filled"
               />
 
-                          {canManageCaregivers && (
+              {canManageCaregivers && (
+                <Button
+                  text={translate("patientScreen.manageCaregivers")}
+                  onPress={() => setShowCaregiverModal(true)}
+                  disabled={isLoading}
+                  testID="manage-caregivers-button"
+                  preset="default"
+                  style={[styles.button, styles.manageButton]}
+                  textStyle={styles.buttonText}
+                />
+              )}
+
               <Button
-                text={translate("patientScreen.manageCaregivers")}
-                onPress={() => setShowCaregiverModal(true)}
-                disabled={isLoading} // Disable while loading
-                testID="manage-caregivers-button"
-                style={[styles.button, styles.manageButton]}
+                text={confirmDelete ? translate("patientScreen.confirmDelete") : translate("patientScreen.deletePatient")}
+                onPress={handleDelete}
+                disabled={isLoading}
+                testID="delete-patient-button"
+                preset="danger"
+                style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
                 textStyle={styles.buttonText}
-                preset="filled"
               />
-            )}
-
-              <Button
-              text={confirmDelete ? translate("patientScreen.confirmDelete") : translate("patientScreen.deletePatient")}
-              onPress={handleDelete}
-              disabled={isLoading}
-              testID="delete-patient-button"
-              style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
-              textStyle={styles.buttonText}
-              preset="filled"
-            />
             </>
           )}
         </View>
@@ -656,21 +662,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     elevation: 3,
   },
   input: {
-    height: 50, // Slightly taller input
-    borderColor: colors.palette.neutral300,
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 15, // More padding
-    marginBottom: 5, // Reduce margin slightly before error
+    // TextField component handles all theming internally
+    // Only override if absolutely necessary - let TextField manage colors
     fontSize: 16,
-    color: colors.palette.biancaHeader,
-    backgroundColor: colors.palette.neutral200, // Very light background for input
+    // TextField already sets color: themeColors.palette.biancaHeader
+    // TextField already sets backgroundColor on inputWrapper, not on input itself
   },
   inputContainer: {
     marginBottom: 15, // Increased margin between fields
   },
   inputWrapper: {
-    // Add any specific styles for the input wrapper if needed
+    // TextField component handles inputWrapper styling automatically
+    // Only override if absolutely necessary
   },
   manageButton: {
     backgroundColor: colors.palette.secondary500, // Muted purple for manage buttons
@@ -724,7 +727,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.palette.overlay50 || colors.palette.overlay || 'rgba(0, 0, 0, 0.5)',
     justifyContent: "center",
     alignItems: "center",
     padding: 20,

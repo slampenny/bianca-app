@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
 import { View, StyleSheet, Animated } from 'react-native'
 import { Text } from 'app/components'
-import { colors, spacing } from 'app/theme'
+import { useTheme } from 'app/theme/ThemeContext'
+import { spacing } from 'app/theme'
 
 interface ToastProps {
   visible: boolean
@@ -20,7 +21,29 @@ const Toast: React.FC<ToastProps> = ({
   onHide,
   testID = 'toast',
 }) => {
+  const { colors } = useTheme()
   const opacity = React.useRef(new Animated.Value(0)).current
+  
+  const createStyles = (colors: any) => StyleSheet.create({
+    container: {
+      position: 'absolute',
+      top: 60,
+      left: spacing.lg,
+      right: spacing.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: 8,
+      zIndex: 1000,
+    },
+    message: {
+      color: colors.palette.neutral100,
+      fontSize: 14,
+      fontWeight: '500',
+      textAlign: 'center',
+    },
+  })
+  
+  const styles = createStyles(colors)
 
   useEffect(() => {
     if (visible) {
@@ -74,25 +97,6 @@ const Toast: React.FC<ToastProps> = ({
     </Animated.View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 60,
-    left: spacing.lg,
-    right: spacing.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    zIndex: 1000,
-  },
-  message: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-})
 
 export default Toast
 

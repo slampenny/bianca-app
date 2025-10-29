@@ -4,7 +4,13 @@ import { TEST_USERS } from './fixtures/testData'
 
 test.describe('Theme Color Changes Verification', () => {
   test('should change actual colors when switching themes', async ({ page }) => {
-    await loginUserViaUI(page, TEST_USERS.STAFF.email, TEST_USERS.STAFF.password)
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    // Check if already logged in
+    const isLoggedIn = await page.locator('[data-testid="profile-button"]').count() > 0
+    if (!isLoggedIn) {
+      await loginUserViaUI(page, TEST_USERS.STAFF.email, TEST_USERS.STAFF.password)
+    }
 
     // Navigate to profile screen
     await page.click('[data-testid="profile-button"]')
@@ -46,7 +52,13 @@ test.describe('Theme Color Changes Verification', () => {
   })
 
   test('should change button colors when switching themes', async ({ page }) => {
-    await loginUserViaUI(page, TEST_USERS.STAFF.email, TEST_USERS.STAFF.password)
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    // Check if already logged in
+    const isLoggedIn = await page.locator('[data-testid="profile-button"]').count() > 0
+    if (!isLoggedIn) {
+      await loginUserViaUI(page, TEST_USERS.STAFF.email, TEST_USERS.STAFF.password)
+    }
 
     // Navigate to profile screen
     await page.click('[data-testid="profile-button"]')

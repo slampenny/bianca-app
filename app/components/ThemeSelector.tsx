@@ -1,5 +1,6 @@
 import React, { useState } from "react"
-import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from "react-native"
+import { View, Pressable, Modal, StyleSheet, ScrollView } from "react-native"
+import { Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { themes, ThemeType } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
@@ -19,7 +20,7 @@ export function ThemeSelector({ testID }: { testID?: string }) {
 
   return (
     <View style={styles.container} testID={testID}>
-      <Text style={[styles.label, { color: colors.palette.neutral800 }]}>{translate("profileScreen.theme")}</Text>
+      <Text style={[styles.label, { color: colors.palette.biancaHeader || colors.text }]}>{translate("profileScreen.theme")}</Text>
       <Pressable 
         style={[styles.selectorButton, { 
           borderColor: colors.palette.neutral300, 
@@ -27,16 +28,16 @@ export function ThemeSelector({ testID }: { testID?: string }) {
         }]} 
         onPress={() => setModalVisible(true)}
       >
-        <Text style={styles.selectorText}>{themeInfo.name}</Text>
+        <Text style={[styles.selectorText, { color: colors.palette.biancaHeader || colors.text }]}>{themeInfo.name}</Text>
         <View style={styles.currentThemeSwatchContainer}>
-          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.primary500 }]} />
-          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.success500 }]} />
-          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.error500 }]} />
+          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.primary500 }]} testID="colorSwatch-primary" accessibilityLabel="colorSwatch-primary" />
+          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.success500 }]} testID="colorSwatch-success" accessibilityLabel="colorSwatch-success" />
+          <View style={[styles.colorSwatch, { backgroundColor: colors.palette.error500 }]} testID="colorSwatch-error" accessibilityLabel="colorSwatch-error" />
           {currentTheme === 'colorblind' && (
-            <View style={[styles.colorSwatch, { backgroundColor: colors.palette.secondary500 }]} />
+            <View style={[styles.colorSwatch, { backgroundColor: colors.palette.secondary500 }]} testID="colorSwatch-secondary" accessibilityLabel="colorSwatch-secondary" />
           )}
           {currentTheme === 'dark' && (
-            <View style={[styles.colorSwatch, { backgroundColor: colors.palette.warning500 }]} />
+            <View style={[styles.colorSwatch, { backgroundColor: colors.palette.warning500 }]} testID="colorSwatch-warning" accessibilityLabel="colorSwatch-warning" />
           )}
         </View>
       </Pressable>
@@ -47,9 +48,9 @@ export function ThemeSelector({ testID }: { testID?: string }) {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.palette.overlay50 || "rgba(0, 0, 0, 0.5)" }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.palette.neutral100 }]}>
-            <Text style={[styles.modalTitle, { color: colors.palette.neutral800 }]}>{translate("profileScreen.selectTheme")}</Text>
+            <Text style={[styles.modalTitle, { color: colors.palette.biancaHeader || colors.text }]}>{translate("profileScreen.selectTheme")}</Text>
             <ScrollView>
               {Object.entries(themes).map(([key, theme]) => (
                 <Pressable
@@ -66,39 +67,39 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                   <View style={styles.themeHeader}>
                     <Text style={[
                       styles.themeName, 
-                      { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral800 }
+                      { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.biancaHeader || colors.text) }
                     ]}>
                       {theme.name}
                     </Text>
                     <View style={styles.themeSwatches}>
-                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.primary500 }]} />
-                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.success500 }]} />
-                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.error500 }]} />
+                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.primary500 }]} testID="colorSwatch-primary" accessibilityLabel="colorSwatch-primary" />
+                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.success500 }]} testID="colorSwatch-success" accessibilityLabel="colorSwatch-success" />
+                      <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.error500 }]} testID="colorSwatch-error" accessibilityLabel="colorSwatch-error" />
                       {key === 'colorblind' && (
-                        <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.secondary500 }]} />
+                        <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.secondary500 }]} testID="colorSwatch-secondary" accessibilityLabel="colorSwatch-secondary" />
                       )}
                       {key === 'dark' && (
-                        <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.warning500 }]} />
+                        <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.warning500 }]} testID="colorSwatch-warning" accessibilityLabel="colorSwatch-warning" />
                       )}
                     </View>
                   </View>
                   <Text style={[
                     styles.themeDescription,
-                    { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                    { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.biancaHeader || colors.text) }
                   ]}>
                     {theme.description}
                   </Text>
                   <View style={styles.accessibilityInfo}>
                     <Text style={[
                       styles.accessibilityText,
-                      { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                      { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                     ]}>
                       WCAG Level: {theme.accessibility.wcagLevel}
                     </Text>
                     {theme.accessibility.colorblindFriendly && (
                       <Text style={[
                         styles.accessibilityText,
-                        { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                        { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                       ]}>
                         Color-blind friendly
                       </Text>
@@ -106,7 +107,7 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                     {theme.accessibility.highContrast && (
                       <Text style={[
                         styles.accessibilityText,
-                        { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                        { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                       ]}>
                         High contrast
                       </Text>
@@ -114,7 +115,7 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                     {theme.accessibility.darkMode && (
                       <Text style={[
                         styles.accessibilityText,
-                        { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                        { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                       ]}>
                         Dark mode
                       </Text>
@@ -155,6 +156,7 @@ const styles = StyleSheet.create({
   },
   selectorText: {
     fontSize: 16,
+    // Color will be set via inline style using theme colors
   },
   currentThemeSwatchContainer: {
     flexDirection: "row",
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Will be overridden by inline style with theme colors
     justifyContent: "center",
     alignItems: "center",
   },

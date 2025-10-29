@@ -1,8 +1,8 @@
 import React from "react"
-import { View, ViewStyle, ScrollView, Dimensions } from "react-native"
+import { View, ViewStyle, ScrollView, Dimensions, StyleSheet } from "react-native"
 import { Text } from "./Text"
 import { Icon } from "./Icon"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 import { SentimentTrendPoint, SentimentType } from "../services/api/api.types"
 import { translate } from "../i18n"
 
@@ -12,8 +12,10 @@ interface SentimentRecentTrendsProps {
 }
 
 export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTrendsProps) {
+  const { colors } = useTheme()
   const screenWidth = Dimensions.get("window").width
   const isMobile = screenWidth < 768
+  const styles = createStyles(colors)
 
   if (recentTrend.length === 0) {
     return (
@@ -49,13 +51,13 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
             {/* Header with date and duration */}
             <View style={styles.cardHeader}>
               <View style={styles.dateContainer}>
-                <Icon icon="calendar" size={14} color={colors.textDim} />
+                <Icon icon="calendar" size={14} color={colors.textDim || colors.palette.neutral600} />
                 <Text style={styles.dateText}>
                   {new Date(conversation.date).toLocaleDateString()}
                 </Text>
               </View>
               <View style={styles.durationContainer}>
-                <Icon icon="clock" size={14} color={colors.textDim} />
+                <Icon icon="clock" size={14} color={colors.textDim || colors.palette.neutral600} />
                 <Text style={styles.durationText}>
                   {Math.round(conversation.duration / 60)}m
                 </Text>
@@ -68,7 +70,7 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                 <View style={styles.sentimentHeader}>
                   <View style={[
                     styles.sentimentBadge,
-                    { backgroundColor: getSentimentColor(conversation.sentiment.sentimentScore) }
+                    { backgroundColor: getSentimentColor(conversation.sentiment.sentimentScore, colors) }
                   ]}>
                     <Text style={styles.sentimentBadgeText}>
                       {conversation.sentiment.overallSentiment}
@@ -116,11 +118,11 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                       <Icon 
                         icon={getConcernIcon(conversation.sentiment.concernLevel)} 
                         size={14} 
-                        color={getConcernColor(conversation.sentiment.concernLevel)} 
+                        color={getConcernColor(conversation.sentiment.concernLevel, colors)} 
                       />
                       <Text style={[
                         styles.concernText,
-                        { color: getConcernColor(conversation.sentiment.concernLevel) }
+                        { color: getConcernColor(conversation.sentiment.concernLevel, colors) }
                       ]}>
                         {conversation.sentiment.concernLevel} {translate("sentimentAnalysis.concern")}
                       </Text>
@@ -130,7 +132,7 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
 
                 {/* Confidence */}
                 <View style={styles.confidenceContainer}>
-                  <Icon icon="shield" size={12} color={colors.textDim} />
+                  <Icon icon="shield" size={12} color={colors.textDim || colors.palette.neutral600} />
                   <Text style={styles.confidenceText}>
                     {Math.round(conversation.sentiment.confidence * 100)}% {translate("sentimentAnalysis.confidence")}
                   </Text>
@@ -148,10 +150,10 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
   )
 }
 
-function getSentimentColor(score: number): string {
+function getSentimentColor(score: number, colors: any): string {
   if (score > 0.3) return colors.palette.biancaSuccess
   if (score < -0.3) return colors.error
-  return colors.textDim
+  return colors.textDim || colors.palette.neutral600
 }
 
 function getConcernIcon(level: string): "alertTriangle" | "alertCircle" | "shield" {
@@ -165,7 +167,7 @@ function getConcernIcon(level: string): "alertTriangle" | "alertCircle" | "shiel
   }
 }
 
-function getConcernColor(level: string): string {
+function getConcernColor(level: string, colors: any): string {
   switch (level) {
     case "high":
       return colors.error
@@ -176,13 +178,13 @@ function getConcernColor(level: string): string {
   }
 }
 
-const styles = {
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.neutral100,
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
-    shadowColor: colors.palette.neutral800,
+    shadowColor: colors.palette.neutral800 || colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -190,13 +192,13 @@ const styles = {
   },
   title: {
     fontSize: 18,
-    fontWeight: "600" as const,
-    color: colors.text,
+    fontWeight: "600",
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     marginBottom: 16,
   },
   mobileScrollContent: {
@@ -219,38 +221,38 @@ const styles = {
     minWidth: 260,
   },
   cardHeader: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   dateContainer: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   dateText: {
     fontSize: 12,
-    color: colors.textDim,
-    fontWeight: "500" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    fontWeight: "500",
   },
   durationContainer: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   durationText: {
     fontSize: 12,
-    color: colors.textDim,
-    fontWeight: "500" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    fontWeight: "500",
   },
   sentimentContainer: {
     gap: 8,
   },
   sentimentHeader: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   sentimentBadge: {
     paddingHorizontal: 8,
@@ -259,26 +261,26 @@ const styles = {
   },
   sentimentBadgeText: {
     fontSize: 12,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.palette.neutral100,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize",
   },
   sentimentScore: {
     fontSize: 16,
-    fontWeight: "700" as const,
-    color: colors.text,
+    fontWeight: "700",
+    color: colors.palette.biancaHeader || colors.text,
   },
   emotionsContainer: {
     gap: 4,
   },
   emotionsLabel: {
     fontSize: 12,
-    fontWeight: "500" as const,
-    color: colors.textDim,
+    fontWeight: "500",
+    color: colors.textDim || colors.palette.neutral600,
   },
   emotionsList: {
-    flexDirection: "row" as const,
-    flexWrap: "wrap" as const,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 4,
   },
   emotionTag: {
@@ -289,72 +291,72 @@ const styles = {
   },
   emotionText: {
     fontSize: 10,
-    color: colors.textDim,
-    fontWeight: "500" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    fontWeight: "500",
   },
   moreEmotions: {
     fontSize: 10,
-    color: colors.textDim,
-    fontStyle: "italic" as const,
-    alignSelf: "center" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    fontStyle: "italic",
+    alignSelf: "center",
   },
   moodContainer: {
     gap: 4,
   },
   moodLabel: {
     fontSize: 12,
-    fontWeight: "500" as const,
-    color: colors.textDim,
+    fontWeight: "500",
+    color: colors.textDim || colors.palette.neutral600,
   },
   moodText: {
     fontSize: 12,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     lineHeight: 16,
   },
   concernContainer: {
     gap: 4,
   },
   concernHeader: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   concernText: {
     fontSize: 12,
-    fontWeight: "500" as const,
-    textTransform: "capitalize" as const,
+    fontWeight: "500",
+    textTransform: "capitalize",
   },
   confidenceContainer: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   confidenceText: {
     fontSize: 11,
-    color: colors.textDim,
-    fontWeight: "500" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    fontWeight: "500",
   },
   noSentimentContainer: {
     padding: 16,
-    alignItems: "center" as const,
+    alignItems: "center",
     backgroundColor: colors.palette.neutral300,
     borderRadius: 8,
   },
   noSentimentText: {
     fontSize: 12,
-    color: colors.textDim,
-    fontStyle: "italic" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    fontStyle: "italic",
   },
   emptyContainer: {
     padding: 24,
-    alignItems: "center" as const,
+    alignItems: "center",
     backgroundColor: colors.palette.neutral200,
     borderRadius: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: colors.textDim,
-    textAlign: "center" as const,
+    color: colors.textDim || colors.palette.neutral600,
+    textAlign: "center",
   },
-}
+})
 

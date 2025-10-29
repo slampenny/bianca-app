@@ -1,7 +1,8 @@
 import React from 'react'
 import { View, StyleSheet, Modal } from 'react-native'
 import { Text, Button } from 'app/components'
-import { colors, spacing } from 'app/theme'
+import { useTheme } from 'app/theme/ThemeContext'
+import { spacing } from 'app/theme'
 
 interface ConfirmationModalProps {
   visible: boolean
@@ -26,6 +27,67 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   confirmButtonStyle,
   testID = 'confirmation-modal',
 }) => {
+  const { colors } = useTheme()
+  
+  const createStyles = (colors: any) => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modal: {
+      backgroundColor: colors.palette.neutral100,
+      borderRadius: 12,
+      padding: spacing.xl,
+      margin: spacing.lg,
+      minWidth: 300,
+      maxWidth: 400,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.palette.neutral800,
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+    },
+    message: {
+      fontSize: 16,
+      color: colors.palette.neutral600,
+      marginBottom: spacing.xl,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    buttonContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    button: {
+      flex: 1,
+      paddingVertical: spacing.sm,
+      borderRadius: 8,
+    },
+    cancelButton: {
+      backgroundColor: colors.palette.neutral200,
+      borderWidth: 1,
+      borderColor: colors.palette.neutral300,
+    },
+    cancelButtonText: {
+      color: colors.palette.neutral700,
+      fontWeight: '600',
+    },
+    confirmButton: {
+      backgroundColor: colors.palette.angry500,
+    },
+    confirmButtonText: {
+      color: colors.palette.neutral100,
+      fontWeight: '600',
+    },
+  })
+  
+  const styles = createStyles(colors)
+  
   return (
     <Modal
       visible={visible}
@@ -59,63 +121,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     </Modal>
   )
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modal: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: spacing.xl,
-    margin: spacing.lg,
-    minWidth: 300,
-    maxWidth: 400,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.palette.neutral800,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: 16,
-    color: colors.palette.neutral600,
-    marginBottom: spacing.xl,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-  },
-  cancelButton: {
-    backgroundColor: colors.palette.neutral200,
-    borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-  },
-  cancelButtonText: {
-    color: colors.palette.neutral700,
-    fontWeight: '600',
-  },
-  confirmButton: {
-    backgroundColor: colors.palette.angry500,
-  },
-  confirmButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-})
 
 export default ConfirmationModal
 

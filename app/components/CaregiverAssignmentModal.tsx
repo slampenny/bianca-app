@@ -2,15 +2,13 @@ import React, { useState, useEffect } from "react"
 import {
   Modal,
   View,
-  Text,
   ScrollView,
   StyleSheet,
-  Pressable,
   Switch,
   ActivityIndicator,
 } from "react-native"
 import { useSelector } from "react-redux"
-import { Button } from "./Button"
+import { Button, Text } from "./"
 import {
   useGetCaregiversQuery,
   useAssignCaregiverMutation,
@@ -19,7 +17,7 @@ import {
 import { useGetAllCaregiversQuery } from "../services/api/caregiverApi"
 import { Patient, Caregiver } from "../services/api/api.types"
 import { RootState } from "../store/store"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 
 interface CaregiverAssignmentModalProps {
   patient: Patient
@@ -32,10 +30,17 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
   isVisible,
   onClose,
 }) => {
+  const { colors, isLoading: themeLoading } = useTheme()
   const [assignedCaregiverIds, setAssignedCaregiverIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   
   const currentUser = useSelector((state: RootState) => state.auth.currentUser)
+  
+  if (themeLoading) {
+    return null
+  }
+  
+  const styles = createStyles(colors)
   
   // Check if user has permission to manage caregivers
   const canManageCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
@@ -86,11 +91,12 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
   const isAssigned = (caregiverId: string) => assignedCaregiverIds.includes(caregiverId)
   
   if (isLoadingCurrent || isLoadingAll) {
+    const loadingStyles = createStyles(colors)
     return (
       <Modal visible={isVisible} onRequestClose={onClose} transparent>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.palette.biancaButtonSelected} />
-          <Text style={styles.loadingText}>Loading caregivers...</Text>
+        <View style={loadingStyles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.palette?.biancaButtonSelected || colors.tint || colors.palette?.primary500} />
+          <Text style={loadingStyles.loadingText}>Loading caregivers...</Text>
         </View>
       </Modal>
     )
@@ -114,6 +120,7 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
             <Button
               text="Close"
               onPress={onClose}
+              preset="primary"
               style={styles.doneButton}
               textStyle={styles.doneButtonText}
               testID="caregiver-assignment-access-denied-close"
@@ -153,10 +160,11 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
                   onValueChange={(value) => handleToggleCaregiver(caregiver.id!, isAssigned(caregiver.id))}
                   disabled={isLoading}
                   trackColor={{ 
-                    false: colors.palette.neutral300, 
-                    true: colors.palette.biancaSuccess 
+                    false: colors.palette?.neutral300 || "#CCCCCC", 
+                    true: colors.palette?.biancaSuccess || colors.palette?.success500 || "#22C55E"
                   }}
-                  thumbColor={colors.palette.neutral100}
+                  // CRITICAL: Thumb should always be white/light for visibility on both dark and light tracks
+                  thumbColor="#FFFFFF"
                 />
               </View>
             )
@@ -174,6 +182,7 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
           <Button
             text="Done"
             onPress={onClose}
+            preset="primary"
             style={styles.doneButton}
             textStyle={styles.doneButtonText}
             testID="caregiver-assignment-done-button"
@@ -184,37 +193,37 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.palette.biancaBackground,
+    backgroundColor: colors.palette?.biancaBackground || colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.palette.biancaBackground,
+    backgroundColor: colors.palette?.biancaBackground || colors.background,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette?.neutral600 || "#666666",
   },
   header: {
-    backgroundColor: colors.palette.neutral100,
+    backgroundColor: colors.palette?.neutral100 || colors.background,
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: colors.palette.biancaBorder,
+    borderBottomColor: colors.palette?.biancaBorder || colors.border || "#E2E8F0",
   },
   title: {
     fontSize: 24,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.palette?.biancaHeader || colors.text || "#000000",
     textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette?.neutral600 || "#666666",
     textAlign: "center",
     marginTop: 4,
   },
@@ -223,14 +232,14 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   caregiverItem: {
-    backgroundColor: colors.palette.neutral100,
+    backgroundColor: colors.palette?.neutral100 || colors.background,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: colors.palette.neutral900,
+    shadowColor: colors.palette?.neutral900 || "#000000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -243,17 +252,17 @@ const styles = StyleSheet.create({
   caregiverName: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.palette?.biancaHeader || colors.text || "#000000",
     marginBottom: 4,
   },
   caregiverDetails: {
     fontSize: 14,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette?.neutral600 || "#666666",
     marginBottom: 4,
   },
   assignedBadge: {
     fontSize: 12,
-    color: colors.palette.biancaSuccess,
+    color: colors.palette?.biancaSuccess || colors.success || "#22C55E",
     fontWeight: "500",
   },
   emptyState: {
@@ -263,25 +272,25 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette?.neutral600 || "#666666",
     textAlign: "center",
   },
   footer: {
-    backgroundColor: colors.palette.neutral100,
+    backgroundColor: colors.palette?.neutral100 || colors.background,
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: colors.palette.biancaBorder,
+    borderTopColor: colors.palette?.biancaBorder || colors.border || "#E2E8F0",
   },
   doneButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
     paddingVertical: 16,
     borderRadius: 8,
+    // Button component handles background color automatically based on preset
   },
   doneButtonText: {
-    color: colors.palette.neutral100,
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
+    // Button component handles text color automatically based on preset
   },
   accessDeniedContainer: {
     flex: 1,
@@ -291,7 +300,7 @@ const styles = StyleSheet.create({
   },
   accessDeniedText: {
     fontSize: 16,
-    color: colors.palette.neutral600,
+    color: colors.textDim || colors.palette?.neutral600 || "#666666",
     textAlign: "center",
     lineHeight: 24,
   },

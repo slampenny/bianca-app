@@ -9,6 +9,13 @@ import { useTheme } from "app/theme/ThemeContext"
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
   const scrollRef = useRef(null)
+  const { colors, isLoading: themeLoading } = useTheme()
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -19,7 +26,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         </View>
       ),
     })
-  }, [navigation])
+  }, [navigation, styles])
 
   const [register, { isLoading }] = useRegisterMutation()
 
@@ -31,7 +38,6 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const [phone, setPhone] = useState("")
   const [organizationName, setOrganizationName] = useState("")
   const [accountType, setAccountType] = useState("individual")
-  const { colors, isLoading: themeLoading } = useTheme()
 
   // Field-specific error messages
   const [nameError, setNameError] = useState("")
@@ -41,10 +47,8 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const [phoneError, setPhoneError] = useState("")
   const [organizationNameError, setOrganizationNameError] = useState("")
   const [generalError, setGeneralError] = useState("")
-  const { colors, isLoading: themeLoading } = useTheme()
 
   const [shouldRegister, setShouldRegister] = useState(false)
-  const { colors, isLoading: themeLoading } = useTheme()
 
   // Clear field error when user starts typing
   const clearFieldError = (field: string) => {
@@ -340,9 +344,9 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           accessibilityLabel="register-submit"
           onPress={handleRegister}
           disabled={isLoading}
-          tx="registerScreen.title" // Make sure this tx key exists
+          tx="registerScreen.title"
+          preset="primary"
           style={styles.registerButton}
-          preset="filled" // Example preset usage
         />
 
         {/* Consent Notice */}
@@ -360,9 +364,14 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         </View>
 
         {/* Go Back Link */}
-        <Pressable testID="register-go-back" style={styles.linkButton} onPress={() => navigation.goBack()}>
+        <Button 
+          testID="register-go-back" 
+          style={styles.linkButton} 
+          onPress={() => navigation.goBack()}
+          preset="default"
+        >
           <Text style={styles.linkButtonText} tx="registerScreen.goBack" />
-        </Pressable>
+        </Button>
 
 
         {/* Add extra space at the bottom to ensure scrollability */}

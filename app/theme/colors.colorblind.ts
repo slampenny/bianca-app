@@ -1,106 +1,107 @@
-// Color-blind friendly color palette
+// Modern 2025 color-blind friendly color palette
 // High contrast colors optimized for users with color vision deficiency
 // Uses distinct colors that are distinguishable for all types of colorblindness
+// Updated with modern 2025 design principles while maintaining accessibility
 
 const palette = {
-  // Neutral colors - high contrast grays
+  // Neutral colors - modern warm grays with high contrast
   neutral100: "#FFFFFF",      // Pure white for backgrounds
-  neutral200: "#F5F5F5",      // Very light gray
-  neutral300: "#E0E0E0",      // Light gray for borders
-  neutral400: "#B0B0B0",      // Medium light gray
-  neutral500: "#808080",      // Medium gray
-  neutral600: "#606060",      // Medium dark gray
-  neutral700: "#404040",      // Dark gray
-  neutral800: "#202020",      // Very dark gray
-  neutral900: "#000000",      // Pure black
+  neutral200: "#FAFAFA",      // Very light warm gray
+  neutral300: "#F0F0F0",      // Light warm gray for borders
+  neutral400: "#E5E5E5",      // Warm gray
+  neutral500: "#A3A3A3",      // Medium warm gray
+  neutral600: "#737373",      // Dark warm gray
+  neutral700: "#525252",      // Darker gray
+  neutral800: "#404040",      // Very dark gray
+  neutral900: "#171717",      // Almost black with warm undertone
 
-  // Primary colors - distinct blue (avoiding green confusion)
-  primary100: "#E6F3FF",      // Very light blue
-  primary200: "#CCE7FF",      // Light blue
-  primary300: "#99CFFF",      // Medium light blue
-  primary400: "#66B7FF",      // Medium blue
-  primary500: "#0066CC",      // Primary blue - distinct and high contrast
-  primary600: "#0052A3",      // Dark blue
-  primary700: "#003D7A",      // Darker blue
-  primary800: "#002952",      // Very dark blue
-  primary900: "#001429",      // Darkest blue
+  // Primary colors - modern indigo-blue (distinct, high contrast)
+  primary100: "#EEF2FF",      // Very light indigo
+  primary200: "#E0E7FF",      // Light indigo
+  primary300: "#C7D2FE",      // Medium light indigo
+  primary400: "#A5B4FC",      // Medium indigo
+  primary500: "#6366F1",      // Primary indigo - modern, distinct, accessible
+  primary600: "#4F46E5",      // Darker indigo
+  primary700: "#4338CA",      // Dark indigo
+  primary800: "#3730A3",      // Very dark indigo
+  primary900: "#312E81",      // Darkest indigo
 
-  // Secondary colors - distinct purple (instead of green)
-  secondary100: "#F3E6FF",    // Very light purple
-  secondary200: "#E7CCFF",    // Light purple
-  secondary300: "#CF99FF",    // Medium light purple
-  secondary400: "#B766FF",    // Medium purple
-  secondary500: "#8B00CC",    // Primary purple - distinct from blue
-  secondary600: "#6F00A3",    // Dark purple
-  secondary700: "#53007A",    // Darker purple
-  secondary800: "#370052",    // Very dark purple
-  secondary900: "#1B0029",    // Darkest purple
+  // Secondary colors - distinct purple (instead of green - colorblind friendly)
+  secondary100: "#F3E8FF",    // Very light purple
+  secondary200: "#E9D5FF",    // Light purple
+  secondary300: "#D8B4FE",    // Medium light purple
+  secondary400: "#C084FC",    // Medium purple
+  secondary500: "#A855F7",    // Primary purple - modern, distinct from blue/green
+  secondary600: "#9333EA",    // Dark purple
+  secondary700: "#7E22CE",    // Darker purple
+  secondary800: "#6B21A8",    // Very dark purple
+  secondary900: "#581C87",    // Darkest purple
 
-  // Success colors - distinct green (but high contrast)
-  success100: "#E6FFE6",      // Very light green
-  success200: "#CCFFCC",      // Light green
-  success300: "#99FF99",      // Medium light green
-  success400: "#66FF66",      // Medium green
-  success500: "#00CC00",      // Primary green - distinct and bright
-  success600: "#00A300",      // Dark green
-  success700: "#007A00",      // Darker green
-  success800: "#005200",      // Very dark green
-  success900: "#002900",      // Darkest green
+  // Success colors - distinct teal-green (colorblind friendly)
+  success100: "#F0FDF4",      // Very light teal-green
+  success200: "#DCFCE7",      // Light teal-green
+  success300: "#BBF7D0",      // Medium light teal-green
+  success400: "#86EFAC",      // Medium teal-green
+  success500: "#22C55E",      // Primary teal-green - distinct and accessible
+  success600: "#16A34A",      // Dark teal-green
+  success700: "#15803D",      // Darker teal-green
+  success800: "#166534",      // Very dark teal-green
+  success900: "#14532D",      // Darkest teal-green
 
-  // Warning colors - distinct yellow/orange
-  warning100: "#FFF8E6",      // Very light yellow
-  warning200: "#FFF1CC",      // Light yellow
-  warning300: "#FFE399",      // Medium light yellow
-  warning400: "#FFD566",      // Medium yellow
-  warning500: "#FFCC00",      // Primary yellow - distinct and bright
-  warning600: "#CCA300",      // Dark yellow
-  warning700: "#997A00",      // Darker yellow
-  warning800: "#665200",      // Very dark yellow
-  warning900: "#332900",      // Darkest yellow
+  // Warning colors - modern amber (high contrast, colorblind friendly)
+  warning100: "#FEF3C7",      // Very light amber
+  warning200: "#FDE68A",      // Light amber
+  warning300: "#FCD34D",      // Medium light amber
+  warning400: "#FBBF24",      // Medium amber
+  warning500: "#F59E0B",      // Primary amber - modern, distinct, accessible
+  warning600: "#D97706",      // Dark amber
+  warning700: "#B45309",      // Darker amber
+  warning800: "#92400E",      // Very dark amber
+  warning900: "#78350F",      // Darkest amber
 
-  // Error colors - distinct red
-  error100: "#FFE6E6",        // Very light red
-  error200: "#FFCCCC",        // Light red
-  error300: "#FF9999",        // Medium light red
-  error400: "#FF6666",        // Medium red
-  error500: "#CC0000",        // Primary red - distinct and high contrast
-  error600: "#A30000",        // Dark red
-  error700: "#7A0000",        // Darker red
-  error800: "#520000",        // Very dark red
-  error900: "#290000",        // Darkest red
+  // Error colors - modern rose-red (high contrast, colorblind friendly)
+  error100: "#FEE2E2",        // Very light rose
+  error200: "#FECACA",        // Light rose
+  error300: "#FCA5A5",        // Medium light rose
+  error400: "#F87171",        // Medium rose
+  error500: "#EF4444",        // Primary rose - modern, distinct, high contrast
+  error600: "#DC2626",        // Dark rose
+  error700: "#B91C1C",        // Darker rose
+  error800: "#991B1B",        // Very dark rose
+  error900: "#7F1D1D",        // Darkest rose
 
-  // Info colors - distinct cyan/teal
-  info100: "#E6FFFF",         // Very light cyan
-  info200: "#CCFFFF",         // Light cyan
-  info300: "#99FFFF",         // Medium light cyan
-  info400: "#66FFFF",         // Medium cyan
-  info500: "#00CCCC",         // Primary cyan - distinct from blue
-  info600: "#00A3A3",         // Dark cyan
-  info700: "#007A7A",         // Darker cyan
-  info800: "#005252",         // Very dark cyan
-  info900: "#002929",         // Darkest cyan
+  // Info colors - modern blue (distinct from indigo primary)
+  info100: "#DBEAFE",         // Very light blue
+  info200: "#BFDBFE",         // Light blue
+  info300: "#93C5FD",         // Medium light blue
+  info400: "#60A5FA",         // Medium blue
+  info500: "#3B82F6",         // Primary blue - modern, distinct from indigo
+  info600: "#2563EB",         // Dark blue
+  info700: "#1D4ED8",         // Darker blue
+  info800: "#1E40AF",         // Very dark blue
+  info900: "#1E3A8A",         // Darkest blue
 
-  // Medical colors - distinct teal
-  medical100: "#E6FFFA",      // Very light teal
-  medical200: "#CCFFF5",      // Light teal
-  medical300: "#99FFEB",      // Medium light teal
-  medical400: "#66FFE1",      // Medium teal
-  medical500: "#00D4AA",      // Primary teal - distinct medical color
-  medical600: "#00A888",      // Dark teal
-  medical700: "#007C66",      // Darker teal
-  medical800: "#005044",      // Very dark teal
-  medical900: "#002422",      // Darkest teal
+  // Medical colors - modern teal (distinct, colorblind friendly)
+  medical100: "#F0FDFA",      // Very light teal
+  medical200: "#CCFBF1",      // Light teal
+  medical300: "#99F6E4",      // Medium light teal
+  medical400: "#5EEAD4",      // Medium teal
+  medical500: "#14B8A6",      // Primary teal - modern, distinct medical color
+  medical600: "#0D9488",      // Dark teal
+  medical700: "#0F766E",      // Darker teal
+  medical800: "#115E59",      // Very dark teal
+  medical900: "#134E4A",      // Darkest teal
 
-  // Additional high contrast colors for specific use cases
-  accent100: "#FFF0E6",       // Very light orange
-  accent200: "#FFE1CC",       // Light orange
-  accent300: "#FFC399",       // Medium light orange
-  accent400: "#FFA566",       // Medium orange
-  accent500: "#FF8800",       // Primary orange - distinct accent
-  accent600: "#CC6D00",       // Dark orange
-  accent700: "#995200",       // Darker orange
-  accent800: "#663700",       // Very dark orange
-  accent900: "#331C00",       // Darkest orange
+  // Accent colors - modern orange (high contrast)
+  accent100: "#FFF7ED",       // Very light orange
+  accent200: "#FFEDD5",       // Light orange
+  accent300: "#FED7AA",       // Medium light orange
+  accent400: "#FDBA74",       // Medium orange
+  accent500: "#FB923C",       // Primary orange - modern, distinct accent
+  accent600: "#F97316",       // Dark orange
+  accent700: "#EA580C",       // Darker orange
+  accent800: "#C2410C",       // Very dark orange
+  accent900: "#9A3412",       // Darkest orange
 
   // Transparent colors
   transparent: "rgba(0, 0, 0, 0)",
@@ -112,17 +113,17 @@ const colors = {
   palette,
   
   // Text colors - high contrast
-  text: palette.neutral800,           // Dark text on light backgrounds
+  text: palette.neutral900,           // Dark text on light backgrounds
   textDim: palette.neutral600,       // Dimmed text
   textInverse: palette.neutral100,   // Light text on dark backgrounds
   
   // Background colors
-  background: palette.neutral100,     // Main background
-  backgroundDim: palette.neutral200,  // Dimmed background
+  background: palette.neutral200,     // Main background - modern warm white
+  backgroundDim: palette.neutral300,  // Dimmed background
   
   // Border colors
-  border: palette.neutral300,         // Standard borders
-  borderDim: palette.neutral200,      // Light borders
+  border: palette.neutral400,         // Standard borders
+  borderDim: palette.neutral300,      // Light borders
   
   // Legacy color names for compatibility
   tint: palette.primary500,           // Main tint color
@@ -131,16 +132,16 @@ const colors = {
   warning: palette.warning500,        // Warning color
   info: palette.info500,              // Info color
   
-  // Healthcare-specific legacy colors
-  biancaBackground: palette.neutral100,
+  // Healthcare-specific legacy colors - modern palette
+  biancaBackground: palette.neutral200,
   biancaButtonSelected: palette.primary500,
-  biancaButtonUnselected: palette.neutral300,
+  biancaButtonUnselected: palette.neutral400,
   biancaHeader: palette.neutral800,
-  biancaBorder: palette.neutral300,
+  biancaBorder: palette.neutral400,
   biancaError: palette.error500,
-  biancaErrorBackground: palette.error100,
+  biancaErrorBackground: "rgba(239, 68, 68, 0.1)",
   biancaSuccess: palette.success500,
-  biancaSuccessBackground: palette.success100,
+  biancaSuccessBackground: "rgba(34, 197, 94, 0.1)",
   biancaWarning: palette.warning500,
   biancaExplanation: palette.neutral600,
 } as const

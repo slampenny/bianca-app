@@ -7,4 +7,5 @@
  */
 export default {
   API_URL: "http://localhost:3000/v1",
+  persistNavigation: "never", // Disable navigation persistence in tests
 } 

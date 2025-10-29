@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { Text, TextInput, ScrollView, Pressable, StyleSheet, View, Image } from "react-native"
+import { ScrollView, StyleSheet, View, Image } from "react-native"
 import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { useUpdateOrgMutation } from "../services/api/orgApi"
@@ -12,6 +12,7 @@ import { useTheme } from "app/theme/ThemeContext"
 import { clearCaregiver } from "../store/caregiverSlice"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
+import { Button, Text, TextField } from "app/components"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
@@ -89,9 +90,9 @@ export function OrgScreen() {
   const styles = createStyles(colors)
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} testID="org-screen">
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} testID="org-screen" accessibilityLabel="org-screen">
       {isError && (
-        <Text style={styles.errorText}>
+        <Text style={styles.errorText} preset="formHelper">
           {"status" in error && "data" in error
             ? `Status: ${error.status}, Data: ${JSON.stringify(error.data)}`
             : "error" in error
@@ -102,7 +103,7 @@ export function OrgScreen() {
       <View style={styles.formCard}>
         {/* Logo Section */}
         <View style={styles.logoSection}>
-          <Text style={styles.sectionTitle}>Organization Logo</Text>
+          <Text style={styles.sectionTitle} preset="formLabel">Organization Logo</Text>
           {canEditOrg ? (
             <AvatarPicker
               initialAvatar={logo}
@@ -115,52 +116,87 @@ export function OrgScreen() {
             <Image source={{ uri: logo }} style={styles.logoPreview} />
           ) : (
             <View style={styles.noLogoContainer}>
-              <Text style={styles.noLogoText}>No logo set</Text>
+              <Text style={styles.noLogoText} preset="formHelper">No logo set</Text>
             </View>
           )}
         </View>
 
-        <TextInput
-          style={[styles.input, !canEditOrg && styles.readonlyInput]}
-          placeholder={translate("orgScreen.namePlaceholder")}
+        <TextField
+          placeholderTx="orgScreen.namePlaceholder"
           value={name}
           onChangeText={setName}
-          placeholderTextColor={colors.palette.neutral600}
           editable={canEditOrg}
+          containerStyle={styles.inputContainer}
+          inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+          style={!canEditOrg ? styles.readonlyInput : styles.input}
         />
-        <TextInput
-          style={[styles.input, !canEditOrg && styles.readonlyInput]}
-          placeholder={translate("orgScreen.emailPlaceholder")}
+        <TextField
+          placeholderTx="orgScreen.emailPlaceholder"
           value={email}
           onChangeText={setEmail}
-          placeholderTextColor={colors.palette.neutral600}
+          keyboardType="email-address"
+          autoCapitalize="none"
           editable={canEditOrg}
+          containerStyle={styles.inputContainer}
+          inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+          style={!canEditOrg ? styles.readonlyInput : styles.input}
         />
-        <TextInput
-          style={[styles.input, !canEditOrg && styles.readonlyInput]}
-          placeholder={translate("orgScreen.phonePlaceholder")}
+        <TextField
+          placeholderTx="orgScreen.phonePlaceholder"
           value={phone}
           onChangeText={setPhone}
-          placeholderTextColor={colors.palette.neutral600}
+          keyboardType="phone-pad"
           editable={canEditOrg}
+          containerStyle={styles.inputContainer}
+          inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+          style={!canEditOrg ? styles.readonlyInput : styles.input}
         />
         {canEditOrg && (
-          <Pressable style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>{translate("orgScreen.save")}</Text>
-          </Pressable>
+          <Button 
+            preset="primary"
+            text={translate("orgScreen.save")}
+            onPress={handleSave}
+          />
         )}
       </View>
-      <Pressable style={styles.viewCaregiversButton} onPress={handleViewCaregivers} testID="view-caregivers-button">
-        <Text style={styles.viewCaregiversButtonText}>{translate("orgScreen.viewCaregivers")}</Text>
-      </Pressable>
-      {canInviteCaregivers && (
-        <Pressable style={styles.inviteCaregiverButton} onPress={handleInviteCaregiver} testID="invite-caregiver-button">
-          <Text style={styles.inviteCaregiverButtonText}>{translate("orgScreen.inviteCaregiver")}</Text>
-        </Pressable>
-      )}
-      <Pressable style={styles.paymentButton} onPress={handlePaymentPress} testID="payment-button">
-        <Text style={styles.paymentButtonText}>{translate("orgScreen.payments")}</Text>
-      </Pressable>
+
+      {/* Actions Section */}
+      <View style={styles.actionsContainer}>
+        <Text style={styles.actionsTitle} preset="formLabel">
+          {translate("orgScreen.organizationActions")}
+        </Text>
+        
+        <View style={styles.actionsGrid}>
+          <Button 
+            preset="default"
+            text={translate("orgScreen.viewCaregivers")}
+            onPress={handleViewCaregivers} 
+            testID="view-caregivers-button"
+            style={styles.actionButton}
+            textStyle={styles.actionButtonText}
+          />
+          
+          {canInviteCaregivers && (
+            <Button 
+              preset="primary"
+              text={translate("orgScreen.inviteCaregiver")}
+              onPress={handleInviteCaregiver} 
+              testID="invite-caregiver-button"
+              style={[styles.actionButton, styles.primaryActionButton]}
+              textStyle={styles.primaryActionButtonText}
+            />
+          )}
+          
+          <Button 
+            preset="default"
+            text={translate("orgScreen.payments")}
+            onPress={handlePaymentPress} 
+            testID="payment-button"
+            style={styles.actionButton}
+            textStyle={styles.actionButtonText}
+          />
+        </View>
+      </View>
     </ScrollView>
   )
 }
@@ -202,55 +238,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 24,
     fontWeight: "600",
   },
-  input: {
-    borderColor: colors.palette.neutral300,
-    borderRadius: 5,
-    borderWidth: 1,
-    color: colors.palette.biancaHeader,
-    fontSize: 16,
-    height: 45,
+  inputContainer: {
     marginBottom: 15,
-    paddingHorizontal: 10,
+  },
+  inputWrapper: {
+    // Default input wrapper - TextField handles most styling
+  },
+  input: {
+    // Text input style - TextField handles color automatically via theme
+  },
+  readonlyInputWrapper: {
+    backgroundColor: colors.palette.neutral200,
   },
   readonlyInput: {
-    backgroundColor: colors.palette.neutral200,
-    color: colors.palette.neutral600,
-    borderColor: colors.palette.neutral400,
+    // Read-only input style - TextField handles text color automatically via theme
+    // Override text color for readonly state if needed
+    opacity: 0.7,
   },
   saveButton: {
-    alignItems: "center",
-    backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 5,
-    paddingVertical: 15,
-  },
-  saveButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  viewCaregiversButton: {
-    alignItems: "center",
-    backgroundColor: colors.palette.biancaSuccess,
-    borderRadius: 5,
     marginTop: 10,
-    paddingVertical: 15,
-  },
-  viewCaregiversButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  inviteCaregiverButton: {
-    alignItems: "center",
-    backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 5,
-    marginTop: 10,
-    paddingVertical: 15,
-  },
-  inviteCaregiverButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 18,
-    fontWeight: "600",
   },
   logoSection: {
     alignItems: "center",
@@ -288,15 +294,50 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: "center",
   },
   paymentButton: {
-    alignItems: "center",
-    backgroundColor: colors.palette.accent500,
-    borderRadius: 5,
     marginTop: 10,
-    paddingVertical: 15,
   },
-  paymentButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 18,
+  actionsContainer: {
+    marginTop: 8,
+  },
+  actionsTitle: {
+    fontSize: 12,
     fontWeight: "600",
+    color: colors.textDim || colors.palette?.neutral600 || "#737373",
+    marginBottom: 16,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  actionsGrid: {
+    gap: 10,
+  },
+  actionButton: {
+    minHeight: 60,
+    borderRadius: 14,
+    // Default preset handles background and border - only add spacing/shadow
+    shadowColor: colors.palette?.neutral900 || "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    // Default preset handles text color automatically
+  },
+  primaryActionButton: {
+    backgroundColor: colors.palette?.primary500 || colors.tint,
+    borderColor: colors.palette?.primary500 || colors.tint,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  primaryActionButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
   },
 })

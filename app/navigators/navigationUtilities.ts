@@ -54,6 +54,11 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
   const initNavState = navigationRestoredDefaultState(Config.persistNavigation)
   const [isRestored, setIsRestored] = useState(initNavState)
   const routeNameRef = useRef<keyof AppStackParamList | undefined>()
+  // Check if we're in test mode
+  const isTestMode = process.env.NODE_ENV === 'test' || 
+                     process.env.PLAYWRIGHT_TEST === '1' || 
+                     process.env.JEST_WORKER_ID
+  
   const onNavigationStateChange = (state: NavigationState | undefined) => {
     const previousRouteName = routeNameRef.current
     if (state) {
@@ -62,14 +67,21 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
         console.log(currentRouteName)
       }
       routeNameRef.current = currentRouteName as keyof AppStackParamList
-      storage.save(persistenceKey, state)
+      // Don't save navigation state in test mode
+      if (!isTestMode) {
+        storage.save(persistenceKey, state)
+      }
     }
   }
   const restoreState = async () => {
     try {
-      // Don't restore navigation state in development to ensure clean navigation after login
-      if (__DEV__) {
+      // Don't restore navigation state in development or test mode
+      if (__DEV__ || isTestMode) {
         setInitialNavigationState(undefined)
+        // Clear any persisted state in test mode
+        if (isTestMode) {
+          await storageKey.remove(persistenceKey)
+        }
       } else {
         const state = (await storageKey.load(persistenceKey)) as
           | NavigationProps["initialState"]

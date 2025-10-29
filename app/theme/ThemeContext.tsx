@@ -123,17 +123,27 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     isLoading,
   }
 
-  if (isLoading) {
-    return null // Don't render children until theme is loaded
-  }
-
+  // Always render children with theme context, even during loading
+  // This prevents components from crashing when they use useTheme()
+  // The theme will update once loading completes
   return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {
   const context = useContext(ThemeContext)
   if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider")
+    // Return default theme if context is not available (e.g., during initialization)
+    // This prevents crashes when components render before ThemeProvider is mounted
+    const defaultThemeData = themes[defaultTheme]
+    return {
+      currentTheme: defaultTheme,
+      setTheme: () => {
+        console.warn("setTheme called outside ThemeProvider")
+      },
+      colors: defaultThemeData.colors,
+      themeInfo: defaultThemeData,
+      isLoading: true,
+    }
   }
   return context
 }

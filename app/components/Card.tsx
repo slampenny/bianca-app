@@ -8,7 +8,8 @@ import {
   ViewProps,
   ViewStyle,
 } from "react-native"
-import { colors, spacing } from "../theme"
+import { spacing } from "../theme"
+import { useTheme } from "../theme/ThemeContext"
 import { Text, TextProps } from "./Text"
 
 type Presets = keyof typeof $containerPresets
@@ -128,6 +129,42 @@ interface CardProps extends TouchableOpacityProps {
  * @returns {JSX.Element} The rendered `Card` component.
  */
 export function Card(props: CardProps) {
+  const { colors } = useTheme()
+  
+  const getContainerPresets = (colors: any) => ({
+    default: [
+      $containerBase,
+      {
+        backgroundColor: colors.palette.neutral100,
+        borderColor: colors.palette.neutral300,
+        shadowColor: colors.palette.neutral800,
+      },
+    ] as StyleProp<ViewStyle>,
+    reversed: [
+      $containerBase,
+      { 
+        backgroundColor: colors.palette.neutral800, 
+        borderColor: colors.palette.neutral500,
+        shadowColor: colors.palette.neutral800,
+      },
+    ] as StyleProp<ViewStyle>,
+  })
+
+  const getHeadingPresets = (colors: any) => ({
+    default: {},
+    reversed: { color: colors.palette.neutral100 },
+  })
+
+  const getContentPresets = (colors: any) => ({
+    default: {},
+    reversed: { color: colors.palette.neutral100 },
+  })
+
+  const getFooterPresets = (colors: any) => ({
+    default: {},
+    reversed: { color: colors.palette.neutral100 },
+  })
+
   const {
     content,
     contentTx,
@@ -166,22 +203,22 @@ export function Card(props: CardProps) {
   >
   const HeaderContentWrapper = verticalAlignment === "force-footer-bottom" ? View : Fragment
 
-  const $containerStyle = [$containerPresets[preset], $containerStyleOverride]
+  const $containerStyle = [getContainerPresets(colors)[preset], $containerStyleOverride]
   const $headingStyle = [
-    $headingPresets[preset],
+    getHeadingPresets(colors)[preset],
     (isFooterPresent || isContentPresent) && { marginBottom: spacing.xxxs },
     $headingStyleOverride,
     HeadingTextProps?.style,
   ]
   const $contentStyle = [
-    $contentPresets[preset],
+    getContentPresets(colors)[preset],
     isHeadingPresent && { marginTop: spacing.xxxs },
     isFooterPresent && { marginBottom: spacing.xxxs },
     $contentStyleOverride,
     ContentTextProps?.style,
   ]
   const $footerStyle = [
-    $footerPresets[preset],
+    getFooterPresets(colors)[preset],
     (isHeadingPresent || isContentPresent) && { marginTop: spacing.xxxs },
     $footerStyleOverride,
     FooterTextProps?.style,
@@ -253,7 +290,6 @@ const $containerBase: ViewStyle = {
   borderRadius: spacing.md,
   padding: spacing.xs,
   borderWidth: 1,
-  shadowColor: colors.palette.neutral800,
   shadowOffset: { width: 0, height: 12 },
   shadowOpacity: 0.08,
   shadowRadius: 12.81,
@@ -274,32 +310,3 @@ const $alignmentWrapperFlexOptions = {
   "force-footer-bottom": "space-between",
 } as const
 
-const $containerPresets = {
-  default: [
-    $containerBase,
-    {
-      backgroundColor: colors.palette.neutral100,
-      borderColor: colors.palette.neutral300,
-    },
-  ] as StyleProp<ViewStyle>,
-
-  reversed: [
-    $containerBase,
-    { backgroundColor: colors.palette.neutral800, borderColor: colors.palette.neutral500 },
-  ] as StyleProp<ViewStyle>,
-}
-
-const $headingPresets: Record<Presets, TextStyle> = {
-  default: {},
-  reversed: { color: colors.palette.neutral100 },
-}
-
-const $contentPresets: Record<Presets, TextStyle> = {
-  default: {},
-  reversed: { color: colors.palette.neutral100 },
-}
-
-const $footerPresets: Record<Presets, TextStyle> = {
-  default: {},
-  reversed: { color: colors.palette.neutral100 },
-}

@@ -15,6 +15,7 @@ export const alertApi = createApi({
       return headers
     },
   }),
+  tagTypes: ["Alert"],
   endpoints: (builder) => ({
     createAlert: builder.mutation<Alert, Partial<Alert>>({
       query: (alert) => ({
@@ -24,10 +25,15 @@ export const alertApi = createApi({
       }),
     }),
     getAllAlerts: builder.query<Alert[], void>({
-      query: () => ({
-        url: "/alerts",
-        method: "GET",
-      }),
+      query: () => {
+        // CRITICAL: Always fetch ALL alerts (both read and unread)
+        // Backend expects showRead as query string parameter with value "true" (string)
+        return {
+          url: "/alerts?showRead=true", // Explicitly include in URL to ensure it's sent
+          method: "GET",
+        }
+      },
+      providesTags: ["Alert"],
     }),
     getAlert: builder.query<Alert, { alertId: string }>({
       query: ({ alertId }) => `/alerts/${alertId}`,
@@ -50,6 +56,7 @@ export const alertApi = createApi({
         url: `/alerts/markAsRead/${alertId}`,
         method: "POST",
       }),
+      invalidatesTags: ["Alert"], // CRITICAL: Invalidate cache so refetch gets updated alerts
     }),
     markAllAsRead: builder.mutation<Alert[], { alerts: Alert[] }>({
       query: ({ alerts }) => ({
@@ -57,6 +64,7 @@ export const alertApi = createApi({
         method: "POST",
         body: { alertIds: alerts.map((alert) => alert.id) },
       }),
+      invalidatesTags: ["Alert"], // CRITICAL: Invalidate cache so refetch gets updated alerts
     }),
   }),
 })

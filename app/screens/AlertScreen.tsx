@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { FlatList, View, Text, StyleSheet, ActivityIndicator } from "react-native"
+import { FlatList, View, StyleSheet, ActivityIndicator, Pressable } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { Toggle, Button, EmptyState, ListItem } from "../components"
+import { Toggle, Button, EmptyState, ListItem, Text } from "../components"
 import {
   useMarkAllAsReadMutation,
   useMarkAlertAsReadMutation,
@@ -41,10 +41,40 @@ export function AlertScreen() {
 
   useEffect(() => {
     if (fetchAllAlerts) {
-      console.log("Fetched alerts:", fetchAllAlerts)
+      const readCount = currentUser 
+        ? fetchAllAlerts.filter(a => a.readBy?.includes(currentUser.id!)).length 
+        : 0
+      const unreadCount = fetchAllAlerts.length - readCount
+      console.log("Fetched alerts from API:", {
+        total: fetchAllAlerts.length,
+        read: readCount,
+        unread: unreadCount,
+        alertIds: fetchAllAlerts.slice(0, 5).map(a => ({ id: a.id, readBy: a.readBy, isRead: currentUser ? a.readBy?.includes(currentUser.id!) : false }))
+      })
+      
+      // CRITICAL: Check if we're about to lose read alerts
+      const currentReadCount = currentUser 
+        ? alerts.filter(a => a.readBy?.includes(currentUser.id!)).length 
+        : 0
+      if (currentReadCount > 0 && readCount === 0 && fetchAllAlerts.length === alerts.filter(a => !a.readBy?.includes(currentUser?.id!)).length) {
+        console.warn('[AlertScreen] WARNING: API returned only unread alerts when read alerts exist!')
+        console.warn('[AlertScreen] Current state has', currentReadCount, 'read alerts, but API returned', readCount)
+        // Don't overwrite if we'd lose read alerts - merge instead
+        const existingReadAlerts = alerts.filter(a => currentUser && a.readBy?.includes(currentUser.id!))
+        const mergedAlerts = [...fetchAllAlerts, ...existingReadAlerts.filter(existing => 
+          !fetchAllAlerts.some(fresh => fresh.id === existing.id)
+        )]
+        console.log('[AlertScreen] Merged alerts to preserve read ones:', mergedAlerts.length)
+        dispatch(setAlerts(mergedAlerts))
+        return
+      }
+      
+      // CRITICAL: Replace entire alerts array with fresh data from API
+      // This ensures we have ALL alerts including read ones
       dispatch(setAlerts(fetchAllAlerts))
+      console.log("Updated Redux state with", fetchAllAlerts.length, "alerts")
     }
-  }, [fetchAllAlerts, dispatch])
+  }, [fetchAllAlerts, dispatch, currentUser?.id])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -65,8 +95,44 @@ export function AlertScreen() {
   const handleAlertPress = async (alert: Alert) => {
     if (alert.id) {
       try {
-        await markAlertAsRead({ alertId: alert.id }).unwrap()
-        refetch()
+        console.log('[AlertScreen] Marking alert as read:', alert.id)
+        console.log('[AlertScreen] Current alerts in state before marking:', alerts.length)
+        console.log('[AlertScreen] Current alerts breakdown:', {
+          total: alerts.length,
+          read: currentUser ? alerts.filter(a => a.readBy?.includes(currentUser.id!)).length : 0,
+          unread: currentUser ? alerts.filter(a => !a.readBy?.includes(currentUser.id!)).length : 0
+        })
+        
+        const updatedAlert = await markAlertAsRead({ alertId: alert.id }).unwrap()
+        console.log('[AlertScreen] Alert marked as read, updated alert:', updatedAlert)
+        console.log('[AlertScreen] Updated alert readBy:', updatedAlert.readBy)
+        
+        // Update Redux immediately with the updated alert to ensure it's in state
+        // Find the alert in the array and update it
+        const alertIndex = alerts.findIndex(a => a.id === alert.id)
+        if (alertIndex !== -1) {
+          const updatedAlerts = [...alerts]
+          updatedAlerts[alertIndex] = updatedAlert
+          dispatch(setAlerts(updatedAlerts))
+          console.log('[AlertScreen] Updated Redux state immediately with', updatedAlerts.length, 'alerts')
+        }
+        
+        // Wait for invalidatesTags to trigger automatic refetch, then also manually refetch
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        const refetchResult = await refetch()
+        
+        if (refetchResult.data) {
+          const readCount = currentUser 
+            ? refetchResult.data.filter(a => a.readBy?.includes(currentUser.id!)).length 
+            : 0
+          console.log('[AlertScreen] After refetch, got:', {
+            total: refetchResult.data.length,
+            read: readCount,
+            unread: refetchResult.data.length - readCount
+          })
+        } else {
+          console.log('[AlertScreen] Refetch returned no data')
+        }
       } catch (error) {
         console.error("Failed to mark alert as read:", error)
       }
@@ -137,9 +203,50 @@ export function AlertScreen() {
     </ListItem>
   )
 
-  const filteredAlerts = showUnread
-    ? (currentUser ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!)) : [])
-    : alerts
+  // Compute filtered alerts - use useMemo to ensure it updates when dependencies change
+  // CRITICAL: When showUnread is false, we MUST show ALL alerts (both read and unread)
+  const filteredAlerts = React.useMemo(() => {
+    console.log('[AlertScreen] Computing filteredAlerts:', {
+      showUnread,
+      totalAlerts: alerts.length,
+      currentUserId: currentUser?.id,
+      alertIds: alerts.map(a => ({ id: a.id, readBy: a.readBy }))
+    })
+    
+    if (showUnread) {
+      // Filter to only show unread alerts
+      const unread = currentUser 
+        ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!)) 
+        : []
+      console.log('[AlertScreen] Unread alerts:', unread.length)
+      return unread
+    } else {
+      // CRITICAL: Show ALL alerts when not filtering by unread (both read and unread)
+      console.log('[AlertScreen] Showing ALL alerts (read + unread):', alerts.length)
+      return alerts
+    }
+  }, [showUnread, alerts, currentUser?.id])
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('[AlertScreen] Debug:', {
+      showUnread,
+      alertsCount: alerts.length,
+      filteredAlertsCount: filteredAlerts.length,
+      currentUserId: currentUser?.id,
+      firstFewAlerts: alerts.slice(0, 3).map(a => ({ 
+        id: a.id, 
+        readBy: a.readBy,
+        isReadByCurrentUser: currentUser ? a.readBy?.includes(currentUser.id!) : false
+      }))
+    })
+  }, [showUnread, alerts.length, filteredAlerts.length, currentUser?.id])
+
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
 
   if (isFetching) {
     return (
@@ -150,26 +257,49 @@ export function AlertScreen() {
   }
 
   const handleShowUnreadChange = (newValue: boolean) => {
+    console.log('[AlertScreen] Changing showUnread from', showUnread, 'to', newValue)
     setShowUnread(newValue)
-    refetch() // Refetch data after changing showUnread
+    // Don't refetch - just update the filter state
   }
 
   return (
-    <View style={styles.container} testID="alert-header">
+    <View style={styles.container} testID="alert-screen" accessibilityLabel="alert-screen">
       <View style={styles.contentContainer}>
         <View style={styles.tabRow}>
-          <Button
-            text={translate("alertScreen.unreadAlerts")}
-            onPress={() => handleShowUnreadChange(true)}
-            style={[styles.tabButton, showUnread ? styles.activeTab : styles.inactiveTab]}
-            textStyle={showUnread ? styles.activeTabText : styles.inactiveTabText}
-          />
-          <Button
-            text={translate("alertScreen.allAlerts")}
-            onPress={() => handleShowUnreadChange(false)}
-            style={[styles.tabButton, !showUnread ? styles.activeTab : styles.inactiveTab]}
-            textStyle={!showUnread ? styles.activeTabText : styles.inactiveTabText}
-          />
+          <Pressable
+            onPress={() => {
+              console.log('Pressing Unread tab')
+              handleShowUnreadChange(true)
+            }}
+            style={styles.tabButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={translate("alertScreen.unreadAlerts")}
+          >
+            <View style={styles.tabButtonContent}>
+              <Text style={styles.tabText}>
+                {translate("alertScreen.unreadAlerts")}
+              </Text>
+              {showUnread && <View style={styles.tabUnderline} />}
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              console.log('Pressing All Alerts tab')
+              handleShowUnreadChange(false)
+            }}
+            style={styles.tabButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={translate("alertScreen.allAlerts")}
+          >
+            <View style={styles.tabButtonContent}>
+              <Text style={styles.tabText}>
+                {translate("alertScreen.allAlerts")}
+              </Text>
+              {!showUnread && <View style={styles.tabUnderline} />}
+            </View>
+          </Pressable>
         </View>
 
         {alerts.length > 0 && (
@@ -183,6 +313,13 @@ export function AlertScreen() {
           </View>
         )}
 
+        {/* Debug indicator */}
+        {__DEV__ && (
+          <Text style={styles.debugText}>
+            Debug: showUnread={showUnread.toString()}, alerts={alerts.length}, filtered={filteredAlerts.length}
+          </Text>
+        )}
+
         {filteredAlerts.length === 0 ? (
           <View style={styles.emptyStateContainer} testID="alert-empty-state">
             <View style={styles.emptyStateIcon}>
@@ -190,9 +327,15 @@ export function AlertScreen() {
             </View>
             <Text style={styles.emptyStateTitle}>{translate("alertScreen.noAlertsTitle")}</Text>
             <Text style={styles.emptyStateSubtitle}>{translate("alertScreen.noAlertsSubtitle")}</Text>
+            {__DEV__ && (
+              <Text style={styles.debugText}>
+                Total alerts in store: {alerts.length}, Show unread: {showUnread.toString()}
+              </Text>
+            )}
           </View>
         ) : (
           <FlatList
+            key={`alert-list-${showUnread ? 'unread' : 'all'}`}
             data={filteredAlerts}
             renderItem={renderItem}
             keyExtractor={(item) => item.id || ""}
@@ -212,12 +355,6 @@ export function AlertScreen() {
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
-  activeTab: {
-    backgroundColor: colors.palette.biancaButtonSelected,
-  },
-  activeTabText: {
-    color: colors.palette.neutral100,
-  },
   alertContent: {
     flex: 1,
   },
@@ -289,12 +426,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     lineHeight: 22,
     textAlign: "center",
   },
-  inactiveTab: {
-    backgroundColor: colors.palette.biancaButtonUnselected,
-  },
-  inactiveTabText: {
-    color: colors.palette.biancaButtonSelected,
-  },
   listItem: {
     backgroundColor: colors.palette.neutral100,
     borderRadius: 6,
@@ -327,13 +458,37 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 10,
   },
   tabButton: {
-    borderRadius: 5,
     flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 10,
+  },
+  tabButtonContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    position: "relative",
+  },
+  tabText: {
+    color: colors.palette.biancaHeader || colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  tabUnderline: {
+    position: "absolute",
+    bottom: -1,
+    left: "10%",
+    right: "10%",
+    height: 2,
+    backgroundColor: colors.palette.biancaHeader || colors.text,
   },
   tabRow: {
     flexDirection: "row",
     marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.palette.biancaBorder || colors.border,
+  },
+  debugText: {
+    color: colors.palette.biancaHeader || colors.text,
+    fontSize: 12,
+    padding: 8,
+    textAlign: "center",
   },
 })

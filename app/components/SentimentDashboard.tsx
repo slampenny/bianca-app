@@ -1,8 +1,8 @@
 import React, { useState } from "react"
-import { View, ViewStyle, ScrollView, RefreshControl, Dimensions } from "react-native"
+import { View, ViewStyle, ScrollView, RefreshControl, Dimensions, StyleSheet } from "react-native"
 import { Text } from "./Text"
 import { Button } from "./Button"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 import { SentimentTrendChart } from "./SentimentTrendChart"
 import { SentimentSummaryCard } from "./SentimentSummaryCard"
 import { SentimentRecentTrends } from "./SentimentRecentTrends"
@@ -29,6 +29,7 @@ export function SentimentDashboard({
   onTimeRangeChange,
   style,
 }: SentimentDashboardProps) {
+  const { colors } = useTheme()
   const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("month")
   const screenWidth = Dimensions.get("window").width
   const isMobile = screenWidth < 768
@@ -43,6 +44,8 @@ export function SentimentDashboard({
     { key: "month" as const, label: translate("sentimentAnalysis.last30Days") },
     { key: "lifetime" as const, label: translate("sentimentAnalysis.allTime") },
   ]
+
+  const styles = createStyles(colors)
 
   return (
     <ScrollView
@@ -139,37 +142,37 @@ export function SentimentDashboard({
   )
 }
 
-const styles = {
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.palette.biancaBackground || colors.background,
   },
   header: {
     padding: 16,
     backgroundColor: colors.palette.neutral100,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.palette.biancaBorder || colors.border,
   },
   title: {
     fontSize: 20,
     fontWeight: "700" as const,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
   },
   timeRangeContainer: {
     padding: 16,
     backgroundColor: colors.palette.neutral100,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.palette.biancaBorder || colors.border,
   },
   timeRangeLabel: {
     fontSize: 14,
     fontWeight: "600" as const,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 12,
   },
   timeRangeButtons: {
@@ -186,7 +189,7 @@ const styles = {
     borderRadius: 8,
     backgroundColor: colors.palette.neutral200,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.palette.biancaBorder || colors.border,
   },
   timeRangeButtonMobile: {
     paddingVertical: 10,
@@ -199,7 +202,7 @@ const styles = {
   timeRangeButtonText: {
     fontSize: 14,
     fontWeight: "500" as const,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     textAlign: "center" as const,
   },
   timeRangeButtonTextMobile: {
@@ -232,12 +235,12 @@ const styles = {
   noDataTitle: {
     fontSize: 16,
     fontWeight: "600" as const,
-    color: colors.text,
+    color: colors.palette.biancaHeader || colors.text,
     marginBottom: 8,
   },
   noDataText: {
     fontSize: 14,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     textAlign: "center" as const,
     lineHeight: 20,
   },
@@ -250,20 +253,20 @@ const styles = {
   },
   loadingText: {
     fontSize: 14,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
   },
   footer: {
     padding: 16,
     backgroundColor: colors.palette.neutral100,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.palette.biancaBorder || colors.border,
     marginTop: 16,
   },
   footerText: {
     fontSize: 12,
-    color: colors.textDim,
+    color: colors.textDim || colors.palette.neutral600,
     textAlign: "center" as const,
     lineHeight: 16,
   },
-}
+})
 

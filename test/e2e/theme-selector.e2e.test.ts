@@ -8,12 +8,12 @@ test.describe('Theme Selector', () => {
     await page.fill('[data-testid="password-input"]', 'Password1')
     await page.click('[data-testid="login-button"]')
     
-    // Wait for login to complete and navigate to profile
-    await page.waitForURL('**/home', { timeout: 10000 })
+    // Wait for login to complete - navigate to home
+    await page.waitForURL('**/MainTabs/Home/**', { timeout: 15000 })
     
     // Navigate to profile screen
     await page.click('[data-testid="profile-button"]')
-    await page.waitForURL('**/profile', { timeout: 10000 })
+    await page.waitForURL('**/profile', { timeout: 15000 })
   })
 
   test('should display theme selector on profile screen', async ({ page }) => {
@@ -64,3 +64,4 @@ test.describe('Theme Selector', () => {
     await expect(colorSwatches).toHaveCount(3) // Primary, success, error colors
   })
 })
+

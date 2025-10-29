@@ -9,7 +9,8 @@ import {
   Image,
 } from "react-native"
 import { isRTL, translate } from "../i18n"
-import { colors, spacing } from "../theme"
+import { spacing } from "../theme"
+import { useTheme } from "../theme/ThemeContext"
 import { ExtendedEdge, useSafeAreaInsetsStyle } from "../utils/useSafeAreaInsetsStyle"
 import { Icon, IconTypes } from "./Icon"
 import { Text, TextProps } from "./Text"
@@ -145,6 +146,7 @@ interface HeaderActionProps {
  * @returns {JSX.Element} The rendered `Header` component.
  */
 export function Header(props: HeaderProps) {
+  const { colors } = useTheme()
   const {
     backgroundColor = colors.background,
     LeftActionComponent,
@@ -242,17 +244,19 @@ function HeaderAction(props: HeaderActionProps) {
         disabled={!onPress}
         activeOpacity={0.8}
       >
-        <Text weight="medium" size="md" text={content} style={$actionText} />
+        <Text weight="medium" size="md" text={content} style={[{ color: colors.tint || colors.palette.primary500 || colors.palette.biancaHeader }]} />
       </TouchableOpacity>
     )
   }
 
   if (icon) {
+    // Use theme-aware icon color if not explicitly provided
+    const iconColorValue = iconColor || colors.tint || colors.palette.primary500 || colors.palette.biancaHeader || colors.text
     return (
       <Icon
         size={24}
         icon={icon}
-        color={iconColor}
+        color={iconColorValue}
         onPress={onPress}
         containerStyle={[$actionIconContainer, { backgroundColor }]}
         style={isRTL ? { transform: [{ rotate: "180deg" }] } : {}}
@@ -285,10 +289,6 @@ const $actionTextContainer: ViewStyle = {
   height: "100%",
   paddingHorizontal: spacing.md,
   zIndex: 2,
-}
-
-const $actionText: TextStyle = {
-  color: colors.tint,
 }
 
 const $actionIconContainer: ViewStyle = {
