@@ -8,7 +8,7 @@ import { LoadingScreen } from "./LoadingScreen"
 import { goBack } from "app/navigators"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { clearCaregiver } from "../store/caregiverSlice"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
@@ -17,6 +17,7 @@ export function OrgScreen() {
   const dispatch = useDispatch()
   const currentOrg = useSelector(getOrg)
   const currentUser = useSelector(getCurrentUser)
+  const { colors, isLoading: themeLoading } = useTheme()
   const [updateOrg, { isError, error }] = useUpdateOrgMutation()
   const [isLoading, setIsLoading] = useState(true)
   const [name, setName] = useState("")
@@ -80,6 +81,12 @@ export function OrgScreen() {
   if (isLoading) {
     return <LoadingScreen />
   }
+
+  if (themeLoading) {
+    return <LoadingScreen />
+  }
+
+  const styles = createStyles(colors)
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} testID="org-screen">
@@ -158,7 +165,7 @@ export function OrgScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.biancaBackground,
     flex: 1,
