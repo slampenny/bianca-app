@@ -4,7 +4,7 @@ import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField, PhoneInputWeb } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
@@ -31,6 +31,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const [phone, setPhone] = useState("")
   const [organizationName, setOrganizationName] = useState("")
   const [accountType, setAccountType] = useState("individual")
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Field-specific error messages
   const [nameError, setNameError] = useState("")
@@ -40,8 +41,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const [phoneError, setPhoneError] = useState("")
   const [organizationNameError, setOrganizationNameError] = useState("")
   const [generalError, setGeneralError] = useState("")
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const [shouldRegister, setShouldRegister] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Clear field error when user starts typing
   const clearFieldError = (field: string) => {
@@ -370,7 +373,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 }
 
 // Add your StyleSheet definitions here
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   button: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaButtonUnselected,

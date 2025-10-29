@@ -7,13 +7,15 @@ import { clearOrg } from "../store/orgSlice"
 import { clearCaregivers } from "../store/caregiverSlice"
 import { clearPatients } from "../store/patientSlice"
 import { Button, Screen, Text } from "app/components"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 
 export const LogoutScreen = () => {
   const dispatch = useDispatch()
   const [logout] = useLogoutMutation()
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const tokens = useSelector(getAuthTokens)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const handleLogoutPress = async () => {
     if (tokens) {
@@ -52,7 +54,7 @@ export const LogoutScreen = () => {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaBackground,

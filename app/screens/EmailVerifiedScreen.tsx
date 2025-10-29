@@ -9,6 +9,7 @@ import { colors, spacing } from "app/theme"
 export const EmailVerifiedScreen = () => {
   const navigation = useNavigation()
   const isLoggedIn = useSelector(isAuthenticated)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   useEffect(() => {
     // Show success message for 3 seconds, then navigate

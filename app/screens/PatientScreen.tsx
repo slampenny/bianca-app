@@ -24,7 +24,7 @@ import {
   useUploadPatientAvatarMutation,
 } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { Button, TextField, PhoneInputWeb } from "app/components"
 import { LANGUAGE_OPTIONS, getLanguageByCode, DEFAULT_LANGUAGE, LanguageOption } from "../constants/languages"
 import { translate } from "../i18n"
@@ -53,6 +53,7 @@ function PatientScreen() {
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
   const dispatch = useDispatch()
   const patient = useSelector(getPatient)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Local form data state
   const [name, setName] = useState("")
@@ -68,12 +69,14 @@ function PatientScreen() {
   const [successMessage, setSuccessMessage] = useState("")
   const [apiError, setApiError] = useState("") // Consolidated API error state
   const [showCaregiverModal, setShowCaregiverModal] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Ref to store the timeout ID
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Get current user for role-based access control
   const currentUser = useSelector(getCurrentUser)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Check if user has permission to create or edit patients
   const canCreateOrEditPatient = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
@@ -593,7 +596,7 @@ function PatientScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   button: {
     paddingVertical: 16, // Consistent padding
     borderRadius: 5,

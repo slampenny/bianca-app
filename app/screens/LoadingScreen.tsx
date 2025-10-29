@@ -1,8 +1,9 @@
 import React from "react"
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 
 export function LoadingScreen({ message }: { message?: string }) {
+  const { colors, isLoading: themeLoading } = useTheme()
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.palette.biancaButtonSelected} />
@@ -11,7 +12,7 @@ export function LoadingScreen({ message }: { message?: string }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaBackground,

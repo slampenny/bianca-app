@@ -6,7 +6,7 @@ import { useSelector } from "react-redux"
 import { Screen } from "../components/Screen"
 import { SentimentDashboard } from "../components/SentimentDashboard"
 import { SentimentDebugPanel } from "../components/SentimentDebugPanel"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 import { translate } from "../i18n"
 import {
   useGetSentimentTrendQuery,
@@ -25,12 +25,14 @@ export function SentimentAnalysisScreen() {
   const routePatientId = route.params?.patientId
   const routePatientName = route.params?.patientName
   const selectedPatient = useSelector(getPatient)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Prioritize route params (from Patient screen) over Redux state (from Reports)
   const patientId = routePatientId || selectedPatient?.id
   const patientName = routePatientName || selectedPatient?.name
 
   const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("lastCall")
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Only fetch sentiment data if we have a patient
   const shouldFetchData = !!patientId
@@ -125,7 +127,7 @@ export function SentimentAnalysisScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

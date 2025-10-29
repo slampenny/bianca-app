@@ -4,7 +4,7 @@ import { useRoute, RouteProp } from "@react-navigation/native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { Screen } from "../components/Screen"
-import { colors } from "../theme/colors"
+import { useTheme } from "../theme/ThemeContext"
 import { translate } from "../i18n"
 import { Ionicons } from "@expo/vector-icons"
 import { 
@@ -33,6 +33,7 @@ export function MedicalAnalysisScreen() {
   const routePatientId = route.params?.patientId
   const routePatientName = route.params?.patientName
   const selectedPatient = useSelector(getPatient)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Prioritize route params (from Patient screen) over Redux state (from Reports)
   const patientId = routePatientId || selectedPatient?.id
@@ -459,7 +460,7 @@ export function MedicalAnalysisScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.palette.biancaBackground,

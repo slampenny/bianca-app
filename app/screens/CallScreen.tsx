@@ -8,13 +8,14 @@ import { CallStatusBanner } from "../components/CallStatusBanner"
 import { ConversationMessages } from "../components/ConversationMessages"
 import { useGetConversationQuery } from "../services/api/conversationApi"
 import { useGetCallStatusQuery } from "../services/api/callWorkflowApi"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 
 export function CallScreen() {
   const dispatch = useDispatch()
   const patient = useSelector(getPatient)
   const activeCall = useSelector(getActiveCall)
   const currentConversation = useSelector(getConversation)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Use the same call status polling that CallStatusBanner uses (this is working!)
   const { 
@@ -262,7 +263,7 @@ export function CallScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.biancaBackground,
     flex: 1,

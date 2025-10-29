@@ -12,7 +12,7 @@ import {
 import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSlice"
 import { Alert, Caregiver, Patient } from "../services/api/api.types"
 import { getCurrentUser } from "app/store/authSlice"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 
 export function AlertScreen() {
@@ -22,6 +22,7 @@ export function AlertScreen() {
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
   const [showUnread, setShowUnread] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const {
     data: fetchAllAlerts,
@@ -210,7 +211,7 @@ export function AlertScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   activeTab: {
     backgroundColor: colors.palette.biancaButtonSelected,
   },

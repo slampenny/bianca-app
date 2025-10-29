@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { Ionicons } from "@expo/vector-icons"
 
 const { width } = Dimensions.get('window')
@@ -18,6 +18,7 @@ const mockHealthData = [
 
 export function HealthReportScreen() {
   const [selectedMetric, setSelectedMetric] = useState('mood')
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const getMetricColor = (value: number, metric: string) => {
     if (metric === 'anxiety') {
@@ -235,7 +236,7 @@ export function HealthReportScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.palette.biancaBackground,

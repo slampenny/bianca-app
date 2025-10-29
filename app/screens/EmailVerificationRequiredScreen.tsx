@@ -10,6 +10,7 @@ export const EmailVerificationRequiredScreen = () => {
   const [resendVerificationEmail, { isLoading }] = useResendVerificationEmailMutation()
   const [email, setEmail] = useState("")
   const [emailSent, setEmailSent] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const handleResendEmail = async () => {
     if (!email.trim()) {

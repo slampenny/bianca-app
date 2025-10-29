@@ -6,7 +6,7 @@ import { getPatient } from "../store/patientSlice"
 import { getConversations, clearConversations, getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall } from "../store/callSlice"
 import { Conversation, Message } from "../services/api/api.types"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { SentimentIndicator } from "../components/SentimentIndicator"
 import { ConversationMessages } from "../components/ConversationMessages"
 import { Screen } from "../components/Screen"
@@ -23,6 +23,7 @@ export function ConversationsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const {
     data: conversationsData,
@@ -201,6 +202,12 @@ export function ConversationsScreen() {
   // Conversations are already sorted by the backend (startTime:desc)
   const conversationsToRender = conversations
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   return (
     <Screen preset="scroll" testID="conversations-screen">
       {/* Debug info for active call */}
@@ -271,7 +278,7 @@ function Header({ title }: { title: string }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   assistantBubble: {
     backgroundColor: colors.palette.biancaSuccess, // Green for assistant
     borderBottomLeftRadius: 4, // WhatsApp-style tail

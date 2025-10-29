@@ -8,7 +8,7 @@ import { setInviteToken } from "app/store/authSlice"
 import { Button, Text, TextField, Screen, Header, PhoneInputWeb } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 
 type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
@@ -17,6 +17,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   const route = useRoute()
   const token = (route.params as any)?.token
   const dispatch = useDispatch()
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const [registerWithInvite, { isLoading }] = useRegisterWithInviteMutation()
 
@@ -26,11 +27,13 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Error states
   const [passwordError, setPasswordError] = useState("")
   const [confirmPasswordError, setConfirmPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Check if we have an invite token and persist it
   useEffect(() => {
@@ -235,7 +238,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaBackground,

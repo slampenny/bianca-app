@@ -137,6 +137,7 @@ function PaymentMethodsScreen() {
   const org = useSelector(getOrg)
   const tokens = useSelector(getAuthTokens)
   const jwt = tokens?.access?.token
+  const { colors, isLoading: themeLoading } = useTheme()
 
   if (!org || !org.id) {
     return (
@@ -182,6 +183,7 @@ function PaymentMethodsScreen() {
 // ================================================
 function ExpandableInvoice({ invoice }: { invoice: any }) {
   const [expanded, setExpanded] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   return (
     <ListItem
@@ -252,6 +254,7 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
 // ================================================
 function CurrentChargesScreen() {
   const org = useSelector(getOrg)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   if (!org || !org.id) {
     return (
@@ -396,10 +399,12 @@ function CurrentChargesScreen() {
 // ================================================
 function BillingInfoScreen() {
   const [showInvoiceHistory, setShowInvoiceHistory] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Keep this check as a safety measure in case this screen is somehow accessed directly
   const currentUser = useSelector(getCurrentUser)
   const org = useSelector(getOrg)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Although the parent checks authorization, keep these basic checks
   if (!currentUser) {
@@ -584,6 +589,7 @@ export function PaymentInfoScreen() {
 
   // *** 1. Get the current user in the main component ***
   const currentUser = useSelector(getCurrentUser)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // *** 2. Handle loading state for user ***
   if (!currentUser) {
@@ -662,7 +668,7 @@ export function PaymentInfoScreen() {
 }
 
 // --- Styles (Updated for new design) ---
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   // General styles
   centered: {
     flex: 1,

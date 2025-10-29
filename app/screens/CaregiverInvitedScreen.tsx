@@ -2,7 +2,7 @@ import React from "react"
 import { View, StyleSheet, Text } from "react-native"
 import { useNavigation, NavigationProp, RouteProp } from "@react-navigation/native"
 import { Screen, LoadingButton } from "app/components"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 
 type CaregiverInvitedScreenRouteProp = RouteProp<OrgStackParamList, "CaregiverInvited">
@@ -12,6 +12,7 @@ interface CaregiverInvitedScreenProps {
 }
 
 export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
+  const { colors, isLoading: themeLoading } = useTheme()
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const { caregiver } = route.params
 
@@ -46,7 +47,7 @@ export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   screen: {
     backgroundColor: colors.background,
   },

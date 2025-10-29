@@ -112,7 +112,7 @@ export const PrivacyScreen = () => {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.biancaBackground,
     flex: 1,

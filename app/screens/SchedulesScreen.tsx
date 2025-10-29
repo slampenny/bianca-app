@@ -27,6 +27,7 @@ export const SchedulesScreen = () => {
     useCreateScheduleMutation()
   const [deleteSchedule, { isLoading: isDeleting, isError: isDeletingError }] =
     useDeleteScheduleMutation()
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const handleSave = async () => {
     if (selectedSchedule && selectedSchedule.id) {
@@ -132,7 +133,7 @@ export const SchedulesScreen = () => {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   button: {
     flex: 1,
     marginHorizontal: spacing.xs,

@@ -8,7 +8,7 @@ import { Caregiver } from "app/services/api/api.types"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { useSyncOrgCaregivers } from "app/utils/useSyncOrgCaregivers"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 
 export function CaregiversScreen() {
@@ -16,6 +16,7 @@ export function CaregiversScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const caregivers = useSelector(getCaregivers)
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
+  const { colors, isLoading: themeLoading } = useTheme()
 
   useSyncOrgCaregivers()
 
@@ -126,7 +127,7 @@ export function CaregiversScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   addButton: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaSuccess,

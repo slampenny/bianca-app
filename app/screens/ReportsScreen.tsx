@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react"
 import { View, Text, StyleSheet, Pressable, Dimensions, Modal, TouchableWithoutFeedback, ScrollView } from "react-native"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector, useDispatch } from "react-redux"
@@ -18,6 +18,7 @@ export function ReportsScreen() {
   const currentUser = useSelector(getCurrentUser)
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [showPatientPicker, setShowPatientPicker] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   // Get patients for the current user
   const patientsSelector = useMemo(
@@ -28,6 +29,7 @@ export function ReportsScreen() {
     [currentUser?.id]
   )
   const patients = useSelector(patientsSelector)
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const handleSentimentPress = () => {
     if (selectedPatient) {
@@ -195,7 +197,7 @@ export function ReportsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.palette.biancaBackground,

@@ -11,7 +11,7 @@ import { StackScreenProps } from "@react-navigation/stack"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Text, TextField, Button } from "app/components"
 import { useForgotPasswordMutation } from "../services/api/authApi"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 
 export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
@@ -20,6 +20,7 @@ export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, 
   const [email, setEmail] = useState("")
   const [emailError, setEmailError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const validateEmail = (text: string) => {
     setEmail(text)
@@ -92,7 +93,7 @@ export const RequestResetScreen = (props: StackScreenProps<LoginStackParamList, 
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },

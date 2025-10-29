@@ -30,7 +30,7 @@ import {
 import { useSendInviteMutation } from "../services/api/orgApi"
 import { useGetUnassignedPatientsQuery, useAssignUnassignedPatientsMutation } from "../services/api/patientApi"
 import { LoadingScreen } from "./LoadingScreen"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
@@ -41,6 +41,7 @@ function CaregiverScreen() {
   const caregiver = useSelector(getCaregiver)
   const currentOrg = useSelector(getOrg)
   const currentUser = useSelector(getCurrentUser)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Debug logging
   console.log('CaregiverScreen Debug:', {
@@ -74,15 +75,18 @@ function CaregiverScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // State for unassigned patients panel
   const [showUnassignedPanel, setShowUnassignedPanel] = useState(false)
   const [selectedPatients, setSelectedPatients] = useState<string[]>([])
   const [assignmentSuccess, setAssignmentSuccess] = useState(false)
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // State for patient reassignment modal
   const [showReassignmentModal, setShowReassignmentModal] = useState(false)
   const [patientsToReassign, setPatientsToReassign] = useState<any[]>([])
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Animation for the panel
   const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current
@@ -560,7 +564,7 @@ function CaregiverScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   assignButton: {
     backgroundColor: colors.palette.biancaSuccess,
   },
