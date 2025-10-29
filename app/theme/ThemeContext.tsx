@@ -2,17 +2,19 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { colors as healthcareColors } from "./colors"
 import { colors as colorblindColors } from "./colors.colorblind"
+import { colors as darkColors } from "./colors.dark"
 
-export type ThemeType = "healthcare" | "colorblind"
+export type ThemeType = "healthcare" | "colorblind" | "dark"
 
 export interface Theme {
   name: string
   description: string
-  colors: typeof healthcareColors | typeof colorblindColors
+  colors: typeof healthcareColors | typeof colorblindColors | typeof darkColors
   accessibility: {
     wcagLevel: "AA" | "AAA"
     colorblindFriendly: boolean
     highContrast: boolean
+    darkMode: boolean
     description: string
   }
 }
@@ -26,6 +28,7 @@ export const themes: Record<ThemeType, Theme> = {
       wcagLevel: "AA",
       colorblindFriendly: false,
       highContrast: false,
+      darkMode: false,
       description: "Standard healthcare theme with medical blue and green colors"
     }
   },
@@ -37,7 +40,20 @@ export const themes: Record<ThemeType, Theme> = {
       wcagLevel: "AAA",
       colorblindFriendly: true,
       highContrast: true,
+      darkMode: false,
       description: "High contrast theme with distinct colors and patterns for users with color vision deficiency"
+    }
+  },
+  dark: {
+    name: "Dark Mode",
+    description: "Dark theme optimized for low-light environments",
+    colors: darkColors,
+    accessibility: {
+      wcagLevel: "AA",
+      colorblindFriendly: false,
+      highContrast: true,
+      darkMode: true,
+      description: "Dark theme with bright colors for comfortable viewing in low-light conditions"
     }
   }
 }

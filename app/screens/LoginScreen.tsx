@@ -9,7 +9,7 @@ import { setOrg } from "../store/orgSlice"
 import { orgApi } from "../services/api/orgApi"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { Button, Header, Screen, Text, TextField } from "app/components"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { SSOLoginButtons } from "../components/SSOLoginButtons"
 
 // Temporary interfaces to avoid import issues
@@ -35,6 +35,7 @@ interface LoginScreenProps {
 export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const dispatch = useDispatch()
   const [loginAPI] = useLoginMutation()
+  const { colors, isLoading: themeLoading } = useTheme()
 
   const authPasswordInput = useRef<TextInput>(null)
   const validationError = useSelector(getValidationError)
@@ -142,6 +143,12 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     }
   }
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   return (
     <Screen style={styles.container} testID="login-form" accessibilityLabel="login-screen">
       <Header titleTx="loginScreen.signIn" />
@@ -213,7 +220,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaBackground,

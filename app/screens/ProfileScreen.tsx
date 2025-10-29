@@ -22,12 +22,13 @@ import { getCaregiver } from "../store/caregiverSlice"
 import { getInviteToken } from "../store/authSlice"
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
 import { LoadingScreen } from "./LoadingScreen"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { navigationRef } from "app/navigators/navigationUtilities"
 
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const dispatch = useDispatch()
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Use language hook to trigger re-renders on language change
   useLanguage()
@@ -201,6 +202,12 @@ function ProfileScreen() {
     )
   }
 
+  if (themeLoading) {
+    return <LoadingScreen />
+  }
+
+  const styles = createStyles(colors)
+
   return (
     <TouchableWithoutFeedback>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
@@ -285,7 +292,7 @@ function ProfileScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   button: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaButtonSelected,

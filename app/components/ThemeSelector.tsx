@@ -32,6 +32,12 @@ export function ThemeSelector({ testID }: { testID?: string }) {
           <View style={[styles.colorSwatch, { backgroundColor: colors.palette.primary500 }]} />
           <View style={[styles.colorSwatch, { backgroundColor: colors.palette.success500 }]} />
           <View style={[styles.colorSwatch, { backgroundColor: colors.palette.error500 }]} />
+          {currentTheme === 'colorblind' && (
+            <View style={[styles.colorSwatch, { backgroundColor: colors.palette.secondary500 }]} />
+          )}
+          {currentTheme === 'dark' && (
+            <View style={[styles.colorSwatch, { backgroundColor: colors.palette.warning500 }]} />
+          )}
         </View>
       </Pressable>
 
@@ -68,6 +74,12 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                       <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.primary500 }]} />
                       <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.success500 }]} />
                       <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.error500 }]} />
+                      {key === 'colorblind' && (
+                        <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.secondary500 }]} />
+                      )}
+                      {key === 'dark' && (
+                        <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.warning500 }]} />
+                      )}
                     </View>
                   </View>
                   <Text style={[
@@ -97,6 +109,14 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                         { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
                       ]}>
                         High contrast
+                      </Text>
+                    )}
+                    {theme.accessibility.darkMode && (
+                      <Text style={[
+                        styles.accessibilityText,
+                        { color: currentTheme === key ? colors.palette.neutral100 : colors.palette.neutral500 }
+                      ]}>
+                        Dark mode
                       </Text>
                     )}
                   </View>

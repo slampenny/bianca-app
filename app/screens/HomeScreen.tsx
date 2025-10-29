@@ -13,7 +13,7 @@ import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { Caregiver, Patient } from "../services/api/api.types"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { RootState } from "../store/store"
-import { colors } from "app/theme/colors"
+import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
 
@@ -23,6 +23,7 @@ export function HomeScreen() {
   const currentUser: Caregiver | null = useSelector(getCurrentUser)
   const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
+  const { colors, isLoading: themeLoading } = useTheme()
   
   // Memoize the patients selector to prevent unnecessary re-renders
   const patientsSelector = React.useMemo(
@@ -158,6 +159,12 @@ export function HomeScreen() {
 
   const ListEmpty = () => <Text style={styles.noUsersText} testID="home-no-patients">No patients found</Text>
 
+  if (themeLoading) {
+    return null
+  }
+
+  const styles = createStyles(colors)
+
   return (
     <View style={styles.container} accessibilityLabel="home-screen">
       {/* Header */}
@@ -204,7 +211,7 @@ export function HomeScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   addButton: {
     marginHorizontal: 16,
   },
