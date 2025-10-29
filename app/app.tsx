@@ -110,20 +110,20 @@ function App(props: AppProps) {
       <ErrorBoundary catchErrors={Config.catchErrors}>
         <GestureHandlerRootView style={$container}>
           <Provider store={store}>
-            <PersistGate
-              loading={null}
-              onBeforeLift={onBeforeLiftPersistGate}
-              persistor={persistor}
-            >
-              <ThemeProvider>
+            <ThemeProvider>
+              <PersistGate
+                loading={null}
+                onBeforeLift={onBeforeLiftPersistGate}
+                persistor={persistor}
+              >
                 <AppNavigator
                   linking={linking}
                   initialState={initialNavigationState}
                   onStateChange={onNavigationStateChange}
                 />
                 <InnerApp />
-              </ThemeProvider>
-            </PersistGate>
+              </PersistGate>
+            </ThemeProvider>
           </Provider>
         </GestureHandlerRootView>
       </ErrorBoundary>
