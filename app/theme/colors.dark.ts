@@ -115,13 +115,13 @@ const colors = {
   textDim: palette.neutral600,       // Dimmed text
   textInverse: palette.neutral200,   // Dark text on light backgrounds
   
-  // Background colors
-  background: palette.neutral100,     // Main background (black)
-  backgroundDim: palette.neutral200,  // Dimmed background
+  // Background colors - use dark grays instead of pure black
+  background: palette.neutral200,     // Main background (dark gray, not black)
+  backgroundDim: palette.neutral300,  // Dimmed background
   
   // Border colors
-  border: palette.neutral300,         // Standard borders
-  borderDim: palette.neutral200,      // Light borders
+  border: palette.neutral400,         // Standard borders (lighter for visibility)
+  borderDim: palette.neutral300,      // Light borders
   
   // Legacy color names for compatibility
   tint: palette.primary500,           // Main tint color
@@ -130,12 +130,12 @@ const colors = {
   warning: palette.warning500,        // Warning color
   info: palette.info500,              // Info color
   
-  // Healthcare-specific legacy colors
-  biancaBackground: palette.neutral100,
+  // Healthcare-specific legacy colors - use appropriate dark theme colors
+  biancaBackground: palette.neutral200,  // Dark gray instead of black
   biancaButtonSelected: palette.primary500,
-  biancaButtonUnselected: palette.neutral300,
-  biancaHeader: palette.neutral800,
-  biancaBorder: palette.neutral300,
+  biancaButtonUnselected: palette.neutral400,
+  biancaHeader: palette.neutral800,       // Light text
+  biancaBorder: palette.neutral400,      // Visible borders
   biancaError: palette.error500,
   biancaErrorBackground: palette.error100,
   biancaSuccess: palette.success500,
