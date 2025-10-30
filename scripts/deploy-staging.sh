@@ -41,6 +41,19 @@ check_and_login_ecr() {
     return 1
 }
 
+check_and_login_public_ecr() {
+    echo "🔐 Checking Public ECR login (public.ecr.aws)..."
+    export DOCKER_CONFIG=/tmp/docker-nocreds
+    mkdir -p "$DOCKER_CONFIG"
+    [ -f "$DOCKER_CONFIG/config.json" ] || printf '{}' > "$DOCKER_CONFIG/config.json"
+    if aws ecr-public get-login-password --region us-east-1 2>/dev/null | docker login --username AWS --password-stdin public.ecr.aws >/dev/null 2>&1; then
+        echo "✅ Public ECR login successful (public.ecr.aws)"
+        return 0
+    fi
+    echo "❌ Public ECR login failed. Base image pulls from public.ecr.aws may fail."
+    return 1
+}
+
 echo "🚀 Deploying Bianca Staging Environment..."
 
 # Check for flags
@@ -114,6 +127,8 @@ else
 fi
 
 echo "🐳 Building and pushing asterisk Docker image..."
+# Ensure we can pull the public ECR base image used by the Asterisk Dockerfile
+check_and_login_public_ecr || true
 docker build -t bianca-app-asterisk:staging ./devops/asterisk
 
 if [ $? -ne 0 ]; then
@@ -275,6 +290,13 @@ if [ -n "$STAGING_IP" ]; then
         docker rm -f \$(docker ps -aq --filter 'name=staging_nginx') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=staging_bianca-app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=bianca-app') 2>/dev/null || true
+
+        # Extra safety: explicitly remove known container names if still present
+        docker rm -f staging_frontend staging_app staging_nginx staging_asterisk 2>/dev/null || true
+
+        # Show remaining staging containers for debugging
+        echo 'Remaining staging containers (if any):'
+        docker ps -a --format '{{.Names}}' | grep -E '^staging_' || true
         
         # Clean up unused images and networks
         docker image prune -f
