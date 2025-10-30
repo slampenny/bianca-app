@@ -1923,7 +1923,11 @@ resource "aws_route53_record" "sip_subdomain" {
   records = [aws_eip.asterisk_eip.public_ip]
 }
 
+# Root domain record - managed by wordpress.tf when WordPress is enabled
+# When create_wordpress=false, this record points to the static IP below
+# When create_wordpress=true, WordPress will update it to point to the WordPress instance
 resource "aws_route53_record" "wordpress_apex" {
+  count   = var.create_wordpress ? 0 : 1  # Only create if WordPress is NOT enabled
   zone_id = data.aws_route53_zone.myphonefriend.zone_id
   name    = "myphonefriend.com"
   type    = "A"
