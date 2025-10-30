@@ -12,6 +12,9 @@ services:
       - WEBSOCKET_URL=wss://api.myphonefriend.com
       # MongoDB for production (using containerized version)
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
+      # Asterisk configuration (will be loaded from AWS Secrets Manager)
+      - ASTERISK_URL=http://asterisk:8088
+      - ASTERISK_ENABLED=true
     # Mount AWS credentials for secrets access
     volumes:
       - ~/.aws:/root/.aws:ro
@@ -23,11 +26,23 @@ services:
     networks:
       - node-network
 
+  frontend:
+    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:production
+    ports:
+      - "80:80"
+    networks:
+      - node-network
+
   mongodb:
     volumes:
       - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
 
   asterisk:
+    environment:
+      # These will be loaded from AWS Secrets Manager via app container or Terraform userdata
+      - ARI_PASSWORD=${ARI_PASSWORD:-}
+      - BIANCA_PASSWORD=${BIANCA_PASSWORD:-}
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS:-3.21.74.167}
     volumes:
       # Mount recordings for production debugging
       - ./devops/asterisk/recordings:/var/spool/asterisk/recording

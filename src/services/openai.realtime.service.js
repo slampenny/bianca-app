@@ -1889,7 +1889,7 @@ class OpenAIRealtimeService {
             logger.debug(`[Transcript Cleanup] Saving stale user transcript for ${callId} (silent for ${userSilenceTime}ms)`);
 
             try {
-              await this.saveCompleteMessage(callId, 'user', transcriptToSave);
+              await this.saveCompleteMessage(callId, 'patient', transcriptToSave);
               // Only clear if it hasn't changed
               if (conn.pendingUserTranscript === transcriptToSave) {
                 conn.pendingUserTranscript = '';
@@ -3631,7 +3631,7 @@ class OpenAIRealtimeService {
         // Save any pending user message
         if (conn.pendingUserTranscript) {
           logger.info(`[OpenAI Call End] Saving pending user message for ${callId}`);
-          await this.saveCompleteMessage(callId, 'user', conn.pendingUserTranscript);
+          await this.saveCompleteMessage(callId, 'patient', conn.pendingUserTranscript);
           conn.pendingUserTranscript = '';
         }
 

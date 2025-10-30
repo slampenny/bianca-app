@@ -53,12 +53,12 @@ const superAdmin = {
 };
 
 const insertCaregivers = async (caregivers) => {
-  return await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, password: hashedPassword })));
+  return await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, password: hashedPassword, isEmailVerified: true })));
 };
 
 const insertCaregiversAndAddToOrg = async (org, caregivers) => {
   const insertedCaregivers = await Caregiver.insertMany(
-    caregivers.map((caregiver) => ({ ...caregiver, org: org.id, password: hashedPassword }))
+    caregivers.map((caregiver) => ({ ...caregiver, org: org.id, password: hashedPassword, isEmailVerified: true }))
   );
   // Add the inserted caregivers to the org.caregivers array
   org.caregivers.push(...insertedCaregivers.map((caregiver) => caregiver._id));

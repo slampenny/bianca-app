@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const config = require('../config/config');
+const ApiError = require('../utils/ApiError');
 const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService } = require('../services');
 const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
 const { auditAuthFailure } = require('../middlewares/auditLog');
@@ -18,22 +19,27 @@ const register = catchAsync(async (req, res, next) => {
       name: req.body.name,
       phone: req.body.phone,
       password: req.body.password,
+      role: 'unverified', // Explicitly set unverified role
     }
   );
 
   const caregiver = org.caregivers[0];
-  const tokens = await tokenService.generateAuthTokens(caregiver);
   
   // Send verification email automatically after registration
   try {
     const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
     await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
   } catch (emailError) {
-    // Log the error but don't fail the registration
     console.error('Failed to send verification email during registration:', emailError);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Registration successful but verification email failed. Please contact support.');
   }
   
-  res.status(httpStatus.CREATED).send({ org, caregiver: CaregiverDTO(caregiver), tokens });
+  // Don't return tokens until email is verified
+  res.status(httpStatus.CREATED).send({ 
+    message: 'Registration successful. Please check your email to verify your account.',
+    caregiver: CaregiverDTO(caregiver),
+    requiresEmailVerification: true
+  });
 });
 
 const registerWithInvite = catchAsync(async (req, res) => {
@@ -55,6 +61,19 @@ const login = catchAsync(async (req, res, next) => {
     // Check if account is locked
     if (caregiver.accountLocked) {
       throw new Error(`Account is locked: ${caregiver.lockedReason || 'Contact support for assistance'}`);
+    }
+
+    // Step 1.5: Check email verification status
+    if (!caregiver.isEmailVerified) {
+      // Send verification email if not already sent recently
+      try {
+        const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+      } catch (emailError) {
+        console.error('Failed to resend verification email:', emailError);
+      }
+      
+      throw new ApiError(httpStatus.FORBIDDEN, 'Please verify your email before logging in. A verification email has been sent.');
     }
 
     // Step 2: Check MFA requirement
@@ -172,6 +191,35 @@ const sendVerificationEmail = catchAsync(async (req, res) => {
   const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.body.caregiver);
   await emailService.sendVerificationEmail(req.body.caregiver.email, verifyEmailToken);
   res.status(httpStatus.NO_CONTENT).send();
+});
+
+const resendVerificationEmail = catchAsync(async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Email is required');
+  }
+  
+  // Find caregiver by email
+  const caregiver = await caregiverService.getCaregiverByEmail(email);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+  
+  // Check if already verified
+  if (caregiver.isEmailVerified) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Email is already verified');
+  }
+  
+  // Generate and send new verification token
+  try {
+    const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+    res.status(httpStatus.OK).send({ message: 'Verification email sent successfully' });
+  } catch (emailError) {
+    console.error('Failed to resend verification email:', emailError);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to send verification email');
+  }
 });
 
 const verifyEmail = catchAsync(async (req, res) => {
@@ -318,5 +366,6 @@ module.exports = {
   forgotPassword,
   resetPassword,
   sendVerificationEmail,
+  resendVerificationEmail,
   verifyEmail,
 };
