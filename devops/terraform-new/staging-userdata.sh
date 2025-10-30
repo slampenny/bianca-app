@@ -231,6 +231,7 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 }
+
 EOF
 
 # Login to ECR (as root for systemd)

@@ -48,6 +48,14 @@ router
   );
 
 router
+  .route('/:caregiverId/theme')
+  .patch(
+    auth('updateOwn:caregiver', 'updateAny:caregiver'),
+    validate(caregiverValidation.updateThemePreference),
+    caregiverController.updateThemePreference
+  );
+
+router
   .route('/:caregiverId/patients/:patientId')
   .post(auth('createAny:patient'), caregiverController.addPatient)
   .delete(auth('deleteAny:patient'), caregiverController.removePatient);

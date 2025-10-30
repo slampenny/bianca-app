@@ -111,6 +111,13 @@ const caregiverSchema = mongoose.Schema(
     lastFailedLogin: {
       type: Date,
     },
+    // Theme preference for accessibility
+    themePreference: {
+      type: String,
+      enum: ['healthcare', 'colorblind'],
+      default: 'healthcare',
+      required: false,
+    },
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
   {
