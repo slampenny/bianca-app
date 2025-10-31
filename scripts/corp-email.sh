@@ -152,7 +152,7 @@ bootstrap() {
   local password=$(echo "$smtp_json" | jq -r .password)
   # Compose instructions email
   local subject="Your biancatechnologies.com SMTP credentials"
-  local body=$(cat <<'TXT'
+  local body=$(cat <<TXT
 Hi,
 
 Your biancatechnologies.com address has been set up:

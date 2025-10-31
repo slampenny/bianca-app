@@ -65,6 +65,10 @@ resource "aws_route53_record" "corp_mx" {
   type    = "MX"
   ttl     = 300
   records = ["10 ${local.mx_hostname}"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "corp_spf" {
@@ -73,6 +77,10 @@ resource "aws_route53_record" "corp_spf" {
   type    = "TXT"
   ttl     = 300
   records = ["v=spf1 include:amazonses.com ~all"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "corp_dmarc" {
@@ -81,6 +89,10 @@ resource "aws_route53_record" "corp_dmarc" {
   type    = "TXT"
   ttl     = 300
   records = ["v=DMARC1; p=none; rua=mailto:postmaster@${local.corp_domain}"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "corp_dkim" {
@@ -90,6 +102,10 @@ resource "aws_route53_record" "corp_dkim" {
   type    = "CNAME"
   ttl     = 300
   records = ["${element(aws_ses_domain_dkim.corp.dkim_tokens, count.index)}.dkim.amazonses.com"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # --------------- SES RECEIPT RULES (into existing set) ---------------

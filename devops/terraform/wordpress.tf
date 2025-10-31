@@ -31,17 +31,17 @@ variable "wordpress_key_pair_name" {
 }
 
 ################################################################################
-# SECURITY GROUP FOR WORDPRESS INSTANCE
+# SECURITY GROUPS (need to be defined before ALB and instance)
 ################################################################################
 
-# Security Group for WordPress EC2 instance
-resource "aws_security_group" "wordpress" {
+# Security Group for WordPress ALB (defined first to avoid circular dependency)
+resource "aws_security_group" "wordpress_alb" {
   count       = var.create_wordpress ? 1 : 0
-  name        = "bianca-wordpress-sg"
-  description = "Security group for WordPress instance"
-  vpc_id      = aws_vpc.staging.id  # Use existing staging VPC
+  name        = "bianca-wordpress-alb-sg"
+  description = "Security group for WordPress ALB"
+  vpc_id      = aws_subnet.public_a.vpc_id  # Use same VPC as subnets
 
-  # HTTP
+  # HTTP from internet
   ingress {
     from_port   = 80
     to_port     = 80
@@ -50,13 +50,45 @@ resource "aws_security_group" "wordpress" {
     description = "HTTP"
   }
 
-  # HTTPS
+  # HTTPS from internet
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
     description = "HTTPS"
+  }
+
+  # Allow all outbound
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound"
+  }
+
+  tags = {
+    Name        = "bianca-wordpress-alb-sg"
+    Environment = var.environment
+    Project     = "bianca"
+  }
+}
+
+# Security Group for WordPress EC2 instance
+resource "aws_security_group" "wordpress" {
+  count       = var.create_wordpress ? 1 : 0
+  name        = "bianca-wordpress-sg"
+  description = "Security group for WordPress instance"
+  vpc_id      = aws_subnet.public_a.vpc_id  # Use same VPC as subnets
+
+  # Allow traffic only from ALB
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.wordpress_alb[0].id]
+    description     = "HTTP from ALB"
   }
 
   # SSH (restrict to your IP in production)
@@ -164,7 +196,7 @@ resource "aws_iam_instance_profile" "wordpress_profile" {
 resource "aws_ebs_volume" "wordpress_data" {
   count = var.create_wordpress ? 1 : 0
 
-  availability_zone = aws_subnet.staging_public.availability_zone
+  availability_zone = aws_subnet.public_a.availability_zone
   size              = 20 # GB - adjust as needed
   type              = "gp3"
   encrypted         = true
@@ -182,7 +214,7 @@ resource "aws_ebs_volume" "wordpress_data" {
 resource "aws_ebs_volume" "wordpress_db" {
   count = var.create_wordpress ? 1 : 0
 
-  availability_zone = aws_subnet.staging_public.availability_zone
+  availability_zone = aws_subnet.public_a.availability_zone
   size              = 10 # GB - adjust as needed
   type              = "gp3"
   encrypted         = true
@@ -193,6 +225,103 @@ resource "aws_ebs_volume" "wordpress_db" {
     Project     = "bianca"
     Backup      = "daily"
     Purpose     = "WordPress MySQL database"
+  }
+}
+
+################################################################################
+# APPLICATION LOAD BALANCER FOR WORDPRESS
+################################################################################
+
+# Application Load Balancer for WordPress
+resource "aws_lb" "wordpress" {
+  count              = var.create_wordpress ? 1 : 0
+  name               = "bianca-wordpress-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.wordpress_alb[0].id]
+  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]  # Need at least 2 subnets in different AZs
+
+  enable_deletion_protection = false
+  enable_http2              = true
+  idle_timeout               = 60
+
+  depends_on = [
+    aws_security_group.wordpress_alb,
+  ]
+
+  tags = {
+    Name        = "bianca-wordpress-alb"
+    Environment = var.environment
+    Project     = "bianca"
+  }
+}
+
+# Target Group for WordPress instance
+resource "aws_lb_target_group" "wordpress" {
+  count    = var.create_wordpress ? 1 : 0
+  name     = "bianca-wordpress-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_subnet.public_a.vpc_id  # Use same VPC as subnets
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200-399"
+  }
+
+  deregistration_delay = 30
+
+  tags = {
+    Name        = "bianca-wordpress-tg"
+    Environment = var.environment
+    Project     = "bianca"
+  }
+}
+
+# Attach WordPress instance to target group
+resource "aws_lb_target_group_attachment" "wordpress" {
+  count            = var.create_wordpress ? 1 : 0
+  target_group_arn = aws_lb_target_group.wordpress[0].arn
+  target_id        = aws_instance.wordpress[0].id
+  port             = 80
+}
+
+# ALB Listener - HTTP (redirect to HTTPS)
+resource "aws_lb_listener" "wordpress_http" {
+  count             = var.create_wordpress ? 1 : 0
+  load_balancer_arn = aws_lb.wordpress[0].arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# ALB Listener - HTTPS (uses ACM certificate)
+resource "aws_lb_listener" "wordpress_https" {
+  count             = var.create_wordpress ? 1 : 0
+  load_balancer_arn = aws_lb.wordpress[0].arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate_validation.wordpress_cert[0].certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.wordpress[0].arn
   }
 }
 
@@ -208,14 +337,14 @@ resource "aws_instance" "wordpress" {
   instance_type          = var.wordpress_instance_type
   key_name               = var.wordpress_key_pair_name != "" ? var.wordpress_key_pair_name : var.asterisk_key_pair_name
   vpc_security_group_ids = [aws_security_group.wordpress[0].id]
-  subnet_id              = aws_subnet.staging_public.id  # Use staging subnet or create dedicated
+  subnet_id              = aws_subnet.public_a.id  # Use public_a subnet
   iam_instance_profile   = aws_iam_instance_profile.wordpress_profile[0].name
 
   user_data = base64encode(templatefile("${path.module}/wordpress-userdata.sh", {
     wp_domain         = var.wp_domain
     s3_backup_bucket  = aws_s3_bucket.wordpress_media[0].id
     aws_region        = var.aws_region
-    cert_arn          = data.aws_acm_certificate.wordpress_cert[0].arn
+    cert_arn          = var.create_wordpress ? aws_acm_certificate_validation.wordpress_cert[0].certificate_arn : ""
   }))
 
   root_block_device {
@@ -340,8 +469,61 @@ data "aws_route53_zone" "wordpress_domain" {
   private_zone = false
 }
 
-# Get ACM certificate for myphonefriend.com (wildcard cert works for root domain too)
-data "aws_acm_certificate" "wordpress_cert" {
+# Request ACM certificate for myphonefriend.com and www.myphonefriend.com
+# Note: ACM certs can't be used directly by nginx on EC2, but we'll use Route53 validation
+# and still use Let's Encrypt for the actual nginx configuration
+resource "aws_acm_certificate" "wordpress_cert" {
+  count            = var.create_wordpress ? 1 : 0
+  domain_name      = var.wp_domain
+  validation_method = "DNS"
+
+  subject_alternative_names = ["www.${var.wp_domain}"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name        = "bianca-wordpress-ssl"
+    Environment = var.environment
+    Project     = "bianca"
+  }
+}
+
+# Route53 validation records for ACM certificate
+resource "aws_route53_record" "wordpress_cert_validation" {
+  for_each = var.create_wordpress ? {
+    for dvo in aws_acm_certificate.wordpress_cert[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  } : {}
+
+  zone_id = data.aws_route53_zone.wordpress_domain[0].zone_id
+  name    = each.value.name
+  type    = each.value.type
+  records = [each.value.record]
+  ttl     = 60
+
+  allow_overwrite = true
+}
+
+# Wait for certificate validation
+resource "aws_acm_certificate_validation" "wordpress_cert" {
+  count           = var.create_wordpress ? 1 : 0
+  certificate_arn = aws_acm_certificate.wordpress_cert[0].arn
+  validation_record_fqdns = [
+    for record in aws_route53_record.wordpress_cert_validation : record.fqdn
+  ]
+
+  timeouts {
+    create = "5m"
+  }
+}
+
+# Also keep data source for backward compatibility (use existing wildcard cert for reference)
+data "aws_acm_certificate" "wordpress_cert_existing" {
   count       = var.create_wordpress ? 1 : 0
   domain      = "*.myphonefriend.com"
   statuses    = ["ISSUED"]
@@ -356,13 +538,17 @@ data "aws_acm_certificate" "wordpress_cert" {
 # Route53 A Record for root domain (myphonefriend.com - WordPress)
 # Uses instance public IP (auto-assigned since EIP limit reached)
 resource "aws_route53_record" "wordpress_root" {
-  count   = var.create_wordpress && length(data.aws_route53_zone.wordpress_domain) > 0 ? 1 : 0
-  zone_id = data.aws_route53_zone.wordpress_domain[0].zone_id
+  count   = var.create_wordpress ? 1 : 0
+  zone_id = data.aws_route53_zone.wordpress_domain[count.index].zone_id
   name    = var.wp_domain  # Just "myphonefriend.com" - NO subdomains touched
   type    = "A"
-  ttl     = 300
-  records = [aws_instance.wordpress[0].public_ip]  # Use instance public IP (auto-assigned, static while instance runs)
-  
+
+  alias {
+    name                   = aws_lb.wordpress[0].dns_name
+    zone_id                = aws_lb.wordpress[0].zone_id
+    evaluate_target_health = true
+  }
+
   lifecycle {
     create_before_destroy = true
     # Prevent accidental modification of subdomain records
@@ -371,13 +557,17 @@ resource "aws_route53_record" "wordpress_root" {
 
 # Create www subdomain record (only if it doesn't exist)
 resource "aws_route53_record" "wordpress_www" {
-  count   = var.create_wordpress && length(data.aws_route53_zone.wordpress_domain) > 0 ? 1 : 0
-  zone_id = data.aws_route53_zone.wordpress_domain[0].zone_id
+  count   = var.create_wordpress ? 1 : 0
+  zone_id = data.aws_route53_zone.wordpress_domain[count.index].zone_id
   name    = "www.${var.wp_domain}"  # Only www subdomain - other subdomains untouched
   type    = "A"
-  ttl     = 300
-  records = [aws_instance.wordpress[0].public_ip]  # Use instance public IP (auto-assigned, static while instance runs)
-  
+
+  alias {
+    name                   = aws_lb.wordpress[0].dns_name
+    zone_id                = aws_lb.wordpress[0].zone_id
+    evaluate_target_health = true
+  }
+
   lifecycle {
     create_before_destroy = true
   }
@@ -433,6 +623,16 @@ output "wordpress_dns_status" {
 }
 
 output "wordpress_certificate_arn" {
-  value       = var.create_wordpress ? data.aws_acm_certificate.wordpress_cert[0].arn : null
-  description = "ACM certificate ARN for WordPress SSL"
+  value       = var.create_wordpress ? aws_acm_certificate_validation.wordpress_cert[0].certificate_arn : null
+  description = "ACM certificate ARN for WordPress SSL (validated via Route53)"
+}
+
+output "wordpress_alb_dns" {
+  value       = var.create_wordpress ? aws_lb.wordpress[0].dns_name : null
+  description = "DNS name of the WordPress Application Load Balancer"
+}
+
+output "wordpress_alb_arn" {
+  value       = var.create_wordpress ? aws_lb.wordpress[0].arn : null
+  description = "ARN of the WordPress Application Load Balancer"
 }

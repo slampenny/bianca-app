@@ -28,18 +28,7 @@ curl -L "https://github.com/docker/compose/releases/latest/download/docker-compo
 chmod +x /usr/local/bin/docker-compose
 ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-# Install certbot for Let's Encrypt SSL (Amazon Linux 2 method)
-# Install snapd first, then certbot via snap
-# Note: This can fail but WordPress will still work - we'll set up SSL later
-echo "Installing certbot..."
-yum install -y snapd || echo "snapd installation failed - will retry SSL setup later"
-systemctl enable --now snapd.socket || echo "snapd socket failed - will retry later"
-ln -sf /var/lib/snapd/snap /snap || true
-sleep 10
-snap install core; snap refresh core || echo "snap core failed - will retry SSL later"
-snap install --classic certbot || echo "certbot installation failed - will set up SSL manually later"
-ln -sf /snap/bin/certbot /usr/bin/certbot || echo "certbot symlink failed"
-echo "Certbot installation attempt complete (may need manual setup)"
+# Note: SSL is handled by ALB with AWS ACM certificate - no need for certbot/Let's Encrypt
 
 # Install AWS CLI v2 if not present
 if ! command -v aws &> /dev/null; then
@@ -169,7 +158,6 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - wordpress
     networks:
@@ -184,8 +172,7 @@ chown -R ec2-user:ec2-user $WORDPRESS_DIR
 chmod -R 755 $WORDPRESS_DIR
 
 # Create nginx configuration
-# Start with HTTP-only config (SSL will be added after certbot runs)
-# This prevents nginx from failing if SSL certs don't exist yet
+# HTTP-only - SSL is handled by ALB, which uses AWS ACM certificate
 cat > $WORDPRESS_DIR/nginx.conf <<'NGINXEOF'
 events {
     worker_connections 1024;
@@ -193,11 +180,10 @@ events {
 
 http {
     upstream wordpress {
-        server wordpress:8080;
+        server wordpress:80;  # WordPress container exposes port 80 internally (8080 is host mapping only)
     }
 
-    # HTTP server (initial configuration)
-    # SSL/HTTPS will be added after Let's Encrypt certificate is obtained
+    # HTTP server - ALB handles HTTPS/SSL termination
     server {
         listen 80;
         server_name WP_DOMAIN_PLACEHOLDER www.WP_DOMAIN_PLACEHOLDER;
@@ -208,7 +194,12 @@ http {
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            # Use X-Forwarded-Proto from ALB if present, otherwise use $scheme
+            proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+            # If ALB didn't send it, use scheme (but ALB should send it)
+            if ($http_x_forwarded_proto = '') {
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
         }
     }
 }
@@ -234,19 +225,12 @@ docker-compose up -d nginx
 # Wait for nginx to be ready
 sleep 10
 
-# Note: SSL certificate setup is skipped here to ensure WordPress works first
-# After WordPress is set up, SSL can be configured manually:
-#   1. Stop nginx: docker-compose stop nginx
-#   2. Get cert: certbot certonly --standalone -d $WP_DOMAIN -d www.$WP_DOMAIN
-#   3. Update nginx.conf to include SSL server block
-#   4. Restart nginx: docker-compose start nginx
-#
-# Alternatively, wait for DNS propagation and then run certbot with nginx plugin:
-#   certbot --nginx -d $WP_DOMAIN -d www.$WP_DOMAIN
-
-echo "✅ WordPress is now accessible on HTTP"
-echo "📍 Access at: http://$WP_DOMAIN"
-echo "🔒 SSL will be configured after WordPress setup is complete"
+echo "✅ WordPress deployment complete"
+echo "📍 HTTP:  http://$WP_DOMAIN (via ALB)"
+echo "🔒 HTTPS: https://$WP_DOMAIN (via ALB with AWS ACM certificate)"
+echo ""
+echo "Note: SSL/HTTPS is handled by Application Load Balancer using AWS ACM certificate"
+echo "      WordPress instance only needs to handle HTTP traffic from ALB"
 
 # Create systemd service for auto-restart
 cat > /etc/systemd/system/bianca-wordpress.service <<EOF
