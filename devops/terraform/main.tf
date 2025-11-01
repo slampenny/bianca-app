@@ -1983,6 +1983,17 @@ resource "aws_route53_record" "ses_dmarc_record" {
 }
 
 ################################################################################
+# EMAIL IDENTITY VERIFICATION (for explicit "from" addresses)
+################################################################################
+
+# Note: When domain is verified, email addresses are automatically verified.
+# However, adding this explicitly ensures support@myphonefriend.com is verified
+# and helps with authentication troubleshooting.
+resource "aws_ses_email_identity" "support_email" {
+  email = "support@myphonefriend.com"
+}
+
+################################################################################
 # EMAIL FORWARDING - Route legal emails to personal Gmail
 ################################################################################
 

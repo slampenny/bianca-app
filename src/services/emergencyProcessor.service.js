@@ -3,6 +3,7 @@
 const { detectEmergency, filterFalsePositives } = require('../utils/emergencyDetector');
 const { localizedEmergencyDetector } = require('./localizedEmergencyDetector.service');
 const { getAlertDeduplicator } = require('../utils/alertDeduplicator');
+const { getConversationContextWindow } = require('../utils/conversationContextWindow');
 const { config } = require('../config/emergency.config');
 const { snsService } = require('./sns.service');
 const alertService = require('./alert.service');
@@ -71,6 +72,10 @@ class EmergencyProcessor {
         logger.warn(`Could not fetch patient language for ${patientId}, using default: ${error.message}`);
       }
 
+      // Step 0: Add utterance to context window for context-aware processing
+      const contextWindow = getConversationContextWindow();
+      contextWindow.addUtterance(patientId, text, 'user', timestamp);
+
       // Step 1: Detect emergency patterns using localized detector
       const emergencyResult = await localizedEmergencyDetector.detectEmergency(text, patientLanguage);
       
@@ -78,24 +83,48 @@ class EmergencyProcessor {
         logger.info(`Emergency detection for patient ${patientId}:`, emergencyResult);
       }
 
-      // Step 2: Filter false positives if enabled
+      // Step 2: Context-aware false positive filtering
       let falsePositiveResult = { isFalsePositive: false, reason: null };
       if (config.enableFalsePositiveFilter && emergencyResult.isEmergency) {
+        // First, check basic false positives
         falsePositiveResult = filterFalsePositives(text, emergencyResult);
+        
+        // If not a basic false positive, check context window for narrative vs present-tense
+        if (!falsePositiveResult.isFalsePositive && config.enableContextAwareFiltering !== false) {
+          const narrativeClassification = contextWindow.classifyNarrativeVsPresent(patientId, text);
+          
+          // If high confidence that it's narrative (past story), mark as false positive
+          if (narrativeClassification.isNarrative && narrativeClassification.confidence > 0.6) {
+            falsePositiveResult = {
+              isFalsePositive: true,
+              reason: `Narrative context detected: ${narrativeClassification.reason}`
+            };
+            
+            if (config.logging.logFalsePositives) {
+              logger.info(`Context-aware false positive for patient ${patientId}: ${falsePositiveResult.reason}`);
+            }
+          } else if (config.logging.logAllDetections) {
+            logger.debug(`Context classification for patient ${patientId}: ${narrativeClassification.reason} (confidence: ${narrativeClassification.confidence.toFixed(2)})`);
+          }
+        }
         
         if (config.logging.logFalsePositives && falsePositiveResult.isFalsePositive) {
           logger.info(`False positive detected for patient ${patientId}: ${falsePositiveResult.reason}`);
         }
       }
 
-      // Step 3: Check deduplication
+      // Step 3: Check deduplication with enhanced multi-signal support
       let deduplicationResult = { shouldAlert: true, reason: 'No deduplication check performed' };
       if (emergencyResult.isEmergency && !falsePositiveResult.isFalsePositive) {
         deduplicationResult = getAlertDeduplicator().shouldAlert(
           patientId, 
           emergencyResult.category, 
           text, 
-          timestamp
+          timestamp,
+          {
+            severity: emergencyResult.severity,
+            contextWindow: contextWindow.getRecentContext(patientId, 5) // Last 5 minutes
+          }
         );
       }
 
@@ -118,8 +147,12 @@ class EmergencyProcessor {
           responseTimeSeconds: config.severityResponseTimes[emergencyResult.severity] || 900
         };
 
-        // Record the alert in deduplicator
-        getAlertDeduplicator().recordAlert(patientId, emergencyResult.category, timestamp, text);
+        // Record the alert in deduplicator with severity
+        const deduplicator = getAlertDeduplicator();
+        const alertRecord = deduplicator.recordAlert(patientId, emergencyResult.category, timestamp, text);
+        if (alertRecord) {
+          alertRecord.severity = emergencyResult.severity;
+        }
       }
 
       // Step 7: Create response

@@ -28,13 +28,15 @@ class AlertDeduplicator {
 
   /**
    * Check if we should send an alert for this patient and emergency type
+   * Enhanced with multi-signal thresholds and cross-time deduplication
    * @param {string} patientId - The patient ID
    * @param {string} category - The emergency category (Medical, Safety, Physical, Request)
    * @param {string} text - The original text that triggered the emergency
    * @param {number} timestamp - Current timestamp (defaults to now)
-   * @returns {Object} - { shouldAlert: boolean, reason: string }
+   * @param {Object} options - Additional options (severity, contextWindow)
+   * @returns {Object} - { shouldAlert: boolean, reason: string, confidence?: number }
    */
-  shouldAlert(patientId, category, text, timestamp = Date.now()) {
+  shouldAlert(patientId, category, text, timestamp = Date.now(), options = {}) {
     try {
       // Validate inputs
       if (!patientId || !category || !text) {
@@ -44,7 +46,8 @@ class AlertDeduplicator {
       const patientHistory = this.alertHistory.get(patientId) || {
         alerts: [],
         hourlyCount: 0,
-        hourlyWindowStart: timestamp
+        hourlyWindowStart: timestamp,
+        multiSignalCounts: {} // Track multiple signals for same emergency type
       };
 
       // Check hourly alert limit
@@ -57,25 +60,98 @@ class AlertDeduplicator {
 
       // Check for recent alerts of the same category within debounce window
       const debounceWindowMs = this.config.debounceMinutes * 60 * 1000;
-      const recentAlert = patientHistory.alerts.find(alert => 
+      const recentAlerts = patientHistory.alerts.filter(alert => 
         alert.category === category && 
         (timestamp - alert.timestamp) < debounceWindowMs
       );
 
-      if (recentAlert) {
-        const timeSinceLastAlert = Math.round((timestamp - recentAlert.timestamp) / 1000 / 60);
-        return { 
-          shouldAlert: false, 
-          reason: `Recent ${category} alert within ${timeSinceLastAlert} minutes (debounce: ${this.config.debounceMinutes}min)` 
+      if (recentAlerts.length > 0) {
+        const timeSinceLastAlert = Math.round((timestamp - recentAlerts[0].timestamp) / 1000 / 60);
+        
+        // Multi-signal threshold: If multiple similar signals in short time, might be legitimate escalation
+        // Allow alert if it's a higher severity emergency or multiple distinct signals
+        const isEscalation = options.severity && options.severity === 'CRITICAL' && 
+                            recentAlerts.some(a => a.severity && a.severity !== 'CRITICAL');
+        
+        if (!isEscalation) {
+          return { 
+            shouldAlert: false, 
+            reason: `Recent ${category} alert${recentAlerts.length > 1 ? `s (${recentAlerts.length})` : ''} within ${timeSinceLastAlert} minutes (debounce: ${this.config.debounceMinutes}min)`,
+            confidence: 0
+          };
+        }
+      }
+
+      // Cross-time pattern detection: Check for similar alerts across longer time periods
+      const longerWindowMs = debounceWindowMs * 3; // Look back 3x debounce window
+      const similarAlerts = patientHistory.alerts.filter(alert => {
+        const timeDiff = timestamp - alert.timestamp;
+        if (timeDiff > longerWindowMs || timeDiff < 0) return false;
+        
+        // Check if similar text (simple similarity check)
+        const similarity = this.calculateTextSimilarity(text.toLowerCase(), (alert.text || '').toLowerCase());
+        return similarity > 0.7; // 70% similarity threshold
+      });
+
+      // If multiple similar alerts across longer period, might indicate pattern
+      if (similarAlerts.length >= 3) {
+        const avgTimeBetween = (timestamp - similarAlerts[0].timestamp) / similarAlerts.length;
+        const hoursBetween = avgTimeBetween / (60 * 60 * 1000);
+        
+        // If alerts are very frequent (more than once per hour), might be pattern
+        if (hoursBetween < 1) {
+          return {
+            shouldAlert: false,
+            reason: `Pattern detected: ${similarAlerts.length + 1} similar ${category} alerts in last ${Math.round((timestamp - similarAlerts[0].timestamp) / 60 / 60 * 100) / 100} hours (likely pattern, not new emergency)`,
+            confidence: 0.3
+          };
+        }
+      }
+
+      // Multi-signal accumulation: Track if this is part of accumulating signals
+      const signalKey = `${category}-${options.severity || 'unknown'}`;
+      const recentSignals = patientHistory.alerts.filter(alert => {
+        const timeDiff = timestamp - alert.timestamp;
+        return timeDiff < debounceWindowMs && alert.category === category;
+      });
+
+      // If multiple distinct signals within window, consider allowing alert (might be escalation)
+      if (recentSignals.length >= 2 && options.severity === 'CRITICAL') {
+        return {
+          shouldAlert: true,
+          reason: `Multiple signals detected (${recentSignals.length + 1}), allowing CRITICAL alert as potential escalation`,
+          confidence: Math.min(0.8, 0.5 + (recentSignals.length * 0.1))
         };
       }
 
-      return { shouldAlert: true, reason: 'No recent alerts of this category' };
+      return { 
+        shouldAlert: true, 
+        reason: 'No recent alerts of this category',
+        confidence: 1.0
+      };
     } catch (error) {
       console.error('Error in shouldAlert:', error);
       // Fail safe - allow alert if there's an error
-      return { shouldAlert: true, reason: 'Error checking deduplication, allowing alert' };
+      return { shouldAlert: true, reason: 'Error checking deduplication, allowing alert', confidence: 0.5 };
     }
+  }
+
+  /**
+   * Calculate simple text similarity (Levenshtein-based, normalized)
+   * @private
+   */
+  calculateTextSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    if (str1 === str2) return 1;
+
+    // Simple word overlap similarity
+    const words1 = new Set(str1.split(/\s+/));
+    const words2 = new Set(str2.split(/\s+/));
+    
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+    
+    return union.size > 0 ? intersection.size / union.size : 0;
   }
 
   /**
@@ -105,11 +181,12 @@ class AlertDeduplicator {
       // Reset hourly count if we're in a new hour window
       this.resetHourlyCountIfNeeded(patientHistory, timestamp);
 
-      // Create alert record
+      // Create alert record with severity if available
       const alertRecord = {
         category,
         timestamp,
         text: text.substring(0, 200), // Limit text length for storage
+        severity: null, // Can be set by caller
         id: `${patientId}_${timestamp}_${category}`
       };
 

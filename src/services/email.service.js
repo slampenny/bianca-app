@@ -69,11 +69,12 @@ async function doInitialization() {
         throw new Error(`SES not accessible: ${sesError.message}`);
       }
 
-      // Create transport with proper SES configuration
+      // Create transport with proper SES configuration for AWS SDK v3
+      // Nodemailer expects the AWS SDK module to be passed, not just the command
       transport = nodemailer.createTransport({
         SES: { 
           ses: sesClient, 
-          aws: { SendRawEmailCommand } 
+          aws: require('@aws-sdk/client-ses')
         },
         sendingRate: 14, // SES default rate limit
       });

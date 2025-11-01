@@ -32,6 +32,41 @@ resource "aws_ses_domain_dkim" "corp" {
   domain = aws_ses_domain_identity.corp.domain
 }
 
+# MAIL FROM domain configuration
+# This is used for bounce and complaint handling
+resource "aws_ses_domain_mail_from" "corp" {
+  domain           = aws_ses_domain_identity.corp.domain
+  mail_from_domain = "mail.${aws_ses_domain_identity.corp.domain}"
+}
+
+# Route53 MX record for MAIL FROM domain (points to SES bounce handling)
+# Note: This record may already exist - import it if needed:
+# terraform import aws_route53_record.corp_mail_from_mx ZONEID_mail.biancatechnologies.com_MX
+resource "aws_route53_record" "corp_mail_from_mx" {
+  zone_id = data.aws_route53_zone.corp.zone_id
+  name    = aws_ses_domain_mail_from.corp.mail_from_domain
+  type    = "MX"
+  ttl     = 300
+  records = ["10 feedback-smtp.${var.aws_region}.amazonses.com"]  # Must point to feedback-smtp, not inbound-smtp!
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Route53 SPF record for MAIL FROM domain
+resource "aws_route53_record" "corp_mail_from_spf" {
+  zone_id = data.aws_route53_zone.corp.zone_id
+  name    = aws_ses_domain_mail_from.corp.mail_from_domain
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=spf1 include:amazonses.com ~all"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # ---------------- S3 BUCKET FOR RAW EMAILS -----------------
 resource "aws_s3_bucket" "corp_email_storage" {
   bucket = local.corp_bucket_name
