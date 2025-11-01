@@ -5,7 +5,8 @@ const logger = require('../config/logger');
 
     // Generate summary using your existing LangChain service
     const { langChainAPI } = require('../api/langChainAPI');
-const { prompts } = require('../templates/prompts'); // Your Bianca system prompt
+const { prompts } = require('../templates/prompts'); // Original Bianca system prompt
+const { prompts: refinedPrompts } = require('../templates/prompts.refined'); // Refined prompt with voice-first rules
 
 // ===== EXISTING METHODS (unchanged) =====
 const createConversationForPatient = async (patientId) => {
@@ -137,6 +138,50 @@ const getConversationHistory = async (patientId, limit = 5) => {
 };
 
 /**
+ * Humanize time delta for last contact time
+ */
+const humanizeTimeDelta = (lastContactTime) => {
+  if (!lastContactTime) return null;
+  
+  const now = new Date();
+  const lastContact = new Date(lastContactTime);
+  const diffMs = now - lastContact;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return diffHours === 1 ? 'about an hour ago' : `${diffHours} hours ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) !== 1 ? 's' : ''} ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) !== 1 ? 's' : ''} ago`;
+  return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) !== 1 ? 's' : ''} ago`;
+};
+
+/**
+ * Get last contact time for a patient
+ */
+const getLastContactTime = async (patientId) => {
+  try {
+    const lastConversation = await Conversation.findOne({
+      patientId,
+      endTime: { $exists: true }, // Only completed conversations
+      status: 'completed'
+    })
+    .sort({ endTime: -1 }) // Most recent first
+    .select('endTime')
+    .lean();
+    
+    return lastConversation?.endTime || null;
+  } catch (err) {
+    logger.error(`[Last Contact Time] Error: ${err.message}`);
+    return null;
+  }
+};
+
+/**
  * Get language name from language code
  */
 const getLanguageName = (languageCode) => {
@@ -171,9 +216,13 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
 
     // Get conversation history
     const conversationHistory = await getConversationHistory(patientId);
+    
+    // Get last contact time to avoid repetition
+    const lastContactTime = await getLastContactTime(patientId);
+    const lastContactHumanized = lastContactTime ? humanizeTimeDelta(lastContactTime) : null;
 
-    // Start with your base Bianca system prompt
-    let enhancedPrompt = prompts.system.content;
+    // Start with refined Bianca system prompt (voice-first, healthcare-aware)
+    let enhancedPrompt = refinedPrompts.system.content;
 
     // Add patient-specific context section
     enhancedPrompt += `\n\nCurrent Patient Context:
@@ -199,23 +248,34 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
       enhancedPrompt += `\n\nLanguage: Communicate in English as usual.`;
     }
 
+    // Add last contact time to avoid repetition
+    if (lastContactHumanized) {
+      enhancedPrompt += `\n\nLast Contact Time: You last spoke with this patient ${lastContactHumanized}.\n- Avoid repeating questions you asked recently (especially if within the last hour).\n- If they told you something important recently, you remember it - don't ask them to repeat it.\n- Use this time gap to vary your questions naturally.`;
+    } else {
+      enhancedPrompt += `\n\nLast Contact Time: This appears to be your first conversation with this patient, or no recent completed conversations found.`;
+    }
+
     // Add conversation history context if available
     if (conversationHistory) {
       enhancedPrompt += `\n\nPrevious Conversation Context:
 ${conversationHistory}
 
-Note: You maintain memory of old conversations as mentioned in your chat settings. Use this context naturally to provide continuity, but don't explicitly mention "previous calls" unless the patient brings them up first.`;
+Note: Use this context naturally to provide continuity, but don't explicitly mention "previous calls" unless the patient brings them up first.`;
     }
 
     // Add call type specific context
     if (callType === 'wellness-check') {
-      enhancedPrompt += `\n\nCall Context: This is a wellness check call you initiated. Wait for the person to speak first, then introduce yourself and ask about their general well-being. Keep it conversational and friendly as per your personality.`;
+      enhancedPrompt += `\n\nCall Context: This is a wellness check call you initiated. Wait for the person to speak first, then introduce yourself with "This is Bianca" and ask about their general well-being. Keep it conversational and friendly.`;
     } else {
-      enhancedPrompt += `\n\nCall Context: The patient called you. Listen to understand what they need and provide appropriate support while maintaining your warm, friendly personality.`;
+      enhancedPrompt += `\n\nCall Context: The patient called you. Listen first to understand what they need, then provide appropriate support while maintaining your warm, empathetic personality.`;
     }
-
-    // Remind about phone conversation format
-    enhancedPrompt += `\n\nImportant: Remember this is a phone conversation, so keep responses short, conversational, and spoken-friendly as outlined in your response guidelines.`;
+    
+    // Add subtle health metric nudge (one at a time, gently)
+    const healthMetrics = ['sleep', 'appetite', 'pain', 'energy', 'medication adherence', 'social connection'];
+    // Rotate through metrics based on conversation count or time
+    const metricIndex = lastContactTime ? (Math.floor(Date.now() / 86400000) % healthMetrics.length) : 0;
+    const suggestedMetric = healthMetrics[metricIndex];
+    enhancedPrompt += `\n\nHealth Metrics: If the conversation flows naturally, consider gently asking about their ${suggestedMetric}. Don't force it - only if it feels natural. One metric per conversation, not a checklist.`;
 
     logger.info(`[Enhanced Prompt] Built prompt for patient ${patient.name} (${callType} call)`);
     return enhancedPrompt;

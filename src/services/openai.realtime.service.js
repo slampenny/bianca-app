@@ -36,6 +36,7 @@ const logger = require('../config/logger');
 const { Message } = require('../models'); // Assuming Message model is used for saving transcripts
 const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
 const { emergencyProcessor } = require('./emergencyProcessor.service');
+const { getConversationContextWindow } = require('../utils/conversationContextWindow');
 
 /**
  * Conversation State Machine
@@ -1934,6 +1935,18 @@ class OpenAIRealtimeService {
       return;
     }
 
+    // Track utterance in context window for context-aware emergency detection
+    if (conn.patientId) {
+      try {
+        const contextWindow = getConversationContextWindow();
+        const contextRole = role === 'assistant' ? 'assistant' : 'user';
+        contextWindow.addUtterance(conn.patientId, content.trim(), contextRole, Date.now());
+        logger.debug(`[Context Window] Added ${contextRole} utterance for patient ${conn.patientId}`);
+      } catch (error) {
+        logger.warn(`[Context Window] Failed to track utterance: ${error.message}`);
+      }
+    }
+
     try {
       logger.info(`[OpenAI Realtime] Attempting to save ${role} message for ${callId}: "${content}"`);
       const conversationService = require('./conversation.service');
@@ -3640,6 +3653,17 @@ class OpenAIRealtimeService {
           logger.info(`[OpenAI Call End] Saving pending assistant message for ${callId}`);
           await this.saveCompleteMessage(callId, 'assistant', conn.pendingAssistantTranscript);
           conn.pendingAssistantTranscript = '';
+        }
+
+        // Clear context window for this patient when call ends
+        if (conn.patientId) {
+          try {
+            const contextWindow = getConversationContextWindow();
+            contextWindow.clearPatientContext(conn.patientId);
+            logger.debug(`[Context Window] Cleared context for patient ${conn.patientId} at call end`);
+          } catch (error) {
+            logger.warn(`[Context Window] Failed to clear context: ${error.message}`);
+          }
         }
       }
 

@@ -10,8 +10,10 @@ const ApiError = require('../../../src/utils/ApiError');
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start();
+  // Set JWT_SECRET for token generation
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-testing';
+  
+  mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
 });
@@ -39,19 +41,18 @@ describe('Auth Controller - Email Verification', () => {
     };
     next = jest.fn();
     
-    // Mock email service
+    // Mock email service (external service - SES)
     jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue();
     
-    // Mock token service
-    const tokenService = require('../../../src/services/token.service');
-    jest.spyOn(tokenService, 'generateVerifyEmailToken').mockResolvedValue('mock-token-123');
+    // Don't mock generateVerifyEmailToken - let it use the real implementation
+    // It needs to save tokens to the database for the tests to work correctly
   });
 
   afterEach(async () => {
     await Caregiver.deleteMany();
     await Org.deleteMany();
     await Token.deleteMany();
-    jest.restoreAllMocks();
+    jest.clearAllMocks(); // Clear call history but keep spies
   });
 
   describe('resendVerificationEmail', () => {
@@ -69,31 +70,27 @@ describe('Auth Controller - Email Verification', () => {
 
       req.body = { email: 'test@example.com' };
 
-      // Debug: Check if function exists
-      expect(typeof authController.resendVerificationEmail).toBe('function');
+      // Don't mock our own services - let them use the real database
+      // The caregiver is already saved to the database, so getCaregiverByEmail will find it
+      // Email service is mocked (external service - SES)
       
-      console.log('About to call resendVerificationEmail');
-      console.log('Caregiver exists:', await Caregiver.findOne({ email: 'test@example.com' }));
-      console.log('Function type:', typeof authController.resendVerificationEmail);
-      console.log('Function toString:', authController.resendVerificationEmail.toString().substring(0, 200));
-      try {
-        await authController.resendVerificationEmail(req, res, next);
-        console.log('Function completed without error');
-      } catch (error) {
-        console.log('Error caught:', error);
-        throw error;
-      }
-
-      // Debug: Check what was called
-      console.log('res.status calls:', res.status.mock.calls);
-      console.log('res.send calls:', res.send.mock.calls);
-      console.log('res.json calls:', res.json.mock.calls);
-      console.log('next calls:', next.mock.calls);
+      // Call the wrapped function - catchAsync returns a function
+      const wrappedFn = authController.resendVerificationEmail;
+      const promise = wrappedFn(req, res, next);
+      
+      // Wait for the promise to resolve
+      await promise;
+      
+      // Wait a tick for any final async operations
+      await new Promise(resolve => setImmediate(resolve));
 
       expect(res.status).toHaveBeenCalledWith(httpStatus.OK);
       expect(res.send).toHaveBeenCalledWith({
         message: 'Verification email sent successfully',
       });
+      
+      // Verify email service was called
+      expect(emailService.sendVerificationEmail).toHaveBeenCalled();
     });
 
     test('should reject resend for verified user', async () => {
@@ -110,8 +107,10 @@ describe('Auth Controller - Email Verification', () => {
 
       req.body = { email: 'test@example.com' };
 
+      // Don't mock our own services - let them use the real database
       await authController.resendVerificationEmail(req, res, next);
 
+      // catchAsync handles ApiError by calling res.status().json()
       expect(res.status).toHaveBeenCalledWith(httpStatus.BAD_REQUEST);
       expect(res.json).toHaveBeenCalledWith({
         message: 'Email is already verified',
@@ -121,8 +120,11 @@ describe('Auth Controller - Email Verification', () => {
     test('should reject resend for non-existent user', async () => {
       req.body = { email: 'nonexistent@example.com' };
 
+      // Don't mock our own services - let them use the real database
+      // This email doesn't exist in the database, so it should return NOT_FOUND
       await authController.resendVerificationEmail(req, res, next);
 
+      // catchAsync handles ApiError by calling res.status().json()
       expect(res.status).toHaveBeenCalledWith(httpStatus.NOT_FOUND);
       expect(res.json).toHaveBeenCalledWith({
         message: 'User not found',
@@ -160,17 +162,26 @@ describe('Auth Controller - Email Verification', () => {
 
       req.query = { token: verifyEmailToken };
 
+      // Don't mock our own services - let them use the real database
+      // The token was generated for the caregiver, so verifyEmail should work
       await authController.verifyEmail(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(httpStatus.OK);
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Email Verified!'));
+      
+      // Verify the caregiver was actually verified
+      const updatedCaregiver = await Caregiver.findById(caregiver._id);
+      expect(updatedCaregiver.isEmailVerified).toBe(true);
     });
 
     test('should handle verification failure', async () => {
       req.query = { token: 'invalid-token' };
 
+      // Don't mock our own services - let them use the real implementation
+      // An invalid token should cause verifyEmail to throw an error
       await authController.verifyEmail(req, res, next);
 
+      // catchAsync handles ApiError by calling res.status().json()
       expect(res.status).toHaveBeenCalledWith(httpStatus.UNAUTHORIZED);
       expect(res.json).toHaveBeenCalledWith({
         message: 'Email verification failed',

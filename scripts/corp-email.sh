@@ -38,16 +38,54 @@ localpart() {
 
 smtp_from_secret() {
   local secret_key_json="$1" # path to JSON with AccessKeyId/SecretAccessKey
-  python3 - "$secret_key_json" <<'PY'
+  local region="$AWS_REGION" # Use AWS_REGION from environment
+  python3 - "$secret_key_json" "$region" <<'PY'
+# IMPORTANT: AWS SES SMTP uses a special password derivation algorithm
+# that differs from standard AWS Signature v4 signing. Key differences:
+# 1. Uses fixed date "11111111" instead of actual date
+# 2. Always signs the message "SendRawEmail"
+# 3. Prepends version byte 0x04 to the signature
+# Reference: https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html
+
 import json,sys,hmac,hashlib,base64
-region='us-east-2'; service='ses'; terminal='aws4_request'; message='SendRawEmail'; version=b'\x04'
-data=json.load(open(sys.argv[1]))
-sk=data['SecretAccessKey']
-k_date=hmac.new(('AWS4'+sk).encode(),region.encode(),hashlib.sha256).digest()
-k_service=hmac.new(k_date,service.encode(),hashlib.sha256).digest()
-k_terminal=hmac.new(k_service,terminal.encode(),hashlib.sha256).digest()
-sig=hmac.new(k_terminal,message.encode(),hashlib.sha256).digest()
-print(json.dumps({'SMTPUsername':data['AccessKeyId'],'SMTPPassword':base64.b64encode(version+sig).decode()}))
+
+region = sys.argv[2]  # Get region from command line argument
+data = json.load(open(sys.argv[1]))
+sk = data['SecretAccessKey']
+
+# AWS SES SMTP Constants - DO NOT CHANGE
+DATE = "11111111"  # Fixed date for SMTP (not actual date!)
+SERVICE = "ses"
+MESSAGE = "SendRawEmail"
+VERSION = 0x04
+
+# Step 1: Create signing key using HMAC-SHA256 chain
+# kSecret = "AWS4" + secret_access_key
+k_secret = ("AWS4" + sk).encode('utf-8')
+
+# kDate = HMAC(kSecret, "11111111") - NOTE: Fixed date, not actual date!
+k_date = hmac.new(k_secret, DATE.encode('utf-8'), hashlib.sha256).digest()
+
+# kRegion = HMAC(kDate, region)
+k_region = hmac.new(k_date, region.encode('utf-8'), hashlib.sha256).digest()
+
+# kService = HMAC(kRegion, "ses")
+k_service = hmac.new(k_region, SERVICE.encode('utf-8'), hashlib.sha256).digest()
+
+# kSigning = HMAC(kService, "aws4_request")
+k_signing = hmac.new(k_service, "aws4_request".encode('utf-8'), hashlib.sha256).digest()
+
+# Step 2: Sign the message "SendRawEmail"
+signature = hmac.new(k_signing, MESSAGE.encode('utf-8'), hashlib.sha256).digest()
+
+# Step 3: Prepend version byte (0x04) and base64 encode
+signature_and_version = bytes([VERSION]) + signature
+smtp_password = base64.b64encode(signature_and_version).decode('utf-8')
+
+print(json.dumps({
+    'SMTPUsername': data['AccessKeyId'],
+    'SMTPPassword': smtp_password
+}))
 PY
 }
 
@@ -55,8 +93,31 @@ create_smtp() {
   local email="$1"; local user="ses-smtp-$(localpart "$email")"
   echo "Creating/ensuring IAM user ${user}..."
   aws iam create-user --user-name "$user" >/dev/null 2>&1 || true
-  cat > /tmp/ses-send-policy.json <<'POL'
-{ "Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ses:SendEmail","ses:SendRawEmail"],"Resource":"*"}]}
+  # SES SMTP requires both SendEmail and SendRawEmail permissions
+  # Get account ID for potential resource ARN scoping
+  account_id=$(aws sts get-caller-identity --query Account --output text)
+  # SES SMTP auth may require scoped permissions to the domain identity
+  # Try scoping to domain ARN if it helps with authentication
+  domain_arn="arn:aws:ses:${AWS_REGION}:${account_id}:identity/${CORP_DOMAIN}"
+  cat > /tmp/ses-send-policy.json <<POL
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:GetSendQuota",
+        "ses:GetSendStatistics"
+      ],
+      "Resource": [
+        "*",
+        "${domain_arn}"
+      ]
+    }
+  ]
+}
 POL
   aws iam put-user-policy --user-name "$user" --policy-name ses-send-only --policy-document file:///tmp/ses-send-policy.json >/dev/null
   echo "Creating new access key (rotate if limit reached)..."
@@ -101,29 +162,100 @@ set_mapping() {
 add_rule() {
   local email="$1"; local lp=$(localpart "$email")
   echo "Ensuring SES receipt rule for $email in $RULE_SET"
-  # Skip if rule already exists for this recipient
-  if aws ses describe-receipt-rule-set --rule-set-name "$RULE_SET" --output json | jq -e --arg email "$email" '.Rules[] | select(.Recipients[]? == $email)' >/dev/null 2>&1; then
+  
+  # Check if rule already exists for this recipient (with better error handling)
+  local existing_check
+  existing_check=$(aws ses describe-receipt-rule-set \
+    --rule-set-name "$RULE_SET" \
+    --profile "$AWS_PROFILE" \
+    --region "$AWS_REGION" \
+    --output json 2>&1)
+  
+  # Check both by recipient email AND by rule name (rule name is corp-<localpart>)
+  if echo "$existing_check" | jq -e --arg email "$email" '.Rules[]? | select(.Recipients[]? == $email)' >/dev/null 2>&1; then
     echo "Rule already exists for $email"
     echo "Rule ensured: corp-${lp}"
     return 0
   fi
+  
+  # Also check by rule name in case recipient check didn't work
+  if echo "$existing_check" | jq -e --arg name "corp-${lp}" '.Rules[]? | select(.Name == $name)' >/dev/null 2>&1; then
+    echo "Rule already exists (found by name: corp-${lp})"
+    echo "Rule ensured: corp-${lp}"
+    return 0
+  fi
+  
   # Create S3 bucket policy to allow SES puts
   cat > /tmp/bucket-policy.json <<JSON
 { "Version":"2012-10-17", "Statement":[{"Sid":"AllowSESPuts","Effect":"Allow","Principal":{"Service":"ses.amazonaws.com"},"Action":"s3:PutObject","Resource":"arn:aws:s3:::${S3_BUCKET}/*","Condition":{"StringEquals":{"aws:Referer":"${account_id}"}}}]}
 JSON
-  aws s3api put-bucket-policy --bucket "$S3_BUCKET" --policy file:///tmp/bucket-policy.json >/dev/null || true
+  aws s3api put-bucket-policy \
+    --bucket "$S3_BUCKET" \
+    --policy file:///tmp/bucket-policy.json \
+    --profile "$AWS_PROFILE" \
+    >/dev/null 2>&1 || true
+  
   # Prepare rule payload
-  rule_payload=$(jq -c --arg email "$email" --arg bucket "$S3_BUCKET" --arg pref "corp/${lp}/" --arg fn "arn:aws:lambda:${AWS_REGION}:${account_id}:function:${LAMBDA_NAME}" '{Name: ("corp-"+($email|split("@")[0])), Enabled:true, TlsPolicy:"Optional", Recipients:[$email], Actions:[{S3Action:{BucketName:$bucket, ObjectKeyPrefix:$pref}},{LambdaAction:{FunctionArn:$fn,InvocationType:"Event"}}] }')
-  # Create with timeout to avoid hanging
-  if ! timeout 8 aws ses create-receipt-rule --rule-set-name "$RULE_SET" --rule "$rule_payload" >/dev/null 2>&1; then
-    echo "create-receipt-rule timed out; verifying..."
+  rule_payload=$(jq -c \
+    --arg email "$email" \
+    --arg bucket "$S3_BUCKET" \
+    --arg pref "corp/${lp}/" \
+    --arg fn "arn:aws:lambda:${AWS_REGION}:${account_id}:function:${LAMBDA_NAME}" \
+    '{Name: ("corp-"+($email|split("@")[0])), Enabled:true, TlsPolicy:"Optional", Recipients:[$email], Actions:[{S3Action:{BucketName:$bucket, ObjectKeyPrefix:$pref}},{LambdaAction:{FunctionArn:$fn,InvocationType:"Event"}}] }')
+  
+  echo "Creating receipt rule..."
+  # Create with explicit timeout and error handling
+  # Use both shell timeout and AWS CLI timeout flags to prevent hanging
+  local create_result
+  create_result=$(timeout 15 aws ses create-receipt-rule \
+    --rule-set-name "$RULE_SET" \
+    --rule "$rule_payload" \
+    --profile "$AWS_PROFILE" \
+    --region "$AWS_REGION" \
+    --cli-read-timeout 10 \
+    --cli-connect-timeout 5 \
+    2>&1)
+  local create_exit=$?
+  
+  if [ $create_exit -eq 124 ]; then
+    echo "Warning: create-receipt-rule timed out after 15 seconds"
+    echo "This may indicate a permissions issue or AWS API problem"
+    echo "Checking if rule was actually created despite timeout..."
+  elif [ $create_exit -ne 0 ]; then
+    # Check if error is "already exists" - this is actually success!
+    if echo "$create_result" | grep -qi "already exists\|duplicate\|AlreadyExists"; then
+      echo "Rule already exists (detected via error message) - this is OK"
+      create_exit=0  # Treat as success
+    else
+      echo "Error creating rule: $create_result"
+      echo "This may be a permissions issue. Check:"
+      echo "  - Lambda function exists: $LAMBDA_NAME"
+      echo "  - S3 bucket exists: $S3_BUCKET"
+      echo "  - Lambda has permission for SES to invoke it"
+    fi
+  else
+    echo "Rule created successfully"
   fi
-  # Verify
-  if aws ses describe-receipt-rule-set --rule-set-name "$RULE_SET" --output json | jq -e --arg email "$email" '.Rules[] | select(.Recipients[]? == $email)' >/dev/null 2>&1; then
+  
+  # Verify rule exists (with retry)
+  sleep 1  # Give AWS time to propagate
+  local verify_result
+  verify_result=$(aws ses describe-receipt-rule-set \
+    --rule-set-name "$RULE_SET" \
+    --profile "$AWS_PROFILE" \
+    --region "$AWS_REGION" \
+    --output json 2>&1)
+  
+  if echo "$verify_result" | jq -e --arg email "$email" '.Rules[]? | select(.Recipients[]? == $email)' >/dev/null 2>&1; then
     echo "Rule ensured: corp-${lp}"
   else
-    echo "Warning: could not confirm rule creation. Create it manually with:"
+    echo "Warning: could not confirm rule creation after verification"
+    echo ""
+    echo "To create manually, run:"
     echo "aws --profile $AWS_PROFILE --region $AWS_REGION ses create-receipt-rule --rule-set-name $RULE_SET --rule '$rule_payload'"
+    echo ""
+    echo "Or skip rule creation and use: ./corp-email.sh set-mapping $email <forward-email>"
+    return 1
   fi
 }
 
@@ -192,8 +324,9 @@ TXT
     # Build message JSON safely (preserves newlines)
     local msg_json
     msg_json=$(printf "%s" "$body" | jq -Rs --arg s "$subject" '{Subject:{Data:$s},Body:{Text:{Data:.}}}')
+    # Use the root domain for FROM address to avoid MAIL FROM domain issues
     aws ses send-email \
-      --from "noreply@${CORP_DOMAIN}" \
+      --from "${email}" \
       --destination "ToAddresses=${forward}" \
       --message "$msg_json" >/dev/null || true
     echo "Bootstrap complete and credentials sent via SES."

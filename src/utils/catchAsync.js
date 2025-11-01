@@ -2,7 +2,7 @@ const httpStatus = require('http-status');
 const ApiError = require('./ApiError');
 
 const catchAsync = (fn) => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch((err) => {
+  return Promise.resolve(fn(req, res, next)).catch((err) => {
     if (err instanceof ApiError) {
       // If the error is an ApiError, send it as a response
       res.status(err.statusCode).json({ message: err.message });

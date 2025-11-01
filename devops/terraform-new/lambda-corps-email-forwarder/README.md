@@ -62,3 +62,4 @@ All logs are sent to CloudWatch Logs under:
 - Invalid email mappings result in warnings
 - S3 access errors are logged with full details
 
+

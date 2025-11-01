@@ -128,7 +128,7 @@ describe('ARI Client', () => {
       expect(AriClient.connect).toHaveBeenCalledWith(
         'http://asterisk:8088',
         'myphonefriend',
-        'ari_bianca_black_cat_4263',
+        expect.any(String), // Password comes from config, not hardcoded
         expect.objectContaining({
           keepAliveIntervalMs: 20000,
           perMessageDeflate: false,

@@ -1,11 +1,29 @@
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const { insertCaregivers, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { Caregiver } = require('../../src/models');
+
+let mongoServer;
+
+beforeAll(async () => {
+  mongoServer = await MongoMemoryServer.create();
+  const mongoUri = mongoServer.getUri();
+  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+});
 
 describe('Caregiver Fixture', () => {
   let testCaregivers;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Clear caregivers before each test
+    const { Caregiver } = require('../../src/models');
+    await Caregiver.deleteMany({});
+    
     testCaregivers = [
       {
         name: 'Test User 1',
@@ -33,17 +51,19 @@ describe('Caregiver Fixture', () => {
         expect(caregiver.isEmailVerified).toBe(true);
         expect(caregiver.password).toBeDefined();
       });
-    });
+    }, 10000); // Increase timeout to 10 seconds
   });
 
   describe('insertCaregiversAndAddToOrg', () => {
     it('should create caregivers with isEmailVerified set to true and add them to org', async () => {
       // Create a mock org
-      const mockOrg = {
-        id: new mongoose.Types.ObjectId(),
+      const { Org } = require('../../src/models');
+      const mockOrg = await Org.create({
+        name: 'Test Org',
+        email: 'test@example.org',
+        phone: '+16045624263',
         caregivers: [],
-        save: jest.fn().mockResolvedValue(true),
-      };
+      });
 
       const insertedCaregivers = await insertCaregiversAndAddToOrg(mockOrg, testCaregivers);
       
@@ -51,12 +71,13 @@ describe('Caregiver Fixture', () => {
       insertedCaregivers.forEach(caregiver => {
         expect(caregiver.isEmailVerified).toBe(true);
         expect(caregiver.password).toBeDefined();
-        expect(caregiver.org).toEqual(mockOrg.id);
+        expect(caregiver.org.toString()).toBe(mockOrg._id.toString());
       });
       
-      expect(mockOrg.caregivers).toHaveLength(2);
-      expect(mockOrg.save).toHaveBeenCalled();
-    });
+      // Reload org to check caregivers were added
+      const updatedOrg = await Org.findById(mockOrg._id);
+      expect(updatedOrg.caregivers).toHaveLength(2);
+    }, 10000); // Increase timeout to 10 seconds
   });
 });
 

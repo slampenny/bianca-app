@@ -170,3 +170,4 @@ echo "WordPress setup complete!"
 echo "WordPress will be available at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
 echo "Configure nginx to proxy biancatechnologies.com to wordpress:80"
 
+
