@@ -155,25 +155,8 @@ export const VerifyEmailScreen = () => {
         })
 
         if (response.ok) {
-          // Verification successful - show success message briefly, then navigate
-          setStatus("success")
-          
-          // After verification, navigate based on login status
-          setTimeout(() => {
-            if (isLoggedIn) {
-              // User is logged in - navigate to home screen using navigationRef
-              // This allows navigation across stacks
-              if (navigationRef.isReady()) {
-                navigationRef.navigate("MainTabs")
-              } else {
-                // Fallback: navigate to Login, AppNavigator will handle stack switch
-                navigation.navigate("Login" as never)
-              }
-            } else {
-              // User is not logged in - go to login screen
-              navigation.navigate("Login" as never)
-            }
-          }, 2000)
+          // Verification successful - navigate to EmailVerifiedScreen which handles the redirect logic
+          navigation.navigate("EmailVerified" as never)
         } else {
           // Verification failed - backend returns HTML, try to extract error message
           setStatus("error")

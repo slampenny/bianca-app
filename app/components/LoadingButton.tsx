@@ -4,7 +4,7 @@ import { colors } from "app/theme/colors"
 import { translate } from "app/i18n"
 
 interface LoadingButtonProps {
-  onPress: () => void
+  onPress: () => void | Promise<void>
   title?: string
   tx?: string
   txOptions?: any
@@ -36,10 +36,14 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
 }) => {
   const isDisabled = disabled || loading
 
-  const handlePress = () => {
+  const handlePress = async () => {
     console.log('LoadingButton pressed', { title, tx, loading, disabled, isDisabled, testID })
     if (!isDisabled && onPress) {
-      onPress()
+      try {
+        await onPress()
+      } catch (error) {
+        console.error('LoadingButton onPress error:', error)
+      }
     }
   }
 

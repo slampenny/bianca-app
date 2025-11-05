@@ -113,12 +113,20 @@ export const EmailVerificationRequiredScreen = () => {
     }
 
     try {
-      await resendVerificationEmail({ email: email.trim() }).unwrap()
+      console.log("Attempting to resend verification email to:", email.trim())
+      const result = await resendVerificationEmail({ email: email.trim() }).unwrap()
+      console.log("Resend verification email success:", result)
       setEmailSent(true)
       setErrorMessage("") // Clear any previous errors on success
       setTimeout(() => setEmailSent(false), 5000) // Hide success message after 5 seconds
     } catch (error: any) {
       console.error("Resend verification email error:", error)
+      console.error("Error details:", {
+        status: error?.status,
+        data: error?.data,
+        error: error?.error,
+        message: error?.message
+      })
       // Extract specific error message from API response
       const errorMsg = error?.data?.message || error?.message || translate("emailVerificationScreen.errorSendFailed")
       setErrorMessage(errorMsg)
