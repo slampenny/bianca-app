@@ -309,7 +309,9 @@ resource "aws_instance" "staging" {
     AutoStop    = "true"
   }
 
-  # Prevent unnecessary user_data changes from triggering instance updates
+  # Note: Spot instances with one-time requests cannot be stopped
+  # To apply user_data changes: terraform taint aws_instance.staging && terraform apply
+  # This will terminate and recreate the instance (data persists on EBS volume)
   lifecycle {
     ignore_changes = [user_data]
   }

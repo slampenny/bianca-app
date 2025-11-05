@@ -1923,17 +1923,9 @@ resource "aws_route53_record" "sip_subdomain" {
   records = [aws_eip.asterisk_eip.public_ip]
 }
 
-# Root domain record - managed by wordpress.tf when WordPress is enabled
-# When create_wordpress=false, this record points to the static IP below
-# When create_wordpress=true, WordPress will update it to point to the WordPress instance
-resource "aws_route53_record" "wordpress_apex" {
-  count   = var.create_wordpress ? 0 : 1  # Only create if WordPress is NOT enabled
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "myphonefriend.com"
-  type    = "A"
-  ttl     = "300"
-  records = ["192.254.225.221"]
-}
+# Root domain record (myphonefriend.com) is managed by wordpress.tf
+# WordPress manages this record via wordpress_root resource in wordpress.tf
+# This resource is intentionally removed to avoid conflicts with WordPress
 
 ################################################################################
 # SES DOMAIN VERIFICATION & DKIM
@@ -2106,71 +2098,43 @@ resource "aws_lambda_function" "email_forwarder" {
   function_name    = "myphonefriend-email-forwarder"
   role            = aws_iam_role.lambda_email_forwarding_role.arn
   handler         = "index.handler"
-  runtime         = "nodejs18.x"
-  timeout         = 30
+  runtime         = "nodejs20.x"
+  timeout         = 60
 
   environment {
     variables = {
-      FORWARD_TO_EMAIL = "jordanglapp@gmail.com"
-      FROM_DOMAIN      = "myphonefriend.com"
+      RECIPIENT_MAP = jsonencode({})
+      FROM_DOMAIN   = "myphonefriend.com"
+      S3_BUCKET     = aws_s3_bucket.ses_email_storage.bucket
     }
   }
 
-  depends_on = [data.archive_file.email_forwarder_zip]
+  depends_on = [
+    null_resource.email_forwarder_dependencies
+  ]
 }
 
-# Create Lambda deployment package
-data "archive_file" "email_forwarder_zip" {
-  type        = "zip"
-  output_path = "email-forwarder.zip"
-  source {
-    content = <<EOF
-const AWS = require('aws-sdk');
-const ses = new AWS.SES();
+# Install dependencies and create Lambda package
+resource "null_resource" "email_forwarder_dependencies" {
+  triggers = {
+    package_json = filemd5("${path.module}/../lambda-email-forwarder/package.json")
+    index_js     = filemd5("${path.module}/../lambda-email-forwarder/index.js")
+  }
 
-exports.handler = async (event) => {
-    console.log('SES Event:', JSON.stringify(event, null, 2));
-    
-    for (const record of event.Records) {
-        if (record.eventSource === 'aws:ses') {
-            const message = record.ses.mail;
-            const originalTo = message.destination[0];
-            const forwardTo = process.env.FORWARD_TO_EMAIL;
-            
-            // Create forwarded email
-            const params = {
-                Source: `noreply@$${process.env.FROM_DOMAIN}`,
-                Destination: {
-                    ToAddresses: [forwardTo]
-                },
-                Message: {
-                    Subject: {
-                        Data: `[FORWARDED from $${originalTo}] $${message.commonHeaders.subject || 'No Subject'}`
-                    },
-                    Body: {
-                        Text: {
-                            Data: `This email was forwarded from $${originalTo}\n\nOriginal sender: $${message.commonHeaders.from}\nDate: $${message.commonHeaders.date}\n\n---\n\nPlease check your S3 bucket for the full email content or set up proper email forwarding.`
-                        }
-                    }
-                }
-            };
-            
-            try {
-                await ses.sendEmail(params).promise();
-                console.log(`Email forwarded from $${originalTo} to $${forwardTo}`);
-            } catch (error) {
-                console.error('Error forwarding email:', error);
-                throw error;
-            }
-        }
-    }
-    
-    return { statusCode: 200, body: 'Emails processed successfully' };
-};
-EOF
-    filename = "index.js"
+  provisioner "local-exec" {
+    command = <<-EOT
+      cd ${path.module}/../lambda-email-forwarder
+      npm install --production --legacy-peer-deps
+      cd ${path.module}
+      rm -f email-forwarder.zip
+      cd ../lambda-email-forwarder
+      zip -r ../terraform/email-forwarder.zip . -x "*.git*" "*.md" "*.txt" "*.gitignore"
+      cd ../terraform
+    EOT
   }
 }
+
+
 
 # IAM role for Lambda
 resource "aws_iam_role" "lambda_email_forwarding_role" {
@@ -2213,9 +2177,15 @@ resource "aws_iam_role_policy" "lambda_email_forwarding_ses" {
       {
         Effect = "Allow"
         Action = [
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:ListBucket"
         ]
-        Resource = "${aws_s3_bucket.ses_email_storage.arn}/*"
+        Resource = [
+          "${aws_s3_bucket.ses_email_storage.arn}/*",
+          aws_s3_bucket.ses_email_storage.arn,
+          "arn:aws:s3:::bianca-corp-email-storage-730335291008/*",
+          "arn:aws:s3:::bianca-corp-email-storage-730335291008"
+        ]
       }
     ]
   })

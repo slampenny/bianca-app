@@ -1227,7 +1227,7 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
         
         { name = "AWS_SES_REGION", value = var.aws_region },
-        { name = "EMAIL_FROM", value = "support@myphonefriend.com" },
+        { name = "EMAIL_FROM", value = "no-replay@myphonefriend.com" },
         { name = "TWILIO_PHONENUMBER", value = "+19786256514" },  # Replace with your actual Twilio number
         { name = "TWILIO_ACCOUNTSID", value = "TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED" },  # Replace with your actual Twilio SID
         { name = "STRIPE_PUBLISHABLE_KEY", value = "pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef" },  # Replace with your actual Stripe publishable key
@@ -1882,14 +1882,6 @@ resource "aws_route53_record" "sip_subdomain" {
   type    = "A"
   ttl     = 300
   records = [aws_eip.asterisk_eip.public_ip]
-}
-
-resource "aws_route53_record" "wordpress_apex" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "myphonefriend.com"
-  type    = "A"
-  ttl     = "300"
-  records = ["192.254.225.221"]
 }
 
 ################################################################################
