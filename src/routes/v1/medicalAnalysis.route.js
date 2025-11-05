@@ -17,7 +17,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/v1/medical-analysis/{patientId}:
+ * /medical-analysis/{patientId}:
  *   get:
  *     summary: Get medical analysis for a patient
  *     description: Retrieves comprehensive medical NLP analysis for a patient over a specified time period
@@ -144,7 +144,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/{patientId}/summary:
+ * /medical-analysis/{patientId}/summary:
  *   get:
  *     summary: Get medical analysis summary for dashboard
  *     description: Retrieves a summary of medical analysis suitable for dashboard display
@@ -240,7 +240,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/{patientId}/baseline:
+ * /medical-analysis/{patientId}/baseline:
  *   get:
  *     summary: Get baseline for a patient
  *     description: Retrieves the established baseline metrics for a patient
@@ -301,7 +301,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/{patientId}/baseline:
+ * /medical-analysis/{patientId}/baseline:
  *   post:
  *     summary: Establish or update baseline for a patient
  *     description: Establishes or updates the baseline metrics for a patient
@@ -378,7 +378,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/results/{patientId}:
+ * /medical-analysis/results/{patientId}:
  *   get:
  *     summary: Get medical analysis results for a patient
  *     description: Retrieves stored medical analysis results for a patient
@@ -428,7 +428,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/trigger-patient/{patientId}:
+ * /medical-analysis/trigger-patient/{patientId}:
  *   post:
  *     summary: Trigger medical analysis for a specific patient
  *     description: Manually triggers medical analysis for a specific patient
@@ -471,7 +471,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/trigger-all:
+ * /medical-analysis/trigger-all:
  *   post:
  *     summary: Trigger medical analysis for all active patients
  *     description: Manually triggers medical analysis for all active patients
@@ -505,7 +505,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/status:
+ * /medical-analysis/status:
  *   get:
  *     summary: Get medical analysis scheduler status
  *     description: Retrieves the current status of the medical analysis scheduler
@@ -543,7 +543,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/medical-analysis/trend/{patientId}:
+ * /medical-analysis/trend/{patientId}:
  *   get:
  *     summary: Get medical analysis trend data for time series visualization
  *     description: Retrieves time series data for medical analysis metrics over time

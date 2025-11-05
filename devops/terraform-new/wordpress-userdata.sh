@@ -130,14 +130,14 @@ services:
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: $DB_PASSWORD
       WORDPRESS_DEBUG: false
-      # Increase upload limits
+      # Note: Using HTTP initially - can add HTTPS later via ALB or Let's Encrypt
       WORDPRESS_CONFIG_EXTRA: |
-        define('WP_HOME', 'https://$WP_DOMAIN');
-        define('WP_SITEURL', 'https://$WP_DOMAIN');
-        define('FORCE_SSL_ADMIN', true);
-        upload_max_filesize=500M
-        post_max_size=500M
-        max_execution_time=300
+        define('WP_HOME', 'http://$WP_DOMAIN');
+        define('WP_SITEURL', 'http://$WP_DOMAIN');
+        define('FORCE_SSL_ADMIN', false);
+        @ini_set('upload_max_filesize', '500M');
+        @ini_set('post_max_size', '500M');
+        @ini_set('max_execution_time', '300');
     ports:
       - "80:80"
     volumes:

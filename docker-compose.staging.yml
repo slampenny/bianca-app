@@ -15,6 +15,8 @@ services:
       - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
       # MongoDB for staging (using containerized version)
       - MONGODB_URL=mongodb://localhost:27017/bianca-service
+      # Email configuration
+      - EMAIL_FROM=no-replay@myphonefriend.com
       # Enable EC2 metadata service for IAM role credentials
       - AWS_EC2_METADATA_DISABLED=false
     # Don't mount ~/.aws - use EC2 instance IAM role via metadata service

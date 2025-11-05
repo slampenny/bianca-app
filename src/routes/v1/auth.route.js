@@ -15,8 +15,11 @@ router.post('/forgot-password', validate(authValidation.forgotPassword), authCon
 router.post('/reset-password', validate(authValidation.resetPassword), authController.resetPassword);
 router.post('/send-verification-email', authController.sendVerificationEmail);
 router.post('/resend-verification-email', validate(authValidation.resendVerificationEmail), authController.resendVerificationEmail);
-router.post('/verify-email', validate(authValidation.verifyEmail), authController.verifyEmail);
-router.get('/verify-email', validate(authValidation.verifyEmail), authController.verifyEmail);
+// Verify email routes - don't use validate middleware so we can return HTML for all errors
+// Validation will be done inside the controller to ensure HTML responses
+router.post('/verify-email', authController.verifyEmail);
+router.get('/verify-email', authController.verifyEmail);
+router.post('/set-password-for-sso', validate(authValidation.setPasswordForSSO), authController.setPasswordForSSO);
 
 module.exports = router;
 

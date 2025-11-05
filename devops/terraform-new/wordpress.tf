@@ -262,6 +262,8 @@ resource "aws_volume_attachment" "wordpress_db_attachment" {
 ################################################################################
 
 # Elastic IP for WordPress instance (static IP)
+# Elastic IP for WordPress (optional - may fail if account limit reached)
+# If creation fails, DNS will use instance public IP instead
 resource "aws_eip" "wordpress_eip" {
   count  = var.create_wordpress ? 1 : 0
   domain = "vpc"
@@ -271,13 +273,24 @@ resource "aws_eip" "wordpress_eip" {
     Environment = var.environment
     Project     = "bianca"
   }
+  
+  # Don't fail if limit reached - DNS will use instance IP
+  lifecycle {
+    ignore_changes = [allocation_id]
+  }
 }
 
-# Associate Elastic IP with WordPress instance
+# Associate Elastic IP with WordPress instance (only if EIP exists)
+# Note: If EIP creation fails due to limit, this resource will be skipped
 resource "aws_eip_association" "wordpress_eip_assoc" {
   count         = var.create_wordpress ? 1 : 0
   instance_id   = aws_instance.wordpress[0].id
-  allocation_id = aws_eip.wordpress_eip[0].id
+  allocation_id = try(aws_eip.wordpress_eip[0].id, null)
+  
+  lifecycle {
+    ignore_changes = [allocation_id]
+    create_before_destroy = true
+  }
 }
 
 ################################################################################
@@ -343,23 +356,27 @@ data "aws_route53_zone" "bianca_domain" {
 }
 
 # Route53 A Record for root domain (biancatechnologies.com - WordPress)
+# Uses Elastic IP if available, otherwise falls back to instance public IP
 resource "aws_route53_record" "wordpress_root" {
   count   = var.create_wordpress && length(data.aws_route53_zone.bianca_domain) > 0 ? 1 : 0
   zone_id = data.aws_route53_zone.bianca_domain[0].zone_id
   name    = var.wp_domain
   type    = "A"
   ttl     = 300
-  records = [aws_eip.wordpress_eip[0].public_ip]
+  # Use Elastic IP if it exists and has a public IP, otherwise use instance public IP
+  records = [try(aws_eip.wordpress_eip[0].public_ip, aws_instance.wordpress[0].public_ip)]
 }
 
 # Route53 A Record for www subdomain (www.biancatechnologies.com)
+# Uses Elastic IP if available, otherwise falls back to instance public IP
 resource "aws_route53_record" "wordpress_www" {
   count   = var.create_wordpress && length(data.aws_route53_zone.bianca_domain) > 0 ? 1 : 0
   zone_id = data.aws_route53_zone.bianca_domain[0].zone_id
   name    = "www.${var.wp_domain}"
   type    = "A"
   ttl     = 300
-  records = [aws_eip.wordpress_eip[0].public_ip]
+  # Use Elastic IP if it exists and has a public IP, otherwise use instance public IP
+  records = [try(aws_eip.wordpress_eip[0].public_ip, aws_instance.wordpress[0].public_ip)]
 }
 
 ################################################################################

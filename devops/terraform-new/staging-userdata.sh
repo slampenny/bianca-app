@@ -147,7 +147,7 @@ services:
       - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=$${PUBLIC_IP}
       - AWS_SES_REGION=$${AWS_REGION}
-      - EMAIL_FROM=staging@myphonefriend.com
+      - EMAIL_FROM=no-replay@myphonefriend.com
       - TWILIO_PHONENUMBER=+19285758645
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef

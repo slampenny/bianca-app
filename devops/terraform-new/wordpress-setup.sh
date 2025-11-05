@@ -171,3 +171,6 @@ echo "WordPress will be available at http://$(curl -s http://169.254.169.254/lat
 echo "Configure nginx to proxy biancatechnologies.com to wordpress:80"
 
 
+
+
+

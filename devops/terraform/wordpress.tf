@@ -1,3 +1,12 @@
+# ============================================================================
+# WORDPRESS HAS BEEN MOVED TO STANDALONE WORKSPACE
+# ============================================================================
+# WordPress is now managed in: devops/terraform-wordpress/
+# This file is kept for reference but resources are commented out.
+# Do NOT uncomment these resources - they will conflict with terraform-wordpress/
+# ============================================================================
+
+
 # WordPress Resources for myphonefriend.com
 # This deploys WordPress on a separate EC2 instance (t3.micro) - isolated from app instances
 # IMPORTANT: WordPress deployment is isolated - it will NOT affect app deployments
@@ -538,10 +547,11 @@ data "aws_acm_certificate" "wordpress_cert_existing" {
 # Route53 A Record for root domain (myphonefriend.com - WordPress)
 # Uses instance public IP (auto-assigned since EIP limit reached)
 resource "aws_route53_record" "wordpress_root" {
-  count   = var.create_wordpress ? 1 : 0
-  zone_id = data.aws_route53_zone.wordpress_domain[count.index].zone_id
-  name    = var.wp_domain  # Just "myphonefriend.com" - NO subdomains touched
-  type    = "A"
+  count          = var.create_wordpress ? 1 : 0
+  zone_id        = data.aws_route53_zone.wordpress_domain[count.index].zone_id
+  name           = var.wp_domain  # Just "myphonefriend.com" - NO subdomains touched
+  type           = "A"
+  allow_overwrite = true  # Allow Terraform to manage existing records
 
   alias {
     name                   = aws_lb.wordpress[0].dns_name
@@ -557,10 +567,11 @@ resource "aws_route53_record" "wordpress_root" {
 
 # Create www subdomain record (only if it doesn't exist)
 resource "aws_route53_record" "wordpress_www" {
-  count   = var.create_wordpress ? 1 : 0
-  zone_id = data.aws_route53_zone.wordpress_domain[count.index].zone_id
-  name    = "www.${var.wp_domain}"  # Only www subdomain - other subdomains untouched
-  type    = "A"
+  count          = var.create_wordpress ? 1 : 0
+  zone_id        = data.aws_route53_zone.wordpress_domain[count.index].zone_id
+  name           = "www.${var.wp_domain}"  # Only www subdomain - other subdomains untouched
+  type           = "A"
+  allow_overwrite = true  # Allow Terraform to manage existing records
 
   alias {
     name                   = aws_lb.wordpress[0].dns_name

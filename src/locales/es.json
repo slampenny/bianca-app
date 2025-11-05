@@ -1,1 +1,30 @@
-{}
+{
+	"sendResetPasswordEmail": {
+		"subject": "My Phone Friend - Solicitud de restablecimiento de contraseña",
+		"text": "Estimado cuidador,\n\nHemos recibido una solicitud para restablecer la contraseña de su cuenta My Phone Friend.\n\nPara restablecer su contraseña, por favor haga clic en el enlace de abajo:\n\n%s\n\nEste enlace de restablecimiento expirará en 1 hora por razones de seguridad.\n\nSi no solicitó un restablecimiento de contraseña, por favor ignore este correo. Su cuenta permanece segura.\n\nSaludos cordiales,\nEl equipo de My Phone Friend\n\n---\nMy Phone Friend - Comunicación sanitaria segura\nEste correo fue enviado desde un dominio verificado: myphonefriend.com"
+	},
+	"sendVerificationEmail": {
+		"subject": "My Phone Friend - Por favor verifique su dirección de correo electrónico",
+		"text": "Estimado cuidador,\n\n¡Gracias por crear su cuenta My Phone Friend! Para completar su registro y asegurar la seguridad de la cuenta, por favor verifique su dirección de correo electrónico.\n\nHaga clic en el enlace de abajo para verificar su correo:\n\n%s\n\nEste enlace de verificación expirará en 24 horas por razones de seguridad.\n\nSi no creó una cuenta My Phone Friend, por favor ignore este correo.\n\n¡Bienvenido a la comunicación sanitaria segura!\n\nSaludos cordiales,\nEl equipo de My Phone Friend\n\n---\nMy Phone Friend - Comunicación sanitaria segura\nEste correo fue enviado desde un dominio verificado: myphonefriend.com"
+	},
+	"inviteEmail": {
+		"subject": "Bienvenido a My Phone Friend - Invitación para unirse",
+		"text": "Estimado cuidador,\n\nHa sido invitado a unirse a My Phone Friend, una plataforma segura para la comunicación sanitaria.\n\nPara aceptar su invitación y configurar su cuenta, por favor haga clic en el enlace de abajo:\n\n%s\n\nEsta invitación expirará en 7 días por razones de seguridad.\n\nSi no esperaba esta invitación, por favor ignore este correo.\n\nSaludos cordiales,\nEl equipo de My Phone Friend\n\n---\nMy Phone Friend - Comunicación sanitaria segura\nEste correo fue enviado desde un dominio verificado: myphonefriend.com"
+	},
+	"emailVerifiedPage": {
+		"title": "¡Correo verificado!",
+		"titleAlreadyVerified": "Ya verificado",
+		"message": "Su cuenta My Phone Friend ha sido verificada exitosamente.",
+		"messageAlreadyVerified": "Su correo electrónico ya está verificado. Puede proceder a iniciar sesión.",
+		"redirecting": "Redirigiendo a la aplicación...",
+		"continueButton": "Continuar a la aplicación"
+	},
+	"emailVerificationFailedPage": {
+		"title": "Verificación fallida",
+		"messageInvalid": "Este enlace de verificación es inválido o ha expirado.",
+		"messageExpired": "Este enlace de verificación ha expirado.",
+		"helpExpired": "Por favor solicite un nuevo correo de verificación desde la pantalla de inicio de sesión.",
+		"helpGeneric": "Si cree que esto es un error, por favor contacte al soporte.",
+		"loginButton": "Ir al inicio de sesión"
+	}
+}

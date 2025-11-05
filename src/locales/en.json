@@ -10,5 +10,21 @@
 	"inviteEmail": {
 		"subject": "Welcome to My Phone Friend - Invitation to Join",
 		"text": "Dear caregiver,\n\nYou have been invited to join My Phone Friend, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n%s\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe My Phone Friend Team\n\n---\nMy Phone Friend - Secure Healthcare Communication\nThis email was sent from a verified domain: myphonefriend.com"
+	},
+	"emailVerifiedPage": {
+		"title": "Email Verified!",
+		"titleAlreadyVerified": "Already Verified",
+		"message": "Your My Phone Friend account has been successfully verified.",
+		"messageAlreadyVerified": "Your email is already verified. You can proceed to login.",
+		"redirecting": "Redirecting you to the app...",
+		"continueButton": "Continue to App"
+	},
+	"emailVerificationFailedPage": {
+		"title": "Verification Failed",
+		"messageInvalid": "This verification link is invalid or has expired.",
+		"messageExpired": "This verification link has expired.",
+		"helpExpired": "Please request a new verification email from the login screen.",
+		"helpGeneric": "If you believe this is an error, please contact support.",
+		"loginButton": "Go to Login"
 	}
 }

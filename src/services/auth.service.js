@@ -12,9 +12,24 @@ const { tokenTypes } = require('../config/tokens');
  */
 const loginCaregiverWithEmailAndPassword = async (email, password) => {
   const login = await caregiverService.getLoginCaregiverData(email);
-  if (!login || !(await login.caregiver.isPasswordMatch(password))) {
+  if (!login) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
   }
+  
+  // Check if user has a password (SSO users might not have one)
+  if (!login.caregiver.password) {
+    // Return a special error to indicate SSO account needs password linking
+    const error = new ApiError(httpStatus.FORBIDDEN, 'This account was created with SSO. Please link your account by setting a password or using SSO login.');
+    error.requiresPasswordLinking = true;
+    error.ssoProvider = login.caregiver.ssoProvider;
+    throw error;
+  }
+  
+  // Verify password
+  if (!(await login.caregiver.isPasswordMatch(password))) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
+  }
+  
   return login;
 };
 
@@ -74,19 +89,68 @@ const resetPassword = async (resetPasswordToken, newPassword) => {
 /**
  * Verify email
  * @param {string} verifyEmailToken
- * @returns {Promise}
+ * @returns {Promise<{success: boolean, alreadyVerified?: boolean, message: string}>}
  */
 const verifyEmail = async (verifyEmailToken) => {
   try {
+    // First, try to verify the token
     const verifyEmailTokenDoc = await tokenService.verifyToken(verifyEmailToken, tokenTypes.VERIFY_EMAIL);
     const caregiver = await caregiverService.getCaregiverById(verifyEmailTokenDoc.caregiver);
+    
     if (!caregiver) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, `Caregiver not found: ${refreshTokenDoc.caregiver}`);
+      throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid verification token');
     }
+    
+    // Check if already verified
+    if (caregiver.isEmailVerified) {
+      return {
+        success: true,
+        alreadyVerified: true,
+        message: 'Your email is already verified. You can proceed to login.'
+      };
+    }
+    
+    // Delete all verification tokens for this caregiver
     await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.VERIFY_EMAIL });
+    
+    // Mark email as verified
     await caregiverService.updateCaregiverById(caregiver.id, { isEmailVerified: true });
+    
+    return {
+      success: true,
+      alreadyVerified: false,
+      message: 'Email verified successfully'
+    };
   } catch (error) {
-    throw new ApiError(httpStatus.UNAUTHORIZED, 'Email verification failed');
+    // If it's an ApiError, check if it's a token verification error
+    if (error instanceof ApiError) {
+      // Check if the token might be invalid/expired, but account might already be verified
+      // Try to find the caregiver by attempting to decode the token
+      try {
+        const jwt = require('jsonwebtoken');
+        const config = require('../config/config');
+        const decoded = jwt.verify(verifyEmailToken, config.jwt.secret);
+        
+        if (decoded.type === tokenTypes.VERIFY_EMAIL && decoded.sub) {
+          const caregiver = await caregiverService.getCaregiverById(decoded.sub);
+          if (caregiver && caregiver.isEmailVerified) {
+            return {
+              success: true,
+              alreadyVerified: true,
+              message: 'Your email is already verified. This verification link has expired, but your account is already verified.'
+            };
+          }
+        }
+      } catch (decodeError) {
+        // Token is invalid, can't decode it
+      }
+      
+      // Re-throw the original ApiError with its message
+      throw error;
+    }
+    
+    // For other errors, throw a generic error
+    throw new ApiError(httpStatus.UNAUTHORIZED, error.message || 'Email verification failed');
   }
 };
 
