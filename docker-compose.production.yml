@@ -12,6 +12,8 @@ services:
       - WEBSOCKET_URL=wss://api.myphonefriend.com
       # MongoDB for production (using containerized version)
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
+      # Email configuration
+      - EMAIL_FROM=no-replay@myphonefriend.com
       # Asterisk configuration (will be loaded from AWS Secrets Manager)
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_ENABLED=true

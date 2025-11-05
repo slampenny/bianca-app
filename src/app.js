@@ -135,8 +135,21 @@ const corsOptions = {
       'http://localhost:3001',
       'http://localhost:8080',
       'http://localhost:8081',
-      'http://localhost:8082'  // For Playwright E2E tests
+      'http://localhost:8082',  // For Playwright E2E tests
+      'http://127.0.0.1:3000',   // Alternative localhost format
+      'http://127.0.0.1:3001',
+      'null'                     // Some browsers send 'null' as origin for file:// URLs
     ];
+    
+    // In development, allow all localhost origins for easier testing
+    if (config.env === 'development') {
+      // Allow localhost and 127.0.0.1 with any port
+      if (origin.startsWith('http://localhost:') || 
+          origin.startsWith('http://127.0.0.1:') ||
+          origin === 'null') {
+        return callback(null, true);
+      }
+    }
     
     // Check if it's an allowed origin
     if (allowedOrigins.includes(origin)) {
@@ -153,7 +166,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
@@ -189,6 +203,12 @@ app.use(helmet({
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+// Serve Universal Links and App Links verification files
+// These must be served at the root domain, not under /v1
+// IMPORTANT: For Universal Links to work, these files must be on the same domain as the email links
+const wellKnownRoute = require('./routes/.well-known.route');
+app.use('/.well-known', wellKnownRoute);
 
 // HIPAA Compliance: Session timeout (automatic logoff after 15 min idle)
 // Must be placed AFTER authentication (passport)

@@ -6,6 +6,7 @@ const { authService, caregiverService, orgService, tokenService, emailService, a
 const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
 const { auditAuthFailure } = require('../middlewares/auditLog');
 const { AuditLog } = require('../models');
+const i18n = require('i18n');
 
 const register = catchAsync(async (req, res, next) => {
   const org = await orgService.createOrg(
@@ -28,7 +29,7 @@ const register = catchAsync(async (req, res, next) => {
   // Send verification email automatically after registration
   try {
     const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
   } catch (emailError) {
     console.error('Failed to send verification email during registration:', emailError);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Registration successful but verification email failed. Please contact support.');
@@ -56,7 +57,8 @@ const login = catchAsync(async (req, res, next) => {
   
   try {
     // Step 1: Validate credentials
-    const { caregiver, patients } = await authService.loginCaregiverWithEmailAndPassword(email, password);
+    const loginData = await authService.loginCaregiverWithEmailAndPassword(email, password);
+    const { caregiver, patients, org } = loginData;
 
     // Check if account is locked
     if (caregiver.accountLocked) {
@@ -68,7 +70,7 @@ const login = catchAsync(async (req, res, next) => {
       // Send verification email if not already sent recently
       try {
         const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
       } catch (emailError) {
         console.error('Failed to resend verification email:', emailError);
       }
@@ -123,6 +125,28 @@ const login = catchAsync(async (req, res, next) => {
     const caregiverDTO = CaregiverDTO(caregiver);
     const tokens = await tokenService.generateAuthTokens(caregiver);
     
+    // Use org from loginData (already populated) or fallback to caregiver.org
+    // Ensure org is an object, not just an ID (in case populate failed)
+    let orgForDTO = org || caregiver.org;
+    
+    // If org is not populated (might be ObjectId or string), fetch it manually
+    if (orgForDTO) {
+      const mongoose = require('mongoose');
+      const isObjectId = orgForDTO instanceof mongoose.Types.ObjectId || 
+                        (orgForDTO.constructor && orgForDTO.constructor.name === 'ObjectId');
+      const isString = typeof orgForDTO === 'string';
+      
+      // Check if org doesn't have expected properties (means it's not populated)
+      const hasOrgProperties = orgForDTO.name !== undefined || orgForDTO.email !== undefined;
+      
+      if ((isObjectId || isString) || !hasOrgProperties) {
+        // org is an ObjectId, string, or not properly populated - fetch it
+        const Org = require('../models/org.model');
+        const orgId = isObjectId ? orgForDTO : (orgForDTO._id || orgForDTO.toString());
+        orgForDTO = await Org.findById(orgId);
+      }
+    }
+    
     // Create audit log for successful login
     await AuditLog.create({
       timestamp: new Date(),
@@ -141,7 +165,7 @@ const login = catchAsync(async (req, res, next) => {
       }
     });
     
-    res.send({ org: OrgDTO(caregiver.org), caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
+    res.send({ org: OrgDTO(orgForDTO), caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
   } catch (error) {
     // HIPAA Compliance: Log failed authentication attempts
     await auditAuthFailure(
@@ -150,7 +174,28 @@ const login = catchAsync(async (req, res, next) => {
       req.get('user-agent'),
       error.message
     );
-    throw error; // Re-throw to be handled by error middleware
+    // Re-throw to be handled by error middleware
+    // IMPORTANT: Preserve custom properties (requiresPasswordLinking, ssoProvider) when re-throwing
+    // This ensures the error middleware can include them in the response
+    if (error instanceof ApiError) {
+      // If it's already an ApiError, just re-throw (properties are already on it)
+      throw error;
+    } else {
+      // If it's a regular Error, convert to ApiError but preserve custom properties
+      const apiError = new ApiError(
+        error.statusCode || httpStatus.INTERNAL_SERVER_ERROR,
+        error.message || 'Internal server error',
+        false,
+        error.stack
+      );
+      if (error.requiresPasswordLinking !== undefined) {
+        apiError.requiresPasswordLinking = error.requiresPasswordLinking;
+      }
+      if (error.ssoProvider !== undefined) {
+        apiError.ssoProvider = error.ssoProvider;
+      }
+      throw apiError;
+    }
   }
 });
 
@@ -187,9 +232,48 @@ const resetPassword = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+/**
+ * Set password for SSO user
+ * Allows SSO users to set a password so they can login with email/password
+ */
+const setPasswordForSSO = catchAsync(async (req, res) => {
+  const { email, password, confirmPassword } = req.body;
+  
+  if (!email || !password || !confirmPassword) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Email, password, and confirmation password are required');
+  }
+  
+  if (password !== confirmPassword) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Passwords do not match');
+  }
+  
+  // Find the caregiver
+  const caregiver = await caregiverService.getCaregiverByEmail(email);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+  
+  // Verify this is an SSO user without a password
+  if (caregiver.password) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'This account already has a password');
+  }
+  
+  if (!caregiver.ssoProvider) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'This account is not an SSO account');
+  }
+  
+  // Set the password
+  await caregiverService.updateCaregiverById(caregiver.id, { password });
+  
+  res.status(httpStatus.OK).send({
+    message: 'Password set successfully. You can now login with your email and password.',
+    success: true
+  });
+});
+
 const sendVerificationEmail = catchAsync(async (req, res) => {
   const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.body.caregiver);
-  await emailService.sendVerificationEmail(req.body.caregiver.email, verifyEmailToken);
+  await emailService.sendVerificationEmail(req.body.caregiver.email, verifyEmailToken, req.body.caregiver.name);
   res.status(httpStatus.NO_CONTENT).send();
 });
 
@@ -214,7 +298,7 @@ const resendVerificationEmail = catchAsync(async (req, res) => {
   // Generate and send new verification token
   try {
     const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken);
+    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
     res.status(httpStatus.OK).send({ message: 'Verification email sent successfully' });
   } catch (emailError) {
     console.error('Failed to resend verification email:', emailError);
@@ -222,110 +306,224 @@ const resendVerificationEmail = catchAsync(async (req, res) => {
   }
 });
 
-const verifyEmail = catchAsync(async (req, res) => {
-  await authService.verifyEmail(req.query.token);
+// Helper function to generate styled, themed, and localized HTML pages
+const generateVerificationPage = (req, isError, options = {}) => {
+  // Get locale from request (i18n middleware sets req.locale)
+  const locale = req.locale || req.getLocale?.() || 'en';
+  const isAlreadyVerified = options.isAlreadyVerified || false;
+  const errorMessage = options.errorMessage || '';
+  const isExpired = options.isExpired || false;
   
-  // Return HTML page that handles both mobile deep linking and web redirect
-  const html = `
+  // Get translations (fallback to English if not available)
+  const t = (key) => {
+    try {
+      return i18n.__({ phrase: key, locale }) || key;
+    } catch {
+      return key;
+    }
+  };
+  
+  const title = isError 
+    ? t('emailVerificationFailedPage.title')
+    : (isAlreadyVerified ? t('emailVerifiedPage.titleAlreadyVerified') : t('emailVerifiedPage.title'));
+  
+  const message = isError
+    ? (isExpired ? t('emailVerificationFailedPage.messageExpired') : (errorMessage || t('emailVerificationFailedPage.messageInvalid')))
+    : (isAlreadyVerified ? t('emailVerifiedPage.messageAlreadyVerified') : t('emailVerifiedPage.message'));
+  
+  const helpText = isError
+    ? (isExpired ? t('emailVerificationFailedPage.helpExpired') : t('emailVerificationFailedPage.helpGeneric'))
+    : '';
+  
+  const buttonText = isError
+    ? t('emailVerificationFailedPage.loginButton')
+    : t('emailVerifiedPage.continueButton');
+  
+  const redirectingText = isError ? '' : t('emailVerifiedPage.redirecting');
+  
+  return `
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="${locale}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Email Verified - My Phone Friend</title>
+      <title>${title} - My Phone Friend</title>
       <style>
         * {
           margin: 0;
           padding: 0;
           box-sizing: border-box;
         }
+        :root {
+          --bg-primary: #ffffff;
+          --bg-secondary: #f8f9fa;
+          --text-primary: #1a1a1a;
+          --text-secondary: #6b7280;
+          --text-tertiary: #9ca3af;
+          --border-color: #e5e5e5;
+          --success-color: #10b981;
+          --error-color: #ef4444;
+          --success-bg: #d1fae5;
+          --error-bg: #fee2e2;
+          --button-bg: #10b981;
+          --button-hover: #059669;
+          --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #000000;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-tertiary: #9ca3af;
+            --border-color: #374151;
+            --success-color: #34d399;
+            --error-color: #f87171;
+            --success-bg: #064e3b;
+            --error-bg: #7f1d1d;
+            --button-bg: #10b981;
+            --button-hover: #34d399;
+            --shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+        }
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background-color: #f8f9fa;
-          color: #1a1a1a;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          background-color: var(--bg-secondary);
+          color: var(--text-primary);
           display: flex;
           justify-content: center;
           align-items: center;
           min-height: 100vh;
           padding: 16px;
+          transition: background-color 0.3s ease, color 0.3s ease;
         }
         .container {
-          background: white;
-          padding: 32px;
-          border-radius: 12px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          max-width: 320px;
+          background: var(--bg-primary);
+          padding: 40px 32px;
+          border-radius: 16px;
+          box-shadow: var(--shadow);
+          max-width: 480px;
           width: 100%;
           text-align: center;
-          border: 1px solid #e5e5e5;
+          border: 1px solid var(--border-color);
+          transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        .icon-container {
+          margin-bottom: 24px;
         }
         .checkmark {
-          color: #10B981;
-          font-size: 60px;
-          margin-bottom: 16px;
+          color: var(--success-color);
+          font-size: 72px;
+          line-height: 1;
+          display: block;
+        }
+        .error-icon {
+          color: var(--error-color);
+          font-size: 72px;
+          line-height: 1;
           display: block;
         }
         .title {
-          color: #1a1a1a;
-          font-size: 24px;
-          font-weight: bold;
+          color: var(--text-primary);
+          font-size: 28px;
+          font-weight: 700;
           margin-bottom: 16px;
-          line-height: 1.2;
+          line-height: 1.3;
+          transition: color 0.3s ease;
         }
         .message {
-          color: #6b7280;
+          color: var(--text-secondary);
           font-size: 16px;
-          margin-bottom: 24px;
+          margin-bottom: 20px;
+          line-height: 1.6;
+          transition: color 0.3s ease;
+        }
+        .help-text {
+          color: var(--text-tertiary);
+          font-size: 14px;
+          margin-top: 16px;
           line-height: 1.5;
+          transition: color 0.3s ease;
         }
         .status {
-          color: #6b7280;
+          color: var(--text-secondary);
           font-size: 14px;
           font-style: italic;
           margin-bottom: 16px;
+          min-height: 20px;
+          transition: color 0.3s ease;
         }
-        .fallback-link {
+        .button {
           display: inline-block;
-          background: #10B981;
+          background: var(--button-bg);
           color: white;
-          padding: 12px 24px;
+          padding: 14px 28px;
           text-decoration: none;
           border-radius: 8px;
-          font-weight: 500;
+          font-weight: 600;
           font-size: 16px;
-          transition: background 0.2s;
-          display: none;
+          transition: background-color 0.2s ease, transform 0.1s ease;
+          margin-top: 8px;
+          border: none;
+          cursor: pointer;
         }
-        .fallback-link:hover {
-          background: #059669;
+        .button:hover {
+          background: var(--button-hover);
+          transform: translateY(-1px);
+        }
+        .button:active {
+          transform: translateY(0);
+        }
+        .fallback-link {
+          display: none;
         }
         .spinner {
           display: inline-block;
-          width: 20px;
-          height: 20px;
-          border: 2px solid #e5e5e5;
+          width: 16px;
+          height: 16px;
+          border: 2px solid var(--border-color);
           border-radius: 50%;
-          border-top-color: #10B981;
-          animation: spin 1s ease-in-out infinite;
+          border-top-color: var(--success-color);
+          animation: spin 0.8s linear infinite;
           margin-right: 8px;
+          vertical-align: middle;
+          transition: border-color 0.3s ease;
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        @media (max-width: 480px) {
+          .container {
+            padding: 32px 24px;
+          }
+          .title {
+            font-size: 24px;
+          }
+          .checkmark, .error-icon {
+            font-size: 64px;
+          }
         }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="checkmark">✓</div>
-        <h1 class="title">Email Verified!</h1>
-        <p class="message">Your My Phone Friend account has been successfully verified.</p>
+        <div class="icon-container">
+          ${isError ? `<div class="error-icon">⚠</div>` : `<div class="checkmark">✓</div>`}
+        </div>
+        <h1 class="title">${title}</h1>
+        <p class="message">${message}</p>
+        ${helpText ? `<p class="help-text">${helpText}</p>` : ''}
+        ${!isError ? `
         <div class="status" id="status">
           <span class="spinner"></span>
-          Redirecting you to the app...
+          ${redirectingText}
         </div>
-        <a href="${config.frontendUrl}" class="fallback-link" id="fallback">Continue to App</a>
+        <a href="${config.frontendUrl}" class="button fallback-link" id="fallback">${buttonText}</a>
+        ` : `
+        <a href="${config.frontendUrl}" class="button">${buttonText}</a>
+        `}
       </div>
-      
+      ${!isError ? `
       <script>
         // Attempt deep link to mobile app first
         function attemptDeepLink() {
@@ -337,8 +535,14 @@ const verifyEmail = catchAsync(async (req, res) => {
           
           // If mobile app doesn't open in 3 seconds, show fallback
           setTimeout(() => {
-            document.getElementById('status').innerHTML = 'App not installed? Click below to continue in browser.';
-            document.getElementById('fallback').style.display = 'inline-block';
+            const statusEl = document.getElementById('status');
+            const fallbackEl = document.getElementById('fallback');
+            if (statusEl) {
+              statusEl.innerHTML = 'App not installed? Click below to continue in browser.';
+            }
+            if (fallbackEl) {
+              fallbackEl.style.display = 'inline-block';
+            }
             
             // Auto-redirect to web after 5 seconds if user doesn't click
             setTimeout(() => {
@@ -350,12 +554,51 @@ const verifyEmail = catchAsync(async (req, res) => {
         // Start the process
         attemptDeepLink();
       </script>
+      ` : ''}
     </body>
     </html>
   `;
+};
+
+const verifyEmail = async (req, res, next) => {
+  // Always set Content-Type to HTML before any response
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   
-  res.status(httpStatus.OK).send(html);
-});
+  // Validate token parameter (manual validation to avoid error middleware)
+  const token = req.query.token || req.body.token;
+  if (!token) {
+    const errorHtml = generateVerificationPage(req, true, {
+      errorMessage: 'Verification token is required',
+      isExpired: false
+    });
+    return res.status(httpStatus.BAD_REQUEST).send(errorHtml);
+  }
+  
+  try {
+    const result = await authService.verifyEmail(token);
+    
+    // Generate localized and themed HTML page
+    const html = generateVerificationPage(req, false, {
+      isAlreadyVerified: result.alreadyVerified,
+      message: result.message
+    });
+  
+    res.status(httpStatus.OK).send(html);
+  } catch (error) {
+    // If verification failed, return a user-friendly error page
+    // Don't pass to error middleware - we want to send HTML, not JSON
+    const errorMessage = error.message || 'Email verification failed';
+    const isExpired = error.message && (error.message.includes('expired') || error.message.includes('Invalid') || error.message.includes('Token not found'));
+    
+    // Generate localized and themed error HTML page
+    const errorHtml = generateVerificationPage(req, true, {
+      errorMessage,
+      isExpired
+    });
+    
+    res.status(httpStatus.UNAUTHORIZED).send(errorHtml);
+  }
+};
 
 module.exports = {
   register,
@@ -368,4 +611,5 @@ module.exports = {
   sendVerificationEmail,
   resendVerificationEmail,
   verifyEmail,
+  setPasswordForSSO,
 };

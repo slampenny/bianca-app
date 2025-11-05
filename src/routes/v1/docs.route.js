@@ -19,6 +19,15 @@ router.use(
     swaggerOptions: {
       url: '/v1/docs/swagger.json',
       persistAuthorization: true,
+      // Ensure requests use the correct base URL
+      requestInterceptor: (request) => {
+        // Ensure request URL is absolute if needed
+        if (request.url && !request.url.startsWith('http')) {
+          // If relative URL, it should work fine with the same origin
+          // Swagger UI will handle relative URLs correctly
+        }
+        return request;
+      },
     },
     customSiteTitle: 'Bianca API Documentation',
     customCss: '.swagger-ui .topbar { display: none }',

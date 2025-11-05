@@ -1249,7 +1249,7 @@ resource "aws_ecs_task_definition" "mongodb_task" {
 #         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
 #         
 #         { name = "AWS_SES_REGION", value = var.aws_region },
-#         { name = "EMAIL_FROM", value = "support@myphonefriend.com" },
+#         { name = "EMAIL_FROM", value = "no-replay@myphonefriend.com" },
 #         { name = "TWILIO_PHONENUMBER", value = "+19786256514" },  # Replace with your actual Twilio number
 #         { name = "TWILIO_ACCOUNTSID", value = "TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED" },  # Replace with your actual Twilio SID
 #         { name = "STRIPE_PUBLISHABLE_KEY", value = "pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef" },  # Replace with your actual Stripe publishable key

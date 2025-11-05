@@ -112,7 +112,11 @@ const baselineConfig = {
   authEnabled: true, // Assuming auth is generally enabled
   baseUrl: envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`, // Default base URL
   apiUrl: (envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`) + '/v1', // Default API URL
-  frontendUrl: envVars.FRONTEND_URL || 'https://app.myphonefriend.com', // Frontend URL for invite links
+  // Frontend URL - should be set via FRONTEND_URL env var:
+  // - Development: http://localhost:8081 (Expo default)
+  // - Staging: https://staging.myphonefriend.com
+  // - Production: https://app.myphonefriend.com
+  frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? 'https://staging.myphonefriend.com' : 'https://app.myphonefriend.com')),
   mongoose: {
     url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {
@@ -140,7 +144,7 @@ const baselineConfig = {
     accessExpirationMinutes: 30,
     refreshExpirationDays: 30,
     resetPasswordExpirationMinutes: 10,
-    verifyEmailExpirationMinutes: 10,
+    verifyEmailExpirationMinutes: 1440, // 24 hours (matches email message)
     inviteExpirationMinutes: 10080 // 7 days
   },
   email: {
@@ -161,7 +165,7 @@ const baselineConfig = {
         pass: envVars.SMTP_PASSWORD,
       },
     },
-    from: envVars.EMAIL_FROM || 'support@myphonefriend.com', // Primary 'from' address
+    from: envVars.EMAIL_FROM || 'no-replay@myphonefriend.com', // Primary 'from' address
   },
   app: {
     rtpPortRange: process.env.APP_RTP_PORT_RANGE || '20002-30000'

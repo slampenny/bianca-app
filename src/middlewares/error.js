@@ -11,6 +11,14 @@ const errorConverter = (err, req, res, next) => {
       error.statusCode || error instanceof mongoose.Error ? httpStatus.BAD_REQUEST : httpStatus.INTERNAL_SERVER_ERROR;
     const message = error.message || httpStatus[statusCode];
     error = new ApiError(statusCode, message, false, err.stack);
+    
+    // Preserve custom error properties from the original error
+    if (err.requiresPasswordLinking !== undefined) {
+      error.requiresPasswordLinking = err.requiresPasswordLinking;
+    }
+    if (err.ssoProvider !== undefined) {
+      error.ssoProvider = err.ssoProvider;
+    }
   }
   next(error);
 };
@@ -25,11 +33,36 @@ const errorHandler = (err, req, res, next) => {
 
   res.locals.errorMessage = err.message;
 
+  // Debug: Log all error properties to see what's available
+  if (err.requiresPasswordLinking !== undefined || err.ssoProvider !== undefined) {
+    logger.info('[SSO Account Linking] Error object properties:', {
+      hasRequiresPasswordLinking: err.requiresPasswordLinking !== undefined,
+      requiresPasswordLinking: err.requiresPasswordLinking,
+      hasSSOProvider: err.ssoProvider !== undefined,
+      ssoProvider: err.ssoProvider,
+      errorKeys: Object.keys(err),
+      errorType: err.constructor.name
+    });
+  }
+
   const response = {
     code: statusCode,
     message,
     ...(['development', 'test'].includes(config.env) && { stack: err.stack }),
+    // Preserve custom error properties (e.g., requiresPasswordLinking, ssoProvider)
+    // Always include these if they exist (not just truthy check)
+    ...(err.requiresPasswordLinking !== undefined && { requiresPasswordLinking: err.requiresPasswordLinking }),
+    ...(err.ssoProvider !== undefined && { ssoProvider: err.ssoProvider }),
   };
+  
+  // Debug logging for SSO account linking errors
+  if (err.requiresPasswordLinking) {
+    logger.info('[SSO Account Linking] Error response being sent:', {
+      requiresPasswordLinking: err.requiresPasswordLinking,
+      ssoProvider: err.ssoProvider,
+      response: response
+    });
+  }
 
   if (['development', 'test'].includes(config.env)) {
     logger.error(err);

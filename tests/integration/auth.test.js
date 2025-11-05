@@ -61,21 +61,21 @@ describe('Auth routes', () => {
         })
         .expect(httpStatus.CREATED);
 
-      const caregiver = res.body.org.caregivers[0];
+      // Registration now returns caregiver directly, not in org.caregivers
+      const caregiver = res.body.caregiver;
 
+      expect(res.body).toHaveProperty('message');
+      expect(res.body).toHaveProperty('requiresEmailVerification', true);
       expect(caregiver).not.toHaveProperty('password');
       expect(caregiver).toEqual({
         id: expect.anything(),
         name: caregiverOne.name,
         email: caregiverOne.email,
         phone: caregiverOne.phone,
-        role: 'orgAdmin',
+        role: 'unverified',
         org: expect.anything(),
         patients: [],
         isEmailVerified: false,
-        mfaEnabled: false,
-        accountLocked: false,
-        failedLoginAttempts: 0,
       });
 
       const dbCaregiver = await Caregiver.findById(caregiver.id);
@@ -83,14 +83,12 @@ describe('Auth routes', () => {
       expect(dbCaregiver).toMatchObject({
         name: caregiverOne.name,
         email: caregiverOne.email,
-        role: 'orgAdmin',
+        role: 'unverified', // Registration creates unverified users
         isEmailVerified: false,
       });
 
-      expect(res.body.tokens).toEqual({
-        access: { token: expect.anything(), expires: expect.anything() },
-        refresh: { token: expect.anything(), expires: expect.anything() },
-      });
+      // Registration no longer returns tokens - requires email verification first
+      expect(res.body).not.toHaveProperty('tokens');
     }, 15000);
 
     test('should return 400 error if email is invalid', async () => {
@@ -173,7 +171,7 @@ describe('Auth routes', () => {
         org: org.id,
         role: 'staff',
         patients: [],
-        isEmailVerified: false,
+        isEmailVerified: true, // Test fixtures set isEmailVerified: true
       });
 
       expect(res.body.tokens).toEqual({

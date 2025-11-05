@@ -62,6 +62,7 @@ SKIP_BACKEND_PUSH=false
 SKIP_FRONTEND_PUSH=false
 SKIP_ASTERISK_PUSH=false
 FORCE_CLEANUP=false
+SKIP_GIT_CHECK=false
 
 for arg in "$@"; do
     case $arg in
@@ -75,8 +76,45 @@ for arg in "$@"; do
             echo "   This will remove ALL containers including MongoDB!"
             FORCE_CLEANUP=true
             ;;
+        --skip-git-check)
+            echo "⚠️  Skipping git branch/status checks (--skip-git-check flag provided)"
+            SKIP_GIT_CHECK=true
+            ;;
     esac
 done
+
+# Git safety checks (unless skipped)
+if [ "$SKIP_GIT_CHECK" = false ]; then
+    echo "🔍 Checking git status..."
+    
+    # Check if we're in a git repo
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        echo "⚠️  Warning: Not in a git repository. Deploying local files as-is."
+    else
+        # Check current branch
+        CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+        echo "   Current branch: $CURRENT_BRANCH"
+        
+        # Check for uncommitted changes
+        if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+            echo "⚠️  WARNING: You have uncommitted changes!"
+            echo "   The deployment will include these uncommitted changes."
+            echo "   Press Ctrl+C to cancel, or continue in 5 seconds..."
+            sleep 5
+        else
+            echo "   ✓ No uncommitted changes"
+        fi
+        
+        # Warn if not on main/master/staging branch
+        if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "staging" ]]; then
+            echo "⚠️  WARNING: You're on branch '$CURRENT_BRANCH', not main/master/staging!"
+            echo "   The deployment will use code from this branch."
+            echo "   Press Ctrl+C to cancel, or continue in 5 seconds..."
+            sleep 5
+        fi
+    fi
+    echo ""
+fi
 
 # Step 1: Build and push Docker images (backend, frontend, and asterisk)
 echo "🐳 Building and pushing backend Docker image..."
@@ -283,7 +321,13 @@ if [ -n "$STAGING_IP" ]; then
         docker-compose stop app asterisk frontend nginx || true
         docker-compose rm -f app asterisk frontend nginx || true
         
-        # Remove any orphaned containers with our project names
+        # Remove any orphaned containers with our project names (force remove by name)
+        # Use exact name matches to avoid conflicts
+        for container_name in staging_app staging_asterisk staging_frontend staging_nginx staging_bianca-app; do
+          docker rm -f \$container_name 2>/dev/null || true
+        done
+        
+        # Also remove by filter pattern (in case names are slightly different)
         docker rm -f \$(docker ps -aq --filter 'name=staging_app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=staging_asterisk') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=staging_frontend') 2>/dev/null || true
@@ -291,8 +335,8 @@ if [ -n "$STAGING_IP" ]; then
         docker rm -f \$(docker ps -aq --filter 'name=staging_bianca-app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=bianca-app') 2>/dev/null || true
 
-        # Extra safety: explicitly remove known container names if still present
-        docker rm -f staging_frontend staging_app staging_nginx staging_asterisk 2>/dev/null || true
+        # Remove network if it exists (will be recreated)
+        docker network rm bianca-staging_bianca-network 2>/dev/null || true
 
         # Show remaining staging containers for debugging
         echo 'Remaining staging containers (if any):'
@@ -344,4 +388,9 @@ echo "💡 Usage:"
 echo "   ./scripts/deploy-staging.sh                    # Normal deployment (preserves MongoDB)"
 echo "   ./scripts/deploy-staging.sh --skip-ecr         # Skip ECR login checks"
 echo "   ./scripts/deploy-staging.sh --force-cleanup    # Remove ALL containers including MongoDB"
+echo "   ./scripts/deploy-staging.sh --skip-git-check   # Skip git branch/status warnings"
 echo "   ./scripts/deploy-staging.sh --skip-ecr --force-cleanup  # Both flags"
+echo ""
+echo "⚠️  IMPORTANT: This script deploys from your LOCAL working directory,"
+echo "   NOT from the main branch! Make sure you're on the right branch"
+echo "   and have committed/pushed your changes before deploying."

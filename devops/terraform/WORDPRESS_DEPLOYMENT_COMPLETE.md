@@ -116,3 +116,6 @@ nslookup myphonefriend.com
 **Terraform State**: All WordPress resources are tracked in Terraform state and can be managed/reproduced.
 
 
+
+
+

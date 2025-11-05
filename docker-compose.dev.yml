@@ -11,9 +11,17 @@ services:
       - .env
     environment:
       - NODE_ENV=development
+      - USE_SES_IN_DEV=${USE_SES_IN_DEV:-true}
+      - AWS_PROFILE=${AWS_PROFILE:-jordan}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8081}
+      # Unset placeholder credentials to avoid conflicts with AWS_PROFILE
+      - AWS_ACCESS_KEY_ID=
+      - AWS_SECRET_ACCESS_KEY=
     volumes:
       - .:/usr/src/bianca-app
       - /usr/src/bianca-app/node_modules  # Exclude node_modules from volume mount
+      - /home/jordanlapp/.aws:/home/node/.aws:ro  # Mount AWS config and SSO cache for SES access (node user)
     working_dir: /usr/src/bianca-app
     command: ["yarn", "dev"]  # Use development command with hot reloading
     ports:

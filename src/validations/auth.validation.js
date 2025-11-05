@@ -56,6 +56,14 @@ const resendVerificationEmail = {
   }),
 };
 
+const setPasswordForSSO = {
+  body: Joi.object().keys({
+    email: Joi.string().email().required(),
+    password: Joi.string().required().custom(password),
+    confirmPassword: Joi.string().required().custom(password),
+  }),
+};
+
 module.exports = {
   register,
   login,
@@ -65,4 +73,5 @@ module.exports = {
   resetPassword,
   verifyEmail,
   resendVerificationEmail,
+  setPasswordForSSO,
 };

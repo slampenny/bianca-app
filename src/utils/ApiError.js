@@ -8,6 +8,8 @@ class ApiError extends Error {
     } else {
       Error.captureStackTrace(this, this.constructor);
     }
+    // Allow custom properties to be set on ApiError instances
+    // This is needed for SSO account linking errors (requiresPasswordLinking, ssoProvider)
   }
 }
 
