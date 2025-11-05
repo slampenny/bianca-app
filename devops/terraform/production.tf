@@ -278,10 +278,9 @@ resource "aws_instance" "production" {
     Environment = "production"
   }
 
-  # Prevent unnecessary user_data changes from triggering instance updates
-  lifecycle {
-    ignore_changes = [user_data]
-  }
+  # On-demand instances can be stopped and restarted to apply user_data changes
+  # To apply user_data changes: terraform taint aws_instance.production && terraform apply
+  # Or manually: stop instance, update user_data, start instance
 }
 
 # Attach EBS volume to production instance
