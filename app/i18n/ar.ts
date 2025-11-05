@@ -4,6 +4,7 @@ const ar: Translations = {
   common: {
     ok: "نعم",
     cancel: "حذف",
+    error: "خطأ",
     back: "خلف",
     logOut: "تسجيل خروج",
   },
@@ -159,6 +160,22 @@ const ar: Translations = {
     successMessage: "تم إرسال رمز إعادة التعيين إلى بريدك الالكتروني!",
     requestFailed: "فشل الطلب. يرجى التحقق من بريدك الالكتروني والمحاولة مرة أخرى.",
   },
+  emailVerificationScreen: {
+    title: "تحقق من بريدك الإلكتروني",
+    message: "لقد أرسلنا رابط التحقق إلى عنوان بريدك الإلكتروني. يرجى النقر على الرابط للتحقق من حسابك قبل تسجيل الدخول.",
+    emailFieldLabel: "عنوان البريد الإلكتروني",
+    emailFieldPlaceholder: "أدخل عنوان بريدك الإلكتروني",
+    resendButton: "إعادة إرسال بريد التحقق",
+    backToLoginButton: "العودة إلى تسجيل الدخول",
+    successMessage: "✓ تم إرسال بريد التحقق! يرجى التحقق من بريدك الوارد.",
+    errorNoEmail: "يرجى إدخال عنوان بريدك الإلكتروني",
+    errorSendFailed: "فشل إرسال بريد التحقق",
+  },
+  emailVerifiedScreen: {
+    title: "تم التحقق من البريد الإلكتروني!",
+    message: "تم التحقق من حساب My Phone Friend بنجاح.",
+    redirecting: "إعادة توجيهك إلى التطبيق...",
+  },
   conversationsScreen: {
     title: "المحادثات",
     yesterday: "أمس",
@@ -301,6 +318,7 @@ const ar: Translations = {
   },
   common: {
     cancel: "إلغاء",
+    error: "خطأ",
     selectImage: "اختر صورة",
     calling: "جاري الاتصال...",
     callNow: "اتصل الآن",

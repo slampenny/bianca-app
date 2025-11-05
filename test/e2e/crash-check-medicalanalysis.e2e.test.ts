@@ -54,3 +54,5 @@ test('MedicalAnalysisScreen should load without crashing', async ({ page }) => {
   console.log('✅ MedicalAnalysisScreen loaded without crashes')
 })
 
+
+

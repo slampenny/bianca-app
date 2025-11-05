@@ -4,6 +4,7 @@ const zh: Translations = {
   common: {
     ok: "确定",
     cancel: "取消",
+    error: "错误",
     back: "返回",
     logOut: "退出登录",
     selectImage: "选择图片",
@@ -97,6 +98,22 @@ const zh: Translations = {
     requestReset: "请求重置",
     successMessage: "重置代码已发送到你的电子邮件！",
     requestFailed: "请求失败。请检查你的电子邮件并重试。",
+  },
+  emailVerificationScreen: {
+    title: "检查您的电子邮件",
+    message: "我们已向您的电子邮件地址发送了验证链接。请点击链接以在登录前验证您的账户。",
+    emailFieldLabel: "电子邮件地址",
+    emailFieldPlaceholder: "输入您的电子邮件地址",
+    resendButton: "重新发送验证电子邮件",
+    backToLoginButton: "返回登录",
+    successMessage: "✓ 验证电子邮件已发送！请检查您的收件箱。",
+    errorNoEmail: "请输入您的电子邮件地址",
+    errorSendFailed: "发送验证电子邮件失败",
+  },
+  emailVerifiedScreen: {
+    title: "电子邮件已验证！",
+    message: "您的 My Phone Friend 帐户已成功验证。",
+    redirecting: "正在重定向到应用程序...",
   },
   conversationsScreen: {
     title: "对话",

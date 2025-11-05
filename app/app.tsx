@@ -47,6 +47,12 @@ const config = {
     },
     MainTabs: "MainTabs",
     EmailVerified: "email-verified",
+    VerifyEmail: {
+      path: "auth/verify-email/:token?",
+      parse: {
+        token: (value: string) => value || undefined,
+      },
+    },
     Signup: "signup",
     ConfirmReset: "reset-password",
   },

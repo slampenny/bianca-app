@@ -16,6 +16,7 @@ interface LoadingButtonProps {
   loadingTx?: string
   testID?: string
   spinnerTestID?: string
+  accessibilityLabel?: string
 }
 
 export const LoadingButton: React.FC<LoadingButtonProps> = ({
@@ -31,6 +32,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
   loadingTx,
   testID,
   spinnerTestID,
+  accessibilityLabel,
 }) => {
   const isDisabled = disabled || loading
 
@@ -69,6 +71,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
       onPress={handlePress}
       disabled={isDisabled}
       testID={testID}
+      accessibilityLabel={accessibilityLabel || testID}
     >
       {loading ? (
         <>

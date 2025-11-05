@@ -44,6 +44,10 @@
       "icon": "./assets/images/app-icon-ios.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.negascout.bianca",
+      "associatedDomains": [
+        "applinks:app.myphonefriend.com",
+        "applinks:staging.myphonefriend.com"
+      ],
       "splash": {
         "image": "./assets/images/splash-logo-ios-mobile.png",
         "tabletImage": "./assets/images/splash-logo-ios-tablet.png",

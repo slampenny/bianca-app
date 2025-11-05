@@ -162,6 +162,22 @@ const ko: Translations = {
     successMessage: "재설정 코드가 이메일로 전송되었습니다!",
     requestFailed: "요청이 실패했습니다. 이메일을 확인하고 다시 시도해 주세요.",
   },
+  emailVerificationScreen: {
+    title: "이메일을 확인하세요",
+    message: "이메일 주소로 확인 링크를 보냈습니다. 로그인하기 전에 링크를 클릭하여 계정을 확인하세요.",
+    emailFieldLabel: "이메일 주소",
+    emailFieldPlaceholder: "이메일 주소를 입력하세요",
+    resendButton: "확인 이메일 재전송",
+    backToLoginButton: "로그인으로 돌아가기",
+    successMessage: "✓ 확인 이메일을 보냈습니다! 받은 편지함을 확인하세요.",
+    errorNoEmail: "이메일 주소를 입력하세요",
+    errorSendFailed: "확인 이메일 전송 실패",
+  },
+  emailVerifiedScreen: {
+    title: "이메일 확인됨!",
+    message: "My Phone Friend 계정이 성공적으로 확인되었습니다.",
+    redirecting: "앱으로 리디렉션 중...",
+  },
   conversationsScreen: {
     title: "대화",
     yesterday: "어제",
@@ -302,6 +318,7 @@ const ko: Translations = {
   },
   common: {
     cancel: "취소",
+    error: "오류",
     selectImage: "이미지 선택",
     calling: "통화 중...",
     callNow: "지금 통화",

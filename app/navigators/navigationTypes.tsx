@@ -8,7 +8,7 @@ export type AppStackParamList = {
   PrivacyPractices: undefined
   Terms: undefined
   EmailVerified: undefined
-  EmailVerificationRequired: undefined
+  EmailVerificationRequired: { email?: string } | undefined
 }
 
 export type DrawerParamList = {
@@ -81,7 +81,9 @@ export type LoginStackParamList = {
   PrivacyPractices: undefined
   Terms: undefined
   EmailVerified: undefined
-  EmailVerificationRequired: undefined
+  EmailVerificationRequired: { email?: string } | undefined
+  VerifyEmail: { token?: string; query?: { token?: string } } | undefined
+  SSOAccountLinking: { email: string; ssoProvider?: string } | undefined
   Signup: { token?: string }
 }
 

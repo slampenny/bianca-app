@@ -6,27 +6,49 @@ import { isAuthenticated } from "app/store/authSlice"
 import { Screen, Text } from "app/components"
 import { spacing } from "app/theme"
 import { useTheme } from "app/theme/ThemeContext"
+import { navigationRef } from "app/navigators/navigationUtilities"
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.palette.neutral100,
+    backgroundColor: colors.palette.biancaBackground || colors.palette.neutral100,
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.lg,
   },
-  successText: {
-    color: colors.palette.success500,
-    fontSize: 24,
+  contentWrapper: {
+    width: "100%",
+    maxWidth: 500,
+    alignSelf: "center",
+    alignItems: "center",
+  },
+  checkmarkContainer: {
+    marginBottom: spacing.lg,
+  },
+  checkmark: {
+    fontSize: 64,
+    color: colors.palette.biancaSuccess || colors.palette.success500 || "#10b981",
+    textAlign: "center",
+  },
+  title: {
+    color: colors.palette.biancaHeader || colors.palette.neutral800,
+    fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: spacing.md,
   },
   messageText: {
-    color: colors.palette.neutral800,
+    color: colors.palette.neutral600 || colors.textDim,
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
+    marginBottom: spacing.sm,
+  },
+  redirectingText: {
+    color: colors.palette.neutral500 || colors.textDim,
+    fontSize: 14,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 })
 
@@ -36,22 +58,32 @@ export const EmailVerifiedScreen = () => {
   const { colors, isLoading: themeLoading } = useTheme()
 
   if (themeLoading) {
-    return null
+    return (
+      <Screen style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading...</Text>
+      </Screen>
+    )
   }
 
   const styles = createStyles(colors)
 
   useEffect(() => {
-    // Show success message for 3 seconds, then navigate
+    // Show success message briefly, then navigate
     const timer = setTimeout(() => {
       if (isLoggedIn) {
-        // User is logged in, go to main app
-        navigation.navigate("MainTabs" as never)
+        // User is logged in - navigate to home screen using navigationRef
+        // This allows navigation across stacks
+        if (navigationRef.isReady()) {
+          navigationRef.navigate("MainTabs")
+        } else {
+          // Fallback: navigate to Login, AppNavigator will handle stack switch
+          navigation.navigate("Login" as never)
+        }
       } else {
         // User is not logged in, go to login
         navigation.navigate("Login" as never)
       }
-    }, 3000)
+    }, 2000)
 
     return () => clearTimeout(timer)
   }, [navigation, isLoggedIn])
@@ -61,26 +93,30 @@ export const EmailVerifiedScreen = () => {
       preset="fixed" 
       style={styles.container}
       contentContainerStyle={styles.container}
+      accessibilityLabel="email-verified-screen"
+      testID="email-verified-screen"
     >
-      <View style={styles.container}>
-        <Text style={styles.successText}>✓</Text>
+      <View style={styles.contentWrapper}>
+        <View style={styles.checkmarkContainer}>
+          <Text style={styles.checkmark}>✓</Text>
+        </View>
         
         <Text 
           preset="heading" 
-          text="Email Verified!" 
-          style={styles.successText}
+          tx="emailVerifiedScreen.title"
+          style={styles.title}
         />
         
         <Text 
           preset="default"
-          text="Your My Phone Friend account has been successfully verified."
+          tx="emailVerifiedScreen.message"
           style={styles.messageText}
         />
         
         <Text 
           size="sm"
-          text="Redirecting you to the app..."
-          style={styles.messageText}
+          tx="emailVerifiedScreen.redirecting"
+          style={styles.redirectingText}
         />
       </View>
     </Screen>

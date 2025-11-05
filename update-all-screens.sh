@@ -108,3 +108,5 @@ npx playwright test test/e2e/app-loading.e2e.test.ts --reporter=line --timeout=1
 
 echo "✨ Theme system update complete!"
 
+
+

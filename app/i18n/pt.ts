@@ -4,6 +4,7 @@ const pt: Translations = {
   common: {
     ok: "OK",
     cancel: "Cancelar",
+    error: "Erro",
     back: "Voltar",
     logOut: "Sair",
     selectImage: "Selecionar imagem",
@@ -97,6 +98,22 @@ const pt: Translations = {
     requestReset: "Solicitar redefinição",
     successMessage: "Código de redefinição enviado para seu email!",
     requestFailed: "Solicitação falhou. Por favor, verifique seu email e tente novamente.",
+  },
+  emailVerificationScreen: {
+    title: "Verifique seu email",
+    message: "Enviamos um link de verificação para o seu endereço de email. Por favor, clique no link para verificar sua conta antes de fazer login.",
+    emailFieldLabel: "Endereço de email",
+    emailFieldPlaceholder: "Digite seu endereço de email",
+    resendButton: "Reenviar email de verificação",
+    backToLoginButton: "Voltar ao login",
+    successMessage: "✓ Email de verificação enviado! Verifique sua caixa de entrada.",
+    errorNoEmail: "Por favor, digite seu endereço de email",
+    errorSendFailed: "Falha ao enviar email de verificação",
+  },
+  emailVerifiedScreen: {
+    title: "E-mail verificado!",
+    message: "Sua conta My Phone Friend foi verificada com sucesso.",
+    redirecting: "Redirecionando para o aplicativo...",
   },
   conversationsScreen: {
     title: "Conversas",

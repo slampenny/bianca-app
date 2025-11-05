@@ -4,6 +4,7 @@ const de: Translations = {
   common: {
     ok: "OK",
     cancel: "Abbrechen",
+    error: "Fehler",
     back: "Zurück",
     logOut: "Abmelden",
     selectImage: "Bild auswählen",
@@ -178,6 +179,22 @@ const de: Translations = {
     requestReset: "Reset anfordern",
     successMessage: "Reset-Code an deine E-Mail gesendet!",
     requestFailed: "Anfrage fehlgeschlagen. Bitte überprüfe deine E-Mail und versuche es erneut.",
+  },
+  emailVerificationScreen: {
+    title: "Überprüfen Sie Ihre E-Mail",
+    message: "Wir haben einen Verifizierungslink an Ihre E-Mail-Adresse gesendet. Bitte klicken Sie auf den Link, um Ihr Konto zu verifizieren, bevor Sie sich anmelden.",
+    emailFieldLabel: "E-Mail-Adresse",
+    emailFieldPlaceholder: "Geben Sie Ihre E-Mail-Adresse ein",
+    resendButton: "Verifizierungs-E-Mail erneut senden",
+    backToLoginButton: "Zurück zur Anmeldung",
+    successMessage: "✓ Verifizierungs-E-Mail gesendet! Bitte überprüfen Sie Ihren Posteingang.",
+    errorNoEmail: "Bitte geben Sie Ihre E-Mail-Adresse ein",
+    errorSendFailed: "Fehler beim Senden der Verifizierungs-E-Mail",
+  },
+  emailVerifiedScreen: {
+    title: "E-Mail verifiziert!",
+    message: "Ihr My Phone Friend-Konto wurde erfolgreich verifiziert.",
+    redirecting: "Sie werden zur App weitergeleitet...",
   },
   conversationsScreen: {
     title: "Unterhaltungen",

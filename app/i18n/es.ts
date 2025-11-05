@@ -72,6 +72,22 @@ const es: Translations = {
     successMessage: "¡Código de restablecimiento enviado a tu correo!",
     requestFailed: "Solicitud fallida. Por favor verifica tu correo y vuelve a intentar.",
   },
+  emailVerificationScreen: {
+    title: "Revisa tu correo electrónico",
+    message: "Hemos enviado un enlace de verificación a tu dirección de correo electrónico. Por favor, haz clic en el enlace para verificar tu cuenta antes de iniciar sesión.",
+    emailFieldLabel: "Dirección de correo electrónico",
+    emailFieldPlaceholder: "Ingresa tu dirección de correo electrónico",
+    resendButton: "Reenviar correo de verificación",
+    backToLoginButton: "Volver al inicio de sesión",
+    successMessage: "✓ ¡Correo de verificación enviado! Por favor, revisa tu bandeja de entrada.",
+    errorNoEmail: "Por favor ingresa tu dirección de correo electrónico",
+    errorSendFailed: "Error al enviar el correo de verificación",
+  },
+  emailVerifiedScreen: {
+    title: "¡Correo verificado!",
+    message: "Tu cuenta de My Phone Friend ha sido verificada exitosamente.",
+    redirecting: "Redirigiendo a la aplicación...",
+  },
   conversationsScreen: {
     title: "Conversaciones",
     yesterday: "Ayer",
@@ -211,6 +227,7 @@ const es: Translations = {
   },
   common: {
     cancel: "Cancelar",
+    error: "Error",
     selectImage: "Seleccionar imagen",
     calling: "Llamando...",
     callNow: "Llamar ahora",

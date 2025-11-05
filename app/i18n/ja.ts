@@ -4,6 +4,7 @@ const ja: Translations = {
   common: {
     ok: "OK",
     cancel: "キャンセル",
+    error: "エラー",
     back: "戻る",
     logOut: "ログアウト",
     selectImage: "画像を選択",
@@ -97,6 +98,22 @@ const ja: Translations = {
     requestReset: "リセットをリクエスト",
     successMessage: "リセットコードがメールに送信されました！",
     requestFailed: "リクエストが失敗しました。メールを確認して再試行してください。",
+  },
+  emailVerificationScreen: {
+    title: "メールを確認してください",
+    message: "確認リンクをメールアドレスに送信しました。ログインする前に、リンクをクリックしてアカウントを確認してください。",
+    emailFieldLabel: "メールアドレス",
+    emailFieldPlaceholder: "メールアドレスを入力してください",
+    resendButton: "確認メールを再送信",
+    backToLoginButton: "ログインに戻る",
+    successMessage: "✓ 確認メールを送信しました！受信箱を確認してください。",
+    errorNoEmail: "メールアドレスを入力してください",
+    errorSendFailed: "確認メールの送信に失敗しました",
+  },
+  emailVerifiedScreen: {
+    title: "メール認証済み！",
+    message: "My Phone Friendアカウントが正常に認証されました。",
+    redirecting: "アプリにリダイレクトしています...",
   },
   conversationsScreen: {
     title: "会話",

@@ -82,6 +82,13 @@ export const authApi = createApi({
         body: data,
       }),
     }),
+    setPasswordForSSO: builder.mutation<{ message: string; success: boolean }, { email: string; password: string; confirmPassword: string }>({
+      query: (data) => ({
+        url: "/auth/set-password-for-sso",
+        method: "POST",
+        body: data,
+      }),
+    }),
   }),
 })
 
@@ -95,4 +102,5 @@ export const {
   useForgotPasswordMutation,
   useSendVerificationEmailMutation,
   useResendVerificationEmailMutation,
+  useSetPasswordForSSOMutation,
 } = authApi

@@ -250,6 +250,22 @@ const fr: Translations = {
     successMessage: "Code de réinitialisation envoyé à votre e-mail !",
     requestFailed: "La demande a échoué. Veuillez vérifier votre e-mail et réessayer.",
   },
+  emailVerificationScreen: {
+    title: "Vérifiez votre e-mail",
+    message: "Nous avons envoyé un lien de vérification à votre adresse e-mail. Veuillez cliquer sur le lien pour vérifier votre compte avant de vous connecter.",
+    emailFieldLabel: "Adresse e-mail",
+    emailFieldPlaceholder: "Entrez votre adresse e-mail",
+    resendButton: "Renvoyer l'e-mail de vérification",
+    backToLoginButton: "Retour à la connexion",
+    successMessage: "✓ E-mail de vérification envoyé ! Veuillez vérifier votre boîte de réception.",
+    errorNoEmail: "Veuillez entrer votre adresse e-mail",
+    errorSendFailed: "Échec de l'envoi de l'e-mail de vérification",
+  },
+  emailVerifiedScreen: {
+    title: "E-mail vérifié !",
+    message: "Votre compte My Phone Friend a été vérifié avec succès.",
+    redirecting: "Redirection vers l'application...",
+  },
   conversationsScreen: {
     title: "Conversations",
     yesterday: "Hier",
@@ -392,6 +408,7 @@ const fr: Translations = {
   },
   common: {
     cancel: "Annuler",
+    error: "Erreur",
     selectImage: "Sélectionner l'image",
     calling: "Appel en cours...",
     callNow: "Appeler maintenant",

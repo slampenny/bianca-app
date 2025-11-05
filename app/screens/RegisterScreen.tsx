@@ -138,20 +138,30 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   useEffect(() => {
     const registerUser = async () => {
       try {
-        const result = await register({ name, email, password, phone }).unwrap()
+        // For organization accounts, use organizationName as the org name
+        const orgName = accountType === "organization" && organizationName ? organizationName : name
+        const result = await register({ name: orgName, email, password, phone }).unwrap()
         // Handle the new registration response format
         if (result && result.requiresEmailVerification) {
-          // Navigate to email verification required screen
-          navigation.navigate("EmailVerificationRequired" as never)
+          // Navigate to email verification required screen with email
+          navigation.navigate("EmailVerificationRequired" as never, { email } as never)
         } else {
           setGeneralError("Registration successful! Please check your email for verification instructions.")
         }
-      } catch (error) {
-        // Handle specific errors if possible, otherwise show generic message
+      } catch (error: any) {
+        // Extract specific error message from API response
         console.error("Registration API Error:", error); // Log the actual error for debugging
-        // You could inspect 'error' here to show more specific messages
-        // e.g., if (error.status === 409) setGeneralError("Email already exists.")
-        setGeneralError("Registration Failed. Please try again.") // Set failure message
+        
+        if (error?.data?.message) {
+          // API returned a specific error message (e.g., "Org Email already taken")
+          setGeneralError(error.data.message)
+        } else if (error?.message) {
+          // Fallback to error.message if data.message doesn't exist
+          setGeneralError(error.message)
+        } else {
+          // Generic fallback if no specific message is available
+          setGeneralError("Registration failed. Please try again.")
+        }
       }
     }
 
@@ -328,14 +338,16 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
 
 
-        {/* MOVED General Error / Success Message HERE */}
+        {/* General Error / Success Message */}
         {generalError ? (
-          <Text
-           testID="general-error-message" // Add testID for easier selection in tests
-           style={generalError.includes("successful") ? styles.successText : styles.errorText}
-          >
-            {generalError}
-          </Text>
+          <View style={generalError.includes("successful") ? styles.successContainer : styles.errorContainer}>
+            <Text
+              testID="general-error-message"
+              style={generalError.includes("successful") ? styles.successText : styles.errorText}
+            >
+              {generalError}
+            </Text>
+          </View>
         ) : null}
 
         {/* Submit Button */}
@@ -396,17 +408,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 20,
   },
-  errorText: {
-    backgroundColor: colors.palette.biancaErrorBackground,
-    borderRadius: 6,
-    color: colors.palette.biancaError,
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    textAlign: "center",
+  errorContainer: {
+    backgroundColor: colors.palette.biancaErrorBackground || "#fee2e2",
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.palette.biancaError || "#dc2626",
+    marginBottom: 20,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     width: "100%",
+  },
+  errorText: {
+    color: colors.palette.biancaError || "#dc2626",
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "left",
+    lineHeight: 20,
   },
   explanationText: {
     color: colors.palette.biancaExplanation,
@@ -451,17 +469,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     marginHorizontal: 5,
   },
-  successText: {
-    backgroundColor: colors.palette.biancaSuccessBackground,
-    borderRadius: 6,
-    color: colors.palette.biancaSuccess,
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    textAlign: "center",
+  successContainer: {
+    backgroundColor: colors.palette.biancaSuccessBackground || "#d1fae5",
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.palette.biancaSuccess || "#10b981",
+    marginBottom: 20,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     width: "100%",
+  },
+  successText: {
+    color: colors.palette.biancaSuccess || "#059669",
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "left",
+    lineHeight: 20,
   },
   consentContainer: {
     marginTop: 20,

@@ -35,7 +35,11 @@ module.exports = ({ config }: ConfigContext): Partial<ExpoConfig> => {
     owner: "negascout",
     slug: "bianca",
     ios: {
-      bundleIdentifier: "com.negascout.bianca"
+      bundleIdentifier: "com.negascout.bianca",
+      associatedDomains: [
+        "applinks:app.myphonefriend.com",
+        "applinks:staging.myphonefriend.com"
+      ]
     }
   }
 }

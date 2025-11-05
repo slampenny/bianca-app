@@ -4,6 +4,7 @@ const it: Translations = {
   common: {
     ok: "OK",
     cancel: "Annulla",
+    error: "Errore",
     back: "Indietro",
     logOut: "Esci",
     selectImage: "Seleziona immagine",
@@ -178,6 +179,22 @@ const it: Translations = {
     requestReset: "Richiedi reset",
     successMessage: "Codice di reset inviato alla tua email!",
     requestFailed: "Richiesta fallita. Per favore controlla la tua email e riprova.",
+  },
+  emailVerificationScreen: {
+    title: "Controlla la tua email",
+    message: "Abbiamo inviato un link di verifica al tuo indirizzo email. Per favore clicca sul link per verificare il tuo account prima di accedere.",
+    emailFieldLabel: "Indirizzo email",
+    emailFieldPlaceholder: "Inserisci il tuo indirizzo email",
+    resendButton: "Reinvia email di verifica",
+    backToLoginButton: "Torna al login",
+    successMessage: "✓ Email di verifica inviata! Controlla la tua casella di posta.",
+    errorNoEmail: "Per favore inserisci il tuo indirizzo email",
+    errorSendFailed: "Invio email di verifica fallito",
+  },
+  emailVerifiedScreen: {
+    title: "Email verificata!",
+    message: "Il tuo account My Phone Friend è stato verificato con successo.",
+    redirecting: "Reindirizzamento all'app...",
   },
   conversationsScreen: {
     title: "Conversazioni",

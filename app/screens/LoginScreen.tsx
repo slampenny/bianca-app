@@ -46,6 +46,16 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const [errorMessage, setErrorMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
+  // Debug: Log state on mount/refresh to diagnose editable issues
+  useEffect(() => {
+    console.log('[LoginScreen] Mounted/Refreshed - State:', {
+      isLoading,
+      themeLoading,
+      hasEmail: !!authEmail,
+      hasPassword: !!authPassword
+    })
+  }, [])
+
   // useLayoutEffect(() => {
   //   navigation.setOptions({
   //     headerShown: true,
@@ -67,14 +77,61 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       const result = await loginAPI({ email: authEmail, password: authPassword }).unwrap()
       dispatch(setAuthTokens(result.tokens))
     } catch (error: any) {
-      console.error(error)
+      console.error('Login error:', error)
+      console.error('Error data:', error?.data)
+      console.error('Error status:', error?.status)
+      console.error('Full error object:', JSON.stringify(error, null, 2))
+      console.error('requiresPasswordLinking:', error?.data?.requiresPasswordLinking)
+      console.error('ssoProvider:', error?.data?.ssoProvider)
       
-      // Check for email verification error
-      if (error?.data?.message?.includes('verify your email')) {
-        setErrorMessage("Please check your email and click the verification link before logging in.")
-        // Optionally navigate to verification screen
-        navigation.navigate("EmailVerificationRequired" as never)
+      // Check for SSO account linking requirement FIRST (before setting error message)
+      // RTK Query structures errors as: error.data contains the response body
+      // Check both error.data and error directly (RTK Query might structure it differently)
+      const requiresLinking = error?.data?.requiresPasswordLinking || error?.requiresPasswordLinking
+      const ssoProvider = error?.data?.ssoProvider || error?.ssoProvider
+      
+      console.log('🔍 Checking for SSO linking requirement...')
+      console.log('  requiresLinking:', requiresLinking)
+      console.log('  ssoProvider:', ssoProvider)
+      console.log('  error.data:', error?.data)
+      console.log('  error.data keys:', error?.data ? Object.keys(error.data) : 'no data')
+      console.log('  error.data JSON:', JSON.stringify(error?.data, null, 2))
+      console.log('  error.status:', error?.status)
+      
+      if (requiresLinking === true || requiresLinking === 'true') {
+        console.log('✅ SSO account linking required - navigating to linking screen...')
+        console.log('Email:', authEmail, 'Provider:', ssoProvider)
+        
+        // Use setTimeout to ensure navigation happens after error handling completes
+        setTimeout(() => {
+          navigation.navigate("SSOAccountLinking" as never, { 
+            email: authEmail,
+            ssoProvider: ssoProvider || 'google'
+          } as never)
+        }, 0)
+        
+        setIsLoading(false)
+        return // Exit early - don't set error message or do other processing
       } else {
+        console.log('❌ requiresPasswordLinking not found or false')
+      }
+      
+      // Check for email verification error and navigate
+      if (error?.data?.message?.includes('verify your email')) {
+        navigation.navigate("EmailVerificationRequired" as never, { email: authEmail } as never)
+        setIsLoading(false)
+        return // Exit early
+      }
+      
+      // Extract specific error message from API response
+      if (error?.data?.message) {
+        // API returned a specific error message
+        setErrorMessage(error.data.message)
+      } else if (error?.message) {
+        // Fallback to error.message
+        setErrorMessage(error.message)
+      } else {
+        // Generic fallback
         setErrorMessage("Failed to log in. Please check your email and password.")
       }
     } finally {
@@ -143,8 +200,14 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     }
   }
 
+  // Don't render inputs until theme is loaded to prevent styling issues
+  // But show a loading state instead of returning null to prevent editable issues
   if (themeLoading) {
-    return null
+    return (
+      <Screen style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} testID="login-form" accessibilityLabel="login-screen">
+        <Text>Loading...</Text>
+      </Screen>
+    )
   }
 
   const styles = createStyles(colors)
@@ -152,7 +215,11 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   return (
     <Screen style={styles.container} testID="login-form" accessibilityLabel="login-screen">
       <Header titleTx="loginScreen.signIn" />
-      {errorMessage ? <Text testID="login-error" style={styles.error}>{errorMessage}</Text> : null}
+      {errorMessage ? (
+        <View style={styles.errorContainer}>
+          <Text testID="login-error" style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
       <TextField
         testID="email-input"
         accessibilityLabel="email-input"
@@ -168,6 +235,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
+        editable={true}
       />
       <TextField
         testID="password-input"
@@ -185,6 +253,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
+        editable={true}
       />
       <Button
         testID="login-button"
@@ -233,10 +302,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  error: {
-    color: colors.palette.biancaError,
+  errorContainer: {
+    backgroundColor: colors.palette.biancaErrorBackground || "#fee2e2",
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.palette.biancaError || "#dc2626",
     marginBottom: 20,
-    textAlign: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: "100%",
+  },
+  errorText: {
+    color: colors.palette.biancaError || "#dc2626",
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "left",
+    lineHeight: 20,
   },
   input: {
     color: colors.palette.biancaHeader,
