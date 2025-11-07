@@ -28,6 +28,8 @@ export * from "./SentimentAnalysisScreen"
 export * from "./MedicalAnalysisScreen"
 export * from "./SignupScreen"
 export * from "./TermsScreen"
+export * from "./MFAVerificationScreen"
+export * from "./MFASetupScreen"
 
 export * from "./ErrorScreen/ErrorBoundary"
 // export other screens here

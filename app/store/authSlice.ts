@@ -47,8 +47,11 @@ export const authSlice = createSlice({
       state.tokens = payload.tokens
     })
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      state.currentUser = payload.caregiver
-      state.tokens = payload.tokens
+      // Only set user and tokens if MFA is not required (when MFA is required, payload only has tempToken)
+      if (!payload.requireMFA) {
+        state.currentUser = payload.caregiver
+        state.tokens = payload.tokens
+      }
     })
     builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
       state.currentUser = payload.caregiver

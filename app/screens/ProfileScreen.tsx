@@ -22,9 +22,11 @@ import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
 import { getInviteToken } from "../store/authSlice"
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
+import { useGetMFAStatusQuery } from "../services/api/mfaApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
 import { navigationRef } from "app/navigators/navigationUtilities"
+import { Button } from "app/components"
 
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
@@ -46,6 +48,9 @@ function ProfileScreen() {
   const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
     useUpdateCaregiverMutation()
   const [uploadAvatar, { isLoading: isUploading, error: uploadError }] = useUploadAvatarMutation()
+  
+  // MFA status
+  const { data: mfaStatus } = useGetMFAStatusQuery()
 
   // Form state
   const [name, setName] = useState("")
@@ -261,6 +266,18 @@ function ProfileScreen() {
             <LanguageSelector testID="language-selector" />
             <ThemeSelector testID="theme-selector" />
 
+            <Button
+              text={mfaStatus?.mfaEnabled 
+                ? (translate("mfa.manageMFA") || "Manage Multi-Factor Authentication")
+                : (translate("mfa.enableMFA") || "Enable Multi-Factor Authentication")
+              }
+              onPress={() => navigation.navigate("MFASetup" as never)}
+              preset="default"
+              testID="mfa-setup-button"
+              accessibilityLabel="mfa-setup-button"
+              style={styles.mfaButton}
+            />
+
             <Pressable
               style={[
                 styles.button,
@@ -343,6 +360,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.palette.secondary500,
     borderRadius: 5,
     paddingVertical: 15,
+  },
+  mfaButton: {
+    marginBottom: 15,
   },
   success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
   unverifiedBanner: {

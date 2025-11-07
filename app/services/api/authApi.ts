@@ -29,8 +29,8 @@ export const authApi = createApi({
       }),
     }),
     login: builder.mutation<
-      { org: Org; caregiver: Caregiver; patients: Patient[]; alerts: Alert[]; tokens: any },
-      { email: string; password: string }
+      { org: Org; caregiver: Caregiver; patients: Patient[]; alerts: Alert[]; tokens: any } | { requireMFA: true; tempToken: string; message: string },
+      { email: string; password: string; mfaToken?: string }
     >({
       query: (data) => ({
         url: "/auth/login",

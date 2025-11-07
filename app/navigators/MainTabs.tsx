@@ -24,6 +24,7 @@ import {
   HealthReportScreen,
   SentimentAnalysisScreen,
   MedicalAnalysisScreen,
+  MFASetupScreen,
 } from "app/screens"
 import { DrawerParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
@@ -100,6 +101,7 @@ function HomeStack() {
       <Stack.Screen name="SentimentAnalysis" component={SentimentAnalysisScreen} options={() => ({ title: translate("headers.sentimentAnalysis") })} />
       <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={() => ({ title: translate("headers.medicalAnalysis") })} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={() => ({ title: translate("headers.profile") })} />
+      <Stack.Screen name="MFASetup" component={MFASetupScreen} options={() => ({ title: translate("mfa.setupTitle") || "Multi-Factor Authentication" })} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={() => ({ title: translate("headers.privacyPolicy") })} />
       <Stack.Screen name="Terms" component={TermsScreen} options={() => ({ title: translate("headers.termsOfService") })} />
       <Stack.Screen name="Logout" component={LogoutScreen} options={() => ({ title: translate("headers.logout") })} />

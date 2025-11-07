@@ -13,6 +13,8 @@ import callWorkflowReducer from "./callWorkflowSlice"
 import {
   alertApi,
   authApi,
+  mfaApi,
+  ssoApi,
   orgApi,
   caregiverApi,
   scheduleApi,
@@ -65,6 +67,8 @@ const rootReducer = combineReducers({
   paymentMethod: paymentMethodReducer,
   [alertApi.reducerPath]: alertApi.reducer,
   [authApi.reducerPath]: authApi.reducer,
+  [mfaApi.reducerPath]: mfaApi.reducer,
+  [ssoApi.reducerPath]: ssoApi.reducer,
   [orgApi.reducerPath]: orgApi.reducer,
   [conversationApi.reducerPath]: conversationApi.reducer,
   [caregiverApi.reducerPath]: caregiverApi.reducer,
@@ -90,6 +94,8 @@ export const store = configureStore({
     }).concat(
       alertApi.middleware,
       authApi.middleware,
+      mfaApi.middleware,
+      ssoApi.middleware,
       orgApi.middleware,
       caregiverApi.middleware,
       patientApi.middleware,

@@ -41,13 +41,9 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
   console.log(`Attempting to login with email: ${email}`)
   
-  // Wait for login form to be visible - try both testID and accessibilityLabel
-  try {
-    await page.waitForSelector('[data-testid="email-input"], [aria-label="email-input"]', { timeout: 10000 })
-  } catch {
-    // If that fails, wait for any login-related element
-    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
-  }
+  // Wait for login form to be visible - try accessibilityLabel first (React Native Web)
+  // This is the same pattern used in auth.workflow.ts
+  await page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
   
   // Fill in login form - try testID first, then accessibilityLabel
   const emailInput = page.getByTestId('email-input').or(page.getByLabel('email-input'))

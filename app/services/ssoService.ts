@@ -3,6 +3,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { DEFAULT_API_CONFIG } from './api/api';
+import { ssoApi } from './api/ssoApi';
+import { store } from '../store/store';
 
 // Complete the auth session in the browser
 WebBrowser.maybeCompleteAuthSession();
@@ -224,44 +226,44 @@ class SSOService {
     };
   }
 
-  // Authenticate with backend
+  // Authenticate with backend using RTK Query
   private async authenticateWithBackend(userInfo: SSOUser): Promise<SSOUser | SSOError> {
     try {
-      const response = await fetch(`${DEFAULT_API_CONFIG.url}/sso/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Use RTK Query mutation for backend authentication
+      const result = store.dispatch(
+        ssoApi.endpoints.ssoLogin.initiate({
           provider: userInfo.provider,
           email: userInfo.email,
           name: userInfo.name,
           id: userInfo.id,
           picture: userInfo.picture,
-        }),
-      });
+        })
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      // Wait for the query to complete
+      const response = await result;
+      
+      if ('error' in response) {
+        // RTK Query error
+        const errorData = (response.error as any)?.data;
         return {
           error: 'Backend authentication failed',
-          description: data.message || 'Failed to authenticate with backend',
+          description: errorData?.message || 'Failed to authenticate with backend',
         };
       }
 
-      if (data.success) {
+      if (response.data.success) {
         // Return the user info with tokens and org for the frontend to handle
         return {
           ...userInfo,
-          tokens: data.tokens,
-          backendUser: data.user,
-          backendOrg: data.org,
+          tokens: response.data.tokens,
+          backendUser: response.data.user,
+          backendOrg: response.data.org,
         } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any };
       } else {
         return {
           error: 'Backend authentication failed',
-          description: data.message || 'Unknown backend error',
+          description: response.data.message || 'Unknown backend error',
         };
       }
     } catch (error) {

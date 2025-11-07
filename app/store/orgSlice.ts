@@ -27,7 +27,10 @@ export const orgSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-        state.org = payload.org as Org
+        // Only set org if MFA is not required (when MFA is required, payload only has tempToken)
+        if (!payload.requireMFA && payload.org) {
+          state.org = payload.org as Org
+        }
       })
       // Auto-clear org on logout
       .addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {

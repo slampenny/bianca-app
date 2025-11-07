@@ -43,7 +43,10 @@ export const caregiverSlice = createSlice({
     // Set current caregiver from login response
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
       console.log("[caregiverSlice] authApi.login.matchFulfilled, payload:", payload)
-      state.caregiver = payload.caregiver
+      // Only set caregiver if MFA is not required (when MFA is required, payload only has tempToken)
+      if (!payload.requireMFA && payload.caregiver) {
+        state.caregiver = payload.caregiver
+      }
     })
     // Auto-clear caregivers on logout
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {

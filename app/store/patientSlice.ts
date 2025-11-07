@@ -40,10 +40,13 @@ export const patientSlice = createSlice({
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
       console.log("Login matchFulfilled:", payload)
-      state.patients[payload.caregiver.id!] = []
-      payload.patients.forEach((patient: Patient) => {
-        state.patients[payload.caregiver.id!].push(patient)
-      })
+      // Only set patients if MFA is not required (when MFA is required, payload only has tempToken)
+      if (!payload.requireMFA && payload.caregiver && payload.patients) {
+        state.patients[payload.caregiver.id!] = []
+        payload.patients.forEach((patient: Patient) => {
+          state.patients[payload.caregiver.id!].push(patient)
+        })
+      }
     })
     // Auto-clear patients on logout
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {

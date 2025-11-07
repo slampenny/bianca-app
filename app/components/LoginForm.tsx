@@ -9,6 +9,7 @@ import { Button, Text, TextField } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { SSOLoginButtons } from "./SSOLoginButtons"
 import { translate } from "../i18n"
+import { useNavigation } from "@react-navigation/native"
 
 // Temporary interfaces to avoid import issues
 interface SSOUser {
@@ -30,6 +31,7 @@ interface LoginFormProps {
   onForgotPasswordPress?: () => void
   onSSOAccountLinking?: (email: string, provider: string) => void
   onEmailVerificationRequired?: (email: string) => void
+  onMFARequired?: (email: string, password: string, tempToken: string) => void
   showRegisterButton?: boolean
   showForgotPasswordButton?: boolean
   showSSOButtons?: boolean
@@ -42,12 +44,14 @@ export const LoginForm: FC<LoginFormProps> = ({
   onForgotPasswordPress,
   onSSOAccountLinking,
   onEmailVerificationRequired,
+  onMFARequired,
   showRegisterButton = true,
   showForgotPasswordButton = true,
   showSSOButtons = true,
   compact = false,
 }) => {
   const dispatch = useDispatch()
+  const navigation = useNavigation()
   const [loginAPI] = useLoginMutation()
   const { colors, isLoading: themeLoading } = useTheme()
 
@@ -73,16 +77,37 @@ export const LoginForm: FC<LoginFormProps> = ({
     setErrorMessage("") // Clear previous errors
     try {
       const result = await loginAPI({ email: authEmail, password: authPassword }).unwrap()
-      dispatch(setAuthTokens(result.tokens))
-      dispatch(setCurrentUser(result.caregiver))
-      dispatch(setCaregiver(result.caregiver))
-      if (result.org) {
-        dispatch(setOrg(result.org))
+      
+      // Check if MFA is required (backend returns status 200 with requireMFA: true)
+      if ('requireMFA' in result && result.requireMFA) {
+        setIsLoading(false)
+        if (onMFARequired) {
+          // Parent component handles navigation
+          onMFARequired(authEmail, authPassword, result.tempToken)
+        } else {
+          // Navigate to MFA verification screen
+          navigation.navigate("MFAVerification" as never, {
+            email: authEmail,
+            password: authPassword,
+            tempToken: result.tempToken,
+          } as never)
+        }
+        return
       }
       
-      // Call success callback if provided
-      if (onLoginSuccess) {
-        onLoginSuccess()
+      // Normal login success
+      if ('tokens' in result) {
+        dispatch(setAuthTokens(result.tokens))
+        dispatch(setCurrentUser(result.caregiver))
+        dispatch(setCaregiver(result.caregiver))
+        if (result.org) {
+          dispatch(setOrg(result.org))
+        }
+        
+        // Call success callback if provided
+        if (onLoginSuccess) {
+          onLoginSuccess()
+        }
       }
     } catch (error: any) {
       console.error('Login error:', error)

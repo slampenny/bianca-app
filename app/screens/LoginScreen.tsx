@@ -35,6 +35,11 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     navigation.navigate("EmailVerificationRequired" as never, { email } as never)
   }
 
+  // Handle MFA verification navigation
+  const handleMFARequired = (email: string, password: string, tempToken: string) => {
+    navigation.navigate("MFAVerification" as never, { email, password, tempToken } as never)
+  }
+
   if (themeLoading) {
     return (
       <Screen style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} testID="login-form" accessibilityLabel="login-screen">
@@ -51,6 +56,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         onForgotPasswordPress={handleForgotPasswordPress}
         onSSOAccountLinking={handleSSOAccountLinking}
         onEmailVerificationRequired={handleEmailVerificationRequired}
+        onMFARequired={handleMFARequired}
         showRegisterButton={true}
         showForgotPasswordButton={true}
         showSSOButtons={true}

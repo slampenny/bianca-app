@@ -44,6 +44,7 @@ export type ProfileStackParamList = {
   Privacy: undefined
   PrivacyPractices: undefined
   Terms: undefined
+  MFASetup: undefined
 }
 
 export type AlertStackParamList = {
@@ -85,6 +86,7 @@ export type LoginStackParamList = {
   VerifyEmail: { token?: string; query?: { token?: string } } | undefined
   SSOAccountLinking: { email: string; ssoProvider?: string } | undefined
   Signup: { token?: string }
+  MFAVerification: { email: string; password: string; tempToken: string }
 }
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {
