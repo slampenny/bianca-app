@@ -45,6 +45,7 @@ const updateCaregiver = {
       isEmailVerified: Joi.boolean().optional(),
       password: Joi.string().required().custom(password).optional(),
       themePreference: Joi.string().valid('healthcare', 'colorblind').optional(),
+      preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar').optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)),
     })
     .min(1)

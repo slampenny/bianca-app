@@ -118,6 +118,13 @@ const caregiverSchema = mongoose.Schema(
       default: 'healthcare',
       required: false,
     },
+    // Preferred language for UI and alerts
+    preferredLanguage: {
+      type: String,
+      enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
+      default: 'en',
+      required: false,
+    },
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
   {
