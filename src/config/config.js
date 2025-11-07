@@ -80,6 +80,11 @@ const envVarsSchema = Joi.object({
   }),
   STRIPE_SECRET_KEY: Joi.string().optional(),
   STRIPE_PUBLISHABLE_KEY: Joi.string().optional(),
+  MFA_ENCRYPTION_KEY: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().optional() // Optional in dev/test environments (can use default for testing)
+  }),
   // **NEW:** Realtime API specific variables
   OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
@@ -351,6 +356,10 @@ baselineConfig.loadSecrets = async () => {
       baselineConfig.stripe.mode = secrets.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'live';
     }
     if (secrets.STRIPE_PUBLISHABLE_KEY) baselineConfig.stripe.publishableKey = secrets.STRIPE_PUBLISHABLE_KEY;
+    // MFA Encryption Key
+    if (secrets.MFA_ENCRYPTION_KEY) {
+      process.env.MFA_ENCRYPTION_KEY = secrets.MFA_ENCRYPTION_KEY;
+    }
     // Mongoose URL
     // if (secrets.MONGODB_URL) {
     //     baselineConfig.mongoose.url = secrets.MONGODB_URL + (baselineConfig.env === 'test' ? '-test' : '');

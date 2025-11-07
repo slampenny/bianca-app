@@ -15,7 +15,7 @@ const paymentMethodFixture = require('../../tests/fixtures/paymentMethod.fixture
 
 // Extract the needed exports
 const { orgOne, insertOrgs } = orgFixture;
-const { caregiverOne, admin, hashedPassword, insertCaregiversAndAddToOrg } = caregiverFixture;
+const { caregiverOne, admin, playwrightTestUser, hashedPassword, insertCaregiversAndAddToOrg } = caregiverFixture;
 const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = patientFixture;
 const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = alertFixture;
 const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = scheduleFixture;
@@ -373,10 +373,11 @@ async function seedDatabase() {
     // Set both caregivers to belong to the same org.
     caregiverOne.org = org1._id;
     admin.org = org1._id;
+    playwrightTestUser.org = org1._id;
 
     // Insert caregivers and add them to org1.
-    // This will insert both admin and caregiverOne to org1.
-    const caregivers = await insertCaregiversAndAddToOrg(org1, [admin, caregiverOne]);
+    // This will insert admin, caregiverOne, and playwrightTestUser to org1.
+    const caregivers = await insertCaregiversAndAddToOrg(org1, [admin, caregiverOne, playwrightTestUser]);
     console.log('Inserted caregivers:', caregivers);
 
     // Create and insert a super admin user
