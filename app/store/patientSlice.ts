@@ -45,6 +45,15 @@ export const patientSlice = createSlice({
         state.patients[payload.caregiver.id!].push(patient)
       })
     })
+    // Auto-clear patients on logout
+    builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
+      state.patient = null
+      state.patients = {}
+    })
+    builder.addMatcher(authApi.endpoints.logout.matchRejected, (state) => {
+      state.patient = null
+      state.patients = {}
+    })
     builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state, { payload }) => {
       console.log("createPatient matchFulfilled:", payload)
       state.patient = payload

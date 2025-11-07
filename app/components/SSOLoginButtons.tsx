@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Text, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ActivityIndicator } from 'react-native';
 import { useTheme } from 'app/theme/ThemeContext';
 import { ssoService, SSOUser, SSOError } from '../services/ssoService';
+import { translate } from '../i18n';
+import { useToast } from '../hooks/useToast';
+import Toast from './Toast';
 
 interface SSOLoginButtonsProps {
   onSSOSuccess: (user: SSOUser) => void;
@@ -17,6 +20,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
   showGenericSSO = false,
 }) => {
   const { colors } = useTheme();
+  const { toast, showError, showInfo, hideToast } = useToast();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false);
   const [isGenericSSOLoading, setIsGenericSSOLoading] = useState(false);
@@ -95,11 +99,12 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
       
       if ('error' in result) {
         onSSOError?.(result);
-        // Show different alerts based on error type
+        // Show different toasts based on error type
+        const message = result.description || result.error;
         if (result.error.includes('not configured')) {
-          Alert.alert('SSO Not Available', result.description || result.error);
+          showError(`${translate("ssoButtons.ssoNotAvailable")}: ${message}`);
         } else {
-          Alert.alert('Sign In Failed', result.description || result.error);
+          showError(`${translate("ssoButtons.signInFailed")}: ${message}`);
         }
       } else {
         onSSOSuccess(result);
@@ -110,7 +115,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
         description: error instanceof Error ? error.message : 'Unknown error',
       };
       onSSOError?.(errorResult);
-      Alert.alert('Sign In Failed', errorResult.description);
+      showError(`${translate("ssoButtons.signInFailed")}: ${errorResult.description}`);
     } finally {
       setIsGoogleLoading(false);
     }
@@ -125,11 +130,12 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
       
       if ('error' in result) {
         onSSOError?.(result);
-        // Show different alerts based on error type
+        // Show different toasts based on error type
+        const message = result.description || result.error;
         if (result.error.includes('not configured')) {
-          Alert.alert('SSO Not Available', result.description || result.error);
+          showError(`${translate("ssoButtons.ssoNotAvailable")}: ${message}`);
         } else {
-          Alert.alert('Sign In Failed', result.description || result.error);
+          showError(`${translate("ssoButtons.signInFailed")}: ${message}`);
         }
       } else {
         onSSOSuccess(result);
@@ -140,7 +146,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
         description: error instanceof Error ? error.message : 'Unknown error',
       };
       onSSOError?.(errorResult);
-      Alert.alert('Sign In Failed', errorResult.description);
+      showError(`${translate("ssoButtons.signInFailed")}: ${errorResult.description}`);
     } finally {
       setIsMicrosoftLoading(false);
     }
@@ -151,12 +157,8 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     
     setIsGenericSSOLoading(true);
     try {
-      // For now, show an alert that this would redirect to company SSO
-      Alert.alert(
-        'Company SSO',
-        'This would redirect to your company\'s SSO provider. Please contact your administrator for setup.',
-        [{ text: 'OK' }]
-      );
+      // For now, show an info toast that this would redirect to company SSO
+      showInfo(translate("ssoButtons.companySSOMessage"));
     } catch (error) {
       const errorResult: SSOError = {
         error: 'Generic SSO failed',
@@ -172,7 +174,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.dividerText}>Or continue with</Text>
+      <Text style={styles.dividerText}>{translate("ssoButtons.orContinueWith")}</Text>
       
       <View style={styles.buttonContainer}>
         {/* Google Sign In Button */}
@@ -187,7 +189,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
           ) : (
             <>
               <Text style={styles.googleIcon}>G</Text>
-              <Text style={styles.ssoButtonText}>Google</Text>
+              <Text style={styles.ssoButtonText}>{translate("ssoButtons.google")}</Text>
             </>
           )}
         </Pressable>
@@ -204,7 +206,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
           ) : (
             <>
               <Text style={styles.microsoftIcon}>M</Text>
-              <Text style={styles.ssoButtonText}>Microsoft</Text>
+              <Text style={styles.ssoButtonText}>{translate("ssoButtons.microsoft")}</Text>
             </>
           )}
         </Pressable>
@@ -221,12 +223,19 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
             ) : (
               <>
                 <Text style={styles.genericSSOIcon}>🏢</Text>
-                <Text style={styles.ssoButtonText}>Company SSO</Text>
+                <Text style={styles.ssoButtonText}>{translate("ssoButtons.companySSO")}</Text>
               </>
             )}
           </Pressable>
         )}
       </View>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="sso-toast"
+      />
     </View>
   );
 };

@@ -89,6 +89,21 @@ export const authApi = createApi({
         body: data,
       }),
     }),
+    verifyEmail: builder.mutation<{ success: boolean; message?: string; html?: string }, { token: string }>({
+      query: ({ token }) => ({
+        url: `/auth/verify-email?token=${encodeURIComponent(token)}`,
+        method: "GET",
+        responseHandler: async (response) => {
+          // Backend returns HTML, so we handle it as text
+          const text = await response.text()
+          return { success: response.ok, html: text, status: response.status }
+        },
+        validateStatus: (response, result) => {
+          // Accept all responses (including errors) so we can parse HTML
+          return true
+        },
+      }),
+    }),
   }),
 })
 
@@ -103,4 +118,5 @@ export const {
   useSendVerificationEmailMutation,
   useResendVerificationEmailMutation,
   useSetPasswordForSSOMutation,
+  useVerifyEmailMutation,
 } = authApi

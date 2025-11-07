@@ -1,5 +1,7 @@
 import React, { useState } from "react"
-import { View, StyleSheet, ScrollView, Alert } from "react-native"
+import { View, StyleSheet, ScrollView } from "react-native"
+import { useToast } from "../hooks/useToast"
+import Toast from "./Toast"
 import { Button, Text } from "./"
 import { useTheme } from "../theme/ThemeContext"
 import { useDebugSentimentAnalysisMutation, useDebugConversationDataMutation, useGetSentimentSummaryQuery, sentimentApi } from "../services/api/sentimentApi"
@@ -13,6 +15,7 @@ interface SentimentDebugPanelProps {
 
 export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
   const { colors } = useTheme()
+  const { toast, showError, showInfo, hideToast } = useToast()
   const [debugResult, setDebugResult] = useState<any>(null)
   const [conversationDebugResult, setConversationDebugResult] = useState<any>(null)
   const [debugSentimentAnalysis, { isLoading: isDebugLoading }] = useDebugSentimentAnalysisMutation()
@@ -43,24 +46,16 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
 
       setDebugResult(result)
       
-      Alert.alert(
-        translate("sentimentAnalysis.debugComplete"),
-        `Found ${result.summary.totalConversations} conversations. Successfully analyzed ${result.summary.successfullyAnalyzed}, failed ${result.summary.failedAnalyses}.`,
-        [{ text: "OK" }]
-      )
+      showInfo(`${translate("sentimentAnalysis.debugComplete")}: Found ${result.summary.totalConversations} conversations. Successfully analyzed ${result.summary.successfullyAnalyzed}, failed ${result.summary.failedAnalyses}.`)
     } catch (error: any) {
       console.error("Debug sentiment analysis failed:", error)
-      Alert.alert(
-        translate("sentimentAnalysis.debugFailed"),
-        error?.data?.message || error?.message || "Unknown error occurred",
-        [{ text: "OK" }]
-      )
+      showError(`${translate("sentimentAnalysis.debugFailed")}: ${error?.data?.message || error?.message || "Unknown error occurred"}`)
     }
   }
 
   const handleDebugConversationData = async () => {
     if (!currentPatient?.id) {
-      Alert.alert(translate("sentimentAnalysis.noPatient"), translate("sentimentAnalysis.pleaseSelectPatient"), [{ text: "OK" }])
+      showError(translate("sentimentAnalysis.pleaseSelectPatient"))
       return
     }
 
@@ -75,18 +70,10 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       console.log(JSON.stringify(result, null, 2))
       console.log('=== END CONVERSATION DEBUG ===')
       
-      Alert.alert(
-        translate("sentimentAnalysis.conversationDebugComplete"),
-        `Total: ${result.summary.totalConversations}, Recent: ${result.summary.recentConversations}, With Sentiment: ${result.summary.conversationsWithSentiment}, Test Found: ${result.summary.testConversationFound}`,
-        [{ text: "OK" }]
-      )
+      showInfo(`${translate("sentimentAnalysis.conversationDebugComplete")}: Total: ${result.summary.totalConversations}, Recent: ${result.summary.recentConversations}, With Sentiment: ${result.summary.conversationsWithSentiment}, Test Found: ${result.summary.testConversationFound}`)
     } catch (error: any) {
       console.error("Debug conversation data failed:", error)
-      Alert.alert(
-        translate("sentimentAnalysis.debugFailed"),
-        error?.data?.message || error?.message || "Unknown error occurred",
-        [{ text: "OK" }]
-      )
+      showError(`${translate("sentimentAnalysis.debugFailed")}: ${error?.data?.message || error?.message || "Unknown error occurred"}`)
     }
   }
 
@@ -121,11 +108,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           console.log('Test Summary Data:', JSON.stringify(testSummaryData, null, 2))
           console.log('Test Error:', testError)
           console.log('=== END DIRECT TEST ===')
-          Alert.alert(
-            translate("sentimentAnalysis.directApiTest"),
-            `Patient: ${currentPatient?.name || 'None'}\nLoading: ${isTestLoading}\nError: ${testError ? 'Yes' : 'No'}\nData: ${testSummaryData ? 'Received' : 'None'}\n\nSummary Data:\n${JSON.stringify(testSummaryData, null, 2)}`,
-            [{ text: "OK" }]
-          )
+          showInfo(`${translate("sentimentAnalysis.directApiTest")}: Patient: ${currentPatient?.name || 'None'}\nLoading: ${isTestLoading}\nError: ${testError ? 'Yes' : 'No'}\nData: ${testSummaryData ? 'Received' : 'None'}\n\nSummary Data:\n${JSON.stringify(testSummaryData, null, 2)}`)
         }}
         disabled={isTestLoading || !currentPatient}
         style={[styles.debugButton, styles.testButton]}
@@ -155,11 +138,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           console.log('Cache invalidated - queries should refetch automatically')
           console.log('=== END FORCE REFRESH ===')
           
-          Alert.alert(
-            translate("sentimentAnalysis.cacheRefreshed"),
-            translate("sentimentAnalysis.cacheRefreshedMessage"),
-            [{ text: "OK" }]
-          )
+          showInfo(translate("sentimentAnalysis.cacheRefreshedMessage"))
         }}
         disabled={!currentPatient}
         style={[styles.debugButton, styles.refreshButton]}
@@ -233,6 +212,13 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           ))}
         </ScrollView>
       )}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="sentiment-debug-toast"
+      />
     </View>
   )
 }

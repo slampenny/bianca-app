@@ -45,6 +45,15 @@ export const caregiverSlice = createSlice({
       console.log("[caregiverSlice] authApi.login.matchFulfilled, payload:", payload)
       state.caregiver = payload.caregiver
     })
+    // Auto-clear caregivers on logout
+    builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
+      state.caregiver = null
+      state.caregivers = []
+    })
+    builder.addMatcher(authApi.endpoints.logout.matchRejected, (state) => {
+      state.caregiver = null
+      state.caregivers = []
+    })
     // Handle caregiver update
     builder.addMatcher(
       caregiverApi.endpoints.updateCaregiver.matchFulfilled,

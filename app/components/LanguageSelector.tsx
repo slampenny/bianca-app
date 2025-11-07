@@ -6,6 +6,9 @@ import { Icon } from "./Icon"
 import { translate } from "../i18n"
 import { LANGUAGE_OPTIONS } from "../constants/languages"
 import { useLanguage } from "../hooks/useLanguage"
+import { useSelector } from "react-redux"
+import { getCaregiver } from "../store/caregiverSlice"
+import { useUpdateCaregiverMutation } from "../services/api/caregiverApi"
 
 interface LanguageSelectorProps {
   style?: any
@@ -16,6 +19,8 @@ export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
   const { colors } = useTheme()
   const [isModalVisible, setIsModalVisible] = useState(false)
   const { currentLanguage: currentLocale, changeLanguage } = useLanguage()
+  const currentUser = useSelector(getCaregiver)
+  const [updateCaregiver] = useUpdateCaregiverMutation()
 
   // Get current language option
   const currentLanguage = LANGUAGE_OPTIONS.find(lang => lang.code === currentLocale) || LANGUAGE_OPTIONS[0]
@@ -111,6 +116,22 @@ export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
     
     // Update i18n locale and persist the choice
     await changeLanguage(languageCode)
+    
+    // Save to backend caregiver profile if user is logged in
+    if (currentUser?.id) {
+      try {
+        await updateCaregiver({
+          id: currentUser.id,
+          caregiver: {
+            preferredLanguage: languageCode,
+          },
+        }).unwrap()
+        console.log("Language preference saved to backend:", languageCode)
+      } catch (error) {
+        console.error("Failed to save language preference to backend:", error)
+        // Don't block the UI - language change still works locally
+      }
+    }
     
     console.log("Current locale after change:", currentLocale)
     

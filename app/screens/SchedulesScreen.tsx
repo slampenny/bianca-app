@@ -71,10 +71,10 @@ export const SchedulesScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} testID="schedules-screen" accessibilityLabel="schedules-screen">
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{translate("schedulesScreen.scheduleDetails")}</Text>
+        <Text style={styles.headerTitle} testID="schedules-header" accessibilityLabel="schedules-header">{translate("schedulesScreen.scheduleDetails")}</Text>
       </View>
 
       {/* Schedule Selector Card */}

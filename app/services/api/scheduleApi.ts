@@ -1,20 +1,10 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
-import { DEFAULT_API_CONFIG } from "./api"
-import { RootState } from "../../store/store"
+import { createApi } from "@reduxjs/toolkit/query/react"
 import { Schedule } from "./api.types"
+import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const scheduleApi = createApi({
   reducerPath: "scheduleApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: DEFAULT_API_CONFIG.url,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.tokens?.access.token
-      if (token) {
-        headers.set("authorization", `Bearer ${token}`)
-      }
-      return headers
-    },
-  }),
+  baseQuery: baseQueryWithReauth(),
   endpoints: (builder) => ({
     createSchedule: builder.mutation<Schedule, { patientId: string; data: Partial<Schedule> }>({
       query: ({ patientId, data }) => ({

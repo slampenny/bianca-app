@@ -65,6 +65,10 @@ export function HomeScreen() {
     navigation.navigate("Patient")
   }
 
+  const handleNavigateToSchedules = () => {
+    navigation.navigate("Schedule")
+  }
+
   const handleCallNow = async (patient: Patient) => {
     try {
       // Set the patient in Redux first
@@ -148,7 +152,7 @@ export function HomeScreen() {
               text="" // Empty text for icon-only button
               onPress={() => handlePatientPress(item)}
               testID={`edit-patient-button-${item.name}`}
-              accessibilityLabel={`Edit ${item.name}`}
+              accessibilityLabel={`edit-patient-button-${item.name}`}
               style={styles.editButton}
               textStyle={styles.editButtonText}
               LeftAccessory={(props) => (
@@ -165,7 +169,7 @@ export function HomeScreen() {
     )
   }
 
-  const ListEmpty = () => <Text style={styles.noUsersText} testID="home-no-patients">No patients found</Text>
+  const ListEmpty = () => <Text style={styles.noUsersText} testID="home-no-patients">{translate("homeScreen.noPatientsFound")}</Text>
 
   if (themeLoading) {
     return null
@@ -214,6 +218,14 @@ export function HomeScreen() {
             <Text style={styles.tooltipText}>{tooltipMessage}</Text>
           </View>
         )}
+        <Button
+          text={translate("homeScreen.viewSchedules") || "View Schedules"}
+          preset="default"
+          onPress={handleNavigateToSchedules}
+          testID="schedule-nav-button"
+          accessibilityLabel="schedule-nav-button"
+          style={styles.scheduleButton}
+        />
       </View>
     </View>
   )
@@ -226,6 +238,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   addButtonContainer: {
     paddingHorizontal: 16,
     paddingVertical: 20,
+    gap: 12,
+  },
+  scheduleButton: {
+    marginHorizontal: 16,
+    marginTop: 8,
   },
   avatar: {
     backgroundColor: colors.palette.neutral300,

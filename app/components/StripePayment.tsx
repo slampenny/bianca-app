@@ -4,6 +4,8 @@ import { Text } from 'app/components'
 import { colors, spacing } from 'app/theme'
 import PlatformUtils from 'app/utils/platform'
 import { useGetStripeConfigQuery } from 'app/services/api/stripeApi'
+import { translate } from 'app/i18n'
+import { useTheme } from 'app/theme/ThemeContext'
 import StripeWebPayment from './StripeWebPayment'
 
 interface StripePaymentProps {
@@ -56,11 +58,14 @@ const StripeMobileWrapper: React.FC<StripePaymentProps & { publishableKey: strin
 
   const { StripeProvider, StripeMobilePayment, isLoaded, error } = mobileComponents
 
+  const { colors: themeColors } = useTheme()
+  const dynamicStyles = createDynamicStyles(themeColors)
+
   if (!isLoaded) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color={colors.palette.accent500} />
-        <Text style={styles.loadingText}>Loading mobile payment system...</Text>
+        <ActivityIndicator size="large" color={themeColors.palette.accent500} />
+        <Text style={dynamicStyles.loadingText}>{translate("paymentScreen.loadingMobilePayment")}</Text>
       </View>
     )
   }
@@ -68,9 +73,9 @@ const StripeMobileWrapper: React.FC<StripePaymentProps & { publishableKey: strin
   if (error || !StripeProvider || !StripeMobilePayment) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorMessage}>
-          Mobile payment system unavailable. Please use the web version.
-          {error && `\nError: ${error}`}
+        <Text style={dynamicStyles.errorMessage}>
+          {translate("paymentScreen.mobilePaymentUnavailable")}
+          {error && `\n${translate("paymentScreen.anErrorOccurred")}: ${error}`}
         </Text>
       </View>
     )
@@ -95,12 +100,15 @@ const StripePayment: React.FC<StripePaymentProps> = ({
   const { data: stripeConfig, isLoading, error } = useGetStripeConfigQuery()
 
 
+  const { colors: themeColors } = useTheme()
+  const dynamicStyles = createDynamicStyles(themeColors)
+
   // Show loading state
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color={colors.palette.accent500} />
-        <Text style={styles.loadingText}>Loading payment system...</Text>
+        <ActivityIndicator size="large" color={themeColors.palette.accent500} />
+        <Text style={dynamicStyles.loadingText}>{translate("paymentScreen.loadingPaymentSystem")}</Text>
       </View>
     )
   }
@@ -109,8 +117,8 @@ const StripePayment: React.FC<StripePaymentProps> = ({
   if (error || !stripeConfig?.publishableKey) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorMessage}>
-          Stripe configuration error. Please contact support.
+        <Text style={dynamicStyles.errorMessage}>
+          {translate("paymentScreen.stripeConfigurationError")}
         </Text>
       </View>
     )
@@ -143,12 +151,25 @@ const StripePayment: React.FC<StripePaymentProps> = ({
   // Fallback for unknown platforms
   return (
     <View style={styles.container}>
-      <Text style={styles.errorMessage}>
-        Unsupported platform. Please use a web browser or mobile app.
+      <Text style={dynamicStyles.errorMessage}>
+        {translate("paymentScreen.unsupportedPlatform")}
       </Text>
     </View>
   )
 }
+
+const createDynamicStyles = (colors: any) => StyleSheet.create({
+  loadingText: {
+    marginTop: spacing.md,
+    color: colors.text || colors.palette.neutral800,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    color: colors.palette.angry500,
+    textAlign: 'center',
+    fontSize: 16,
+  },
+})
 
 const styles = StyleSheet.create({
   container: {
@@ -156,16 +177,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    color: colors.palette.angry500,
-    textAlign: 'center',
-    fontSize: 16,
   },
 })
 

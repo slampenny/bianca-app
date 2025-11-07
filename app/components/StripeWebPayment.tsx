@@ -13,8 +13,11 @@ import { useAttachPaymentMethodMutation, useGetPaymentMethodsQuery, useSetDefaul
 import { useSelector } from 'react-redux'
 import { getOrg } from 'app/store/orgSlice'
 import { translate } from 'app/i18n'
+import { useTheme } from 'app/theme/ThemeContext'
+import { useLanguage } from 'app/hooks/useLanguage'
 import ConfirmationModal from './ConfirmationModal'
 import Toast from './Toast'
+import i18n from 'i18n-js'
 
 interface PaymentMethod {
   id: string
@@ -45,6 +48,7 @@ const PaymentForm: React.FC<{
 }> = ({ orgId, onPaymentMethodAdded, onError }) => {
   const stripe = useStripe()
   const elements = useElements()
+  const { colors: themeColors } = useTheme()
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
@@ -106,8 +110,9 @@ const PaymentForm: React.FC<{
       })
 
       if (error) {
-        setMessage(error.message || 'An error occurred')
-        onError?.(error.message || 'An error occurred')
+        const errorMsg = error.message || translate("paymentScreen.anErrorOccurred")
+        setMessage(errorMsg)
+        onError?.(errorMsg)
         return
       }
 
@@ -117,8 +122,9 @@ const PaymentForm: React.FC<{
           paymentMethodId: paymentMethod.id,
         }).unwrap()
 
-        setMessage('Payment method added successfully!')
-        showToast('Payment method added successfully!', 'success')
+        const successMsg = translate("paymentScreen.paymentMethodAddedSuccess")
+        setMessage(successMsg)
+        showToast(successMsg, 'success')
         onPaymentMethodAdded?.()
         
         // Clear the card element
@@ -128,7 +134,7 @@ const PaymentForm: React.FC<{
         refetch()
       }
     } catch (err: any) {
-      const errorMessage = err.message || 'An error occurred'
+      const errorMessage = err.message || translate("paymentScreen.anErrorOccurred")
       setMessage(errorMessage)
       showToast(errorMessage, 'error')
       onError?.(errorMessage)
@@ -152,18 +158,19 @@ const PaymentForm: React.FC<{
       }).unwrap()
       
       console.log('Set default payment method result:', result)
-      showToast('Payment method set as default successfully!', 'success')
+      const successMsg = translate("paymentScreen.paymentMethodSetDefaultSuccess")
+      showToast(successMsg, 'success')
       
       // Refetch and log the updated data
       const refetchResult = await refetch()
       console.log('Refetch result:', refetchResult.data)
       
       // Force a re-render by updating a dummy state
-      setMessage('Payment method set as default successfully!')
+      setMessage(successMsg)
       
     } catch (err: any) {
       console.error('Error setting default payment method:', err)
-      const errorMessage = err.message || 'Failed to set default payment method'
+      const errorMessage = err.message || translate("paymentScreen.failedToSetDefault")
       showToast(errorMessage, 'error')
     }
   }
@@ -171,8 +178,8 @@ const PaymentForm: React.FC<{
   const handleDeletePaymentMethod = (paymentMethodId: string) => {
     setConfirmationModal({
       visible: true,
-      title: 'Delete Payment Method',
-      message: 'Are you sure you want to delete this payment method? This action cannot be undone.',
+      title: translate("paymentScreen.deletePaymentMethod"),
+      message: translate("paymentScreen.deletePaymentMethodConfirm"),
       onConfirm: () => confirmDeletePaymentMethod(paymentMethodId),
       paymentMethodId,
     })
@@ -187,58 +194,96 @@ const PaymentForm: React.FC<{
         paymentMethodId,
       }).unwrap()
       
-      showToast('Payment method deleted successfully!', 'success')
+      showToast(translate("paymentScreen.paymentMethodDeletedSuccess"), 'success')
       refetch()
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to delete payment method'
+      const errorMessage = err.message || translate("paymentScreen.failedToDelete")
       showToast(errorMessage, 'error')
     }
   }
 
+  // Get current locale for CardElement localization
+  const { currentLanguage } = useLanguage()
+  const currentLocale = currentLanguage || i18n.locale || 'en'
+  // Map our locale codes to Stripe's supported locales
+  // Stripe supports: auto, bg, cs, da, de, el, en, es, et, fi, fr, hu, id, it, ja, lt, lv, ms, mt, nb, nl, pl, pt, ro, ru, sk, sl, sv, tr, zh
+  const stripeLocaleMap: { [key: string]: string } = {
+    'en': 'en',
+    'zh': 'zh',
+    'fr': 'fr',
+    'es': 'es',
+    'de': 'de',
+    'it': 'it',
+    'ja': 'ja',
+    'ko': 'auto', // Korean not directly supported, use auto
+    'pt': 'pt',
+    'ru': 'ru',
+    'ar': 'auto', // Arabic not directly supported, use auto
+  }
+  const stripeLocale = stripeLocaleMap[currentLocale] || 'en'
+  
+  // Debug logging
+  if (__DEV__) {
+    console.log('[StripeWebPayment] Locale detection:', {
+      currentLanguage,
+      i18nLocale: i18n.locale,
+      currentLocale,
+      stripeLocale,
+    })
+  }
+
+  // Create themed card element options based on current theme
+  // Note: locale should NOT be in CardElement options - it goes in Elements options
   const cardElementOptions = {
     style: {
       base: {
         fontSize: '16px',
-        color: '#424770',
+        color: themeColors.text || themeColors.palette.neutral800 || '#424770',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
         '::placeholder': {
-          color: '#aab7c4',
+          color: themeColors.textDim || themeColors.palette.neutral500 || '#aab7c4',
         },
       },
       invalid: {
-        color: '#9e2146',
+        color: themeColors.palette.angry500 || '#9e2146',
+        iconColor: themeColors.palette.angry500 || '#9e2146',
       },
     },
   }
 
+  const dynamicStyles = createDynamicStyles(themeColors)
+
   return (
-    <View style={styles.container} accessibilityLabel="stripe-web-payment-container">
-      <Text style={styles.title} accessibilityLabel="payment-methods-title">Add Payment Method</Text>
+    <View style={[styles.container, { backgroundColor: themeColors.palette.biancaBackground }]} accessibilityLabel="stripe-web-payment-container">
+      <Text style={dynamicStyles.title} accessibilityLabel="payment-methods-title">{translate("paymentScreen.addPaymentMethod")}</Text>
       
       {paymentMethodsLoading && (
         <View style={styles.loadingContainer} accessibilityLabel="payment-methods-loading">
-          <Text style={styles.loadingText}>Loading payment methods...</Text>
+          <Text style={dynamicStyles.loadingText}>{translate("paymentScreen.loadingPaymentMethods")}</Text>
         </View>
       )}
 
       {!paymentMethodsLoading && paymentMethodsError && (
-        <View style={styles.errorContainer} accessibilityLabel="payment-methods-error">
-          <Text style={styles.errorText}>Error loading payment methods: {paymentMethodsError.message}</Text>
+        <View style={[styles.errorContainer, { backgroundColor: themeColors.palette.angry100 }]} accessibilityLabel="payment-methods-error">
+          <Text style={dynamicStyles.errorText}>{translate("paymentScreen.errorLoadingPaymentMethods")} {paymentMethodsError.message}</Text>
         </View>
       )}
 
       {!paymentMethodsLoading && !paymentMethodsError && paymentMethods.length > 0 && (
         <View style={styles.existingMethods} accessibilityLabel="existing-payment-methods">
-          <Text style={styles.sectionTitle} accessibilityLabel="existing-methods-title">Existing Payment Methods ({paymentMethods.length})</Text>
+          <Text style={dynamicStyles.sectionTitle} accessibilityLabel="existing-methods-title">
+            {translate("paymentScreen.existingPaymentMethods")} ({paymentMethods.length})
+          </Text>
           
           {paymentMethods.map((method: PaymentMethod, index: number) => {
             // Create display text based on available data
-            let displayText = 'Payment Method'
-            let subText = method.isDefault ? 'Default' : ''
+            let displayText = translate("paymentScreen.paymentMethod")
+            let subText = method.isDefault ? translate("paymentScreen.default") : ''
             
             if (method.brand && method.last4) {
               displayText = `${method.brand.toUpperCase()} •••• ${method.last4}`
               if (method.expMonth && method.expYear) {
-                subText = `${subText ? subText + ' • ' : ''}Expires ${method.expMonth}/${method.expYear}`
+                subText = `${subText ? subText + ' • ' : ''}${translate("paymentScreen.expires")} ${method.expMonth}/${method.expYear}`
               }
             } else if (method.bankName && method.accountType) {
               displayText = `${method.bankName} ${method.accountType}`
@@ -247,21 +292,21 @@ const PaymentForm: React.FC<{
             }
             
             return (
-              <View key={method.id} style={styles.paymentMethodCard} accessibilityLabel={`payment-method-card-${method.id}`}>
+              <View key={method.id} style={[styles.paymentMethodCard, { backgroundColor: themeColors.palette.neutral100, borderColor: themeColors.palette.neutral300 }]} accessibilityLabel={`payment-method-card-${method.id}`}>
                 <View style={styles.paymentMethodContent}>
                   <View style={styles.paymentMethodInfo}>
-                    <Text style={styles.paymentMethodText} accessibilityLabel={`payment-method-text-${method.id}`}>{displayText}</Text>
-                    {subText ? <Text style={styles.paymentMethodSubText} accessibilityLabel={`payment-method-subtext-${method.id}`}>{subText}</Text> : null}
+                    <Text style={dynamicStyles.paymentMethodText} accessibilityLabel={`payment-method-text-${method.id}`}>{displayText}</Text>
+                    {subText ? <Text style={dynamicStyles.paymentMethodSubText} accessibilityLabel={`payment-method-subtext-${method.id}`}>{subText}</Text> : null}
                     {method.isDefault && (
-                      <View style={styles.defaultBadge} accessibilityLabel={`default-badge-${method.id}`}>
-                        <Text style={styles.defaultBadgeText}>Default</Text>
+                      <View style={[styles.defaultBadge, { backgroundColor: themeColors.palette.accent500 }]} accessibilityLabel={`default-badge-${method.id}`}>
+                        <Text style={styles.defaultBadgeText}>{translate("paymentScreen.default")}</Text>
                       </View>
                     )}
                   </View>
                   <View style={styles.paymentMethodActions}>
                     {!method.isDefault && (
                       <Button
-                        text="Set Default"
+                        text={translate("paymentScreen.setDefault")}
                         onPress={() => handleSetDefault(method.id)}
                         style={styles.actionButton}
                         textStyle={styles.actionButtonText}
@@ -269,7 +314,7 @@ const PaymentForm: React.FC<{
                       />
                     )}
                     <Button
-                      text="Remove"
+                      text={translate("paymentScreen.remove")}
                       onPress={() => handleDeletePaymentMethod(method.id)}
                       style={[styles.actionButton, styles.removeButton]}
                       textStyle={[styles.actionButtonText, styles.removeButtonText]}
@@ -283,14 +328,14 @@ const PaymentForm: React.FC<{
         </View>
       )}
 
-      <View style={styles.formContainer} accessibilityLabel="add-payment-form">
-        <Text style={styles.sectionTitle} accessibilityLabel="add-card-title">Add New Card</Text>
-        <View style={styles.cardElementContainer} accessibilityLabel="card-element-container">
-          <CardElement options={cardElementOptions} />
+      <View style={[styles.formContainer, { backgroundColor: themeColors.palette.neutral100 }]} accessibilityLabel="add-payment-form">
+        <Text style={dynamicStyles.sectionTitle} accessibilityLabel="add-card-title">{translate("paymentScreen.addNewCard")}</Text>
+        <View style={[styles.cardElementContainer, { backgroundColor: themeColors.palette.neutral100, borderColor: themeColors.palette.neutral300 }]} accessibilityLabel="card-element-container">
+          <CardElement key={`card-element-${stripeLocale}`} options={cardElementOptions} />
         </View>
         
         <Button
-          text="Add Payment Method"
+          text={translate("paymentScreen.addPaymentMethod")}
           onPress={handleSubmit}
           disabled={!stripe || isLoading}
           style={styles.submitButton}
@@ -298,7 +343,7 @@ const PaymentForm: React.FC<{
         />
         
         {message && (
-          <Text style={[styles.message, message.includes('success') ? styles.successMessage : styles.errorMessage]} accessibilityLabel="payment-message">
+          <Text style={[dynamicStyles.message, message.includes('success') ? dynamicStyles.successMessage : dynamicStyles.errorMessage]} accessibilityLabel="payment-message">
             {message}
           </Text>
         )}
@@ -318,8 +363,8 @@ const PaymentForm: React.FC<{
         visible={confirmationModal.visible}
         title={confirmationModal.title}
         message={confirmationModal.message}
-        confirmText="Delete"
-        cancelText="Cancel"
+        confirmText={translate("common.delete")}
+        cancelText={translate("common.cancel")}
         onConfirm={confirmationModal.onConfirm}
         onCancel={() => setConfirmationModal(prev => ({ ...prev, visible: false }))}
         confirmButtonStyle={styles.deleteConfirmButton}
@@ -335,12 +380,55 @@ const StripeWebPayment: React.FC<StripeWebPaymentProps> = ({
   onPaymentMethodAdded,
   onError,
 }) => {
+  // Use language hook to trigger re-renders on language change
+  const { currentLanguage } = useLanguage()
+  
+  // Get current locale for Stripe Elements localization
+  const currentLocale = currentLanguage || i18n.locale || 'en'
+  // Map our locale codes to Stripe's supported locales
+  // Stripe supports: auto, bg, cs, da, de, el, en, es, et, fi, fr, hu, id, it, ja, lt, lv, ms, mt, nb, nl, pl, pt, ro, ru, sk, sl, sv, tr, zh
+  const stripeLocaleMap: { [key: string]: string } = {
+    'en': 'en',
+    'zh': 'zh',
+    'fr': 'fr',
+    'es': 'es',
+    'de': 'de',
+    'it': 'it',
+    'ja': 'ja',
+    'ko': 'auto', // Korean not directly supported, use auto
+    'pt': 'pt',
+    'ru': 'ru',
+    'ar': 'auto', // Arabic not directly supported, use auto
+  }
+  const stripeLocale = stripeLocaleMap[currentLocale] || 'en'
+  
   // Initialize Stripe with the provided publishable key
-  const stripePromise = loadStripe(publishableKey)
+  // Note: loadStripe doesn't accept locale - it must be passed to Elements options
+  const stripePromise = React.useMemo(() => loadStripe(publishableKey), [publishableKey])
+  
+  // Create a key that changes when locale changes to force complete remount
+  // This ensures Stripe Elements re-initializes with the new locale
+  const elementsKey = `stripe-elements-${stripeLocale}`
+
+  // Debug logging
+  if (__DEV__) {
+    console.log('[StripeWebPayment] Locale configuration:', {
+      currentLanguage,
+      i18nLocale: i18n.locale,
+      currentLocale,
+      stripeLocale,
+      elementsKey,
+    })
+  }
 
   return (
-    <Elements stripe={stripePromise}>
+    <Elements 
+      key={elementsKey}
+      stripe={stripePromise} 
+      options={{ locale: stripeLocale }}
+    >
       <PaymentForm
+        key={`payment-form-${stripeLocale}`}
         orgId={orgId}
         onPaymentMethodAdded={onPaymentMethodAdded}
         onError={onError}
@@ -349,32 +437,62 @@ const StripeWebPayment: React.FC<StripeWebPaymentProps> = ({
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: spacing.md,
-  },
+const createDynamicStyles = (colors: any) => StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: spacing.lg,
-    color: colors.text,
+    color: colors.text || colors.palette.neutral800,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: spacing.md,
-    color: colors.text,
+    color: colors.text || colors.palette.neutral800,
+  },
+  paymentMethodText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text || colors.palette.neutral800,
+    marginBottom: spacing.xs,
+  },
+  paymentMethodSubText: {
+    fontSize: 14,
+    color: colors.textDim || colors.palette.neutral600,
+  },
+  loadingText: {
+    color: colors.textDim || colors.palette.neutral600,
+    fontSize: 14,
+  },
+  errorText: {
+    color: colors.palette.angry500,
+    fontSize: 14,
+  },
+  message: {
+    marginTop: spacing.md,
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  successMessage: {
+    color: colors.palette.accent500,
+  },
+  errorMessage: {
+    color: colors.palette.angry500,
+  },
+})
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: spacing.md,
   },
   existingMethods: {
     marginBottom: spacing.xl,
   },
   paymentMethodCard: {
     marginBottom: spacing.sm,
-    backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.palette.neutral300,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -398,21 +516,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
   },
-  paymentMethodText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.palette.neutral800,
-    marginBottom: spacing.xs,
-  },
-  paymentMethodSubText: {
-    fontSize: 14,
-    color: colors.palette.neutral600,
-  },
   defaultBadge: {
     position: 'absolute',
     top: spacing.sm,
     right: spacing.sm,
-    backgroundColor: colors.palette.accent500,
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 4,
@@ -441,49 +548,26 @@ const styles = StyleSheet.create({
     color: colors.palette.angry600,
   },
   formContainer: {
-    backgroundColor: colors.palette.neutral100,
     padding: spacing.lg,
     borderRadius: 8,
   },
   cardElementContainer: {
     padding: spacing.md,
-    backgroundColor: colors.palette.neutral100,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: colors.palette.neutral300,
     marginBottom: spacing.lg,
   },
   submitButton: {
     marginTop: spacing.md,
   },
-  message: {
-    marginTop: spacing.md,
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  successMessage: {
-    color: colors.palette.accent500,
-  },
-  errorMessage: {
-    color: colors.palette.angry500,
-  },
   loadingContainer: {
     padding: spacing.md,
     alignItems: 'center',
   },
-  loadingText: {
-    color: colors.palette.neutral600,
-    fontSize: 14,
-  },
   errorContainer: {
     padding: spacing.md,
-    backgroundColor: colors.palette.angry100,
     borderRadius: 4,
     marginBottom: spacing.md,
-  },
-  errorText: {
-    color: colors.palette.angry500,
-    fontSize: 14,
   },
   deleteConfirmButton: {
     backgroundColor: colors.palette.angry500,

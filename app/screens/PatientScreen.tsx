@@ -489,6 +489,7 @@ function PatientScreen() {
                 onPress={handleManageConversations}
                 disabled={isLoading}
                 testID="manage-conversations-button"
+                accessibilityLabel="manage-conversations-button"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
@@ -699,7 +700,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   fieldLabel: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.palette.biancaHeader,
+    color: colors.text || colors.palette.biancaHeader || colors.palette.neutral800,
     marginBottom: 8,
   },
   languagePicker: {
@@ -711,11 +712,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderRadius: 5,
     paddingHorizontal: 15,
-    backgroundColor: colors.palette.neutral200,
+    backgroundColor: colors.palette.neutral100,
   },
   languagePickerText: {
     fontSize: 16,
-    color: colors.palette.biancaHeader,
+    color: colors.text || colors.palette.biancaHeader || colors.palette.neutral800,
     flex: 1,
   },
   languagePickerArrow: {

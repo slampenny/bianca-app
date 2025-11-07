@@ -8,9 +8,9 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     
     try {
       // GIVEN: I am logged in as a STAFF user (limited permissions)
-      await page.getByTestId('email-input').fill('fake@example.org') // Staff user
-      await page.getByTestId('password-input').fill('Password1')
-      await page.getByTestId('login-button').click()
+      await page.locator('[aria-label="email-input"]').fill('fake@example.org') // Staff user
+      await page.locator('[aria-label="password-input"]').fill('Password1')
+      await page.locator('[aria-label="login-button"]').click()
       await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
       
       console.log('✅ Logged in as STAFF user (fake@example.org)')
@@ -135,9 +135,9 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     
     try {
       // GIVEN: I am logged in as an ADMIN user (full permissions)
-      await page.getByTestId('email-input').fill('admin@example.org') // Admin user
-      await page.getByTestId('password-input').fill('Password1')
-      await page.getByTestId('login-button').click()
+      await page.locator('[aria-label="email-input"]').fill('admin@example.org') // Admin user
+      await page.locator('[aria-label="password-input"]').fill('Password1')
+      await page.locator('[aria-label="login-button"]').click()
       await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
       
       console.log('✅ Logged in as ADMIN user (admin@example.org)')
@@ -321,9 +321,9 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     console.log('=== PERMISSION ERROR HANDLING ===')
     
     // GIVEN: I want to test how the app handles permission errors
-    await page.getByTestId('email-input').fill('fake@example.org') // Staff user with limited permissions
-    await page.getByTestId('password-input').fill('Password1')
-    await page.getByTestId('login-button').click()
+    await page.locator('[aria-label="email-input"]').fill('fake@example.org') // Staff user with limited permissions
+    await page.locator('[aria-label="password-input"]').fill('Password1')
+    await page.locator('[aria-label="login-button"]').click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     console.log('✅ Testing permission error handling with staff user')
@@ -333,9 +333,19 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
       {
         name: 'Organization Management',
         action: async () => {
-          await page.getByTestId('tab-org').click()
+          // Try to find org tab - may not exist for staff users
+          const orgTab = page.locator('[data-testid="tab-org"], [aria-label*="org"], [aria-label*="organization"]').first()
+          const orgTabExists = await orgTab.count() > 0
+          if (!orgTabExists) {
+            console.log('⚠️ Org tab not found - may not be available to staff user')
+            return false
+          }
+          await orgTab.click({ timeout: 5000 }).catch(() => {
+            console.log('⚠️ Could not click org tab')
+          })
           await page.waitForTimeout(2000)
-          return await page.getByTestId('view-caregivers-button').count() > 0
+          const caregiversButton = page.locator('[data-testid="view-caregivers-button"], [aria-label*="caregivers"]')
+          return await caregiversButton.count() > 0
         }
       }
     ]
@@ -343,15 +353,18 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     for (const restrictedAction of restrictedActions) {
       try {
         console.log(`Testing ${restrictedAction.name}...`)
-        const actionWorked = await restrictedAction.action()
+        const actionWorked = await Promise.race([
+          restrictedAction.action(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+        ]) as boolean
         
         if (actionWorked) {
           console.log(`✅ ${restrictedAction.name}: Accessible to staff user`)
         } else {
           console.log(`⚠️ ${restrictedAction.name}: Not accessible to staff user (expected)`)
         }
-      } catch (error) {
-        console.log(`❌ ${restrictedAction.name}: Error - ${error.message}`)
+      } catch (error: any) {
+        console.log(`⚠️ ${restrictedAction.name}: ${error.message || 'Not accessible'}`)
       }
     }
     

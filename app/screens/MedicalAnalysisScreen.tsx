@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from "react"
-import { View, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native"
+import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native"
+import { useToast } from "../hooks/useToast"
+import Toast from "../components/Toast"
 import { useRoute, RouteProp } from "@react-navigation/native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
@@ -28,6 +30,7 @@ type MedicalAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "MedicalAnal
 
 export function MedicalAnalysisScreen() {
   const route = useRoute<MedicalAnalysisScreenRouteProp>()
+  const { toast, showError, showSuccess, hideToast } = useToast()
   const navigation = useNavigation()
   
   // Get patient from route params (when accessed from Patient screen) or Redux state (when accessed from Reports)
@@ -78,7 +81,7 @@ export function MedicalAnalysisScreen() {
       if ('data' in analysisError && analysisError.data) {
         errorMessage = (analysisError.data as any)?.message || errorMessage
       }
-      Alert.alert(translate('medicalAnalysis.error'), errorMessage)
+      showError(errorMessage)
     }
   }, [analysisError])
 
@@ -90,7 +93,7 @@ export function MedicalAnalysisScreen() {
       if ('data' in triggerError && triggerError.data) {
         errorMessage = (triggerError.data as any)?.message || errorMessage
       }
-      Alert.alert(translate('medicalAnalysis.error'), errorMessage)
+      showError(errorMessage)
     }
   }, [triggerError])
 
@@ -103,14 +106,11 @@ export function MedicalAnalysisScreen() {
       console.log('Trigger analysis result:', result)
       
       if (result.success) {
-        Alert.alert(
-          translate('medicalAnalysis.success'), 
-          translate('medicalAnalysis.triggerSuccess')
-        )
+        showSuccess(translate('medicalAnalysis.triggerSuccess'))
         // RTK Query will automatically refetch results after 10 seconds
         // No manual polling needed!
       } else {
-        Alert.alert(translate('medicalAnalysis.error'), result.message || translate('medicalAnalysis.triggerFailed'))
+        showError(result.message || translate('medicalAnalysis.triggerFailed'))
       }
     } catch (error) {
       // Error is handled by the useEffect above
@@ -462,6 +462,13 @@ export function MedicalAnalysisScreen() {
           })()}
         </ScrollView>
       )}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="medical-analysis-toast"
+      />
     </Screen>
   )
 }

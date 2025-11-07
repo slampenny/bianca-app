@@ -3,6 +3,9 @@ import {
   GestureResponderEvent,
   Image,
   ImageStyle,
+  Platform,
+  Pressable,
+  PressableProps,
   StyleProp,
   SwitchProps,
   TextInputProps,
@@ -20,7 +23,7 @@ import { Text, TextProps } from "./Text"
 
 type Variants = "checkbox" | "switch" | "radio"
 
-interface BaseToggleProps extends Omit<TouchableOpacityProps, "style"> {
+interface BaseToggleProps extends Omit<PressableProps, "style"> {
   /**
    * The variant of the toggle.
    * Options: "checkbox", "switch", "radio"
@@ -180,6 +183,7 @@ export function Toggle(props: ToggleProps) {
     containerStyle: $containerStyleOverride,
     inputWrapperStyle: $inputWrapperStyleOverride,
     testID,
+    accessibilityLabel,
     ...WrapperProps
   } = props
 
@@ -188,8 +192,9 @@ export function Toggle(props: ToggleProps) {
 
   const disabled = editable === false || status === "disabled" || props.disabled
 
+  // Use Pressable instead of TouchableOpacity for better React Native Web compatibility
   const Wrapper = useMemo(
-    () => (disabled ? View : TouchableOpacity) as ComponentType<TouchableOpacityProps | ViewProps>,
+    () => (disabled ? View : Pressable) as ComponentType<PressableProps | ViewProps>,
     [disabled],
   )
   const ToggleInput = useMemo(() => ToggleInputs[variant] || (() => null), [variant])
@@ -211,16 +216,9 @@ export function Toggle(props: ToggleProps) {
     onPress?.(e)
   }
 
-  return (
-    <Wrapper
-      accessibilityRole={variant}
-      accessibilityState={{ checked: value, disabled }}
-      activeOpacity={0.7}
-      onPress={handlePress}
-      style={$containerStyles}
-      testID={testID}
-      {...WrapperProps}
-    >
+  // Pressable can work with regular children, but we need to ensure it's clickable
+  const pressableContent = (
+    <>
       <View style={$inputWrapperStyles}>
         {labelPosition === "left" && <FieldLabel {...props} labelPosition={labelPosition} />}
 
@@ -249,6 +247,28 @@ export function Toggle(props: ToggleProps) {
           style={$helperStyles}
         />
       )}
+    </>
+  )
+
+  // For React Native Web, we need to ensure aria-checked is set explicitly
+  // Pressable might not always set it from accessibilityState
+  const webProps = Platform.OS === 'web' ? {
+    'aria-checked': value,
+    'aria-disabled': disabled,
+  } : {}
+  
+  return (
+    <Wrapper
+      accessibilityRole={variant}
+      accessibilityState={{ checked: value, disabled }}
+      accessibilityLabel={accessibilityLabel || testID}
+      onPress={handlePress}
+      style={$containerStyles}
+      testID={testID}
+      {...webProps}
+      {...WrapperProps}
+    >
+      {disabled ? pressableContent : pressableContent}
     </Wrapper>
   )
 }

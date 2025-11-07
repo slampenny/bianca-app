@@ -36,6 +36,7 @@ export interface Caregiver {
   org: string
   role: CaregiverRole
   patients: string[] // Assuming this is the ID of the caregiver
+  preferredLanguage?: string
 }
 
 export interface AlertPages {

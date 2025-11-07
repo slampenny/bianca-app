@@ -2,10 +2,17 @@ import { Translations } from "./en"
 
 const fr: Translations = {
   common: {
-    ok: "OK !",
+    ok: "OK",
     cancel: "Annuler",
-    back: "Retour",
-    logOut: "Déconnexion",
+    close: "Fermer",
+    error: "Erreur",
+    anErrorOccurred: "Une erreur s'est produite",
+    selectImage: "Sélectionner l'image",
+    calling: "Appel en cours...",
+    callNow: "Appeler maintenant",
+    ending: "Fin...",
+    endCall: "Terminer l'appel",
+    loading: "Chargement...",
   },
   alertScreen: {
     markAllAsRead: "Marquer tout comme lu",
@@ -24,13 +31,7 @@ const fr: Translations = {
   legalLinks: {
     privacyPolicy: "Politique de confidentialité",
     termsOfService: "Conditions d'utilisation",
-  },
-  welcomeScreen: {
-    postscript:
-      "psst  — Ce n'est probablement pas à quoi ressemble votre application. (À moins que votre designer ne vous ait donné ces écrans, dans ce cas, mettez la en prod !)",
-    readyForLaunch: "Votre application, presque prête pour le lancement !",
-    exciting: "(ohh, c'est excitant !)",
-    letsGo: "Allons-y !",
+    privacyPractices: "Pratiques de Confidentialité HIPAA",
   },
   errorScreen: {
     title: "Quelque chose s'est mal passé !",
@@ -83,6 +84,12 @@ const fr: Translations = {
     organizationNameFieldPlaceholder: "Entrez le nom de votre organisation",
     organizationButton: "Organisation",
     individualButton: "Individuel",
+    individualExplanation: "S'inscrire en tant qu'individu pour un usage personnel.",
+    organizationExplanation: "S'inscrire en tant qu'organisation pour un usage professionnel ou de groupe.",
+    consentText: "En vous inscrivant, vous acceptez nos",
+    consentAnd: "et",
+    termsOfService: "Conditions d'utilisation",
+    privacyPolicy: "Politique de confidentialité",
   },
   signupScreen: {
     title: "Complétez votre invitation",
@@ -104,6 +111,8 @@ const fr: Translations = {
     guest: "Invité",
     addPatient: "Ajouter un patient",
     adminOnlyMessage: "Seuls les administrateurs d'organisation et les super administrateurs peuvent ajouter des patients",
+    noPatientsFound: "Aucun patient trouvé",
+    viewSchedules: "Voir les plannings",
   },
   tabs: {
     home: "Accueil",
@@ -131,116 +140,8 @@ const fr: Translations = {
     privacyPolicy: "Politique de confidentialité",
     termsOfService: "Conditions d'utilisation",
     mentalHealthReport: "Rapport de santé mentale",
-  },
-  loginScreen: {
-    signIn: "Se connecter",
+    login: "Se connecter",
     register: "S'inscrire",
-    enterDetails:
-      "Entrez vos informations ci-dessous pour débloquer des informations top secrètes. Vous ne devinerez jamais ce que nous avons en attente. Ou peut-être que vous le ferez ; ce n'est pas de la science spatiale ici.",
-    emailFieldLabel: "E-mail",
-    passwordFieldLabel: "Mot de passe",
-    emailFieldPlaceholder: "Entrez votre adresse e-mail",
-    passwordFieldPlaceholder: "Mot de passe super secret ici",
-    forgotPassword: "Mot de passe oublié ?",
-    tapToSignIn: "Appuyez pour vous connecter !",
-    hint: "Astuce : vous pouvez utiliser n'importe quelle adresse e-mail et votre mot de passe préféré :)",
-  },
-  demoNavigator: {
-    componentsTab: "Composants",
-    debugTab: "Débogage",
-    communityTab: "Communauté",
-    podcastListTab: "Podcasts",
-  },
-  demoCommunityScreen: {
-    title: "Connectez-vous avec la communauté",
-    tagLine:
-      "Rejoignez la communauté d'ingénieurs React Native d'Infinite Red et améliorez votre développement d'applications avec nous !",
-    joinUsOnSlackTitle: "Rejoignez-nous sur Slack",
-    joinUsOnSlack:
-      "Vous souhaitez vous connecter avec des ingénieurs React Native du monde entier ? Rejoignez la conversation dans la communauté Slack d'Infinite Red ! Notre communauté en pleine croissance est un espace sûr pour poser des questions, apprendre des autres et développer votre réseau.",
-    joinSlackLink: "Rejoindre la communauté Slack",
-    makeIgniteEvenBetterTitle: "Rendre Ignite encore meilleur",
-    makeIgniteEvenBetter:
-      "Vous avez une idée pour rendre Ignite encore meilleur ? Nous sommes heureux de l'entendre ! Nous cherchons toujours des personnes qui veulent nous aider à construire les meilleurs outils React Native. Rejoignez-nous sur GitHub pour nous aider à construire l'avenir d'Ignite.",
-    contributeToIgniteLink: "Contribuer à Ignite",
-    theLatestInReactNativeTitle: "Les dernières nouvelles de React Native",
-    theLatestInReactNative:
-      "Nous sommes là pour vous tenir au courant de tout ce que React Native a à offrir.",
-    reactNativeRadioLink: "React Native Radio",
-    reactNativeNewsletterLink: "React Native Newsletter",
-    reactNativeLiveLink: "React Native Live",
-    chainReactConferenceLink: "Conférence Chain React",
-    hireUsTitle: "Engagez Infinite Red pour votre prochain projet",
-    hireUs:
-      "Que ce soit pour gérer un projet complet ou pour former des équipes à notre formation pratique, Infinite Red peut vous aider pour presque tous les projets React Native.",
-    hireUsLink: "Envoyez-nous un message",
-  },
-  demoShowroomScreen: {
-    jumpStart: "Composants pour démarrer votre projet !",
-    lorem2Sentences:
-      "Nulla cupidatat deserunt amet quis aliquip nostrud do adipisicing. Adipisicing excepteur elit laborum Lorem adipisicing do duis.",
-    demoHeaderTxExample: "Yay",
-    demoViaTxProp: "Via la propriété `tx`",
-    demoViaSpecifiedTxProp: "Via la propriété `{{prop}}Tx` spécifiée",
-  },
-  demoDebugScreen: {
-    howTo: "COMMENT FAIRE",
-    title: "Débugage",
-    tagLine:
-      "Félicitations, vous avez un modèle d'application React Native très avancé ici. Profitez de cette base de code !",
-    reactotron: "Envoyer à Reactotron",
-    reportBugs: "Signaler des bugs",
-    demoList: "Liste de démonstration",
-    demoPodcastList: "Liste de podcasts de démonstration",
-    androidReactotronHint:
-      "Si cela ne fonctionne pas, assurez-vous que l'application de bureau Reactotron est en cours d'exécution, exécutez adb reverse tcp:9090 tcp:9090 à partir de votre terminal, puis rechargez l'application.",
-    iosReactotronHint:
-      "Si cela ne fonctionne pas, assurez-vous que l'application de bureau Reactotron est en cours d'exécution, puis rechargez l'application.",
-    macosReactotronHint:
-      "Si cela ne fonctionne pas, assurez-vous que l'application de bureau Reactotron est en cours d'exécution, puis rechargez l'application.",
-    webReactotronHint:
-      "Si cela ne fonctionne pas, assurez-vous que l'application de bureau Reactotron est en cours d'exécution, puis rechargez l'application.",
-    windowsReactotronHint:
-      "Si cela ne fonctionne pas, assurez-vous que l'application de bureau Reactotron est en cours d'exécution, puis rechargez l'application.",
-  },
-  demoPodcastListScreen: {
-    title: "Épisodes de Radio React Native",
-    onlyFavorites: "Afficher uniquement les favoris",
-    favoriteButton: "Favori",
-    unfavoriteButton: "Non favori",
-    accessibility: {
-      cardHint:
-        "Double-cliquez pour écouter l'épisode. Double-cliquez et maintenez pour {{action}} cet épisode.",
-      switch: "Activez pour afficher uniquement les favoris",
-      favoriteAction: "Basculer en favori",
-      favoriteIcon: "Épisode non favori",
-      unfavoriteIcon: "Épisode favori",
-      publishLabel: "Publié le {{date}}",
-      durationLabel: "Durée : {{hours}} heures {{minutes}} minutes {{seconds}} secondes",
-    },
-    noFavoritesEmptyState: {
-      heading: "C'est un peu vide ici",
-      content:
-        "Aucun favori n'a été ajouté pour le moment. Appuyez sur le cœur d'un épisode pour l'ajouter à vos favoris !",
-    },
-  },
-  registerScreen: {
-    title: "S'inscrire",
-    nameFieldLabel: "Nom",
-    emailFieldLabel: "E-mail",
-    phoneFieldLabel: "Téléphone",
-    passwordFieldLabel: "Mot de passe",
-    goBack: "Retour",
-    confirmPasswordFieldLabel: "Confirmer le mot de passe",
-    organizationNameFieldLabel: "Nom de l'organisation",
-    nameFieldPlaceholder: "Entrez votre nom",
-    emailFieldPlaceholder: "Entrez votre adresse e-mail",
-    passwordFieldPlaceholder: "Entrez votre mot de passe",
-    confirmPasswordFieldPlaceholder: "Confirmez votre mot de passe",
-    phoneFieldPlaceholder: "(xxx)xxx-xxxx",
-    organizationNameFieldPlaceholder: "Entrez le nom de votre organisation",
-    organizationButton: "Organisation",
-    individualButton: "Individuel",
   },
   requestResetScreen: {
     title: "Demander la réinitialisation du mot de passe",
@@ -253,6 +154,7 @@ const fr: Translations = {
   emailVerificationScreen: {
     title: "Vérifiez votre e-mail",
     message: "Nous avons envoyé un lien de vérification à votre adresse e-mail. Veuillez cliquer sur le lien pour vérifier votre compte avant de vous connecter.",
+    verifying: "Vérification...",
     emailFieldLabel: "Adresse e-mail",
     emailFieldPlaceholder: "Entrez votre adresse e-mail",
     resendButton: "Renvoyer l'e-mail de vérification",
@@ -260,11 +162,54 @@ const fr: Translations = {
     successMessage: "✓ E-mail de vérification envoyé ! Veuillez vérifier votre boîte de réception.",
     errorNoEmail: "Veuillez entrer votre adresse e-mail",
     errorSendFailed: "Échec de l'envoi de l'e-mail de vérification",
+    errorNoToken: "Le jeton de vérification est manquant",
+    errorVerificationFailed: "Échec de la vérification de l'e-mail",
+    errorNetwork: "Impossible de se connecter au serveur. Veuillez vérifier votre connexion Internet et réessayer.",
+    verificationFailed: "Échec de la vérification de l'e-mail",
+  },
+  emailVerificationFailedPage: {
+    title: "Échec de la vérification",
+    messageExpired: "Ce lien de vérification a expiré. Veuillez demander un nouvel e-mail de vérification.",
+    messageInvalid: "Ce lien de vérification est invalide ou a déjà été utilisé.",
+    helpExpired: "Les liens de vérification expirent après 24 heures pour des raisons de sécurité.",
+    helpGeneric: "Si vous pensez qu'il s'agit d'une erreur, veuillez contacter le support.",
+    loginButton: "Aller à la connexion",
   },
   emailVerifiedScreen: {
     title: "E-mail vérifié !",
     message: "Votre compte My Phone Friend a été vérifié avec succès.",
     redirecting: "Redirection vers l'application...",
+  },
+  ssoLinkingScreen: {
+    title: "Lier votre compte",
+    message: "Ce compte a été créé avec {{provider}}. Pour utiliser la connexion par e-mail/mot de passe, veuillez définir un mot de passe ci-dessous, ou continuez avec {{provider}}.",
+    passwordLabel: "Mot de passe",
+    passwordPlaceholder: "Entrez votre mot de passe",
+    confirmPasswordLabel: "Confirmer le mot de passe",
+    confirmPasswordPlaceholder: "Confirmez votre mot de passe",
+    setPasswordButton: "Définir le mot de passe",
+    backToLoginButton: "Retour à la connexion",
+    orDivider: "Ou",
+    successMessage: "✓ Mot de passe défini avec succès ! Vous pouvez maintenant vous connecter avec votre e-mail et votre mot de passe.",
+    errorNoPassword: "Veuillez entrer un mot de passe",
+    errorNoConfirmPassword: "Veuillez confirmer votre mot de passe",
+    errorPasswordMismatch: "Les mots de passe ne correspondent pas",
+    errorPasswordTooShort: "Le mot de passe doit contenir au moins 8 caractères",
+    errorSetPasswordFailed: "Échec de la définition du mot de passe",
+    errorSSOFailed: "Échec de la connexion SSO. Veuillez réessayer.",
+    providerGoogle: "Google",
+    providerMicrosoft: "Microsoft",
+    providerSSO: "SSO",
+  },
+  ssoButtons: {
+    orContinueWith: "Ou continuer avec",
+    google: "Google",
+    microsoft: "Microsoft",
+    companySSO: "SSO entreprise",
+    ssoNotAvailable: "SSO non disponible",
+    signInFailed: "Échec de la connexion",
+    companySSOTitle: "SSO entreprise",
+    companySSOMessage: "Cela redirigerait vers le fournisseur SSO de votre entreprise. Veuillez contacter votre administrateur pour la configuration.",
   },
   conversationsScreen: {
     title: "Conversations",
@@ -275,6 +220,7 @@ const fr: Translations = {
     noConversationsToDisplay: "Aucune conversation à afficher",
     noPreviousConversations: "Aucune conversation précédente trouvée pour ce patient",
     errorFetchingConversations: "Erreur lors de la récupération des conversations",
+    loadingMoreConversations: "Chargement de plus de conversations...",
   },
   patientScreen: {
     nameLabel: "Nom *",
@@ -357,11 +303,31 @@ const fr: Translations = {
     viewCaregivers: "Voir les aidants",
     inviteCaregiver: "Inviter un aidant",
     payments: "Paiements",
+    organizationActions: "Actions de l'organisation",
+    organizationLogo: "Logo de l'organisation",
+    noLogoSet: "Aucun logo défini",
   },
   caregiverScreen: {
+    nameLabel: "Nom",
     namePlaceholder: "Nom",
+    emailLabel: "E-mail",
     emailPlaceholder: "E-mail",
+    phoneLabel: "Téléphone",
     phonePlaceholder: "Téléphone",
+    loadingUnassignedPatients: "Chargement des patients non assignés...",
+    assigningPatients: "Assignation des patients...",
+    patientsAssignedSuccess: "Patients assignés avec succès !",
+    loadingCaregivers: "Chargement des aidants...",
+    save: "ENREGISTRER",
+    invite: "INVITER",
+    confirmDelete: "CONFIRMER LA SUPPRESSION",
+    deleteCaregiver: "SUPPRIMER L'AIDANT",
+    assignUnassignedPatients: "Assigner les patients non assignés",
+    assignUnassignedPatientsTitle: "Assigner les patients non assignés",
+    selectAll: "Tout sélectionner",
+    deselectAll: "Tout désélectionner",
+    assignSelected: "Assigner la sélection",
+    noUnassignedPatientsFound: "Aucun patient non assigné trouvé.",
   },
   caregiversScreen: {
     invited: "Invité",
@@ -371,21 +337,6 @@ const fr: Translations = {
     noPermissionToView: "Vous n'avez pas la permission de voir les aidants. Veuillez contacter votre administrateur.",
     addCaregiver: "Ajouter un aidant",
   },
-  signupScreen: {
-    title: "Complétez votre invitation",
-    fullNameLabel: "Nom complet",
-    fullNamePlaceholder: "Votre nom complet",
-    emailLabel: "Adresse e-mail",
-    emailPlaceholder: "votre.email@exemple.com",
-    phoneLabel: "Numéro de téléphone",
-    phonePlaceholder: "(555) 123-4567",
-    passwordLabel: "Mot de passe",
-    passwordPlaceholder: "Entrez votre mot de passe",
-    confirmPasswordLabel: "Confirmer le mot de passe",
-    confirmPasswordPlaceholder: "Confirmez votre mot de passe",
-    completeRegistration: "Compléter l'inscription",
-    preconfiguredMessage: "Votre nom, e-mail et détails de l'organisation ont été préconfigurés par votre administrateur.",
-  },
   confirmResetScreen: {
     title: "Réinitialiser votre mot de passe",
     subtitle: "Entrez votre nouveau mot de passe ci-dessous. Assurez-vous qu'il est sécurisé et facile à retenir.",
@@ -394,73 +345,10 @@ const fr: Translations = {
     confirmPasswordLabel: "Confirmer le nouveau mot de passe",
     confirmPasswordPlaceholder: "Confirmez votre nouveau mot de passe",
   },
-  homeScreen: {
-    welcome: "Bienvenue, {{name}}",
-    guest: "Invité",
-    addPatient: "Ajouter un patient",
-    adminOnlyMessage: "Seuls les administrateurs d'organisation et les super administrateurs peuvent ajouter des patients",
-  },
-  tabs: {
-    home: "Accueil",
-    org: "Organisation",
-    reports: "Rapports",
-    alerts: "Alertes",
-  },
-  common: {
-    cancel: "Annuler",
-    error: "Erreur",
-    selectImage: "Sélectionner l'image",
-    calling: "Appel en cours...",
-    callNow: "Appeler maintenant",
-    ending: "Fin...",
-    endCall: "Terminer l'appel",
-  },
-  headers: {
-    home: "Accueil",
-    patient: "Patient",
-    schedule: "Horaire",
-    conversations: "Conversations",
-    call: "Appel",
-    profile: "Profil",
-    logout: "Déconnexion",
-    alerts: "Alertes",
-    organization: "Organisation",
-    caregivers: "Aidants",
-    caregiver: "Aidant",
-    caregiverInvited: "Aidant invité",
-    payments: "Paiements",
-    reports: "Rapports",
-    sentimentAnalysis: "Analyse de sentiment",
-    medicalAnalysis: "Analyse médicale",
-    privacyPolicy: "Politique de confidentialité",
-    termsOfService: "Conditions d'utilisation",
-    mentalHealthReport: "Rapport de santé mentale",
-  },
   scheduleScreen: {
     heading: "Configuration des horaires",
     saveSchedule: "Enregistrer l'horaire",
     deleteSchedule: "Supprimer l'horaire",
-  },
-  scheduleComponent: {
-    schedule: "Horaire",
-    startTime: "Heure de début",
-    frequency: "Fréquence",
-    daily: "Quotidien",
-    weekly: "Hebdomadaire",
-    monthly: "Mensuel",
-    sunday: "Dimanche",
-    monday: "Lundi",
-    tuesday: "Mardi",
-    wednesday: "Mercredi",
-    thursday: "Jeudi",
-    friday: "Vendredi",
-    saturday: "Samedi",
-    scheduleDetails: "Détails de l'horaire",
-    active: "Actif",
-    everyDayAt: "Tous les jours à {{time}}",
-    everyDaysAt: "Tous les {{days}} à {{time}}",
-    everyWeekAt: "Toutes les semaines à {{time}}",
-    everyMonthOn: "Tous les mois le {{day}} à {{time}}",
   },
   sentimentAnalysis: {
     lastCall: "Dernier appel",
@@ -505,19 +393,22 @@ const fr: Translations = {
     avg: "Moy :",
     negative: "Négatif",
     positive: "Positif",
+    insufficientDataForTrend: "Données insuffisantes pour l'analyse de tendance",
+    needMoreConversations: "Besoin de plus de conversations pour une tendance fiable",
+    lowConfidence: "Faible confiance",
     // Last Call
     lastCallAnalysis: "Analyse du dernier appel",
     noRecentCall: "Aucun appel récent",
     noRecentCallMessage: "La conversation la plus récente n'a pas encore d'analyse de sentiment disponible.",
     duration: "Durée",
     analysisDate: "Date d'analyse",
+    conversationId: "ID de conversation",
     overallSentiment: "Sentiment global",
     scoreRange: "Échelle de score : -1.0 (Très négatif) à +1.0 (Très positif)",
     analysisConfidence: "Confiance de l'analyse :",
     keyEmotionsDetected: "Émotions clés détectées",
     patientMoodAssessment: "Évaluation de l'humeur du patient",
     concernLevel: "Niveau de préoccupation",
-    concern: "PRÉOCCUPATION",
     lowConcernDescription: "Le patient semble être de bonne humeur avec des préoccupations minimales.",
     mediumConcernDescription: "Quelques zones de préoccupation ont été notées pendant la conversation.",
     highConcernDescription: "Des préoccupations importantes ont été identifiées qui peuvent nécessiter une attention.",
@@ -537,9 +428,7 @@ const fr: Translations = {
     testDirectApiCall: "Tester l'appel API direct",
     forceRefreshCache: "Forcer l'actualisation du cache",
     currentPatient: "Patient actuel :",
-    noPatientSelected: "Aucun patient sélectionné",
     debugResults: "Résultats de débogage",
-    totalConversations: "Total des conversations",
     withoutSentiment: "Sans sentiment",
     successfullyAnalyzed: "Analysées avec succès",
     failedAnalyses: "Analyses échouées",
@@ -549,7 +438,6 @@ const fr: Translations = {
     score: "Score",
     mood: "Humeur",
     emotions: "Émotions",
-    concernLevel: "Niveau de préoccupation",
     failed: "Échoué",
     noAnalysisPerformed: "Aucune analyse effectuée",
     cacheRefreshed: "Cache actualisé",
@@ -602,6 +490,8 @@ const fr: Translations = {
   profileScreen: {
     languageSelector: "Langue / Language",
     selectLanguage: "Sélectionner la langue",
+    theme: "Thème",
+    selectTheme: "Sélectionner le Thème",
     namePlaceholder: "Nom",
     emailPlaceholder: "E-mail",
     phonePlaceholder: "Téléphone",
@@ -611,6 +501,10 @@ const fr: Translations = {
     profileUpdatedSuccess: "Votre profil a été mis à jour avec succès !",
     profileUpdateFailed: "Échec de la mise à jour du profil. Veuillez réessayer.",
     invalidPhoneFormat: "Format de téléphone invalide (10 chiffres ou +1XXXXXXXXXX)",
+    completeProfileTitle: "Complétez votre profil",
+    completeProfileMessage: "Veuillez compléter votre profil en ajoutant un numéro de téléphone avant de continuer.",
+    completeProfileMessageUnverified: "Veuillez ajouter votre numéro de téléphone pour compléter votre profil et accéder à toutes les fonctionnalités.",
+    errorUploadingAvatar: "Erreur lors du téléchargement de l'avatar",
   },
   reportsScreen: {
     selectPatient: "Sélectionner un patient :",
@@ -644,25 +538,265 @@ const fr: Translations = {
     saturday: "Samedi",
     scheduleDetails: "Détails du planning",
     active: "Actif",
+    everyDayAt: "Tous les jours à {{time}}",
+    everyDaysAt: "Tous les {{days}} à {{time}}",
+    everyWeekAt: "Toutes les semaines à {{time}}",
+    everyMonthOn: "Tous les mois le {{day}} à {{time}}",
   },
-  conversationsScreen: {
-    title: "Conversations",
-    yesterday: "Hier",
-    noMessages: "Aucun message",
-    noPatientSelected: "Aucun patient sélectionné",
-    firstConversation: "Aucune conversation précédente trouvée. Ce sera la première conversation avec ce patient.",
-    noConversationsToDisplay: "Aucune conversation à afficher",
-    noPreviousConversations: "Aucune conversation précédente trouvée pour ce patient",
-    errorFetchingConversations: "Erreur lors de la récupération des conversations",
-    loadingMoreConversations: "Chargement de plus de conversations...",
+  themes: {
+    healthcare: {
+      name: "Soins de Santé",
+      description: "Thème médical professionnel avec des couleurs bleues et vertes",
+    },
+    colorblind: {
+      name: "Adapté aux Daltoniens",
+      description: "Thème à haut contraste optimisé pour les déficiences de vision des couleurs",
+    },
+    dark: {
+      name: "Mode Sombre",
+      description: "Thème sombre optimisé pour les environnements à faible luminosité",
+    },
+    accessibility: {
+      wcagLevel: "Niveau WCAG",
+      colorblindFriendly: "Adapté aux daltoniens",
+      highContrast: "Haut contraste",
+      darkMode: "Mode sombre",
+    },
   },
-  caregiversScreen: {
-    invited: "Invité",
-    edit: "Modifier",
-    noCaregiversFound: "Aucun aidant trouvé",
-    notAuthorized: "Non autorisé",
-    noPermissionToView: "Vous n'avez pas la permission de voir les aidants",
-    addCaregiver: "Ajouter un aidant",
+  privacyPracticesScreen: {
+    content: `# Avis sur les pratiques de confidentialité
+## Services de communication de santé MyPhoneFriend
+
+**Date d'entrée en vigueur** : 15 octobre 2025
+
+---
+
+## VOS INFORMATIONS. VOS DROITS. NOS RESPONSABILITÉS.
+
+**CET AVIS DÉCRIT COMMENT LES INFORMATIONS MÉDICALES VOUS CONCERNANT PEUVENT ÊTRE UTILISÉES ET DIVULGUÉES ET COMMENT VOUS POUVEZ ACCÉDER À CES INFORMATIONS. VEUILLEZ LE LIRE ATTENTIVEMENT.**
+
+---
+
+## VOS DROITS
+
+Vous avez le droit de :
+- Obtenir une copie de vos informations de santé
+- Corriger vos informations de santé
+- Demander une communication confidentielle
+- Nous demander de limiter les informations que nous partageons
+- Obtenir une liste de ceux avec qui nous avons partagé vos informations
+- Obtenir une copie de cet avis de confidentialité
+- Choisir quelqu'un pour agir en votre nom
+- Déposer une plainte si vous croyez que vos droits à la confidentialité ont été violés
+
+---
+
+## VOS CHOIX
+
+Vous avez certains choix sur la façon dont nous utilisons et partageons les informations lorsque nous :
+- Répondons aux questions de votre famille et de vos amis concernant vos soins
+- Fournissons des informations vous concernant dans des situations de secours en cas de catastrophe
+
+**Nous ne partageons jamais vos informations à des fins de marketing ou de vente de vos données.**
+
+---
+
+# VOS DROITS DÉTAILLÉS
+
+## Obtenir une copie de vos informations de santé
+
+**Vous pouvez demander à voir ou obtenir une copie de vos informations de santé.**
+
+Ce que vous pouvez demander :
+- Enregistrements d'appels et transcriptions
+- Résumés de bien-être et résultats d'analyse IA
+- Alertes médicales générées par notre système
+- Notifications d'urgence
+- Informations de compte et préférences
+
+**Comment faire une demande** :
+- Email : privacy@myphonefriend.com
+- Téléphone : +1-604-562-4263
+
+**Notre réponse** : Dans les 30 jours
+
+---
+
+## Demandez-nous de corriger vos informations de santé
+
+**Vous pouvez nous demander de corriger les informations de santé que vous pensez être incorrectes ou incomplètes.**
+
+**Notre réponse** : Dans les 60 jours
+
+---
+
+## Demander des communications confidentielles
+
+**Vous pouvez nous demander de vous contacter d'une manière ou à un endroit spécifique.**
+
+Exemples :
+- "Veuillez m'envoyer un email au lieu d'appeler"
+- "Veuillez me contacter uniquement sur mon téléphone portable"
+
+Nous accommoderons toutes les demandes raisonnables.
+
+---
+
+## Demandez-nous de limiter ce que nous utilisons ou partageons
+
+**Vous pouvez nous demander de ne pas utiliser ou partager certaines informations de santé.**
+
+Nous devons accepter si vous avez payé de votre poche en totalité et nous demandez de ne pas partager avec votre plan de santé.
+
+---
+
+## Obtenir une liste des divulgations
+
+**Vous pouvez demander un "compte rendu des divulgations"** - une liste des moments où nous avons partagé vos informations de santé.
+
+Couvre : 6 dernières années  
+Exclut : Divulgations pour traitement, paiement et opérations (sauf si vous le demandez)
+
+---
+
+## Déposer une plainte
+
+**Déposer auprès de nous** :
+- Email : privacy@myphonefriend.com
+- Téléphone : +1-604-562-4263
+
+**Déposer auprès de HHS** :
+- Site web : https://www.hhs.gov/hipaa/filing-a-complaint
+- Téléphone : 1-800-368-1019
+
+**Nous ne vous représenterons pas pour avoir déposé une plainte.**
+
+---
+
+# NOS UTILISATIONS ET DIVULGATIONS
+
+## Comment nous utilisons vos informations de santé
+
+**Pour le traitement** :
+- Fournir des résumés de bien-être IA à vos aidants
+- Générer des alertes d'urgence pour les situations urgentes
+- Permettre aux aidants de surveiller votre bien-être
+- Faciliter la communication avec votre équipe de soins
+
+**Pour le paiement** :
+- Facturer votre organisation de santé pour les services
+- Traiter les factures pour le temps d'appel et l'analyse
+
+**Pour les opérations de santé** :
+- Améliorer nos algorithmes de détection IA
+- Assurance qualité et amélioration
+- Formation de nos systèmes pour mieux servir les patients
+
+---
+
+## Avec qui nous partageons
+
+**Votre organisation de santé** :
+- Vos aidants et coordinateurs de soins assignés
+- Administrateurs d'organisation pour la facturation
+
+**Associés commerciaux** (Fournisseurs de services) :
+- Services IA (Azure OpenAI) : Pour transcription et analyse
+- Services vocaux (Twilio) : Pour la gestion des appels téléphoniques
+- Hébergement cloud (AWS) : Pour le stockage sécurisé des données
+- Base de données (MongoDB Atlas) : Pour la gestion des données
+
+Tous les associés commerciaux signent des accords d'associé commercial et doivent protéger vos informations.
+
+**Comme requis par la loi** :
+- Services d'urgence (911) si urgence détectée
+- Autorités de santé publique (signalement d'abus, de négligence)
+- Application de la loi (avec ordre juridique valide)
+
+**Nous ne faisons PAS** :
+- ❌ Vendre vos informations de santé
+- ❌ Partager avec des spécialistes du marketing ou des annonceurs
+- ❌ Utiliser à des fins de marketing sans votre autorisation
+- ❌ Partager sur les réseaux sociaux
+
+---
+
+# INFORMATIONS DE SANTÉ QUE NOUS COLLECTONS
+
+**Pendant l'utilisation de nos services** :
+- Nom du patient, numéro de téléphone, date de naissance
+- Enregistrements d'appels et transcriptions
+- Informations liées à la santé provenant d'appels (symptômes, médicaments, humeur)
+- Alertes d'urgence et incidents
+- Tendances et modèles de bien-être
+- Notes et observations des aidants
+- Résultats d'analyse médicale de l'IA
+
+---
+
+# VOS RESPONSABILITÉS
+
+**Si vous utilisez notre service pour appeler une autre personne**, vous êtes responsable de :
+- Obtenir les consentements nécessaires pour l'enregistrement
+- S'assurer qu'ils comprennent le service
+- Suivre les lois applicables sur le consentement à l'enregistrement
+
+---
+
+# NOTIFICATION DE VIOLATION
+
+**Si vos informations de santé sont incorrectement consultées ou divulguées**, nous :
+- Enquêterons sur l'incident
+- Vous notifierons dans les 60 jours si violation signalable
+- Expliquerons ce qui s'est passé et ce que nous faisons
+- Fournirons des informations sur les mesures que vous pouvez prendre
+
+---
+
+# MODIFICATIONS DE CET AVIS
+
+- Nous pouvons modifier cet avis et les modifications s'appliqueront à toutes les informations que nous avons
+- Le nouvel avis sera disponible dans l'application et sur notre site web
+- Vous pouvez toujours demander une copie actuelle
+
+---
+
+# INFORMATIONS DE CONTACT
+
+**Responsable de la protection des données** :
+- Email : privacy@myphonefriend.com
+- Téléphone : +1-604-562-4263
+- Courrier : Bureau de la confidentialité MyPhoneFriend, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+**Heures** : Lundi-Vendredi, 9h - 17h PST
+
+---
+
+# DÉPOSER UNE PLAINTE
+
+**Avec nous** :
+- Email : privacy@myphonefriend.com
+- Téléphone : +1-604-562-4263
+
+**Avec le gouvernement fédéral (HHS)** :
+- Site web : https://www.hhs.gov/hipaa/filing-a-complaint
+- Téléphone : 1-800-368-1019
+- Courrier : Bureau des droits civils, Département américain de la santé et des services sociaux, 200 Independence Avenue S.W., Washington, D.C. 20201
+
+---
+
+**Date d'entrée en vigueur** : 15 octobre 2025  
+**Version** : 1.0
+
+Cet avis sur les pratiques de confidentialité est conforme à la règle de confidentialité HIPAA (45 CFR §164.520)
+
+---
+
+## Assistance linguistique
+
+**Anglais** : Si vous avez besoin d'aide pour comprendre cet avis, contactez privacy@myphonefriend.com
+
+**Español** : Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
   },
 }
 

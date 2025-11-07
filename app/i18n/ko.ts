@@ -153,6 +153,12 @@ const ko: Translations = {
     organizationNameFieldPlaceholder: "조직 이름을 입력하세요",
     organizationButton: "조직",
     individualButton: "개인",
+    individualExplanation: "개인 사용을 위해 개인으로 등록합니다.",
+    organizationExplanation: "회사 또는 그룹 사용을 위해 조직으로 등록합니다.",
+    consentText: "등록하면 다음에 동의하는 것입니다",
+    consentAnd: "및",
+    termsOfService: "서비스 약관",
+    privacyPolicy: "개인정보 보호정책",
   },
   requestResetScreen: {
     title: "비밀번호 재설정 요청",
@@ -161,6 +167,37 @@ const ko: Translations = {
     requestReset: "재설정 요청",
     successMessage: "재설정 코드가 이메일로 전송되었습니다!",
     requestFailed: "요청이 실패했습니다. 이메일을 확인하고 다시 시도해 주세요.",
+  },
+  ssoLinkingScreen: {
+    title: "계정 연결",
+    message: "이 계정은 {{provider}}로 생성되었습니다. 이메일/비밀번호 로그인을 사용하려면 아래에서 비밀번호를 설정하거나 {{provider}}로 계속하세요.",
+    passwordLabel: "비밀번호",
+    passwordPlaceholder: "비밀번호를 입력하세요",
+    confirmPasswordLabel: "비밀번호 확인",
+    confirmPasswordPlaceholder: "비밀번호를 확인하세요",
+    setPasswordButton: "비밀번호 설정",
+    backToLoginButton: "로그인으로 돌아가기",
+    orDivider: "또는",
+    successMessage: "✓ 비밀번호가 성공적으로 설정되었습니다! 이제 이메일과 비밀번호로 로그인할 수 있습니다.",
+    errorNoPassword: "비밀번호를 입력하세요",
+    errorNoConfirmPassword: "비밀번호를 확인하세요",
+    errorPasswordMismatch: "비밀번호가 일치하지 않습니다",
+    errorPasswordTooShort: "비밀번호는 최소 8자 이상이어야 합니다",
+    errorSetPasswordFailed: "비밀번호 설정 실패",
+    errorSSOFailed: "SSO 로그인 실패. 다시 시도하세요.",
+    providerGoogle: "Google",
+    providerMicrosoft: "Microsoft",
+    providerSSO: "SSO",
+  },
+  ssoButtons: {
+    orContinueWith: "또는 계속하기",
+    google: "Google",
+    microsoft: "Microsoft",
+    companySSO: "회사 SSO",
+    ssoNotAvailable: "SSO를 사용할 수 없음",
+    signInFailed: "로그인 실패",
+    companySSOTitle: "회사 SSO",
+    companySSOMessage: "회사의 SSO 공급자로 리디렉션됩니다. 설정을 위해 관리자에게 문의하세요.",
   },
   emailVerificationScreen: {
     title: "이메일을 확인하세요",
@@ -267,11 +304,18 @@ const ko: Translations = {
     viewCaregivers: "간병인 보기",
     inviteCaregiver: "간병인 초대",
     payments: "결제",
+    organizationActions: "조직 작업",
+    organizationLogo: "조직 로고",
+    noLogoSet: "로고가 설정되지 않음",
   },
   caregiverScreen: {
     namePlaceholder: "이름",
     emailPlaceholder: "이메일",
     phonePlaceholder: "전화번호",
+    loadingUnassignedPatients: "할당되지 않은 환자 로딩 중...",
+    assigningPatients: "환자 할당 중...",
+    patientsAssignedSuccess: "환자가 성공적으로 할당되었습니다!",
+    loadingCaregivers: "간병인 로딩 중...",
   },
   caregiversScreen: {
     invited: "초대됨",
@@ -309,6 +353,8 @@ const ko: Translations = {
     guest: "게스트",
     addPatient: "환자 추가",
     adminOnlyMessage: "조직 관리자와 슈퍼 관리자만 환자를 추가할 수 있습니다",
+    noPatientsFound: "환자를 찾을 수 없습니다",
+    viewSchedules: "일정 보기",
   },
   tabs: {
     home: "홈",
@@ -318,12 +364,15 @@ const ko: Translations = {
   },
   common: {
     cancel: "취소",
+    close: "닫기",
     error: "오류",
+    anErrorOccurred: "오류가 발생했습니다",
     selectImage: "이미지 선택",
     calling: "통화 중...",
     callNow: "지금 통화",
     ending: "종료 중...",
     endCall: "통화 종료",
+    loading: "로딩 중...",
   },
   legalLinks: {
     privacyPolicy: "개인정보 보호정책",
@@ -349,6 +398,8 @@ const ko: Translations = {
     privacyPolicy: "개인정보 보호정책",
     termsOfService: "서비스 약관",
     mentalHealthReport: "정신 건강 보고서",
+    login: "로그인",
+    register: "등록",
   },
   scheduleScreen: {
     heading: "일정 구성",
@@ -516,6 +567,8 @@ const ko: Translations = {
   profileScreen: {
     languageSelector: "언어 / Language",
     selectLanguage: "언어 선택",
+    theme: "테마",
+    selectTheme: "테마 선택",
     namePlaceholder: "이름",
     emailPlaceholder: "이메일",
     phonePlaceholder: "전화번호",
@@ -525,6 +578,10 @@ const ko: Translations = {
     profileUpdatedSuccess: "프로필이 성공적으로 업데이트되었습니다!",
     profileUpdateFailed: "프로필 업데이트에 실패했습니다. 다시 시도해 주세요.",
     invalidPhoneFormat: "잘못된 전화번호 형식 (10자리 또는 +1XXXXXXXXXX)",
+    completeProfileTitle: "프로필 완성",
+    completeProfileMessage: "계속하기 전에 전화번호를 추가하여 프로필을 완성하세요.",
+    completeProfileMessageUnverified: "프로필을 완성하고 모든 기능에 액세스하려면 전화번호를 추가하세요.",
+    errorUploadingAvatar: "아바타 업로드 오류",
   },
   reportsScreen: {
     selectPatient: "환자 선택:",
@@ -577,6 +634,241 @@ const ko: Translations = {
     notAuthorized: "권한 없음",
     noPermissionToView: "간병인을 볼 권한이 없습니다",
     addCaregiver: "간병인 추가",
+  },
+  privacyPracticesScreen: {
+    content: `# 개인정보 보호 실무 공지
+## MyPhoneFriend 헬스케어 커뮤니케이션 서비스
+
+**시행일**: 2025년 10월 15일
+
+---
+
+## 귀하의 정보. 귀하의 권리. 우리의 책임.
+
+**이 공지는 귀하에 대한 의료 정보가 어떻게 사용되고 공개될 수 있는지, 그리고 이 정보에 접근하는 방법을 설명합니다. 신중하게 검토해 주세요.**
+
+---
+
+## 귀하의 권리
+
+귀하는 다음의 권리가 있습니다:
+- 건강 정보의 사본을 받을 수 있음
+- 건강 정보를 수정할 수 있음
+- 기밀 통신을 요청할 수 있음
+- 공유하는 정보를 제한하도록 요청할 수 있음
+- 정보를 공유한 대상의 목록을 받을 수 있음
+- 이 개인정보 보호 공지의 사본을 받을 수 있음
+- 귀하를 대신하여 행동할 사람을 선택할 수 있음
+- 개인정보 보호 권리가 침해되었다고 믿는 경우 불만을 제기할 수 있음
+
+---
+
+## 귀하의 선택
+
+다음과 같은 경우 정보 사용 및 공유 방식에 대한 선택권이 있습니다:
+- 가족과 친구들의 귀하의 치료에 대한 질문에 답변
+- 재해 구호 상황에서 귀하에 대한 정보 제공
+
+**우리는 마케팅이나 데이터 판매를 위해 귀하의 정보를 공유하지 않습니다.**
+
+---
+
+# 귀하의 상세 권리
+
+## 건강 정보의 사본 받기
+
+**귀하의 건강 정보를 보거나 사본을 받을 수 있습니다.**
+
+요청할 수 있는 내용:
+- 통화 녹음 및 전사
+- 웰니스 요약 및 AI 분석 결과
+- 시스템에서 생성한 의료 알림
+- 비상 알림
+- 계정 정보 및 기본 설정
+
+**요청 방법**:
+- 이메일: privacy@myphonefriend.com
+- 전화: +1-604-562-4263
+
+**우리의 응답**: 30일 이내
+
+---
+
+## 건강 정보 수정 요청
+
+**부정확하거나 불완전하다고 생각하는 건강 정보의 수정을 요청할 수 있습니다.**
+
+**우리의 응답**: 60일 이내
+
+---
+
+## 기밀 통신 요청
+
+**특정 방식이나 위치로 연락하도록 요청할 수 있습니다.**
+
+예:
+- "전화 대신 이메일로 연락해 주세요"
+- "휴대전화로만 연락해 주세요"
+
+합리적인 요청은 모두 수용합니다.
+
+---
+
+## 사용 또는 공유 제한 요청
+
+**특정 건강 정보를 사용하거나 공유하지 않도록 요청할 수 있습니다.**
+
+전액 자비로 지불하고 건강 보험과 공유하지 않도록 요청한 경우 우리는 동의해야 합니다.
+
+---
+
+## 공개 목록 받기
+
+**"공개 회계"를 요청할 수 있습니다** - 건강 정보를 공유한 횟수의 목록.
+
+포함: 지난 6년  
+제외: 치료, 지불 및 운영을 위한 공개(요청하지 않는 한)
+
+---
+
+## 불만 제기
+
+**우리에게 제기**:
+- 이메일: privacy@myphonefriend.com
+- 전화: +1-604-562-4263
+
+**HHS에 제기**:
+- 웹사이트: https://www.hhs.gov/hipaa/filing-a-complaint
+- 전화: 1-800-368-1019
+
+**불만을 제기한 것에 대해 보복하지 않습니다.**
+
+---
+
+# 우리의 사용 및 공개
+
+## 건강 정보 사용 방법
+
+**치료를 위해**:
+- 간병인에게 AI 웰니스 요약 제공
+- 긴급 상황에 대한 비상 알림 생성
+- 간병인이 귀하의 웰빙을 모니터링할 수 있도록 함
+- 간병 팀과의 커뮤니케이션 촉진
+
+**지불을 위해**:
+- 의료 기관에 서비스 청구
+- 통화 시간 및 분석에 대한 청구서 처리
+
+**의료 운영을 위해**:
+- AI 감지 알고리즘 개선
+- 품질 보증 및 개선
+- 환자에게 더 나은 서비스를 제공하기 위해 시스템 훈련
+
+---
+
+## 공유하는 대상
+
+**귀하의 의료 기관**:
+- 지정된 간병인 및 간병 코디네이터
+- 청구를 위한 조직 관리자
+
+**비즈니스 어소시에이트** (서비스 제공자):
+- AI 서비스 (Azure OpenAI): 전사 및 분석을 위해
+- 음성 서비스 (Twilio): 전화 통화 처리를 위해
+- 클라우드 호스팅 (AWS): 안전한 데이터 저장을 위해
+- 데이터베이스 (MongoDB Atlas): 데이터 관리를 위해
+
+모든 비즈니스 어소시에이트는 비즈니스 어소시에이트 계약에 서명하고 귀하의 정보를 보호해야 합니다.
+
+**법률에 따라 요구되는 경우**:
+- 비상이 감지된 경우 비상 서비스 (911)
+- 공중 보건 당국 (학대, 방치 신고)
+- 법 집행 기관 (유효한 법적 명령이 있는 경우)
+
+**우리는 하지 않습니다**:
+- ❌ 건강 정보를 판매
+- ❌ 마케터나 광고주와 공유
+- ❌ 승인 없이 마케팅에 사용
+- ❌ 소셜 미디어에서 공유
+
+---
+
+# 수집하는 건강 정보
+
+**서비스 사용 중**:
+- 환자 이름, 전화번호, 생년월일
+- 통화 녹음 및 전사
+- 통화에서 얻은 건강 관련 정보 (증상, 약물, 기분)
+- 비상 알림 및 사건
+- 웰니스 추세 및 패턴
+- 간병인 메모 및 관찰
+- AI의 의료 분석 결과
+
+---
+
+# 귀하의 책임
+
+**우리 서비스를 사용하여 다른 사람에게 전화를 거는 경우**, 귀하는 다음에 대한 책임이 있습니다:
+- 녹음에 필요한 동의 획득
+- 서비스를 이해하도록 보장
+- 적용 가능한 녹음 동의 법률 준수
+
+---
+
+# 위반 알림
+
+**건강 정보가 부적절하게 액세스되거나 공개된 경우**, 우리는:
+- 사건을 조사합니다
+- 보고 가능한 위반인 경우 60일 이내에 알림
+- 무슨 일이 일어났는지, 무엇을 하고 있는지 설명
+- 취할 수 있는 조치에 대한 정보 제공
+
+---
+
+# 이 공지의 변경
+
+- 이 공지를 변경할 수 있으며 변경 사항은 우리가 보유한 모든 정보에 적용됩니다
+- 새로운 공지는 앱과 웹사이트에서 사용할 수 있습니다
+- 언제든지 현재 사본을 요청할 수 있습니다
+
+---
+
+# 연락처 정보
+
+**개인정보 보호 책임자**:
+- 이메일: privacy@myphonefriend.com
+- 전화: +1-604-562-4263
+- 우편: MyPhoneFriend 개인정보 보호 사무소, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+**영업 시간**: 월요일-금요일, 오전 9시-오후 5시 PST
+
+---
+
+# 불만 제기
+
+**우리에게**:
+- 이메일: privacy@myphonefriend.com
+- 전화: +1-604-562-4263
+
+**연방 정부 (HHS)에**:
+- 웹사이트: https://www.hhs.gov/hipaa/filing-a-complaint
+- 전화: 1-800-368-1019
+- 우편: 미국 보건복지부 시민권국, 200 Independence Avenue S.W., Washington, D.C. 20201
+
+---
+
+**시행일**: 2025년 10월 15일  
+**버전**: 1.0
+
+이 개인정보 보호 실무 공지는 HIPAA 개인정보 보호 규칙 (45 CFR §164.520)을 준수합니다
+
+---
+
+## 언어 지원
+
+**영어**: 이 공지를 이해하는 데 도움이 필요한 경우 privacy@myphonefriend.com으로 문의하세요
+
+**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
   },
 }
 

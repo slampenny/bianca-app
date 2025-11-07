@@ -313,13 +313,6 @@ export function AlertScreen() {
           </View>
         )}
 
-        {/* Debug indicator */}
-        {__DEV__ && (
-          <Text style={styles.debugText}>
-            Debug: showUnread={showUnread.toString()}, alerts={alerts.length}, filtered={filteredAlerts.length}
-          </Text>
-        )}
-
         {filteredAlerts.length === 0 ? (
           <View style={styles.emptyStateContainer} testID="alert-empty-state">
             <View style={styles.emptyStateIcon}>
@@ -327,11 +320,6 @@ export function AlertScreen() {
             </View>
             <Text style={styles.emptyStateTitle}>{translate("alertScreen.noAlertsTitle")}</Text>
             <Text style={styles.emptyStateSubtitle}>{translate("alertScreen.noAlertsSubtitle")}</Text>
-            {__DEV__ && (
-              <Text style={styles.debugText}>
-                Total alerts in store: {alerts.length}, Show unread: {showUnread.toString()}
-              </Text>
-            )}
           </View>
         ) : (
           <FlatList

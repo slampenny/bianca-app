@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react"
+import { useSelector } from "react-redux"
 import { changeLanguage } from "../i18n"
 import i18n from "i18n-js"
 import { addLanguageChangeListener, removeLanguageChangeListener } from "./languageNotifications"
+import { getCaregiver } from "../store/caregiverSlice"
 
 // Enhanced changeLanguage function that notifies listeners
 export const changeLanguageWithNotification = async (languageCode: string) => {
@@ -16,6 +18,7 @@ export const changeLanguageWithNotification = async (languageCode: string) => {
 
 // Hook to track language changes and trigger re-renders
 export const useLanguage = () => {
+  const caregiver = useSelector(getCaregiver)
   const [currentLanguage, setCurrentLanguage] = useState(() => {
     // Safely get initial language with fallback
     try {
@@ -24,6 +27,16 @@ export const useLanguage = () => {
       return "en"
     }
   })
+
+  // Sync language from caregiver's preferredLanguage when caregiver data is loaded
+  useEffect(() => {
+    if (caregiver?.preferredLanguage && caregiver.preferredLanguage !== i18n.locale) {
+      console.log("Syncing language from caregiver profile:", caregiver.preferredLanguage)
+      changeLanguageWithNotification(caregiver.preferredLanguage).catch(error => {
+        console.error("Failed to sync language from caregiver profile:", error)
+      })
+    }
+  }, [caregiver?.preferredLanguage, caregiver?.id])
 
   useEffect(() => {
     const handleLanguageChange = () => {

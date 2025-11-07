@@ -4,8 +4,17 @@ import { TEST_USERS } from "../fixtures/testData"
 
 export async function navigateToRegister(page: Page) {
   await page.goto("/")
-  await page.getByTestId("register-button").click()
-  await expect(page.getByTestId("register-name")).toBeVisible()
+  // Wait for login screen to load - use aria-label for React Native Web
+  await page.waitForSelector('[aria-label="email-input"]', { timeout: 30000 })
+  await page.waitForTimeout(1000) // Small delay to ensure form is ready
+  
+  // Click register button - use aria-label
+  const registerButton = page.locator('[aria-label="register-link"], [aria-label="register-button"]')
+  await registerButton.waitFor({ state: 'visible', timeout: 15000 })
+  await registerButton.click()
+  
+  // Wait for register screen - use aria-label
+  await page.waitForSelector('[aria-label="register-name"]', { timeout: 15000 })
 }
 
 export async function navigateToHome(page: Page, user?: { email: string; password: string }) {
@@ -16,7 +25,7 @@ export async function navigateToHome(page: Page, user?: { email: string; passwor
 }
 
 export async function isLoginScreen(page: Page) {
-  await expect(page.getByTestId("login-button")).toBeVisible()
+  await expect(page.locator('[aria-label="login-button"]')).toBeVisible()
 }
 
 export async function isHomeScreen(page: Page) {
@@ -61,55 +70,26 @@ export async function isCaregiversScreen(page: Page) {
 
 export async function navigateToSchedules(page: Page) {
   console.log("Navigating to Schedules...")
-  // Try multiple methods to access schedules
-  const methods = [
-    // Method 1: Direct navigation button
-    async () => {
-      await page.getByTestId('schedule-nav-button').click()
-      await page.waitForTimeout(2000)
-    },
-    // Method 2: Tab navigation
-    async () => {
-      await page.getByTestId('tab-schedules').click()
-      await page.waitForTimeout(2000)
-    },
-    // Method 3: Text link
-    async () => {
-      await page.getByText(/schedule/i).first().click()
-      await page.waitForTimeout(2000)
-    }
-  ]
-  
-  for (const method of methods) {
-    try {
-      await method()
-      // Check if we're on a schedule screen
-      if (await page.getByTestId('schedules-screen').count() > 0 || 
-          await page.getByText(/schedule/i).count() > 0) {
-        console.log("Successfully navigated to Schedules")
-        return
-      }
-    } catch (error) {
-      console.log("Navigation method failed, trying next...")
-      continue
-    }
+  // Schedule navigation button should ALWAYS be available - if not, that's a BUG
+  // Use accessibilityLabel for React Native Web
+  const scheduleNav = page.locator('[data-testid="schedule-nav-button"], [aria-label="schedule-nav-button"]')
+  const navCount = await scheduleNav.count()
+  if (navCount === 0) {
+    throw new Error('BUG: Schedule navigation button not found - schedule functionality should always be available!')
   }
   
-  throw new Error("Could not navigate to Schedules screen")
+  await scheduleNav.first().click()
+  await page.waitForTimeout(2000)
+  
+  // Verify we're on the schedule screen
+  const scheduleScreen = page.locator('[data-testid="schedules-screen"], [aria-label="schedules-screen"]')
+  await expect(scheduleScreen).toBeVisible({ timeout: 10000 })
+  console.log("Successfully navigated to Schedules")
 }
 
 export async function isSchedulesScreen(page: Page) {
   console.log("Checking if on Schedules Screen...")
-  try {
-    await expect(page.getByTestId('schedules-screen')).toBeVisible({ timeout: 5000 })
-    console.log("Confirmed on Schedules Screen.")
-  } catch {
-    // Fallback: check for schedule-related content
-    const scheduleElements = await page.getByText(/schedule/i).count()
-    if (scheduleElements > 0) {
-      console.log("Confirmed on Schedules Screen (fallback).")
-    } else {
-      throw new Error("Not on Schedules Screen")
-    }
-  }
+  // Use accessibilityLabel for React Native Web
+  await expect(page.locator('[data-testid="schedules-screen"], [aria-label="schedules-screen"]')).toBeVisible({ timeout: 10000 })
+  console.log("Confirmed on Schedules Screen.")
 }

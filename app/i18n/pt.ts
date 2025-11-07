@@ -4,7 +4,9 @@ const pt: Translations = {
   common: {
     ok: "OK",
     cancel: "Cancelar",
+    close: "Fechar",
     error: "Erro",
+    anErrorOccurred: "Ocorreu um erro",
     back: "Voltar",
     logOut: "Sair",
     selectImage: "Selecionar imagem",
@@ -12,6 +14,7 @@ const pt: Translations = {
     callNow: "Ligar agora",
     ending: "Finalizando...",
     endCall: "Finalizar chamada",
+    loading: "Carregando...",
   },
   alertScreen: {
     markAllAsRead: "Marcar tudo como lido",
@@ -82,12 +85,19 @@ const pt: Translations = {
     passwordFieldPlaceholder: "Digite sua senha",
     confirmPasswordFieldPlaceholder: "Confirme sua senha",
     organizationNameFieldPlaceholder: "Digite o nome da sua organização",
+    organizationButton: "Organização",
+    individualButton: "Individual",
+    individualExplanation: "Registre-se como indivíduo para uso pessoal.",
+    organizationExplanation: "Registre-se como organização para uso empresarial ou de grupo.",
+    consentText: "Ao se registrar, você concorda com nossos",
+    consentAnd: "e",
+    termsOfService: "Termos de Serviço",
+    privacyPolicy: "Política de Privacidade",
     signUp: "Registrar",
     signIn: "Entrar",
     alreadyHaveAccount: "Já tem uma conta?",
     dontHaveAccount: "Não tem uma conta?",
     termsAndConditions: "Termos e condições",
-    privacyPolicy: "Política de privacidade",
     agreeToTerms: "Ao se registrar, você concorda com nossos",
     and: "e",
   },
@@ -98,6 +108,37 @@ const pt: Translations = {
     requestReset: "Solicitar redefinição",
     successMessage: "Código de redefinição enviado para seu email!",
     requestFailed: "Solicitação falhou. Por favor, verifique seu email e tente novamente.",
+  },
+  ssoLinkingScreen: {
+    title: "Vincular sua conta",
+    message: "Esta conta foi criada com {{provider}}. Para usar o login com email/senha, defina uma senha abaixo ou continue com {{provider}}.",
+    passwordLabel: "Senha",
+    passwordPlaceholder: "Digite sua senha",
+    confirmPasswordLabel: "Confirmar senha",
+    confirmPasswordPlaceholder: "Confirme sua senha",
+    setPasswordButton: "Definir senha",
+    backToLoginButton: "Voltar ao login",
+    orDivider: "Ou",
+    successMessage: "✓ Senha definida com sucesso! Agora você pode fazer login com seu email e senha.",
+    errorNoPassword: "Por favor, digite uma senha",
+    errorNoConfirmPassword: "Por favor, confirme sua senha",
+    errorPasswordMismatch: "As senhas não coincidem",
+    errorPasswordTooShort: "A senha deve ter pelo menos 8 caracteres",
+    errorSetPasswordFailed: "Falha ao definir senha",
+    errorSSOFailed: "Login SSO falhou. Por favor, tente novamente.",
+    providerGoogle: "Google",
+    providerMicrosoft: "Microsoft",
+    providerSSO: "SSO",
+  },
+  ssoButtons: {
+    orContinueWith: "Ou continuar com",
+    google: "Google",
+    microsoft: "Microsoft",
+    companySSO: "SSO da empresa",
+    ssoNotAvailable: "SSO não disponível",
+    signInFailed: "Falha no login",
+    companySSOTitle: "SSO da empresa",
+    companySSOMessage: "Isso redirecionaria para o provedor SSO da sua empresa. Entre em contato com seu administrador para configuração.",
   },
   emailVerificationScreen: {
     title: "Verifique seu email",
@@ -193,6 +234,8 @@ const pt: Translations = {
   profileScreen: {
     languageSelector: "Idioma / Language",
     selectLanguage: "Selecionar idioma",
+    theme: "Tema",
+    selectTheme: "Selecionar tema",
     namePlaceholder: "Nome",
     emailPlaceholder: "Email",
     phonePlaceholder: "Telefone",
@@ -202,6 +245,10 @@ const pt: Translations = {
     profileUpdatedSuccess: "Seu perfil foi atualizado com sucesso!",
     profileUpdateFailed: "Falha ao atualizar perfil. Por favor, tente novamente.",
     invalidPhoneFormat: "Formato de telefone inválido (10 dígitos ou +1XXXXXXXXXX)",
+    completeProfileTitle: "Complete seu perfil",
+    completeProfileMessage: "Complete seu perfil adicionando um número de telefone antes de continuar.",
+    completeProfileMessageUnverified: "Adicione seu número de telefone para completar seu perfil e acessar todos os recursos.",
+    errorUploadingAvatar: "Erro ao carregar avatar",
   },
   reportsScreen: {
     selectPatient: "Selecionar paciente:",
@@ -246,6 +293,15 @@ const pt: Translations = {
     noPreviousConversations: "Nenhuma conversa anterior encontrada para este paciente",
     errorFetchingConversations: "Erro ao buscar conversas",
     loadingMoreConversations: "Carregando mais conversas...",
+  },
+  caregiverScreen: {
+    namePlaceholder: "Nome",
+    emailPlaceholder: "E-mail",
+    phonePlaceholder: "Telefone",
+    loadingUnassignedPatients: "Carregando pacientes não atribuídos...",
+    assigningPatients: "Atribuindo pacientes...",
+    patientsAssignedSuccess: "Pacientes atribuídos com sucesso!",
+    loadingCaregivers: "Carregando cuidadores...",
   },
   caregiversScreen: {
     invited: "Convidado",
@@ -412,12 +468,26 @@ const pt: Translations = {
     guest: "Convidado",
     addPatient: "Adicionar paciente",
     adminOnlyMessage: "Apenas administradores de organização e super administradores podem adicionar pacientes",
+    noPatientsFound: "Nenhum paciente encontrado",
+    viewSchedules: "Ver agendas",
   },
   tabs: {
     home: "Início",
     org: "Organização",
     reports: "Relatórios",
     alerts: "Alertas",
+  },
+  orgScreen: {
+    namePlaceholder: "Nome",
+    emailPlaceholder: "Email",
+    phonePlaceholder: "Telefone",
+    save: "SALVAR",
+    viewCaregivers: "Ver cuidadores",
+    inviteCaregiver: "Convidar cuidador",
+    payments: "Pagamentos",
+    organizationActions: "Ações da organização",
+    organizationLogo: "Logo da organização",
+    noLogoSet: "Nenhum logo definido",
   },
   headers: {
     home: "Início",
@@ -439,6 +509,263 @@ const pt: Translations = {
     privacyPolicy: "Política de privacidade",
     termsOfService: "Termos de serviço",
     mentalHealthReport: "Relatório de saúde mental",
+    login: "Entrar",
+    register: "Registrar",
+  },
+  themes: {
+    healthcare: {
+      name: "Saúde",
+      description: "Tema médico profissional com cores azul e verde",
+    },
+    colorblind: {
+      name: "Amigável para daltônicos",
+      description: "Tema de alto contraste otimizado para deficiência de visão de cores",
+    },
+    dark: {
+      name: "Modo escuro",
+      description: "Tema escuro otimizado para ambientes com pouca luz",
+    },
+    accessibility: {
+      wcagLevel: "Nível WCAG",
+      colorblindFriendly: "Amigável para daltônicos",
+      highContrast: "Alto contraste",
+      darkMode: "Modo escuro",
+    },
+  },
+  privacyPracticesScreen: {
+    content: `# Aviso de Práticas de Privacidade
+## Serviços de Comunicação de Saúde MyPhoneFriend
+
+**Data de vigência**: 15 de outubro de 2025
+
+---
+
+## SUAS INFORMAÇÕES. SEUS DIREITOS. NOSSAS RESPONSABILIDADES.
+
+**ESTE AVISO DESCREVE COMO AS INFORMAÇÕES MÉDICAS SOBRE VOCÊ PODEM SER USADAS E DIVULGADAS E COMO VOCÊ PODE ACESSAR ESSAS INFORMAÇÕES. POR FAVOR, REVISE-O CUIDADOSAMENTE.**
+
+---
+
+## SEUS DIREITOS
+
+Você tem o direito de:
+- Obter uma cópia de suas informações de saúde
+- Corrigir suas informações de saúde
+- Solicitar comunicação confidencial
+- Pedir-nos para limitar as informações que compartilhamos
+- Obter uma lista daqueles com quem compartilhamos suas informações
+- Obter uma cópia deste aviso de privacidade
+- Escolher alguém para agir em seu nome
+- Apresentar uma reclamação se acreditar que seus direitos de privacidade foram violados
+
+---
+
+## SUAS ESCOLHAS
+
+Você tem algumas escolhas sobre como usamos e compartilhamos informações quando:
+- Respondemos perguntas de sua família e amigos sobre seu cuidado
+- Fornecemos informações sobre você em situações de socorro em desastres
+
+**Nunca compartilhamos suas informações para marketing ou venda de seus dados.**
+
+---
+
+# SEUS DIREITOS DETALHADOS
+
+## Obter uma cópia de suas informações de saúde
+
+**Você pode solicitar ver ou obter uma cópia de suas informações de saúde.**
+
+O que você pode solicitar:
+- Gravações de chamadas e transcrições
+- Resumos de bem-estar e resultados de análise de IA
+- Alertas médicos gerados por nosso sistema
+- Notificações de emergência
+- Informações da conta e preferências
+
+**Como solicitar**:
+- Email: privacy@myphonefriend.com
+- Telefone: +1-604-562-4263
+
+**Nossa resposta**: Dentro de 30 dias
+
+---
+
+## Peça-nos para corrigir suas informações de saúde
+
+**Você pode pedir-nos para corrigir informações de saúde que acredita serem incorretas ou incompletas.**
+
+**Nossa resposta**: Dentro de 60 dias
+
+---
+
+## Solicitar comunicações confidenciais
+
+**Você pode pedir-nos para contatá-lo de uma maneira específica ou em um local específico.**
+
+Exemplos:
+- "Por favor, envie-me um email em vez de ligar"
+- "Por favor, entre em contato apenas no meu celular"
+
+Acomodaremos todas as solicitações razoáveis.
+
+---
+
+## Peça-nos para limitar o que usamos ou compartilhamos
+
+**Você pode pedir-nos para não usar ou compartilhar certas informações de saúde.**
+
+Devemos concordar se você pagou do próprio bolso integralmente e nos pede para não compartilhar com seu plano de saúde.
+
+---
+
+## Obter uma lista de divulgações
+
+**Você pode solicitar um "relatório de divulgações"** - uma lista das vezes que compartilhamos suas informações de saúde.
+
+Cobre: Últimos 6 anos  
+Exclui: Divulgações para tratamento, pagamento e operações (a menos que você solicite)
+
+---
+
+## Apresentar uma reclamação
+
+**Apresentar conosco**:
+- Email: privacy@myphonefriend.com
+- Telefone: +1-604-562-4263
+
+**Apresentar com HHS**:
+- Site: https://www.hhs.gov/hipaa/filing-a-complaint
+- Telefone: 1-800-368-1019
+
+**Não retaliaremos contra você por apresentar uma reclamação.**
+
+---
+
+# NOSSOS USOS E DIVULGAÇÕES
+
+## Como usamos suas informações de saúde
+
+**Para tratamento**:
+- Fornecer resumos de bem-estar de IA aos seus cuidadores
+- Gerar alertas de emergência para situações urgentes
+- Permitir que cuidadores monitorem seu bem-estar
+- Facilitar a comunicação com sua equipe de cuidados
+
+**Para pagamento**:
+- Cobrar sua organização de saúde pelos serviços
+- Processar faturas por tempo de chamada e análise
+
+**Para operações de saúde**:
+- Melhorar nossos algoritmos de detecção de IA
+- Garantia de qualidade e melhoria
+- Treinar nossos sistemas para servir melhor os pacientes
+
+---
+
+## Com quem compartilhamos
+
+**Sua organização de saúde**:
+- Seus cuidadores e coordenadores de cuidados designados
+- Administradores da organização para faturamento
+
+**Associados comerciais** (Provedores de serviços):
+- Serviços de IA (Azure OpenAI): Para transcrição e análise
+- Serviços de voz (Twilio): Para tratamento de chamadas telefônicas
+- Hospedagem em nuvem (AWS): Para armazenamento seguro de dados
+- Banco de dados (MongoDB Atlas): Para gerenciamento de dados
+
+Todos os associados comerciais assinam acordos de associado comercial e devem proteger suas informações.
+
+**Conforme exigido por lei**:
+- Serviços de emergência (911) se emergência detectada
+- Autoridades de saúde pública (relatórios de abuso, negligência)
+- Aplicação da lei (com ordem legal válida)
+
+**NÃO fazemos**:
+- ❌ Vender suas informações de saúde
+- ❌ Compartilhar com profissionais de marketing ou anunciantes
+- ❌ Usar para marketing sem sua autorização
+- ❌ Compartilhar em redes sociais
+
+---
+
+# INFORMAÇÕES DE SAÚDE QUE COLETAMOS
+
+**Durante o uso de nossos serviços**:
+- Nome do paciente, número de telefone, data de nascimento
+- Gravações de chamadas e transcrições
+- Informações relacionadas à saúde das chamadas (sintomas, medicamentos, humor)
+- Alertas e incidentes de emergência
+- Tendências e padrões de bem-estar
+- Notas e observações dos cuidadores
+- Resultados de análise médica de IA
+
+---
+
+# SUAS RESPONSABILIDADES
+
+**Se você está usando nosso serviço para ligar para outra pessoa**, você é responsável por:
+- Obter os consentimentos necessários para gravação
+- Garantir que entendam o serviço
+- Seguir as leis aplicáveis de consentimento de gravação
+
+---
+
+# NOTIFICAÇÃO DE VIOLAÇÃO
+
+**Se suas informações de saúde forem acessadas ou divulgadas indevidamente**, nós:
+- Investigaremos o incidente
+- Notificaremos você dentro de 60 dias se for uma violação reportável
+- Explicaremos o que aconteceu e o que estamos fazendo
+- Forneceremos informações sobre os passos que você pode tomar
+
+---
+
+# MUDANÇAS NESTE AVISO
+
+- Podemos alterar este aviso e as alterações se aplicarão a todas as informações que temos
+- O novo aviso estará disponível no aplicativo e em nosso site
+- Você sempre pode solicitar uma cópia atual
+
+---
+
+# INFORMAÇÕES DE CONTATO
+
+**Oficial de privacidade**:
+- Email: privacy@myphonefriend.com
+- Telefone: +1-604-562-4263
+- Correio: Escritório de Privacidade MyPhoneFriend, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+**Horário**: Segunda a Sexta, 9h - 17h PST
+
+---
+
+# APRESENTAR UMA RECLAMAÇÃO
+
+**Conosco**:
+- Email: privacy@myphonefriend.com
+- Telefone: +1-604-562-4263
+
+**Com o governo federal (HHS)**:
+- Site: https://www.hhs.gov/hipaa/filing-a-complaint
+- Telefone: 1-800-368-1019
+- Correio: Escritório de Direitos Civis, Departamento de Saúde e Serviços Humanos dos EUA, 200 Independence Avenue S.W., Washington, D.C. 20201
+
+---
+
+**Data de vigência**: 15 de outubro de 2025  
+**Versão**: 1.0
+
+Este Aviso de Práticas de Privacidade está em conformidade com a Regra de Privacidade HIPAA (45 CFR §164.520)
+
+---
+
+## Assistência de idiomas
+
+**Inglês**: Se você precisar de ajuda para entender este aviso, entre em contato com privacy@myphonefriend.com
+
+**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
   },
 }
 

@@ -14,13 +14,20 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
     await caregiver.givenIAmOnCaregiversScreen()
     
     // THEN: I should see the caregivers list
-    const caregiverListFound = await caregiver.thenIShouldSeeCaregiversList()
+    const caregiverListFound = await Promise.race([
+      caregiver.thenIShouldSeeCaregiversList(),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000))
+    ])
     
     // AND: I should see existing caregivers from seed data
-    const caregiverCount = await caregiver.givenIHaveExistingCaregivers()
+    const caregiverCount = await Promise.race([
+      caregiver.givenIHaveExistingCaregivers(),
+      new Promise<number>((resolve) => setTimeout(() => resolve(0), 10000))
+    ])
     
     console.log(`✅ Caregiver management access verified - ${caregiverCount} caregivers found`)
     expect(caregiverListFound).toBe(true)
+    expect(caregiverCount).toBeGreaterThan(0)
   })
 
   test('Workflow: Adding New Caregiver Journey', async ({ page }) => {
@@ -38,7 +45,10 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
       role: 'staff'
     }
     
-    const addCaregiverSuccessful = await caregiver.whenIAddNewCaregiver(newCaregiverData)
+    const addCaregiverSuccessful = await Promise.race([
+      caregiver.whenIAddNewCaregiver(newCaregiverData),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+    ])
     
     // THEN: Caregiver addition workflow should be accessible
     if (addCaregiverSuccessful) {
@@ -46,8 +56,8 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
       
       // Look for submit button
       const submitElements = [
-        page.getByTestId('submit-caregiver-button'),
-        page.getByTestId('send-invite-button'),
+        page.locator('[data-testid="submit-caregiver-button"], [aria-label*="submit"]'),
+        page.locator('[data-testid="send-invite-button"], [aria-label*="send"], [aria-label*="invite"]'),
         page.getByText(/submit/i),
         page.getByText(/send/i),
         page.getByText(/invite/i)
@@ -76,7 +86,10 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
     
     if (caregiverCount > 0) {
       // WHEN: I edit an existing caregiver (try with "Test User" from seed data)
-      const editSuccessful = await caregiver.whenIEditCaregiver('Test User')
+      const editSuccessful = await Promise.race([
+        caregiver.whenIEditCaregiver('Test User'),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+      ])
       
       if (editSuccessful) {
         // AND: I update caregiver details
@@ -86,7 +99,10 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
           phone: '555-9999'
         }
         
-        const updateSuccessful = await caregiver.whenIUpdateCaregiverDetails('Test User', updatedData)
+        const updateSuccessful = await Promise.race([
+          caregiver.whenIUpdateCaregiverDetails('Test User', updatedData),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000))
+        ])
         
         // THEN: Caregiver editing workflow should work
         console.log(`✅ Caregiver editing workflow: ${updateSuccessful ? 'functional' : 'interface found'}`)
@@ -105,14 +121,23 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
     
     // GIVEN: I want to manage caregiver avatars
     await caregiver.givenIAmAnOrgAdminWithCaregiverAccess()
-    const caregiverCount = await caregiver.givenIHaveExistingCaregivers()
+    const caregiverCount = await Promise.race([
+      caregiver.givenIHaveExistingCaregivers(),
+      new Promise<number>((resolve) => setTimeout(() => resolve(0), 10000))
+    ])
     
     if (caregiverCount > 0) {
       // WHEN: I upload an avatar for a caregiver
-      const avatarUploadAvailable = await caregiver.whenIUploadCaregiverAvatar('Test User')
+      const avatarUploadAvailable = await Promise.race([
+        caregiver.whenIUploadCaregiverAvatar('Test User'),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+      ])
       
       // AND: I change an existing avatar
-      const avatarChangeAvailable = await caregiver.whenIChangeCaregiverAvatar('Admin User')
+      const avatarChangeAvailable = await Promise.race([
+        caregiver.whenIChangeCaregiverAvatar('Admin User'),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+      ])
       
       // THEN: Avatar management should be accessible
       const avatarManagementWorking = avatarUploadAvailable || avatarChangeAvailable
@@ -120,8 +145,11 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
       console.log(`✅ Avatar management workflow: ${avatarManagementWorking ? 'available' : 'not found'}`)
       
       if (avatarManagementWorking) {
-        // Verify avatar upload interface
-        const avatarInterfaceFound = await caregiver.thenIShouldSeeAvatarUploadOption()
+        // Verify avatar upload interface (with timeout protection)
+        const avatarInterfaceFound = await Promise.race([
+          caregiver.thenIShouldSeeAvatarUploadOption(),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000))
+        ])
         console.log(`✅ Avatar upload interface: ${avatarInterfaceFound ? 'functional' : 'basic'}`)
       }
     }
@@ -140,11 +168,17 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
     
     if (caregiverCount > 0) {
       // WHEN: I assign a caregiver to patients
-      const assignmentAvailable = await caregiver.whenIAssignCaregiverToPatients('Test User')
+      const assignmentAvailable = await Promise.race([
+        caregiver.whenIAssignCaregiverToPatients('Test User'),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+      ])
       
       // THEN: Patient assignment interface should be accessible
       if (assignmentAvailable) {
-        const assignmentInterface = await caregiver.thenIShouldSeePatientAssignmentInterface()
+        const assignmentInterface = await Promise.race([
+          caregiver.thenIShouldSeePatientAssignmentInterface(),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000))
+        ])
         console.log(`✅ Patient assignment interface: ${assignmentInterface ? 'available' : 'basic'}`)
       } else {
         console.log('ℹ Patient assignment interface not immediately visible')
@@ -152,7 +186,7 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
     }
     
     // Assignment workflow exploration is successful
-    expect(caregiverCount).toBeGreaterThanOrEqual(0)
+    expect(caregiverCount).toBeGreaterThan(0)
     console.log('✅ Caregiver-patient assignment workflow tested')
   })
 
@@ -165,17 +199,35 @@ test.describe('Caregiver Management Workflow - Complete CRUD Operations', () => 
     await caregiver.givenIAmAnOrgAdminWithCaregiverAccess()
     console.log('✅ Phase 1: Admin authentication complete')
     
-    // WHEN: I manage the caregiver team
-    const caregiverCount = await caregiver.givenIHaveExistingCaregivers()
+    // WHEN: I manage the caregiver team (with timeout protection)
+    const caregiverCount = await Promise.race([
+      caregiver.givenIHaveExistingCaregivers(),
+      new Promise<number>((resolve) => setTimeout(() => resolve(0), 10000))
+    ])
     console.log(`✅ Phase 2: Caregiver access verified - ${caregiverCount} caregivers`)
     
-    // AND: I test caregiver CRUD operations
+    // AND: I test caregiver CRUD operations (with timeout protection)
     const crudOperations = {
-      list: await caregiver.thenIShouldSeeCaregiversList(),
-      add: await caregiver.whenIAddNewCaregiver({ name: 'Test New', email: 'test@new.com', phone: '555-0000' }),
-      edit: caregiverCount > 0 ? await caregiver.whenIEditCaregiver('Test User') : false,
-      avatar: caregiverCount > 0 ? await caregiver.thenIShouldSeeAvatarUploadOption() : false,
-      assignment: caregiverCount > 0 ? await caregiver.whenIAssignCaregiverToPatients('Test User') : false
+      list: await Promise.race([
+        caregiver.thenIShouldSeeCaregiversList(),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000))
+      ]),
+      add: await Promise.race([
+        caregiver.whenIAddNewCaregiver({ name: 'Test New', email: 'test@new.com', phone: '555-0000' }),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+      ]),
+      edit: caregiverCount > 0 ? await Promise.race([
+        caregiver.whenIEditCaregiver('Test User'),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+      ]) : false,
+      avatar: caregiverCount > 0 ? await Promise.race([
+        caregiver.thenIShouldSeeAvatarUploadOption(),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000))
+      ]) : false,
+      assignment: caregiverCount > 0 ? await Promise.race([
+        caregiver.whenIAssignCaregiverToPatients('Test User'),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000))
+      ]) : false
     }
     
     console.log('CRUD operations tested:', crudOperations)

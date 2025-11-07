@@ -7,8 +7,10 @@ import {
   StyleSheet,
   Switch,
   ActivityIndicator,
-  Alert,
 } from "react-native"
+import { useToast } from "../hooks/useToast"
+import Toast from "./Toast"
+import ConfirmationModal from "./ConfirmationModal"
 import { useSelector } from "react-redux"
 import { Button } from "./Button"
 import {
@@ -34,9 +36,11 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
   onComplete,
   orgId,
 }) => {
+  const { toast, showError, showSuccess, hideToast } = useToast()
   const [selectedCaregiverId, setSelectedCaregiverId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [reassignedCount, setReassignedCount] = useState(0)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   
   const currentUser = useSelector((state: RootState) => state.auth.currentUser)
   
@@ -63,7 +67,7 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
   
   const handleReassignAllPatients = async () => {
     if (!selectedCaregiverId || patients.length === 0) {
-      Alert.alert("Error", "Please select a caregiver and ensure there are patients to reassign.")
+      showError("Please select a caregiver and ensure there are patients to reassign.")
       return
     }
     
@@ -87,20 +91,14 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
       setReassignedCount(successCount)
       
       if (successCount === patients.length) {
-        Alert.alert(
-          "Success", 
-          `All ${successCount} patients have been successfully reassigned.`,
-          [{ text: "OK", onPress: onComplete }]
-        )
+        showSuccess(`All ${successCount} patients have been successfully reassigned.`)
+        setTimeout(() => onComplete(), 2000)
       } else {
-        Alert.alert(
-          "Partial Success", 
-          `${successCount} out of ${patients.length} patients were reassigned successfully.`,
-          [{ text: "OK", onPress: onComplete }]
-        )
+        showSuccess(`${successCount} out of ${patients.length} patients were reassigned successfully.`)
+        setTimeout(() => onComplete(), 2000)
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to reassign patients. Please try again.")
+      showError("Failed to reassign patients. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -108,15 +106,7 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
   
   const handleCancel = () => {
     if (isLoading) return
-    
-    Alert.alert(
-      "Cancel Reassignment",
-      "Are you sure you want to cancel? Patients will remain unassigned.",
-      [
-        { text: "Continue Reassignment", style: "cancel" },
-        { text: "Cancel", style: "destructive", onPress: onClose }
-      ]
-    )
+    setShowCancelConfirm(true)
   }
   
   if (isLoadingCaregivers) {
@@ -229,6 +219,23 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
           )}
         </View>
       </View>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="patient-reassignment-toast"
+      />
+      <ConfirmationModal
+        visible={showCancelConfirm}
+        title="Cancel Reassignment"
+        message="Are you sure you want to cancel? Patients will remain unassigned."
+        confirmText="Cancel"
+        cancelText="Continue Reassignment"
+        onConfirm={onClose}
+        onCancel={() => setShowCancelConfirm(false)}
+        testID="patient-reassignment-cancel-confirm"
+      />
     </Modal>
   )
 }

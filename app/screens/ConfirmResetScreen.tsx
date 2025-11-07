@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react"
-import { View, ViewStyle, Alert, StyleSheet } from "react-native"
+import { View, ViewStyle, StyleSheet } from "react-native"
+import { useToast } from "../hooks/useToast"
+import Toast from "../components/Toast"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useResetPasswordMutation } from "../services/api/authApi"
@@ -44,6 +46,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const route = useRoute()
   const token = (route.params as any)?.token
   const { colors, isLoading: themeLoading } = useTheme()
+  const { toast, showError, hideToast } = useToast()
 
   if (themeLoading) {
     return null
@@ -62,11 +65,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   // Check if we have a reset token
   useEffect(() => {
     if (!token) {
-      Alert.alert(
-        "Invalid Reset Link",
-        "This password reset link is invalid or has expired. Please request a new password reset.",
-        [{ text: "OK", onPress: () => navigation.navigate("RequestReset") }]
-      )
+      showError("This password reset link is invalid or has expired. Please request a new password reset.")
+      setTimeout(() => navigation.navigate("RequestReset" as never), 2000)
       return
     }
 
@@ -237,6 +237,13 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
           />
         </View>
       </View>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="confirm-reset-toast"
+      />
     </Screen>
   )
 }

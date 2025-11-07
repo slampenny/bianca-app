@@ -189,6 +189,7 @@ export function Card(props: CardProps) {
     HeadingTextProps,
     FooterTextProps,
     testID,
+    accessibilityLabel,
     ...WrapperProps
   } = props
 
@@ -235,6 +236,7 @@ export function Card(props: CardProps) {
       style={$containerStyle}
       activeOpacity={0.8}
       accessibilityRole={isPressable ? "button" : undefined}
+      accessibilityLabel={accessibilityLabel || testID}
       testID={testID}
       {...WrapperProps}
     >

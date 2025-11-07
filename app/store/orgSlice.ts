@@ -29,6 +29,13 @@ export const orgSlice = createSlice({
       .addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
         state.org = payload.org as Org
       })
+      // Auto-clear org on logout
+      .addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
+        state.org = null
+      })
+      .addMatcher(authApi.endpoints.logout.matchRejected, (state) => {
+        state.org = null
+      })
       // Listen for any action that ends with '/updateOrg/fulfilled'
       .addMatcher(
         (action) => action.type.endsWith('/updateOrg/fulfilled'),

@@ -1,6 +1,6 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { DEFAULT_API_CONFIG } from './api/api';
 
@@ -251,12 +251,13 @@ class SSOService {
       }
 
       if (data.success) {
-        // Return the user info with tokens for the frontend to handle
+        // Return the user info with tokens and org for the frontend to handle
         return {
           ...userInfo,
           tokens: data.tokens,
           backendUser: data.user,
-        } as SSOUser & { tokens: any; backendUser: any };
+          backendOrg: data.org,
+        } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any };
       } else {
         return {
           error: 'Backend authentication failed',

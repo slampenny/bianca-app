@@ -4,7 +4,9 @@ const de: Translations = {
   common: {
     ok: "OK",
     cancel: "Abbrechen",
+    close: "Schließen",
     error: "Fehler",
+    anErrorOccurred: "Ein Fehler ist aufgetreten",
     back: "Zurück",
     logOut: "Abmelden",
     selectImage: "Bild auswählen",
@@ -12,6 +14,7 @@ const de: Translations = {
     callNow: "Jetzt anrufen",
     ending: "Beenden...",
     endCall: "Anruf beenden",
+    loading: "Laden...",
   },
   alertScreen: {
     markAllAsRead: "Alle als gelesen markieren",
@@ -85,6 +88,12 @@ const de: Translations = {
     organizationNameFieldPlaceholder: "Geben Sie den Namen Ihrer Organisation ein",
     organizationButton: "Organisation",
     individualButton: "Einzeln",
+    individualExplanation: "Registrieren Sie sich als Einzelperson für den persönlichen Gebrauch.",
+    organizationExplanation: "Registrieren Sie sich als Organisation für den Firmen- oder Gruppengebrauch.",
+    consentText: "Mit der Anmeldung stimmen Sie unseren",
+    consentAnd: "und",
+    termsOfService: "Nutzungsbedingungen",
+    privacyPolicy: "Datenschutzrichtlinie",
   },
   signupScreen: {
     title: "Vervollständigen Sie Ihre Einladung",
@@ -106,6 +115,7 @@ const de: Translations = {
     guest: "Gast",
     addPatient: "Patient hinzufügen",
     adminOnlyMessage: "Nur Organisationsadministratoren und Super-Administratoren können Patienten hinzufügen",
+    noPatientsFound: "Keine Patienten gefunden",
   },
   tabs: {
     home: "Start",
@@ -179,6 +189,37 @@ const de: Translations = {
     requestReset: "Reset anfordern",
     successMessage: "Reset-Code an deine E-Mail gesendet!",
     requestFailed: "Anfrage fehlgeschlagen. Bitte überprüfe deine E-Mail und versuche es erneut.",
+  },
+  ssoLinkingScreen: {
+    title: "Ihr Konto verknüpfen",
+    message: "Dieses Konto wurde mit {{provider}} erstellt. Um die Anmeldung per E-Mail/Passwort zu verwenden, legen Sie bitte unten ein Passwort fest oder fahren Sie mit {{provider}} fort.",
+    passwordLabel: "Passwort",
+    passwordPlaceholder: "Geben Sie Ihr Passwort ein",
+    confirmPasswordLabel: "Passwort bestätigen",
+    confirmPasswordPlaceholder: "Bestätigen Sie Ihr Passwort",
+    setPasswordButton: "Passwort festlegen",
+    backToLoginButton: "Zurück zur Anmeldung",
+    orDivider: "Oder",
+    successMessage: "✓ Passwort erfolgreich festgelegt! Sie können sich jetzt mit Ihrer E-Mail und Ihrem Passwort anmelden.",
+    errorNoPassword: "Bitte geben Sie ein Passwort ein",
+    errorNoConfirmPassword: "Bitte bestätigen Sie Ihr Passwort",
+    errorPasswordMismatch: "Die Passwörter stimmen nicht überein",
+    errorPasswordTooShort: "Das Passwort muss mindestens 8 Zeichen lang sein",
+    errorSetPasswordFailed: "Fehler beim Festlegen des Passworts",
+    errorSSOFailed: "SSO-Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    providerGoogle: "Google",
+    providerMicrosoft: "Microsoft",
+    providerSSO: "SSO",
+  },
+  ssoButtons: {
+    orContinueWith: "Oder fortfahren mit",
+    google: "Google",
+    microsoft: "Microsoft",
+    companySSO: "Unternehmens-SSO",
+    ssoNotAvailable: "SSO nicht verfügbar",
+    signInFailed: "Anmeldung fehlgeschlagen",
+    companySSOTitle: "Unternehmens-SSO",
+    companySSOMessage: "Dies würde zum SSO-Anbieter Ihres Unternehmens weiterleiten. Bitte kontaktieren Sie Ihren Administrator für die Einrichtung.",
   },
   emailVerificationScreen: {
     title: "Überprüfen Sie Ihre E-Mail",
@@ -274,6 +315,8 @@ const de: Translations = {
   profileScreen: {
     languageSelector: "Sprache / Language",
     selectLanguage: "Sprache auswählen",
+    theme: "Thema",
+    selectTheme: "Thema auswählen",
     namePlaceholder: "Name",
     emailPlaceholder: "E-Mail",
     phonePlaceholder: "Telefon",
@@ -283,6 +326,10 @@ const de: Translations = {
     profileUpdatedSuccess: "Dein Profil wurde erfolgreich aktualisiert!",
     profileUpdateFailed: "Fehler beim Aktualisieren des Profils. Bitte versuche es erneut.",
     invalidPhoneFormat: "Ungültiges Telefonformat (10 Ziffern oder +1XXXXXXXXXX)",
+    completeProfileTitle: "Vervollständigen Sie Ihr Profil",
+    completeProfileMessage: "Bitte vervollständigen Sie Ihr Profil, indem Sie eine Telefonnummer hinzufügen, bevor Sie fortfahren.",
+    completeProfileMessageUnverified: "Bitte fügen Sie Ihre Telefonnummer hinzu, um Ihr Profil zu vervollständigen und auf alle Funktionen zuzugreifen.",
+    errorUploadingAvatar: "Fehler beim Hochladen des Avatars",
   },
   reportsScreen: {
     selectPatient: "Patient auswählen:",
@@ -478,6 +525,8 @@ const de: Translations = {
     guest: "Gast",
     addPatient: "Patient hinzufügen",
     adminOnlyMessage: "Nur Organisationsadministratoren und Superadministratoren können Patienten hinzufügen",
+    noPatientsFound: "Keine Patienten gefunden",
+    viewSchedules: "Zeitpläne anzeigen",
   },
   tabs: {
     home: "Start",
@@ -505,14 +554,20 @@ const de: Translations = {
     privacyPolicy: "Datenschutzrichtlinie",
     termsOfService: "Nutzungsbedingungen",
     mentalHealthReport: "Psychischer Gesundheitsbericht",
+    login: "Anmelden",
+    register: "Registrieren",
   },
   orgScreen: {
     namePlaceholder: "Organisationsname",
+    emailPlaceholder: "E-Mail",
     phonePlaceholder: "Organisationstelefon",
     save: "Speichern",
     viewCaregivers: "Betreuer anzeigen",
     inviteCaregiver: "Betreuer einladen",
     payments: "Zahlungen",
+    organizationActions: "Organisationsaktionen",
+    organizationLogo: "Organisationslogo",
+    noLogoSet: "Kein Logo festgelegt",
   },
   caregiverScreen: {
     nameLabel: "Name *",
@@ -523,6 +578,10 @@ const de: Translations = {
     phonePlaceholder: "Telefonnummer eingeben",
     updateCaregiver: "BETREUER AKTUALISIEREN",
     createCaregiver: "BETREUER ERSTELLEN",
+    loadingUnassignedPatients: "Lade nicht zugewiesene Patienten...",
+    assigningPatients: "Weise Patienten zu...",
+    patientsAssignedSuccess: "Patienten erfolgreich zugewiesen!",
+    loadingCaregivers: "Lade Betreuer...",
     confirmDelete: "LÖSCHUNG BESTÄTIGEN",
     deleteCaregiver: "BETREUER LÖSCHEN",
   },
@@ -558,6 +617,261 @@ const de: Translations = {
     confirmReset: "Reset bestätigen",
     successMessage: "Passwort erfolgreich zurückgesetzt!",
     requestFailed: "Reset fehlgeschlagen. Bitte überprüfen Sie Ihren Code und versuchen Sie es erneut.",
+  },
+  themes: {
+    healthcare: {
+      name: "Gesundheitswesen",
+      description: "Professionelles medizinisches Thema mit blauen und grünen Farben",
+    },
+    colorblind: {
+      name: "Farbenblindfreundlich",
+      description: "Hochkontrast-Thema optimiert für Farbsehschwäche",
+    },
+    dark: {
+      name: "Dunkler Modus",
+      description: "Dunkles Thema optimiert für Umgebungen mit wenig Licht",
+    },
+    accessibility: {
+      wcagLevel: "WCAG-Level",
+      colorblindFriendly: "Farbenblindfreundlich",
+      highContrast: "Hochkontrast",
+      darkMode: "Dunkler Modus",
+    },
+  },
+  privacyPracticesScreen: {
+    content: `# Hinweis zu Datenschutzpraktiken
+## MyPhoneFriend Healthcare Communication Services
+
+**Gültigkeitsdatum**: 15. Oktober 2025
+
+---
+
+## IHRE INFORMATIONEN. IHRE RECHTE. UNSERE VERANTWORTUNGEN.
+
+**DIESER HINWEIS BESCHREIBT, WIE MEDIZINISCHE INFORMATIONEN ÜBER SIE VERWENDET UND OFFENGELEGT WERDEN KÖNNEN UND WIE SIE ZUGANG ZU DIESEN INFORMATIONEN ERHALTEN KÖNNEN. BITTE LESEN SIE ES SORGFÄLTIG DURCH.**
+
+---
+
+## IHRE RECHTE
+
+Sie haben das Recht:
+- Eine Kopie Ihrer Gesundheitsinformationen zu erhalten
+- Ihre Gesundheitsinformationen zu korrigieren
+- Vertrauliche Kommunikation anzufordern
+- Uns zu bitten, die Informationen, die wir teilen, zu begrenzen
+- Eine Liste derjenigen zu erhalten, mit denen wir Ihre Informationen geteilt haben
+- Eine Kopie dieser Datenschutzerklärung zu erhalten
+- Jemanden zu wählen, der für Sie handelt
+- Eine Beschwerde einzureichen, wenn Sie glauben, dass Ihre Datenschutzrechte verletzt wurden
+
+---
+
+## IHRE WAHLMÖGLICHKEITEN
+
+Sie haben einige Wahlmöglichkeiten, wie wir Informationen verwenden und teilen, wenn wir:
+- Fragen Ihrer Familie und Freunde zu Ihrer Pflege beantworten
+- Informationen über Sie in Katastrophenhilfesituationen bereitstellen
+
+**Wir teilen Ihre Informationen niemals für Marketing oder Verkauf Ihrer Daten.**
+
+---
+
+# IHRE DETAILLIERTEN RECHTE
+
+## Kopie Ihrer Gesundheitsinformationen erhalten
+
+**Sie können verlangen, Ihre Gesundheitsinformationen einzusehen oder eine Kopie zu erhalten.**
+
+Was Sie anfordern können:
+- Anrufaufzeichnungen und Transkriptionen
+- Gesundheitszusammenfassungen und KI-Analyseergebnisse
+- Von unserem System generierte medizinische Warnungen
+- Notfallbenachrichtigungen
+- Kontoinformationen und Einstellungen
+
+**So fordern Sie an**:
+- E-Mail: privacy@myphonefriend.com
+- Telefon: +1-604-562-4263
+
+**Unsere Antwort**: Innerhalb von 30 Tagen
+
+---
+
+## Bitten Sie uns, Ihre Gesundheitsinformationen zu korrigieren
+
+**Sie können uns bitten, Gesundheitsinformationen zu korrigieren, die Sie für falsch oder unvollständig halten.**
+
+**Unsere Antwort**: Innerhalb von 60 Tagen
+
+---
+
+## Vertrauliche Kommunikation anfordern
+
+**Sie können uns bitten, Sie auf eine bestimmte Weise oder an einem bestimmten Ort zu kontaktieren.**
+
+Beispiele:
+- "Bitte senden Sie mir eine E-Mail, anstatt anzurufen"
+- "Bitte kontaktieren Sie mich nur auf meinem Handy"
+
+Wir werden alle angemessenen Anfragen erfüllen.
+
+---
+
+## Bitten Sie uns, zu begrenzen, was wir verwenden oder teilen
+
+**Sie können uns bitten, bestimmte Gesundheitsinformationen nicht zu verwenden oder zu teilen.**
+
+Wir müssen zustimmen, wenn Sie vollständig aus eigener Tasche bezahlt haben und uns bitten, nicht mit Ihrem Gesundheitsplan zu teilen.
+
+---
+
+## Liste der Offenlegungen erhalten
+
+**Sie können eine "Rechnungslegung der Offenlegungen" anfordern** - eine Liste der Zeiten, in denen wir Ihre Gesundheitsinformationen geteilt haben.
+
+Umfasst: Letzte 6 Jahre  
+Schließt aus: Offenlegungen für Behandlung, Zahlung und Betrieb (es sei denn, Sie fordern es an)
+
+---
+
+## Beschwerde einreichen
+
+**Bei uns einreichen**:
+- E-Mail: privacy@myphonefriend.com
+- Telefon: +1-604-562-4263
+
+**Bei HHS einreichen**:
+- Website: https://www.hhs.gov/hipaa/filing-a-complaint
+- Telefon: 1-800-368-1019
+
+**Wir werden Sie nicht für die Einreichung einer Beschwerde bestrafen.**
+
+---
+
+# UNSERE VERWENDUNGEN UND OFFENLEGUNGEN
+
+## Wie wir Ihre Gesundheitsinformationen verwenden
+
+**Für Behandlung**:
+- Bereitstellung von KI-Gesundheitszusammenfassungen für Ihre Betreuer
+- Generierung von Notfallwarnungen für dringende Situationen
+- Ermöglichen Sie Betreuern, Ihr Wohlbefinden zu überwachen
+- Erleichterung der Kommunikation mit Ihrem Pflegeteam
+
+**Für Zahlung**:
+- Abrechnung Ihrer Gesundheitsorganisation für Dienstleistungen
+- Verarbeitung von Rechnungen für Anrufzeit und Analyse
+
+**Für Gesundheitsbetriebe**:
+- Verbesserung unserer KI-Erkennungsalgorithmen
+- Qualitätssicherung und -verbesserung
+- Schulung unserer Systeme, um Patienten besser zu dienen
+
+---
+
+## Mit wem wir teilen
+
+**Ihre Gesundheitsorganisation**:
+- Ihre zugewiesenen Betreuer und Pflegekoordinatoren
+- Organisationsadministratoren für Abrechnung
+
+**Geschäftspartner** (Dienstleister):
+- KI-Dienste (Azure OpenAI): Für Transkription und Analyse
+- Sprachdienste (Twilio): Für Telefonanrufbehandlung
+- Cloud-Hosting (AWS): Für sichere Datenspeicherung
+- Datenbank (MongoDB Atlas): Für Datenverwaltung
+
+Alle Geschäftspartner unterzeichnen Geschäftspartnervereinbarungen und müssen Ihre Informationen schützen.
+
+**Wie gesetzlich vorgeschrieben**:
+- Notdienste (911), wenn Notfall erkannt wird
+- Gesundheitsbehörden (Missbrauchs-, Vernachlässigungsmeldung)
+- Strafverfolgung (mit gültigem Rechtsbefehl)
+
+**Wir tun NICHT**:
+- ❌ Verkaufen Sie Ihre Gesundheitsinformationen
+- ❌ Mit Vermarktern oder Werbetreibenden teilen
+- ❌ Ohne Ihre Autorisierung für Marketing verwenden
+- ❌ In sozialen Medien teilen
+
+---
+
+# GESUNDHEITSINFORMATIONEN, DIE WIR SAMMELN
+
+**Während der Nutzung unserer Dienste**:
+- Patientename, Telefonnummer, Geburtsdatum
+- Anrufaufzeichnungen und Transkriptionen
+- Gesundheitsbezogene Informationen aus Anrufen (Symptome, Medikamente, Stimmung)
+- Notfallwarnungen und Vorfälle
+- Gesundheitstrends und -muster
+- Betreuernotizen und Beobachtungen
+- Medizinische Analyseergebnisse von KI
+
+---
+
+# IHRE VERANTWORTUNGEN
+
+**Wenn Sie unseren Dienst verwenden, um eine andere Person anzurufen**, sind Sie verantwortlich für:
+- Erhalt der notwendigen Einverständnisse für Aufzeichnung
+- Sicherstellung, dass sie den Dienst verstehen
+- Befolgung der geltenden Aufzeichnungseinverständnisgesetze
+
+---
+
+# VERLETZUNGSBENACHRICHTIGUNG
+
+**Wenn auf Ihre Gesundheitsinformationen unangemessen zugegriffen oder sie offengelegt werden**, werden wir:
+- Den Vorfall untersuchen
+- Sie innerhalb von 60 Tagen benachrichtigen, wenn meldepflichtige Verletzung
+- Erklären, was passiert ist und was wir tun
+- Informationen zu Schritten bereitstellen, die Sie unternehmen können
+
+---
+
+# ÄNDERUNGEN AN DIESEM HINWEIS
+
+- Wir können diesen Hinweis ändern und Änderungen gelten für alle Informationen, die wir haben
+- Neuer Hinweis wird in der App und auf unserer Website verfügbar sein
+- Sie können jederzeit eine aktuelle Kopie anfordern
+
+---
+
+# KONTAKTINFORMATIONEN
+
+**Datenschutzbeauftragter**:
+- E-Mail: privacy@myphonefriend.com
+- Telefon: +1-604-562-4263
+- Post: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+**Stunden**: Montag-Freitag, 9-17 Uhr PST
+
+---
+
+# BESCHWERDE EINREICHEN
+
+**Bei uns**:
+- E-Mail: privacy@myphonefriend.com
+- Telefon: +1-604-562-4263
+
+**Bei der Bundesregierung (HHS)**:
+- Website: https://www.hhs.gov/hipaa/filing-a-complaint
+- Telefon: 1-800-368-1019
+- Post: Office for Civil Rights, U.S. Department of Health and Human Services, 200 Independence Avenue S.W., Washington, D.C. 20201
+
+---
+
+**Gültigkeitsdatum**: 15. Oktober 2025  
+**Version**: 1.0
+
+Dieser Hinweis zu Datenschutzpraktiken entspricht der HIPAA-Datenschutzregel (45 CFR §164.520)
+
+---
+
+## Sprachunterstützung
+
+**Englisch**: Wenn Sie Hilfe beim Verstehen dieses Hinweises benötigen, kontaktieren Sie privacy@myphonefriend.com
+
+**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
   },
 }
 

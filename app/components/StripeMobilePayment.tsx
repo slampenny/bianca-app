@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { View, StyleSheet, Alert } from 'react-native'
+import { View, StyleSheet } from 'react-native'
+import { useToast } from '../hooks/useToast'
+import Toast from './Toast'
+import ConfirmationModal from './ConfirmationModal'
 import { Text, Button, Card, ListItem } from 'app/components'
 import { colors, spacing } from 'app/theme'
 import { useGetPaymentMethodsQuery, useSetDefaultPaymentMethodMutation, useDetachPaymentMethodMutation, useCreateSetupIntentMutation } from 'app/services/api/paymentMethodApi'
@@ -31,9 +34,12 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
   onPaymentMethodAdded,
   onError,
 }) => {
+  const { toast, showError, showSuccess, hideToast } = useToast()
   const [stripeHook, setStripeHook] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [stripeLoading, setStripeLoading] = useState(true)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [paymentMethodToDelete, setPaymentMethodToDelete] = useState<string | null>(null)
 
   // Dynamically load the Stripe hook
   useEffect(() => {
@@ -111,7 +117,7 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
 
   const handleAddPaymentMethod = async () => {
     if (!isPaymentSheetReady) {
-      Alert.alert('Error', 'Payment system not ready. Please try again.')
+      showError('Payment system not ready. Please try again.')
       return
     }
 
@@ -171,31 +177,26 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
   }
 
   const handleDeletePaymentMethod = async (paymentMethodId: string) => {
-    Alert.alert(
-      'Delete Payment Method',
-      'Are you sure you want to delete this payment method?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await detachPaymentMethod({ orgId, paymentMethodId }).unwrap()
-              setMessage('Payment method deleted!')
-              refetch() // Refresh payment methods list
-            } catch (err: any) {
-              const errorMessage = err.message || 'Failed to delete payment method'
-              setMessage(errorMessage)
-              onError?.(errorMessage)
-            }
-          },
-        },
-      ]
-    )
+    setPaymentMethodToDelete(paymentMethodId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeletePaymentMethod = async () => {
+    if (!paymentMethodToDelete) return
+    try {
+      await detachPaymentMethod({ orgId, paymentMethodId: paymentMethodToDelete }).unwrap()
+      setMessage('Payment method deleted!')
+      showSuccess('Payment method deleted!')
+      setPaymentMethodToDelete(null)
+      setShowDeleteConfirm(false)
+      refetch() // Refresh payment methods list
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to delete payment method'
+      setMessage(errorMessage)
+      showError(errorMessage)
+      onError?.(errorMessage)
+      setShowDeleteConfirm(false)
+    }
   }
 
 
@@ -246,6 +247,26 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
           </Text>
         )}
       </View>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="stripe-mobile-toast"
+      />
+      <ConfirmationModal
+        visible={showDeleteConfirm}
+        title="Delete Payment Method"
+        message="Are you sure you want to delete this payment method?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeletePaymentMethod}
+        onCancel={() => {
+          setShowDeleteConfirm(false)
+          setPaymentMethodToDelete(null)
+        }}
+        testID="stripe-delete-confirm"
+      />
     </View>
   )
 }

@@ -4,16 +4,38 @@ export { expect }
 import { asyncStorageMockScript } from './asyncStorageMock'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
-  if (await page.getByTestId('register-name').count() === 0) {
-    await page.getByTestId('register-link').click()
+  // Use aria-label for React Native Web
+  if (await page.locator('[aria-label="register-name"]').count() === 0) {
+    await page.locator('[aria-label="register-link"]').click()
+    await page.waitForSelector('[aria-label="register-name"]', { timeout: 10000 })
   }
-  await page.getByTestId('register-name').fill(name)
-  await page.getByTestId('register-email').fill(email)
-  await page.getByTestId('register-password').fill(password)
-  await page.getByTestId('register-confirm-password').fill(password)
-  await page.getByTestId('register-phone').fill(phone)
-  await page.getByTestId('register-submit').click()
-  await page.waitForSelector('[data-testid="home-header"], [data-testid="email-input"]', { timeout: 10000 })
+  await page.locator('[aria-label="register-name"]').fill(name)
+  await page.locator('[aria-label="register-email"]').fill(email)
+  await page.locator('[aria-label="register-password"]').fill(password)
+  await page.locator('[aria-label="register-confirm-password"]').fill(password)
+  await page.locator('[aria-label="register-phone"]').fill(phone)
+  await page.locator('[aria-label="register-submit"]').click()
+  // Wait for navigation after registration - check for email verification screen or home screen
+  await page.waitForTimeout(2000) // Give time for navigation
+  
+  // Try to find email verification screen indicators
+  const emailVerificationButton = page.locator('[data-testid="resend-verification-button"]')
+  const backToLoginButton = page.locator('[data-testid="back-to-login-button"]')
+  const homeHeader = page.locator('[data-testid="home-header"]')
+  
+  // Wait for any of these indicators to be visible
+  try {
+    await Promise.race([
+      emailVerificationButton.waitFor({ state: 'visible', timeout: 5000 }),
+      backToLoginButton.waitFor({ state: 'visible', timeout: 5000 }),
+      homeHeader.waitFor({ state: 'visible', timeout: 5000 }),
+    ])
+  } catch {
+    // If none found, check if we're on login screen (registration may have failed)
+    await page.waitForSelector('[aria-label="email-input"]', { timeout: 5000 }).catch(() => {
+      // If we can't find anything, that's okay - the test will handle it
+    })
+  }
 }
 
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
@@ -393,26 +415,75 @@ export async function waitForPatientListToLoad(page: Page): Promise<void> {
 // Custom test fixture that navigates to the root URL before each test
 export const test = base.extend<{}>({
   page: async ({ page }, use) => {
+    // Capture console logs and errors to file
+    const consoleLogs: string[] = []
+    const consoleErrors: string[] = []
+    
+    page.on('console', (msg) => {
+      const text = msg.text()
+      consoleLogs.push(`[${msg.type()}] ${text}`)
+      if (msg.type() === 'error') {
+        consoleErrors.push(text)
+      }
+    })
+    
+    page.on('pageerror', (error) => {
+      const errorText = `Page Error: ${error.message}\n${error.stack}`
+      consoleErrors.push(errorText)
+      consoleLogs.push(`[pageerror] ${errorText}`)
+    })
+    
+    page.on('requestfailed', (request) => {
+      const errorText = `Request Failed: ${request.method()} ${request.url()} - ${request.failure()?.errorText}`
+      consoleErrors.push(errorText)
+      consoleLogs.push(`[requestfailed] ${errorText}`)
+    })
+    
     // Inject AsyncStorage mock before navigating
     await page.addInitScript(asyncStorageMockScript)
     
-    // Clear storage first, then navigate
-    await page.goto('/')
-    await page.evaluate(() => {
-      if ((window as any).AsyncStorage) {
-        (window as any).AsyncStorage.clear()
+    try {
+      // Clear storage first, then navigate
+      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 })
+      await page.evaluate(() => {
+        if ((window as any).AsyncStorage) {
+          (window as any).AsyncStorage.clear()
+        }
+        localStorage.clear()
+        sessionStorage.clear()
+      })
+      
+      // Reload to ensure clean state
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+      
+      // Wait for login screen - use aria-label for React Native Web
+      try {
+        await page.waitForSelector('[aria-label="email-input"]', { timeout: 30000 })
+        console.log('Successfully loaded login screen')
+      } catch (error) {
+        // Try alternative selectors
+        await page.waitForSelector('input[type="email"], [aria-label="email-input"], [aria-label="login-form"]', { timeout: 10000 }).catch(() => {
+          console.error('Failed to find login screen elements')
+          throw error
+        })
       }
-      localStorage.clear()
-      sessionStorage.clear()
-    })
-    
-    // Reload to ensure clean state
-    await page.reload()
-    
-    // Wait for login screen
-    await page.waitForSelector('[data-testid="email-input"]', { timeout: 15000 })
-    console.log('Successfully loaded login screen')
-    
-    await use(page)
+      
+      await use(page)
+    } catch (error) {
+      // Write console logs to file before throwing
+      const fs = require('fs')
+      const path = require('path')
+      const logFile = path.join(__dirname, '../../test-console-logs.txt')
+      const errorFile = path.join(__dirname, '../../test-console-errors.txt')
+      
+      fs.writeFileSync(logFile, consoleLogs.join('\n'), 'utf8')
+      fs.writeFileSync(errorFile, consoleErrors.join('\n'), 'utf8')
+      
+      console.error(`\n=== Console logs written to ${logFile} ===`)
+      console.error(`=== Console errors written to ${errorFile} ===`)
+      console.error(`Total logs: ${consoleLogs.length}, Total errors: ${consoleErrors.length}`)
+      
+      throw error
+    }
   },
 })

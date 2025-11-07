@@ -190,8 +190,8 @@ export function ConversationMessages({ messages, style, 'data-testid': testId }:
       {sortedMessages.length > 0 ? (
         sortedMessages.map((message, index) => renderMessage(message, index))
       ) : (
-        <View style={styles.noMessagesContainer}>
-          <Text style={styles.noMessagesText}>
+        <View style={styles.noMessagesContainer} testID="no-messages-container" accessibilityLabel="no-messages">
+          <Text style={styles.noMessagesText} testID="no-messages-text" accessibilityLabel="no-messages-text">
             No messages yet. The conversation will appear here as it unfolds...
           </Text>
         </View>

@@ -403,7 +403,7 @@ function CaregiverScreen() {
           />
 
           <Button
-            text={caregiver && caregiver.id ? "SAVE" : "INVITE"}
+            text={caregiver && caregiver.id ? translate("caregiverScreen.save") : translate("caregiverScreen.invite")}
             onPress={handleSave}
             disabled={!email || !phone || !!emailError || !!phoneError || isUpdating || isInviting}
             testID="caregiver-save-button"
@@ -417,7 +417,7 @@ function CaregiverScreen() {
 
           {caregiver && caregiver.id && (
             <Button
-              text={confirmDelete ? "CONFIRM DELETE" : "DELETE CAREGIVER"}
+              text={confirmDelete ? translate("caregiverScreen.confirmDelete") : translate("caregiverScreen.deleteCaregiver")}
               onPress={handleDelete}
               disabled={isDeleting}
               testID="delete-caregiver-button"
@@ -434,7 +434,7 @@ function CaregiverScreen() {
           {/* Assign Unassigned Patients Button - Only show for orgAdmins */}
           {caregiver && caregiver.id && currentUser?.role === 'orgAdmin' && (
             <Button
-              text="Assign Unassigned Patients"
+              text={translate("caregiverScreen.assignUnassignedPatients")}
               onPress={handleAssignUnassignedPatients}
               disabled={isLoadingUnassigned}
               testID="assign-unassigned-patients-button"
@@ -465,7 +465,7 @@ function CaregiverScreen() {
             />
             <View style={styles.panelContent} testID="assign-unassigned-patients-modal">
               <View style={styles.panelHeader}>
-                <Text style={styles.panelTitle}>Assign Unassigned Patients</Text>
+                <Text style={styles.panelTitle}>{translate("caregiverScreen.assignUnassignedPatientsTitle")}</Text>
                 <Pressable
                   style={styles.panelCloseButton}
                   onPress={closeUnassignedPanel}
@@ -475,16 +475,16 @@ function CaregiverScreen() {
               </View>
               
               {isLoadingUnassigned ? (
-                <Text style={styles.loadingText} testID="unassigned-patients-loading">Loading unassigned patients...</Text>
+                <Text style={styles.loadingText} testID="unassigned-patients-loading">{translate("caregiverScreen.loadingUnassignedPatients")}</Text>
               ) : isAssigning ? (
-                <Text style={styles.loadingText}>Assigning patients...</Text>
+                <Text style={styles.loadingText}>{translate("caregiverScreen.assigningPatients")}</Text>
               ) : assignmentSuccess ? (
-                <Text style={styles.successText} testID="patients-assigned-success-message">Patients assigned successfully!</Text>
+                <Text style={styles.successText} testID="patients-assigned-success-message">{translate("caregiverScreen.patientsAssignedSuccess")}</Text>
               ) : unassignedPatients && unassignedPatients.length > 0 ? (
                 <>
                   <View style={styles.selectionControls}>
                     <Button
-                      text="Select All"
+                      text={translate("caregiverScreen.selectAll")}
                       onPress={handleSelectAll}
                       testID="select-all-patients-button"
                       style={styles.selectionButton}
@@ -492,7 +492,7 @@ function CaregiverScreen() {
                       preset="default"
                     />
                     <Button
-                      text="Deselect All"
+                      text={translate("caregiverScreen.deselectAll")}
                       onPress={handleDeselectAll}
                       testID="deselect-all-patients-button"
                       style={styles.selectionButton}
@@ -525,7 +525,7 @@ function CaregiverScreen() {
                   
                   <View style={styles.panelButtons}>
                     <Button
-                      text="Assign Selected"
+                      text={translate("caregiverScreen.assignSelected")}
                       onPress={handleAssignSelectedPatients}
                       disabled={selectedPatients.length === 0 || isAssigning}
                       testID="assign-selected-patients-button"
@@ -539,7 +539,7 @@ function CaregiverScreen() {
                     />
                     
                     <Button
-                      text="Cancel"
+                      text={translate("common.cancel")}
                       onPress={closeUnassignedPanel}
                       testID="cancel-unassigned-panel-button"
                       preset="default"
@@ -549,7 +549,7 @@ function CaregiverScreen() {
                   </View>
                 </>
               ) : (
-                <Text style={styles.noPatientsText} testID="no-unassigned-patients-message">No unassigned patients found.</Text>
+                <Text style={styles.noPatientsText} testID="no-unassigned-patients-message">{translate("caregiverScreen.noUnassignedPatientsFound")}</Text>
               )}
             </View>
           </Animated.View>

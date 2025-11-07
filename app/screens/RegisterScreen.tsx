@@ -5,6 +5,7 @@ import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField, PhoneInputWeb } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
+import { translate } from "app/i18n"
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
@@ -205,6 +206,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.buttonContainer}>
           <Button
             testID="register-individual-toggle"
+            accessibilityLabel="register-individual-toggle"
             tx="registerScreen.individualButton" // Make sure these tx keys exist in your i18n files
             onPress={() => setAccountType("individual")}
             style={accountType === "individual" ? styles.selectedButton : styles.button}
@@ -212,6 +214,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           />
           <Button
             testID="register-organization-toggle"
+            accessibilityLabel="register-organization-toggle"
             tx="registerScreen.organizationButton" // Make sure these tx keys exist in your i18n files
             onPress={() => setAccountType("organization")}
             style={accountType === "organization" ? styles.selectedButton : styles.button}
@@ -221,8 +224,8 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
         <Text style={styles.explanationText}>
           {accountType === "individual"
-            ? "Register as an individual for personal use."
-            : "Register as an organization for company or group use."}
+            ? translate("registerScreen.individualExplanation")
+            : translate("registerScreen.organizationExplanation")}
         </Text>
 
         {/* Form Fields */}
@@ -230,6 +233,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           <View style={styles.fieldContainer}>
             <TextField
               testID="register-org-name"
+              accessibilityLabel="register-org-name"
               placeholderTx="registerScreen.organizationNameFieldPlaceholder"
               labelTx="registerScreen.organizationNameFieldLabel"
               value={organizationName}
@@ -364,20 +368,21 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         {/* Consent Notice */}
         <View style={styles.consentContainer}>
           <Text style={styles.consentText}>
-            By signing up, you agree to our{" "}
+            {translate("registerScreen.consentText")}{" "}
             <Text style={styles.consentLink} onPress={() => navigation.navigate("Terms" as never)}>
-              Terms of Service
+              {translate("registerScreen.termsOfService")}
             </Text>{" "}
-            and{" "}
+            {translate("registerScreen.consentAnd")}{" "}
             <Text style={styles.consentLink} onPress={() => navigation.navigate("Privacy" as never)}>
-              Privacy Policy
+              {translate("registerScreen.privacyPolicy")}
             </Text>
           </Text>
         </View>
 
         {/* Go Back Link */}
         <Button 
-          testID="register-go-back" 
+          testID="register-go-back"
+          accessibilityLabel="register-go-back"
           style={styles.linkButton} 
           onPress={() => navigation.goBack()}
           preset="default"

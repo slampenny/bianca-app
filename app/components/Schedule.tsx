@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { View, StyleSheet, Switch } from "react-native"
+import { View, StyleSheet } from "react-native"
 import { Picker } from "@react-native-picker/picker"
 import { Toggle, Text } from "."
 import { Schedule } from "../services/api/api.types"
@@ -135,14 +135,19 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   
   const styles = createStyles(colors)
 
+  // Only reset state when the schedule ID changes (switching to a different schedule)
+  // Don't reset when the same schedule is updated (e.g., when toggle changes isActive)
   useEffect(() => {
-    setId(initialSchedule.id)
-    setPatient(initialSchedule.patient)
-    setFrequency(initialSchedule.frequency)
-    setIntervals(initialSchedule.intervals)
-    setIsActive(initialSchedule.isActive)
-    setTime(initialSchedule.time)
-  }, [initialSchedule])
+    // Only update if the schedule ID has changed (new schedule selected)
+    if (initialSchedule.id !== id) {
+      setId(initialSchedule.id)
+      setPatient(initialSchedule.patient)
+      setFrequency(initialSchedule.frequency)
+      setIntervals(initialSchedule.intervals)
+      setIsActive(initialSchedule.isActive)
+      setTime(initialSchedule.time)
+    }
+  }, [initialSchedule.id, initialSchedule.patient, id]) // Only depend on ID and patient, not the whole object
 
   useEffect(() => {
     const newSchedule: Schedule = { id, patient, frequency, intervals, isActive, time }
@@ -288,12 +293,12 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
 
       <View style={styles.switchContainer}>
         <Text style={styles.switchLabel}>{translate("scheduleComponent.active")}:</Text>
-        <Switch
-          trackColor={{ false: colors.palette.neutral400, true: colors.palette.primary500 }}
-          thumbColor={isActive ? colors.palette.warning500 : colors.palette.neutral200}
-          ios_backgroundColor={colors.palette.neutral600}
-          onValueChange={setIsActive}
+        <Toggle
+          testID="schedule-toggle-active"
+          accessibilityLabel="schedule-toggle-active"
+          variant="switch"
           value={isActive}
+          onValueChange={setIsActive}
         />
       </View>
     </View>

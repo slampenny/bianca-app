@@ -241,18 +241,24 @@ export function ConversationsScreen() {
   }
 
   const toggleConversation = (conversationId: string) => {
+    console.log('[ConversationsScreen] Toggling conversation:', conversationId, 'Current expanded:', Array.from(expandedConversations))
     const newExpanded = new Set(expandedConversations)
     if (newExpanded.has(conversationId)) {
       newExpanded.delete(conversationId)
+      console.log('[ConversationsScreen] Collapsing conversation:', conversationId)
     } else {
       newExpanded.add(conversationId)
+      console.log('[ConversationsScreen] Expanding conversation:', conversationId)
       // Set this conversation as the current one in Redux
-      const conversation = conversations.find(c => c.id === conversationId)
+      // Use conversationsData.results if available, otherwise fall back to Redux conversations
+      const allConversations = conversationsData?.results || conversations
+      const conversation = allConversations.find((c: any) => c.id === conversationId)
       if (conversation) {
         dispatch(setConversation(conversation))
       }
     }
     setExpandedConversations(newExpanded)
+    console.log('[ConversationsScreen] New expanded set:', Array.from(newExpanded))
   }
 
   const formatDate = (dateString: string) => {
@@ -304,6 +310,7 @@ export function ConversationsScreen() {
       <Card 
         style={styles.conversationCard} 
         testID={`conversation-card-${item.id}`}
+        accessibilityLabel={`conversation-card-${item.id}`}
         heading={`Conversation ${formatDate(conversationDate)}`}
         content={`${getConversationPreview(item.messages || [])}\n${messageCount} message${messageCount !== 1 ? 's' : ''}`}
         RightComponent={
@@ -345,7 +352,8 @@ export function ConversationsScreen() {
   )
 
   // Conversations are already sorted by the backend (startTime:desc)
-  const conversationsToRender = conversations
+  // Use conversationsData.results if available (from API), otherwise fall back to Redux conversations
+  const conversationsToRender = conversationsData?.results || conversations
 
   return (
     <Screen preset="scroll" testID="conversations-screen">

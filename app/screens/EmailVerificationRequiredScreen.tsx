@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { View, ViewStyle, Alert, StyleSheet } from "react-native"
+import { View, ViewStyle, StyleSheet } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
 import { Screen, Text, Button, TextField } from "app/components"
 import { LoadingButton } from "app/components/LoadingButton"

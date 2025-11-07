@@ -2,6 +2,7 @@ import React from "react"
 import { View, StyleSheet, ActivityIndicator } from "react-native"
 import { useTheme } from "app/theme/ThemeContext"
 import { Text } from "app/components"
+import { translate } from "app/i18n"
 
 export function LoadingScreen({ message }: { message?: string }) {
   const { colors, isLoading: themeLoading } = useTheme()
@@ -15,7 +16,7 @@ export function LoadingScreen({ message }: { message?: string }) {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.palette.biancaButtonSelected} />
-      <Text style={styles.loadingText}>{message || "Loading..."}</Text>
+      <Text style={styles.loadingText}>{message || translate("common.loading")}</Text>
     </View>
   )
 }

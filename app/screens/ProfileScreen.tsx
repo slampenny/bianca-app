@@ -5,8 +5,9 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   View,
-  Alert,
 } from "react-native"
+import { useToast } from "../hooks/useToast"
+import Toast from "../components/Toast"
 import { Text, TextField } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
@@ -15,6 +16,7 @@ import { LanguageSelector } from "app/components/LanguageSelector"
 import { ThemeSelector } from "app/components/ThemeSelector"
 import { useLanguage } from "app/hooks/useLanguage"
 import { translate } from "app/i18n"
+import i18n from "i18n-js"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
@@ -27,6 +29,7 @@ import { navigationRef } from "app/navigators/navigationUtilities"
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const dispatch = useDispatch()
+  const { toast, showInfo, hideToast } = useToast()
   const { colors, isLoading: themeLoading } = useTheme()
   
   // Use language hook to trigger re-renders on language change
@@ -116,12 +119,8 @@ function ProfileScreen() {
         // Prevent default behavior of leaving the screen for other navigations
         e.preventDefault()
         
-        // Show alert to user
-        Alert.alert(
-          'Complete Your Profile',
-          'Please complete your profile by adding a phone number before continuing.',
-          [{ text: 'OK' }]
-        )
+        // Show info toast to user
+        showInfo(translate("profileScreen.completeProfileMessage"))
       })
 
       return unsubscribe
@@ -132,12 +131,16 @@ function ProfileScreen() {
     if (!currentUser || !currentUser.id) return
 
     try {
+      // Get current language preference from i18n
+      const currentLanguage = i18n.locale || 'en'
+      
       // Create updated user object
       const updatedCaregiver = {
         ...currentUser,
         name,
         email,
         phone,
+        preferredLanguage: currentLanguage,
       }
 
       // Upload avatar if changed
@@ -188,120 +191,104 @@ function ProfileScreen() {
 
   const styles = createStyles(colors)
 
-  // If user is not authenticated and has no invite token, show error
-  if (!currentUser && !inviteToken) {
-    const handleGoToLogin = () => {
-      if (navigationRef.isReady()) {
-        navigationRef.navigate("Login")
-      }
-    }
-    
-    return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
-        <Text style={styles.error} accessibilityLabel="error-message">
-          Error: Please authenticate. Please log in to access your profile.
-        </Text>
-        <Pressable
-          style={styles.button}
-          onPress={handleGoToLogin}
-          accessibilityLabel="go-to-login-button"
-          accessible={true}
-        >
-          <Text style={styles.buttonText}>Go to Login</Text>
-        </Pressable>
-      </ScrollView>
-    )
-  }
-
   return (
-    <TouchableWithoutFeedback>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
-        {(updateError || uploadError) && (
-          <Text style={styles.error}>
-            {updateError && "data" in updateError
-              ? `Error: ${(updateError.data as { message: string }).message}`
-              : uploadError && "data" in uploadError
-              ? `Error uploading avatar: ${(uploadError.data as { message: string }).message}`
-              : "An error occurred"}
-          </Text>
-        )}
-
-        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
-
-        {isUnverified && (
-          <View style={styles.unverifiedBanner}>
-            <Text style={styles.unverifiedTitle}>Complete Your Profile</Text>
-            <Text style={styles.unverifiedText}>
-              Please add your phone number to complete your profile and access all features.
+    <>
+      <TouchableWithoutFeedback>
+        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
+          {(updateError || uploadError) && (
+            <Text style={styles.error}>
+              {updateError && "data" in updateError
+                ? `${translate("common.error")}: ${(updateError.data as { message: string }).message}`
+                : uploadError && "data" in uploadError
+                ? `${translate("profileScreen.errorUploadingAvatar")}: ${(uploadError.data as { message: string }).message}`
+                : translate("common.anErrorOccurred")}
             </Text>
+          )}
+
+          {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+
+          {isUnverified && (
+            <View style={styles.unverifiedBanner}>
+              <Text style={styles.unverifiedTitle}>{translate("profileScreen.completeProfileTitle")}</Text>
+              <Text style={styles.unverifiedText}>
+                {translate("profileScreen.completeProfileMessageUnverified")}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.formCard}>
+
+            <AvatarPicker
+              initialAvatar={avatar}
+              onAvatarChanged={({ uri, blob }) => {
+                setAvatar(uri)
+                if (blob) setAvatarBlob(blob)
+              }}
+            />
+
+            <TextField
+              placeholderTx="profileScreen.namePlaceholder"
+              value={name}
+              onChangeText={setName}
+              containerStyle={styles.inputContainer}
+              inputWrapperStyle={styles.inputWrapper}
+              style={styles.input}
+            />
+            <TextField
+              placeholderTx="profileScreen.emailPlaceholder"
+              value={email}
+              onChangeText={validateEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              containerStyle={styles.inputContainer}
+              inputWrapperStyle={styles.inputWrapper}
+              style={styles.input}
+              status={emailError ? "error" : undefined}
+              helper={emailError || undefined}
+            />
+            <TextField
+              placeholderTx="profileScreen.phonePlaceholder"
+              value={phone}
+              onChangeText={validatePhone}
+              keyboardType="phone-pad"
+              containerStyle={styles.inputContainer}
+              inputWrapperStyle={styles.inputWrapper}
+              style={styles.input}
+              status={phoneError ? "error" : undefined}
+              helper={phoneError || undefined}
+            />
+
+            <LanguageSelector testID="language-selector" />
+            <ThemeSelector testID="theme-selector" />
+
+            <Pressable
+              style={[
+                styles.button,
+                (!email || !phone || emailError || phoneError) ? styles.buttonDisabled : undefined,
+              ]}
+              onPress={handleSave}
+              disabled={!email || !phone || !!emailError || !!phoneError}
+            >
+              <Text style={styles.buttonText}>{translate("profileScreen.updateProfile")}</Text>
+            </Pressable>
+
+            <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button" accessibilityLabel="profile-logout-button" accessible={true}>
+              <Text style={styles.buttonText}>{translate("profileScreen.logout")}</Text>
+            </Pressable>
+
+            {/* Legal Links */}
+            <LegalLinks style={styles.legalLinks} />
           </View>
-        )}
-
-        <View style={styles.formCard}>
-
-          <AvatarPicker
-            initialAvatar={avatar}
-            onAvatarChanged={({ uri, blob }) => {
-              setAvatar(uri)
-              if (blob) setAvatarBlob(blob)
-            }}
-          />
-
-          <TextField
-            placeholderTx="profileScreen.namePlaceholder"
-            value={name}
-            onChangeText={setName}
-            containerStyle={styles.inputContainer}
-            inputWrapperStyle={styles.inputWrapper}
-            style={styles.input}
-          />
-          <TextField
-            placeholderTx="profileScreen.emailPlaceholder"
-            value={email}
-            onChangeText={validateEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            containerStyle={styles.inputContainer}
-            inputWrapperStyle={styles.inputWrapper}
-            style={styles.input}
-            status={emailError ? "error" : undefined}
-            helper={emailError || undefined}
-          />
-          <TextField
-            placeholderTx="profileScreen.phonePlaceholder"
-            value={phone}
-            onChangeText={validatePhone}
-            keyboardType="phone-pad"
-            containerStyle={styles.inputContainer}
-            inputWrapperStyle={styles.inputWrapper}
-            style={styles.input}
-            status={phoneError ? "error" : undefined}
-            helper={phoneError || undefined}
-          />
-
-          <LanguageSelector testID="language-selector" />
-          <ThemeSelector testID="theme-selector" />
-
-          <Pressable
-            style={[
-              styles.button,
-              (!email || !phone || emailError || phoneError) ? styles.buttonDisabled : undefined,
-            ]}
-            onPress={handleSave}
-            disabled={!email || !phone || !!emailError || !!phoneError}
-          >
-            <Text style={styles.buttonText}>{translate("profileScreen.updateProfile")}</Text>
-          </Pressable>
-
-          <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button" accessibilityLabel="profile-logout-button" accessible={true}>
-            <Text style={styles.buttonText}>{translate("profileScreen.logout")}</Text>
-          </Pressable>
-
-          {/* Legal Links */}
-          <LegalLinks style={styles.legalLinks} />
-        </View>
-      </ScrollView>
-    </TouchableWithoutFeedback>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="profile-toast"
+      />
+    </>
   )
 }
 

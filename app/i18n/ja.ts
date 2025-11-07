@@ -4,7 +4,9 @@ const ja: Translations = {
   common: {
     ok: "OK",
     cancel: "キャンセル",
+    close: "閉じる",
     error: "エラー",
+    anErrorOccurred: "エラーが発生しました",
     back: "戻る",
     logOut: "ログアウト",
     selectImage: "画像を選択",
@@ -12,6 +14,7 @@ const ja: Translations = {
     callNow: "今すぐ通話",
     ending: "終了中...",
     endCall: "通話終了",
+    loading: "読み込み中...",
   },
   alertScreen: {
     markAllAsRead: "すべて既読にする",
@@ -82,12 +85,19 @@ const ja: Translations = {
     passwordFieldPlaceholder: "パスワードを入力してください",
     confirmPasswordFieldPlaceholder: "パスワードを確認してください",
     organizationNameFieldPlaceholder: "組織名を入力してください",
+    organizationButton: "組織",
+    individualButton: "個人",
+    individualExplanation: "個人利用のために個人として登録します。",
+    organizationExplanation: "会社またはグループ利用のために組織として登録します。",
+    consentText: "登録することで、以下に同意します",
+    consentAnd: "と",
+    termsOfService: "利用規約",
+    privacyPolicy: "プライバシーポリシー",
     signUp: "登録",
     signIn: "サインイン",
     alreadyHaveAccount: "すでにアカウントをお持ちですか？",
     dontHaveAccount: "アカウントをお持ちでないですか？",
     termsAndConditions: "利用規約",
-    privacyPolicy: "プライバシーポリシー",
     agreeToTerms: "登録することで、以下に同意します",
     and: "と",
   },
@@ -98,6 +108,37 @@ const ja: Translations = {
     requestReset: "リセットをリクエスト",
     successMessage: "リセットコードがメールに送信されました！",
     requestFailed: "リクエストが失敗しました。メールを確認して再試行してください。",
+  },
+  ssoLinkingScreen: {
+    title: "アカウントをリンク",
+    message: "このアカウントは {{provider}} で作成されました。メール/パスワードでログインするには、以下でパスワードを設定するか、{{provider}} で続行してください。",
+    passwordLabel: "パスワード",
+    passwordPlaceholder: "パスワードを入力してください",
+    confirmPasswordLabel: "パスワードを確認",
+    confirmPasswordPlaceholder: "パスワードを確認してください",
+    setPasswordButton: "パスワードを設定",
+    backToLoginButton: "ログインに戻る",
+    orDivider: "または",
+    successMessage: "✓ パスワードが正常に設定されました！メールとパスワードでログインできるようになりました。",
+    errorNoPassword: "パスワードを入力してください",
+    errorNoConfirmPassword: "パスワードを確認してください",
+    errorPasswordMismatch: "パスワードが一致しません",
+    errorPasswordTooShort: "パスワードは8文字以上である必要があります",
+    errorSetPasswordFailed: "パスワードの設定に失敗しました",
+    errorSSOFailed: "SSOログインに失敗しました。もう一度お試しください。",
+    providerGoogle: "Google",
+    providerMicrosoft: "Microsoft",
+    providerSSO: "SSO",
+  },
+  ssoButtons: {
+    orContinueWith: "または続行",
+    google: "Google",
+    microsoft: "Microsoft",
+    companySSO: "企業SSO",
+    ssoNotAvailable: "SSOは利用できません",
+    signInFailed: "サインインに失敗しました",
+    companySSOTitle: "企業SSO",
+    companySSOMessage: "これは企業のSSOプロバイダーにリダイレクトされます。設定については管理者にお問い合わせください。",
   },
   emailVerificationScreen: {
     title: "メールを確認してください",
@@ -193,6 +234,8 @@ const ja: Translations = {
   profileScreen: {
     languageSelector: "言語 / Language",
     selectLanguage: "言語を選択",
+    theme: "テーマ",
+    selectTheme: "テーマを選択",
     namePlaceholder: "名前",
     emailPlaceholder: "メール",
     phonePlaceholder: "電話",
@@ -202,6 +245,10 @@ const ja: Translations = {
     profileUpdatedSuccess: "プロフィールが正常に更新されました！",
     profileUpdateFailed: "プロフィールの更新に失敗しました。再試行してください。",
     invalidPhoneFormat: "無効な電話番号形式（10桁または+1XXXXXXXXXX）",
+    completeProfileTitle: "プロフィールを完成させる",
+    completeProfileMessage: "続行する前に、電話番号を追加してプロフィールを完成させてください。",
+    completeProfileMessageUnverified: "プロフィールを完成させ、すべての機能にアクセスするには、電話番号を追加してください。",
+    errorUploadingAvatar: "アバターのアップロードエラー",
   },
   reportsScreen: {
     selectPatient: "患者を選択：",
@@ -246,6 +293,15 @@ const ja: Translations = {
     noPreviousConversations: "この患者の以前の会話が見つかりません",
     errorFetchingConversations: "会話の取得中にエラーが発生しました",
     loadingMoreConversations: "さらに会話を読み込み中...",
+  },
+  caregiverScreen: {
+    namePlaceholder: "名前",
+    emailPlaceholder: "メール",
+    phonePlaceholder: "電話",
+    loadingUnassignedPatients: "未割り当ての患者を読み込み中...",
+    assigningPatients: "患者を割り当て中...",
+    patientsAssignedSuccess: "患者の割り当てが完了しました！",
+    loadingCaregivers: "介護者を読み込み中...",
   },
   caregiversScreen: {
     invited: "招待済み",
@@ -412,12 +468,26 @@ const ja: Translations = {
     guest: "ゲスト",
     addPatient: "患者を追加",
     adminOnlyMessage: "組織管理者とスーパー管理者のみが患者を追加できます",
+    noPatientsFound: "患者が見つかりません",
+    viewSchedules: "スケジュールを表示",
   },
   tabs: {
     home: "ホーム",
     org: "組織",
     reports: "レポート",
     alerts: "アラート",
+  },
+  orgScreen: {
+    namePlaceholder: "名前",
+    emailPlaceholder: "メール",
+    phonePlaceholder: "電話",
+    save: "保存",
+    viewCaregivers: "介護者を表示",
+    inviteCaregiver: "介護者を招待",
+    payments: "支払い",
+    organizationActions: "組織のアクション",
+    organizationLogo: "組織のロゴ",
+    noLogoSet: "ロゴが設定されていません",
   },
   headers: {
     home: "ホーム",
@@ -439,6 +509,263 @@ const ja: Translations = {
     privacyPolicy: "プライバシーポリシー",
     termsOfService: "利用規約",
     mentalHealthReport: "メンタルヘルスレポート",
+    login: "ログイン",
+    register: "登録",
+  },
+  themes: {
+    healthcare: {
+      name: "ヘルスケア",
+      description: "青と緑の色を使ったプロフェッショナルな医療テーマ",
+    },
+    colorblind: {
+      name: "色覚障害者向け",
+      description: "色覚障害に最適化された高コントラストテーマ",
+    },
+    dark: {
+      name: "ダークモード",
+      description: "低照度環境に最適化されたダークテーマ",
+    },
+    accessibility: {
+      wcagLevel: "WCAGレベル",
+      colorblindFriendly: "色覚障害者向け",
+      highContrast: "高コントラスト",
+      darkMode: "ダークモード",
+    },
+  },
+  privacyPracticesScreen: {
+    content: `# プライバシー実践に関する通知
+## MyPhoneFriend ヘルスケア通信サービス
+
+**有効日**: 2025年10月15日
+
+---
+
+## あなたの情報。あなたの権利。私たちの責任。
+
+**この通知は、あなたに関する医療情報がどのように使用され、開示される可能性があるか、およびこの情報にアクセスする方法を説明しています。よくお読みください。**
+
+---
+
+## あなたの権利
+
+あなたには以下の権利があります：
+- 健康情報のコピーを取得する
+- 健康情報を訂正する
+- 機密通信を要求する
+- 共有する情報を制限するよう求める
+- 情報を共有した相手のリストを取得する
+- このプライバシー通知のコピーを取得する
+- あなたに代わって行動する人を選択する
+- プライバシー権が侵害されたと信じる場合、苦情を申し立てる
+
+---
+
+## あなたの選択
+
+以下の場合に、情報の使用と共有方法について選択肢があります：
+- 家族や友人からのあなたのケアに関する質問に答える
+- 災害救援状況であなたに関する情報を提供する
+
+**私たちは、マーケティングやデータの販売のためにあなたの情報を共有することは決してありません。**
+
+---
+
+# あなたの詳細な権利
+
+## 健康情報のコピーを取得する
+
+**あなたの健康情報を閲覧またはコピーを取得するよう要求できます。**
+
+要求できる内容：
+- 通話録音と文字起こし
+- ウェルネス要約とAI分析結果
+- システムが生成した医療アラート
+- 緊急通知
+- アカウント情報と設定
+
+**要求方法**：
+- メール: privacy@myphonefriend.com
+- 電話: +1-604-562-4263
+
+**私たちの回答**: 30日以内
+
+---
+
+## 健康情報の訂正を求める
+
+**不正確または不完全だと思う健康情報の訂正を求めることができます。**
+
+**私たちの回答**: 60日以内
+
+---
+
+## 機密通信を要求する
+
+**特定の方法または場所で連絡するよう求めることができます。**
+
+例：
+- "電話ではなくメールで連絡してください"
+- "携帯電話のみで連絡してください"
+
+合理的な要求にはすべて対応します。
+
+---
+
+## 使用または共有を制限するよう求める
+
+**特定の健康情報を使用または共有しないよう求めることができます。**
+
+全額自己負担で支払い、健康保険と共有しないよう求めた場合、私たちは同意する必要があります。
+
+---
+
+## 開示のリストを取得する
+
+**「開示の会計」を要求できます** - 健康情報を共有した回数のリスト。
+
+対象: 過去6年間  
+除外: 治療、支払い、運営のための開示（要求しない限り）
+
+---
+
+## 苦情を申し立てる
+
+**私たちに申し立てる**：
+- メール: privacy@myphonefriend.com
+- 電話: +1-604-562-4263
+
+**HHSに申し立てる**：
+- ウェブサイト: https://www.hhs.gov/hipaa/filing-a-complaint
+- 電話: 1-800-368-1019
+
+**苦情を申し立てたことに対して報復することはありません。**
+
+---
+
+# 私たちの使用と開示
+
+## 健康情報の使用方法
+
+**治療のために**：
+- ケア提供者にAIウェルネス要約を提供
+- 緊急事態の緊急アラートを生成
+- ケア提供者があなたの健康状態を監視できるようにする
+- ケアチームとのコミュニケーションを促進
+
+**支払いのために**：
+- 医療機関にサービスを請求
+- 通話時間と分析の請求書を処理
+
+**医療運営のために**：
+- AI検出アルゴリズムを改善
+- 品質保証と改善
+- 患者により良いサービスを提供するためにシステムを訓練
+
+---
+
+## 共有する相手
+
+**あなたの医療機関**：
+- 割り当てられたケア提供者とケアコーディネーター
+- 請求のための組織管理者
+
+**ビジネスアソシエイト**（サービスプロバイダー）：
+- AIサービス（Azure OpenAI）: 文字起こしと分析のため
+- 音声サービス（Twilio）: 電話通話処理のため
+- クラウドホスティング（AWS）: 安全なデータストレージのため
+- データベース（MongoDB Atlas）: データ管理のため
+
+すべてのビジネスアソシエイトはビジネスアソシエイト契約に署名し、あなたの情報を保護する必要があります。
+
+**法律で要求される場合**：
+- 緊急事態が検出された場合の緊急サービス（911）
+- 公衆衛生当局（虐待、ネグレクトの報告）
+- 法執行機関（有効な法的命令がある場合）
+
+**私たちはしません**：
+- ❌ 健康情報を販売する
+- ❌ マーケターや広告主と共有する
+- ❌ 承認なしにマーケティングに使用する
+- ❌ ソーシャルメディアで共有する
+
+---
+
+# 収集する健康情報
+
+**サービスの使用中**：
+- 患者名、電話番号、生年月日
+- 通話録音と文字起こし
+- 通話からの健康関連情報（症状、薬物、気分）
+- 緊急アラートとインシデント
+- ウェルネスの傾向とパターン
+- ケア提供者のメモと観察
+- AIからの医療分析結果
+
+---
+
+# あなたの責任
+
+**私たちのサービスを使用して他の人に電話をかける場合**、あなたは以下に責任があります：
+- 録音に必要な同意を取得する
+- サービスを理解していることを確認する
+- 適用される録音同意法に従う
+
+---
+
+# 違反通知
+
+**健康情報が不適切にアクセスまたは開示された場合**、私たちは：
+- インシデントを調査します
+- 報告可能な違反の場合、60日以内に通知します
+- 何が起こったか、何をしているかを説明します
+- 取ることができる手順に関する情報を提供します
+
+---
+
+# この通知の変更
+
+- この通知を変更でき、変更は私たちが持つすべての情報に適用されます
+- 新しい通知はアプリとウェブサイトで利用可能になります
+- いつでも現在のコピーを要求できます
+
+---
+
+# 連絡先情報
+
+**プライバシー責任者**：
+- メール: privacy@myphonefriend.com
+- 電話: +1-604-562-4263
+- 郵送: MyPhoneFriendプライバシーオフィス、2955 Elbow Place、Port Coquitlam、BC V3B 7T3
+
+**営業時間**: 月曜日-金曜日、午前9時-午後5時 PST
+
+---
+
+# 苦情を申し立てる
+
+**私たちに**：
+- メール: privacy@myphonefriend.com
+- 電話: +1-604-562-4263
+
+**連邦政府（HHS）に**：
+- ウェブサイト: https://www.hhs.gov/hipaa/filing-a-complaint
+- 電話: 1-800-368-1019
+- 郵送: 米国保健社会福祉省市民権局、200 Independence Avenue S.W.、Washington、D.C. 20201
+
+---
+
+**有効日**: 2025年10月15日  
+**バージョン**: 1.0
+
+このプライバシー実践に関する通知は、HIPAAプライバシールール（45 CFR §164.520）に準拠しています
+
+---
+
+## 言語支援
+
+**英語**: この通知を理解するのに助けが必要な場合は、privacy@myphonefriend.comにお問い合わせください
+
+**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
   },
 }
 

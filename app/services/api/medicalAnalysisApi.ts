@@ -1,24 +1,14 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
-import { DEFAULT_API_CONFIG } from "./api"
-import { RootState } from "../../store/store"
+import { createApi } from "@reduxjs/toolkit/query/react"
 import { 
   MedicalAnalysisResult, 
   MedicalAnalysisTrend, 
   MedicalAnalysisSummary 
 } from "./api.types"
+import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const medicalAnalysisApi = createApi({
   reducerPath: "medicalAnalysisApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: DEFAULT_API_CONFIG.url,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.tokens?.access?.token
-      if (token) {
-        headers.set("authorization", `Bearer ${token}`)
-      }
-      return headers
-    },
-  }),
+  baseQuery: baseQueryWithReauth(),
   tagTypes: ["MedicalAnalysisResult", "MedicalAnalysisTrend", "MedicalAnalysisSummary"],
   endpoints: (builder) => ({
     // Get medical analysis results for a specific patient

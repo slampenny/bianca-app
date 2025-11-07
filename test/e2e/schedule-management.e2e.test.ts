@@ -12,73 +12,40 @@ test.describe("Schedule Management Workflow", () => {
     console.log('=== SCHEDULE MANAGEMENT WORKFLOW ===')
     
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
     // WHEN: I navigate to schedule management
-    try {
-      await navigateToSchedules(page)
-      await isSchedulesScreen(page)
-      console.log('✅ Successfully accessed schedule management')
-    } catch (error) {
-      console.log('ℹ Schedule management not directly accessible, exploring alternatives...')
-      
-      // Try alternative access methods
-      const alternativeAccess = {
-        'schedule nav button': await page.getByTestId('schedule-nav-button').count(),
-        'schedule tab': await page.getByTestId('tab-schedules').count(),
-        'schedule text links': await page.getByText(/schedule/i).count(),
-        'patient schedule access': 0
-      }
-      
-      // Check if schedules are accessible via patient management
-      if (await page.locator('[data-testid^="patient-card-"]').count() > 0) {
-        await page.locator('[data-testid^="patient-card-"]').first().click()
-        await page.waitForTimeout(2000)
-        
-        alternativeAccess['patient schedule access'] = await page.getByText(/schedule/i).count()
-      }
-      
-      console.log('Alternative schedule access methods:', alternativeAccess)
-      
-      // THEN: At least one method should be available
-      const hasAccess = Object.values(alternativeAccess).some(count => count > 0)
-      expect(hasAccess).toBe(true)
-    }
+    // Schedule functionality should ALWAYS be available - if not, that's a BUG
+    await navigateToSchedules(page)
+    await isSchedulesScreen(page)
+    console.log('✅ Successfully accessed schedule management')
   })
 
   test("schedule screen displays correctly", async ({ page }) => {
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
     // WHEN: I access the schedule screen
-    try {
-      await navigateToSchedules(page)
-      
-      // THEN: Schedule screen should display properly
-      const scheduleScreenElements = {
-        'schedule header': await page.getByText(/schedule/i).count(),
-        'schedule content': await page.locator('[data-testid*="schedule"]').count(),
-        'patient selector': await page.locator('select, [data-testid*="patient"]').count(),
-        'schedule form': await page.locator('form, [data-testid*="form"]').count(),
-        'schedule list': await page.locator('[data-testid*="list"], [data-testid*="card"]').count()
-      }
-      
-      console.log('Schedule screen elements found:', scheduleScreenElements)
-      
-      // Should have at least some schedule-related content
-      const totalElements = Object.values(scheduleScreenElements).reduce((sum, count) => sum + count, 0)
-      expect(totalElements).toBeGreaterThan(0)
-      console.log('✅ Schedule screen displays correctly')
-      
-    } catch (error) {
-      console.log('ℹ Schedule screen not accessible, but this is acceptable for this test')
-      expect(true).toBe(true)
+    // Schedule functionality should ALWAYS be available
+    await navigateToSchedules(page)
+    
+    // THEN: Schedule screen should display properly
+    await expect(page.locator('[data-testid="schedules-screen"], [aria-label="schedules-screen"]')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('[data-testid="schedules-header"], [aria-label="schedules-header"]')).toBeVisible({ timeout: 10000 })
+    
+    // Schedule screen should have interactive elements
+    const saveButton = page.locator('button:has-text("Save"), [data-testid*="save"], [aria-label*="save"]')
+    const saveButtonCount = await saveButton.count()
+    if (saveButtonCount === 0) {
+      throw new Error('BUG: Save button not found on schedule screen - schedule save functionality should always be available!')
     }
+    
+    console.log('✅ Schedule screen displays correctly')
   })
 
   test("can interact with schedule components", async ({ page }) => {
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
     // WHEN: I try to access schedule functionality
     try {
@@ -122,7 +89,7 @@ test.describe("Schedule Management Workflow", () => {
 
   test("schedule management integrates with patient data", async ({ page }) => {
     // GIVEN: I'm on the home screen with patients
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
     // WHEN: I explore the relationship between schedules and patients
     const patientScheduleIntegration = {
@@ -153,7 +120,7 @@ test.describe("Schedule Management Workflow", () => {
 
   test("schedule workflow handles different user scenarios", async ({ page }) => {
     // GIVEN: I'm logged in as a user with patients
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
     // WHEN: I explore different schedule scenarios
     const scenarios = {
@@ -208,7 +175,7 @@ test.describe("Schedule Management Workflow", () => {
 
   test("schedule management respects user permissions", async ({ page }) => {
     // GIVEN: I'm logged in with specific permissions
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
     // WHEN: I try to access schedule management
     const permissionChecks = {

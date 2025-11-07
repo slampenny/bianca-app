@@ -35,6 +35,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { ViewStyle } from "react-native"
 import useRefreshToken from "./effects/useRefreshToken"
 import { useLanguage } from "./hooks/useLanguage"
+import { AuthModalProvider } from "./contexts/AuthModalContext"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -64,6 +65,9 @@ interface AppProps {
 
 function InnerApp() {
   useRefreshToken()
+  // Set up language change listener to trigger app-wide re-renders
+  // This must be inside the Redux Provider
+  useLanguage()
   return null
 }
 
@@ -81,9 +85,6 @@ function App(props: AppProps) {
   } = useNavigationPersistence(storage, NAVIGATION_PERSISTENCE_KEY)
 
   const [areFontsLoaded] = useFonts(customFontsToLoad)
-
-  // Set up language change listener to trigger app-wide re-renders
-  useLanguage()
 
   const onBeforeLiftPersistGate = () => {
     // If your initialization scripts run very fast, it's good to show the splash screen for just a bit longer to prevent flicker.
@@ -117,18 +118,20 @@ function App(props: AppProps) {
         <GestureHandlerRootView style={$container}>
           <Provider store={store}>
             <ThemeProvider>
-              <PersistGate
-                loading={null}
-                onBeforeLift={onBeforeLiftPersistGate}
-                persistor={persistor}
-              >
-                <AppNavigator
-                  linking={linking}
-                  initialState={initialNavigationState}
-                  onStateChange={onNavigationStateChange}
-                />
-                <InnerApp />
-              </PersistGate>
+              <AuthModalProvider>
+                <PersistGate
+                  loading={null}
+                  onBeforeLift={onBeforeLiftPersistGate}
+                  persistor={persistor}
+                >
+                  <AppNavigator
+                    linking={linking}
+                    initialState={initialNavigationState}
+                    onStateChange={onNavigationStateChange}
+                  />
+                  <InnerApp />
+                </PersistGate>
+              </AuthModalProvider>
             </ThemeProvider>
           </Provider>
         </GestureHandlerRootView>

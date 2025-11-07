@@ -64,6 +64,12 @@ const en = {
     organizationNameFieldPlaceholder: "Enter your Orginization's Name",
     organizationButton: "Organization",
     individualButton: "Individual",
+    individualExplanation: "Register as an individual for personal use.",
+    organizationExplanation: "Register as an organization for company or group use.",
+    consentText: "By signing up, you agree to our",
+    consentAnd: "and",
+    termsOfService: "Terms of Service",
+    privacyPolicy: "Privacy Policy",
   },
   requestResetScreen: {
     title: "Request Password Reset",
@@ -87,6 +93,7 @@ const en = {
     errorNoToken: "Verification token is missing",
     errorVerificationFailed: "Email verification failed",
     errorNetwork: "Unable to connect to server. Please check your internet connection and try again.",
+    verificationFailed: "Email verification failed",
   },
   emailVerificationFailedPage: {
     title: "Verification Failed",
@@ -121,6 +128,16 @@ const en = {
     providerGoogle: "Google",
     providerMicrosoft: "Microsoft",
     providerSSO: "SSO",
+  },
+  ssoButtons: {
+    orContinueWith: "Or continue with",
+    google: "Google",
+    microsoft: "Microsoft",
+    companySSO: "Company SSO",
+    ssoNotAvailable: "SSO Not Available",
+    signInFailed: "Sign In Failed",
+    companySSOTitle: "Company SSO",
+    companySSOMessage: "This would redirect to your company's SSO provider. Please contact your administrator for setup.",
   },
   conversationsScreen: {
     title: "Conversations",
@@ -204,6 +221,29 @@ const en = {
     accessRestrictedMessage: "You do not have the necessary permissions to view or manage payment information.",
     contactAdministrator: "Please contact your organization administrator for assistance.",
     loadingUserInformation: "Loading user information...",
+    // Payment methods / Stripe
+    addPaymentMethod: "Add Payment Method",
+    loadingPaymentSystem: "Loading payment system...",
+    loadingPaymentMethods: "Loading payment methods...",
+    stripeConfigurationError: "Stripe configuration error. Please contact support.",
+    unsupportedPlatform: "Unsupported platform. Please use a web browser or mobile app.",
+    errorLoadingPaymentMethods: "Error loading payment methods:",
+    existingPaymentMethods: "Existing Payment Methods",
+    default: "Default",
+    setDefault: "Set Default",
+    remove: "Remove",
+    addNewCard: "Add New Card",
+    deletePaymentMethod: "Delete Payment Method",
+    deletePaymentMethodConfirm: "Are you sure you want to delete this payment method? This action cannot be undone.",
+    paymentMethodAddedSuccess: "Payment method added successfully!",
+    paymentMethodSetDefaultSuccess: "Payment method set as default successfully!",
+    paymentMethodDeletedSuccess: "Payment method deleted successfully!",
+    failedToSetDefault: "Failed to set default payment method",
+    failedToDelete: "Failed to delete payment method",
+    expires: "Expires",
+    mobilePaymentUnavailable: "Mobile payment system unavailable. Please use the web version.",
+    loadingMobilePayment: "Loading mobile payment system...",
+    anErrorOccurred: "An error occurred",
   },
   orgScreen: {
     namePlaceholder: "Name",
@@ -214,6 +254,8 @@ const en = {
     inviteCaregiver: "Invite Caregiver",
     payments: "Payments",
     organizationActions: "Organization Actions",
+    organizationLogo: "Organization Logo",
+    noLogoSet: "No logo set",
   },
   caregiverScreen: {
     nameLabel: "Name",
@@ -222,6 +264,20 @@ const en = {
     emailPlaceholder: "Email",
     phoneLabel: "Phone",
     phonePlaceholder: "Phone",
+    loadingUnassignedPatients: "Loading unassigned patients...",
+    assigningPatients: "Assigning patients...",
+    patientsAssignedSuccess: "Patients assigned successfully!",
+    loadingCaregivers: "Loading caregivers...",
+    save: "SAVE",
+    invite: "INVITE",
+    confirmDelete: "CONFIRM DELETE",
+    deleteCaregiver: "DELETE CAREGIVER",
+    assignUnassignedPatients: "Assign Unassigned Patients",
+    assignUnassignedPatientsTitle: "Assign Unassigned Patients",
+    selectAll: "Select All",
+    deselectAll: "Deselect All",
+    assignSelected: "Assign Selected",
+    noUnassignedPatientsFound: "No unassigned patients found.",
   },
   caregiversScreen: {
     invited: "Invited",
@@ -259,6 +315,8 @@ const en = {
     guest: "Guest",
     addPatient: "Add Patient",
     adminOnlyMessage: "Only org admins and super admins can add patients",
+    noPatientsFound: "No patients found",
+    viewSchedules: "View Schedules",
   },
   tabs: {
     home: "Home",
@@ -267,19 +325,258 @@ const en = {
     alerts: "Alerts",
   },
   common: {
+    ok: "OK",
     cancel: "Cancel",
     close: "Close",
     error: "Error",
+    anErrorOccurred: "An error occurred",
     selectImage: "Select Image",
     calling: "Calling...",
     callNow: "Call Now",
     ending: "Ending...",
     endCall: "End Call",
+    loading: "Loading...",
+    delete: "Delete",
   },
   legalLinks: {
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
     privacyPractices: "HIPAA Privacy Practices",
+  },
+  privacyPracticesScreen: {
+    content: `# Notice of Privacy Practices
+## MyPhoneFriend Healthcare Communication Services
+
+**Effective Date**: October 15, 2025
+
+---
+
+## YOUR INFORMATION. YOUR RIGHTS. OUR RESPONSIBILITIES.
+
+**THIS NOTICE DESCRIBES HOW MEDICAL INFORMATION ABOUT YOU MAY BE USED AND DISCLOSED AND HOW YOU CAN GET ACCESS TO THIS INFORMATION. PLEASE REVIEW IT CAREFULLY.**
+
+---
+
+## YOUR RIGHTS
+
+You have the right to:
+- Get a copy of your health information
+- Correct your health information
+- Request confidential communication
+- Ask us to limit the information we share
+- Get a list of those with whom we've shared your information
+- Get a copy of this privacy notice
+- Choose someone to act for you
+- File a complaint if you believe your privacy rights have been violated
+
+---
+
+## YOUR CHOICES
+
+You have some choices in how we use and share information as we:
+- Answer questions from your family and friends about your care
+- Provide information about you in disaster relief situations
+
+**We never share your information for marketing or sale of your data.**
+
+---
+
+# YOUR DETAILED RIGHTS
+
+## Get a Copy of Your Health Information
+
+**You can ask to see or get a copy of your health information.**
+
+What you can request:
+- Call recordings and transcriptions
+- Wellness summaries and AI analysis results
+- Medical alerts generated by our system
+- Emergency notifications
+- Account information and preferences
+
+**How to request**:
+- Email: privacy@myphonefriend.com
+- Phone: +1-604-562-4263
+
+**Our response**: Within 30 days
+
+---
+
+## Ask Us to Correct Your Health Information
+
+**You can ask us to correct health information that you think is incorrect or incomplete.**
+
+**Our response**: Within 60 days
+
+---
+
+## Request Confidential Communications
+
+**You can ask us to contact you in a specific way or location.**
+
+Examples:
+- "Please email me instead of calling"
+- "Please contact me on my cell phone only"
+
+We will accommodate all reasonable requests.
+
+---
+
+## Ask Us to Limit What We Use or Share
+
+**You can ask us not to use or share certain health information.**
+
+We must agree if you paid out-of-pocket in full and ask us not to share with your health plan.
+
+---
+
+## Get a List of Disclosures
+
+**You can ask for an "accounting of disclosures"** - a list of times we've shared your health information.
+
+Covers: Past 6 years  
+Excludes: Disclosures for treatment, payment, and operations (unless you request)
+
+---
+
+## File a Complaint
+
+**File with us**:
+- Email: privacy@myphonefriend.com
+- Phone: +1-604-562-4263
+
+**File with HHS**:
+- Website: https://www.hhs.gov/hipaa/filing-a-complaint
+- Phone: 1-800-368-1019
+
+**We will not retaliate against you for filing a complaint.**
+
+---
+
+# OUR USES AND DISCLOSURES
+
+## How We Use Your Health Information
+
+**For Treatment**:
+- Provide AI wellness summaries to your caregivers
+- Generate emergency alerts for urgent situations
+- Enable caregivers to monitor your wellbeing
+- Facilitate communication with your care team
+
+**For Payment**:
+- Bill your healthcare organization for services
+- Process invoices for call time and analysis
+
+**For Healthcare Operations**:
+- Improve our AI detection algorithms
+- Quality assurance and improvement
+- Training our systems to better serve patients
+
+---
+
+## Who We Share With
+
+**Your Healthcare Organization**:
+- Your assigned caregivers and care coordinators
+- Organization administrators for billing
+
+**Business Associates** (Service Providers):
+- AI Services (Azure OpenAI): For transcription and analysis
+- Voice Services (Twilio): For phone call handling
+- Cloud Hosting (AWS): For secure data storage
+- Database (MongoDB Atlas): For data management
+
+All business associates sign Business Associate Agreements and must protect your information.
+
+**As Required by Law**:
+- Emergency services (911) if emergency detected
+- Public health authorities (abuse, neglect reporting)
+- Law enforcement (with valid legal order)
+
+**We Do NOT**:
+- ❌ Sell your health information
+- ❌ Share with marketers or advertisers
+- ❌ Use for marketing without your authorization
+- ❌ Share on social media
+
+---
+
+# HEALTH INFORMATION WE COLLECT
+
+**During Use of Our Services**:
+- Patient name, phone number, date of birth
+- Call recordings and transcriptions
+- Health-related information from calls (symptoms, medications, mood)
+- Emergency alerts and incidents
+- Wellness trends and patterns
+- Caregiver notes and observations
+- Medical analysis results from AI
+
+---
+
+# YOUR RESPONSIBILITIES
+
+**If you are using our service to call another person**, you are responsible for:
+- Obtaining necessary consents for recording
+- Ensuring they understand the service
+- Following applicable recording consent laws
+
+---
+
+# BREACH NOTIFICATION
+
+**If your health information is improperly accessed or disclosed**, we will:
+- Investigate the incident
+- Notify you within 60 days if reportable breach
+- Explain what happened and what we're doing
+- Provide information on steps you can take
+
+---
+
+# CHANGES TO THIS NOTICE
+
+- We may change this notice and changes will apply to all information we have
+- New notice will be available in the app and on our website
+- You can always request a current copy
+
+---
+
+# CONTACT INFORMATION
+
+**Privacy Officer**:
+- Email: privacy@myphonefriend.com
+- Phone: +1-604-562-4263
+- Mail: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+**Hours**: Monday-Friday, 9 AM - 5 PM PST
+
+---
+
+# FILE A COMPLAINT
+
+**With Us**:
+- Email: privacy@myphonefriend.com
+- Phone: +1-604-562-4263
+
+**With Federal Government (HHS)**:
+- Website: https://www.hhs.gov/hipaa/filing-a-complaint
+- Phone: 1-800-368-1019
+- Mail: Office for Civil Rights, U.S. Department of Health and Human Services, 200 Independence Avenue S.W., Washington, D.C. 20201
+
+---
+
+**Effective Date**: October 15, 2025  
+**Version**: 1.0
+
+This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.520)
+
+---
+
+## Language Assistance
+
+**English**: If you need help understanding this notice, contact privacy@myphonefriend.com
+
+**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
   },
   headers: {
     home: "Home",
@@ -301,6 +598,8 @@ const en = {
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
     mentalHealthReport: "Mental Health Report",
+    login: "Sign In",
+    register: "Register",
   },
   scheduleScreen: {
     heading: "Schedule Configuration",
@@ -483,6 +782,10 @@ const en = {
     profileUpdatedSuccess: "Your profile was updated successfully!",
     profileUpdateFailed: "Failed to update profile. Please try again.",
     invalidPhoneFormat: "Invalid phone format (10 digits or +1XXXXXXXXXX)",
+    completeProfileTitle: "Complete Your Profile",
+    completeProfileMessage: "Please complete your profile by adding a phone number before continuing.",
+    completeProfileMessageUnverified: "Please add your phone number to complete your profile and access all features.",
+    errorUploadingAvatar: "Error uploading avatar",
   },
   reportsScreen: {
     selectPatient: "Select Patient:",
@@ -518,6 +821,26 @@ const en = {
     notAuthorized: "Not Authorized",
     noPermissionToView: "You don't have permission to view caregivers",
     addCaregiver: "Add Caregiver",
+  },
+  themes: {
+    healthcare: {
+      name: "Healthcare",
+      description: "Professional medical theme with blue and green colors",
+    },
+    colorblind: {
+      name: "Color-Blind Friendly",
+      description: "High contrast theme optimized for color vision deficiency",
+    },
+    dark: {
+      name: "Dark Mode",
+      description: "Dark theme optimized for low-light environments",
+    },
+    accessibility: {
+      wcagLevel: "WCAG Level",
+      colorblindFriendly: "Color-blind friendly",
+      highContrast: "High contrast",
+      darkMode: "Dark mode",
+    },
   },
 }
 

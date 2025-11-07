@@ -7,6 +7,7 @@ import { Screen, Text } from "app/components"
 import { spacing } from "app/theme"
 import { useTheme } from "app/theme/ThemeContext"
 import { navigationRef } from "app/navigators/navigationUtilities"
+import { translate } from "app/i18n"
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -60,7 +61,7 @@ export const EmailVerifiedScreen = () => {
   if (themeLoading) {
     return (
       <Screen style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading...</Text>
+        <Text>{translate("common.loading")}</Text>
       </Screen>
     )
   }

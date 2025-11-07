@@ -9,6 +9,7 @@ import {
 } from "react-native"
 import { useSelector } from "react-redux"
 import { Button, Text } from "./"
+import { translate } from "../i18n"
 import {
   useGetCaregiversQuery,
   useAssignCaregiverMutation,
@@ -96,7 +97,7 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
       <Modal visible={isVisible} onRequestClose={onClose} transparent>
         <View style={loadingStyles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.palette?.biancaButtonSelected || colors.tint || colors.palette?.primary500} />
-          <Text style={loadingStyles.loadingText}>Loading caregivers...</Text>
+          <Text style={loadingStyles.loadingText}>{translate("caregiverScreen.loadingCaregivers")}</Text>
         </View>
       </Modal>
     )

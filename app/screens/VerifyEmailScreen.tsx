@@ -7,8 +7,8 @@ import { Screen, Text, Button } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { spacing } from "app/theme"
 import { translate } from "app/i18n"
-import Config from "app/config"
 import { navigationRef } from "app/navigators/navigationUtilities"
+import { useVerifyEmailMutation } from "app/services/api/authApi"
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -60,6 +60,7 @@ export const VerifyEmailScreen = () => {
   const isLoggedIn = useSelector(isAuthenticated)
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying")
   const [errorMessage, setErrorMessage] = useState<string>("")
+  const [verifyEmail, { isLoading: isVerifying }] = useVerifyEmailMutation()
 
   // Extract token from route params
   // React Navigation linking should automatically parse ?token=... from URL on web
@@ -135,55 +136,56 @@ export const VerifyEmailScreen = () => {
       extractTokenFromUrl().then((extractedToken) => {
         if (!extractedToken && !token) {
           setStatus("error")
-          setErrorMessage(translate("emailVerificationScreen.errorNoToken") || "Verification token is missing")
+          setErrorMessage(translate("emailVerificationScreen.errorNoToken"))
         }
       })
       return
     }
 
-    // Call the backend API to verify the email
-    const verifyEmail = async () => {
+    // Call the backend API to verify the email using RTK Query
+    const verifyEmailMutation = async () => {
       try {
-        // Config.API_URL already includes /v1
-        // Use the API URL from config, which handles both localhost and production
-        const apiUrl = Config.API_URL || 'http://localhost:3000/v1'
-        const response = await fetch(`${apiUrl}/auth/verify-email?token=${encodeURIComponent(token)}`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'text/html,application/json',
-          },
-        })
-
-        if (response.ok) {
+        const result = await verifyEmail({ token }).unwrap()
+        
+        if (result.success) {
           // Verification successful - navigate to EmailVerifiedScreen which handles the redirect logic
           navigation.navigate("EmailVerified" as never)
         } else {
           // Verification failed - backend returns HTML, try to extract error message
           setStatus("error")
-          const errorText = await response.text()
-          // Simple regex to extract error message from HTML
-          const messageMatch = errorText.match(/<p[^>]*class="message"[^>]*>([^<]+)<\/p>/i) || 
-                               errorText.match(/<p[^>]*>([^<]+)<\/p>/i)
-          const errorMsg = messageMatch ? messageMatch[1].trim() : "Email verification failed"
-          setErrorMessage(errorMsg)
+          if (result.html) {
+            // Simple regex to extract error message from HTML
+            const messageMatch = result.html.match(/<p[^>]*class="message"[^>]*>([^<]+)<\/p>/i) || 
+                                 result.html.match(/<p[^>]*>([^<]+)<\/p>/i)
+            const errorMsg = messageMatch ? messageMatch[1].trim() : translate("emailVerificationScreen.verificationFailed")
+            setErrorMessage(errorMsg)
+          } else {
+            setErrorMessage(result.message || translate("emailVerificationScreen.verificationFailed"))
+          }
         }
       } catch (error: any) {
         console.error('Email verification error:', error)
         setStatus("error")
-        // Check if it's a network error (connection refused, etc.)
-        if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        // RTK Query error handling
+        if (error?.data?.html) {
+          // Try to extract error from HTML response
+          const messageMatch = error.data.html.match(/<p[^>]*class="message"[^>]*>([^<]+)<\/p>/i) || 
+                               error.data.html.match(/<p[^>]*>([^<]+)<\/p>/i)
+          const errorMsg = messageMatch ? messageMatch[1].trim() : translate("emailVerificationScreen.verificationFailed")
+          setErrorMessage(errorMsg)
+        } else if (error?.status === 'FETCH_ERROR' || error?.error === 'FETCH_ERROR') {
           setErrorMessage(translate("emailVerificationScreen.errorNetwork") || "Unable to connect to server. Please check your internet connection and try again.")
         } else {
-          setErrorMessage(error?.message || translate("emailVerificationScreen.errorVerificationFailed") || "Failed to verify email")
+          setErrorMessage(error?.data?.message || error?.message || translate("emailVerificationScreen.errorVerificationFailed"))
         }
       }
     }
 
     // Only verify if we have a token
     if (token) {
-      verifyEmail()
+      verifyEmailMutation()
     }
-  }, [token, navigation])
+  }, [token, navigation, verifyEmail])
 
   if (themeLoading) {
     return null

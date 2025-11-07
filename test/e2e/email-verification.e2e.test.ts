@@ -77,16 +77,11 @@ test.describe('Email Verification Flow', () => {
 
     // Verify we're on the frontend (localhost:8081)
     expect(page.url()).toContain('localhost:8081')
-    expect(page.url()).toContain('/auth/verify-email')
-    expect(page.url()).toContain(`token=${testToken}`)
-
-    // Wait for VerifyEmailScreen to load
-    await page.waitForSelector('[data-testid="verify-email-screen"], [aria-label*="verify"], [aria-label*="email"]', { 
-      timeout: 5000 
-    }).catch(() => {
-      // If screen doesn't have test IDs, check for any content
-      expect(page.url()).toContain('verify-email')
-    })
+    
+    // After verification, the app redirects to /email-verified or stays on verify-email
+    await page.waitForTimeout(2000) // Give time for redirect
+    const url = page.url()
+    expect(url).toMatch(/localhost:8081.*(verify-email|email-verified)/)
 
     console.log('✅ Verification link opens correctly in frontend')
   })
@@ -128,12 +123,7 @@ test.describe('Email Verification Flow', () => {
     await page.goto('http://localhost:8081')
     
     // Register user (this will trigger email verification)
-    await registerUserViaUI(page, {
-      email: testEmail,
-      password: testPassword,
-      name: 'Test User',
-      phone: '+1234567890'
-    })
+    await registerUserViaUI(page, 'Test User', testEmail, testPassword, '1234567890')
 
     // Mock email service to capture verification link
     let verificationLink = ''

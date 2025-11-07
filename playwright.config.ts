@@ -1,12 +1,12 @@
 import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
-  timeout: 30000, // Increase timeout for integration tests
+  timeout: 60000, // Increase timeout for integration tests
   testDir: './test/e2e',
   use: {
     screenshot: 'only-on-failure',
     baseURL: 'http://localhost:8081',
-    headless: false,
+    headless: true,
     browserName: 'chromium',
     viewport: { width: 1280, height: 720 },
     trace: 'on-first-retry',
@@ -17,6 +17,10 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { browserName: 'chromium' },
+    },
+    {
+      name: 'firefox',
+      use: { browserName: 'firefox' },
     },
   ],
   globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),

@@ -1,0 +1,56 @@
+[info] Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+[log] Initializing language...
+[log] Initializing language...
+[log] Config loading - Environment check: JSHandle@object
+[log] Using DEV config (localhost detected)
+[log] Final API_URL: http://localhost:3000/v1
+[warning] "shadow*" style props are deprecated. Use "boxShadow".
+[warning] Require cycle: app/components/index.ts -> app/components/AvatarPicker.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[warning] Require cycle: app/components/index.ts -> app/components/CaregiverAssignmentModal.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[warning] Require cycle: app/components/index.ts -> app/components/LanguageSelector.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[warning] Require cycle: app/components/index.ts -> app/components/PatientReassignmentModal.tsx -> app/components/Toast.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[warning] Require cycle: app/components/index.ts -> app/components/PatientReassignmentModal.tsx -> app/components/ConfirmationModal.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[warning] Require cycle: app/components/index.ts -> app/components/ProfileButton.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[warning] Require cycle: app/components/index.ts -> app/components/CallNowButton.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[warning] Require cycle: app/components/index.ts -> app/components/CallStatusBanner.tsx -> app/components/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[log] OAuth Redirect URI: http://localhost:8081
+[log] OAuth Client IDs: JSHandle@object
+[warning] Require cycle: app/navigators/index.ts -> app/navigators/AppNavigator.tsx -> app/navigators/AppNavigators.tsx -> app/screens/index.ts -> app/screens/OrgScreen.tsx -> app/navigators/index.ts
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[log] Running application "main" with appParams:
+ JSHandle@object 
+Development-level warnings: ON.
+Performance optimizations: OFF.
+[log] Saved language from storage: null
+[log] System locale detected: en-US
+[log] System locale is English, using it
+[log] Final i18n.locale set to: en-US
+[log] Saved language from storage: null
+[log] System locale detected: en-US
+[log] System locale is English, using it
+[log] Final i18n.locale set to: en-US
+[warning] props.pointerEvents is deprecated. Use style.pointerEvents
+[requestfailed] Request Failed: GET https://js.stripe.com/clover/stripe.js - NS_BINDING_ABORTED
+[info] Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+[log] Initializing language...
+[log] Initializing language...
+[log] Config loading - Environment check: JSHandle@object
+[log] Using DEV config (localhost detected)
+[log] Final API_URL: http://localhost:3000/v1

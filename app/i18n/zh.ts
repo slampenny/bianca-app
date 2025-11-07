@@ -4,7 +4,9 @@ const zh: Translations = {
   common: {
     ok: "确定",
     cancel: "取消",
+    close: "关闭",
     error: "错误",
+    anErrorOccurred: "发生错误",
     back: "返回",
     logOut: "退出登录",
     selectImage: "选择图片",
@@ -12,6 +14,7 @@ const zh: Translations = {
     callNow: "立即通话",
     ending: "结束中...",
     endCall: "结束通话",
+    loading: "加载中...",
   },
   alertScreen: {
     markAllAsRead: "全部标记为已读",
@@ -82,12 +85,19 @@ const zh: Translations = {
     passwordFieldPlaceholder: "输入你的密码",
     confirmPasswordFieldPlaceholder: "确认你的密码",
     organizationNameFieldPlaceholder: "输入你的组织名称",
+    organizationButton: "组织",
+    individualButton: "个人",
+    individualExplanation: "注册为个人用户供个人使用。",
+    organizationExplanation: "注册为组织用户供公司或团体使用。",
+    consentText: "通过注册，你同意我们的",
+    consentAnd: "和",
+    termsOfService: "服务条款",
+    privacyPolicy: "隐私政策",
     signUp: "注册",
     signIn: "登录",
     alreadyHaveAccount: "已有账户？",
     dontHaveAccount: "没有账户？",
     termsAndConditions: "条款和条件",
-    privacyPolicy: "隐私政策",
     agreeToTerms: "通过注册，你同意我们的",
     and: "和",
   },
@@ -98,6 +108,37 @@ const zh: Translations = {
     requestReset: "请求重置",
     successMessage: "重置代码已发送到你的电子邮件！",
     requestFailed: "请求失败。请检查你的电子邮件并重试。",
+  },
+  ssoLinkingScreen: {
+    title: "关联您的账户",
+    message: "此账户是使用 {{provider}} 创建的。要使用电子邮件/密码登录，请在下面设置密码，或继续使用 {{provider}}。",
+    passwordLabel: "密码",
+    passwordPlaceholder: "输入您的密码",
+    confirmPasswordLabel: "确认密码",
+    confirmPasswordPlaceholder: "确认您的密码",
+    setPasswordButton: "设置密码",
+    backToLoginButton: "返回登录",
+    orDivider: "或",
+    successMessage: "✓ 密码设置成功！您现在可以使用您的电子邮件和密码登录。",
+    errorNoPassword: "请输入密码",
+    errorNoConfirmPassword: "请确认您的密码",
+    errorPasswordMismatch: "密码不匹配",
+    errorPasswordTooShort: "密码必须至少包含 8 个字符",
+    errorSetPasswordFailed: "设置密码失败",
+    errorSSOFailed: "SSO 登录失败。请重试。",
+    providerGoogle: "Google",
+    providerMicrosoft: "Microsoft",
+    providerSSO: "SSO",
+  },
+  ssoButtons: {
+    orContinueWith: "或继续使用",
+    google: "Google",
+    microsoft: "Microsoft",
+    companySSO: "企业 SSO",
+    ssoNotAvailable: "SSO 不可用",
+    signInFailed: "登录失败",
+    companySSOTitle: "企业 SSO",
+    companySSOMessage: "这将重定向到您企业的 SSO 提供商。请联系您的管理员进行设置。",
   },
   emailVerificationScreen: {
     title: "检查您的电子邮件",
@@ -193,6 +234,8 @@ const zh: Translations = {
   profileScreen: {
     languageSelector: "语言 / Language",
     selectLanguage: "选择语言",
+    theme: "主题",
+    selectTheme: "选择主题",
     namePlaceholder: "姓名",
     emailPlaceholder: "电子邮件",
     phonePlaceholder: "电话",
@@ -202,6 +245,10 @@ const zh: Translations = {
     profileUpdatedSuccess: "你的个人资料已成功更新！",
     profileUpdateFailed: "更新个人资料失败。请重试。",
     invalidPhoneFormat: "无效的电话格式（10位数字或+1XXXXXXXXXX）",
+    completeProfileTitle: "完成您的个人资料",
+    completeProfileMessage: "请先添加电话号码以完成您的个人资料，然后再继续。",
+    completeProfileMessageUnverified: "请添加您的电话号码以完成您的个人资料并访问所有功能。",
+    errorUploadingAvatar: "上传头像时出错",
   },
   reportsScreen: {
     selectPatient: "选择患者：",
@@ -246,6 +293,15 @@ const zh: Translations = {
     noPreviousConversations: "未找到此患者的之前对话",
     errorFetchingConversations: "获取对话时出错",
     loadingMoreConversations: "加载更多对话...",
+  },
+  caregiverScreen: {
+    namePlaceholder: "姓名",
+    emailPlaceholder: "电子邮件",
+    phonePlaceholder: "电话",
+    loadingUnassignedPatients: "加载未分配的患者...",
+    assigningPatients: "分配患者中...",
+    patientsAssignedSuccess: "患者已成功分配！",
+    loadingCaregivers: "加载护理人员...",
   },
   caregiversScreen: {
     invited: "已邀请",
@@ -412,6 +468,8 @@ const zh: Translations = {
     guest: "访客",
     addPatient: "添加患者",
     adminOnlyMessage: "只有组织管理员和超级管理员可以添加患者",
+    noPatientsFound: "未找到患者",
+    viewSchedules: "查看日程",
   },
   tabs: {
     home: "首页",
@@ -439,6 +497,263 @@ const zh: Translations = {
     privacyPolicy: "隐私政策",
     termsOfService: "服务条款",
     mentalHealthReport: "心理健康报告",
+    login: "登录",
+    register: "注册",
+  },
+  themes: {
+    healthcare: {
+      name: "医疗保健",
+      description: "专业的医疗主题，采用蓝色和绿色",
+    },
+    colorblind: {
+      name: "色盲友好",
+      description: "专为色觉缺陷优化的高对比度主题",
+    },
+    dark: {
+      name: "深色模式",
+      description: "专为低光环境优化的深色主题",
+    },
+    accessibility: {
+      wcagLevel: "WCAG级别",
+      colorblindFriendly: "色盲友好",
+      highContrast: "高对比度",
+      darkMode: "深色模式",
+    },
+  },
+  privacyPracticesScreen: {
+    content: `# 隐私实践通知
+## MyPhoneFriend 医疗通信服务
+
+**生效日期**：2025年10月15日
+
+---
+
+## 您的信息。您的权利。我们的责任。
+
+**本通知描述了您的医疗信息可能如何被使用和披露，以及您如何获取此信息。请仔细阅读。**
+
+---
+
+## 您的权利
+
+您有权：
+- 获取您的健康信息副本
+- 更正您的健康信息
+- 要求保密通信
+- 要求我们限制我们共享的信息
+- 获取我们已共享您信息的对象列表
+- 获取此隐私通知的副本
+- 选择某人代表您行事
+- 如果您认为您的隐私权受到侵犯，可以提出投诉
+
+---
+
+## 您的选择
+
+在我们执行以下操作时，您对信息的使用和共享方式有一些选择：
+- 回答您的家人和朋友关于您护理的问题
+- 在灾难救援情况下提供关于您的信息
+
+**我们绝不会为营销或出售您的数据而共享您的信息。**
+
+---
+
+# 您的详细权利
+
+## 获取您的健康信息副本
+
+**您可以要求查看或获取您的健康信息副本。**
+
+您可以请求的内容：
+- 通话录音和转录
+- 健康摘要和AI分析结果
+- 我们系统生成的医疗警报
+- 紧急通知
+- 账户信息和偏好设置
+
+**如何请求**：
+- 电子邮件：privacy@myphonefriend.com
+- 电话：+1-604-562-4263
+
+**我们的回复**：30天内
+
+---
+
+## 要求我们更正您的健康信息
+
+**您可以要求我们更正您认为不正确或不完整的健康信息。**
+
+**我们的回复**：60天内
+
+---
+
+## 要求保密通信
+
+**您可以要求我们以特定方式或地点与您联系。**
+
+示例：
+- "请通过电子邮件联系我，而不是打电话"
+- "请仅通过我的手机联系我"
+
+我们将满足所有合理的要求。
+
+---
+
+## 要求我们限制我们使用或共享的内容
+
+**您可以要求我们不要使用或共享某些健康信息。**
+
+如果您全额自付费用并要求我们不要与您的健康计划共享，我们必须同意。
+
+---
+
+## 获取披露列表
+
+**您可以要求"披露账目"** - 我们共享您健康信息的次数列表。
+
+涵盖：过去6年  
+排除：用于治疗、付款和运营的披露（除非您要求）
+
+---
+
+## 提出投诉
+
+**向我们提出**：
+- 电子邮件：privacy@myphonefriend.com
+- 电话：+1-604-562-4263
+
+**向HHS提出**：
+- 网站：https://www.hhs.gov/hipaa/filing-a-complaint
+- 电话：1-800-368-1019
+
+**我们不会因您提出投诉而进行报复。**
+
+---
+
+# 我们的使用和披露
+
+## 我们如何使用您的健康信息
+
+**用于治疗**：
+- 向您的护理人员提供AI健康摘要
+- 为紧急情况生成紧急警报
+- 使护理人员能够监控您的健康状况
+- 促进与您的护理团队的沟通
+
+**用于付款**：
+- 向您的医疗组织开具服务账单
+- 处理通话时间和分析发票
+
+**用于医疗运营**：
+- 改进我们的AI检测算法
+- 质量保证和改进
+- 培训我们的系统以更好地为患者服务
+
+---
+
+## 我们与谁共享
+
+**您的医疗组织**：
+- 您指定的护理人员和护理协调员
+- 负责计费的组织管理员
+
+**业务伙伴**（服务提供商）：
+- AI服务（Azure OpenAI）：用于转录和分析
+- 语音服务（Twilio）：用于电话处理
+- 云托管（AWS）：用于安全数据存储
+- 数据库（MongoDB Atlas）：用于数据管理
+
+所有业务伙伴都签署了业务伙伴协议，必须保护您的信息。
+
+**法律要求**：
+- 如果检测到紧急情况，紧急服务（911）
+- 公共卫生当局（虐待、忽视报告）
+- 执法部门（具有有效法律命令）
+
+**我们不**：
+- ❌ 出售您的健康信息
+- ❌ 与营销人员或广告商共享
+- ❌ 未经您授权用于营销
+- ❌ 在社交媒体上共享
+
+---
+
+# 我们收集的健康信息
+
+**在使用我们的服务期间**：
+- 患者姓名、电话号码、出生日期
+- 通话录音和转录
+- 通话中的健康相关信息（症状、药物、情绪）
+- 紧急警报和事件
+- 健康趋势和模式
+- 护理人员笔记和观察
+- AI的医疗分析结果
+
+---
+
+# 您的责任
+
+**如果您使用我们的服务致电另一个人**，您有责任：
+- 获得录音的必要同意
+- 确保他们理解服务
+- 遵守适用的录音同意法律
+
+---
+
+# 违规通知
+
+**如果您的健康信息被不当访问或披露**，我们将：
+- 调查事件
+- 如果是可报告的违规行为，在60天内通知您
+- 解释发生了什么以及我们正在做什么
+- 提供您可以采取的步骤信息
+
+---
+
+# 本通知的变更
+
+- 我们可能会更改本通知，变更将适用于我们拥有的所有信息
+- 新通知将在应用程序和我们的网站上提供
+- 您可以随时请求当前副本
+
+---
+
+# 联系信息
+
+**隐私官**：
+- 电子邮件：privacy@myphonefriend.com
+- 电话：+1-604-562-4263
+- 邮件：MyPhoneFriend隐私办公室，2955 Elbow Place，Port Coquitlam，BC V3B 7T3
+
+**工作时间**：周一至周五，上午9点至下午5点（太平洋标准时间）
+
+---
+
+# 提出投诉
+
+**向我们提出**：
+- 电子邮件：privacy@myphonefriend.com
+- 电话：+1-604-562-4263
+
+**向联邦政府（HHS）提出**：
+- 网站：https://www.hhs.gov/hipaa/filing-a-complaint
+- 电话：1-800-368-1019
+- 邮件：美国卫生与公众服务部民权办公室，200 Independence Avenue S.W.，Washington，D.C. 20201
+
+---
+
+**生效日期**：2025年10月15日  
+**版本**：1.0
+
+本隐私实践通知符合HIPAA隐私规则（45 CFR §164.520）
+
+---
+
+## 语言协助
+
+**英语**：如果您需要帮助理解本通知，请联系privacy@myphonefriend.com
+
+**Español**：Si necesita ayuda，comuníquese con privacy@myphonefriend.com`,
   },
 }
 

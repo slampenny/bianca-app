@@ -513,7 +513,9 @@ function BillingInfoScreen() {
                 </Text>
               </View>
               <Text style={styles.totalBilledSubtext}>
-                Across {sortedInvoices.length} invoice{sortedInvoices.length !== 1 ? 's' : ''}
+                {translate("paymentScreen.acrossInvoices")
+                  .replace("{count}", sortedInvoices.length.toString())
+                  .replace("{s}", sortedInvoices.length !== 1 ? 's' : '')}
               </Text>
             </View>
           }
@@ -525,7 +527,7 @@ function BillingInfoScreen() {
         <View style={styles.invoiceHistorySection}>
           <View style={styles.invoiceHistoryHeader}>
             <Text preset="subheading" style={styles.invoiceHistoryTitle}>
-              Invoice History ({previousInvoices.length})
+              {translate("paymentScreen.invoiceHistory").replace("{count}", previousInvoices.length.toString())}
             </Text>
             <Button
               preset="default"

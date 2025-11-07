@@ -1,20 +1,10 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
-import { DEFAULT_API_CONFIG } from "./api"
-import { RootState } from "../../store/store"
+import { createApi } from "@reduxjs/toolkit/query/react"
 import { Alert } from "./api.types"
+import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const alertApi = createApi({
   reducerPath: "alertApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: DEFAULT_API_CONFIG.url,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.tokens?.access?.token
-      if (token) {
-        headers.set("authorization", `Bearer ${token}`)
-      }
-      return headers
-    },
-  }),
+  baseQuery: baseQueryWithReauth(),
   tagTypes: ["Alert"],
   endpoints: (builder) => ({
     createAlert: builder.mutation<Alert, Partial<Alert>>({

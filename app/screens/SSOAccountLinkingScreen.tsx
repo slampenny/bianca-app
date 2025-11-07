@@ -12,7 +12,6 @@ import { useDispatch } from "react-redux"
 import { setAuthEmail, setAuthTokens, setCurrentUser } from "app/store/authSlice"
 import { setCaregiver } from "app/store/caregiverSlice"
 import { setOrg } from "app/store/orgSlice"
-import { orgApi } from "app/services/api/orgApi"
 import { translate } from "app/i18n"
 
 const createStyles = (colors: any) => StyleSheet.create({
@@ -175,7 +174,7 @@ export const SSOAccountLinkingScreen = () => {
     }
   }
 
-  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any }) => {
+  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any }) => {
     setIsSSOLoading(true)
     try {
       if (user.tokens && user.backendUser) {
@@ -185,16 +184,9 @@ export const SSOAccountLinkingScreen = () => {
         dispatch(setCurrentUser(user.backendUser))
         dispatch(setCaregiver(user.backendUser))
         
-        // Fetch and set org data if the user has an org
-        if (user.backendUser.org) {
-          try {
-            const orgResponse = await dispatch(orgApi.endpoints.getOrg.initiate({ orgId: user.backendUser.org }))
-            if (orgResponse.data) {
-              dispatch(setOrg(orgResponse.data))
-            }
-          } catch (orgError) {
-            console.error('Failed to load org data after SSO login:', orgError)
-          }
+        // Set org if included in response (orgSlice handles this)
+        if (user.backendOrg) {
+          dispatch(setOrg(user.backendOrg))
         }
         
         setErrorMessage("")

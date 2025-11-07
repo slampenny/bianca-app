@@ -34,10 +34,10 @@ export const LogoutScreen = () => {
     }
     
     // Always clear local state regardless of API response
+    // Note: Slices will auto-clear on logout via extraReducers, but we still call clearAuth
+    // to ensure auth state is cleared immediately
     dispatch(clearAuth())
-    dispatch(clearOrg())
-    dispatch(clearCaregivers())
-    dispatch(clearPatients())
+    // Other slices (org, caregiver, patient) will auto-clear via extraReducers listening to logout events
     
     // Navigate to login screen or handle logout completion
     // The navigation will be handled by the auth state change

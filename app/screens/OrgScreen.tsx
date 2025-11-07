@@ -3,13 +3,14 @@ import { useSelector, useDispatch } from "react-redux"
 import { ScrollView, StyleSheet, View, Image } from "react-native"
 import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
-import { useUpdateOrgMutation } from "../services/api/orgApi"
+import { useUpdateOrgMutation, orgApi } from "../services/api/orgApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { goBack } from "app/navigators"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { clearCaregiver } from "../store/caregiverSlice"
+import { setOrg } from "../store/orgSlice"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
 import { Button, Text, TextField } from "app/components"
@@ -36,14 +37,41 @@ export function OrgScreen() {
   const canEditOrg = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
 
   useEffect(() => {
-    if (currentOrg) {
-      setName(currentOrg.name)
-      setEmail(currentOrg.email)
-      setPhone(currentOrg.phone)
-      setLogo(currentOrg.logo || null)
-      setIsLoading(false)
+    const loadOrg = async () => {
+      // If org is already in Redux, use it
+      if (currentOrg) {
+        setName(currentOrg.name)
+        setEmail(currentOrg.email)
+        setPhone(currentOrg.phone)
+        setLogo(currentOrg.logo || null)
+        setIsLoading(false)
+        return
+      }
+
+      // If user has an org reference but org not in Redux, fetch it
+      if (currentUser?.org && !currentOrg) {
+        try {
+          const orgResponse = await dispatch(orgApi.endpoints.getOrg.initiate({ orgId: currentUser.org }))
+          if (orgResponse.data) {
+            dispatch(setOrg(orgResponse.data))
+            // The useEffect will run again when currentOrg updates
+          } else {
+            // No org found - stop loading to show the screen
+            setIsLoading(false)
+          }
+        } catch (error) {
+          console.error('Failed to load org:', error)
+          // Stop loading even if fetch fails
+          setIsLoading(false)
+        }
+      } else {
+        // No org reference - stop loading
+        setIsLoading(false)
+      }
     }
-  }, [currentOrg])
+
+    loadOrg()
+  }, [currentOrg, currentUser?.org, dispatch])
 
   const handleSave = async () => {
     if (currentOrg?.id) {
@@ -103,7 +131,7 @@ export function OrgScreen() {
       <View style={styles.formCard}>
         {/* Logo Section */}
         <View style={styles.logoSection}>
-          <Text style={styles.sectionTitle} preset="formLabel">Organization Logo</Text>
+          <Text style={styles.sectionTitle} preset="formLabel">{translate("orgScreen.organizationLogo")}</Text>
           {canEditOrg ? (
             <AvatarPicker
               initialAvatar={logo}
@@ -116,7 +144,7 @@ export function OrgScreen() {
             <Image source={{ uri: logo }} style={styles.logoPreview} />
           ) : (
             <View style={styles.noLogoContainer}>
-              <Text style={styles.noLogoText} preset="formHelper">No logo set</Text>
+              <Text style={styles.noLogoText} preset="formHelper">{translate("orgScreen.noLogoSet")}</Text>
             </View>
           )}
         </View>
@@ -172,6 +200,7 @@ export function OrgScreen() {
             text={translate("orgScreen.viewCaregivers")}
             onPress={handleViewCaregivers} 
             testID="view-caregivers-button"
+            accessibilityLabel="view-caregivers-button"
             style={styles.actionButton}
             textStyle={styles.actionButtonText}
           />

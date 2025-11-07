@@ -128,7 +128,7 @@ test.describe('Logout Workflow - Real Backend Integration', () => {
 
   test('Workflow: User without authentication sees error on profile', async ({ page }) => {
     // GIVEN: I am not logged in
-    await page.goto('http://localhost:8082/')
+    await page.goto('http://localhost:8081/')
     
     // WHEN: I try to access the profile screen (via profile button)
     const profileButton = page.locator('[aria-label="profile-button"]')
