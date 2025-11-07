@@ -52,6 +52,14 @@ const superAdmin = {
   patients: [],
 };
 
+const playwrightTestUser = {
+  name: 'Playwright Test User',
+  email: 'playwright@example.org',
+  phone: '+16045624263',
+  role: 'orgAdmin',
+  patients: [],
+};
+
 const insertCaregivers = async (caregivers) => {
   return await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, password: hashedPassword, isEmailVerified: true })));
 };
@@ -103,6 +111,7 @@ module.exports = {
   fakeId,
   admin,
   superAdmin,
+  playwrightTestUser,
   insertCaregivers,
   insertCaregiversAndAddToOrg,
   insertCaregivertoOrgAndReturnToken,

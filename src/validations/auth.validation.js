@@ -14,6 +14,7 @@ const login = {
   body: Joi.object().keys({
     email: Joi.string().required(),
     password: Joi.string().required(),
+    mfaToken: Joi.string().optional().description('6-digit TOTP token or 8-character backup code for MFA verification'),
   }),
 };
 
