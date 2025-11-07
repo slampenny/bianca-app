@@ -200,7 +200,7 @@ class EmergencyProcessor {
         return { success: false, error: 'Patient not found' };
       }
 
-      // Create alert message
+      // Create alert message (stored in English, will be translated when fetched)
       const alertMessage = this.createAlertMessage(patient, alertData, originalText);
 
       // Create alert in database

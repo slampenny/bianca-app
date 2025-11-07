@@ -737,9 +737,9 @@ resource "aws_cloudwatch_dashboard" "backup_monitoring" {
 ################################################################################
 
 variable "backup_notification_email" {
-  description = "Email address for backup notifications"
+  description = "Email address for backup notifications (administrator email)"
   type        = string
-  default     = "devops@myphonefriend.com" # Change this to your email
+  default     = "jlapp@biancatechnologies.com" # Administrator email for backup alerts
 }
 
 variable "mongodb_atlas_api_public_key" {

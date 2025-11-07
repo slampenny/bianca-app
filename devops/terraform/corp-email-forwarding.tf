@@ -32,6 +32,14 @@
 #   private_zone = false
 # }
 
+# Try to find Route53 hosted zone for biancatechnologies.com
+# If domain is managed in Route53, we'll create DNS records automatically
+# Note: If zone doesn't exist, these records won't be created and you'll need to add DNS manually
+data "aws_route53_zone" "biancatechnologies" {
+  name         = "biancatechnologies.com."
+  private_zone = false
+}
+
 # # ---------------- SES DOMAIN IDENTIFICATION ----------------
 # resource "aws_ses_domain_identity" "corp" {
 #   domain = local.corp_domain
@@ -210,3 +218,48 @@
 
 # # If Lambda is not defined in this stack, create a shim resource to expose ARN for interpolation
 # # No-op placeholder removed; using data source for Lambda ARN
+
+################################################################################
+# ZOHO MAIL MX RECORDS
+# These MX records point to Zoho Mail servers for receiving emails
+################################################################################
+
+resource "aws_route53_record" "zoho_mx" {
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "biancatechnologies.com"
+  type    = "MX"
+  ttl     = 3600
+  records = [
+    "10 mx.zohocloud.ca.",
+    "20 mx2.zohocloud.ca.",
+    "50 mx3.zohocloud.ca."
+  ]
+}
+
+################################################################################
+# ZOHO MAIL SPF RECORD
+# Required for email authentication - allows Zoho Mail and AWS SES to send
+################################################################################
+
+resource "aws_route53_record" "zoho_spf" {
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "biancatechnologies.com"
+  type    = "TXT"
+  ttl     = 3600
+  # Merged SPF: includes zohocloud.ca (Canadian server), zoho.com (general), and amazonses.com (AWS)
+  records = ["v=spf1 include:zohocloud.ca include:zoho.com include:amazonses.com ~all"]
+}
+
+################################################################################
+# ZOHO MAIL DKIM RECORD
+# Required for email authentication - prevents emails from being marked as spam
+################################################################################
+
+resource "aws_route53_record" "zoho_dkim" {
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "zmail._domainkey.biancatechnologies.com"
+  type    = "TXT"
+  ttl     = 3600
+  # DKIM public key from Zoho Mail (exact value from Zoho admin)
+  records = ["v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDOeiMSBXNisY9pFu8jtlpLxxBz08vn6NZ8PE3MZGrEFg53X60zC4n9p4+ehH9MZQx3QVc9K6gXteUTMLKgKNiP+fBl0y/oHiRPSZK8Ts1/XUjAphPtWiNQs5JhOnl+fPtN7X0LM1Om2+M+u4HL1lqx//8rbZwgYJWqt3tyjY/vMQIDAQAB"]
+}

@@ -6,7 +6,7 @@ const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const { tokenService, orgService, emailService } = require('../services');
 const { tokenTypes } = require('../config/tokens');
-const { CaregiverDTO } = require('../dtos');
+const { CaregiverDTO, OrgDTO } = require('../dtos');
 
 const login = async (req, res) => {
   try {
@@ -17,6 +17,8 @@ const login = async (req, res) => {
     let caregiver = await Caregiver.findOne({ email });
     console.log('Caregiver found:', !!caregiver);
 
+    let orgForDTO = null;
+    
     if (!caregiver) {
       console.log('Creating new org and caregiver...');
       // Create new user through the proper registration workflow
@@ -40,6 +42,8 @@ const login = async (req, res) => {
       );
 
       caregiver = org.caregivers[0];
+      // Use the org we just created
+      orgForDTO = org;
       
       // Send verification email automatically after registration (even though SSO users are pre-verified)
       // Temporarily disabled to fix crash
@@ -59,6 +63,23 @@ const login = async (req, res) => {
           caregiver.avatar = picture;
         }
         await caregiver.save();
+      }
+      
+      // Fetch org data if caregiver has an org
+      if (caregiver.org) {
+        const mongoose = require('mongoose');
+        const orgId = caregiver.org instanceof mongoose.Types.ObjectId || 
+                      (caregiver.org.constructor && caregiver.org.constructor.name === 'ObjectId')
+                      ? caregiver.org 
+                      : (caregiver.org._id || caregiver.org.toString());
+        
+        // Check if org is already populated
+        if (caregiver.org.name !== undefined || caregiver.org.email !== undefined) {
+          orgForDTO = caregiver.org;
+        } else {
+          // Fetch org from database
+          orgForDTO = await Org.findById(orgId);
+        }
       }
     }
 
@@ -100,7 +121,8 @@ const login = async (req, res) => {
           expires: refreshExpires,
         },
       },
-      user: CaregiverDTO(caregiver)
+      user: CaregiverDTO(caregiver),
+      org: orgForDTO ? OrgDTO(orgForDTO) : null
     });
 
   } catch (error) {

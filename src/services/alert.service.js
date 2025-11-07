@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const httpStatus = require('http-status');
 const { Alert, Caregiver } = require('../models');
 const ApiError = require('../utils/ApiError');
+const { translateAlertMessage, parseAlertMessage } = require('../utils/alertTranslations');
 
 const createAlert = async (alertData) => {
   return await Alert.create(alertData);
@@ -20,6 +21,23 @@ const getAlertById = async (alertId, caregiverId) => {
   // Optionally check if the alert has been read by this caregiver, if required
   if (alert.readBy && alert.readBy.includes(caregiverId)) {
     throw new ApiError(httpStatus.FORBIDDEN, 'Alert has already been read');
+  }
+
+  // Translate alert message based on caregiver's preferred language
+  if (caregiverId) {
+    const caregiver = await Caregiver.findById(caregiverId).select('preferredLanguage');
+    if (caregiver && caregiver.preferredLanguage) {
+      const alertData = parseAlertMessage(alert.message);
+      if (alertData) {
+        alert.message = translateAlertMessage(alert.message, caregiver.preferredLanguage, {
+          severity: alertData.severity,
+          category: alertData.category,
+          phrase: alertData.phrase,
+          patientName: alertData.patientName,
+          originalText: alertData.originalText
+        });
+      }
+    }
   }
 
   return alert;
@@ -61,18 +79,41 @@ const getAlerts = async (caregiverId, showRead = false) => {
     ],
   };
 
+  let alerts;
   if (showRead) {
-    const alerts = await Alert.find(baseConditions);
-    return alerts;
+    alerts = await Alert.find(baseConditions);
+  } else {
+    // Only include alerts that have NOT been read by the caregiver.
+    const conditions = {
+      $and: [
+        baseConditions,
+        { readBy: { $not: { $elemMatch: { $eq: objectCaregiverId } } } }, // Use ObjectId for comparison
+      ],
+    };
+    alerts = await Alert.find(conditions);
   }
-  // Only include alerts that have NOT been read by the caregiver.
-  const conditions = {
-    $and: [
-      baseConditions,
-      { readBy: { $not: { $elemMatch: { $eq: objectCaregiverId } } } }, // Use ObjectId for comparison
-    ],
-  };
-  const alerts = await Alert.find(conditions);
+
+  // Translate alert messages based on caregiver's preferred language
+  const caregiverLanguage = caregiver.preferredLanguage || 'en';
+  if (caregiverLanguage !== 'en') {
+    alerts = alerts.map(alert => {
+      const alertData = parseAlertMessage(alert.message);
+      if (alertData) {
+        // Create a new object to avoid modifying the original Mongoose document
+        const translatedAlert = alert.toObject();
+        translatedAlert.message = translateAlertMessage(alert.message, caregiverLanguage, {
+          severity: alertData.severity,
+          category: alertData.category,
+          phrase: alertData.phrase,
+          patientName: alertData.patientName,
+          originalText: alertData.originalText
+        });
+        return translatedAlert;
+      }
+      return alert;
+    });
+  }
+
   return alerts;
 };
 
