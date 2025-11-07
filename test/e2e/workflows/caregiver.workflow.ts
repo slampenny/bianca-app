@@ -6,8 +6,8 @@ export class CaregiverWorkflow {
 
   // GIVEN steps - Setup conditions
   async givenIAmAnOrgAdminWithCaregiverAccess() {
-    // Login as admin user who can manage caregivers - use aria-label
-    await this.page.locator('[aria-label="email-input"]').fill('admin@example.org')
+    // Login as playwright test user (orgAdmin role) who can manage caregivers - use aria-label
+    await this.page.locator('[aria-label="email-input"]').fill('playwright@example.org')
     await this.page.locator('[aria-label="password-input"]').fill('Password1')
     await this.page.locator('[aria-label="login-button"]').click()
     

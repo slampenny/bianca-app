@@ -7,7 +7,7 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
     console.log('=== CAREGIVER MANAGEMENT WORKFLOW ===')
     
     // GIVEN: I am an organization admin
-    await page.locator('[aria-label="email-input"]').fill('admin@example.org')
+    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
     await page.locator('[aria-label="password-input"]').fill('Password1')
     await page.locator('[aria-label="login-button"]').click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
@@ -52,7 +52,7 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
 
   test('Workflow: View Caregivers List Journey', async ({ page }) => {
     // GIVEN: I am an admin accessing caregiver management
-    await page.locator('[aria-label="email-input"]').fill('admin@example.org')
+    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
     await page.locator('[aria-label="password-input"]').fill('Password1')
     await page.locator('[aria-label="login-button"]').click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
@@ -97,7 +97,7 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
 
   test('Workflow: Invite New Caregiver Journey', async ({ page }) => {
     // GIVEN: I am an admin who wants to invite a caregiver
-    await page.locator('[aria-label="email-input"]').fill('admin@example.org')
+    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
     await page.locator('[aria-label="password-input"]').fill('Password1')
     await page.locator('[aria-label="login-button"]').click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
@@ -156,7 +156,7 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
     console.log('=== CAREGIVER CRUD DISCOVERY ===')
     
     // GIVEN: I am exploring all caregiver management capabilities
-    await page.locator('[aria-label="email-input"]').fill('admin@example.org')
+    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
     await page.locator('[aria-label="password-input"]').fill('Password1')
     await page.locator('[aria-label="login-button"]').click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })

@@ -135,12 +135,12 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     
     try {
       // GIVEN: I am logged in as an ADMIN user (full permissions)
-      await page.locator('[aria-label="email-input"]').fill('admin@example.org') // Admin user
+      await page.locator('[aria-label="email-input"]').fill('playwright@example.org') // Playwright test user (orgAdmin role)
       await page.locator('[aria-label="password-input"]').fill('Password1')
       await page.locator('[aria-label="login-button"]').click()
       await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
       
-      console.log('✅ Logged in as ADMIN user (admin@example.org)')
+      console.log('✅ Logged in as PLAYWRIGHT TEST USER (playwright@example.org, orgAdmin role)')
       
       const editButtons = await page.locator('[data-testid^="edit-patient-button-"]').count()
       console.log(`✅ Found ${editButtons} edit buttons as admin user`)

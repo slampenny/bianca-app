@@ -27,6 +27,7 @@ test('user can fill login form and see error on failure', async ({ page }) => {
   const errorSelectors = [
     page.getByText(/Failed to log in/i),
     page.getByText(/Invalid email or password/i),
+    page.getByText(/Incorrect email or password/i),
     page.getByText(/Please check your email and password/i),
     page.locator('[aria-label="login-error"], [data-testid="login-error"]'),
     page.locator('.error, [class*="error"]'),
@@ -35,7 +36,7 @@ test('user can fill login form and see error on failure', async ({ page }) => {
   let errorFound = false
   for (const errorSelector of errorSelectors) {
     try {
-      await expect(errorSelector).toBeVisible({ timeout: 5000 })
+      await expect(errorSelector.first()).toBeVisible({ timeout: 5000 })
       errorFound = true
       console.log('✓ Error message found')
       break

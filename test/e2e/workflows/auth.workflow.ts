@@ -20,8 +20,8 @@ export class AuthWorkflow {
 
   async givenIHaveValidAdminCredentials() {
     return {
-      email: 'admin@example.org', // From backend admin fixture
-      password: 'Password1'       // From backend caregiver fixture
+      email: 'playwright@example.org', // From backend playwrightTestUser fixture (orgAdmin role, MFA disabled)
+      password: 'Password1'            // From backend caregiver fixture
     }
   }
 
@@ -118,6 +118,41 @@ export class AuthWorkflow {
   async thenIShouldBeOnHomeScreen() {
     // Wait for home screen to load - look for home header or add patient button
     await this.page.waitForTimeout(3000)
+    
+    // Check if we're on MFA verification screen (user might have MFA enabled)
+    const mfaScreen = await this.page.locator('[aria-label="mfa-token-input"], [data-testid="mfa-verification-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
+    if (mfaScreen) {
+      // User has MFA enabled - we need to complete MFA verification
+      // For now, we'll use a backup code if available, or skip this test
+      // In a real scenario, we'd need to generate a valid TOTP token
+      console.log('User has MFA enabled - attempting to verify with backup code or mock token')
+      
+      // Try to find backup codes or use a mock token
+      // Note: This will likely fail with invalid token, but we'll handle that
+      const mfaTokenInput = this.page.locator('[aria-label="mfa-token-input"]')
+      const verifyButton = this.page.locator('[aria-label="mfa-verify-button"]')
+      
+      // Try with a 6-digit code (might work in test mode, or will show error)
+      await mfaTokenInput.fill('123456')
+      await verifyButton.click()
+      
+      // Wait for either success (home screen) or error
+      await this.page.waitForTimeout(2000)
+      
+      // Check if we're now on home screen (token was accepted) or still on MFA screen (token rejected)
+      const isHomeNow = await this.page.locator('[aria-label="home-header"]').isVisible({ timeout: 3000 }).catch(() => false)
+      const isAddPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 3000 }).catch(() => false)
+      
+      if (isHomeNow || isAddPatient) {
+        // MFA verification succeeded
+        return
+      }
+      
+      // MFA verification failed - this is expected with a mock token
+      // The test should handle this case - either skip or use a real backup code
+      throw new Error('MFA verification required but mock token was rejected. Test needs to use a valid backup code or TOTP token.')
+    }
+    
     const homeHeader = await this.page.locator('[aria-label="home-header"]').isVisible().catch(() => false)
     const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible().catch(() => false)
     expect(homeHeader || addPatient).toBe(true)

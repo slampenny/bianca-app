@@ -6,8 +6,8 @@ export class OrgWorkflow {
 
   // GIVEN steps - Setup conditions
   async givenIAmAnOrgAdmin() {
-    // Login as admin user who has org management permissions - use aria-label
-    await this.page.locator('[aria-label="email-input"]').fill('admin@example.org')
+    // Login as playwright test user (orgAdmin role) who has org management permissions - use aria-label
+    await this.page.locator('[aria-label="email-input"]').fill('playwright@example.org')
     await this.page.locator('[aria-label="password-input"]').fill('Password1')
     await this.page.locator('[aria-label="login-button"]').click()
     

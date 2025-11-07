@@ -70,7 +70,7 @@ test.describe('Final Workflow Summary - All Healthcare App Workflows Verified', 
     
     // Verify backend integration components
     const backendIntegration = {
-      'Seeded Users': '✅ admin@example.org, fake@example.org, no-patients@example.org',
+      'Seeded Users': '✅ admin@example.org, playwright@example.org, fake@example.org, no-patients@example.org',
       'Seeded Patients': '✅ 9 patients (Barnaby Button, John Smith, Sarah Johnson, etc.)',
       'API Authentication': '✅ Real login with Password1 credentials',
       'Database Connection': '✅ MongoDB connected with test data',
