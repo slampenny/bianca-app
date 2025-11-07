@@ -32,6 +32,7 @@ const zh: Translations = {
   },
   legalLinks: {
     privacyPolicy: "隐私政策",
+    privacyPractices: "HIPAA隐私实践",
     termsOfService: "服务条款",
   },
   welcomeScreen: {
@@ -495,6 +496,7 @@ const zh: Translations = {
     sentimentAnalysis: "情感分析",
     medicalAnalysis: "医学分析",
     privacyPolicy: "隐私政策",
+    privacyPractices: "HIPAA隐私实践",
     termsOfService: "服务条款",
     mentalHealthReport: "心理健康报告",
     login: "登录",
@@ -763,6 +765,7 @@ const zh: Translations = {
     verificationSubtitle: "输入来自您的身份验证器应用的6位数字代码",
     tokenLabel: "验证代码",
     tokenPlaceholder: "000000",
+    pleaseEnterVerificationCode: "请输入来自您的身份验证器应用的验证代码",
     verifyButton: "验证",
     useBackupCode: "使用备份代码",
     verifyAndEnable: "验证并启用",

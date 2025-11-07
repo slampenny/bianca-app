@@ -21,13 +21,17 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
-      header: () => (
-        <View style={styles.header}>
-          <Text style={styles.headerTitle} tx="registerScreen.title" />
-        </View>
-      ),
+      headerBackTitleVisible: false,
+      headerTintColor: colors.palette.biancaHeader || colors.text,
+      headerStyle: {
+        backgroundColor: colors.palette.biancaBackground,
+      },
+      headerTitleStyle: {
+        color: colors.palette.biancaHeader || colors.text,
+      },
+      title: translate("registerScreen.title") || translate("headers.register"),
     })
-  }, [navigation, styles])
+  }, [navigation, colors])
 
   const [register, { isLoading }] = useRegisterMutation()
 

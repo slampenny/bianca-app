@@ -26,6 +26,7 @@ export function MFASetupScreen() {
   const [backupCodes, setBackupCodes] = useState<string[]>([])
   const [verificationToken, setVerificationToken] = useState("")
   const [disableToken, setDisableToken] = useState("")
+  const [verificationError, setVerificationError] = useState("")
   const verificationInput = useRef<TextInput>(null)
   const disableInput = useRef<TextInput>(null)
 
@@ -47,17 +48,19 @@ export function MFASetupScreen() {
   }
 
   const handleVerifyAndEnable = async () => {
+    // Clear any previous error
+    setVerificationError("")
+    
     if (verificationToken.length !== 6) {
-      Alert.alert(
-        translate("common.error") || "Error",
-        translate("mfa.invalidTokenLength") || "Please enter a 6-digit code"
-      )
+      setVerificationError(translate("mfa.pleaseEnterVerificationCode") || "Please enter the verification code from your authenticator app")
+      verificationInput.current?.focus()
       return
     }
 
     try {
       await verifyAndEnableMFA({ token: verificationToken.trim() }).unwrap()
       setStep('enabled')
+      setVerificationError("")
       refetchStatus()
       Alert.alert(
         translate("mfa.enabled") || "MFA Enabled",
@@ -151,15 +154,21 @@ export function MFASetupScreen() {
   }
 
   // Determine current step based on MFA status
+  // Only update step if we're not in the middle of a setup flow (verify, disable, regenerate)
   React.useEffect(() => {
     if (mfaStatus) {
+      // Don't override step if we're in the middle of setup/verification flow
+      if (step === 'verify' || step === 'disable' || step === 'regenerate') {
+        return
+      }
+      
       if (mfaStatus.mfaEnabled) {
         setStep('enabled')
       } else {
         setStep('status')
       }
     }
-  }, [mfaStatus])
+  }, [mfaStatus, step])
 
   if (step === 'status') {
     return (
@@ -257,19 +266,30 @@ export function MFASetupScreen() {
           onChangeText={(text) => {
             const digitsOnly = text.replace(/[^0-9]/g, "")
             setVerificationToken(digitsOnly.slice(0, 6))
+            // Clear error when user starts typing
+            if (verificationError) {
+              setVerificationError("")
+            }
           }}
           keyboardType="number-pad"
           maxLength={6}
           autoFocus
           testID="mfa-verify-token-input"
           accessibilityLabel="mfa-verify-token-input"
+          status={verificationError ? "error" : undefined}
+          helper={verificationError || undefined}
         />
+
+        {verificationError && (
+          <Text style={styles.errorMessage}>
+            {verificationError}
+          </Text>
+        )}
 
         <Button
           text={translate("mfa.verifyAndEnable") || "Verify and Enable"}
           onPress={handleVerifyAndEnable}
           preset="primary"
-          disabled={verificationToken.length !== 6}
           loading={isVerifying}
           testID="mfa-verify-enable-button"
           accessibilityLabel="mfa-verify-enable-button"
@@ -284,6 +304,7 @@ export function MFASetupScreen() {
             setSecret(null)
             setBackupCodes([])
             setVerificationToken("")
+            setVerificationError("")
           }}
           preset="default"
           disabled={isVerifying}
@@ -612,6 +633,13 @@ const createStyles = (colors: any) =>
     },
     disableConfirmButton: {
       marginTop: 10,
+    },
+    errorMessage: {
+      color: colors.palette.error500 || colors.error,
+      fontSize: 14,
+      marginTop: 8,
+      marginBottom: 8,
+      textAlign: "center",
     },
   })
 

@@ -278,16 +278,15 @@ function ProfileScreen() {
               style={styles.mfaButton}
             />
 
-            <Pressable
-              style={[
-                styles.button,
-                (!email || !phone || emailError || phoneError) ? styles.buttonDisabled : undefined,
-              ]}
+            <Button
+              text={translate("profileScreen.updateProfile")}
               onPress={handleSave}
+              preset="primary"
               disabled={!email || !phone || !!emailError || !!phoneError}
-            >
-              <Text style={styles.buttonText}>{translate("profileScreen.updateProfile")}</Text>
-            </Pressable>
+              testID="profile-update-button"
+              accessibilityLabel="profile-update-button"
+              style={styles.updateButton}
+            />
 
             <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button" accessibilityLabel="profile-logout-button" accessible={true}>
               <Text style={styles.buttonText}>{translate("profileScreen.logout")}</Text>
@@ -310,15 +309,9 @@ function ProfileScreen() {
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
-  button: {
-    alignItems: "center",
-    backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 5,
+  updateButton: {
     marginBottom: 15,
-    paddingVertical: 15,
   },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: colors.palette.neutral100, fontSize: 18, fontWeight: "600" },
   container: { backgroundColor: colors.palette.biancaBackground, flex: 1 },
   contentContainer: { padding: 20 },
   error: { color: colors.palette.biancaError, marginBottom: 10, textAlign: "center" },
