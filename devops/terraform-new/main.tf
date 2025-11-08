@@ -1923,13 +1923,8 @@ resource "aws_route53_record" "sip_subdomain" {
   records = [aws_eip.asterisk_eip.public_ip]
 }
 
-resource "aws_route53_record" "wordpress_apex" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "myphonefriend.com"
-  type    = "A"
-  ttl     = "300"
-  records = ["192.254.225.221"]
-}
+# Note: WordPress DNS records (including myphonefriend.com A record) are managed
+# in the separate terraform-wordpress workspace
 
 ################################################################################
 # SES DOMAIN VERIFICATION & DKIM
@@ -2091,7 +2086,7 @@ resource "aws_lambda_function" "email_forwarder" {
   function_name    = "myphonefriend-email-forwarder"
   role            = aws_iam_role.lambda_email_forwarding_role.arn
   handler         = "index.handler"
-  runtime         = "nodejs18.x"
+  runtime         = "nodejs20.x"
   timeout         = 30
 
   environment {

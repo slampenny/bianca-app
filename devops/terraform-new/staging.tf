@@ -585,7 +585,7 @@ resource "aws_lambda_function" "staging_auto_stop" {
   function_name = "bianca-staging-auto-stop"
   role          = aws_iam_role.staging_lambda_role.arn
   handler       = "index.handler"
-  runtime       = "python3.9"
+  runtime       = "python3.12"
   timeout       = 60
 
   environment {

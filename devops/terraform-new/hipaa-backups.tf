@@ -380,7 +380,7 @@ resource "aws_lambda_function" "mongodb_backup" {
   role            = aws_iam_role.backup_lambda_role.arn
   handler         = "index.handler"
   source_code_hash = fileexists("${path.module}/lambda-backup.zip") ? filebase64sha256("${path.module}/lambda-backup.zip") : null
-  runtime         = "nodejs18.x"
+  runtime         = "nodejs20.x"
   timeout         = 900 # 15 minutes (enough for large database dumps)
   memory_size     = 1024 # 1GB RAM
 
@@ -536,7 +536,7 @@ resource "aws_lambda_function" "backup_verification" {
   role            = aws_iam_role.backup_lambda_role.arn
   handler         = "verify.handler"
   source_code_hash = fileexists("${path.module}/lambda-verify-backup.zip") ? filebase64sha256("${path.module}/lambda-verify-backup.zip") : null
-  runtime         = "nodejs18.x"
+  runtime         = "nodejs20.x"
   timeout         = 900
   memory_size     = 2048 # More memory for restore testing
 
@@ -668,7 +668,7 @@ resource "aws_lambda_function" "mongodb_restore" {
   role            = aws_iam_role.backup_lambda_role.arn
   handler         = "restore.handler"
   source_code_hash = fileexists("${path.module}/lambda-restore.zip") ? filebase64sha256("${path.module}/lambda-restore.zip") : null
-  runtime         = "nodejs18.x"
+  runtime         = "nodejs20.x"
   timeout         = 900
   memory_size     = 2048
 
