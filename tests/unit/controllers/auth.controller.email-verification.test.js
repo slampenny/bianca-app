@@ -38,8 +38,19 @@ describe('Auth Controller - Email Verification', () => {
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
       json: jest.fn(),
+      setHeader: jest.fn(), // Added for verifyEmail tests
     };
-    next = jest.fn();
+    next = jest.fn((error) => {
+      // Simulate error middleware behavior - when catchAsync passes error to next(),
+      // the error middleware converts it and calls res.status().json()
+      if (error) {
+        const statusCode = error.statusCode || 500;
+        const message = error.message || 'Internal server error';
+        res.status(statusCode);
+        // Match the format expected by tests (just message, not code)
+        res.json({ message });
+      }
+    });
     
     // Mock email service (external service - SES)
     jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue();
@@ -166,8 +177,11 @@ describe('Auth Controller - Email Verification', () => {
       // The token was generated for the caregiver, so verifyEmail should work
       await authController.verifyEmail(req, res, next);
 
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html; charset=utf-8');
       expect(res.status).toHaveBeenCalledWith(httpStatus.OK);
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Email Verified!'));
+      // Check that HTML response was sent (contains HTML structure)
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('<!DOCTYPE html>'));
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('<div class="checkmark">'));
       
       // Verify the caregiver was actually verified
       const updatedCaregiver = await Caregiver.findById(caregiver._id);
@@ -181,11 +195,12 @@ describe('Auth Controller - Email Verification', () => {
       // An invalid token should cause verifyEmail to throw an error
       await authController.verifyEmail(req, res, next);
 
-      // catchAsync handles ApiError by calling res.status().json()
+      // verifyEmail handles errors internally and sends HTML (not JSON)
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html; charset=utf-8');
       expect(res.status).toHaveBeenCalledWith(httpStatus.UNAUTHORIZED);
-      expect(res.json).toHaveBeenCalledWith({
-        message: 'Email verification failed',
-      });
+      // Check that HTML error response was sent (contains HTML structure and error icon)
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('<!DOCTYPE html>'));
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('<div class="error-icon">'));
     });
   });
 });
