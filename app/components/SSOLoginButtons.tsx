@@ -19,21 +19,21 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
   disabled = false,
   showGenericSSO = false,
 }) => {
-  const { colors } = useTheme();
+  const { colors, themeInfo } = useTheme();
   const { toast, showError, showInfo, hideToast } = useToast();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false);
   const [isGenericSSOLoading, setIsGenericSSOLoading] = useState(false);
   
-  const createStyles = (colors: any) => StyleSheet.create({
+  const createStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     container: {
-      marginVertical: 20,
+      marginVertical: 12, // Reduced from 20
     },
     dividerText: {
       textAlign: 'center',
       color: colors.palette.neutral600,
-      fontSize: 14,
-      marginBottom: 15,
+      fontSize: 13, // Reduced from 14
+      marginBottom: 10, // Reduced from 15
     },
     buttonContainer: {
       flexDirection: 'row',
@@ -52,8 +52,15 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
       borderColor: colors.palette.neutral300,
     },
     googleButton: {
-      backgroundColor: colors.palette.neutral100, // Theme-aware instead of #ffffff
-      borderColor: colors.palette.neutral300, // Theme-aware instead of #dadce0
+      // Google brand guidelines: White background in light mode, darker background in dark mode
+      // In dark mode, prioritize visibility - use much lighter gray background for clear contrast
+      backgroundColor: isDarkMode 
+        ? colors.palette.neutral700  // Lighter gray (#A3A3A3) in dark mode - MAXIMUM visibility!
+        : colors.palette.neutral100, // White in light mode (per Google brand guidelines)
+      borderColor: isDarkMode 
+        ? colors.palette.neutral800  // Very visible light border in dark mode (#D4D4D4 - very light gray)
+        : colors.palette.neutral400, // Standard border in light mode
+      borderWidth: isDarkMode ? 2 : 1, // Thicker border in dark mode for maximum visibility
     },
     microsoftButton: {
       backgroundColor: '#0078d4', // Microsoft brand color - keep as-is
@@ -70,7 +77,23 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
       fontSize: 16,
       fontWeight: '500',
       marginLeft: 8,
-      color: colors.palette.biancaHeader, // Theme-aware text color
+      // Google brand guidelines: Dark text on white (light mode), light text on dark (dark mode)
+      color: colors.palette.biancaHeader, // Theme-aware: dark in light mode, light in dark mode
+    },
+    googleButtonText: {
+      fontSize: 16,
+      fontWeight: '500',
+      marginLeft: 8,
+      // Ensure high contrast: dark text on white (light mode), light text on dark gray (dark mode)
+      color: isDarkMode 
+        ? colors.palette.neutral900  // Very light text (#FAFAFA) in dark mode for maximum contrast
+        : colors.palette.biancaHeader, // Dark text in light mode
+    },
+    microsoftButtonText: {
+      fontSize: 16,
+      fontWeight: '500',
+      marginLeft: 8,
+      color: '#FFFFFF', // Always white text on blue Microsoft background
     },
     googleIcon: {
       fontSize: 18,
@@ -80,7 +103,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     microsoftIcon: {
       fontSize: 18,
       fontWeight: 'bold',
-      color: colors.palette.neutral100,
+      color: '#FFFFFF', // Always white icon on blue Microsoft background
     },
     genericSSOIcon: {
       fontSize: 18,
@@ -88,7 +111,13 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     },
   });
   
-  const styles = createStyles(colors);
+  const isDarkMode = themeInfo.darkMode;
+  const styles = createStyles(colors, isDarkMode);
+  
+  // Debug: Log to verify dark mode detection (remove after testing)
+  if (__DEV__) {
+    console.log('[SSO Buttons] Dark mode:', isDarkMode, 'Background color:', isDarkMode ? '#A3A3A3' : '#FFFFFF');
+  }
 
   const handleGoogleSignIn = async () => {
     if (disabled || isGoogleLoading) return;
@@ -179,17 +208,40 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
       <View style={styles.buttonContainer}>
         {/* Google Sign In Button */}
         <Pressable
-          style={[styles.ssoButton, styles.googleButton, disabled && styles.disabledButton]}
+          style={[
+            // Completely independent styles - no base ssoButton to avoid conflicts
+            {
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              borderRadius: 6,
+              // Force Google button colors - these MUST override everything
+              // Using very light gray in dark mode for maximum visibility
+              backgroundColor: isDarkMode ? '#B0B0B0' : '#FFFFFF', // Even lighter gray (#B0B0B0) for dark mode
+              borderColor: isDarkMode ? '#E0E0E0' : '#E5E5E5', // Very light border
+              borderWidth: isDarkMode ? 2 : 1,
+            },
+            disabled && { opacity: 0.5 }
+          ]}
           onPress={handleGoogleSignIn}
           disabled={disabled || isLoading}
           testID="google-sso-button"
         >
             {isGoogleLoading ? (
-            <ActivityIndicator color={colors.palette.neutral800} size="small" />
+            <ActivityIndicator color={colors.palette.biancaHeader} size="small" />
           ) : (
             <>
               <Text style={styles.googleIcon}>G</Text>
-              <Text style={styles.ssoButtonText}>{translate("ssoButtons.google")}</Text>
+              <Text style={{
+                fontSize: 16,
+                fontWeight: '500',
+                marginLeft: 8,
+                // Force dark text color for visibility on light gray background in dark mode
+                color: isDarkMode ? '#171717' : '#171717' // Dark text (#171717) for maximum contrast
+              }}>{translate("ssoButtons.google")}</Text>
             </>
           )}
         </Pressable>
@@ -202,11 +254,11 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
           testID="microsoft-sso-button"
         >
           {isMicrosoftLoading ? (
-            <ActivityIndicator color={colors.palette.neutral100} size="small" />
+            <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <>
               <Text style={styles.microsoftIcon}>M</Text>
-              <Text style={styles.ssoButtonText}>{translate("ssoButtons.microsoft")}</Text>
+              <Text style={styles.microsoftButtonText}>{translate("ssoButtons.microsoft")}</Text>
             </>
           )}
         </Pressable>

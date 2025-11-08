@@ -56,7 +56,7 @@
       }
     },
     "web": {
-      "favicon": "./assets/images/app-icon-web-favicon.png",
+      "favicon": "./assets/images/appstore.png",
       "splash": {
         "image": "./assets/images/splash-logo-web.png",
         "resizeMode": "contain",

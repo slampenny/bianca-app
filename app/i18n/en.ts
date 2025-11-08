@@ -42,6 +42,7 @@ const en = {
     passwordFieldPlaceholder: "Super secret password here",
     forgotPassword: "Forgot Password?",
     hint: "Hint: you can use any email address and your favorite password :)",
+    tagline: "Wellness Check Communication",
   },
   logoutScreen: {
     logoutButton: "Logout",

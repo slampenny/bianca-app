@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, FC } from "react"
-import { TextInput, View, StyleSheet } from "react-native"
+import { TextInput, View, StyleSheet, Image, Platform } from "react-native"
 import { useDispatch, useSelector } from "react-redux"
 import { useLoginMutation } from "../services/api/authApi"
 import { setAuthEmail, setAuthTokens, setCurrentUser, getValidationError, getAuthEmail } from "../store/authSlice"
@@ -236,6 +236,35 @@ export const LoginForm: FC<LoginFormProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* App Branding */}
+      {!compact && (
+        <View style={styles.brandingContainer}>
+          <View style={styles.iconWrapper}>
+            <Image 
+              source={require("../../assets/images/appstore.png")} 
+              style={styles.appIcon}
+              resizeMode="contain"
+              accessibilityLabel="MyPhoneFriend App Icon"
+              testID="app-icon"
+              // Web-specific: ensure no default styling interferes
+              {...(Platform.OS === 'web' && {
+                style: [
+                  styles.appIcon,
+                  {
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    boxShadow: 'none',
+                  }
+                ]
+              })}
+            />
+          </View>
+          <Text style={styles.appName}>MyPhoneFriend</Text>
+          <Text style={styles.appTagline}>{translate("loginScreen.tagline") || "Wellness Check Communication"}</Text>
+        </View>
+      )}
+      
       {errorMessage ? (
         <View 
           style={styles.errorContainer} 
@@ -338,32 +367,72 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     alignItems: "center",
     flex: 1,
     justifyContent: compact ? "flex-start" : "center",
-    padding: compact ? 20 : 20,
+    padding: compact ? 16 : 16, // Reduced from 20
+    paddingTop: compact ? 16 : 12, // Reduced top padding
     width: "100%",
+  },
+  brandingContainer: {
+    alignItems: "center",
+    marginBottom: compact ? 16 : 20, // Reduced from 32
+    marginTop: compact ? 0 : 8, // Reduced from 20
+    backgroundColor: 'transparent', // Ensure container is transparent
+  },
+  iconWrapper: {
+    width: 60, // Reduced from 80
+    height: 60, // Reduced from 80
+    marginBottom: 8, // Reduced from 12
+    backgroundColor: 'transparent',
+    overflow: 'hidden', // Ensure no overflow creates background
+  },
+  appIcon: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent', // Ensure transparent background
+    // Explicitly remove any borders or backgrounds
+    borderWidth: 0,
+    borderColor: 'transparent',
+    // Ensure no tinting that might affect transparency
+    opacity: 1,
+    // Web-specific styles
+    ...(Platform.OS === 'web' && {
+      objectFit: 'contain',
+      display: 'block',
+    }),
+  },
+  appName: {
+    fontSize: 24, // Reduced from 28
+    fontWeight: "bold",
+    color: colors.palette.biancaHeader,
+    marginBottom: 2, // Reduced from 4
+  },
+  appTagline: {
+    fontSize: 12, // Reduced from 14
+    color: colors.palette.neutral600,
+    textAlign: "center",
   },
   errorContainer: {
     backgroundColor: colors.palette.biancaErrorBackground || "#fee2e2",
     borderRadius: 8,
     borderLeftWidth: 4,
     borderLeftColor: colors.palette.biancaError || "#dc2626",
-    marginBottom: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    marginBottom: 12, // Reduced from 20
+    paddingHorizontal: 12, // Reduced from 16
+    paddingVertical: 8, // Reduced from 12
     width: "100%",
   },
   errorText: {
     color: colors.palette.biancaError || "#dc2626",
-    fontSize: 14,
+    fontSize: 13, // Reduced from 14
     fontWeight: "500",
     textAlign: "left",
-    lineHeight: 20,
+    lineHeight: 18, // Reduced from 20
   },
   input: {
     color: colors.palette.biancaHeader,
     fontSize: 16,
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 12, // Reduced from 16
     width: "100%",
   },
   inputWrapper: {
@@ -372,9 +441,9 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     elevation: 1,
-    marginBottom: 8,
+    marginBottom: 6, // Reduced from 8
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 10, // Reduced from 12
     shadowColor: colors.palette.neutral900,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -382,7 +451,7 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
   },
   linkButton: {
     alignSelf: "center",
-    marginTop: 10,
+    marginTop: 6, // Reduced from 10
   },
   linkButtonText: {
     color: colors.palette.biancaButtonSelected,
@@ -393,24 +462,24 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
   loginButton: {
     backgroundColor: colors.palette.biancaButtonSelected,
     borderRadius: 5,
-    marginBottom: 8,
-    marginTop: 16,
+    marginBottom: 6, // Reduced from 8
+    marginTop: 10, // Reduced from 16
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10, // Reduced from 12
     width: "100%",
   },
   loginButtonText: {
     color: colors.palette.neutral100,
-    fontSize: 18,
+    fontSize: 16, // Reduced from 18
     fontWeight: "bold",
     textAlign: "center",
   },
   registerButton: {
     backgroundColor: colors.palette.biancaButtonUnselected,
     borderRadius: 5,
-    marginBottom: 8,
+    marginBottom: 6, // Reduced from 8
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10, // Reduced from 12
     width: "100%",
   },
   registerButtonText: {
