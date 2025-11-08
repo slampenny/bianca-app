@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import {
   Modal,
   View,
@@ -18,7 +18,9 @@ import {
 } from "../services/api/patientApi"
 import { useGetAllCaregiversQuery } from "../services/api/caregiverApi"
 import { Patient, Caregiver } from "../services/api/api.types"
+import { logger } from "../utils/logger"
 import { RootState } from "../store/store"
+import { TIMEOUTS } from "../constants"
 import { colors } from "../theme/colors"
 
 interface PatientReassignmentModalProps {
@@ -41,6 +43,7 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
   const [isLoading, setIsLoading] = useState(false)
   const [reassignedCount, setReassignedCount] = useState(0)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   const currentUser = useSelector((state: RootState) => state.auth.currentUser)
   
@@ -63,6 +66,14 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
     if (availableCaregivers.length > 0 && !selectedCaregiverId) {
       setSelectedCaregiverId(availableCaregivers[0].id!)
     }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
   }, [availableCaregivers, selectedCaregiverId])
   
   const handleReassignAllPatients = async () => {
@@ -84,18 +95,29 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
           }).unwrap()
           successCount++
         } catch (error) {
-          console.error(`Failed to reassign patient ${patient.name}:`, error)
+          logger.error(`Failed to reassign patient ${patient.name}:`, error)
         }
       }
       
       setReassignedCount(successCount)
       
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
       if (successCount === patients.length) {
         showSuccess(`All ${successCount} patients have been successfully reassigned.`)
-        setTimeout(() => onComplete(), 2000)
+        timeoutRef.current = setTimeout(() => {
+          onComplete()
+          timeoutRef.current = null
+        }, TIMEOUTS.NAVIGATION_DELAY)
       } else {
         showSuccess(`${successCount} out of ${patients.length} patients were reassigned successfully.`)
-        setTimeout(() => onComplete(), 2000)
+        timeoutRef.current = setTimeout(() => {
+          onComplete()
+          timeoutRef.current = null
+        }, TIMEOUTS.NAVIGATION_DELAY)
       }
     } catch (error) {
       showError("Failed to reassign patients. Please try again.")

@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Caregiver } from "../services/api/api.types"
 import { authApi, caregiverApi, orgApi } from "app/services/api"
+import { logger } from "../utils/logger"
 
 interface CaregiverState {
   caregiver: Caregiver | null
@@ -18,23 +19,23 @@ export const caregiverSlice = createSlice({
   initialState,
   reducers: {
     setCaregiver: (state, action: PayloadAction<Caregiver | null>) => {
-      console.log("[caregiverSlice] setCaregiver called with:", action.payload)
+      logger.debug("[caregiverSlice] setCaregiver called with:", action.payload)
       state.caregiver = action.payload
     },
     setCaregivers: (state, action: PayloadAction<Caregiver[]>) => {
-      console.log("[caregiverSlice] setCaregivers called with:", action.payload)
+      logger.debug("[caregiverSlice] setCaregivers called with:", action.payload)
       state.caregivers = action.payload
     },
     clearCaregiver: (state) => {
-      console.log("[caregiverSlice] clearCaregiver called")
+      logger.debug("[caregiverSlice] clearCaregiver called")
       state.caregiver = null
     },
     clearCaregivers: (state) => {
-      console.log("[caregiverSlice] clearCaregivers called")
+      logger.debug("[caregiverSlice] clearCaregivers called")
       state.caregivers = []
     },
     removeCaregiver: (state, action: PayloadAction<string>) => {
-      console.log("[caregiverSlice] removeCaregiver called with id:", action.payload)
+      logger.debug("[caregiverSlice] removeCaregiver called with id:", action.payload)
       state.caregivers = state.caregivers.filter((cg) => cg.id !== action.payload)
     },
 
@@ -42,7 +43,7 @@ export const caregiverSlice = createSlice({
   extraReducers: (builder) => {
     // Set current caregiver from login response
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      console.log("[caregiverSlice] authApi.login.matchFulfilled, payload:", payload)
+      logger.debug("[caregiverSlice] authApi.login.matchFulfilled, payload:", payload)
       // Only set caregiver if MFA is not required (when MFA is required, payload only has tempToken)
       if (!payload.requireMFA && payload.caregiver) {
         state.caregiver = payload.caregiver
@@ -61,7 +62,7 @@ export const caregiverSlice = createSlice({
     builder.addMatcher(
       caregiverApi.endpoints.updateCaregiver.matchFulfilled,
       (state, { payload }) => {
-        console.log(
+        logger.debug(
           "[caregiverSlice] caregiverApi.updateCaregiver.matchFulfilled, payload:",
           payload,
         )
@@ -78,7 +79,7 @@ export const caregiverSlice = createSlice({
     // Use caregiverId from action.meta.arg since payload is void.
     builder.addMatcher(orgApi.endpoints.removeCaregiver.matchFulfilled, (state, { payload }) => {
       if (payload?.id) {
-        console.log(
+        logger.debug(
           "[caregiverSlice] orgApi.removeCaregiver.matchFulfilled, removed id:",
           payload.id,
         )
@@ -91,14 +92,14 @@ export const caregiverSlice = createSlice({
     // Handle invite: when a caregiver is invited successfully via orgApi sendInvite,
     // add the returned caregiver to the caregivers array.
     builder.addMatcher(orgApi.endpoints.sendInvite.matchFulfilled, (state, { payload }) => {
-      console.log("[caregiverSlice] orgApi.sendInvite.matchFulfilled, payload:", payload.caregiver)
+      logger.debug("[caregiverSlice] orgApi.sendInvite.matchFulfilled, payload:", payload.caregiver)
       state.caregivers.push(payload.caregiver)
     })
 
     builder.addMatcher(
       caregiverApi.endpoints.getAllCaregivers.matchFulfilled,
       (state, { payload }) => {
-        console.log(
+        logger.debug(
           "[caregiverSlice] caregiverApi.getAllCaregivers.matchFulfilled, payload:",
           payload,
         )

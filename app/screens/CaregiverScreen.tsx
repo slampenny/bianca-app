@@ -21,6 +21,7 @@ import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver, clearCaregiver } from "../store/caregiverSlice"
 import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
+import { logger } from "../utils/logger"
 import {
   useUpdateCaregiverMutation,
   useUploadAvatarMutation,
@@ -43,7 +44,7 @@ function CaregiverScreen() {
   const { colors, isLoading: themeLoading } = useTheme()
   
   // Debug logging
-  console.log('CaregiverScreen Debug:', {
+  logger.debug('CaregiverScreen Debug:', {
     caregiver: caregiver?.id,
     currentOrg: currentOrg?.id,
     currentUser: currentUser?.id,
@@ -79,6 +80,17 @@ function CaregiverScreen() {
   const [showUnassignedPanel, setShowUnassignedPanel] = useState(false)
   const [selectedPatients, setSelectedPatients] = useState<string[]>([])
   const [assignmentSuccess, setAssignmentSuccess] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [])
   
   // State for patient reassignment modal
   const [showReassignmentModal, setShowReassignmentModal] = useState(false)
@@ -228,27 +240,40 @@ function CaregiverScreen() {
       setAssignmentSuccess(true)
       setSuccessMessage(`${selectedPatients.length} patient(s) assigned successfully!`)
       
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
       // Close panel after a short delay to show success message
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         closeUnassignedPanel()
         setSuccessMessage("")
+        timeoutRef.current = null
       }, 2000)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Assignment error:', error)
       const errorMessage = error?.data?.message || "Failed to assign patients. Please try again."
       setSuccessMessage(`Error: ${errorMessage}`)
-      setTimeout(() => {
+      
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
+      timeoutRef.current = setTimeout(() => {
         setSuccessMessage("")
+        timeoutRef.current = null
       }, 5000)
     }
   }
 
   const handleSave = async () => {
-    console.log('handleSave called', { caregiver, name, email, phone, emailError, phoneError })
+    logger.debug('handleSave called', { caregiver, name, email, phone, emailError, phoneError })
     
     if (caregiver && caregiver.id) {
       // Update branch for an existing caregiver
-      console.log('Updating existing caregiver')
+      logger.debug('Updating existing caregiver')
       const updatedCaregiver = {
         name,
         avatar,
@@ -269,17 +294,17 @@ function CaregiverScreen() {
       }
     } else {
       // Invite branch for new caregiver
-      console.log('Inviting new caregiver', { currentOrg, name, email, phone })
+      logger.debug('Inviting new caregiver', { currentOrg, name, email, phone })
       
       // Check form validation
       if (!email || !phone || emailError || phoneError) {
-        console.log('Form validation failed:', { email, phone, emailError, phoneError })
+        logger.debug('Form validation failed:', { email, phone, emailError, phoneError })
         return
       }
       
               try {
           if (currentOrg?.id) {
-            console.log('Sending invite to backend...')
+            logger.debug('Sending invite to backend...')
             const { caregiver: invitedCaregiver } = await sendInvite({
               orgId: currentOrg.id,
               name,
@@ -287,7 +312,7 @@ function CaregiverScreen() {
               phone,
             }).unwrap()
           
-          console.log('Invite successful:', invitedCaregiver)
+          logger.debug('Invite successful:', invitedCaregiver)
           
           // Clear caregiver state and navigate to success screen
           dispatch(clearCaregiver())
@@ -301,11 +326,18 @@ function CaregiverScreen() {
         } else {
           console.error('No currentOrg available')
           setErrorMessage("Error: No organization found.")
-          setTimeout(() => {
+          
+          // Clear any existing timeout
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+          }
+          
+          timeoutRef.current = setTimeout(() => {
             setErrorMessage("")
+            timeoutRef.current = null
           }, 5000)
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Invite error:', error)
         console.error('Invite error details:', {
           message: error?.message,
@@ -322,8 +354,14 @@ function CaregiverScreen() {
           setErrorMessage("An error occurred while sending the invite.")
         }
         
-        setTimeout(() => {
+        // Clear any existing timeout
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+        }
+        
+        timeoutRef.current = setTimeout(() => {
           setErrorMessage("")
+          timeoutRef.current = null
         }, 5000)
       }
     }

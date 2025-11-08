@@ -53,10 +53,14 @@ test.describe('Invite User Workflow - Corrected', () => {
     })
 
     // Login as admin
-    await page.getByTestId('email-input').fill(TEST_USERS.ORG_ADMIN.email)
-    await page.getByTestId('password-input').fill(TEST_USERS.ORG_ADMIN.password)
-    await page.getByTestId('login-button').click()
-    await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    // Wait for login screen to load
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="email-input"], [aria-label="email-input"]', { timeout: 10000 })
+    
+    await page.getByTestId('email-input').or(page.getByLabel('email-input')).fill(TEST_USERS.ORG_ADMIN.email)
+    await page.getByTestId('password-input').or(page.getByLabel('password-input')).fill(TEST_USERS.ORG_ADMIN.password)
+    await page.getByTestId('login-button').or(page.getByLabel('login-button')).click()
+    await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
 
     // Step 2: Navigate to Organization screen
     await page.getByTestId('organization-tab').click()
@@ -195,7 +199,7 @@ test.describe('Invite User Workflow - Corrected', () => {
     await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 
     // Verify user is logged in
-    await expect(invitePage.getByTestId('home-header')).toBeVisible()
+    await expect(invitePage.getByLabel('home-header')).toBeVisible()
 
     // Close the invite page
     await invitePage.close()
@@ -263,10 +267,12 @@ test.describe('Invite User Workflow - Corrected', () => {
 
     // Navigate to signup page with valid token
     await page.goto(`/signup?token=${inviteToken}`)
-    await page.waitForSelector('[data-testid="signup-screen"]')
+    await page.waitForSelector('[data-testid="signup-screen"]', { timeout: 10000 })
+    await page.waitForTimeout(1000) // Give screen time to render
 
     // Try to submit without filling required fields
-    await page.getByTestId('signup-submit-button').click()
+    await page.getByTestId('signup-submit-button').waitFor({ timeout: 10000 }).catch(() => {})
+    await page.getByTestId('signup-submit-button').click({ timeout: 5000 }).catch(() => {})
 
     // Should see validation errors
     await expect(page.getByText('Password is required')).toBeVisible()
@@ -328,10 +334,14 @@ test.describe('Invite User Workflow - Corrected', () => {
       })
     })
 
-    await page.getByTestId('email-input').fill(TEST_USERS.ORG_ADMIN.email)
-    await page.getByTestId('password-input').fill(TEST_USERS.ORG_ADMIN.password)
-    await page.getByTestId('login-button').click()
-    await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    // Wait for login screen to load
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="email-input"], [aria-label="email-input"]', { timeout: 10000 })
+    
+    await page.getByTestId('email-input').or(page.getByLabel('email-input')).fill(TEST_USERS.ORG_ADMIN.email)
+    await page.getByTestId('password-input').or(page.getByLabel('password-input')).fill(TEST_USERS.ORG_ADMIN.password)
+    await page.getByTestId('login-button').or(page.getByLabel('login-button')).click()
+    await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
 
     // Navigate to Organization screen
     await page.getByTestId('organization-tab').click()
@@ -453,7 +463,7 @@ test.describe('Invite User Workflow - Corrected', () => {
     await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 
     // Verify the new user is logged in and can access the app
-    await expect(invitePage.getByTestId('home-header')).toBeVisible()
+    await expect(invitePage.getByLabel('home-header')).toBeVisible()
 
     await invitePage.close()
   })

@@ -3,6 +3,7 @@ import { RootState } from "./store"
 import { authApi, alertApi } from "../services/api"
 import { Alert } from "../services/api/api.types"
 import { getCurrentUser } from "./authSlice"
+import { logger } from "../utils/logger"
 
 interface AlertState {
   selectedAlert: Alert | null
@@ -68,7 +69,7 @@ export const alertSlice = createSlice({
       // CRITICAL: Replace the alert in-place to preserve it in the array
       // This ensures the alert remains visible on "All Alerts" tab
       if (index !== -1) {
-        console.log('[AlertSlice] Updating alert in state (preserving in array):', { 
+        logger.debug('[AlertSlice] Updating alert in state (preserving in array):', { 
           alertId: payload.id, 
           oldReadBy: state.alerts[index].readBy,
           newReadBy: payload.readBy 
@@ -76,7 +77,7 @@ export const alertSlice = createSlice({
         state.alerts[index] = payload
       } else {
         // If alert not found, add it to preserve all alerts
-        console.warn('[AlertSlice] Alert not found in state array, adding it:', payload.id)
+        logger.warn('[AlertSlice] Alert not found in state array, adding it:', payload.id)
         state.alerts.push(payload)
       }
       // DO NOT filter or remove alerts - keep ALL alerts in the array

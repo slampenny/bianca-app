@@ -28,6 +28,9 @@ import { useTheme } from "app/theme/ThemeContext"
 import { Button, TextField, PhoneInputWeb } from "app/components"
 import { LANGUAGE_OPTIONS, getLanguageByCode, DEFAULT_LANGUAGE, LanguageOption } from "../constants/languages"
 import { translate } from "../i18n"
+import { logger } from "../utils/logger"
+import type { ThemeColors } from "../types"
+import { TIMEOUTS } from "../constants"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
@@ -192,15 +195,21 @@ function PatientScreen() {
 
   const handleDelete = () => {
     if (confirmDelete && patient && patient.id) {
+      // Use async/await to avoid race conditions
       deletePatient({ id: patient.id })
         .unwrap()
         .then(() => {
-          dispatch(setPatient(null)) // Clear patient from Redux
-          navigation.navigate("Home") // Navigate away on delete
+          // Check if component is still mounted before updating state
+          if (isMounted()) {
+            dispatch(setPatient(null)) // Clear patient from Redux
+            navigation.navigate("Home") // Navigate away on delete
+          }
         })
         .catch((err) => {
-          console.error("Delete Patient Error", err)
-          // Error handled by the useEffect hook for deleteError
+          if (isMounted()) {
+            logger.error("Delete Patient Error", err)
+            // Error handled by the useEffect hook for deleteError
+          }
         })
     } else {
       setConfirmDelete(true)
@@ -251,7 +260,7 @@ function PatientScreen() {
             updatedPatientData.patient.avatar = uploadedAvatarUrl // Update payload
             setAvatarBlob(undefined) // Clear the blob after successful upload
           } catch (err) {
-            console.error("Avatar upload error during update:", err)
+            logger.error("Avatar upload error during update:", err)
             // Error is captured by uploadError state and handled by useEffect
             // Optionally set a specific message: setApiError(`Avatar upload failed: ${extractErrorMessage(err)}`);
             return // Stop the save process if avatar upload fails
@@ -269,10 +278,17 @@ function PatientScreen() {
         const result = await updatePatient(updatedPatientData).unwrap()
         dispatch(setPatient(result)) // Update Redux with the final patient data
         setSuccessMessage("Patient updated successfully!") // Show success message
+        
+        // Clear any existing timeout
+        if (successTimeoutRef.current) {
+          clearTimeout(successTimeoutRef.current)
+        }
+        
         // Navigate back to home screen after successful update
-        setTimeout(() => {
+        successTimeoutRef.current = setTimeout(() => {
           navigation.navigate("Home")
-        }, 500) // Reduced timeout to 500ms
+          successTimeoutRef.current = null
+        }, TIMEOUTS.NAVIGATION_DELAY)
       } else {
         // --- New patient creation flow ---
 
@@ -307,7 +323,7 @@ function PatientScreen() {
               setAvatarBlob(undefined) // Clear blob after successful upload and final update
             }
           } catch (err) {
-            console.error("Avatar upload/update error during create:", err)
+            logger.error("Avatar upload/update error during create:", err)
             // Error captured by hooks. Patient *might* be created without avatar.
             // Inform the user the main record was created but avatar failed.
             setApiError(`Patient created, but avatar upload failed: ${extractErrorMessage(err)}`)
@@ -321,10 +337,17 @@ function PatientScreen() {
         // 4. Update Redux with the final patient data (either with or without uploaded avatar)
         dispatch(setPatient(finalPatient))
         setSuccessMessage("Patient created successfully!") // Show success message
+        
+        // Clear any existing timeout
+        if (successTimeoutRef.current) {
+          clearTimeout(successTimeoutRef.current)
+        }
+        
         // Navigate back to home screen after successful creation
-        setTimeout(() => {
+        successTimeoutRef.current = setTimeout(() => {
           navigation.navigate("Home")
-        }, 500) // Reduced timeout to 500ms
+          successTimeoutRef.current = null
+        }, TIMEOUTS.NAVIGATION_DELAY)
       }
     } catch (error) {
       // Errors from createPatient or updatePatient are caught here
@@ -601,7 +624,7 @@ function PatientScreen() {
   )
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     paddingVertical: 16, // Consistent padding
     borderRadius: 5,

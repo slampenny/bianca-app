@@ -29,8 +29,12 @@ test.describe('SSO Email Verification Workflow', () => {
         });
       });
 
-      // Click Google login button
-      await page.click('[data-testid="google-login-button"]');
+      // Wait for login screen and SSO buttons to be visible
+      await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+      await page.waitForSelector('[data-testid="google-sso-button"]', { timeout: 10000 })
+      
+      // Click Google SSO button
+      await page.click('[data-testid="google-sso-button"]');
 
       // Should be able to login immediately (email is pre-verified)
       await expect(page).toHaveURL(/.*main-tabs/);
@@ -59,7 +63,7 @@ test.describe('SSO Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="google-login-button"]');
+      await page.click('[data-testid="google-sso-button"]');
 
       // Should redirect to profile screen for completion
       await expect(page).toHaveURL(/.*profile/);
@@ -90,7 +94,11 @@ test.describe('SSO Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="microsoft-login-button"]');
+      // Wait for login screen and SSO buttons to be visible
+      await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+      await page.waitForSelector('[data-testid="microsoft-sso-button"]', { timeout: 10000 })
+      
+      await page.click('[data-testid="microsoft-sso-button"]');
 
       // Should be able to login immediately
       await expect(page).toHaveURL(/.*main-tabs/);
@@ -121,7 +129,7 @@ test.describe('SSO Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="google-login-button"]');
+      await page.click('[data-testid="google-sso-button"]');
     });
 
     test('should promote SSO user to orgAdmin after profile completion', async ({ page }) => {
@@ -163,7 +171,7 @@ test.describe('SSO Email Verification Workflow', () => {
       };
 
       // First register with email
-      await page.click('[accessibilityLabel="register-link"]');
+      await page.click('[data-testid="register-button"], [aria-label="register-link"]');
       await page.fill('[data-testid="name-input"]', testUser.name);
       await page.fill('[data-testid="email-input"]', testUser.email);
       await page.fill('[data-testid="password-input"]', testUser.password);
@@ -197,7 +205,7 @@ test.describe('SSO Email Verification Workflow', () => {
       });
 
       await page.click('[data-testid="back-to-login-button"]');
-      await page.click('[data-testid="google-login-button"]');
+      await page.click('[data-testid="google-sso-button"]');
 
       // Should still need email verification
       await expect(page).toHaveURL(/.*email-verification-required/);
@@ -226,7 +234,7 @@ test.describe('SSO Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="google-login-button"]');
+      await page.click('[data-testid="google-sso-button"]');
       await expect(page).toHaveURL(/.*main-tabs/);
 
       // Logout
@@ -234,7 +242,7 @@ test.describe('SSO Email Verification Workflow', () => {
       await expect(page).toHaveURL(/.*login/);
 
       // Try to register with same email
-      await page.click('[accessibilityLabel="register-link"]');
+      await page.click('[data-testid="register-button"], [aria-label="register-link"]');
       await page.fill('[data-testid="name-input"]', 'SSO First User');
       await page.fill('[data-testid="email-input"]', 'sso-first@example.com');
       await page.fill('[data-testid="password-input"]', 'Password123');
@@ -258,7 +266,7 @@ test.describe('SSO Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="google-login-button"]');
+      await page.click('[data-testid="google-sso-button"]');
 
       // Should show error message
       await expect(page.locator('text=SSO login failed')).toBeVisible();
@@ -270,7 +278,7 @@ test.describe('SSO Email Verification Workflow', () => {
         await route.abort('Failed');
       });
 
-      await page.click('[data-testid="google-login-button"]');
+      await page.click('[data-testid="google-sso-button"]');
 
       // Should show error message
       await expect(page.locator('text=SSO login failed')).toBeVisible();
@@ -286,7 +294,7 @@ test.describe('SSO Email Verification Workflow', () => {
         });
       });
 
-      await page.click('[data-testid="google-login-button"]');
+      await page.click('[data-testid="google-sso-button"]');
 
       // Should show error message
       await expect(page.locator('text=SSO login failed')).toBeVisible();

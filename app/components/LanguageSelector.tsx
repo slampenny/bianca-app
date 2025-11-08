@@ -9,6 +9,7 @@ import { useLanguage } from "../hooks/useLanguage"
 import { useSelector } from "react-redux"
 import { getCaregiver } from "../store/caregiverSlice"
 import { useUpdateCaregiverMutation } from "../services/api/caregiverApi"
+import { logger } from "../utils/logger"
 
 interface LanguageSelectorProps {
   style?: any
@@ -111,8 +112,8 @@ export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
   const styles = createStyles(colors)
 
   const handleLanguageSelect = async (languageCode: string) => {
-    console.log("Selecting language:", languageCode)
-    console.log("Current locale before change:", currentLocale)
+    logger.debug("Selecting language:", languageCode)
+    logger.debug("Current locale before change:", currentLocale)
     
     // Update i18n locale and persist the choice
     await changeLanguage(languageCode)
@@ -126,14 +127,14 @@ export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
             preferredLanguage: languageCode,
           },
         }).unwrap()
-        console.log("Language preference saved to backend:", languageCode)
+        logger.debug("Language preference saved to backend:", languageCode)
       } catch (error) {
         console.error("Failed to save language preference to backend:", error)
         // Don't block the UI - language change still works locally
       }
     }
     
-    console.log("Current locale after change:", currentLocale)
+    logger.debug("Current locale after change:", currentLocale)
     
     // Close modal
     setIsModalVisible(false)

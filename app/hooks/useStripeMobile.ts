@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Platform } from 'react-native'
+import { logger } from '../utils/logger'
 
 interface StripeMobileComponents {
   StripeProvider: any
@@ -42,7 +43,7 @@ export const useStripeMobile = (): StripeMobileComponents => {
           error: null,
         })
       } catch (error) {
-        console.error('Failed to load mobile Stripe components:', error)
+        logger.error('Failed to load mobile Stripe components:', error)
         setComponents(prev => ({
           ...prev,
           isLoaded: true,

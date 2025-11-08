@@ -41,10 +41,39 @@ export class PatientDetailedWorkflow {
     
     // Select first patient if no specific name or patient not found
     const firstPatientCard = this.page.locator('[data-testid^="patient-card-"]').first()
-    if (await firstPatientCard.count() > 0) {
-      await firstPatientCard.click()
-      await this.page.waitForTimeout(2000)
-      return true
+    const cardCount = await firstPatientCard.count().catch(() => 0)
+    
+    if (cardCount > 0) {
+      // Try to scroll the card into view
+      await firstPatientCard.scrollIntoViewIfNeeded().catch(() => {})
+      await this.page.waitForTimeout(500)
+      
+      // Check if card is visible
+      const isVisible = await firstPatientCard.isVisible().catch(() => false)
+      
+      if (isVisible) {
+        await firstPatientCard.click({ timeout: 5000 }).catch(() => {})
+        await this.page.waitForTimeout(2000)
+        return true
+      } else {
+        // If not visible, try clicking anyway (might be in a scrollable container)
+        try {
+          await firstPatientCard.click({ force: true, timeout: 5000 })
+          await this.page.waitForTimeout(2000)
+          return true
+        } catch (error) {
+          // Try alternative: click by aria-label
+          const patientByLabel = this.page.locator('[aria-label^="patient-card-"]').first()
+          const labelCount = await patientByLabel.count().catch(() => 0)
+          if (labelCount > 0) {
+            await patientByLabel.scrollIntoViewIfNeeded().catch(() => {})
+            await this.page.waitForTimeout(500)
+            await patientByLabel.click({ timeout: 5000 }).catch(() => {})
+            await this.page.waitForTimeout(2000)
+            return true
+          }
+        }
+      }
     }
     
     return false
@@ -52,7 +81,9 @@ export class PatientDetailedWorkflow {
 
   async givenIAmOnPatientDetailsScreen(patientName?: string) {
     const patientSelected = await this.givenIHaveSelectedAPatient(patientName)
-    if (!patientSelected) return false
+    if (!patientSelected) {
+      throw new Error(`Failed to select patient${patientName ? `: ${patientName}` : ''} - no patient cards found or could not be clicked`)
+    }
 
     // Look for patient details/edit interface
     const patientDetailsElements = [

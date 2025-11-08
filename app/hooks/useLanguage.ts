@@ -4,15 +4,16 @@ import { changeLanguage } from "../i18n"
 import i18n from "i18n-js"
 import { addLanguageChangeListener, removeLanguageChangeListener } from "./languageNotifications"
 import { getCaregiver } from "../store/caregiverSlice"
+import { logger } from "../utils/logger"
 
 // Enhanced changeLanguage function that notifies listeners
 export const changeLanguageWithNotification = async (languageCode: string) => {
   try {
-    console.log("changeLanguageWithNotification called with:", languageCode)
+    logger.debug("changeLanguageWithNotification called with:", languageCode)
     await changeLanguage(languageCode)
-    console.log("Language changed successfully")
+    logger.debug("Language changed successfully")
   } catch (error) {
-    console.error("Error changing language:", error)
+    logger.error("Error changing language:", error)
   }
 }
 
@@ -31,9 +32,9 @@ export const useLanguage = () => {
   // Sync language from caregiver's preferredLanguage when caregiver data is loaded
   useEffect(() => {
     if (caregiver?.preferredLanguage && caregiver.preferredLanguage !== i18n.locale) {
-      console.log("Syncing language from caregiver profile:", caregiver.preferredLanguage)
+      logger.debug("Syncing language from caregiver profile:", caregiver.preferredLanguage)
       changeLanguageWithNotification(caregiver.preferredLanguage).catch(error => {
-        console.error("Failed to sync language from caregiver profile:", error)
+        logger.error("Failed to sync language from caregiver profile:", error)
       })
     }
   }, [caregiver?.preferredLanguage, caregiver?.id])
@@ -42,10 +43,10 @@ export const useLanguage = () => {
     const handleLanguageChange = () => {
       try {
         const newLanguage = (i18n && i18n.locale) ? i18n.locale : "en"
-        console.log("useLanguage: Language change detected, updating to:", newLanguage)
+        logger.debug("useLanguage: Language change detected, updating to:", newLanguage)
         setCurrentLanguage(newLanguage)
       } catch (error) {
-        console.error("Error in handleLanguageChange:", error)
+        logger.error("Error in handleLanguageChange:", error)
         setCurrentLanguage("en")
       }
     }

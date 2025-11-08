@@ -15,6 +15,7 @@ import {
 } from "../services/api/sentimentApi"
 import { HomeStackParamList } from "../navigators/navigationTypes"
 import { getPatient } from "../store/patientSlice"
+import { logger } from "../utils/logger"
 
 type SentimentAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "SentimentAnalysis">
 
@@ -63,18 +64,18 @@ export function SentimentAnalysisScreen() {
 
   // Debug logging
   React.useEffect(() => {
-    console.log('=== SENTIMENT ANALYSIS DEBUG ===')
-    console.log('[SentimentAnalysis] Patient source:', routePatientId ? 'route params' : 'Redux state')
-    console.log('[SentimentAnalysis] Patient ID:', patientId)
-    console.log('[SentimentAnalysis] Patient name:', patientName)
-    console.log('[SentimentAnalysis] Should fetch data:', shouldFetchData)
-    console.log('[SentimentAnalysis] Trend loading:', isTrendLoading)
-    console.log('[SentimentAnalysis] Summary loading:', isSummaryLoading)
-    console.log('[SentimentAnalysis] Trend error:', trendError)
-    console.log('[SentimentAnalysis] Summary error:', summaryError)
-    console.log('[SentimentAnalysis] Trend data (full):', JSON.stringify(trendData, null, 2))
-    console.log('[SentimentAnalysis] Summary data (full):', JSON.stringify(summaryData, null, 2))
-    console.log('=== END DEBUG ===')
+    logger.debug('=== SENTIMENT ANALYSIS DEBUG ===')
+    logger.debug('[SentimentAnalysis] Patient source:', routePatientId ? 'route params' : 'Redux state')
+    logger.debug('[SentimentAnalysis] Patient ID:', patientId)
+    logger.debug('[SentimentAnalysis] Patient name:', patientName)
+    logger.debug('[SentimentAnalysis] Should fetch data:', shouldFetchData)
+    logger.debug('[SentimentAnalysis] Trend loading:', isTrendLoading)
+    logger.debug('[SentimentAnalysis] Summary loading:', isSummaryLoading)
+    logger.debug('[SentimentAnalysis] Trend error:', trendError)
+    logger.debug('[SentimentAnalysis] Summary error:', summaryError)
+    logger.debug('[SentimentAnalysis] Trend data (full):', JSON.stringify(trendData, null, 2))
+    logger.debug('[SentimentAnalysis] Summary data (full):', JSON.stringify(summaryData, null, 2))
+    logger.debug('=== END DEBUG ===')
   }, [patientId, patientName, shouldFetchData, isTrendLoading, isSummaryLoading, trendError, summaryError, trendData, summaryData, routePatientId])
 
   const handleRefresh = useCallback(() => {

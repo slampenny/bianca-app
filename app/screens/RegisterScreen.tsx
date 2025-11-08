@@ -6,6 +6,8 @@ import { Button, Text, TextField, PhoneInputWeb } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
+import type { ThemeColors } from "../types"
+import { logger } from "../utils/logger"
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
@@ -153,9 +155,9 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         } else {
           setGeneralError("Registration successful! Please check your email for verification instructions.")
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Extract specific error message from API response
-        console.error("Registration API Error:", error); // Log the actual error for debugging
+        logger.error("Registration API Error:", error); // Log the actual error for debugging
         
         if (error?.data?.message) {
           // API returned a specific error message (e.g., "Org Email already taken")
@@ -403,7 +405,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 }
 
 // Add your StyleSheet definitions here
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaButtonUnselected,

@@ -14,6 +14,7 @@ import { Alert, Caregiver, Patient } from "../services/api/api.types"
 import { getCurrentUser } from "app/store/authSlice"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
+import { logger } from "../utils/logger"
 
 export function AlertScreen() {
   const dispatch = useDispatch()
@@ -45,7 +46,7 @@ export function AlertScreen() {
         ? fetchAllAlerts.filter(a => a.readBy?.includes(currentUser.id!)).length 
         : 0
       const unreadCount = fetchAllAlerts.length - readCount
-      console.log("Fetched alerts from API:", {
+      logger.debug("Fetched alerts from API:", {
         total: fetchAllAlerts.length,
         read: readCount,
         unread: unreadCount,
@@ -57,14 +58,14 @@ export function AlertScreen() {
         ? alerts.filter(a => a.readBy?.includes(currentUser.id!)).length 
         : 0
       if (currentReadCount > 0 && readCount === 0 && fetchAllAlerts.length === alerts.filter(a => !a.readBy?.includes(currentUser?.id!)).length) {
-        console.warn('[AlertScreen] WARNING: API returned only unread alerts when read alerts exist!')
-        console.warn('[AlertScreen] Current state has', currentReadCount, 'read alerts, but API returned', readCount)
+        logger.warn('[AlertScreen] WARNING: API returned only unread alerts when read alerts exist!')
+        logger.warn('[AlertScreen] Current state has', currentReadCount, 'read alerts, but API returned', readCount)
         // Don't overwrite if we'd lose read alerts - merge instead
         const existingReadAlerts = alerts.filter(a => currentUser && a.readBy?.includes(currentUser.id!))
         const mergedAlerts = [...fetchAllAlerts, ...existingReadAlerts.filter(existing => 
           !fetchAllAlerts.some(fresh => fresh.id === existing.id)
         )]
-        console.log('[AlertScreen] Merged alerts to preserve read ones:', mergedAlerts.length)
+        logger.debug('[AlertScreen] Merged alerts to preserve read ones:', mergedAlerts.length)
         dispatch(setAlerts(mergedAlerts))
         return
       }
@@ -72,7 +73,7 @@ export function AlertScreen() {
       // CRITICAL: Replace entire alerts array with fresh data from API
       // This ensures we have ALL alerts including read ones
       dispatch(setAlerts(fetchAllAlerts))
-      console.log("Updated Redux state with", fetchAllAlerts.length, "alerts")
+      logger.debug("Updated Redux state with", fetchAllAlerts.length, "alerts")
     }
   }, [fetchAllAlerts, dispatch, currentUser?.id])
 
@@ -95,17 +96,17 @@ export function AlertScreen() {
   const handleAlertPress = async (alert: Alert) => {
     if (alert.id) {
       try {
-        console.log('[AlertScreen] Marking alert as read:', alert.id)
-        console.log('[AlertScreen] Current alerts in state before marking:', alerts.length)
-        console.log('[AlertScreen] Current alerts breakdown:', {
+        logger.debug('[AlertScreen] Marking alert as read:', alert.id)
+        logger.debug('[AlertScreen] Current alerts in state before marking:', alerts.length)
+        logger.debug('[AlertScreen] Current alerts breakdown:', {
           total: alerts.length,
           read: currentUser ? alerts.filter(a => a.readBy?.includes(currentUser.id!)).length : 0,
           unread: currentUser ? alerts.filter(a => !a.readBy?.includes(currentUser.id!)).length : 0
         })
         
         const updatedAlert = await markAlertAsRead({ alertId: alert.id }).unwrap()
-        console.log('[AlertScreen] Alert marked as read, updated alert:', updatedAlert)
-        console.log('[AlertScreen] Updated alert readBy:', updatedAlert.readBy)
+        logger.debug('[AlertScreen] Alert marked as read, updated alert:', updatedAlert)
+        logger.debug('[AlertScreen] Updated alert readBy:', updatedAlert.readBy)
         
         // Update Redux immediately with the updated alert to ensure it's in state
         // Find the alert in the array and update it
@@ -114,7 +115,7 @@ export function AlertScreen() {
           const updatedAlerts = [...alerts]
           updatedAlerts[alertIndex] = updatedAlert
           dispatch(setAlerts(updatedAlerts))
-          console.log('[AlertScreen] Updated Redux state immediately with', updatedAlerts.length, 'alerts')
+          logger.debug('[AlertScreen] Updated Redux state immediately with', updatedAlerts.length, 'alerts')
         }
         
         // Wait for invalidatesTags to trigger automatic refetch, then also manually refetch
@@ -125,16 +126,16 @@ export function AlertScreen() {
           const readCount = currentUser 
             ? refetchResult.data.filter(a => a.readBy?.includes(currentUser.id!)).length 
             : 0
-          console.log('[AlertScreen] After refetch, got:', {
+          logger.debug('[AlertScreen] After refetch, got:', {
             total: refetchResult.data.length,
             read: readCount,
             unread: refetchResult.data.length - readCount
           })
         } else {
-          console.log('[AlertScreen] Refetch returned no data')
+          logger.debug('[AlertScreen] Refetch returned no data')
         }
       } catch (error) {
-        console.error("Failed to mark alert as read:", error)
+        logger.error("Failed to mark alert as read:", error)
       }
     }
   }
@@ -206,7 +207,7 @@ export function AlertScreen() {
   // Compute filtered alerts - use useMemo to ensure it updates when dependencies change
   // CRITICAL: When showUnread is false, we MUST show ALL alerts (both read and unread)
   const filteredAlerts = React.useMemo(() => {
-    console.log('[AlertScreen] Computing filteredAlerts:', {
+    logger.debug('[AlertScreen] Computing filteredAlerts:', {
       showUnread,
       totalAlerts: alerts.length,
       currentUserId: currentUser?.id,
@@ -218,18 +219,18 @@ export function AlertScreen() {
       const unread = currentUser 
         ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!)) 
         : []
-      console.log('[AlertScreen] Unread alerts:', unread.length)
+      logger.debug('[AlertScreen] Unread alerts:', unread.length)
       return unread
     } else {
       // CRITICAL: Show ALL alerts when not filtering by unread (both read and unread)
-      console.log('[AlertScreen] Showing ALL alerts (read + unread):', alerts.length)
+      logger.debug('[AlertScreen] Showing ALL alerts (read + unread):', alerts.length)
       return alerts
     }
   }, [showUnread, alerts, currentUser?.id])
 
   // Debug logging
   React.useEffect(() => {
-    console.log('[AlertScreen] Debug:', {
+    logger.debug('[AlertScreen] Debug:', {
       showUnread,
       alertsCount: alerts.length,
       filteredAlertsCount: filteredAlerts.length,
@@ -257,7 +258,7 @@ export function AlertScreen() {
   }
 
   const handleShowUnreadChange = (newValue: boolean) => {
-    console.log('[AlertScreen] Changing showUnread from', showUnread, 'to', newValue)
+    logger.debug('[AlertScreen] Changing showUnread from', showUnread, 'to', newValue)
     setShowUnread(newValue)
     // Don't refetch - just update the filter state
   }
@@ -268,7 +269,7 @@ export function AlertScreen() {
         <View style={styles.tabRow}>
           <Pressable
             onPress={() => {
-              console.log('Pressing Unread tab')
+              logger.debug('Pressing Unread tab')
               handleShowUnreadChange(true)
             }}
             style={styles.tabButton}
@@ -285,7 +286,7 @@ export function AlertScreen() {
           </Pressable>
           <Pressable
             onPress={() => {
-              console.log('Pressing All Alerts tab')
+              logger.debug('Pressing All Alerts tab')
               handleShowUnreadChange(false)
             }}
             style={styles.tabButton}

@@ -4,13 +4,16 @@ import { RootState } from "../../store/store"
 
 // Event emitter for auth modal - we'll use a simple callback pattern
 let showAuthModalCallback: (() => void) | null = null
-let pendingRequests: Array<{
+
+interface PendingRequest {
   args: string | FetchArgs
-  api: any
-  extraOptions: any
-  resolve: (result: any) => void
-  reject: (error: any) => void
-}> = []
+  api: unknown
+  extraOptions: unknown
+  resolve: (result: unknown) => void
+  reject: (error: unknown) => void
+}
+
+let pendingRequests: PendingRequest[] = []
 let isAuthModalShowing = false
 
 export function setShowAuthModalCallback(callback: (() => void) | null) {

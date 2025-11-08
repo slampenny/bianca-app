@@ -9,6 +9,7 @@ import Config from "../config"
 import type { PersistNavigationConfig } from "../config/config.base"
 import { useIsMounted } from "../utils/useIsMounted"
 import type { AppStackParamList, NavigationProps } from "./navigationTypes"
+import { logger } from "../utils/logger"
 
 import * as storage from "../utils/storage"
 
@@ -64,7 +65,7 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
     if (state) {
       const currentRouteName = getActiveRouteName(state)
       if (previousRouteName !== currentRouteName && __DEV__) {
-        console.log(currentRouteName)
+        logger.debug('Navigation route changed:', currentRouteName)
       }
       routeNameRef.current = currentRouteName as keyof AppStackParamList
       // Don't save navigation state in test mode

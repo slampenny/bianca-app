@@ -7,6 +7,7 @@ import {
 } from "app/store/caregiverSlice"
 import { getOrg } from "app/store/orgSlice"
 import { useGetAllCaregiversQuery } from "app/services/api"
+import { logger } from "./logger"
 
 export function useSyncOrgCaregivers() {
   const dispatch = useDispatch()
@@ -15,7 +16,7 @@ export function useSyncOrgCaregivers() {
   const orgId = currentUser?.org || currentOrg?.id || null
 
   // Query caregivers for this org
-  console.log("orgId:", orgId)
+  logger.debug("orgId:", orgId)
   const { data: caregiversData } = useGetAllCaregiversQuery({ org: orgId }, { skip: !orgId })
 
   // When data arrives, store it in the slice

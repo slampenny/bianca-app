@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
 import { Screen, Text, Button, TextField } from "app/components"
@@ -13,6 +13,7 @@ import { setAuthEmail, setAuthTokens, setCurrentUser } from "app/store/authSlice
 import { setCaregiver } from "app/store/caregiverSlice"
 import { setOrg } from "app/store/orgSlice"
 import { translate } from "app/i18n"
+import { logger } from "../utils/logger"
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -102,6 +103,17 @@ export const SSOAccountLinkingScreen = () => {
   const [passwordSet, setPasswordSet] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [isSSOLoading, setIsSSOLoading] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [])
   const { colors: themeColors, isLoading: themeLoading } = useTheme()
 
   if (themeLoading) {
@@ -161,13 +173,20 @@ export const SSOAccountLinkingScreen = () => {
         // No need to manually navigate - the app will switch to AuthStack
       } catch (loginError) {
         // If auto-login fails, navigate back to login screen
-        console.error('Auto-login after password set failed:', loginError)
-        setTimeout(() => {
+        logger.error('Auto-login after password set failed:', loginError)
+        
+        // Clear any existing timeout
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+        }
+        
+        timeoutRef.current = setTimeout(() => {
           navigation.navigate("Login" as never)
+          timeoutRef.current = null
         }, 2000)
       }
-    } catch (error: any) {
-      console.error("Set password error:", error)
+    } catch (error: unknown) {
+      logger.error("Set password error:", error)
       const errorMsg = error?.data?.message || error?.message || translate("ssoLinkingScreen.errorSetPasswordFailed")
       setErrorMessage(errorMsg)
       setPasswordSet(false)
@@ -198,7 +217,7 @@ export const SSOAccountLinkingScreen = () => {
         setErrorMessage(translate("ssoLinkingScreen.errorSSOFailed"))
       }
     } catch (error) {
-      console.error('SSO login error:', error)
+      logger.error('SSO login error:', error)
       setErrorMessage(translate("ssoLinkingScreen.errorSSOFailed"))
     } finally {
       setIsSSOLoading(false)

@@ -13,8 +13,16 @@ test.describe('Billing Screen', () => {
     await authWorkflow.thenIShouldBeOnHomeScreen()
     
     // Navigate to billing screen through Org tab
-    await page.getByTestId('tab-org').click()
-    await page.getByText('Payment').click()
+    await page.getByTestId('tab-org').or(page.getByLabel('Organization tab')).click()
+    // Wait for org screen to load
+    await page.waitForSelector('[data-testid="org-screen"], [data-testid="payment-button"]', { timeout: 10000 })
+    // Click payment button using flexible selector
+    const paymentButton = page.locator('[data-testid="payment-button"]').first()
+    await paymentButton.waitFor({ timeout: 5000 })
+    await paymentButton.click()
+    await page.waitForTimeout(2000) // Wait for payment screen to load
+    // Wait for payment screen to be visible with flexible selector
+    await page.waitForSelector('[data-testid="payment-info-container"]', { timeout: 10000 })
     await expect(page.getByTestId('payment-info-container')).toBeVisible()
     
     // Check that tabs are visible
@@ -56,8 +64,14 @@ test.describe('Billing Screen', () => {
     await authWorkflow.thenIShouldBeOnHomeScreen()
     
     // Try to navigate to billing screen through Org tab
-    await page.getByTestId('tab-org').click()
-    await page.getByText('Payment').click()
+    await page.getByTestId('tab-org').or(page.getByLabel('Organization tab')).click()
+    // Wait for org screen to load
+    await page.waitForSelector('[data-testid="org-screen"], [data-testid="payment-button"]', { timeout: 10000 })
+    // Click payment button using flexible selector
+    const paymentButton = page.locator('[data-testid="payment-button"]').first()
+    await paymentButton.waitFor({ timeout: 5000 })
+    await paymentButton.click()
+    await page.waitForTimeout(2000) // Wait for payment screen to load
     
     // Should show access restricted message
     await expect(page.getByTestId('access-restricted-title')).toBeVisible()
@@ -75,8 +89,16 @@ test.describe('Billing Screen', () => {
     await authWorkflow.thenIShouldBeOnHomeScreen()
     
     // Navigate to billing screen through Org tab
-    await page.getByTestId('tab-org').click()
-    await page.getByText('Payment').click()
+    await page.getByTestId('tab-org').or(page.getByLabel('Organization tab')).click()
+    // Wait for org screen to load
+    await page.waitForSelector('[data-testid="org-screen"], [data-testid="payment-button"]', { timeout: 10000 })
+    // Click payment button using flexible selector
+    const paymentButton = page.locator('[data-testid="payment-button"]').first()
+    await paymentButton.waitFor({ timeout: 5000 })
+    await paymentButton.click()
+    await page.waitForTimeout(2000) // Wait for payment screen to load
+    // Wait for payment screen to be visible
+    await page.waitForSelector('[data-testid="payment-info-container"]', { timeout: 10000 })
     await page.getByTestId('current-charges-tab').click()
     
     // Wait for content to load
@@ -107,8 +129,16 @@ test.describe('Billing Screen', () => {
     await authWorkflow.thenIShouldBeOnHomeScreen()
     
     // Navigate to billing screen through Org tab
-    await page.getByTestId('tab-org').click()
-    await page.getByText('Payment').click()
+    await page.getByTestId('tab-org').or(page.getByLabel('Organization tab')).click()
+    // Wait for org screen to load
+    await page.waitForSelector('[data-testid="org-screen"], [data-testid="payment-button"]', { timeout: 10000 })
+    // Click payment button using flexible selector
+    const paymentButton = page.locator('[data-testid="payment-button"]').first()
+    await paymentButton.waitFor({ timeout: 5000 })
+    await paymentButton.click()
+    await page.waitForTimeout(2000) // Wait for payment screen to load
+    // Wait for payment screen to be visible
+    await page.waitForSelector('[data-testid="payment-info-container"]', { timeout: 10000 })
     await page.getByTestId('billing-info-tab').click()
     
     // Wait for content to load

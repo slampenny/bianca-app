@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Patient } from "../services/api/api.types"
 import { authApi, patientApi } from "app/services/api"
+import { logger } from "../utils/logger"
 
 interface PatientState {
   patient: Patient | null
@@ -18,28 +19,28 @@ export const patientSlice = createSlice({
   initialState,
   reducers: {
     setPatient: (state, action: PayloadAction<Patient | null>) => {
-      console.log("setPatient called with:", action.payload)
+      logger.debug("setPatient called with:", action.payload)
       state.patient = action.payload
     },
     setPatientsForCaregiver: (
       state,
       action: PayloadAction<{ caregiverId: string; patients: Patient[] }>,
     ) => {
-      console.log("setPatientsForCaregiver called for caregiver:", action.payload.caregiverId)
+      logger.debug("setPatientsForCaregiver called for caregiver:", action.payload.caregiverId)
       state.patients[action.payload.caregiverId] = action.payload.patients
     },
     clearPatient: (state) => {
-      console.log("clearPatient called")
+      logger.debug("clearPatient called")
       state.patient = null
     },
     clearPatients: (state) => {
-      console.log("clearPatients called")
+      logger.debug("clearPatients called")
       state.patients = {}
     },
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      console.log("Login matchFulfilled:", payload)
+      logger.debug("Login matchFulfilled:", payload)
       // Only set patients if MFA is not required (when MFA is required, payload only has tempToken)
       if (!payload.requireMFA && payload.caregiver && payload.patients) {
         state.patients[payload.caregiver.id!] = []
@@ -58,7 +59,7 @@ export const patientSlice = createSlice({
       state.patients = {}
     })
     builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state, { payload }) => {
-      console.log("createPatient matchFulfilled:", payload)
+      logger.debug("createPatient matchFulfilled:", payload)
       state.patient = payload
       
       // Add the patient to all caregivers' patient lists
@@ -79,19 +80,19 @@ export const patientSlice = createSlice({
       // This is a fallback in case the caregivers array is not populated
       const currentUser = (state as any).auth?.user
       if (currentUser && currentUser.id) {
-        console.log(`Adding patient to current user's list: ${currentUser.id}`)
+        logger.debug(`Adding patient to current user's list: ${currentUser.id}`)
         if (!state.patients[currentUser.id]) {
           state.patients[currentUser.id] = []
         }
         const existingIndex = state.patients[currentUser.id].findIndex(p => p.id === payload.id)
         if (existingIndex === -1) {
           state.patients[currentUser.id].push(payload)
-          console.log(`Patient added to user ${currentUser.id}'s list. Total patients: ${state.patients[currentUser.id].length}`)
+          logger.debug(`Patient added to user ${currentUser.id}'s list. Total patients: ${state.patients[currentUser.id].length}`)
         } else {
-          console.log(`Patient already exists in user ${currentUser.id}'s list`)
+          logger.debug(`Patient already exists in user ${currentUser.id}'s list`)
         }
       } else {
-        console.log('No current user found in auth state')
+        logger.debug('No current user found in auth state')
       }
     })
     builder.addMatcher(patientApi.endpoints.updatePatient.matchFulfilled, (state, { payload }) => {
@@ -108,7 +109,7 @@ export const patientSlice = createSlice({
     builder.addMatcher(
       patientApi.endpoints.uploadPatientAvatar.matchFulfilled,
       (state, { payload }) => {
-        console.log("uploadPatientAvatar matchFulfilled:", payload)
+        logger.debug("uploadPatientAvatar matchFulfilled:", payload)
         if (state.patient && state.patient.id === payload.id) {
           state.patient.avatar = payload.avatar
         }
@@ -124,7 +125,7 @@ export const patientSlice = createSlice({
       },
     )
     builder.addMatcher(patientApi.endpoints.deletePatient.matchFulfilled, (state) => {
-      console.log("deletePatient matchFulfilled")
+      logger.debug("deletePatient matchFulfilled")
       if (state.patient && state.patient.caregivers) {
         state.patient.caregivers.forEach((caregiverId: string) => {
           state.patients[caregiverId] = state.patients[caregiverId]?.filter(

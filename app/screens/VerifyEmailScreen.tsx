@@ -7,10 +7,12 @@ import { Screen, Text, Button } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { spacing } from "app/theme"
 import { translate } from "app/i18n"
+import type { ThemeColors } from "../types"
 import { navigationRef } from "app/navigators/navigationUtilities"
 import { useVerifyEmailMutation } from "app/services/api/authApi"
+import { logger } from "../utils/logger"
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.palette.biancaBackground || colors.palette.neutral100,
@@ -126,7 +128,7 @@ export const VerifyEmailScreen = () => {
 
         return () => subscription.remove()
       } catch (e) {
-        console.error('Error extracting token from URL:', e)
+        logger.error('Error extracting token from URL:', e)
         return null
       }
     }
@@ -163,8 +165,8 @@ export const VerifyEmailScreen = () => {
             setErrorMessage(result.message || translate("emailVerificationScreen.verificationFailed"))
           }
         }
-      } catch (error: any) {
-        console.error('Email verification error:', error)
+      } catch (error: unknown) {
+        logger.error('Email verification error:', error)
         setStatus("error")
         // RTK Query error handling
         if (error?.data?.html) {

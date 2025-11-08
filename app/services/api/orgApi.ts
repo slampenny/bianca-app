@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import { Org, OrgPages, Caregiver } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
+import { logger } from "../../utils/logger"
 
 export const orgApi = createApi({
   reducerPath: "orgApi",
@@ -12,7 +13,7 @@ export const orgApi = createApi({
       { name?: string; role?: string; sortBy?: string; limit?: number; page?: number }
     >({
       query: (params) => {
-        console.log("[orgApi] getAllOrgs query called with params:", params)
+        logger.debug("[orgApi] getAllOrgs query called with params:", params)
         return {
           url: `/orgs`,
           method: "GET",
@@ -22,13 +23,13 @@ export const orgApi = createApi({
     }),
     getOrg: builder.query<Org, { orgId: string }>({
       query: ({ orgId }) => {
-        console.log("[orgApi] getOrg query called for orgId:", orgId)
+        logger.debug("[orgApi] getOrg query called for orgId:", orgId)
         return `/orgs/${orgId}`
       },
     }),
     updateOrg: builder.mutation<{ org: Org }, { orgId: string; org: any }>({
       query: ({ orgId, org }) => {
-        console.log("[orgApi] updateOrg mutation called for orgId:", orgId, "with org:", org)
+        logger.debug("[orgApi] updateOrg mutation called for orgId:", orgId, "with org:", org)
         return {
           url: `/orgs/${orgId}`,
           method: "PATCH",
@@ -38,7 +39,7 @@ export const orgApi = createApi({
     }),
     deleteOrg: builder.mutation<void, { orgId: string }>({
       query: ({ orgId }) => {
-        console.log("[orgApi] deleteOrg mutation called for orgId:", orgId)
+        logger.debug("[orgApi] deleteOrg mutation called for orgId:", orgId)
         return {
           url: `/orgs/${orgId}`,
           method: "DELETE",
@@ -47,7 +48,7 @@ export const orgApi = createApi({
     }),
     addCaregiver: builder.mutation<void, { orgId: string; caregiverId: string }>({
       query: ({ orgId, caregiverId }) => {
-        console.log(
+        logger.debug(
           "[orgApi] addCaregiver mutation called for orgId:",
           orgId,
           "caregiverId:",
@@ -62,7 +63,7 @@ export const orgApi = createApi({
     }),
     removeCaregiver: builder.mutation<Caregiver, { orgId: string; caregiverId: string }>({
       query: ({ orgId, caregiverId }) => {
-        console.log(
+        logger.debug(
           "[orgApi] removeCaregiver mutation called for orgId:",
           orgId,
           "caregiverId:",
@@ -77,7 +78,7 @@ export const orgApi = createApi({
     }),
     setRole: builder.mutation<void, { orgId: string; caregiverId: string; role: string }>({
       query: ({ orgId, caregiverId, role }) => {
-        console.log(
+        logger.debug(
           "[orgApi] setRole mutation called for orgId:",
           orgId,
           "caregiverId:",
@@ -97,7 +98,7 @@ export const orgApi = createApi({
       { orgId: string; name: string; email: string; phone: string }
     >({
       query: ({ orgId, name, email, phone }) => {
-        console.log(
+        logger.debug(
           "[orgApi] sendInvite mutation called for orgId:",
           orgId,
           "with name:",
@@ -117,7 +118,7 @@ export const orgApi = createApi({
     }),
     verifyInvite: builder.mutation<void, { orgId: string; token: string }>({
       query: ({ orgId, token }) => {
-        console.log("[orgApi] verifyInvite mutation called for orgId:", orgId, "token:", token)
+        logger.debug("[orgApi] verifyInvite mutation called for orgId:", orgId, "token:", token)
         return {
           url: `/orgs/${orgId}/verify-invite/${token}`,
           method: "PATCH",

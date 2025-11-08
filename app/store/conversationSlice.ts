@@ -3,6 +3,7 @@ import { RootState } from "./store"
 import { Conversation } from "../services/api/api.types"
 import { patientApi, conversationApi } from "../services/api"
 import { setActiveCall } from "./callSlice"
+import { logger } from "../utils/logger"
 
 interface ConversationState {
   conversation: Conversation
@@ -34,10 +35,10 @@ export const conversationSlice = createSlice({
   reducers: {
     setConversation: (state, action: PayloadAction<Conversation | null>) => {
       if (!action.payload) {
-        console.log('[ConversationSlice] Setting conversation to default (null)');
+        logger.debug('[ConversationSlice] Setting conversation to default (null)');
         state.conversation = defaultConversation
       } else {
-        console.log('[ConversationSlice] Setting conversation:', action.payload.id);
+        logger.debug('[ConversationSlice] Setting conversation:', action.payload.id);
         state.conversation = action.payload
         const index = state.conversations.findIndex(
           (conversation) => conversation.id === state.conversation.id,
@@ -49,7 +50,7 @@ export const conversationSlice = createSlice({
     },
     setConversations: (state, action: PayloadAction<Conversation[]>) => {
       if (action.payload.length > 0) {
-        console.log('[ConversationSlice] Setting conversations, current conversation set to:', action.payload[0].id);
+        logger.debug('[ConversationSlice] Setting conversations, current conversation set to:', action.payload[0].id);
         state.conversation = action.payload[0]
       }
       state.conversations = action.payload
@@ -81,7 +82,7 @@ export const conversationSlice = createSlice({
     builder.addMatcher(
       conversationApi.endpoints.getConversationsByPatient.matchFulfilled,
       (state, { payload }) => {
-        console.log('[ConversationSlice] getConversationsByPatient fulfilled:', {
+        logger.debug('[ConversationSlice] getConversationsByPatient fulfilled:', {
           page: payload.page,
           totalResults: payload.totalResults,
           resultsCount: payload.results?.length || 0
@@ -90,11 +91,11 @@ export const conversationSlice = createSlice({
         // For the first page, replace all conversations
         if (payload.page === 1) {
           state.conversations = payload.results || [];
-          console.log('[ConversationSlice] Set first page conversations:', payload.results?.map(c => ({ id: c.id, startTime: c.startTime })));
+          logger.debug('[ConversationSlice] Set first page conversations:', payload.results?.map(c => ({ id: c.id, startTime: c.startTime })));
         } else {
           // For subsequent pages, append to existing conversations
           state.conversations = [...state.conversations, ...(payload.results || [])];
-          console.log('[ConversationSlice] Appended page conversations, total:', state.conversations.length);
+          logger.debug('[ConversationSlice] Appended page conversations, total:', state.conversations.length);
         }
         
         // Set the first conversation as the current one if we have conversations
@@ -114,7 +115,7 @@ export const conversationSlice = createSlice({
     // Listen for active call changes and sync conversation ID
     builder.addMatcher(setActiveCall.match, (state, { payload }) => {
       if (payload?.conversationId) {
-        console.log('[ConversationSlice] Active call set, syncing conversation ID:', payload.conversationId);
+        logger.debug('[ConversationSlice] Active call set, syncing conversation ID:', payload.conversationId);
         
         // Find the conversation that matches the active call's conversation ID
         const matchingConversation = state.conversations.find(
@@ -122,10 +123,10 @@ export const conversationSlice = createSlice({
         );
         
         if (matchingConversation) {
-          console.log('[ConversationSlice] Found matching conversation, setting as current:', matchingConversation.id);
+          logger.debug('[ConversationSlice] Found matching conversation, setting as current:', matchingConversation.id);
           state.conversation = matchingConversation;
         } else {
-          console.log('[ConversationSlice] No matching conversation found for active call ID:', payload.conversationId);
+          logger.debug('[ConversationSlice] No matching conversation found for active call ID:', payload.conversationId);
           // The conversation might not be loaded yet, but we should still set a placeholder
           // This will be updated when the conversation is fetched
         }
@@ -135,7 +136,7 @@ export const conversationSlice = createSlice({
     builder.addMatcher(conversationApi.endpoints.getConversation.matchFulfilled, (state, { payload, meta }) => {
       // We'll handle this in the component level since we can't easily access other slice state here
       // The CallScreen will handle setting the conversation when it gets the data
-      console.log('[ConversationSlice] Conversation fetched:', payload.id);
+      logger.debug('[ConversationSlice] Conversation fetched:', payload.id);
     })
   },
 })

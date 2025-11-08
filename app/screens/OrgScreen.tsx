@@ -13,7 +13,9 @@ import { clearCaregiver } from "../store/caregiverSlice"
 import { setOrg } from "../store/orgSlice"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
+import type { ThemeColors } from "../types"
 import { Button, Text, TextField } from "app/components"
+import { logger } from "../utils/logger"
 
 export function OrgScreen() {
   const dispatch = useDispatch()
@@ -60,7 +62,7 @@ export function OrgScreen() {
             setIsLoading(false)
           }
         } catch (error) {
-          console.error('Failed to load org:', error)
+          logger.error('Failed to load org:', error)
           // Stop loading even if fetch fails
           setIsLoading(false)
         }
@@ -230,7 +232,7 @@ export function OrgScreen() {
   )
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.biancaBackground,
     flex: 1,

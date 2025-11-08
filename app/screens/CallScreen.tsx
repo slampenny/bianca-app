@@ -10,6 +10,8 @@ import { ConversationMessages } from "../components/ConversationMessages"
 import { useGetConversationQuery } from "../services/api/conversationApi"
 import { useGetCallStatusQuery } from "../services/api/callWorkflowApi"
 import { useTheme } from "app/theme/ThemeContext"
+import { logger } from "../utils/logger"
+import { POLLING_INTERVALS, STRINGS } from "../constants"
 
 export function CallScreen() {
   const dispatch = useDispatch()
@@ -27,8 +29,8 @@ export function CallScreen() {
   } = useGetCallStatusQuery(
     activeCall?.conversationId || '',
     {
-      pollingInterval: 2000, // Poll every 2 seconds for live call updates
-      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call',
+      pollingInterval: POLLING_INTERVALS.CALL_STATUS,
+      skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID,
     }
   )
 
@@ -41,15 +43,15 @@ export function CallScreen() {
   } = useGetConversationQuery(
     { conversationId: activeCall?.conversationId || '' },
     {
-      pollingInterval: 3000, // Poll every 3 seconds (less frequent than call status)
-      skip: !activeCall?.conversationId || activeCall.conversationId === 'temp-call' || !callStatusData,
+      pollingInterval: POLLING_INTERVALS.CONVERSATION,
+      skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID || !callStatusData,
       // Only try conversation API if call status is working
     }
   )
 
   // Log call status and conversation polling activity
   React.useEffect(() => {
-    console.log('💬 CallScreen - Call status polling:', {
+    logger.debug('💬 CallScreen - Call status polling:', {
       conversationId: activeCall?.conversationId,
       callStatusLoading: isCallStatusLoading,
       callStatusFetching: isCallStatusFetching,
@@ -64,7 +66,7 @@ export function CallScreen() {
     
     // Log AI speaking status
     if (callStatusData?.data?.aiSpeaking) {
-      console.log('🎤 CallScreen - AI Speaking Status:', {
+      logger.debug('🎤 CallScreen - AI Speaking Status:', {
         isSpeaking: callStatusData.data.aiSpeaking.isSpeaking,
         userIsSpeaking: callStatusData.data.aiSpeaking.userIsSpeaking,
         conversationState: callStatusData.data.aiSpeaking.conversationState,
@@ -74,7 +76,7 @@ export function CallScreen() {
     
     // Log message count
     if (callStatusData?.data?.messages) {
-      console.log('💬 CallScreen - Messages from call status:', {
+      logger.debug('💬 CallScreen - Messages from call status:', {
         messageCount: callStatusData.data.messages.length,
         messages: callStatusData.data.messages.map(m => ({
           id: m.id,
@@ -88,7 +90,7 @@ export function CallScreen() {
     
     // Log specific 404 errors with more context
     if ((conversationError as any)?.status === 404) {
-      console.warn('⚠️ CallScreen - Conversation not found (404), but call status is working:', {
+      logger.warn('⚠️ CallScreen - Conversation not found (404), but call status is working:', {
         conversationId: activeCall?.conversationId,
         callStatusWorking: !!callStatusData,
         error: conversationError,
@@ -118,7 +120,7 @@ export function CallScreen() {
   // Log conversation updates and sync with Redux store
   React.useEffect(() => {
     if (liveConversationData) {
-      console.log('💬 CallScreen - Live conversation data updated:', {
+      logger.debug('💬 CallScreen - Live conversation data updated:', {
         conversationId: liveConversationData.id,
         messageCount: liveConversationData.messages?.length || 0,
         lastMessage: liveConversationData.messages?.[liveConversationData.messages.length - 1]?.content?.substring(0, 50) || 'No messages',
@@ -128,7 +130,7 @@ export function CallScreen() {
       // Ensure the live conversation data is set as the current conversation in Redux
       // This ensures the conversation screen shows the same conversation as the call status banner
       if (liveConversationData.id !== currentConversation?.id) {
-        console.log('🔄 CallScreen - Syncing live conversation to Redux store:', liveConversationData.id);
+        logger.debug('🔄 CallScreen - Syncing live conversation to Redux store:', liveConversationData.id);
         dispatch(setConversation(liveConversationData));
       }
     }
@@ -137,7 +139,7 @@ export function CallScreen() {
   // Consume pending call data when component mounts
   React.useEffect(() => {
     if (!activeCall) {
-      console.log('CallScreen - Consuming pending call data')
+      logger.debug('CallScreen - Consuming pending call data')
       dispatch(consumePendingCallData())
     }
   }, [activeCall, dispatch])
@@ -176,7 +178,7 @@ export function CallScreen() {
             initialStatus={activeCall.status || 'initiated'}
             patientName={patient.name}
             onStatusChange={(status) => {
-              console.log('Call status changed:', status)
+              logger.debug('Call status changed:', status)
             }}
           />
         </View>

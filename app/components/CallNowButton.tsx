@@ -8,6 +8,7 @@ import { colors } from "app/theme/colors"
 import { useAppDispatch } from "../store/store"
 import { setActiveCall, setCallStatus } from "../store/callSlice"
 import { translate } from "app/i18n"
+import { logger } from "../utils/logger"
 
 interface CallNowButtonProps {
   patientId: string
@@ -40,10 +41,10 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       })
       
       // Store call data in Redux
-      console.log('CallNowButton - Full response:', response)
-      console.log('CallNowButton - response.conversationId:', response.conversationId)
-      console.log('CallNowButton - response.data:', (response as any).data)
-      console.log('CallNowButton - response.success:', (response as any).success)
+      logger.debug('CallNowButton - Full response:', response)
+      logger.debug('CallNowButton - response.conversationId:', response.conversationId)
+      logger.debug('CallNowButton - response.data:', (response as any).data)
+      logger.debug('CallNowButton - response.success:', (response as any).success)
       
       dispatch(setActiveCall(response))
       dispatch(setCallStatus({
@@ -76,7 +77,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
     } catch (err: any) {
       const errorMessage = err?.response?.data?.message || 'Failed to initiate call'
       setError(errorMessage)
-      console.error('Call initiation error:', err)
+      logger.error('Call initiation error:', err)
     } finally {
       setIsCalling(false)
     }

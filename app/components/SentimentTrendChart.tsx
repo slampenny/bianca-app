@@ -4,6 +4,7 @@ import { Text } from "./Text"
 import { useTheme } from "../theme/ThemeContext"
 import { SentimentTrend, SentimentTrendPoint } from "../services/api/api.types"
 import { translate } from "../i18n"
+import { logger } from "../utils/logger"
 
 interface SentimentTrendChartProps {
   trend: SentimentTrend
@@ -19,7 +20,7 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
   const styles = createStyles(colors)
 
   // Debug logging
-  console.log('[SentimentChart] Received trend data:', {
+  logger.debug('[SentimentChart] Received trend data:', {
     trend,
     dataPoints,
     summary,
@@ -77,7 +78,7 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
     const y = chartHeight - ((score - minScore) / scoreRange) * chartHeight
     
     // Debug logging
-    console.log(`[SentimentChart] Point ${index}:`, {
+    logger.debug(`[SentimentChart] Point ${index}:`, {
       point,
       sentiment: point.sentiment,
       sentimentScore: point.sentiment?.sentimentScore,

@@ -8,6 +8,7 @@ import { clearCaregivers } from "../store/caregiverSlice"
 import { clearPatients } from "../store/patientSlice"
 import { Button, Screen, Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
+import { logger } from "../utils/logger"
 
 export const LogoutScreen = () => {
   const dispatch = useDispatch()
@@ -26,9 +27,9 @@ export const LogoutScreen = () => {
     if (tokens) {
       try {
         await logout({ refreshToken: tokens.refresh.token }).unwrap()
-        console.log("Logout successful")
+        logger.debug("Logout successful")
       } catch (error) {
-        console.log("Logout API failed (this is normal if token was already expired):", error)
+        logger.warn("Logout API failed (this is normal if token was already expired):", error)
         // Don't treat 404 as an error - it means the token was already invalid
       }
     }
@@ -59,7 +60,7 @@ export const LogoutScreen = () => {
   )
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaBackground,

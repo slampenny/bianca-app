@@ -7,6 +7,7 @@ import { useGetStripeConfigQuery } from 'app/services/api/stripeApi'
 import { translate } from 'app/i18n'
 import { useTheme } from 'app/theme/ThemeContext'
 import StripeWebPayment from './StripeWebPayment'
+import { logger } from '../utils/logger'
 
 interface StripePaymentProps {
   orgId: string
@@ -44,7 +45,7 @@ const StripeMobileWrapper: React.FC<StripePaymentProps & { publishableKey: strin
           error: null,
         })
       } catch (error) {
-        console.error('Failed to load mobile Stripe components:', error)
+        logger.error('Failed to load mobile Stripe components:', error)
         setMobileComponents(prev => ({
           ...prev,
           isLoaded: true,

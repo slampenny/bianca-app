@@ -15,11 +15,13 @@ import { getOrg } from "../store/orgSlice"
 import { useGetInvoicesByOrgQuery, useGetUnbilledCostsByOrgQuery } from "../services/api/paymentApi"
 import { WebView } from "react-native-webview"
 import { translate } from "../i18n"
+import type { ThemeColors } from "../types"
 import Config from "../config"
 import { spacing } from "app/theme"
 import { useTheme } from "app/theme/ThemeContext"
 import { Text, Card, ListItem, Button, Icon } from "app/components"
 import StripePayment from "app/components/StripePayment"
+import { logger } from "../utils/logger"
 
 // --- Define the required roles ---
 const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
@@ -163,11 +165,11 @@ function PaymentMethodsScreen() {
 
   const handlePaymentMethodAdded = () => {
     // Refresh payment methods or show success message
-    console.log('Payment method added successfully')
+    logger.debug('Payment method added successfully')
   }
 
   const handleError = (error: string) => {
-    console.error('Payment error:', error)
+    logger.error('Payment error:', error)
     // You could show a toast or alert here
   }
 
@@ -279,7 +281,7 @@ function CurrentChargesScreen() {
 
   useEffect(() => {
     if (unbilledCostsError) {
-      console.error("Error loading unbilled costs", unbilledCostsError)
+      logger.error("Error loading unbilled costs", unbilledCostsError)
     }
   }, [unbilledCostsError])
 
@@ -443,7 +445,7 @@ function BillingInfoScreen() {
 
   useEffect(() => {
     if (invoicesError) {
-      console.error("Error loading invoices", invoicesError)
+      logger.error("Error loading invoices", invoicesError)
     }
   }, [invoicesError])
 
@@ -682,7 +684,7 @@ export function PaymentInfoScreen() {
 }
 
 // --- Styles (Updated for new design) ---
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // General styles
   centered: {
     flex: 1,

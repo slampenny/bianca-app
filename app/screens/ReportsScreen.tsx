@@ -9,6 +9,7 @@ import { getPatientsForCaregiver, setPatient } from "../store/patientSlice"
 import { Patient } from "../services/api/api.types"
 import { translate } from "../i18n"
 import { Button, Text } from "app/components"
+import { logger } from "../utils/logger"
 
 const { width } = Dimensions.get('window')
 const buttonSize = Math.min((width - 60) / 2, 160) // Max 160px width, responsive
@@ -51,7 +52,7 @@ export function ReportsScreen() {
 
   const handleComingSoonPress = () => {
     // TODO: Show coming soon message
-    console.log("Coming soon pressed")
+    logger.debug("Coming soon pressed")
   }
 
   if (themeLoading) {

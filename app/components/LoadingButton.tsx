@@ -2,6 +2,7 @@ import React from "react"
 import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from "react-native"
 import { colors } from "app/theme/colors"
 import { translate } from "app/i18n"
+import { logger } from "../utils/logger"
 
 interface LoadingButtonProps {
   onPress: () => void | Promise<void>
@@ -37,7 +38,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
   const isDisabled = disabled || loading
 
   const handlePress = async () => {
-    console.log('LoadingButton pressed', { title, tx, loading, disabled, isDisabled, testID })
+    logger.debug('LoadingButton pressed', { title, tx, loading, disabled, isDisabled, testID })
     if (!isDisabled && onPress) {
       try {
         await onPress()

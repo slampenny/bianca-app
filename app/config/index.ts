@@ -19,6 +19,7 @@ import DevConfig from "./config.dev"
 import TestConfig from "./config.test"
 import StagingConfig from "./config.staging"
 import Constants from "expo-constants"
+import { logger } from "../utils/logger"
 
 // Check for test environment first to avoid window access issues
 let ExtraConfig = ProdConfig
@@ -27,10 +28,10 @@ if (process.env.NODE_ENV === 'test' ||
     process.env.PLAYWRIGHT_TEST === '1' ||
     process.env.JEST_WORKER_ID) {
   ExtraConfig = TestConfig
-  console.log('Using TEST config');
+  logger.debug('Using TEST config');
 } else {
   // Debug logging (only when not in test environment)
-  console.log('Config loading - Environment check:', {
+  logger.debug('Config loading - Environment check:', {
     __DEV__: typeof __DEV__ !== 'undefined' ? __DEV__ : 'undefined',
     NODE_ENV: process.env.NODE_ENV,
     PLAYWRIGHT_TEST: process.env.PLAYWRIGHT_TEST,
@@ -42,25 +43,25 @@ if (process.env.NODE_ENV === 'test' ||
   // For web: if running on localhost, use dev config (for local testing and Playwright tests)
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
     ExtraConfig = DevConfig
-    console.log('Using DEV config (localhost detected)');
+    logger.debug('Using DEV config (localhost detected)');
   }
   // Use dev config for development
   else if (typeof __DEV__ !== 'undefined' && __DEV__) {
     ExtraConfig = DevConfig
-    console.log('Using DEV config');
+    logger.debug('Using DEV config');
   }
   // Use staging config if explicitly set in Expo config or build-time environment
   else if (Constants.expoConfig?.extra?.environment === 'staging' || 
            process.env.EXPO_PUBLIC_ENVIRONMENT === 'staging') {
     ExtraConfig = StagingConfig
-    console.log('Using STAGING config (from Expo constants or build env)');
+    logger.debug('Using STAGING config (from Expo constants or build env)');
   } else {
-    console.log('Using PROD config');
+    logger.debug('Using PROD config');
   }
 }
 
 const Config = { ...BaseConfig, ...ExtraConfig }
 
-console.log('Final API_URL:', Config.API_URL);
+logger.debug('Final API_URL:', Config.API_URL);
 
 export default Config

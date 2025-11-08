@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
 import { Screen, Text, Button, TextField } from "app/components"
@@ -9,6 +9,8 @@ import { useTheme } from "app/theme/ThemeContext"
 import { useSelector } from "react-redux"
 import { getAuthEmail } from "app/store/authSlice"
 import { translate } from "app/i18n"
+import { logger } from "../utils/logger"
+import { TIMEOUTS } from "../constants"
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -113,15 +115,25 @@ export const EmailVerificationRequiredScreen = () => {
     }
 
     try {
-      console.log("Attempting to resend verification email to:", email.trim())
+      logger.debug("Attempting to resend verification email to:", email.trim())
       const result = await resendVerificationEmail({ email: email.trim() }).unwrap()
-      console.log("Resend verification email success:", result)
+      logger.debug("Resend verification email success:", result)
       setEmailSent(true)
       setErrorMessage("") // Clear any previous errors on success
-      setTimeout(() => setEmailSent(false), 5000) // Hide success message after 5 seconds
-    } catch (error: any) {
-      console.error("Resend verification email error:", error)
-      console.error("Error details:", {
+      
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
+      // Set new timeout with cleanup
+      timeoutRef.current = setTimeout(() => {
+        setEmailSent(false)
+        timeoutRef.current = null
+      }, TIMEOUTS.SUCCESS_MESSAGE_DISPLAY)
+    } catch (error: unknown) {
+      logger.error("Resend verification email error:", error)
+      logger.error("Error details:", {
         status: error?.status,
         data: error?.data,
         error: error?.error,

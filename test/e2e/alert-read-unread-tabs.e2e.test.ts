@@ -6,14 +6,14 @@ import { TEST_USERS } from './fixtures/testData'
 test.describe("Alert Read/Unread Tabs Verification", () => {
   test.beforeEach(async ({ page }) => {
     await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.getByLabel('home-header')).toBeVisible()
   })
 
   test("should show different items on Unread vs All Alerts tabs when alerts are read", async ({ page }) => {
     console.log('=== ALERT READ/UNREAD TABS TEST ===')
     
     // Navigate to alert screen
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     
@@ -80,7 +80,7 @@ test.describe("Alert Read/Unread Tabs Verification", () => {
     console.log('=== ALL ALERTS UNREAD TEST ===')
     
     // Navigate to alert screen
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     

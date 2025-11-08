@@ -5,6 +5,7 @@ import { spacing, typography } from "app/theme"
 import { Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
+import type { ThemeColors } from "../types"
 import { useLanguage } from "app/hooks/useLanguage"
 import Markdown from 'react-native-markdown-display'
 
@@ -109,7 +110,7 @@ const createStyles = (colors: any, windowHeight?: number) => StyleSheet.create({
   },
 })
 
-const createMarkdownStyles = (colors: any) => ({
+const createMarkdownStyles = (colors: ThemeColors) => ({
   body: {
     color: colors.text,
     fontSize: 16,

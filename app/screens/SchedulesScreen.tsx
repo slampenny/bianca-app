@@ -13,9 +13,11 @@ import { LoadingScreen } from "./LoadingScreen"
 import { Schedule } from "app/services/api"
 import { getPatient } from "app/store/patientSlice"
 import { spacing } from "app/theme"
+import { logger } from "../utils/logger"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { Text, Button, Card } from "app/components"
+import type { ThemeColors } from "../types"
 
 export const SchedulesScreen = () => {
   const dispatch = useDispatch()
@@ -44,7 +46,7 @@ export const SchedulesScreen = () => {
     if (selectedSchedule && selectedSchedule.id) {
       await deleteSchedule({ scheduleId: selectedSchedule.id })
     } else {
-      console.error("No schedule selected to delete.")
+      logger.error("No schedule selected to delete.")
     }
   }
 
@@ -147,7 +149,7 @@ export const SchedulesScreen = () => {
   )
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     flex: 1,
     marginHorizontal: spacing.xs,

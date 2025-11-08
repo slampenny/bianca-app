@@ -25,6 +25,7 @@ import {
 } from "../services/api/api.types"
 import { HomeStackParamList } from "../navigators/navigationTypes"
 import { getPatient } from "../store/patientSlice"
+import { logger } from "../utils/logger"
 
 type MedicalAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "MedicalAnalysis">
 
@@ -101,9 +102,9 @@ export function MedicalAnalysisScreen() {
     if (!patientId) return
     
     try {
-      console.log('Triggering medical analysis for patient:', patientId)
+      logger.debug('Triggering medical analysis for patient:', patientId)
       const result = await triggerAnalysis({ patientId }).unwrap()
-      console.log('Trigger analysis result:', result)
+      logger.debug('Trigger analysis result:', result)
       
       if (result.success) {
         showSuccess(translate('medicalAnalysis.triggerSuccess'))
@@ -216,7 +217,7 @@ export function MedicalAnalysisScreen() {
       ) : (
         <ScrollView style={styles.resultsContainer}>
           {(() => {
-            console.log('Total analysis results:', analysisResults.length)
+            logger.debug('Total analysis results:', analysisResults.length)
             
             // Get the most recent analysis result
             const latestResult = analysisResults
@@ -238,21 +239,21 @@ export function MedicalAnalysisScreen() {
               )
               .sort((a, b) => new Date(a.analysisDate).getTime() - new Date(b.analysisDate).getTime()) // Sort chronologically for chart
             
-            console.log('Latest result:', latestResult)
-            console.log('Latest result cognitive metrics:', latestResult?.cognitiveMetrics)
-            console.log('Latest result psychiatric metrics:', latestResult?.psychiatricMetrics)
-            console.log('Latest result vocabulary metrics:', latestResult?.vocabularyMetrics)
-            console.log('Cognitive risk score:', latestResult?.cognitiveMetrics?.riskScore)
-            console.log('Psychiatric overall risk score:', latestResult?.psychiatricMetrics?.overallRiskScore)
-            console.log('Vocabulary complexity score:', latestResult?.vocabularyMetrics?.complexityScore)
+            logger.debug('Latest result:', latestResult)
+            logger.debug('Latest result cognitive metrics:', latestResult?.cognitiveMetrics)
+            logger.debug('Latest result psychiatric metrics:', latestResult?.psychiatricMetrics)
+            logger.debug('Latest result vocabulary metrics:', latestResult?.vocabularyMetrics)
+            logger.debug('Cognitive risk score:', latestResult?.cognitiveMetrics?.riskScore)
+            logger.debug('Psychiatric overall risk score:', latestResult?.psychiatricMetrics?.overallRiskScore)
+            logger.debug('Vocabulary complexity score:', latestResult?.vocabularyMetrics?.complexityScore)
             
             // Debug: Show all properties of each metric object
-            console.log('Cognitive metrics keys:', latestResult?.cognitiveMetrics ? Object.keys(latestResult.cognitiveMetrics) : 'no cognitive metrics')
-            console.log('Psychiatric metrics keys:', latestResult?.psychiatricMetrics ? Object.keys(latestResult.psychiatricMetrics) : 'no psychiatric metrics')
-            console.log('Vocabulary metrics keys:', latestResult?.vocabularyMetrics ? Object.keys(latestResult.vocabularyMetrics) : 'no vocabulary metrics')
-            console.log('Time series data points:', timeSeriesData.length)
-            console.log('Trend data:', trendData)
-            console.log('Trend data structure:', {
+            logger.debug('Cognitive metrics keys:', latestResult?.cognitiveMetrics ? Object.keys(latestResult.cognitiveMetrics) : 'no cognitive metrics')
+            logger.debug('Psychiatric metrics keys:', latestResult?.psychiatricMetrics ? Object.keys(latestResult.psychiatricMetrics) : 'no psychiatric metrics')
+            logger.debug('Vocabulary metrics keys:', latestResult?.vocabularyMetrics ? Object.keys(latestResult.vocabularyMetrics) : 'no vocabulary metrics')
+            logger.debug('Time series data points:', timeSeriesData.length)
+            logger.debug('Trend data:', trendData)
+            logger.debug('Trend data structure:', {
               hasTrendData: !!trendData,
               hasTrend: !!trendData?.trend,
               hasSummary: !!trendData?.trend?.summary,

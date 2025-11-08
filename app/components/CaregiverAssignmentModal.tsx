@@ -18,6 +18,7 @@ import {
 import { useGetAllCaregiversQuery } from "../services/api/caregiverApi"
 import { Patient, Caregiver } from "../services/api/api.types"
 import { RootState } from "../store/store"
+import { logger } from "../utils/logger"
 import { useTheme } from "../theme/ThemeContext"
 
 interface CaregiverAssignmentModalProps {
@@ -82,7 +83,7 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
         setAssignedCaregiverIds(prev => [...prev, caregiverId])
       }
     } catch (error) {
-      console.error('Error toggling caregiver assignment:', error)
+      logger.error('Error toggling caregiver assignment:', error)
       // Could add a toast notification here for error feedback
     } finally {
       setIsLoading(false)

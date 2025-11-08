@@ -10,6 +10,7 @@ import { useTheme } from "app/theme/ThemeContext"
 import { SSOLoginButtons } from "./SSOLoginButtons"
 import { translate } from "../i18n"
 import { useNavigation } from "@react-navigation/native"
+import { logger } from "../utils/logger"
 
 // Temporary interfaces to avoid import issues
 interface SSOUser {
@@ -109,7 +110,7 @@ export const LoginForm: FC<LoginFormProps> = ({
           onLoginSuccess()
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error)
       console.error('Error data:', error?.data)
       console.error('Error status:', error?.status)
@@ -129,7 +130,7 @@ export const LoginForm: FC<LoginFormProps> = ({
       const ssoProvider = errorData?.ssoProvider || error?.ssoProvider
       
       if (requiresLinking === true || requiresLinking === 'true') {
-        console.log('✅ SSO account linking required')
+        logger.debug('✅ SSO account linking required')
         if (onSSOAccountLinking) {
           // Parent component handles navigation
           onSSOAccountLinking(authEmail, ssoProvider || 'google')
@@ -174,7 +175,7 @@ export const LoginForm: FC<LoginFormProps> = ({
       }
       
       // Always set error message - this ensures it's displayed even if error structure is unexpected
-      console.log('Setting error message:', finalErrorMessage, 'from error:', { status: errorStatus, data: errorData })
+      logger.debug('Setting error message:', finalErrorMessage, 'from error:', { status: errorStatus, data: errorData })
       setErrorMessage(finalErrorMessage)
     } finally {
       setIsLoading(false)

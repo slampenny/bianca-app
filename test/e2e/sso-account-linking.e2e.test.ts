@@ -494,7 +494,7 @@ test.describe('SSO Account Linking Workflow', () => {
 
     // Should successfully login
     await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
-    await expect(page.getByTestId('home-header').or(page.getByLabel('home-header'))).toBeVisible()
+    await expect(page.getByLabel('home-header').or(page.getByLabel('home-header'))).toBeVisible()
   })
 })
 

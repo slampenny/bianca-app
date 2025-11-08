@@ -5,6 +5,8 @@ import {
   MedicalAnalysisSummary 
 } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
+import { DEFAULT_API_CONFIG } from "./api"
+import { logger } from "../../utils/logger"
 
 export const medicalAnalysisApi = createApi({
   reducerPath: "medicalAnalysisApi",
@@ -18,7 +20,7 @@ export const medicalAnalysisApi = createApi({
     >({
       query: ({ patientId, limit = 10 }) => {
         const url = `/medical-analysis/results/${patientId}`
-        console.log('Medical Analysis API - getMedicalAnalysisResults:', {
+        logger.debug('Medical Analysis API - getMedicalAnalysisResults:', {
           baseUrl: DEFAULT_API_CONFIG.url,
           fullUrl: DEFAULT_API_CONFIG.url + url,
           patientId,
@@ -68,7 +70,7 @@ export const medicalAnalysisApi = createApi({
     >({
       query: ({ patientId }) => {
         const url = `/medical-analysis/trigger-patient/${patientId}`
-        console.log('Medical Analysis API - triggerMedicalAnalysis:', {
+        logger.debug('Medical Analysis API - triggerMedicalAnalysis:', {
           baseUrl: DEFAULT_API_CONFIG.url,
           fullUrl: DEFAULT_API_CONFIG.url + url,
           patientId
@@ -79,18 +81,33 @@ export const medicalAnalysisApi = createApi({
         }
       },
       async onQueryStarted({ patientId }, { dispatch, queryFulfilled }) {
+        let timeoutId: NodeJS.Timeout | null = null
         try {
           await queryFulfilled
           // Wait 10 seconds before invalidating cache to give job time to complete
-          setTimeout(() => {
+          timeoutId = setTimeout(() => {
             dispatch(medicalAnalysisApi.util.invalidateTags([
               { type: "MedicalAnalysisResult", id: patientId },
               { type: "MedicalAnalysisTrend", id: `${patientId}-month` }
             ]))
+            timeoutId = null
           }, 10000)
         } catch (error) {
           // Don't invalidate cache if the trigger failed
-          console.error('Trigger failed, not invalidating cache:', error)
+          // Clean up timeout if mutation was cancelled
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
+          }
+          logger.error('Trigger failed, not invalidating cache:', error)
+        }
+        
+        // Return cleanup function to clear timeout if query is cancelled
+        return () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
+          }
         }
       },
     }),

@@ -56,7 +56,7 @@ test.describe('Screen Crash Check', () => {
     page.on('pageerror', (error) => errors.push(error.message))
     
     await loginIfNeeded(page)
-    await page.getByTestId('tab-alert').click()
+    await page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')).click()
     await page.waitForTimeout(2000)
     expect(errors.length).toBe(0)
   })

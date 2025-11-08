@@ -2,6 +2,7 @@ import { useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { authApi } from "../services/api"
 import { RootState, AppDispatch } from "../store/store"
+import { logger } from "../utils/logger"
 
 const useRefreshToken = () => {
   const dispatch = useDispatch<AppDispatch>()
@@ -12,7 +13,7 @@ const useRefreshToken = () => {
       dispatch(authApi.endpoints.refreshTokens.initiate({ refreshToken: tokens.refresh.token }))
         .unwrap()
         .catch((error) => {
-          console.error("Failed to refresh tokens", error)
+          logger.error("Failed to refresh tokens", error)
         })
     }
   }, [dispatch, tokens])

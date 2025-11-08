@@ -5,6 +5,7 @@ import { spacing, typography } from "app/theme"
 import { Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
+import type { ThemeColors } from "../types"
 import Markdown from 'react-native-markdown-display'
 
 const PRIVACY_MD = `
@@ -142,7 +143,7 @@ export const PrivacyScreen = () => {
   )
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     backgroundColor: colors.palette.biancaBackground,
     flex: 1,
@@ -184,7 +185,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 })
 
-const createMarkdownStyles = (colors: any) => ({
+const createMarkdownStyles = (colors: ThemeColors) => ({
   body: {
     color: colors.text,
     fontSize: 16,

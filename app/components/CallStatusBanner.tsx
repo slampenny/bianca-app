@@ -7,6 +7,8 @@ import { colors } from "app/theme/colors"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import { setCallStatus, updateCallStatus } from "../store/callSlice"
 import { translate } from "app/i18n"
+import { logger } from "../utils/logger"
+import { POLLING_INTERVALS } from "../constants"
 
 interface CallStatusBannerProps {
   conversationId: string
@@ -23,7 +25,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
 }) => {
   // Validate conversationId
   if (!conversationId || conversationId === 'temp-call') {
-    console.warn('CallStatusBanner - Invalid conversationId:', conversationId)
+    logger.warn('CallStatusBanner - Invalid conversationId:', conversationId)
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Invalid conversation ID</Text>
@@ -39,14 +41,14 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   
   // RTK Query hooks
   const { data: callStatusData, error: callStatusError, isLoading, isFetching } = useGetCallStatusQuery(conversationId, {
-    pollingInterval: 2000, // Poll every 2 seconds
+    pollingInterval: POLLING_INTERVALS.CALL_STATUS,
     // Only skip polling when call is in a terminal state
     skip: conversationId === 'temp-call' || ['completed', 'failed', 'busy', 'no_answer', 'ended'].includes(status)
   })
 
   // Log polling activity
   React.useEffect(() => {
-    console.log('🔄 CallStatusBanner - Polling status check:', {
+    logger.debug('🔄 CallStatusBanner - Polling status check:', {
       conversationId,
       isLoading,
       isFetching,
@@ -57,18 +59,18 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   
   // Debug logging for call monitoring
   React.useEffect(() => {
-    console.log('CallStatusBanner - conversationId:', conversationId)
-    console.log('CallStatusBanner - initialStatus:', initialStatus)
-    console.log('CallStatusBanner - current status:', status)
-    console.log('CallStatusBanner - callStatusData:', callStatusData)
-    console.log('CallStatusBanner - callStatusError:', callStatusError)
+    logger.debug('CallStatusBanner - conversationId:', conversationId)
+    logger.debug('CallStatusBanner - initialStatus:', initialStatus)
+    logger.debug('CallStatusBanner - current status:', status)
+    logger.debug('CallStatusBanner - callStatusData:', callStatusData)
+    logger.debug('CallStatusBanner - callStatusError:', callStatusError)
     
     // Log the raw API response structure
     if (callStatusData) {
-      console.log('CallStatusBanner - Raw API response:', JSON.stringify(callStatusData, null, 2))
-      console.log('CallStatusBanner - Has data property:', 'data' in callStatusData)
+      logger.debug('CallStatusBanner - Raw API response:', JSON.stringify(callStatusData, null, 2))
+      logger.debug('CallStatusBanner - Has data property:', 'data' in callStatusData)
       if ('data' in callStatusData) {
-        console.log('CallStatusBanner - Data property content:', callStatusData.data)
+        logger.debug('CallStatusBanner - Data property content:', callStatusData.data)
       }
     }
   }, [conversationId, initialStatus, status, callStatusData, callStatusError])
@@ -77,7 +79,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
 
   // Update call status from RTK Query data
   useEffect(() => {
-    console.log('📡 CallStatusBanner - API Response received:', {
+    logger.debug('📡 CallStatusBanner - API Response received:', {
       hasData: !!callStatusData,
       hasError: !!callStatusError,
       data: callStatusData,
@@ -87,7 +89,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     
     if (callStatusData && callStatusData.data) {
       const newStatus = callStatusData.data.status
-      console.log('✅ CallStatusBanner - Processing API data:', {
+      logger.debug('✅ CallStatusBanner - Processing API data:', {
         newStatus,
         currentStatus: status,
         fullResponse: callStatusData.data,
@@ -96,7 +98,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       
       // Always update the status from the API - it's the source of truth
       if (newStatus && newStatus !== status) {
-        console.log('🔄 CallStatusBanner - Status changed, updating to:', newStatus)
+        logger.debug('🔄 CallStatusBanner - Status changed, updating to:', newStatus)
         setStatus(newStatus)
         onStatusChange?.(newStatus)
         
@@ -106,22 +108,22 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
           status: newStatus
         }))
       } else {
-        console.log('⏸️ CallStatusBanner - Status unchanged:', newStatus)
+        logger.debug('⏸️ CallStatusBanner - Status unchanged:', newStatus)
       }
       
       // Update duration and start time if available
       // Only update duration from API for terminal states to avoid conflicts with local timer
       if (callStatusData.data.duration !== undefined && ['completed', 'failed', 'busy', 'no_answer', 'ended'].includes(newStatus)) {
-        console.log('⏱️ CallStatusBanner - Updating duration from API for terminal state:', callStatusData.data.duration)
+        logger.debug('⏱️ CallStatusBanner - Updating duration from API for terminal state:', callStatusData.data.duration)
         setCallDuration(callStatusData.data.duration)
       }
       
       if (callStatusData.data.startTime) {
-        console.log('🕐 CallStatusBanner - Updating start time:', callStatusData.data.startTime)
+        logger.debug('🕐 CallStatusBanner - Updating start time:', callStatusData.data.startTime)
         setCallStartTime(new Date(callStatusData.data.startTime))
       }
     } else if (callStatusError) {
-      console.error('❌ CallStatusBanner - API Error:', callStatusError)
+      logger.error('❌ CallStatusBanner - API Error:', callStatusError)
       // Don't update local state on error - keep the last known good state
     }
   }, [callStatusData, status, onStatusChange, dispatch, conversationId, callStatusError])
@@ -191,7 +193,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       }))
     } catch (err: any) {
       setError('Failed to end call')
-      console.error('End call error:', err)
+      logger.error('End call error:', err)
     }
   }
 

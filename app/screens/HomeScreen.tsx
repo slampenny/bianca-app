@@ -16,6 +16,7 @@ import { RootState } from "../store/store"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
+import { logger } from "../utils/logger"
 
 
 export function HomeScreen() {
@@ -75,14 +76,14 @@ export function HomeScreen() {
       dispatch(setPatient(patient))
       
       // Actually initiate the call via backend API
-      console.log('Initiating call for patient:', patient.id, patient.name)
+      logger.debug('Initiating call for patient:', patient.id, patient.name)
       const response = await initiateCall({
         patientId: patient.id || '',
         callNotes: `Manual call initiated by agent to ${patient.name}`
       }).unwrap()
       
-      console.log('Call initiated successfully, response:', response)
-      console.log('HomeScreen - response.conversationId:', response.conversationId)
+      logger.debug('Call initiated successfully, response:', response)
+      logger.debug('HomeScreen - response.conversationId:', response.conversationId)
       
       // Clear any existing call and conversation data before setting new call
       dispatch(clearCallData())
@@ -104,7 +105,7 @@ export function HomeScreen() {
       
       // Navigate to dedicated call screen
       navigation.navigate("Call")
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to initiate call:', error)
       
       // Handle different types of errors

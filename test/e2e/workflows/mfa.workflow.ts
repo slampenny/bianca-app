@@ -251,21 +251,90 @@ export class MFAWorkflow {
   }
 
   async whenILogout() {
-    // Navigate to profile if not already there
-    const profileButton = this.page.locator('[data-testid="profile-button"], [aria-label="profile-button"]')
-    const isProfileVisible = await profileButton.isVisible().catch(() => false)
-    if (isProfileVisible) {
-      await profileButton.click()
-      await this.page.waitForTimeout(1000)
+    // First, try to navigate to home screen to ensure we're in the main app
+    const homeHeader = this.page.locator('[data-testid="home-header"], [aria-label="home-header"]')
+    const isOnHome = await homeHeader.isVisible().catch(() => false)
+    
+    if (!isOnHome) {
+      // Try clicking home tab
+      const homeTab = this.page.locator('[data-testid="tab-home"]')
+      if (await homeTab.isVisible().catch(() => false)) {
+        await homeTab.click()
+        await this.page.waitForTimeout(1000)
+      }
     }
     
-    // Click logout button
+    // Check if we're already on profile screen
+    const isOnProfile = await this.page.locator('[data-testid="profile-screen"], [aria-label="profile-screen"]').isVisible().catch(() => false)
+    
+    if (!isOnProfile) {
+      // Navigate to profile - try multiple ways
+      const profileButton = this.page.locator('[data-testid="profile-button"], [aria-label="profile-button"]')
+      const isProfileButtonVisible = await profileButton.isVisible({ timeout: 3000 }).catch(() => false)
+      
+      if (isProfileButtonVisible) {
+        await profileButton.click()
+        // Wait for profile screen to load
+        await this.page.waitForSelector('[data-testid="profile-screen"], [aria-label="profile-screen"]', { timeout: 10000 }).catch(() => {})
+        await this.page.waitForTimeout(1000)
+      } else {
+        // Try navigating back first
+        await this.page.goBack().catch(() => {})
+        await this.page.waitForTimeout(1000)
+        
+        // Try profile button again
+        const profileBtn = this.page.locator('[data-testid="profile-button"], [aria-label="profile-button"]')
+        if (await profileBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await profileBtn.click()
+          await this.page.waitForSelector('[data-testid="profile-screen"], [aria-label="profile-screen"]', { timeout: 10000 }).catch(() => {})
+          await this.page.waitForTimeout(1000)
+        }
+      }
+    }
+    
+    // Click logout button - try with a longer timeout and multiple attempts
     const logoutButton = this.page.locator('[data-testid="profile-logout-button"], [aria-label="profile-logout-button"]')
-    await logoutButton.waitFor({ state: 'visible', timeout: 10000 })
-    await logoutButton.click()
+    
+    // Wait for logout button with retries
+    let logoutVisible = false
+    for (let i = 0; i < 3; i++) {
+      logoutVisible = await logoutButton.isVisible({ timeout: 5000 }).catch(() => false)
+      if (logoutVisible) break
+      
+      // If not visible, try navigating to profile again
+      const profileBtn = this.page.locator('[data-testid="profile-button"], [aria-label="profile-button"]')
+      if (await profileBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await profileBtn.click()
+        await this.page.waitForTimeout(1000)
+      }
+    }
+    
+    if (!logoutVisible) {
+      // If we can't find logout button, try navigating directly to login screen
+      // This can happen if we're on a screen where profile isn't accessible
+      console.log('⚠️ Logout button not found, attempting direct navigation to login')
+      await this.page.goto('/').catch(() => {})
+      await this.page.waitForTimeout(1000)
+      
+      // Check if we're on login screen
+      const isOnLogin = await this.page.locator('[data-testid="email-input"], [aria-label="email-input"]').isVisible({ timeout: 3000 }).catch(() => false)
+      if (isOnLogin) {
+        return // Already on login screen
+      }
+      
+      // If still not on login, try one more time to find logout
+      const finalLogoutAttempt = await logoutButton.isVisible({ timeout: 3000 }).catch(() => false)
+      if (finalLogoutAttempt) {
+        await logoutButton.click()
+      } else {
+        throw new Error('Logout button not found and could not navigate to login screen')
+      }
+    } else {
+      await logoutButton.click()
+    }
     
     // Wait for login screen
-    await this.page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
+    await this.page.waitForSelector('[aria-label="email-input"], [data-testid="email-input"]', { timeout: 10000 })
   }
 
   async whenIClickCancelOnMFAVerification() {

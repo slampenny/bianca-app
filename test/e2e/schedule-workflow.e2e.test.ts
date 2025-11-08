@@ -313,15 +313,31 @@ test.describe("Schedule Workflow", () => {
       throw new Error('BUG: No patients found - cannot test navigation without a patient!')
     }
     
-    // Click on a patient to navigate to Patient screen
-    await patientCard.first().click()
-    await page.waitForTimeout(2000) // Wait for Patient screen to load
+    // Click on the edit button for an existing patient (not the card itself which might create new)
+    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButtonCount = await editButton.count()
+    
+    if (editButtonCount > 0) {
+      await editButton.click()
+    } else {
+      // Fallback: click the patient card
+      await patientCard.first().click()
+    }
+    
+    // Wait for Patient screen to load
+    await page.waitForSelector('[data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForTimeout(1000) // Give time for form to populate
     
     // Now navigate to schedules from Patient screen
     const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
     const scheduleButtonCount = await manageSchedulesButton.count()
     
     if (scheduleButtonCount === 0) {
+      // Check if we're in new patient mode
+      const isNewPatient = await page.getByTestId('patient-screen').getByText(/create|new|add/i).count()
+      if (isNewPatient > 0) {
+        throw new Error('BUG: Navigated to new patient mode instead of existing patient - Manage schedules button only appears for existing patients!')
+      }
       throw new Error('BUG: Manage schedules button not found on Patient screen!')
     }
     

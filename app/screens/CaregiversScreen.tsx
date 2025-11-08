@@ -10,6 +10,7 @@ import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { useSyncOrgCaregivers } from "app/utils/useSyncOrgCaregivers"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
+import { logger } from "../utils/logger"
 
 export function CaregiversScreen() {
   const dispatch = useDispatch()
@@ -24,7 +25,7 @@ export function CaregiversScreen() {
   const isAuthorized = true
 
   // Debug logging
-  console.log('CaregiversScreen Debug:', {
+  logger.debug('CaregiversScreen Debug:', {
     currentUser: currentUser?.id,
     currentUserRole: currentUser?.role,
     currentUserOrg: currentUser?.org,
@@ -36,7 +37,7 @@ export function CaregiversScreen() {
   // Just display what the backend returns (no frontend filtering)
   const orgCaregivers = caregivers
 
-  console.log('Displaying caregivers:', {
+  logger.debug('Displaying caregivers:', {
     orgCaregiversCount: orgCaregivers.length,
     includes_current_user: orgCaregivers.some(c => c.id === currentUser?.id)
   })

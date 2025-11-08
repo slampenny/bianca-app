@@ -5,6 +5,7 @@ import { useGetMFAStatusQuery, useEnableMFAMutation, useVerifyAndEnableMFAMutati
 import { Button, Text, TextField } from "../components"
 import { useTheme } from "../theme/ThemeContext"
 import { translate } from "../i18n"
+import type { ThemeColors } from "../types"
 import { useNavigation } from "@react-navigation/native"
 
 type SetupStep = 'status' | 'enable' | 'verify' | 'enabled' | 'disable'
@@ -39,7 +40,7 @@ export function MFASetupScreen() {
       setSecret(result.secret)
       setBackupCodes(result.backupCodes)
       setStep('verify')
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert(
         translate("common.error") || "Error",
         error?.data?.message || translate("mfa.enableFailed") || "Failed to enable MFA"
@@ -66,7 +67,7 @@ export function MFASetupScreen() {
         translate("mfa.enabled") || "MFA Enabled",
         translate("mfa.enabledSuccess") || "Multi-factor authentication has been successfully enabled."
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert(
         translate("common.error") || "Error",
         error?.data?.message || translate("mfa.verificationFailed") || "Invalid code. Please try again."
@@ -102,7 +103,7 @@ export function MFASetupScreen() {
                 translate("mfa.disabled") || "MFA Disabled",
                 translate("mfa.disabledSuccess") || "Multi-factor authentication has been disabled."
               )
-            } catch (error: any) {
+            } catch (error: unknown) {
               Alert.alert(
                 translate("common.error") || "Error",
                 error?.data?.message || translate("mfa.disableFailed") || "Failed to disable MFA. Please check your code."
@@ -141,7 +142,7 @@ export function MFASetupScreen() {
                 translate("mfa.backupCodesRegenerated") || "Backup Codes Regenerated",
                 translate("mfa.backupCodesRegeneratedMessage") || "Your new backup codes have been generated. Please save them securely."
               )
-            } catch (error: any) {
+            } catch (error: unknown) {
               Alert.alert(
                 translate("common.error") || "Error",
                 error?.data?.message || translate("mfa.regenerateFailed") || "Failed to regenerate backup codes."
@@ -507,7 +508,7 @@ export function MFASetupScreen() {
   )
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,

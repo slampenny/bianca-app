@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import { Conversation, ConversationPages } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
+import { logger } from "../../utils/logger"
 
 export const conversationApi = createApi({
   reducerPath: "conversationApi",
@@ -44,7 +45,7 @@ export const conversationApi = createApi({
         },
       }),
       transformResponse: (response: ConversationPages) => {
-        console.log('[ConversationApi] Raw API response:', {
+        logger.debug('[ConversationApi] Raw API response:', {
           page: response.page,
           totalPages: response.totalPages,
           totalResults: response.totalResults,

@@ -8,8 +8,10 @@ import { setOrg } from "../store/orgSlice"
 import { Button, Text, TextField } from "../components"
 import { useTheme } from "../theme/ThemeContext"
 import { translate } from "../i18n"
+import type { ThemeColors } from "../types"
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"
 import { LoginStackParamList } from "../navigators/navigationTypes"
+import { logger } from "../utils/logger"
 
 type MFAVerificationScreenRouteProp = RouteProp<LoginStackParamList, "MFAVerification">
 
@@ -65,8 +67,8 @@ export function MFAVerificationScreen() {
           routes: [{ name: "MainTabs" as never }],
         })
       }
-    } catch (error: any) {
-      console.error('MFA verification error:', error)
+    } catch (error: unknown) {
+      logger.error('MFA verification error:', error)
       const errorData = error?.data
       const errorMessage = errorData?.message || translate("mfa.verificationFailed") || "Invalid code. Please try again."
       setErrorMessage(errorMessage)
@@ -163,7 +165,7 @@ export function MFAVerificationScreen() {
   )
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,

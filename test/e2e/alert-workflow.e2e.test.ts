@@ -12,10 +12,10 @@ test.describe("Alert Workflow", () => {
     console.log('=== ALERT WORKFLOW TEST ===')
     
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.getByLabel('home-header')).toBeVisible()
     
     // WHEN: I check the alert tab badge - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.waitFor({ state: 'visible' })
     
     // THEN: I should see a badge with unread alert count
@@ -34,10 +34,10 @@ test.describe("Alert Workflow", () => {
 
   test("can navigate to alerts screen and see alerts", async ({ page }) => {
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.getByLabel('home-header')).toBeVisible()
     
     // WHEN: I click on the alert tab - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     
@@ -60,7 +60,7 @@ test.describe("Alert Workflow", () => {
 
   test("can toggle between unread and all alerts", async ({ page }) => {
     // GIVEN: I'm on the alert screen - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     
@@ -138,7 +138,7 @@ test.describe("Alert Workflow", () => {
 
   test("can mark individual alerts as read", async ({ page }) => {
     // GIVEN: I'm on the alert screen - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     
@@ -164,7 +164,7 @@ test.describe("Alert Workflow", () => {
 
   test("can mark all alerts as read", async ({ page }) => {
     // GIVEN: I'm on the alert screen with unread alerts - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     
@@ -205,7 +205,7 @@ test.describe("Alert Workflow", () => {
 
   test("can refresh alerts", async ({ page }) => {
     // GIVEN: I'm on the alert screen - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     
@@ -224,7 +224,7 @@ test.describe("Alert Workflow", () => {
 
   test("shows empty state when no alerts", async ({ page }) => {
     // GIVEN: I'm on the alert screen - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
     await alertTab.click()
     await page.waitForTimeout(2000)
     
@@ -250,7 +250,7 @@ test.describe("Alert Workflow", () => {
 
   test("alert badge updates when alerts are read", async ({ page }) => {
     // GIVEN: I'm on the home screen with unread alerts
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.getByLabel('home-header')).toBeVisible()
     
     // Get initial badge count - check both testID and accessibility label
     const alertTabElement = page.locator('[aria-label="Alerts tab"], [data-testid="tab-alert"]')
@@ -264,7 +264,7 @@ test.describe("Alert Workflow", () => {
       console.log(`Initial badge count: ${initialCount}`)
       
       // WHEN: I navigate to alerts and mark some as read - use accessibility label
-      const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert'))
+      const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
       await alertTab.click()
       await page.waitForTimeout(2000)
       

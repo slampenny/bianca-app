@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { colors as healthcareColors } from "./colors"
 import { colors as colorblindColors } from "./colors.colorblind"
 import { colors as darkColors } from "./colors.dark"
+import { logger } from "../utils/logger"
 
 export type ThemeType = "healthcare" | "colorblind" | "dark"
 
@@ -93,7 +94,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           setCurrentTheme(prefersColorblind ? "colorblind" : "healthcare")
         }
       } catch (error) {
-        console.warn("Failed to load theme:", error)
+        logger.warn("Failed to load theme:", error)
         setCurrentTheme(defaultTheme)
       } finally {
         setIsLoading(false)
@@ -108,7 +109,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, theme)
       setCurrentTheme(theme)
     } catch (error) {
-      console.warn("Failed to save theme:", error)
+      logger.warn("Failed to save theme:", error)
       setCurrentTheme(theme) // Still update locally even if storage fails
     }
   }
@@ -138,7 +139,7 @@ export function useTheme() {
     return {
       currentTheme: defaultTheme,
       setTheme: () => {
-        console.warn("setTheme called outside ThemeProvider")
+        logger.warn("setTheme called outside ThemeProvider")
       },
       colors: defaultThemeData.colors,
       themeInfo: defaultThemeData,
@@ -168,7 +169,7 @@ export const detectColorblindPreference = (): boolean => {
       return true
     }
   } catch (error) {
-    console.warn("Error detecting colorblind preference:", error)
+    logger.warn("Error detecting colorblind preference:", error)
   }
   
   return false

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
@@ -9,6 +9,7 @@ import { Button, Text, TextField, Screen, Header, PhoneInputWeb } from "app/comp
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
+import { logger } from "../utils/logger"
 
 type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
@@ -32,20 +33,29 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   const [passwordError, setPasswordError] = useState("")
   const [confirmPasswordError, setConfirmPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check if we have an invite token and persist it
   useEffect(() => {
     if (token) {
       // Store the invite token in Redux so it persists across navigation
       dispatch(setInviteToken(token))
-      console.log("Signup with invite token:", token)
+      logger.debug("Signup with invite token:", token)
     } else {
       setGeneralError("Invalid or expired invite token")
       // Navigate to login after a short delay to show the error
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         navigation.navigate("Login")
+        timeoutRef.current = null
       }, 2000)
-      return
+      
+      // Cleanup on unmount
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+          timeoutRef.current = null
+        }
+      }
     }
 
     // TODO: Decode token to prefill user information
@@ -104,13 +114,13 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         phone,
       }).unwrap()
 
-      console.log("Signup successful:", result)
+      logger.debug("Signup successful:", result)
       
       // Navigate to main app since user is now registered and logged in
       navigation.navigate("MainTabs" as any)
       
-    } catch (error: any) {
-      console.error("Signup error:", error)
+    } catch (error: unknown) {
+      logger.error("Signup error:", error)
       
       if (error?.data?.message) {
         setGeneralError(error.data.message)

@@ -12,10 +12,10 @@ test.describe("Alert Badge Width Test", () => {
     console.log('=== ALERT BADGE WIDTH TEST ===')
     
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.getByLabel('home-header')).toBeVisible()
     
     // WHEN: I check the alert tab badge
-    const alertTab = page.getByTestId('tab-alert')
+    const alertTab = page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')).or(page.getByLabel('Alerts tab'))
     await alertTab.waitFor({ state: 'visible' })
     
     // Check if there's a badge on the alert tab
@@ -85,11 +85,11 @@ test.describe("Alert Badge Width Test", () => {
 
   test("badge styling properties are correct", async ({ page }) => {
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.getByLabel('home-header')).toBeVisible()
     
     // WHEN: I check for the alert tab
-    const alertTab = page.getByTestId('tab-alert')
-    await alertTab.waitFor({ state: 'visible' })
+    const alertTab = page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')).or(page.getByLabel('Alerts tab'))
+    await expect(alertTab).toBeVisible({ timeout: 10000 })
     
     // Check if badge exists
     const badgeElement = page.locator('[data-testid="tab-alert"] span[style*="background-color: rgb(255, 59, 48)"]')

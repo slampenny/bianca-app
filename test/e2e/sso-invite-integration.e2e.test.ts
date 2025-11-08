@@ -80,6 +80,8 @@ test.describe('SSO and Invite Integration Workflow', () => {
     })
 
     // Admin logs in via Google SSO
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="google-sso-button"]', { timeout: 10000 })
     await page.getByTestId('google-sso-button').click()
     await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 
@@ -183,7 +185,7 @@ test.describe('SSO and Invite Integration Workflow', () => {
 
     // Step 5: Verify new user is logged in
     await inviteePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
-    await expect(inviteePage.getByTestId('home-header')).toBeVisible()
+    await expect(inviteePage.getByLabel('home-header')).toBeVisible()
 
     // Step 6: Verify admin can see the new user in caregivers list
     await page.getByTestId('caregivers-tab').click()
@@ -564,7 +566,7 @@ test.describe('SSO and Invite Integration Workflow', () => {
     await inviteePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 
     // Step 5: Verify user is logged in and can access the app
-    await expect(inviteePage.getByTestId('home-header')).toBeVisible()
+    await expect(inviteePage.getByLabel('home-header')).toBeVisible()
 
     // Clean up
     await inviteePage.close()

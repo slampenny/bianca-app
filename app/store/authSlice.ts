@@ -3,6 +3,7 @@ import { authApi } from "../services/api/authApi"
 import { caregiverApi } from "../services/api/caregiverApi"
 import { AuthTokens, Caregiver } from "../services/api/api.types"
 import { RootState } from "./store"
+import { logger } from "../utils/logger"
 
 interface AuthState {
   tokens: AuthTokens | null // This is the JWT token
@@ -67,19 +68,19 @@ export const authSlice = createSlice({
     // Also clear local state if logout fails (e.g., network error, expired token)
     // This ensures users can always log out locally even if the API is down
     builder.addMatcher(authApi.endpoints.logout.matchRejected, (state) => {
-      console.log('[authSlice] Logout API failed, clearing local state anyway')
+      logger.warn('[authSlice] Logout API failed, clearing local state anyway')
       state.tokens = null
       state.authEmail = ""
       state.currentUser = null
       state.inviteToken = null
     })
     builder.addMatcher(authApi.endpoints.refreshTokens.matchFulfilled, (state, { payload }) => {
-      console.log("refreshed tokens", JSON.stringify(payload.tokens))
+      logger.debug("refreshed tokens", JSON.stringify(payload.tokens))
       state.tokens = payload.tokens
     })
     // Add this block
     builder.addMatcher(authApi.endpoints.refreshTokens.matchRejected, (state) => {
-      console.log("Failed to refresh tokens")
+      logger.warn("Failed to refresh tokens")
       state.tokens = null
       state.currentUser = null
     })

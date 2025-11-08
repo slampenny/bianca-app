@@ -5,6 +5,7 @@ import Constants from 'expo-constants';
 import { DEFAULT_API_CONFIG } from './api/api';
 import { ssoApi } from './api/ssoApi';
 import { store } from '../store/store';
+import { logger } from '../utils/logger';
 
 // Complete the auth session in the browser
 WebBrowser.maybeCompleteAuthSession();
@@ -16,8 +17,8 @@ const MICROSOFT_TENANT_ID = Constants.expoConfig?.extra?.microsoftTenantId || 'c
 
 // Redirect URI for OAuth - Use AuthSession.makeRedirectUri() for now
 const redirectUri = AuthSession.makeRedirectUri();
-console.log('OAuth Redirect URI:', redirectUri);
-console.log('OAuth Client IDs:', {
+logger.debug('OAuth Redirect URI:', redirectUri);
+logger.debug('OAuth Client IDs:', {
   google: GOOGLE_CLIENT_ID ? 'configured' : 'missing',
   microsoft: MICROSOFT_CLIENT_ID ? 'configured' : 'missing',
   tenant: MICROSOFT_TENANT_ID
@@ -124,7 +125,7 @@ class SSOService {
         };
       }
     } catch (error) {
-      console.error('Google sign-in error:', error);
+      logger.error('Google sign-in error:', error);
       return {
         error: 'Google sign-in failed',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -172,7 +173,7 @@ class SSOService {
         };
       }
     } catch (error) {
-      console.error('Microsoft sign-in error:', error);
+      logger.error('Microsoft sign-in error:', error);
       return {
         error: 'Microsoft sign-in failed',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -267,7 +268,7 @@ class SSOService {
         };
       }
     } catch (error) {
-      console.error('Backend authentication error:', error);
+      logger.error('Backend authentication error:', error);
       return {
         error: 'Backend authentication failed',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -288,7 +289,7 @@ class SSOService {
         await WebBrowser.openAuthSessionAsync(signOutUrl, redirectUri);
       }
     } catch (error) {
-      console.error('Sign out error:', error);
+      logger.error('Sign out error:', error);
     }
   }
 }

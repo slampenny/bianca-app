@@ -58,14 +58,18 @@ test.describe('Invite User Workflow', () => {
       })
     })
 
+    // Wait for login screen to load
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="email-input"], [aria-label="email-input"]', { timeout: 10000 })
+    
     // Login as admin
-    await page.getByTestId('email-input').fill(TEST_USERS.ORG_ADMIN.email)
-    await page.getByTestId('password-input').fill(TEST_USERS.ORG_ADMIN.password)
-    await page.getByTestId('login-button').click()
-    await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    await page.getByTestId('email-input').or(page.getByLabel('email-input')).fill(TEST_USERS.ORG_ADMIN.email)
+    await page.getByTestId('password-input').or(page.getByLabel('password-input')).fill(TEST_USERS.ORG_ADMIN.password)
+    await page.getByTestId('login-button').or(page.getByLabel('login-button')).click()
+    await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
 
     // Step 2: Navigate to Organization screen
-    await page.getByTestId('tab-org').click()
+    await page.getByTestId('tab-org').or(page.getByLabel('Organization tab')).click()
     await page.waitForSelector('[data-testid="org-screen"]')
 
     // Step 3: Click "Invite Caregiver" button
@@ -221,7 +225,7 @@ test.describe('Invite User Workflow', () => {
     await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
 
     // Verify user is logged in
-    await expect(invitePage.getByTestId('home-header')).toBeVisible()
+    await expect(invitePage.getByLabel('home-header')).toBeVisible()
 
     // Close the invite page
     await invitePage.close()
@@ -543,7 +547,7 @@ test.describe('Invite User Workflow', () => {
     await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 
     // Verify the new user is logged in and can access the app
-    await expect(invitePage.getByTestId('home-header')).toBeVisible()
+    await expect(invitePage.getByLabel('home-header')).toBeVisible()
 
     await invitePage.close()
   })

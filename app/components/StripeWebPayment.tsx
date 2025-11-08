@@ -18,6 +18,7 @@ import { useLanguage } from 'app/hooks/useLanguage'
 import ConfirmationModal from './ConfirmationModal'
 import Toast from './Toast'
 import i18n from 'i18n-js'
+import { logger } from '../utils/logger'
 
 interface PaymentMethod {
   id: string
@@ -73,7 +74,7 @@ const PaymentForm: React.FC<{
   const { data: paymentMethods = [], refetch, isLoading: paymentMethodsLoading, error: paymentMethodsError } = useGetPaymentMethodsQuery(orgId)
 
   // Debug logging
-  console.log('Payment methods query:', { 
+  logger.debug('Payment methods query:', { 
     paymentMethods, 
     paymentMethodsLoading, 
     paymentMethodsError,
@@ -81,7 +82,7 @@ const PaymentForm: React.FC<{
   })
   
   // Debug payment methods rendering
-  console.log('Payment methods for rendering:', paymentMethods.map(pm => ({
+  logger.debug('Payment methods for rendering:', paymentMethods.map(pm => ({
     id: pm.id,
     isDefault: pm.isDefault,
     brand: pm.brand,
@@ -150,26 +151,26 @@ const PaymentForm: React.FC<{
   }
 
   const handleSetDefault = async (paymentMethodId: string) => {
-    console.log('Setting default payment method:', { paymentMethodId, orgId })
+    logger.debug('Setting default payment method:', { paymentMethodId, orgId })
     try {
       const result = await setDefaultPaymentMethod({
         orgId,
         paymentMethodId,
       }).unwrap()
       
-      console.log('Set default payment method result:', result)
+      logger.debug('Set default payment method result:', result)
       const successMsg = translate("paymentScreen.paymentMethodSetDefaultSuccess")
       showToast(successMsg, 'success')
       
       // Refetch and log the updated data
       const refetchResult = await refetch()
-      console.log('Refetch result:', refetchResult.data)
+      logger.debug('Refetch result:', refetchResult.data)
       
       // Force a re-render by updating a dummy state
       setMessage(successMsg)
       
     } catch (err: any) {
-      console.error('Error setting default payment method:', err)
+      logger.error('Error setting default payment method:', err)
       const errorMessage = err.message || translate("paymentScreen.failedToSetDefault")
       showToast(errorMessage, 'error')
     }
@@ -224,7 +225,7 @@ const PaymentForm: React.FC<{
   
   // Debug logging
   if (__DEV__) {
-    console.log('[StripeWebPayment] Locale detection:', {
+    logger.debug('[StripeWebPayment] Locale detection:', {
       currentLanguage,
       i18nLocale: i18n.locale,
       currentLocale,
@@ -412,7 +413,7 @@ const StripeWebPayment: React.FC<StripeWebPaymentProps> = ({
 
   // Debug logging
   if (__DEV__) {
-    console.log('[StripeWebPayment] Locale configuration:', {
+    logger.debug('[StripeWebPayment] Locale configuration:', {
       currentLanguage,
       i18nLocale: i18n.locale,
       currentLocale,

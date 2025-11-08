@@ -27,6 +27,25 @@ import {
   medicalAnalysisApi,
   stripeApi,
 } from "../services/api/"
+
+// Auto-register all APIs for easier maintenance
+const apiServices = {
+  alertApi,
+  authApi,
+  mfaApi,
+  ssoApi,
+  orgApi,
+  caregiverApi,
+  scheduleApi,
+  patientApi,
+  paymentApi,
+  paymentMethodApi,
+  conversationApi,
+  callWorkflowApi,
+  sentimentApi,
+  medicalAnalysisApi,
+  stripeApi,
+} as const
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import {
   persistStore,
@@ -53,6 +72,11 @@ const authPersistConfig = {
   blacklist: ["authEmail"], // Exclude authEmail from persistence to prevent fake@example.org from appearing in production
 }
 
+// Build API reducers dynamically
+const apiReducers = Object.fromEntries(
+  Object.values(apiServices).map((api) => [api.reducerPath, api.reducer])
+)
+
 const rootReducer = combineReducers({
   org: orgReducer,
   caregiver: caregiverReducer,
@@ -65,24 +89,13 @@ const rootReducer = combineReducers({
   callWorkflow: callWorkflowReducer,
   payment: paymentReducer,
   paymentMethod: paymentMethodReducer,
-  [alertApi.reducerPath]: alertApi.reducer,
-  [authApi.reducerPath]: authApi.reducer,
-  [mfaApi.reducerPath]: mfaApi.reducer,
-  [ssoApi.reducerPath]: ssoApi.reducer,
-  [orgApi.reducerPath]: orgApi.reducer,
-  [conversationApi.reducerPath]: conversationApi.reducer,
-  [caregiverApi.reducerPath]: caregiverApi.reducer,
-  [patientApi.reducerPath]: patientApi.reducer,
-  [paymentApi.reducerPath]: paymentApi.reducer,
-  [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
-  [scheduleApi.reducerPath]: scheduleApi.reducer,
-  [callWorkflowApi.reducerPath]: callWorkflowApi.reducer,
-  [sentimentApi.reducerPath]: sentimentApi.reducer,
-  [medicalAnalysisApi.reducerPath]: medicalAnalysisApi.reducer,
-  [stripeApi.reducerPath]: stripeApi.reducer,
+  ...apiReducers,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)
+
+// Build API middleware dynamically
+const apiMiddleware = Object.values(apiServices).map((api) => api.middleware)
 
 export const store = configureStore({
   reducer: persistedReducer,
@@ -91,23 +104,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(
-      alertApi.middleware,
-      authApi.middleware,
-      mfaApi.middleware,
-      ssoApi.middleware,
-      orgApi.middleware,
-      caregiverApi.middleware,
-      patientApi.middleware,
-      paymentApi.middleware,
-      paymentMethodApi.middleware,
-      scheduleApi.middleware,
-      conversationApi.middleware,
-      callWorkflowApi.middleware,
-      sentimentApi.middleware,
-      medicalAnalysisApi.middleware,
-      stripeApi.middleware,
-    ),
+    }).concat(...apiMiddleware),
 })
 
 export const persistor = persistStore(store)

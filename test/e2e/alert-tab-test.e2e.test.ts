@@ -14,10 +14,10 @@ test.describe("Alert Tab Test", () => {
     console.log('=== ALERT TAB TEST ===')
     
     // GIVEN: I'm on the home screen
-    await expect(page.getByTestId('home-header')).toBeVisible()
+    await expect(page.getByLabel('home-header')).toBeVisible()
     
     // WHEN: I check the alert tab badge
-    const alertTab = page.getByTestId('tab-alert')
+    const alertTab = page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab'))
     await alertTab.waitFor({ state: 'visible' })
     
     // Check if there's a badge on the alert tab - look for the actual badge element

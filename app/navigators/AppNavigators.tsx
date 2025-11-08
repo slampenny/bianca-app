@@ -5,6 +5,7 @@ import { AppStackParamList, LoginStackParamList } from "./navigationTypes"
 import { translate } from "app/i18n"
 import { useLanguage } from "app/hooks/useLanguage"
 import { useTheme } from "app/theme/ThemeContext"
+import { createThemeAwareHeaderOptions } from "./navigationHelpers"
 
 const Stack = createStackNavigator<AppStackParamList>()
 const LoginStack = createStackNavigator<LoginStackParamList>()
@@ -23,50 +24,17 @@ export const AuthStack = () => {
       <Stack.Screen 
         name="Privacy" 
         component={PrivacyScreen}
-        options={() => ({
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerTintColor: colors.palette.biancaHeader || colors.text,
-          headerStyle: {
-            backgroundColor: colors.palette.biancaBackground,
-          },
-          headerTitleStyle: {
-            color: colors.palette.biancaHeader || colors.text,
-          },
-          title: translate("headers.privacyPolicy"),
-        })}
+        options={createThemeAwareHeaderOptions("headers.privacyPolicy", colors)}
       />
       <Stack.Screen 
         name="PrivacyPractices" 
         component={PrivacyPracticesScreen}
-        options={() => ({
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerTintColor: colors.palette.biancaHeader || colors.text,
-          headerStyle: {
-            backgroundColor: colors.palette.biancaBackground,
-          },
-          headerTitleStyle: {
-            color: colors.palette.biancaHeader || colors.text,
-          },
-          title: translate("headers.privacyPractices"),
-        })}
+        options={createThemeAwareHeaderOptions("headers.privacyPractices", colors)}
       />
       <Stack.Screen 
         name="Terms" 
         component={TermsScreen}
-        options={() => ({
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerTintColor: colors.palette.biancaHeader || colors.text,
-          headerStyle: {
-            backgroundColor: colors.palette.biancaBackground,
-          },
-          headerTitleStyle: {
-            color: colors.palette.biancaHeader || colors.text,
-          },
-          title: translate("headers.termsOfService"),
-        })}
+        options={createThemeAwareHeaderOptions("headers.termsOfService", colors)}
       />
       <Stack.Screen name="EmailVerified" component={EmailVerifiedScreen} />
       <Stack.Screen name="EmailVerificationRequired" component={EmailVerificationRequiredScreen} />
@@ -88,50 +56,17 @@ export const UnauthStack = () => {
       <LoginStack.Screen 
         name="Privacy" 
         component={PrivacyScreen}
-        options={() => ({
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerTintColor: colors.palette.biancaHeader || colors.text,
-          headerStyle: {
-            backgroundColor: colors.palette.biancaBackground,
-          },
-          headerTitleStyle: {
-            color: colors.palette.biancaHeader || colors.text,
-          },
-          title: translate("headers.privacyPolicy"),
-        })}
+        options={createThemeAwareHeaderOptions("headers.privacyPolicy", colors)}
       />
       <LoginStack.Screen 
         name="PrivacyPractices" 
         component={PrivacyPracticesScreen}
-        options={() => ({
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerTintColor: colors.palette.biancaHeader || colors.text,
-          headerStyle: {
-            backgroundColor: colors.palette.biancaBackground,
-          },
-          headerTitleStyle: {
-            color: colors.palette.biancaHeader || colors.text,
-          },
-          title: translate("headers.privacyPractices"),
-        })}
+        options={createThemeAwareHeaderOptions("headers.privacyPractices", colors)}
       />
       <LoginStack.Screen 
         name="Terms" 
         component={TermsScreen}
-        options={() => ({
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerTintColor: colors.palette.biancaHeader || colors.text,
-          headerStyle: {
-            backgroundColor: colors.palette.biancaBackground,
-          },
-          headerTitleStyle: {
-            color: colors.palette.biancaHeader || colors.text,
-          },
-          title: translate("headers.termsOfService"),
-        })}
+        options={createThemeAwareHeaderOptions("headers.termsOfService", colors)}
       />
       <LoginStack.Screen name="EmailVerified" component={EmailVerifiedScreen} />
       <LoginStack.Screen name="EmailVerificationRequired" component={EmailVerificationRequiredScreen} />

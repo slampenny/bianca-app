@@ -7,6 +7,7 @@ import { Text, Button, Card, ListItem } from 'app/components'
 import { colors, spacing } from 'app/theme'
 import { useGetPaymentMethodsQuery, useSetDefaultPaymentMethodMutation, useDetachPaymentMethodMutation, useCreateSetupIntentMutation } from 'app/services/api/paymentMethodApi'
 import { translate } from 'app/i18n'
+import { logger } from '../utils/logger'
 
 interface PaymentMethod {
   id: string
@@ -49,7 +50,7 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
         setStripeHook(stripeModule.useStripe())
         setStripeLoading(false)
       } catch (error) {
-        console.error('Failed to load Stripe hook:', error)
+        logger.error('Failed to load Stripe hook:', error)
         setStripeLoading(false)
         onError?.('Failed to load payment system')
       }
@@ -102,14 +103,14 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
       })
 
       if (error) {
-        console.error('Error initializing payment sheet:', error)
+        logger.error('Error initializing payment sheet:', error)
         setMessage('Failed to initialize payment system')
         onError?.('Failed to initialize payment system')
       } else {
         setIsPaymentSheetReady(true)
       }
     } catch (err: any) {
-      console.error('Error initializing payment sheet:', err)
+      logger.error('Error initializing payment sheet:', err)
       setMessage('Failed to initialize payment system')
       onError?.('Failed to initialize payment system')
     }

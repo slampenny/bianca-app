@@ -8,6 +8,7 @@ import { useDebugSentimentAnalysisMutation, useDebugConversationDataMutation, us
 import { useSelector, useDispatch } from "react-redux"
 import { getPatient } from "../store/patientSlice"
 import { translate } from "../i18n"
+import { logger } from "../utils/logger"
 
 interface SentimentDebugPanelProps {
   style?: any
@@ -47,7 +48,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       setDebugResult(result)
       
       showInfo(`${translate("sentimentAnalysis.debugComplete")}: Found ${result.summary.totalConversations} conversations. Successfully analyzed ${result.summary.successfullyAnalyzed}, failed ${result.summary.failedAnalyses}.`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Debug sentiment analysis failed:", error)
       showError(`${translate("sentimentAnalysis.debugFailed")}: ${error?.data?.message || error?.message || "Unknown error occurred"}`)
     }
@@ -66,12 +67,12 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
 
       setConversationDebugResult(result)
       
-      console.log('=== CONVERSATION DEBUG RESULT ===')
-      console.log(JSON.stringify(result, null, 2))
-      console.log('=== END CONVERSATION DEBUG ===')
+      logger.debug('=== CONVERSATION DEBUG RESULT ===')
+      logger.debug(JSON.stringify(result, null, 2))
+      logger.debug('=== END CONVERSATION DEBUG ===')
       
       showInfo(`${translate("sentimentAnalysis.conversationDebugComplete")}: Total: ${result.summary.totalConversations}, Recent: ${result.summary.recentConversations}, With Sentiment: ${result.summary.conversationsWithSentiment}, Test Found: ${result.summary.testConversationFound}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Debug conversation data failed:", error)
       showError(`${translate("sentimentAnalysis.debugFailed")}: ${error?.data?.message || error?.message || "Unknown error occurred"}`)
     }
@@ -103,11 +104,11 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       <Button
         text={isTestLoading ? translate("sentimentAnalysis.testing") : translate("sentimentAnalysis.testDirectApiCall")}
         onPress={() => {
-          console.log('=== DIRECT API TEST ===')
-          console.log('Current Patient:', currentPatient)
-          console.log('Test Summary Data:', JSON.stringify(testSummaryData, null, 2))
-          console.log('Test Error:', testError)
-          console.log('=== END DIRECT TEST ===')
+          logger.debug('=== DIRECT API TEST ===')
+          logger.debug('Current Patient:', currentPatient)
+          logger.debug('Test Summary Data:', JSON.stringify(testSummaryData, null, 2))
+          logger.debug('Test Error:', testError)
+          logger.debug('=== END DIRECT TEST ===')
           showInfo(`${translate("sentimentAnalysis.directApiTest")}: Patient: ${currentPatient?.name || 'None'}\nLoading: ${isTestLoading}\nError: ${testError ? 'Yes' : 'No'}\nData: ${testSummaryData ? 'Received' : 'None'}\n\nSummary Data:\n${JSON.stringify(testSummaryData, null, 2)}`)
         }}
         disabled={isTestLoading || !currentPatient}
@@ -118,7 +119,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       <Button
         text={translate("sentimentAnalysis.forceRefreshCache")}
         onPress={() => {
-          console.log('=== FORCE REFRESH CACHE ===')
+          logger.debug('=== FORCE REFRESH CACHE ===')
           
           // Invalidate all sentiment-related cache entries
           dispatch(sentimentApi.util.invalidateTags([
@@ -135,8 +136,8 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
             ]))
           }
           
-          console.log('Cache invalidated - queries should refetch automatically')
-          console.log('=== END FORCE REFRESH ===')
+          logger.debug('Cache invalidated - queries should refetch automatically')
+          logger.debug('=== END FORCE REFRESH ===')
           
           showInfo(translate("sentimentAnalysis.cacheRefreshedMessage"))
         }}

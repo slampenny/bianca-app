@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
+import { logger } from "../utils/logger"
 
 interface AvatarPickerProps {
   initialAvatar: string | null
@@ -16,7 +17,7 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
   const [image, setImage] = useState<string | null>(null)
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   
-  console.log("AvatarPicker rendered with language:", currentLanguage)
+  logger.debug("AvatarPicker rendered with language:", currentLanguage)
 
   useEffect(() => {
     if (initialAvatar) {
@@ -28,7 +29,7 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
         fullUrl = `${window.location.origin}${initialAvatar}`
       }
 
-      console.log("Setting initial avatar URL:", fullUrl)
+      logger.debug("Setting initial avatar URL:", fullUrl)
       setImage(fullUrl)
     } else {
       setImage(null)
@@ -95,7 +96,7 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
 
       if (!result.canceled) {
         const uri = result.assets[0].uri
-        console.log("Selected image URI:", uri)
+        logger.debug("Selected image URI:", uri)
         // Process the image and notify parent component
         await processImage(uri)
       }

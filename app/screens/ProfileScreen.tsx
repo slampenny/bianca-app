@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import {
   ScrollView,
   Pressable,
@@ -18,6 +18,8 @@ import { useLanguage } from "app/hooks/useLanguage"
 import { translate } from "app/i18n"
 import i18n from "i18n-js"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
+import { logger } from "../utils/logger"
+import { TIMEOUTS } from "../constants"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
 import { getInviteToken } from "../store/authSlice"
@@ -67,7 +69,7 @@ function ProfileScreen() {
   // When setting the avatar state in ProfileScreen
   useEffect(() => {
     if (currentUser) {
-      console.log("Current user avatar:", currentUser.avatar)
+      logger.debug("Current user avatar:", currentUser.avatar)
       setName(currentUser.name || "")
       setAvatar(currentUser.avatar || "")
       setEmail(currentUser.email || "")
@@ -79,7 +81,7 @@ function ProfileScreen() {
   useEffect(() => {
     if (!currentUser && inviteToken) {
       // User has invite token but no current user - redirect to signup
-      console.log("Redirecting invited user to signup screen")
+      logger.debug("Redirecting invited user to signup screen")
       navigation.navigate("Signup", { token: inviteToken })
     }
   }, [currentUser, inviteToken, navigation])
@@ -162,7 +164,7 @@ function ProfileScreen() {
             updatedCaregiver.avatar = result.avatar
           }
         } catch (avatarError) {
-          console.error("Avatar upload error:", avatarError)
+          logger.error("Avatar upload error:", avatarError)
           // Continue with profile update even if avatar upload fails
         }
       }
@@ -176,13 +178,28 @@ function ProfileScreen() {
       // Show success message
       setSuccessMessage(translate("profileScreen.profileUpdatedSuccess"))
 
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
       // Navigate back after a brief delay to show the success message
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         navigation.goBack()
+        timeoutRef.current = null
       }, 1000)
     } catch (error) {
       setSuccessMessage(translate("profileScreen.profileUpdateFailed"))
-      setTimeout(() => setSuccessMessage(""), 2000)
+      
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
+      timeoutRef.current = setTimeout(() => {
+        setSuccessMessage("")
+        timeoutRef.current = null
+      }, TIMEOUTS.SUCCESS_MESSAGE_DISPLAY)
     }
   }
 

@@ -5,6 +5,7 @@ import { useSelector } from "react-redux"
 import { isAuthenticated } from "../store/authSlice"
 import { setShowAuthModalCallback, notifyAuthSuccess, notifyAuthCancelled } from "../services/api/baseQueryWithAuth"
 import { useTheme } from "../theme/ThemeContext"
+import type { ThemeColors } from "../types"
 
 interface AuthModalContextType {
   showAuthModal: () => void
@@ -106,7 +107,7 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   )
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     modalContainer: {
       flex: 1,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
@@ -10,6 +10,9 @@ import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { spacing } from "app/theme"
 import { translate } from "../i18n"
 import { useTheme } from "app/theme/ThemeContext"
+import { logger } from "../utils/logger"
+import { TIMEOUTS } from "../constants"
+import type { ErrorResponse } from "../types"
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -61,16 +64,30 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const [confirmPasswordError, setConfirmPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check if we have a reset token
   useEffect(() => {
     if (!token) {
       showError("This password reset link is invalid or has expired. Please request a new password reset.")
-      setTimeout(() => navigation.navigate("RequestReset" as never), 2000)
-      return
+      timeoutRef.current = setTimeout(() => navigation.navigate("RequestReset" as never), TIMEOUTS.PASSWORD_RESET_REDIRECT)
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+          timeoutRef.current = null
+        }
+      }
     }
 
-    console.log("Password reset with token:", token)
+    logger.debug("Password reset with token:", token)
+    
+    // Cleanup on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
   }, [token, navigation])
 
   const validateForm = () => {
@@ -111,18 +128,26 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
       
       setIsSuccess(true)
       
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
       // Show success and redirect to login after 2 seconds
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         navigation.navigate("Login")
-      }, 2000)
+        timeoutRef.current = null
+      }, TIMEOUTS.PASSWORD_RESET_REDIRECT)
       
-    } catch (error: any) {
-      console.error("Password reset error:", error)
+    } catch (error: unknown) {
+      logger.error("Password reset error:", error)
       
-      if (error?.data?.message) {
-        setGeneralError(error.data.message)
-      } else if (error?.message) {
-        setGeneralError(error.message)
+      // RTK Query errors have a specific structure
+      const errorResponse = error as { data?: { message?: string }; message?: string }
+      if (errorResponse?.data?.message) {
+        setGeneralError(errorResponse.data.message)
+      } else if (errorResponse?.message) {
+        setGeneralError(errorResponse.message)
       } else {
         setGeneralError("Password reset failed. Please try again or request a new reset link.")
       }

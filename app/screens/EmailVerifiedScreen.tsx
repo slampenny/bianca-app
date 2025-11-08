@@ -8,8 +8,9 @@ import { spacing } from "app/theme"
 import { useTheme } from "app/theme/ThemeContext"
 import { navigationRef } from "app/navigators/navigationUtilities"
 import { translate } from "app/i18n"
+import type { ThemeColors } from "../types"
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.palette.biancaBackground || colors.palette.neutral100,

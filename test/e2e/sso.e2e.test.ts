@@ -81,6 +81,10 @@ test.describe('SSO Authentication Workflow', () => {
       })
     })
 
+    // Wait for login screen and SSO buttons to be visible
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="google-sso-button"]', { timeout: 10000 })
+    
     // Click Google SSO button
     await page.getByTestId('google-sso-button').click()
 
@@ -207,6 +211,10 @@ test.describe('SSO Authentication Workflow', () => {
       })
     })
 
+    // Wait for login screen and SSO buttons to be visible
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="microsoft-sso-button"]', { timeout: 10000 })
+    
     // Click Microsoft SSO button
     await page.getByTestId('microsoft-sso-button').click()
 
@@ -369,6 +377,10 @@ test.describe('SSO Authentication Workflow', () => {
       })
     })
 
+    // Wait for login screen and SSO buttons to be visible
+    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="google-sso-button"]', { timeout: 10000 })
+    
     // Click Google SSO button
     await page.getByTestId('google-sso-button').click()
 

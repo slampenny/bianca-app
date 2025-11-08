@@ -13,8 +13,9 @@ import { ConversationMessages } from "../components/ConversationMessages"
 import { Screen } from "../components/Screen"
 import { Card } from "../components/Card"
 import { translate } from "../i18n"
+import { logger } from "../utils/logger"
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   assistantBubble: {
     backgroundColor: colors.palette.biancaSuccess, // Green for assistant
     borderBottomLeftRadius: 4, // WhatsApp-style tail
@@ -182,7 +183,7 @@ export function ConversationsScreen() {
   // Handle pagination state
   useEffect(() => {
     if (conversationsData) {
-      console.log(`[ConversationsScreen] Received conversations data:`, {
+      logger.debug(`[ConversationsScreen] Received conversations data:`, {
         page: conversationsData.page,
         totalPages: conversationsData.totalPages,
         totalResults: conversationsData.totalResults,
@@ -205,7 +206,7 @@ export function ConversationsScreen() {
 
   // Debug logging for Redux state
   useEffect(() => {
-    console.log(`[ConversationsScreen] Redux conversations state:`, {
+    logger.debug(`[ConversationsScreen] Redux conversations state:`, {
       conversationsCount: conversations.length,
       conversationIds: conversations.map(c => ({ id: c.id, startTime: c.startTime })),
       currentConversationId: currentConversation?.id
@@ -213,7 +214,7 @@ export function ConversationsScreen() {
   }, [conversations, currentConversation]);
 
   const loadMoreConversations = useCallback(() => {
-    console.log(`[ConversationsScreen] loadMoreConversations called:`, {
+    logger.debug(`[ConversationsScreen] loadMoreConversations called:`, {
       hasMore,
       isLoading,
       currentPage: page,
@@ -221,10 +222,10 @@ export function ConversationsScreen() {
     });
     
     if (hasMore && !isLoading) {
-      console.log(`[ConversationsScreen] Loading page ${page + 1}`);
+      logger.debug(`[ConversationsScreen] Loading page ${page + 1}`);
       setPage(prev => prev + 1)
     } else {
-      console.log(`[ConversationsScreen] Cannot load more:`, {
+      logger.debug(`[ConversationsScreen] Cannot load more:`, {
         hasMore,
         isLoading
       });
@@ -241,14 +242,14 @@ export function ConversationsScreen() {
   }
 
   const toggleConversation = (conversationId: string) => {
-    console.log('[ConversationsScreen] Toggling conversation:', conversationId, 'Current expanded:', Array.from(expandedConversations))
+    logger.debug('[ConversationsScreen] Toggling conversation:', conversationId, 'Current expanded:', Array.from(expandedConversations))
     const newExpanded = new Set(expandedConversations)
     if (newExpanded.has(conversationId)) {
       newExpanded.delete(conversationId)
-      console.log('[ConversationsScreen] Collapsing conversation:', conversationId)
+      logger.debug('[ConversationsScreen] Collapsing conversation:', conversationId)
     } else {
       newExpanded.add(conversationId)
-      console.log('[ConversationsScreen] Expanding conversation:', conversationId)
+      logger.debug('[ConversationsScreen] Expanding conversation:', conversationId)
       // Set this conversation as the current one in Redux
       // Use conversationsData.results if available, otherwise fall back to Redux conversations
       const allConversations = conversationsData?.results || conversations
@@ -258,7 +259,7 @@ export function ConversationsScreen() {
       }
     }
     setExpandedConversations(newExpanded)
-    console.log('[ConversationsScreen] New expanded set:', Array.from(newExpanded))
+    logger.debug('[ConversationsScreen] New expanded set:', Array.from(newExpanded))
   }
 
   const formatDate = (dateString: string) => {

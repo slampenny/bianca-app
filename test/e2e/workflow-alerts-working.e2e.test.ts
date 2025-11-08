@@ -19,7 +19,7 @@ test.describe('Working Alert Workflows - Real Backend Integration', () => {
     const alertElements = [
       { name: 'alert-badge', selector: page.getByTestId('alert-badge') },
       { name: 'alerts-tab', selector: page.getByTestId('alerts-tab') },
-      { name: 'tab-alert', selector: page.getByTestId('tab-alert') },
+      { name: 'tab-alert', selector: page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')) },
       { name: 'alert text', selector: page.getByText(/alert/i) }
     ]
     
