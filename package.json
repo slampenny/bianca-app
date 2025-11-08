@@ -112,7 +112,7 @@
     "joi": "^17.3.0",
     "jsonwebtoken": "^8.5.1",
     "moment": "^2.24.0",
-    "mongoose": "^5.7.7",
+    "mongoose": "^8.19.3",
     "mongoose-delete": "^1.0.2",
     "mongoose-to-swagger": "^1.5.1",
     "morgan": "^1.9.1",

@@ -133,6 +133,9 @@ if [ "$SKIP_BACKEND_PUSH" != true ]; then
         echo "❌ Backend docker push failed. Please check the error above."
         exit 1
     fi
+    # Clean up local image after successful push to save space
+    echo "🧹 Cleaning up local backend image..."
+    docker rmi bianca-app-backend:production 2>/dev/null || true
 else
     echo "⏭️  Skipping backend ECR push"
 fi
@@ -171,11 +174,21 @@ if [ "$SKIP_FRONTEND_PUSH" != true ]; then
         echo "❌ Frontend docker push failed. Please check the error above."
         exit 1
     fi
+    # Clean up local image after successful push to save space
+    echo "🧹 Cleaning up local frontend image..."
+    docker rmi bianca-app-frontend:production 2>/dev/null || true
 else
     echo "⏭️  Skipping frontend ECR push"
 fi
 
 cd ../bianca-app-backend
+
+# Clean up Docker build cache and untagged images to free up space
+echo "🧹 Cleaning up Docker build cache and untagged images..."
+docker builder prune -f 2>/dev/null || true
+docker image prune -f 2>/dev/null || true
+# Remove untagged ECR images
+docker images | grep "730335291008.dkr.ecr.us-east-2.amazonaws.com" | grep "<none>" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
 # Step 2: Build Lambda packages for HIPAA backups (if directories exist)
 if [ -d "devops/terraform/lambda-backup" ]; then

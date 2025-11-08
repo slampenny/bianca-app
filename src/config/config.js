@@ -125,8 +125,7 @@ const baselineConfig = {
   mongoose: {
     url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      // useNewUrlParser and useUnifiedTopology are default in Mongoose 6+
       connectTimeoutMS: 30000,           // How long to wait for initial connection
       socketTimeoutMS: 60000,            // How long to wait on operations after connection
       keepAlive: true,                   // Enable TCP keep-alive
