@@ -21,7 +21,7 @@
       "**/*"
     ],
     "android": {
-      "icon": "./assets/images/app-icon-android-legacy.png",
+      "icon": "./assets/images/playstore.png",
       "package": "com.negascout.bianca",
       "versionCode": 1,
       "adaptiveIcon": {
@@ -41,7 +41,7 @@
       ]
     },
     "ios": {
-      "icon": "./assets/images/app-icon-ios.png",
+      "icon": "./assets/images/appstore.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.negascout.bianca",
       "associatedDomains": [
