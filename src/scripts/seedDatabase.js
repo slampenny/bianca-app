@@ -352,7 +352,7 @@ async function addNormalPatientConversations(patientId) {
 async function seedDatabase() {
   try {
     // Connect to the database
-    await mongoose.connect(config.mongoose.url, { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(config.mongoose.url);
 
     // Clear the database
     await Org.deleteMany({});

@@ -24,7 +24,7 @@ describe('Billing System Integration Tests', () => {
     mongoServer = new MongoMemoryServer();
     await mongoServer.start();
     const mongoUri = await mongoServer.getUri();
-    await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongoUri, {});
     // Create test organization
     org = await Org.create({
       name: 'Integration Test Healthcare Org',

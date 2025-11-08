@@ -12,10 +12,7 @@ async function setupMongoMemoryServer() {
   await mongoServer.start();
   const mongoUri = await mongoServer.getUri();
   
-  await mongoose.connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
+  await mongoose.connect(mongoUri);
   
   return mongoUri;
 }
