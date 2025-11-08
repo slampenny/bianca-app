@@ -9,7 +9,7 @@ beforeAll(async () => {
   mongoServer = new MongoMemoryServer();
   await mongoServer.start(); // Fix: Use start() function instead of new keyword
   const mongoUri = await mongoServer.getUri();
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await mongoose.connect(mongoUri, {});
 });
 
 afterAll(async () => {

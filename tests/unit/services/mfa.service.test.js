@@ -38,8 +38,6 @@ beforeAll(async () => {
   await mongoServer.start();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, { 
-    useNewUrlParser: true, 
-    useUnifiedTopology: true 
   });
 });
 
@@ -103,7 +101,7 @@ describe('MFA Service', () => {
     });
 
     it('should throw error if caregiver not found', async () => {
-      const fakeId = mongoose.Types.ObjectId();
+      const fakeId = new mongoose.Types.ObjectId();
       
       await expect(mfaService.enableMFA(fakeId))
         .rejects
@@ -378,7 +376,7 @@ describe('MFA Service', () => {
     });
 
     it('should throw error if caregiver not found', async () => {
-      const fakeId = mongoose.Types.ObjectId();
+      const fakeId = new mongoose.Types.ObjectId();
 
       await expect(mfaService.getMFAStatus(fakeId))
         .rejects

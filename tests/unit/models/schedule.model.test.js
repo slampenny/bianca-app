@@ -9,7 +9,7 @@ describe('Schedule model', () => {
     mongoServer = new MongoMemoryServer();
     await mongoServer.start();
     const mongoUri = await mongoServer.getUri();
-    await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect(mongoUri, {});
   });
 
   afterAll(async () => {

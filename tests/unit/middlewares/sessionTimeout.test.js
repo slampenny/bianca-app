@@ -23,8 +23,6 @@ beforeAll(async () => {
   await mongoServer.start();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, { 
-    useNewUrlParser: true, 
-    useUnifiedTopology: true 
   });
 });
 
@@ -38,7 +36,7 @@ afterEach(async () => {
 });
 
 describe('Session Timeout Middleware', () => {
-  const testUserId = mongoose.Types.ObjectId();
+  const testUserId = new mongoose.Types.ObjectId();
 
   describe('sessionTimeoutMiddleware', () => {
     it('should allow first request from user', async () => {
@@ -197,8 +195,8 @@ describe('Session Timeout Middleware', () => {
     });
 
     it('should count active sessions correctly', async () => {
-      const user1Id = mongoose.Types.ObjectId();
-      const user2Id = mongoose.Types.ObjectId();
+      const user1Id = new mongoose.Types.ObjectId();
+      const user2Id = new mongoose.Types.ObjectId();
 
       const req1 = httpMocks.createRequest({
         caregiver: { _id: user1Id, role: 'staff' }
@@ -237,14 +235,14 @@ describe('Session Timeout Middleware', () => {
     });
 
     it('should return false for non-existent session', () => {
-      const fakeUserId = mongoose.Types.ObjectId();
+      const fakeUserId = new mongoose.Types.ObjectId();
       expect(isSessionActive(fakeUserId.toString())).toBe(false);
     });
 
     it('should return false for expired session', () => {
       // This test would require mocking time or waiting for actual timeout
       // For unit tests, we just verify the function exists and handles non-existent sessions
-      const fakeUserId = mongoose.Types.ObjectId();
+      const fakeUserId = new mongoose.Types.ObjectId();
       expect(isSessionActive(fakeUserId.toString())).toBe(false);
     });
   });
