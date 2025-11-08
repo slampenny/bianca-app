@@ -317,7 +317,9 @@ const generateVerificationPage = (req, isError, options = {}) => {
   // Get translations (fallback to English if not available)
   const t = (key) => {
     try {
-      return i18n.__({ phrase: key, locale }) || key;
+      const result = i18n.__({ phrase: key, locale });
+      // Ensure we always return a string (i18n might return object if not initialized)
+      return (typeof result === 'string' ? result : key);
     } catch {
       return key;
     }
