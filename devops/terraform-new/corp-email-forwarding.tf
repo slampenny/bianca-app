@@ -1,18 +1,24 @@
 # corp-email-forwarding.tf
-# AWS SES Email Forwarding Setup for biancatechnologies.com
+# Email Configuration for biancatechnologies.com
 # 
-# ⚠️ DISABLED - MIGRATED TO ZOHO MAIL
-# All resources below are commented out because biancatechnologies.com now uses Zoho Mail.
-# Email is handled directly by Zoho - no SES/Lambda forwarding needed.
+# HYBRID SETUP: Zoho Mail + AWS SES (both can send AND receive)
 # 
-# This configuration previously set up:
-# - S3 bucket to store incoming emails
-# - SES receipt rules to receive emails for biancatechnologies.com
-# - Lambda function to process and forward emails to Gmail addresses
-# - IAM roles and permissions for all components
-#
-# IMPORTANT: If you run terraform apply, these resources will NOT be recreated.
-# This prevents conflicts with Zoho Mail MX records and infrastructure.
+# RECEIVING:
+# - Zoho Mail: Handles receiving emails (MX records point to Zoho)
+#   Users can receive emails at jlapp@biancatechnologies.com, etc.
+# 
+# SENDING:
+# - Zoho Mail: Users can send emails from their Zoho inbox
+#   Uses Zoho DKIM record (zmail._domainkey.biancatechnologies.com)
+# - AWS SES: WordPress can send emails (notifications, contact forms, etc.)
+#   Uses SES DKIM records (3 CNAME records)
+# 
+# AUTHENTICATION:
+# - SPF Record: Authorizes BOTH Zoho and SES to send emails
+# - DKIM: Both services have their own DKIM records (no conflict)
+# 
+# Note: The SES email forwarding resources (S3, Lambda) are commented out
+# because we're using Zoho Mail for receiving, not SES.
 
 ################################################################################
 # S3 BUCKET FOR EMAIL STORAGE
@@ -248,16 +254,18 @@
 # to avoid conflicts (SES only allows one active rule set)
 # The rule set is created in main.tf as aws_ses_receipt_rule_set.email_forwarding
 
-# # SES Domain Identity Verification
-# # This needs to be done first - domain must be verified in SES before receiving emails
-# resource "aws_ses_domain_identity" "biancatechnologies" {
-#   domain = "biancatechnologies.com"
-# }
+# SES Domain Identity Verification
+# Required for WordPress to send emails via SES
+# Note: Zoho Mail handles receiving (MX records), SES handles sending (WordPress)
+resource "aws_ses_domain_identity" "biancatechnologies" {
+  domain = "biancatechnologies.com"
+}
 
-# # SES Domain DKIM (recommended for better deliverability)
-# resource "aws_ses_domain_dkim" "biancatechnologies" {
-#   domain = aws_ses_domain_identity.biancatechnologies.domain
-# }
+# SES Domain DKIM (required for email deliverability)
+# Enables DKIM signing for emails sent via SES (WordPress)
+resource "aws_ses_domain_dkim" "biancatechnologies" {
+  domain = aws_ses_domain_identity.biancatechnologies.domain
+}
 
 # Try to find Route53 hosted zone for biancatechnologies.com
 # If domain is managed in Route53, we'll create DNS records automatically
@@ -267,26 +275,26 @@ data "aws_route53_zone" "biancatechnologies" {
   private_zone = false
 }
 
-# ⚠️ DISABLED - Using Zoho Mail, SES verification records not needed
-# # Route53 DNS Records for SES Domain Verification
-# resource "aws_route53_record" "corp_ses_verification" {
-#   zone_id = data.aws_route53_zone.biancatechnologies.zone_id
-#   name    = "_amazonses.${aws_ses_domain_identity.biancatechnologies.domain}"
-#   type    = "TXT"
-#   ttl     = 600
-#   records = [aws_ses_domain_identity.biancatechnologies.verification_token]
-# }
+# Route53 DNS Records for SES Domain Verification
+# Required for WordPress to send emails via SES
+resource "aws_route53_record" "corp_ses_verification" {
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "_amazonses.${aws_ses_domain_identity.biancatechnologies.domain}"
+  type    = "TXT"
+  ttl     = 600
+  records = [aws_ses_domain_identity.biancatechnologies.verification_token]
+}
 
-# ⚠️ DISABLED - Using Zoho Mail, SES DKIM records not needed
-# # Route53 DKIM Records (3 CNAME records)
-# resource "aws_route53_record" "corp_ses_dkim" {
-#   count   = 3
-#   zone_id = data.aws_route53_zone.biancatechnologies.zone_id
-#   name    = "${element(aws_ses_domain_dkim.biancatechnologies.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.biancatechnologies.domain}"
-#   type    = "CNAME"
-#   ttl     = 600
-#   records = ["${element(aws_ses_domain_dkim.biancatechnologies.dkim_tokens, count.index)}.dkim.amazonses.com"]
-# }
+# Route53 DKIM Records (3 CNAME records)
+# Required for DKIM signing of emails sent via SES (WordPress)
+resource "aws_route53_record" "corp_ses_dkim" {
+  count   = 3
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "${element(aws_ses_domain_dkim.biancatechnologies.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.biancatechnologies.domain}"
+  type    = "CNAME"
+  ttl     = 600
+  records = ["${element(aws_ses_domain_dkim.biancatechnologies.dkim_tokens, count.index)}.dkim.amazonses.com"]
+}
 
 ################################################################################
 # ZOHO MAIL MX RECORDS
@@ -306,8 +314,11 @@ resource "aws_route53_record" "zoho_mx" {
 }
 
 ################################################################################
-# ZOHO MAIL SPF RECORD
-# Required for email authentication - allows Zoho Mail and AWS SES to send
+# SPF RECORD
+# Required for email authentication - allows BOTH Zoho Mail AND AWS SES to send emails
+# - Zoho Mail: Users can send from their Zoho inbox (jlapp@biancatechnologies.com, etc.)
+# - AWS SES: WordPress can send emails (notifications, contact forms, etc.)
+# This single SPF record authorizes both services to send emails
 ################################################################################
 
 resource "aws_route53_record" "zoho_spf" {
