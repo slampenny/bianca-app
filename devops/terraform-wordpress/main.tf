@@ -577,6 +577,21 @@ resource "aws_route53_record" "wordpress_www" {
 }
 
 ################################################################################
+# SES DOMAIN VERIFICATION FOR EMAIL SENDING
+################################################################################
+
+# Note: SES domain verification for myphonefriend.com is managed in the main
+# terraform workspace (devops/terraform/main.tf). The domain should already be
+# verified. This section documents the requirement.
+#
+# To verify SES is set up correctly, run:
+#   aws ses get-identity-verification-attributes --identities myphonefriend.com --region us-east-2
+#
+# The WordPress instance has IAM permissions to send emails via SES (configured above).
+# WordPress itself needs to be configured to use SES via an SMTP plugin.
+# See WORDPRESS_EMAIL_SETUP.md for instructions.
+
+################################################################################
 # OUTPUTS
 ################################################################################
 
