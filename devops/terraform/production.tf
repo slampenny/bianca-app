@@ -121,11 +121,19 @@ resource "aws_security_group" "production" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # SIP
+  # SIP UDP
   ingress {
     from_port   = 5060
     to_port     = 5060
     protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # SIP TCP (required for Twilio)
+  ingress {
+    from_port   = 5061
+    to_port     = 5061
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -238,6 +246,7 @@ resource "aws_launch_template" "production" {
     region         = var.aws_region
     aws_account_id = var.aws_account_id
     environment    = "production"
+    eip_address    = aws_eip.production.public_ip  # Pass EIP so it's always correct
   }))
 
   # Force recreation when userdata changes
@@ -249,6 +258,15 @@ resource "aws_launch_template" "production" {
       Name        = "bianca-production"
       Environment = "production"
     }
+  }
+}
+
+# Elastic IP for production instance (prevents IP changes on restart)
+resource "aws_eip" "production" {
+  domain = "vpc"
+  tags = {
+    Name        = "bianca-production-eip"
+    Environment = "production"
   }
 }
 
@@ -281,6 +299,12 @@ resource "aws_instance" "production" {
   # On-demand instances can be stopped and restarted to apply user_data changes
   # To apply user_data changes: terraform taint aws_instance.production && terraform apply
   # Or manually: stop instance, update user_data, start instance
+}
+
+# Associate Elastic IP with production instance
+resource "aws_eip_association" "production" {
+  instance_id   = aws_instance.production.id
+  allocation_id = aws_eip.production.id
 }
 
 # Attach EBS volume to production instance
@@ -429,7 +453,7 @@ resource "aws_lb_listener" "production_https" {
   }
 }
 
-# HTTPS listener rule for API
+# HTTPS listener rule for API - route ALL api.myphonefriend.com traffic to API
 resource "aws_lb_listener_rule" "production_api_https_rule" {
   listener_arn = aws_lb_listener.production_https.arn
   priority     = 100
@@ -440,8 +464,8 @@ resource "aws_lb_listener_rule" "production_api_https_rule" {
   }
 
   condition {
-    path_pattern {
-      values = ["/api/*", "/v1/*", "/health"]
+    host_header {
+      values = ["api.myphonefriend.com"]
     }
   }
 }
@@ -461,6 +485,22 @@ resource "aws_route53_record" "production_app" {
   type    = "CNAME"
   ttl     = 300
   records = [aws_lb.production.dns_name]
+}
+
+# SIP DNS record - automatically updates when EIP changes
+# Note: This may conflict with main.tf - if so, remove the one in main.tf
+resource "aws_route53_record" "production_sip" {
+  zone_id        = data.aws_route53_zone.myphonefriend.zone_id
+  name           = "sip.myphonefriend.com"
+  type           = "A"
+  ttl            = 300
+  records        = [aws_eip.production.public_ip]
+  allow_overwrite = true  # Allow overwriting existing record
+  
+  # Allow this to be managed here instead of main.tf
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Production CloudWatch Log Group

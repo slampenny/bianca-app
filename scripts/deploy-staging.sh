@@ -287,9 +287,41 @@ echo "✅ Staging infrastructure deployed!"
 
 # Step 3: Update running containers with new images
 echo "🔄 Updating staging containers with new images..."
-STAGING_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan)
 
-if [ -n "$STAGING_IP" ]; then
+# Wait for staging instance to be running and get IP
+echo "⏳ Waiting for staging instance to be ready..."
+STAGING_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=pending,running,starting" --query 'Reservations[0].Instances[0].InstanceId' --output text --profile jordan)
+
+if [ -n "$STAGING_INSTANCE_ID" ] && [ "$STAGING_INSTANCE_ID" != "None" ]; then
+    echo "Found staging instance: $STAGING_INSTANCE_ID"
+    
+    # Wait for instance to be running
+    echo "Waiting for instance to reach running state..."
+    aws ec2 wait instance-running --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region us-east-2 || true
+    
+    # Wait a bit more for public IP to be assigned
+    echo "Waiting for public IP assignment..."
+    sleep 10
+    
+    # Get the public IP
+    STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region us-east-2)
+    
+    # Retry if IP is not yet assigned
+    MAX_RETRIES=6
+    RETRY_COUNT=0
+    while [ -z "$STAGING_IP" ] || [ "$STAGING_IP" == "None" ] || [ "$STAGING_IP" == "null" ]; do
+        if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+            echo "❌ Timeout waiting for staging instance IP"
+            exit 1
+        fi
+        echo "Waiting for public IP... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+        sleep 10
+        STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region us-east-2)
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+    done
+fi
+
+if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "null" ]; then
     echo "Updating containers on staging instance: $STAGING_IP"
     
     # NOTE: Do NOT copy docker-compose files!
@@ -343,6 +375,13 @@ if [ -n "$STAGING_IP" ]; then
           docker rm -f \$container_name 2>/dev/null || true
         done
         
+        # Ensure MongoDB container name is free (in case of conflicts)
+        # Only remove if it's stopped, not if it's running (to preserve data)
+        if docker ps -a --filter 'name=staging_mongodb' --filter 'status=exited' | grep -q staging_mongodb; then
+          echo 'Removing stopped MongoDB container to avoid name conflicts...'
+          docker rm -f staging_mongodb 2>/dev/null || true
+        fi
+        
         # Also remove by filter pattern (in case names are slightly different)
         docker rm -f \$(docker ps -aq --filter 'name=staging_app') 2>/dev/null || true
         docker rm -f \$(docker ps -aq --filter 'name=staging_asterisk') 2>/dev/null || true
@@ -367,14 +406,46 @@ if [ -n "$STAGING_IP" ]; then
       
       # Check if MongoDB container already exists (running or stopped)
       if docker ps -aq --filter 'name=staging_mongodb' | grep -q .; then
-        echo 'MongoDB container already exists, starting only app, asterisk, frontend, and nginx...'
-        # Start only the application services, skip MongoDB
-        docker-compose up -d --no-deps app asterisk frontend nginx
+        echo 'MongoDB container already exists...'
+        # Remove the existing MongoDB container to avoid name conflicts
+        echo 'Removing existing MongoDB container to avoid conflicts...'
+        docker rm -f staging_mongodb 2>/dev/null || true
+        # Also try removing by the container ID if name doesn't work
+        EXISTING_MONGODB=$(docker ps -aq --filter 'name=staging_mongodb' | head -1)
+        if [ -n "$EXISTING_MONGODB" ]; then
+          docker rm -f "$EXISTING_MONGODB" 2>/dev/null || true
+        fi
+        echo 'Starting all containers (MongoDB will be recreated)...'
+        docker-compose up -d
       else
         echo 'Starting all containers (including MongoDB)...'
         # Start all containers (MongoDB will be created)
         docker-compose up -d
       fi
+      
+      # Wait for MongoDB to be ready (up to 30 seconds)
+      echo 'Waiting for MongoDB to be ready...'
+      MAX_WAIT=30
+      WAIT_COUNT=0
+      while [ \$WAIT_COUNT -lt \$MAX_WAIT ]; do
+        if docker exec staging_mongodb mongosh --eval 'db.adminCommand("ping")' --quiet >/dev/null 2>&1; then
+          echo '✅ MongoDB is ready'
+          break
+        fi
+        echo 'Waiting for MongoDB... (\$((WAIT_COUNT + 1))/\$MAX_WAIT seconds)'
+        sleep 2
+        WAIT_COUNT=\$((WAIT_COUNT + 2))
+      done
+      
+      if [ \$WAIT_COUNT -ge \$MAX_WAIT ]; then
+        echo '⚠️  MongoDB may not be ready yet. Checking status...'
+        docker ps | grep mongodb || echo 'MongoDB container not found in running containers'
+        docker logs staging_mongodb --tail 30 2>/dev/null || echo 'Could not get MongoDB logs'
+      fi
+      
+      # Show container status
+      echo 'Container status:'
+      docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E 'staging_|NAMES' || true
     "
     
     if [ $? -eq 0 ]; then
@@ -384,8 +455,13 @@ if [ -n "$STAGING_IP" ]; then
         exit 1
     fi
 else
-    echo "❌ Could not find staging instance IP"
-    exit 1
+    echo "⚠️  Staging instance not found or not running yet"
+    echo "   This is normal if the instance was just created. You can manually update containers later with:"
+    echo "   ./scripts/staging-control.sh status"
+    echo "   ./scripts/staging-control.sh start  # if needed"
+    echo "   Then run the container update manually"
+    # Don't exit with error - infrastructure was deployed successfully
+    # Just skip the container update step
 fi
 
 echo "🧪 Testing staging environment..."

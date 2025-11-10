@@ -94,6 +94,7 @@ echo "🐳 Building and pushing backend Docker image..."
 echo "🔓 Logging out from Docker Hub to avoid credential issues..."
 docker logout docker.io 2>/dev/null || true
 
+# Simple build like staging (uses cached images if available)
 docker build -t bianca-app-backend:production .
 
 if [ $? -ne 0 ]; then
@@ -146,7 +147,7 @@ cd ../bianca-app-frontend
 # Logout from Docker Hub again before frontend build (in case we logged back in for ECR)
 docker logout docker.io 2>/dev/null || true
 
-# Build frontend with production config for proper environment
+# Simple build like staging (uses cached images if available)
 docker build -t bianca-app-frontend:production -f devops/Dockerfile --build-arg BUILD_ENV=production .
 
 if [ $? -ne 0 ]; then
@@ -345,6 +346,15 @@ sleep 30
 
 echo "Testing production API..."
 curl -f https://api.myphonefriend.com/health && echo "✅ Production environment is healthy!" || echo "❌ Production environment health check failed"
+
+# Run post-deployment validation
+echo ""
+echo "🔍 Running post-deployment validation..."
+if [ -f "./scripts/validate-production-deployment.sh" ]; then
+    ./scripts/validate-production-deployment.sh || echo "⚠️  Validation found some issues - please review above"
+else
+    echo "⚠️  Validation script not found, skipping..."
+fi
 
 echo "🎉 Production deployment complete!"
 echo "🌐 Production API: https://api.myphonefriend.com"

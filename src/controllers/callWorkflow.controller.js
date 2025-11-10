@@ -97,6 +97,57 @@ const getCallStatus = catchAsync(async (req, res) => {
   await conversation.populate('patientId', 'name phone');
   await conversation.populate('agentId', 'name');
   
+  // Ensure messages are fully populated (in case they weren't from getConversationById)
+  // This is important for realtime calls where messages might be added dynamically
+  if (conversation.messages && conversation.messages.length > 0) {
+    // Check if messages are already populated (have content property) or are just ObjectIds
+    const firstMessage = conversation.messages[0];
+    if (!firstMessage || !firstMessage.content) {
+      // Messages are not populated, populate them now
+      await conversation.populate('messages');
+    }
+  }
+  
+  // For active calls, also check Message collection directly to ensure we get all latest messages
+  // This is important because messages might be saved to Message collection before conversation.messages is updated
+  const { Message } = require('../models');
+  let allMessages = conversation.messages || [];
+  
+  // If this is an active call, also query Message collection to ensure we have all messages
+  if (conversation.status === 'in-progress' || conversation.status === 'initiated') {
+    const directMessages = await Message.find({ conversationId: conversation._id })
+      .sort({ createdAt: 1 })
+      .lean();
+    
+    // Merge messages from both sources, removing duplicates by message ID
+    const messageMap = new Map();
+    
+    // Add messages from conversation.messages (populated)
+    allMessages.forEach(msg => {
+      const msgId = msg._id?.toString() || msg.id?.toString();
+      if (msgId) {
+        messageMap.set(msgId, msg);
+      }
+    });
+    
+    // Add/update with messages from Message collection (might be more up-to-date)
+    directMessages.forEach(msg => {
+      const msgId = msg._id?.toString();
+      if (msgId) {
+        messageMap.set(msgId, msg);
+      }
+    });
+    
+    // Convert back to array and sort by createdAt
+    allMessages = Array.from(messageMap.values()).sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+      const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+      return timeA - timeB;
+    });
+    
+    logger.debug(`[CallStatus] Merged messages: ${conversation.messages?.length || 0} from conversation, ${directMessages.length} from Message collection, ${allMessages.length} total`);
+  }
+  
   // Get AI speaking status from OpenAI realtime service
   let aiSpeakingStatus = {
     isSpeaking: false,
@@ -123,6 +174,25 @@ const getCallStatus = catchAsync(async (req, res) => {
     logger.warn(`[CallStatus] Could not get AI speaking status: ${error.message}`);
   }
   
+  // Convert messages to plain objects to ensure proper JSON serialization
+  // This ensures all messages (including patient messages) are included
+  const messages = allMessages.map(msg => {
+    // If message is a Mongoose document, convert to plain object
+    if (msg.toObject) {
+      return msg.toObject();
+    }
+    // If already a plain object, return as-is
+    return msg;
+  });
+  
+  // Log message details for debugging
+  logger.debug(`[CallStatus] Returning ${messages.length} messages for conversation ${conversationId}`, {
+    messageCount: messages.length,
+    patientMessageCount: messages.filter(m => m.role === 'patient').length,
+    assistantMessageCount: messages.filter(m => m.role === 'assistant').length,
+    messageRoles: messages.map(m => m.role)
+  });
+  
   const status = {
     conversationId: conversation._id,
     status: conversation.status,
@@ -131,8 +201,8 @@ const getCallStatus = catchAsync(async (req, res) => {
     duration: conversation.duration,
     patient: conversation.patientId,
     agent: conversation.agentId,
-    // Include messages for live call display
-    messages: conversation.messages || [],
+    // Include all messages (patient and assistant) for live call display
+    messages: messages,
     // Include AI speaking status
     aiSpeaking: aiSpeakingStatus
   };

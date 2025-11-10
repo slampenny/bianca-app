@@ -271,6 +271,14 @@ data "aws_route53_zone" "myphonefriend" {
   private_zone = false
 }
 
+# Route53 zone for biancawellness.com
+# Note: Domain must be registered in Route 53 first via AWS Console
+# After registration, Route 53 will automatically create a hosted zone
+data "aws_route53_zone" "biancawellness" {
+  name         = "biancawellness.com."
+  private_zone = false
+}
+
 data "aws_acm_certificate" "app_cert" {
   domain      = "*.myphonefriend.com"
   statuses    = ["ISSUED"]
@@ -1914,14 +1922,9 @@ resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
 #   }
 # }
 
-# KEPT: Direct EIP mapping for SIP (Twilio needs direct access)
-resource "aws_route53_record" "sip_subdomain" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
-  name    = "sip.myphonefriend.com"
-  type    = "A"
-  ttl     = 300
-  records = [aws_eip.asterisk_eip.public_ip]
-}
+# SIP DNS record moved to production.tf to avoid conflicts
+# The production.tf file manages sip.myphonefriend.com using aws_eip.production
+# This was removed to prevent duplicate resource conflicts
 
 # Root domain record (myphonefriend.com) is managed by wordpress.tf
 # WordPress manages this record via wordpress_root resource in wordpress.tf
@@ -2311,7 +2314,7 @@ output "asterisk_public_ip" {
 
 output "sip_dns_name" {
   description = "DNS name for SIP (sip.myphonefriend.com)"
-  value       = aws_route53_record.sip_subdomain.name
+  value       = try(aws_route53_record.production_sip.name, "sip.myphonefriend.com")
 }
 
 # COST MINIMIZATION: API ALB DNS output - STOPPED (ALB commented out)
