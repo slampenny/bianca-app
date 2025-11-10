@@ -3337,5 +3337,155 @@ router.post('/send-verification-email', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /test/get-email:
+ *   post:
+ *     summary: Retrieve last email from Ethereal for a recipient (test only)
+ *     description: |
+ *       ⚠️ WARNING: This route does not require authentication for testing purposes.
+ *       Use with caution in production environments.
+ *       
+ *       Retrieves the most recent email sent to the specified recipient from Ethereal.
+ *       Extracts tokens (verification, invite, reset password) from the email content.
+ *       Only works when NODE_ENV is development or test and Ethereal is configured.
+ *     tags: [Test - Email]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to retrieve email for
+ *                 example: test@example.com
+ *               waitForEmail:
+ *                 type: boolean
+ *                 description: Whether to wait for email to arrive (default: false)
+ *                 example: false
+ *               maxWaitMs:
+ *                 type: number
+ *                 description: Maximum time to wait in milliseconds (default: 30000)
+ *                 example: 30000
+ *     responses:
+ *       "200":
+ *         description: Email retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 email:
+ *                   type: object
+ *                   properties:
+ *                     subject:
+ *                       type: string
+ *                     from:
+ *                       type: string
+ *                     to:
+ *                       type: string
+ *                     text:
+ *                       type: string
+ *                     html:
+ *                       type: string
+ *                     date:
+ *                       type: string
+ *                       format: date-time
+ *                     tokens:
+ *                       type: object
+ *                       properties:
+ *                         verification:
+ *                           type: string
+ *                           description: Verification token extracted from email
+ *                         invite:
+ *                           type: string
+ *                           description: Invite token extracted from email
+ *                         resetPassword:
+ *                           type: string
+ *                           description: Reset password token extracted from email
+ *       "400":
+ *         description: Bad request (missing email or invalid format)
+ *       "404":
+ *         description: Email not found
+ *       "500":
+ *         description: Internal server error (Ethereal not configured or IMAP error)
+ */
+router.post('/get-email', async (req, res) => {
+    try {
+        const { email, waitForEmail = false, maxWaitMs = 30000 } = req.body;
+        
+        // Validate required fields
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
+            });
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email address format'
+            });
+        }
+        
+        // Only allow in development or test environments
+        if (config.env !== 'development' && config.env !== 'test') {
+            return res.status(403).json({
+                success: false,
+                message: 'This endpoint is only available in development or test environments'
+            });
+        }
+        
+        const etherealEmailRetriever = require('../../services/etherealEmailRetriever.service');
+        
+        let emailData;
+        if (waitForEmail) {
+            logger.info(`[Test Get Email] Waiting for email to ${email} (max wait: ${maxWaitMs}ms)`);
+            emailData = await etherealEmailRetriever.waitForEmail(email, maxWaitMs);
+        } else {
+            logger.info(`[Test Get Email] Retrieving last email for ${email}`);
+            emailData = await etherealEmailRetriever.retrieveLastEmail(email);
+        }
+        
+        res.status(200).json({
+            success: true,
+            message: 'Email retrieved successfully',
+            email: emailData
+        });
+    } catch (error) {
+        logger.error('[Test Get Email] Failed to retrieve email:', error);
+        
+        if (error.message.includes('No emails found') || error.message.includes('not found')) {
+            return res.status(404).json({
+                success: false,
+                message: error.message,
+                error: {
+                    message: error.message
+                }
+            });
+        }
+        
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve email',
+            error: {
+                message: error.message,
+                stack: config.env === 'development' ? error.stack : undefined
+            }
+        });
+    }
+});
+
 // Export the router
 module.exports = router;

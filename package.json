@@ -112,6 +112,7 @@
     "i18n": "^0.15.1",
     "joi": "^17.3.0",
     "jsonwebtoken": "^8.5.1",
+    "mailparser": "^3.9.0",
     "moment": "^2.24.0",
     "mongoose": "^8.19.3",
     "mongoose-delete": "^1.0.2",

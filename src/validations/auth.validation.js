@@ -10,6 +10,16 @@ const register = {
   }),
 };
 
+const registerWithInvite = {
+  body: Joi.object().keys({
+    token: Joi.string().required().description('Invite token from email'),
+    email: Joi.string().required().email(),
+    password: Joi.string().required().custom(password),
+    name: Joi.string().required(),
+    phone: Joi.string().required(),
+  }),
+};
+
 const login = {
   body: Joi.object().keys({
     email: Joi.string().required(),
@@ -67,6 +77,7 @@ const setPasswordForSSO = {
 
 module.exports = {
   register,
+  registerWithInvite,
   login,
   logout,
   refreshTokens,
