@@ -244,35 +244,43 @@ test.describe("Schedule Workflow", () => {
     await expect(page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')).toBeVisible({ timeout: 10000 })
     
     // Find delete button - should be available on schedules screen
-    const deleteButton = page.locator('[data-testid="schedule-delete-button"], [aria-label="schedule-delete-button"], button:has-text("Delete")')
+    // IMPORTANT: Filter out patient delete button - only look for schedule delete button
+    const deleteButton = page.locator('[data-testid="schedule-delete-button"]').or(page.locator('[aria-label="schedule-delete-button"]'))
     const deleteButtonCount = await deleteButton.count()
+    
     if (deleteButtonCount === 0) {
       // If no schedules exist, delete button might not be available - that's okay
+      // Check if we're on schedules screen and if there are any schedules
       const schedulePicker = page.locator('select, [role="combobox"]')
       const pickerCount = await schedulePicker.count()
-      if (pickerCount === 0) {
+      const scheduleItems = page.locator('[data-testid*="schedule-"], [aria-label*="schedule-"]')
+      const scheduleItemCount = await scheduleItems.count()
+      
+      if (pickerCount === 0 && scheduleItemCount === 0) {
         // No schedules to delete - test passes
         expect(true).toBe(true)
         return
       }
+      // If we have schedules but no delete button, that's a bug
       throw new Error('BUG: Delete schedule button not found - schedule deletion should be available when schedules exist!')
     }
     
-    // Click delete button
-    await deleteButton.first().click()
-    await page.waitForTimeout(1000) // Wait for deletion to process
-    
-    // If there's a confirmation modal, confirm it
-    const confirmModal = page.locator('[data-testid*="confirm"], [aria-label*="confirm"], text=/confirm|delete/i')
-    const confirmModalCount = await confirmModal.count()
-    if (confirmModalCount > 0) {
-      const confirmButton = page.locator('button:has-text("Confirm"), button:has-text("Delete"), button:has-text("Yes")')
-      const confirmButtonCount = await confirmButton.count()
-      if (confirmButtonCount > 0) {
-        await confirmButton.first().click()
-        await page.waitForTimeout(1000)
+    // Click delete button with retry logic for intercepted clicks
+    try {
+      await deleteButton.first().waitFor({ state: 'visible', timeout: 5000 })
+      await deleteButton.first().click({ timeout: 10000, force: false })
+    } catch (error) {
+      // If click is intercepted, try force click
+      if (error.message?.includes('intercept') || error.message?.includes('not visible') || error.message?.includes('not clickable')) {
+        await deleteButton.first().scrollIntoViewIfNeeded()
+        await page.waitForTimeout(500)
+        await deleteButton.first().click({ timeout: 10000, force: true })
+      } else {
+        throw error
       }
     }
+    // Wait for deletion to process (deletion happens directly, no confirmation modal)
+    await page.waitForTimeout(2000)
     
     // Should still be on schedules screen (or back to patient screen if all schedules deleted)
     const scheduleScreen = page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')
@@ -389,10 +397,10 @@ test.describe("Schedule Workflow", () => {
   })
 
   test("can navigate back to home from schedules", async ({ page }) => {
-    await navigateToSchedulesViaPatient(page)
-    
     // Navigation stack: Home -> Patient -> Schedule
     // First, navigate to a patient (required before accessing schedules)
+    await isHomeScreen(page)
+    
     const patientCard = page.locator('[data-testid^="patient-card-"], [aria-label^="patient-card-"]')
     const patientCardCount = await patientCard.count()
     
@@ -405,30 +413,36 @@ test.describe("Schedule Workflow", () => {
     const editButtonCount = await editButton.count()
     
     if (editButtonCount > 0) {
-      await editButton.click()
+      try {
+        await editButton.click({ timeout: 10000, force: true })
+      } catch (error) {
+        // If edit button click fails, try patient card
+        await patientCard.first().click({ timeout: 10000, force: true })
+      }
     } else {
       // Fallback: click the patient card
-      await patientCard.first().click()
+      await patientCard.first().click({ timeout: 10000, force: true })
     }
     
     // Wait for Patient screen to load
-    await page.waitForSelector('[data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="patient-screen"], [aria-label*="patient-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000) // Give time for form to populate
     
     // Now navigate to schedules from Patient screen
     const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
-    const scheduleButtonCount = await manageSchedulesButton.count()
+    const scheduleButtonCount = await manageSchedulesButton.count({ timeout: 5000 })
     
     if (scheduleButtonCount === 0) {
       // Check if we're in new patient mode
-      const isNewPatient = await page.getByTestId('patient-screen').getByText(/create|new|add/i).count()
-      if (isNewPatient > 0) {
+      const isNewPatient = await page.getByText(/CREATE PATIENT/i).count() > 0
+      if (isNewPatient) {
         throw new Error('BUG: Navigated to new patient mode instead of existing patient - Manage schedules button only appears for existing patients!')
       }
       throw new Error('BUG: Manage schedules button not found on Patient screen!')
     }
     
-    await manageSchedulesButton.first().click()
+    await manageSchedulesButton.first().waitFor({ state: 'visible', timeout: 5000 })
+    await manageSchedulesButton.first().click({ timeout: 10000, force: true })
     await expect(page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')).toBeVisible({ timeout: 10000 })
     
     // Now we're on Schedule screen

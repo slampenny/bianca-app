@@ -13,17 +13,11 @@ export class CaregiverWorkflow {
     
     // Wait for home screen and navigate to org
     await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
-    // Use specific selectors for the tab button, not the screen
-    const orgTab = this.page.getByTestId('tab-org').or(this.page.getByLabel('Organization tab'))
-    const orgTabExists = await orgTab.count() > 0
-    if (orgTabExists) {
-      await orgTab.click({ timeout: 5000 }).catch(() => {
-        console.log('⚠️ Could not click org tab')
-      })
-      // Wait for org screen to become visible after clicking tab
-      await this.page.locator('[data-testid="org-screen"], [aria-label="org-screen"]').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
-    }
-    await this.page.waitForTimeout(2000)
+    // Use navigation helper
+    const { navigateToOrgScreen } = await import('../helpers/navigation')
+    await navigateToOrgScreen(this.page).catch(() => {
+      console.log('⚠️ Could not navigate to org screen')
+    })
   }
 
   async givenIAmOnCaregiversScreen() {
@@ -31,24 +25,9 @@ export class CaregiverWorkflow {
     let navigated = false
     
     try {
-      // Always click the org tab first - inactive tabs are hidden by React Navigation
-      // This is expected behavior: React Navigation keeps all tabs mounted but hides inactive ones
-      // Use specific selectors for the tab button, not the screen
-      const orgTab = this.page.getByTestId('tab-org').or(this.page.getByLabel('Organization tab'))
-      const orgTabExists = await orgTab.count() > 0
-      
-      if (!orgTabExists) {
-        throw new Error('Org tab not found - cannot navigate to org screen')
-      }
-      
-      // Click the org tab to make it active
-      await orgTab.click({ timeout: 5000 })
-      
-      // Wait for org screen to become visible after tab activation
-      // React Navigation will show the screen after the tab is clicked
-      const orgScreen = this.page.locator('[data-testid="org-screen"], [aria-label="org-screen"]')
-      await orgScreen.waitFor({ state: 'visible', timeout: 10000 })
-      await this.page.waitForTimeout(1000) // Give ScrollView time to render
+      // Use navigation helper to navigate to org screen
+      const { navigateToOrgScreen } = await import('../helpers/navigation')
+      await navigateToOrgScreen(this.page)
       
       // Try multiple ways to navigate to caregivers
       const navigationMethods = [

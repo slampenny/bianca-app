@@ -1,18 +1,12 @@
-# SSO and Invite User Workflow Tests
+# Invite User Workflow Tests
 
-This directory contains comprehensive end-to-end tests for the Single Sign-On (SSO) and user invitation workflows in the Bianca App.
+This directory contains end-to-end tests for the user invitation workflows in the Bianca App.
+
+**Note:** SSO tests have been removed because they depend on external Google/Microsoft OAuth screens that cannot be controlled in automated tests.
 
 ## Test Files
 
-### 1. `sso.e2e.test.ts`
-Tests the complete SSO authentication workflow including:
-- Google SSO login with profile completion
-- Microsoft SSO login
-- SSO logout flow
-- SSO error handling
-- Unverified user role and profile completion
-
-### 2. `invite-user.e2e.test.ts`
+### 1. `invite-user.e2e.test.ts`
 Tests the user invitation workflow including:
 - Admin sending invites
 - Email link simulation
@@ -20,26 +14,11 @@ Tests the user invitation workflow including:
 - Invalid/expired token handling
 - Form validation
 
-### 3. `sso-invite-integration.e2e.test.ts`
-Integration tests that combine SSO and invite workflows:
-- SSO admin invites user
-- Unverified SSO users cannot send invites
-- Invited users can later use SSO
-
-### 4. `helpers/emailTestHelpers.ts`
+### 2. `helpers/emailTestHelpers.ts`
 Helper utilities for email testing:
 - Email capture and simulation
 - Email link extraction
 - Invite workflow automation
-
-## Test Configuration
-
-### `sso-invite.config.ts`
-Special configuration for SSO and invite tests:
-- Longer timeouts for OAuth flows
-- Non-headless mode for debugging
-- Separate test projects for different test types
-- Retry logic for flaky tests
 
 ## Running the Tests
 
@@ -48,39 +27,17 @@ Special configuration for SSO and invite tests:
 2. Frontend server running on `localhost:8081`
 3. Database seeded with test data
 
-### Run All SSO and Invite Tests
+### Run Invite Tests
 ```bash
-# Using the special configuration
-npx playwright test --config=test/e2e/sso-invite.config.ts
-
-# Or using the main configuration
-npx playwright test test/e2e/sso*.e2e.test.ts test/e2e/invite*.e2e.test.ts
-```
-
-### Run Specific Test Suites
-```bash
-# SSO tests only
-npx playwright test test/e2e/sso.e2e.test.ts
-
-# Invite tests only
-npx playwright test test/e2e/invite-user.e2e.test.ts
-
-# Integration tests only
-npx playwright test test/e2e/sso-invite-integration.e2e.test.ts
+npx playwright test test/e2e/invite*.e2e.test.ts
 ```
 
 ### Run with Debug Mode
 ```bash
-# Run with browser visible and slower actions
-npx playwright test --config=test/e2e/sso-invite.config.ts --headed --slowMo=1000
+npx playwright test test/e2e/invite*.e2e.test.ts --headed --slowMo=1000
 ```
 
 ## Test Data
-
-### SSO Test Data
-- Uses `generateUniqueTestData()` for unique test users
-- Mocks OAuth responses for Google and Microsoft
-- Simulates user info from OAuth providers
 
 ### Invite Test Data
 - Uses seeded admin users from `TEST_USERS.ORG_ADMIN`
@@ -89,13 +46,7 @@ npx playwright test --config=test/e2e/sso-invite.config.ts --headed --slowMo=100
 
 ## Mocking Strategy
 
-### OAuth Flows
-- Mock OAuth authorization endpoints
-- Simulate OAuth callbacks with success responses
-- Mock user info APIs (Google, Microsoft)
-
 ### Backend APIs
-- Mock SSO login endpoints
 - Mock invite sending and verification
 - Mock user registration and profile updates
 
@@ -106,30 +57,13 @@ npx playwright test --config=test/e2e/sso-invite.config.ts --headed --slowMo=100
 
 ## Key Test Scenarios
 
-### SSO Workflow
-1. **New SSO User**: OAuth → Profile completion → Full access
-2. **Existing SSO User**: OAuth → Direct login
-3. **SSO Logout**: Logout → Token cleanup → Redirect to login
-4. **SSO Errors**: Invalid OAuth → Error handling
-
 ### Invite Workflow
 1. **Admin Sends Invite**: Admin → Organization screen → Invite Caregiver → Fill details → Send invite → Email captured
 2. **User Clicks Email Link**: Email link → Signup page with token
 3. **User Completes Signup**: Set password → Backend verification → Login
 4. **Invalid/Expired Tokens**: Error handling
 
-### Integration Scenarios
-1. **SSO Admin + Invite**: SSO admin → Organization screen → Send invite → User signup
-2. **Unverified SSO User**: SSO login → Profile completion → Full access
-3. **Invited User + SSO**: Invite signup → Logout → SSO login
-
 ## Debugging Tips
-
-### SSO Issues
-- Check OAuth mock responses
-- Verify user info API mocks
-- Ensure backend SSO endpoint mocks are correct
-- Check token format and expiration
 
 ### Invite Issues
 - Verify email capture is working
@@ -144,12 +78,6 @@ npx playwright test --config=test/e2e/sso-invite.config.ts --headed --slowMo=100
 - **State issues**: Ensure proper cleanup between tests
 
 ## Test Maintenance
-
-### Adding New SSO Providers
-1. Add OAuth mock routes
-2. Add user info API mocks
-3. Update test data and scenarios
-4. Add provider-specific error cases
 
 ### Adding New Invite Features
 1. Update email helper functions
@@ -192,12 +120,6 @@ npx playwright test --config=test/e2e/sso-invite.config.ts --headed --slowMo=100
 2. Verify frontend is accessible
 3. Check mock route patterns
 4. Review test logs and screenshots
-
-### OAuth Issues
-1. Verify OAuth mock responses
-2. Check callback URL handling
-3. Ensure proper token formats
-4. Test with real OAuth providers
 
 ### Email Issues
 1. Check email capture logic

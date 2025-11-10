@@ -7,10 +7,9 @@ export class PaymentHelpers {
    * Navigate to payment methods screen
    */
   async navigateToPaymentMethods(): Promise<void> {
-    await this.page.getByTestId('tab-org').click()
-    await this.page.getByText('Payment').click()
-    await this.page.getByTestId('payment-methods-tab').click()
-    await expect(this.page.getByTestId('payment-methods-container')).toBeVisible()
+    // Import navigation helper using require for compatibility
+    const navigation = require('./navigation')
+    await navigation.navigateToPaymentMethods(this.page)
   }
 
   /**
@@ -161,9 +160,12 @@ export class PaymentHelpers {
   }
 
   /**
-   * Mock payment methods API response
+   * @deprecated Do not mock services we own. Use real backend with seeded data instead.
+   * Use seedDatabase() from backendHelpers.ts to seed test data.
+   * These methods are kept for backwards compatibility but should not be used in new tests.
    */
   async mockPaymentMethodsResponse(paymentMethods: any[]): Promise<void> {
+    console.warn('⚠️ mockPaymentMethodsResponse is deprecated. Use real backend with seeded data instead.')
     await this.page.route('**/v1/payment-methods/orgs/*', async (route) => {
       route.fulfill({
         status: 200,
@@ -174,9 +176,10 @@ export class PaymentHelpers {
   }
 
   /**
-   * Mock payment methods API error
+   * @deprecated Do not mock services we own. Use real backend with seeded data instead.
    */
   async mockPaymentMethodsError(status: number = 500, message: string = 'Internal server error'): Promise<void> {
+    console.warn('⚠️ mockPaymentMethodsError is deprecated. Use real backend with seeded data instead.')
     await this.page.route('**/v1/payment-methods/orgs/*', async (route) => {
       route.fulfill({
         status,
@@ -187,9 +190,10 @@ export class PaymentHelpers {
   }
 
   /**
-   * Mock Stripe configuration
+   * @deprecated Do not mock services we own. Use real backend with seeded data instead.
    */
   async mockStripeConfig(publishableKey: string = 'pk_test_1234567890', mode: string = 'test'): Promise<void> {
+    console.warn('⚠️ mockStripeConfig is deprecated. Use real backend with seeded data instead.')
     await this.page.route('**/v1/stripe/publishable-key', async (route) => {
       route.fulfill({
         status: 200,
@@ -200,9 +204,10 @@ export class PaymentHelpers {
   }
 
   /**
-   * Mock Stripe configuration error
+   * @deprecated Do not mock services we own. Use real backend with seeded data instead.
    */
   async mockStripeConfigError(status: number = 500, message: string = 'Stripe configuration error'): Promise<void> {
+    console.warn('⚠️ mockStripeConfigError is deprecated. Use real backend with seeded data instead.')
     await this.page.route('**/v1/stripe/publishable-key', async (route) => {
       route.fulfill({
         status,
@@ -213,9 +218,10 @@ export class PaymentHelpers {
   }
 
   /**
-   * Mock set default payment method API
+   * @deprecated Do not mock services we own. Use real backend with seeded data instead.
    */
   async mockSetDefaultPaymentMethod(success: boolean = true): Promise<void> {
+    console.warn('⚠️ mockSetDefaultPaymentMethod is deprecated. Use real backend with seeded data instead.')
     await this.page.route('**/v1/payment-methods/orgs/*/set-default', async (route) => {
       if (success) {
         route.fulfill({
@@ -234,9 +240,10 @@ export class PaymentHelpers {
   }
 
   /**
-   * Mock remove payment method API
+   * @deprecated Do not mock services we own. Use real backend with seeded data instead.
    */
   async mockRemovePaymentMethod(success: boolean = true): Promise<void> {
+    console.warn('⚠️ mockRemovePaymentMethod is deprecated. Use real backend with seeded data instead.')
     await this.page.route('**/v1/payment-methods/orgs/*/detach', async (route) => {
       if (success) {
         route.fulfill({

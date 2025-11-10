@@ -17,12 +17,10 @@ export class OrgWorkflow {
 
   async givenIAmOnOrgManagementScreen() {
     // Navigate to organization tab - use flexible selectors
-    const orgTab = this.page.locator('[data-testid="tab-org"], [aria-label*="org"], [aria-label*="organization"]').first()
-    const orgTabExists = await orgTab.count() > 0
-    if (orgTabExists) {
-      await orgTab.click({ timeout: 5000 }).catch(() => {
-        console.log('⚠️ Could not click org tab')
-      })
+    const { navigateToOrgScreen } = await import('../helpers/navigation')
+    await navigateToOrgScreen(this.page).catch(() => {
+      console.log('⚠️ Could not navigate to org screen')
+    })
       await this.page.waitForTimeout(2000) // Allow org screen to load
     } else {
       console.log('⚠️ Org tab not found - may not be available')

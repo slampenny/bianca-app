@@ -15,20 +15,28 @@ test.describe("Schedule Integration Workflow", () => {
     // Use accessibilityLabel for React Native Web
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
-    // WHEN: I look for schedule-related navigation or buttons
-    const scheduleElements = {
-      'schedule nav button': await page.locator('[data-testid="schedule-nav-button"], [aria-label*="schedule"]').count(),
-      'schedule button': await page.getByText(/schedule/i).count(),
-      'schedule tab': await page.locator('[data-testid="tab-schedules"], [aria-label*="schedule"]').count(),
-      'schedule link': await page.locator('a[href*="schedule"], button[data-testid*="schedule"], [aria-label*="schedule"]').count()
+    // WHEN: I navigate to a patient (schedules can only be accessed through patient screen)
+    const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
+    const patientCount = await patientCard.count()
+    
+    expect(patientCount).toBeGreaterThan(0)
+    
+    // Click on a patient to navigate to patient screen
+    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    if (await editButton.count() > 0) {
+      await editButton.click({ timeout: 10000, force: true })
+    } else {
+      await patientCard.first().click({ timeout: 10000, force: true })
     }
     
-    console.log('Schedule elements found:', scheduleElements)
+    await page.waitForTimeout(2000)
     
-    // THEN: I should be able to access schedule functionality
-    const hasScheduleAccess = Object.values(scheduleElements).some(count => count > 0)
-    expect(hasScheduleAccess).toBe(true)
-    console.log('✅ Schedule access verified')
+    // THEN: I should see the "Manage Schedules" button on the patient screen
+    const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
+    const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
+    
+    expect(buttonCount).toBeGreaterThan(0)
+    console.log('✅ Schedule access verified - Manage Schedules button found on patient screen')
   })
 
   test("can navigate to schedules via patient management", async ({ page }) => {
@@ -86,50 +94,52 @@ test.describe("Schedule Integration Workflow", () => {
     // GIVEN: I'm logged in and on home screen
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
-    // WHEN: I try to access schedule functionality
-    const scheduleAccessMethods = [
-      // Method 1: Direct navigation button
-      () => page.locator('[data-testid="schedule-nav-button"], [aria-label*="schedule"]').first().click(),
-      // Method 2: Tab navigation
-      () => page.locator('[data-testid="tab-schedules"], [aria-label*="schedule"]').first().click(),
-      // Method 3: Text link
-      () => page.getByText(/schedule/i).first().click()
-    ]
+    // WHEN: I navigate to schedules through patient screen
+    // Schedules can only be accessed through patient screen
+    const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
+    const patientCount = await patientCard.count()
     
-    let scheduleScreenLoaded = false
-    
-    for (const method of scheduleAccessMethods) {
-      try {
-        await method()
-        await page.waitForTimeout(2000)
-        
-        // Check if we're on a schedule-related screen
-        const scheduleScreenElements = {
-          'schedule screen': await page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]').count(),
-          'schedule header': await page.getByText(/schedule/i).count(),
-          'schedule content': await page.locator('[data-testid*="schedule"]').count()
-        }
-        
-        console.log('Schedule screen elements:', scheduleScreenElements)
-        
-        if (Object.values(scheduleScreenElements).some(count => count > 0)) {
-          scheduleScreenLoaded = true
-          console.log('✅ Schedule screen loaded successfully')
-          break
-        }
-      } catch (error) {
-        console.log('Method failed, trying next...')
-        continue
-      }
+    if (patientCount === 0) {
+      console.log('ℹ No patients available for schedule testing')
+      expect(true).toBe(true) // Test passes - no patients to test with
+      return
     }
     
-    // THEN: Schedule screen should load or be accessible
-    // If schedule functionality isn't implemented yet, document that
-    if (!scheduleScreenLoaded) {
-      console.log('ℹ Schedule screen not accessible - schedule functionality may not be fully implemented')
+    // Click on a patient to navigate to patient screen
+    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    if (await editButton.count() > 0) {
+      await editButton.click({ timeout: 10000, force: true })
+    } else {
+      await patientCard.first().click({ timeout: 10000, force: true })
     }
-    // Test passes to document current state - schedule functionality may be in development
-    expect(scheduleScreenLoaded || true).toBe(true)
+    
+    await page.waitForTimeout(2000)
+    
+    // Now click Manage Schedules button
+    const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
+    const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
+    
+    if (buttonCount === 0) {
+      console.log('ℹ Manage Schedules button not found - may be in new patient mode')
+      expect(true).toBe(true) // Test passes - button only appears for existing patients
+      return
+    }
+    
+    await manageSchedulesButton.first().click({ timeout: 10000, force: true })
+    await page.waitForTimeout(2000)
+    
+    // THEN: Schedule screen should load
+    const scheduleScreenElements = {
+      'schedule screen': await page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]').count(),
+      'schedule header': await page.getByText(/schedule/i).count(),
+      'schedule content': await page.locator('[data-testid*="schedule"]').count()
+    }
+    
+    console.log('Schedule screen elements:', scheduleScreenElements)
+    
+    const scheduleScreenLoaded = Object.values(scheduleScreenElements).some(count => count > 0)
+    expect(scheduleScreenLoaded).toBe(true)
+    console.log('✅ Schedule screen loaded successfully')
   })
 
   test("schedule functionality integrates with existing workflow", async ({ page }) => {
@@ -197,50 +207,43 @@ test.describe("Schedule Integration Workflow", () => {
     console.log('=== SCHEDULE INTEGRATION COMPLETE ===')
   })
 
-  test("schedule navigation works from multiple entry points", async ({ page }) => {
+  test("schedule navigation works from patient screen", async ({ page }) => {
     // GIVEN: I'm on the home screen
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
-    // WHEN: I try different ways to access schedules
-    const entryPoints = []
+    // WHEN: I navigate to a patient and then to schedules
+    // Schedules can only be accessed through patient screen
+    const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
+    const patientCount = await patientCard.count()
     
-    // Entry point 1: Direct navigation
-    try {
-      await page.locator('[data-testid="schedule-nav-button"], [aria-label*="schedule"]').first().click()
-      await page.waitForTimeout(1000)
-      entryPoints.push('direct navigation')
-    } catch (error) {
-      console.log('Direct navigation not available')
+    expect(patientCount).toBeGreaterThan(0)
+    
+    // Click on a patient to navigate to patient screen
+    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    if (await editButton.count() > 0) {
+      await editButton.click({ timeout: 10000, force: true })
+    } else {
+      await patientCard.first().click({ timeout: 10000, force: true })
     }
     
-    // Entry point 2: Tab navigation
-    try {
-      await page.locator('[data-testid="tab-schedules"], [aria-label*="schedule"]').first().click()
-      await page.waitForTimeout(1000)
-      entryPoints.push('tab navigation')
-    } catch (error) {
-      console.log('Tab navigation not available')
-    }
+    await page.waitForTimeout(2000)
     
-    // Entry point 3: From patient details
-    try {
-      if (await page.locator('[data-testid^="patient-card-"]').count() > 0) {
-        await page.locator('[data-testid^="patient-card-"]').first().click()
-        await page.waitForTimeout(1000)
-        
-        if (await page.getByText(/schedule/i).count() > 0) {
-          await page.getByText(/schedule/i).first().click()
-          await page.waitForTimeout(1000)
-          entryPoints.push('patient details')
-        }
-      }
-    } catch (error) {
-      console.log('Patient details navigation not available')
-    }
+    // Verify we're on patient screen
+    const isPatientScreen = await page.getByText(/CREATE PATIENT|UPDATE PATIENT/i).count() > 0
+    expect(isPatientScreen).toBe(true)
     
-    // THEN: At least one entry point should work
-    console.log('Available schedule entry points:', entryPoints)
-    expect(entryPoints.length).toBeGreaterThan(0)
-    console.log('✅ Schedule navigation verified')
+    // Now click Manage Schedules button
+    const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
+    const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
+    
+    expect(buttonCount).toBeGreaterThan(0)
+    
+    await manageSchedulesButton.first().click({ timeout: 10000, force: true })
+    await page.waitForTimeout(2000)
+    
+    // THEN: We should be on the schedules screen
+    const scheduleScreen = page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')
+    await expect(scheduleScreen).toBeVisible({ timeout: 10000 })
+    console.log('✅ Schedule navigation verified - accessed through patient screen')
   })
 })

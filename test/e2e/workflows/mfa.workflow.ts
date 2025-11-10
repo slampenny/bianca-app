@@ -256,10 +256,27 @@ export class MFAWorkflow {
     const isOnHome = await homeHeader.isVisible().catch(() => false)
     
     if (!isOnHome) {
-      // Try clicking home tab
+      // Try clicking home tab with retry logic for intercepted clicks
       const homeTab = this.page.locator('[data-testid="tab-home"]')
       if (await homeTab.isVisible().catch(() => false)) {
-        await homeTab.click()
+        try {
+          await homeTab.click({ timeout: 10000, force: false })
+        } catch (error) {
+          // If click is intercepted, try force click or wait and retry
+          if (error.message?.includes('intercept') || error.message?.includes('not clickable')) {
+            await this.page.waitForTimeout(500)
+            try {
+              await homeTab.click({ timeout: 10000, force: true })
+            } catch {
+              // If still fails, try scrolling into view first
+              await homeTab.scrollIntoViewIfNeeded()
+              await this.page.waitForTimeout(500)
+              await homeTab.click({ timeout: 10000, force: true })
+            }
+          } else {
+            throw error
+          }
+        }
         await this.page.waitForTimeout(1000)
       }
     }

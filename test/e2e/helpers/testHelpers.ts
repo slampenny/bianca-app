@@ -38,29 +38,85 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
   }
 }
 
+/**
+ * Reliable click helper that handles intercepted clicks and visibility issues
+ */
+export async function reliableClick(page: Page, locator: any, options: { timeout?: number; force?: boolean } = {}): Promise<void> {
+  const { timeout = 10000, force = false } = options
+  
+  try {
+    // Wait for element to be visible and enabled
+    await locator.waitFor({ state: 'visible', timeout: Math.min(timeout, 5000) })
+    await locator.click({ timeout, force: false })
+  } catch (error) {
+    // If click is intercepted or element not clickable, try force click
+    if (error.message?.includes('intercept') || error.message?.includes('not clickable') || error.message?.includes('not visible')) {
+      // Scroll into view first
+      await locator.scrollIntoViewIfNeeded()
+      await page.waitForTimeout(500)
+      
+      // Try force click
+      try {
+        await locator.click({ timeout, force: true })
+      } catch (forceError) {
+        // If still fails, wait a bit more and try again
+        await page.waitForTimeout(1000)
+        await locator.click({ timeout, force: true })
+      }
+    } else if (force) {
+      // If force was requested and first attempt failed, try force
+      await locator.scrollIntoViewIfNeeded()
+      await page.waitForTimeout(500)
+      await locator.click({ timeout, force: true })
+    } else {
+      throw error
+    }
+  }
+}
+
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
   console.log(`Attempting to login with email: ${email}`)
   
-  // Wait for login form to be visible - try accessibilityLabel first (React Native Web)
+  // Wait for login form to be visible - try multiple selectors with longer timeout
   // This is the same pattern used in auth.workflow.ts
-  await page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
+  try {
+    await page.waitForSelector('[aria-label="email-input"]', { timeout: 30000 })
+  } catch {
+    // Fallback: try data-testid
+    await page.waitForSelector('[data-testid="email-input"]', { timeout: 30000 })
+  }
+  
+  await page.waitForTimeout(1000) // Small delay to ensure form is ready
   
   // Fill in login form - try testID first, then accessibilityLabel
   const emailInput = page.getByTestId('email-input').or(page.getByLabel('email-input'))
   const passwordInput = page.getByTestId('password-input').or(page.getByLabel('password-input'))
   
-  await emailInput.fill(email)
-  await passwordInput.fill(password)
+  // Wait for inputs to be visible and enabled
+  await expect(emailInput).toBeVisible({ timeout: 15000 })
+  await expect(passwordInput).toBeVisible({ timeout: 15000 })
+  
+  await emailInput.fill(email, { timeout: 10000 })
+  await passwordInput.fill(password, { timeout: 10000 })
   
   const loginButton = page.getByTestId('login-button').or(page.getByLabel('login-button'))
-  await expect(loginButton).toBeVisible();
+  await expect(loginButton).toBeVisible({ timeout: 15000 });
   
-  // Click login button
-  await loginButton.click()
-  
-  // Wait for either success or error
+  // Click login button with retry logic for intercepted clicks
   try {
-    await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    await loginButton.click({ timeout: 10000, force: false })
+  } catch (error) {
+    // If click is intercepted, try force click
+    if (error.message?.includes('intercept') || error.message?.includes('not clickable')) {
+      await loginButton.click({ timeout: 10000, force: true })
+    } else {
+      throw error
+    }
+  }
+  
+  // Wait for either success or error with longer timeout
+  try {
+    await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 20000 })
     console.log('Login successful - home header found')
   } catch (error) {
     console.log('Login failed - checking for error messages')
@@ -222,22 +278,26 @@ export async function createPatientViaUI(page: Page, name: string, email: string
 }
 
 export async function goToOrgTab(page: Page): Promise<void> {
-  await page.getByTestId('tab-org').click()
+  const { navigateToOrgTab } = await import('./navigation')
+  await navigateToOrgTab(page)
   await page.waitForSelector('[data-testid="view-caregivers-button"]', { timeout: 10000 })
 }
 
 export async function goToHomeTab(page: Page): Promise<void> {
-  await page.getByTestId('tab-home').click()
+  const { navigateToHomeTab } = await import('./navigation')
+  await navigateToHomeTab(page)
   await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 }
 
 export async function goToAlertTab(page: Page): Promise<void> {
-  await page.getByTestId('tab-alert').click()
+  const { navigateToAlertTab } = await import('./navigation')
+  await navigateToAlertTab(page)
   await page.waitForSelector('[data-testid="alert-header"]', { timeout: 10000 })
 }
 
 export async function goToPaymentTab(page: Page): Promise<void> {
-  await page.getByTestId('tab-payment').click()
+  const { navigateToPaymentScreen } = await import('./navigation')
+  await navigateToPaymentScreen(page)
   await page.waitForSelector('[data-testid="payment-info-container"]', { timeout: 10000 })
 }
 

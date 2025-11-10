@@ -36,10 +36,9 @@ test.describe("Alert Workflow", () => {
     // GIVEN: I'm on the home screen
     await expect(page.getByLabel('home-header')).toBeVisible()
     
-    // WHEN: I click on the alert tab - use accessibility label
-    const alertTab = page.getByLabel('Alerts tab').or(page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')))
-    await alertTab.click()
-    await page.waitForTimeout(2000)
+    // WHEN: I click on the alert tab using helper
+    const { navigateToAlertTab } = await import('./helpers/navigation')
+    await navigateToAlertTab(page)
     
     // THEN: I should see the alert screen - use accessibility label
     await expect(page.getByLabel('alert-screen').or(page.getByTestId('alert-screen'))).toBeVisible()
