@@ -88,6 +88,7 @@ export const EmailVerificationRequiredScreen = () => {
   const [emailSent, setEmailSent] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const { colors, isLoading: themeLoading } = useTheme()
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Set email from route params or Redux if not already set
@@ -97,6 +98,16 @@ export const EmailVerificationRequiredScreen = () => {
       setEmail(authEmail)
     }
   }, [routeEmail, authEmail, email])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [])
 
   if (themeLoading) {
     return null
@@ -168,13 +179,12 @@ export const EmailVerificationRequiredScreen = () => {
         <View style={styles.fieldContainer}>
           <TextField
             value={email}
-            onChangeText={setEmail}
             labelTx="emailVerificationScreen.emailFieldLabel"
             placeholderTx="emailVerificationScreen.emailFieldPlaceholder"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
-            editable={true}
+            editable={false}
             accessibilityLabel="email-input"
             testID="email-input"
           />

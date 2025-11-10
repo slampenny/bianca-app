@@ -26,16 +26,13 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   })
 
   // Clear navigation state when logging in/out to ensure we start at the correct screen
-  // Also clear in test mode
-  const isTestMode = process.env.NODE_ENV === 'test' || 
-                     process.env.PLAYWRIGHT_TEST === '1' || 
-                     process.env.JEST_WORKER_ID
-  
+  // This prevents corrupted navigation state from causing crashes
   useEffect(() => {
-    if (__DEV__ || isTestMode) {
-      storage.remove("navigationState")
-    }
-  }, [isLoggedIn, isTestMode])
+    // Always clear navigation state on login/logout to prevent [object Object] errors
+    storage.remove("navigationState").catch(() => {
+      // Ignore errors if storage is not available
+    })
+  }, [isLoggedIn])
 
   // Redirect unverified users to profile screen
   useEffect(() => {

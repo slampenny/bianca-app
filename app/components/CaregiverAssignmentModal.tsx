@@ -48,15 +48,17 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
   const canManageCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
   
   // Fetch current caregivers for this patient
+  // Skip if user doesn't have permission or patient doesn't have an ID
   const { data: currentCaregivers, isLoading: isLoadingCurrent } = useGetCaregiversQuery(
     { patientId: patient.id! },
-    { skip: !patient.id }
+    { skip: !patient.id || !canManageCaregivers }
   )
   
   // Fetch all caregivers in the organization
+  // Skip if user doesn't have permission or patient doesn't have an org
   const { data: allCaregivers, isLoading: isLoadingAll } = useGetAllCaregiversQuery(
     { org: patient.org! },
-    { skip: !patient.org }
+    { skip: !patient.org || !canManageCaregivers }
   )
   
   // Mutations for assigning/unassigning caregivers

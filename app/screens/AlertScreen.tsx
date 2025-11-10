@@ -39,41 +39,66 @@ export function AlertScreen() {
 
   const [markAllAsRead] = useMarkAllAsReadMutation()
   const [markAlertAsRead] = useMarkAlertAsReadMutation()
+  
+  // Use a ref to track current alerts for merging without causing dependency issues
+  const alertsRef = React.useRef(alerts)
+  React.useEffect(() => {
+    alertsRef.current = alerts
+  }, [alerts])
 
   useEffect(() => {
     if (fetchAllAlerts) {
+      // First, deduplicate the API response itself (in case API returns duplicates)
+      const uniqueApiAlerts = Array.from(
+        new Map(fetchAllAlerts.map(a => [a.id, a])).values()
+      )
+      
       const readCount = currentUser 
-        ? fetchAllAlerts.filter(a => a.readBy?.includes(currentUser.id!)).length 
+        ? uniqueApiAlerts.filter(a => a.readBy?.includes(currentUser.id!)).length 
         : 0
-      const unreadCount = fetchAllAlerts.length - readCount
+      const unreadCount = uniqueApiAlerts.length - readCount
       logger.debug("Fetched alerts from API:", {
-        total: fetchAllAlerts.length,
+        total: uniqueApiAlerts.length,
         read: readCount,
         unread: unreadCount,
-        alertIds: fetchAllAlerts.slice(0, 5).map(a => ({ id: a.id, readBy: a.readBy, isRead: currentUser ? a.readBy?.includes(currentUser.id!) : false }))
+        hadDuplicates: fetchAllAlerts.length !== uniqueApiAlerts.length,
+        alertIds: uniqueApiAlerts.slice(0, 5).map(a => ({ id: a.id, readBy: a.readBy, isRead: currentUser ? a.readBy?.includes(currentUser.id!) : false }))
       })
       
-      // CRITICAL: Check if we're about to lose read alerts
-      const currentReadCount = currentUser 
-        ? alerts.filter(a => a.readBy?.includes(currentUser.id!)).length 
-        : 0
-      if (currentReadCount > 0 && readCount === 0 && fetchAllAlerts.length === alerts.filter(a => !a.readBy?.includes(currentUser?.id!)).length) {
-        logger.warn('[AlertScreen] WARNING: API returned only unread alerts when read alerts exist!')
-        logger.warn('[AlertScreen] Current state has', currentReadCount, 'read alerts, but API returned', readCount)
-        // Don't overwrite if we'd lose read alerts - merge instead
-        const existingReadAlerts = alerts.filter(a => currentUser && a.readBy?.includes(currentUser.id!))
-        const mergedAlerts = [...fetchAllAlerts, ...existingReadAlerts.filter(existing => 
-          !fetchAllAlerts.some(fresh => fresh.id === existing.id)
-        )]
-        logger.debug('[AlertScreen] Merged alerts to preserve read ones:', mergedAlerts.length)
-        dispatch(setAlerts(mergedAlerts))
-        return
-      }
+      // CRITICAL: Only merge if we detect the API is missing read alerts that we know exist
+      // This handles race conditions where an alert was just marked as read but the API hasn't updated yet
+      const currentAlerts = alertsRef.current
+      const currentReadAlerts = currentUser 
+        ? currentAlerts.filter(a => a.readBy?.includes(currentUser.id!))
+        : []
       
-      // CRITICAL: Replace entire alerts array with fresh data from API
-      // This ensures we have ALL alerts including read ones
-      dispatch(setAlerts(fetchAllAlerts))
-      logger.debug("Updated Redux state with", fetchAllAlerts.length, "alerts")
+      // Create a map of API alerts by ID for quick lookup
+      const apiAlertsMap = new Map(uniqueApiAlerts.map(a => [a.id, a]))
+      
+      // Check if any read alerts from local state are missing from API response
+      const missingReadAlerts = currentReadAlerts.filter(localReadAlert => 
+        !apiAlertsMap.has(localReadAlert.id)
+      )
+      
+      if (missingReadAlerts.length > 0) {
+        logger.debug('[AlertScreen] API missing read alerts, merging:', missingReadAlerts.length)
+        // Only merge if we detect missing alerts - otherwise trust the API completely
+        const mergedAlerts = [...uniqueApiAlerts, ...missingReadAlerts]
+        // Remove duplicates (shouldn't be any, but be safe)
+        const finalAlerts = Array.from(
+          new Map(mergedAlerts.map(a => [a.id, a])).values()
+        )
+        logger.debug('[AlertScreen] Merged alerts:', {
+          fromAPI: uniqueApiAlerts.length,
+          addedFromLocal: missingReadAlerts.length,
+          total: finalAlerts.length
+        })
+        dispatch(setAlerts(finalAlerts))
+      } else {
+        // API has all alerts, just use it directly (no merging needed)
+        logger.debug('[AlertScreen] API has all alerts, using directly')
+        dispatch(setAlerts(uniqueApiAlerts))
+      }
     }
   }, [fetchAllAlerts, dispatch, currentUser?.id])
 
@@ -108,18 +133,12 @@ export function AlertScreen() {
         logger.debug('[AlertScreen] Alert marked as read, updated alert:', updatedAlert)
         logger.debug('[AlertScreen] Updated alert readBy:', updatedAlert.readBy)
         
-        // Update Redux immediately with the updated alert to ensure it's in state
-        // Find the alert in the array and update it
-        const alertIndex = alerts.findIndex(a => a.id === alert.id)
-        if (alertIndex !== -1) {
-          const updatedAlerts = [...alerts]
-          updatedAlerts[alertIndex] = updatedAlert
-          dispatch(setAlerts(updatedAlerts))
-          logger.debug('[AlertScreen] Updated Redux state immediately with', updatedAlerts.length, 'alerts')
-        }
+        // Note: The alertSlice extraReducer automatically updates the alert in Redux state
+        // No need to manually update here - that could cause duplicates
         
         // Wait for invalidatesTags to trigger automatic refetch, then also manually refetch
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // This ensures we get the latest data from the server
+        await new Promise(resolve => setTimeout(resolve, 500))
         const refetchResult = await refetch()
         
         if (refetchResult.data) {

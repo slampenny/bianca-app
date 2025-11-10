@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { View, StyleSheet } from "react-native"
+import { View, StyleSheet, Platform } from "react-native"
 import { Picker } from "@react-native-picker/picker"
 import { Toggle, Text } from "."
 import { Schedule } from "../services/api/api.types"
@@ -15,7 +15,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   initialSchedule,
   onScheduleChange,
 }) => {
-  const { colors } = useTheme()
+  const { colors, currentTheme } = useTheme()
   const [id, setId] = useState(initialSchedule.id)
   const [patient, setPatient] = useState(initialSchedule.patient)
   const [frequency, setFrequency] = useState(initialSchedule.frequency)
@@ -82,12 +82,20 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       backgroundColor: "transparent",
       // Note: Picker text color is limited on web, but we try to set it
       color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+      fontSize: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 0,
     },
     pickerItem: {
       height: 50,
+      fontSize: 16,
+      lineHeight: 50,
+      paddingHorizontal: 12,
+      paddingVertical: 0,
       // Note: Picker.Item style prop has limited support on web/iOS
       // The picker wrapper background provides contrast
       color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+      backgroundColor: "transparent",
     },
     pickerWrapper: {
       // CRITICAL: Use theme-aware background
@@ -97,6 +105,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       borderRadius: 5,
       borderWidth: 1,
       overflow: "hidden",
+      minHeight: 50,
     },
     switchContainer: {
       alignItems: "center",
@@ -134,6 +143,56 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   })
   
   const styles = createStyles(colors)
+
+  // Inject CSS for web Picker dropdown theming
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const isDarkMode = currentTheme === "dark"
+      
+      const dropdownBg = isDarkMode 
+        ? (colors.palette?.neutral500 || "#525252") 
+        : (colors.palette?.neutral100 || "#FFFFFF")
+      const dropdownText = isDarkMode
+        ? (colors.text || colors.palette?.neutral900 || "#FAFAFA")
+        : (colors.text || colors.palette?.neutral800 || "#000000")
+      const hoverBg = isDarkMode
+        ? (colors.palette?.neutral400 || "#404040")
+        : (colors.palette?.neutral200 || "#FAFAFA")
+
+      const styleId = 'picker-dropdown-theme'
+      let styleElement = document.getElementById(styleId)
+      
+      if (!styleElement) {
+        styleElement = document.createElement('style')
+        styleElement.id = styleId
+        document.head.appendChild(styleElement)
+      }
+
+      styleElement.textContent = `
+        select {
+          background-color: ${dropdownBg} !important;
+          color: ${dropdownText} !important;
+        }
+        select option {
+          background-color: ${dropdownBg} !important;
+          color: ${dropdownText} !important;
+        }
+        select option:hover,
+        select option:checked {
+          background-color: ${hoverBg} !important;
+          color: ${dropdownText} !important;
+        }
+      `
+
+      return () => {
+        // Cleanup on unmount
+        const element = document.getElementById(styleId)
+        if (element) {
+          element.remove()
+        }
+      }
+    }
+  }, [colors, currentTheme])
 
   // Only reset state when the schedule ID changes (switching to a different schedule)
   // Don't reset when the same schedule is updated (e.g., when toggle changes isActive)
@@ -203,7 +262,6 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{translate("scheduleComponent.schedule")}</Text>
       <View style={styles.formGroup}>
         <Text style={styles.label}>{translate("scheduleComponent.startTime")}</Text>
         <View style={styles.pickerWrapper}>

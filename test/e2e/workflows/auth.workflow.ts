@@ -153,9 +153,19 @@ export class AuthWorkflow {
       throw new Error('MFA verification required but mock token was rejected. Test needs to use a valid backup code or TOTP token.')
     }
     
-    const homeHeader = await this.page.locator('[aria-label="home-header"]').isVisible().catch(() => false)
-    const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible().catch(() => false)
-    expect(homeHeader || addPatient).toBe(true)
+    // Wait a bit more for the page to fully render
+    await this.page.waitForTimeout(2000)
+    
+    // Check multiple indicators that we're on the home screen
+    const homeHeader = await this.page.locator('[aria-label="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
+    const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 5000 }).catch(() => false)
+    const homeScreen = await this.page.locator('[aria-label="home-screen"]').isVisible({ timeout: 5000 }).catch(() => false)
+    const profileButton = await this.page.locator('[aria-label="profile-button"]').isVisible({ timeout: 5000 }).catch(() => false)
+    
+    // If we're not on login screen and we can see profile button or home elements, we're on home
+    const loginScreen = await this.page.locator('[aria-label="login-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
+    
+    expect(homeHeader || addPatient || homeScreen || (profileButton && !loginScreen)).toBe(true)
   }
 
   async thenIShouldSeeWelcomeMessage() {

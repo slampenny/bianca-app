@@ -13,7 +13,7 @@ interface AuthModalContextType {
   isVisible: boolean
 }
 
-const AuthModalContext = createContext<AuthModalContextType | undefined>(undefined)
+export const AuthModalContext = createContext<AuthModalContextType | undefined>(undefined)
 
 export const useAuthModal = () => {
   const context = useContext(AuthModalContext)
@@ -31,13 +31,19 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   const [isVisible, setIsVisible] = useState(false)
   const isAuthenticatedUser = useSelector(isAuthenticated)
   const { colors } = useTheme()
+  
+  // Use refs to track previous state and prevent unwanted modal closures
+  const wasAuthenticatedRef = React.useRef(isAuthenticatedUser)
+  const modalWasExplicitlyOpenedRef = React.useRef(false)
 
   const showAuthModal = useCallback(() => {
     setIsVisible(true)
+    modalWasExplicitlyOpenedRef.current = true
   }, [])
 
   const hideAuthModal = useCallback(() => {
     setIsVisible(false)
+    modalWasExplicitlyOpenedRef.current = false
     notifyAuthCancelled()
   }, [])
 
@@ -50,16 +56,29 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   }, [showAuthModal])
 
   // Watch for authentication success - close modal and retry requests
+  // Only close when user actually transitions from unauthenticated to authenticated
   React.useEffect(() => {
-    if (isVisible && isAuthenticatedUser) {
+    const wasAuthenticated = wasAuthenticatedRef.current
+    const isNowAuthenticated = isAuthenticatedUser
+    
+    // Only close modal if:
+    // 1. Modal is visible
+    // 2. Modal was explicitly opened (not just a state re-evaluation)
+    // 3. User was NOT authenticated before
+    // 4. User IS authenticated now (successful login)
+    if (isVisible && modalWasExplicitlyOpenedRef.current && !wasAuthenticated && isNowAuthenticated) {
       // User logged in successfully - close modal and retry pending requests
       setIsVisible(false)
+      modalWasExplicitlyOpenedRef.current = false
       
       // Force a small delay to ensure state is fully updated
       setTimeout(() => {
         notifyAuthSuccess()
       }, 50)
     }
+    
+    // Update ref for next render
+    wasAuthenticatedRef.current = isAuthenticatedUser
   }, [isVisible, isAuthenticatedUser])
 
   const handleLoginSuccess = useCallback(() => {

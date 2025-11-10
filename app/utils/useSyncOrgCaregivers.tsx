@@ -15,9 +15,17 @@ export function useSyncOrgCaregivers() {
   const currentOrg = useSelector(getOrg)
   const orgId = currentUser?.org || currentOrg?.id || null
 
+  // Only orgAdmin and superAdmin can read all caregivers in an org
+  // Staff users only have read:own:caregiver permission
+  const canReadAllCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
+
   // Query caregivers for this org
-  logger.debug("orgId:", orgId)
-  const { data: caregiversData } = useGetAllCaregiversQuery({ org: orgId }, { skip: !orgId })
+  // Skip if user doesn't have permission or no org ID
+  logger.debug("orgId:", orgId, "canReadAllCaregivers:", canReadAllCaregivers)
+  const { data: caregiversData } = useGetAllCaregiversQuery(
+    { org: orgId },
+    { skip: !orgId || !canReadAllCaregivers }
+  )
 
   // When data arrives, store it in the slice
   useEffect(() => {

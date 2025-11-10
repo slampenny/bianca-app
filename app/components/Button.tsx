@@ -6,6 +6,7 @@ import {
   StyleProp,
   TextStyle,
   ViewStyle,
+  ActivityIndicator,
 } from "react-native"
 import { spacing, typography } from "../theme"
 import { useTheme } from "../theme/ThemeContext"
@@ -95,6 +96,10 @@ export interface ButtonProps extends PressableProps {
    * An optional style override for the disabled state
    */
   disabledStyle?: StyleProp<ViewStyle>
+  /**
+   * Show loading spinner and disable button when true
+   */
+  loading?: boolean
 
   testID?: string
 }
@@ -129,12 +134,16 @@ export function Button(props: ButtonProps) {
     RightAccessory,
     LeftAccessory,
     disabled,
+    loading = false,
     disabledStyle: $disabledViewStyleOverride,
     testID,
     ...rest
   } = props
 
   const preset: Presets = props.preset ?? "default"
+  
+  // Button is disabled if explicitly disabled OR loading
+  const isDisabled = disabled || loading
   
   // Create presets dynamically based on current theme colors
   const $viewPresets = getViewPresets(colors)
@@ -152,7 +161,7 @@ export function Button(props: ButtonProps) {
       $viewPresets[preset],
       $viewStyleOverride,
       !!pressed && [$pressedViewPresets[preset], $pressedViewStyleOverride],
-      !!disabled && $disabledViewStyleOverride,
+      !!isDisabled && $disabledViewStyleOverride,
     ]
   }
   /**
@@ -165,34 +174,51 @@ export function Button(props: ButtonProps) {
       $textPresets[preset],
       $textStyleOverride,
       !!pressed && [$pressedTextPresets[preset], $pressedTextStyleOverride],
-      !!disabled && $disabledTextStyleOverride,
+      !!isDisabled && $disabledTextStyleOverride,
     ]
+  }
+  
+  // Determine spinner color based on preset
+  const getSpinnerColor = () => {
+    if (preset === 'primary' || preset === 'success' || preset === 'danger' || preset === 'warning') {
+      return colors.palette.neutral100 // White spinner on colored buttons
+    }
+    return colors.palette.biancaHeader // Dark spinner on default buttons
   }
 
   return (
     <Pressable
       style={$viewStyle}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
+      accessibilityState={{ disabled: isDisabled }}
       {...rest}
-      disabled={disabled}
+      disabled={isDisabled}
       testID={testID}
     >
       {(state) => (
         <>
-          {!!LeftAccessory && (
-            <LeftAccessory style={$leftAccessoryStyle} pressableState={state} disabled={disabled} />
+          {!!LeftAccessory && !loading && (
+            <LeftAccessory style={$leftAccessoryStyle} pressableState={state} disabled={isDisabled} />
+          )}
+          
+          {loading && (
+            <ActivityIndicator 
+              size="small" 
+              color={getSpinnerColor()} 
+              style={{ marginRight: 8 }}
+              testID={`${testID}-spinner`}
+            />
           )}
 
           <Text tx={tx} text={text} txOptions={txOptions} style={$textStyle(state)}>
             {children}
           </Text>
 
-          {!!RightAccessory && (
+          {!!RightAccessory && !loading && (
             <RightAccessory
               style={$rightAccessoryStyle}
               pressableState={state}
-              disabled={disabled}
+              disabled={isDisabled}
             />
           )}
         </>

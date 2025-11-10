@@ -1,5 +1,5 @@
 import React from "react"
-import { View, Text, StyleSheet, Pressable } from "react-native"
+import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { colors } from "app/theme/colors"
 import { translate } from "../i18n"
@@ -18,6 +18,8 @@ export const LegalLinks: React.FC<LegalLinksProps> = ({
   style
 }) => {
   const navigation = useNavigation()
+  const { width } = useWindowDimensions()
+  const isSmallScreen = width < 400
 
   const openPrivacyPolicy = () => {
     navigation.navigate("Privacy" as never)
@@ -32,19 +34,19 @@ export const LegalLinks: React.FC<LegalLinksProps> = ({
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, isSmallScreen && styles.containerSmall, style]}>
       {showPrivacyPolicy && (
-        <Pressable onPress={openPrivacyPolicy} style={styles.linkContainer}>
+        <Pressable onPress={openPrivacyPolicy} style={[styles.linkContainer, isSmallScreen && styles.linkContainerSmall]}>
           <Text style={styles.linkText}>{translate("legalLinks.privacyPolicy")}</Text>
         </Pressable>
       )}
       {showPrivacyPractices && (
-        <Pressable onPress={openPrivacyPractices} style={styles.linkContainer}>
+        <Pressable onPress={openPrivacyPractices} style={[styles.linkContainer, isSmallScreen && styles.linkContainerSmall]}>
           <Text style={styles.linkText}>{translate("legalLinks.privacyPractices")}</Text>
         </Pressable>
       )}
       {showTermsOfService && (
-        <Pressable onPress={openTermsOfService} style={styles.linkContainer}>
+        <Pressable onPress={openTermsOfService} style={[styles.linkContainer, isSmallScreen && styles.linkContainerSmall]}>
           <Text style={styles.linkText}>{translate("legalLinks.termsOfService")}</Text>
         </Pressable>
       )}
@@ -58,9 +60,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 10,
+    flexWrap: "wrap",
+  },
+  containerSmall: {
+    flexDirection: "column",
   },
   linkContainer: {
     marginHorizontal: 10,
+  },
+  linkContainerSmall: {
+    marginHorizontal: 0,
+    marginBottom: 8,
   },
   linkText: {
     color: colors.palette.primary500,

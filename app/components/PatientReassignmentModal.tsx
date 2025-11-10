@@ -47,10 +47,15 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
   
   const currentUser = useSelector((state: RootState) => state.auth.currentUser)
   
+  // Only orgAdmin and superAdmin can read all caregivers in an org
+  // Staff users only have read:own:caregiver permission
+  const canReadAllCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
+  
   // Fetch all caregivers in the organization (excluding the one being deleted)
+  // Skip if user doesn't have permission or no org ID
   const { data: allCaregivers, isLoading: isLoadingCaregivers } = useGetAllCaregiversQuery(
     { org: orgId },
-    { skip: !orgId }
+    { skip: !orgId || !canReadAllCaregivers }
   )
   
   // Mutation for assigning patients to caregivers

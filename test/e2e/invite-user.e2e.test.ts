@@ -69,12 +69,17 @@ test.describe('Invite User Workflow', () => {
     await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
 
     // Step 2: Navigate to Organization screen
-    await page.getByTestId('tab-org').or(page.getByLabel('Organization tab')).click()
-    await page.waitForSelector('[data-testid="org-screen"]')
+    const orgTab = page.locator('[data-testid="tab-org"], [aria-label="Organization tab"]').first()
+    await orgTab.waitFor({ timeout: 10000, state: 'visible' })
+    await orgTab.click()
+    await page.waitForSelector('[data-testid="org-screen"], [aria-label="org-screen"]', { timeout: 10000 })
+    await page.waitForTimeout(1000) // Wait for screen to fully render
 
     // Step 3: Click "Invite Caregiver" button
-    await page.getByTestId('invite-caregiver-button').click()
-    await page.waitForSelector('[data-testid="caregiver-screen"]')
+    const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
+    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.click()
+    await page.waitForSelector('[data-testid="caregiver-screen"], [aria-label="caregiver-screen"]', { timeout: 10000 })
 
     // Step 4: Fill in caregiver details in the invite form
     await page.getByTestId('caregiver-name-input').fill(testData.name)
@@ -247,12 +252,18 @@ test.describe('Invite User Workflow', () => {
 
     // Navigate to invite registration page with invalid token
     await page.goto(`/signup?token=${invalidToken}`)
-    await page.waitForSelector('[data-testid="signup-screen"]')
+    await page.waitForSelector('[data-testid="signup-screen"], [aria-label="signup-screen"], [data-testid="register-name"], [aria-label="register-name"]', { timeout: 10000 })
 
     // Fill in the form to trigger the error
-    await page.getByTestId('register-name').fill('Test User')
-    await page.getByTestId('register-password').fill('StrongPassword123!')
-    await page.getByTestId('register-confirm-password').fill('StrongPassword123!')
+    const nameField = page.locator('[data-testid="register-name"], [aria-label="register-name"]').first()
+    await nameField.waitFor({ timeout: 10000, state: 'visible' })
+    await nameField.fill('Test User')
+    
+    const passwordField = page.locator('[data-testid="register-password"], [aria-label="register-password"], [data-testid="signup-password-input"], [aria-label="signup-password-input"]').first()
+    await passwordField.fill('StrongPassword123!')
+    
+    const confirmPasswordField = page.locator('[data-testid="register-confirm-password"], [aria-label="register-confirm-password"], [data-testid="signup-confirm-password-input"], [aria-label="signup-confirm-password-input"]').first()
+    await confirmPasswordField.fill('StrongPassword123!')
 
     // Submit the form
     await page.getByTestId('register-submit').click()
@@ -281,12 +292,18 @@ test.describe('Invite User Workflow', () => {
 
     // Navigate to invite registration page with expired token
     await page.goto(`/signup?token=${expiredToken}`)
-    await page.waitForSelector('[data-testid="signup-screen"]')
+    await page.waitForSelector('[data-testid="signup-screen"], [aria-label="signup-screen"], [data-testid="register-name"], [aria-label="register-name"]', { timeout: 10000 })
 
     // Fill in the form to trigger the error
-    await page.getByTestId('register-name').fill('Test User')
-    await page.getByTestId('register-password').fill('StrongPassword123!')
-    await page.getByTestId('register-confirm-password').fill('StrongPassword123!')
+    const nameField = page.locator('[data-testid="register-name"], [aria-label="register-name"]').first()
+    await nameField.waitFor({ timeout: 10000, state: 'visible' })
+    await nameField.fill('Test User')
+    
+    const passwordField = page.locator('[data-testid="register-password"], [aria-label="register-password"], [data-testid="signup-password-input"], [aria-label="signup-password-input"]').first()
+    await passwordField.fill('StrongPassword123!')
+    
+    const confirmPasswordField = page.locator('[data-testid="register-confirm-password"], [aria-label="register-confirm-password"], [data-testid="signup-confirm-password-input"], [aria-label="signup-confirm-password-input"]').first()
+    await confirmPasswordField.fill('StrongPassword123!')
 
     // Submit the form
     await page.getByTestId('register-submit').click()
@@ -348,27 +365,30 @@ test.describe('Invite User Workflow', () => {
 
     // Navigate to invite registration page
     await page.goto(`/signup?token=${inviteToken}`)
-    await page.waitForSelector('[data-testid="signup-screen"]')
+    await page.waitForSelector('[data-testid="signup-screen"], [aria-label="signup-screen"]', { timeout: 10000 })
 
-    // Debug: Check if fields are present
-    console.log('Checking for register-name field...')
-    const nameField = page.getByTestId('register-name')
-    await expect(nameField).toBeVisible()
+    // Wait for fields to be visible - use both testID and aria-label
+    const nameField = page.locator('[data-testid="register-name"], [aria-label="signup-name-input"]').first()
+    await nameField.waitFor({ timeout: 10000, state: 'visible' })
     
     // Fill in required fields (email and phone should be prefilled from invite token)
     await nameField.fill(testData.name)
-    await page.getByTestId('register-password').fill('StrongPassword123!')
-    await page.getByTestId('register-confirm-password').fill('StrongPassword123!')
+    
+    const passwordField = page.locator('[data-testid="register-password"], [aria-label="signup-password-input"]').first()
+    await passwordField.waitFor({ timeout: 10000, state: 'visible' })
+    await passwordField.fill('StrongPassword123!')
+    
+    const confirmPasswordField = page.locator('[data-testid="register-confirm-password"], [aria-label="signup-confirm-password-input"]').first()
+    await confirmPasswordField.waitFor({ timeout: 10000, state: 'visible' })
+    await confirmPasswordField.fill('StrongPassword123!')
 
     // Wait for the button to become enabled
-    await page.getByTestId('register-submit').waitFor({ state: 'visible' })
-    await expect(page.getByTestId('register-submit')).toBeEnabled()
-
-    // Debug: Check button state
-    console.log('Button should be enabled now, clicking...')
+    const submitButton = page.locator('[data-testid="register-submit"], [aria-label="signup-submit-button"]').first()
+    await submitButton.waitFor({ timeout: 10000, state: 'visible' })
+    await expect(submitButton).toBeEnabled({ timeout: 5000 })
     
     // Now the button should be enabled and we can test validation
-    await page.getByTestId('register-submit').click()
+    await submitButton.click()
     
     // Debug: Wait a bit and check what happened
     await page.waitForTimeout(2000)
@@ -469,7 +489,9 @@ test.describe('Invite User Workflow', () => {
     })
 
     // Send invite
-    await page.getByTestId('invite-caregiver-button').click()
+    const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
+    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.click()
     await page.getByTestId('caregiver-email-input').fill(testData.email)
     
     // Fill phone field (required for the button to be enabled)

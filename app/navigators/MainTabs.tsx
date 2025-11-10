@@ -169,6 +169,7 @@ function ReportsStack() {
 export default function MainTabNavigator() {
   const unreadAlertCount = useSelector(selectUnreadAlertCount) // Get unread alert count
   const { colors } = useTheme()
+  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
 
   return (
     <Tab.Navigator
@@ -203,34 +204,34 @@ export default function MainTabNavigator() {
       <Tab.Screen 
         name="Home" 
         component={HomeStack} 
-        options={{ 
+        options={() => ({ 
           tabBarLabel: translate("tabs.home"),
           tabBarTestID: "tab-home",
           tabBarAccessibilityLabel: "Home tab",
-        }} 
+        })} 
       />
       <Tab.Screen 
         name="Org" 
         component={OrgStack} 
-        options={{ 
+        options={() => ({ 
           tabBarLabel: translate("tabs.org"),
           tabBarTestID: "tab-org",
           tabBarAccessibilityLabel: "Organization tab",
-        }} 
+        })} 
       />
       <Tab.Screen 
         name="Reports" 
         component={ReportsStack} 
-        options={{ 
+        options={() => ({ 
           tabBarLabel: translate("tabs.reports"),
           tabBarTestID: "tab-reports",
           tabBarAccessibilityLabel: "Reports tab",
-        }} 
+        })} 
       />
       <Tab.Screen
         name="Alert"
         component={AlertStack}
-        options={{
+        options={() => ({
           tabBarLabel: translate("tabs.alerts"),
           tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
           tabBarBadgeStyle: {
@@ -242,7 +243,7 @@ export default function MainTabNavigator() {
           },
           tabBarTestID: "tab-alert",
           tabBarAccessibilityLabel: "Alerts tab",
-        }}
+        })}
       />
     </Tab.Navigator>
   )

@@ -66,9 +66,6 @@ export function HomeScreen() {
     navigation.navigate("Patient")
   }
 
-  const handleNavigateToSchedules = () => {
-    navigation.navigate("Schedule")
-  }
 
   const handleCallNow = async (patient: Patient) => {
     try {
@@ -219,14 +216,6 @@ export function HomeScreen() {
             <Text style={styles.tooltipText}>{tooltipMessage}</Text>
           </View>
         )}
-        <Button
-          text={translate("homeScreen.viewSchedules") || "View Schedules"}
-          preset="default"
-          onPress={handleNavigateToSchedules}
-          testID="schedule-nav-button"
-          accessibilityLabel="schedule-nav-button"
-          style={styles.scheduleButton}
-        />
       </View>
     </View>
   )
@@ -240,10 +229,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 20,
     gap: 12,
-  },
-  scheduleButton: {
-    marginHorizontal: 16,
-    marginTop: 8,
   },
   avatar: {
     backgroundColor: colors.palette.neutral300,

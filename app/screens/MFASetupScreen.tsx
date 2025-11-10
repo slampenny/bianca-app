@@ -281,12 +281,6 @@ export function MFASetupScreen() {
           helper={verificationError || undefined}
         />
 
-        {verificationError && (
-          <Text style={styles.errorMessage}>
-            {verificationError}
-          </Text>
-        )}
-
         <Button
           text={translate("mfa.verifyAndEnable") || "Verify and Enable"}
           onPress={handleVerifyAndEnable}

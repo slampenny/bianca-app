@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, FC } from "react"
+import React, { useState, useRef, useEffect, FC, useContext } from "react"
 import { TextInput, View, StyleSheet, Image, Platform } from "react-native"
 import { useDispatch, useSelector } from "react-redux"
 import { useLoginMutation } from "../services/api/authApi"
@@ -9,8 +9,11 @@ import { Button, Text, TextField } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { SSOLoginButtons } from "./SSOLoginButtons"
 import { translate } from "../i18n"
-import { useNavigation } from "@react-navigation/native"
+import { navigationRef } from "../navigators/navigationUtilities"
 import { logger } from "../utils/logger"
+import { useToast } from "../hooks/useToast"
+import Toast from "./Toast"
+import { AuthModalContext } from "../contexts/AuthModalContext"
 
 // Temporary interfaces to avoid import issues
 interface SSOUser {
@@ -52,9 +55,17 @@ export const LoginForm: FC<LoginFormProps> = ({
   compact = false,
 }) => {
   const dispatch = useDispatch()
-  const navigation = useNavigation()
+  // Get auth modal context to close modal after successful login (if available)
+  // useContext returns undefined if not in provider, which is safe
+  // We must call useContext unconditionally (React hook rules)
+  const authModalContext = useContext(AuthModalContext)
+  const hideAuthModal = authModalContext?.hideAuthModal
+  // Use global navigationRef instead of useNavigation() hook
+  // This works both inside and outside NavigationContainer (e.g., in AuthModal)
+  // navigationRef is available globally and doesn't require being inside NavigationContainer
   const [loginAPI] = useLoginMutation()
   const { colors, isLoading: themeLoading } = useTheme()
+  const { toast, showError, hideToast } = useToast()
 
   const authPasswordInput = useRef<TextInput>(null)
   const validationError = useSelector(getValidationError)
@@ -85,13 +96,17 @@ export const LoginForm: FC<LoginFormProps> = ({
         if (onMFARequired) {
           // Parent component handles navigation
           onMFARequired(authEmail, authPassword, result.tempToken)
-        } else {
-          // Navigate to MFA verification screen
-          navigation.navigate("MFAVerification" as never, {
+        } else if (navigationRef.isReady()) {
+          // Use global navigationRef to navigate to MFA verification screen
+          navigationRef.navigate("MFAVerification" as never, {
             email: authEmail,
             password: authPassword,
             tempToken: result.tempToken,
           } as never)
+        } else {
+          // No navigation available and no callback - show error
+          setErrorMessage("MFA verification required but navigation is not available. Please use the main login screen.")
+          setIsLoading(false)
         }
         return
       }
@@ -177,6 +192,9 @@ export const LoginForm: FC<LoginFormProps> = ({
       // Always set error message - this ensures it's displayed even if error structure is unexpected
       logger.debug('Setting error message:', finalErrorMessage, 'from error:', { status: errorStatus, data: errorData })
       setErrorMessage(finalErrorMessage)
+      
+      // Also show toast notification for better visibility
+      showError(finalErrorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -198,6 +216,13 @@ export const LoginForm: FC<LoginFormProps> = ({
         }
         
         setErrorMessage("");
+        
+        // Explicitly close auth modal after successful SSO login
+        // This ensures the modal closes even if the AuthModalContext effect doesn't trigger
+        if (hideAuthModal) {
+          hideAuthModal();
+        }
+        
         if (onLoginSuccess) {
           onLoginSuccess()
         }
@@ -236,12 +261,21 @@ export const LoginForm: FC<LoginFormProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* Toast notification for errors */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        testID="login-toast"
+      />
+      
       {/* App Branding */}
       {!compact && (
         <View style={styles.brandingContainer}>
           <View style={styles.iconWrapper}>
             <Image 
-              source={require("../../assets/images/appstore.png")} 
+              source={require("../../assets/images/icon.png")} 
               style={styles.appIcon}
               resizeMode="contain"
               accessibilityLabel="MyPhoneFriend App Icon"
@@ -325,7 +359,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         preset="primary"
         style={styles.loginButton}
         textStyle={styles.loginButtonText}
-        disabled={isLoading}
+        loading={isLoading}
       />
       
       {showSSOButtons && (

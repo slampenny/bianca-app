@@ -65,6 +65,9 @@ function ProfileScreen() {
   const [emailError, setEmailError] = useState("")
   const [phoneError, setPhoneError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  
+  // Timeout ref for navigation delay
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // When setting the avatar state in ProfileScreen
   useEffect(() => {
@@ -133,6 +136,16 @@ function ProfileScreen() {
       return unsubscribe
     }
   }, [navigation, isUnverified])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [])
 
   const handleSave = async () => {
     if (!currentUser || !currentUser.id) return

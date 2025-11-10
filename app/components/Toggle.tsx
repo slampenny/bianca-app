@@ -20,6 +20,7 @@ import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated"
 import { colors, spacing } from "../theme"
 import { iconRegistry, IconTypes } from "./Icon"
 import { Text, TextProps } from "./Text"
+import { useTheme } from "../theme/ThemeContext"
 
 type Variants = "checkbox" | "switch" | "radio"
 
@@ -430,6 +431,10 @@ function Switch(props: ToggleInputProps & { testID?: string }) {
     testID,
   } = props
 
+  // Use theme-aware colors for better dark mode visibility
+  const { colors: themeColors, currentTheme } = useTheme()
+  const isDarkMode = currentTheme === "dark"
+
   const knobSizeFallback = 2
 
   const knobWidth = [$detailStyleOverride?.width, $switchDetail?.width, knobSizeFallback].find(
@@ -440,35 +445,27 @@ function Switch(props: ToggleInputProps & { testID?: string }) {
     (v) => typeof v === "number",
   )
 
+  // Use theme-aware colors with better contrast for dark mode
+  // Use same background color for both on and off states (no color change)
   const offBackgroundColor = [
-    disabled && colors.palette.neutral400,
-    status === "error" && colors.errorBackground,
-    colors.palette.neutral300,
+    disabled && themeColors.palette.neutral400,
+    status === "error" && themeColors.errorBackground,
+    isDarkMode ? themeColors.palette.neutral500 : colors.palette.neutral300,
   ].filter(Boolean)[0]
 
   const onBackgroundColor = [
-    disabled && colors.transparent,
-    status === "error" && colors.errorBackground,
-    colors.palette.secondary500,
+    disabled && themeColors.transparent,
+    status === "error" && themeColors.errorBackground,
+    isDarkMode ? themeColors.palette.neutral500 : colors.palette.neutral300, // Same as off state
   ].filter(Boolean)[0]
 
-  const knobBackgroundColor = (function () {
-    if (on) {
-      return [
-        $detailStyleOverride?.backgroundColor,
-        status === "error" && colors.error,
-        disabled && colors.palette.neutral600,
-        colors.palette.neutral100,
-      ].filter(Boolean)[0]
-    } else {
-      return [
-        $innerStyleOverride?.backgroundColor,
-        disabled && colors.palette.neutral600,
-        status === "error" && colors.error,
-        colors.palette.neutral200,
-      ].filter(Boolean)[0]
-    }
-  })()
+  // Keep knob color constant to avoid re-renders that break animation
+  const knobBackgroundColor = [
+    $detailStyleOverride?.backgroundColor,
+    status === "error" && themeColors.error,
+    disabled && themeColors.palette.neutral600,
+    themeColors.palette.neutral100, // Always use same color regardless of on/off state
+  ].filter(Boolean)[0]
 
   const $animatedSwitchKnob = useAnimatedStyle(() => {
     const offsetLeft = ($innerStyleOverride?.paddingStart ||
@@ -483,10 +480,17 @@ function Switch(props: ToggleInputProps & { testID?: string }) {
       $switchInner?.paddingRight ||
       0) as number
 
-    const start = withTiming(on ? "100%" : "0%")
-    const marginStart = withTiming(on ? -(knobWidth || 0) - offsetRight : 0 + offsetLeft)
+    const switchWidth = 56 // From $inputOuterVariants.switch width
+    const knobW = knobWidth || 24
+    const maxTranslate = switchWidth - knobW - offsetLeft - offsetRight
+    
+    const translateX = withTiming(on ? maxTranslate : 0, {
+      duration: 200,
+    })
 
-    return { start, marginStart }
+    return { 
+      transform: [{ translateX }],
+    }
   }, [on, knobWidth])
 
   return (
@@ -514,9 +518,17 @@ function Switch(props: ToggleInputProps & { testID?: string }) {
         style={[
           $switchDetail,
           $detailStyleOverride,
+          { 
+            width: knobWidth, 
+            height: knobHeight,
+            backgroundColor: knobBackgroundColor,
+            left: ($innerStyleOverride?.paddingStart ||
+              $innerStyleOverride?.paddingLeft ||
+              $switchInner?.paddingStart ||
+              $switchInner?.paddingLeft ||
+              0) as number,
+          },
           $animatedSwitchKnob,
-          { width: knobWidth, height: knobHeight },
-          { backgroundColor: knobBackgroundColor },
         ]}
       />
     </View>

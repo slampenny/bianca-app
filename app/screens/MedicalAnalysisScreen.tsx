@@ -508,7 +508,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     gap: 8,
   },
   triggerButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
+    backgroundColor: colors.palette.primary500,
     flex: 1,
   },
   actionButtonText: {

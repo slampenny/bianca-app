@@ -1,11 +1,9 @@
 import React, { useState, useCallback } from "react"
 import { View, StyleSheet } from "react-native"
 import { useRoute, RouteProp } from "@react-navigation/native"
-import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { Screen } from "../components/Screen"
 import { SentimentDashboard } from "../components/SentimentDashboard"
-import { SentimentDebugPanel } from "../components/SentimentDebugPanel"
 import { useTheme } from "../theme/ThemeContext"
 import { Text } from "../components"
 import { translate } from "../i18n"
@@ -21,7 +19,6 @@ type SentimentAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "Sentiment
 
 export function SentimentAnalysisScreen() {
   const route = useRoute<SentimentAnalysisScreenRouteProp>()
-  const navigation = useNavigation()
   
   // Get patient from route params (when accessed from Patient screen) or Redux state (when accessed from Reports)
   const routePatientId = route.params?.patientId
@@ -36,12 +33,13 @@ export function SentimentAnalysisScreen() {
   const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("lastCall")
 
   // Only fetch sentiment data if we have a patient
-  const shouldFetchData = !!patientId
+  const shouldFetchData = !!patientId && (typeof patientId === 'string' ? patientId.trim().length > 0 : true)
 
   // Fetch sentiment data
   const {
     data: trendData,
     isLoading: isTrendLoading,
+    isFetching: isTrendFetching,
     refetch: refetchTrend,
     error: trendError,
   } = useGetSentimentTrendQuery({
@@ -54,6 +52,7 @@ export function SentimentAnalysisScreen() {
   const {
     data: summaryData,
     isLoading: isSummaryLoading,
+    isFetching: isSummaryFetching,
     refetch: refetchSummary,
     error: summaryError,
   } = useGetSentimentSummaryQuery({
@@ -71,12 +70,14 @@ export function SentimentAnalysisScreen() {
     logger.debug('[SentimentAnalysis] Should fetch data:', shouldFetchData)
     logger.debug('[SentimentAnalysis] Trend loading:', isTrendLoading)
     logger.debug('[SentimentAnalysis] Summary loading:', isSummaryLoading)
+    logger.debug('[SentimentAnalysis] Trend fetching:', isTrendFetching)
+    logger.debug('[SentimentAnalysis] Summary fetching:', isSummaryFetching)
     logger.debug('[SentimentAnalysis] Trend error:', trendError)
     logger.debug('[SentimentAnalysis] Summary error:', summaryError)
     logger.debug('[SentimentAnalysis] Trend data (full):', JSON.stringify(trendData, null, 2))
     logger.debug('[SentimentAnalysis] Summary data (full):', JSON.stringify(summaryData, null, 2))
     logger.debug('=== END DEBUG ===')
-  }, [patientId, patientName, shouldFetchData, isTrendLoading, isSummaryLoading, trendError, summaryError, trendData, summaryData, routePatientId])
+  }, [patientId, patientName, shouldFetchData, isTrendLoading, isSummaryLoading, isTrendFetching, isSummaryFetching, trendError, summaryError, trendData, summaryData, routePatientId])
 
   const handleRefresh = useCallback(() => {
     refetchTrend()
@@ -87,7 +88,18 @@ export function SentimentAnalysisScreen() {
     setSelectedTimeRange(timeRange)
   }, [])
 
-  const isLoading = isTrendLoading || isSummaryLoading
+  // Only show loading if we're actually fetching (not just skipped)
+  const isLoading = shouldFetchData && (isTrendLoading || isSummaryLoading || isTrendFetching || isSummaryFetching)
+  
+  // Log errors for debugging
+  React.useEffect(() => {
+    if (trendError) {
+      logger.error('[SentimentAnalysis] Trend query error:', trendError)
+    }
+    if (summaryError) {
+      logger.error('[SentimentAnalysis] Summary query error:', summaryError)
+    }
+  }, [trendError, summaryError])
 
   if (themeLoading) {
     return null
@@ -124,12 +136,10 @@ export function SentimentAnalysisScreen() {
         trend={trendData}
         summary={summaryData}
         isLoading={isLoading}
+        selectedTimeRange={selectedTimeRange}
         onRefresh={handleRefresh}
         onTimeRangeChange={handleTimeRangeChange}
       />
-      
-      {/* Debug Panel - Only show in development */}
-      {__DEV__ && <SentimentDebugPanel />}
     </Screen>
   )
 }

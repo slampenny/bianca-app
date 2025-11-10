@@ -15,6 +15,7 @@ interface SentimentDashboardProps {
   trend?: SentimentTrend
   summary?: SentimentSummary
   isLoading?: boolean
+  selectedTimeRange?: "lastCall" | "month" | "lifetime"
   onRefresh?: () => void
   onTimeRangeChange?: (timeRange: "lastCall" | "month" | "lifetime") => void
   style?: ViewStyle
@@ -25,14 +26,22 @@ export function SentimentDashboard({
   trend,
   summary,
   isLoading = false,
+  selectedTimeRange: propSelectedTimeRange,
   onRefresh,
   onTimeRangeChange,
   style,
 }: SentimentDashboardProps) {
   const { colors } = useTheme()
-  const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("month")
+  const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">(propSelectedTimeRange || "lastCall")
   const screenWidth = Dimensions.get("window").width
   const isMobile = screenWidth < 768
+
+  // Sync internal state with prop when it changes
+  React.useEffect(() => {
+    if (propSelectedTimeRange !== undefined && propSelectedTimeRange !== selectedTimeRange) {
+      setSelectedTimeRange(propSelectedTimeRange)
+    }
+  }, [propSelectedTimeRange])
 
   const handleTimeRangeChange = (timeRange: "lastCall" | "month" | "lifetime") => {
     setSelectedTimeRange(timeRange)
@@ -88,11 +97,18 @@ export function SentimentDashboard({
       {selectedTimeRange === "lastCall" ? (
         // Last Call View - Detailed analysis of most recent conversation
         <>
-          {summary && summary.recentTrend && summary.recentTrend.length > 0 && (
+          {summary && summary.recentTrend && summary.recentTrend.length > 0 ? (
             <SentimentLastCall 
               lastCall={summary.recentTrend[0]} 
               style={styles.lastCall} 
             />
+          ) : !isLoading && (
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataTitle}>{translate("sentimentAnalysis.noRecentCall")}</Text>
+              <Text style={styles.noDataText}>
+                {translate("sentimentAnalysis.noRecentCallMessage")}
+              </Text>
+            </View>
           )}
         </>
       ) : (
@@ -131,13 +147,6 @@ export function SentimentDashboard({
           <Text style={styles.loadingText}>{translate("sentimentAnalysis.loadingSentimentAnalysis")}</Text>
         </View>
       )}
-
-      {/* Footer info */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          {translate("sentimentAnalysis.sentimentAnalysisFooter")}
-        </Text>
-      </View>
     </ScrollView>
   )
 }
@@ -254,19 +263,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   loadingText: {
     fontSize: 14,
     color: colors.textDim || colors.palette.neutral600,
-  },
-  footer: {
-    padding: 16,
-    backgroundColor: colors.palette.neutral100,
-    borderTopWidth: 1,
-    borderTopColor: colors.palette.biancaBorder || colors.border,
-    marginTop: 16,
-  },
-  footerText: {
-    fontSize: 12,
-    color: colors.textDim || colors.palette.neutral600,
-    textAlign: "center" as const,
-    lineHeight: 16,
   },
 })
 

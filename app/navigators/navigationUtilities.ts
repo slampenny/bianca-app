@@ -87,11 +87,39 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
         const state = (await storageKey.load(persistenceKey)) as
           | NavigationProps["initialState"]
           | null
-        if (state) setInitialNavigationState(state)
+        // Validate the restored state to prevent [object Object] errors
+        if (state && isValidNavigationState(state)) {
+          setInitialNavigationState(state)
+        } else {
+          // Invalid state - clear it to prevent crashes
+          await storageKey.remove(persistenceKey).catch(() => {})
+          setInitialNavigationState(undefined)
+        }
       }
     } finally {
       if (isMounted()) setIsRestored(true)
     }
+  }
+  
+  // Helper function to validate navigation state
+  const isValidNavigationState = (state: any): boolean => {
+    if (!state || typeof state !== 'object') return false
+    
+    // Check if state has routes array
+    if (!Array.isArray(state.routes)) return false
+    
+    // Validate each route has a valid name (string, not object)
+    for (const route of state.routes) {
+      if (!route || typeof route.name !== 'string') {
+        return false
+      }
+      // Recursively check nested routes
+      if (route.state && !isValidNavigationState(route.state)) {
+        return false
+      }
+    }
+    
+    return true
   }
   useEffect(() => {
     if (!isRestored) restoreState()
