@@ -67,6 +67,32 @@ const getCaregiverByEmail = async (email) => {
 };
 
 const getLoginCaregiverData = async (email) => {
+  // Check MongoDB connection before querying
+  const mongoose = require('mongoose');
+  const config = require('../config/config');
+  
+  if (mongoose.connection.readyState !== 1) {
+    // Try to reconnect if not connected
+    logger.warn(`MongoDB not connected (state: ${mongoose.connection.readyState}). Attempting to reconnect...`);
+    try {
+      await mongoose.connect(config.mongoose.url, config.mongoose.options);
+      // Wait a moment for connection to stabilize
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (mongoose.connection.readyState === 1) {
+        logger.info('MongoDB reconnected successfully');
+      } else {
+        throw new Error(`MongoDB reconnection failed. Connection state: ${mongoose.connection.readyState}`);
+      }
+    } catch (reconnectError) {
+      const error = new Error(`MongoDB not connected. Connection state: ${mongoose.connection.readyState}. Connection URL: ${config.mongoose.url}. Error: ${reconnectError.message}`);
+      error.code = 'MONGOOSE_NOT_CONNECTED';
+      error.originalError = reconnectError;
+      logger.error(`MongoDB connection error: ${error.message}`);
+      throw error;
+    }
+  }
+  
   const caregiver = await Caregiver.findOne({ email })
     .populate('org')
     .populate({

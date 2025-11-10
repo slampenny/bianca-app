@@ -125,14 +125,30 @@ const baselineConfig = {
   mongoose: {
     url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     options: {
-      // useNewUrlParser and useUnifiedTopology are default in Mongoose 6+
+      // Mongoose 8.x: useNewUrlParser and useUnifiedTopology are default and removed
+      // Connection timeouts
       connectTimeoutMS: 30000,           // How long to wait for initial connection
       socketTimeoutMS: 60000,            // How long to wait on operations after connection
-      keepAlive: true,                   // Enable TCP keep-alive
-      keepAliveInitialDelay: 300000,     // Wait 5 min before first keepalive ping
-      maxPoolSize: 10,                   // Allow for more concurrent queries (esp. during seed)
+      serverSelectionTimeoutMS: 30000,   // How long to wait for server selection (Mongoose 8.x)
+      
+      // Connection pooling
+      maxPoolSize: 10,                   // Maximum number of connections in pool
+      minPoolSize: 2,                    // Minimum number of connections to maintain (Mongoose 8.x)
+      
+      // Keep-alive settings (Mongoose 8.x: use socket-level options, not keepAlive option)
+      // TCP keep-alive is handled at the socket level automatically in Mongoose 8.x
+      // keepAliveInitialDelay is not a valid option in Mongoose 8.x
+      
+      // Write concern
       retryWrites: true,                 // Safe to retry inserts on transient network errors
-      w: 'majority'                      // Write concern for retryWrites
+      w: 'majority',                     // Write concern for retryWrites
+      
+      // Mongoose 8.x: Buffer configuration
+      // bufferCommands and bufferMaxEntries are not valid options in Mongoose 8.x
+      // Mongoose 8.x automatically buffers commands when disconnected (default 10s timeout)
+      
+      // Mongoose 8.x: Additional connection options
+      heartbeatFrequencyMS: 10000,       // How often to check connection health (Mongoose 8.x)
     }
   },
   billing: { 

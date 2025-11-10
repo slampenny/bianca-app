@@ -6,13 +6,19 @@
 
 set -e
 
-# Variables
+# Variables - Terraform templatefile passes lowercase, convert to uppercase for use in script
 REGION="${region}"
 AWS_ACCOUNT_ID="${aws_account_id}"
 ENVIRONMENT="${environment}"
 
 # Get instance metadata
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+# Use EIP if provided (from Terraform), otherwise fall back to instance metadata
+# This ensures we always use the correct IP even if instance is recreated
+if [ -n "${eip_address}" ]; then
+  PUBLIC_IP="${eip_address}"
+else
+  PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+fi
 PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 
 # Update system
@@ -33,11 +39,21 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 ./aws/install
 
+# Install jq for JSON parsing
+yum install -y jq
+
 # Create application directory
 mkdir -p /opt/bianca-production
 cd /opt/bianca-production
 
-# Create docker-compose.yml - NO SECRETS HARDCODED
+# Fetch Asterisk passwords from Secrets Manager
+echo "Fetching Asterisk passwords from Secrets Manager..."
+SECRET_ARN="arn:aws:secretsmanager:${region}:${aws_account_id}:secret:MySecretsManagerSecret-*"
+SECRET_VALUE=$(aws secretsmanager get-secret-value --region ${region} --secret-id MySecretsManagerSecret --query SecretString --output text)
+ARI_PASSWORD=$(echo $SECRET_VALUE | jq -r .ARI_PASSWORD)
+BIANCA_PASSWORD=$(echo $SECRET_VALUE | jq -r .BIANCA_PASSWORD)
+
+# Create docker-compose.yml - Asterisk passwords loaded from Secrets Manager
 cat > docker-compose.yml <<EOF
 version: '3.8'
 
@@ -68,6 +84,8 @@ services:
       - PRIVATE_ADDRESS=$${PRIVATE_IP}
       - RTP_START_PORT=10000
       - RTP_END_PORT=10100
+      - ARI_PASSWORD=$${ARI_PASSWORD}
+      - BIANCA_PASSWORD=$${BIANCA_PASSWORD}
     volumes:
       - asterisk_logs:/var/log/asterisk
     networks:

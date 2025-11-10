@@ -44,13 +44,34 @@ async function startServer() {
       try {
         logger.info(`Attempting to connect to MongoDB (attempt ${retries + 1}/${maxRetries})...`);
         await mongoose.connect(config.mongoose.url, config.mongoose.options);
-        logger.info('Connected to MongoDB');
-        mongoConnected = true;
+        
+        // Verify connection is actually ready
+        if (mongoose.connection.readyState === 1) {
+          logger.info('Connected to MongoDB');
+          mongoConnected = true;
+          
+          // Set up connection event handlers
+          mongoose.connection.on('error', (err) => {
+            logger.error(`MongoDB connection error: ${err.message}`);
+          });
+          
+          mongoose.connection.on('disconnected', () => {
+            logger.warn('MongoDB disconnected. Attempting to reconnect...');
+            // Mongoose will automatically attempt to reconnect
+          });
+          
+          mongoose.connection.on('reconnected', () => {
+            logger.info('MongoDB reconnected successfully');
+          });
+        } else {
+          throw new Error(`MongoDB connection not ready. State: ${mongoose.connection.readyState}`);
+        }
       } catch (mongoError) {
         retries++;
         logger.error(`MongoDB connection attempt ${retries} failed: ${mongoError.message}`);
         if (retries >= maxRetries) {
-          logger.error('Max MongoDB connection retries reached. Continuing without database.');
+          logger.error('Max MongoDB connection retries reached. Server will start but database operations will fail.');
+          // Don't exit - let the server start but log warnings
         } else {
           logger.info(`Waiting ${5 * retries} seconds before next MongoDB connection attempt...`);
           await new Promise(resolve => setTimeout(resolve, 5000 * retries));

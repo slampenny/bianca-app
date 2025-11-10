@@ -349,6 +349,182 @@ async function addNormalPatientConversations(patientId) {
   return normalConversations;
 }
 
+/**
+ * Add recent patient conversations (within last 30 days) for sentiment analysis
+ * @param {string} patientId - The patient ID to add conversations for
+ */
+async function addRecentPatientConversations(patientId) {
+  console.log('Adding recent patient conversations for patient:', patientId);
+  
+  const recentConversations = [];
+  
+  // Create 3 recent conversations within the last 30 days
+  const daysAgo = [2, 7, 14]; // 2 days ago, 7 days ago, 14 days ago
+  
+  for (let i = 0; i < daysAgo.length; i++) {
+    const days = daysAgo[i];
+    const convDate = new Date();
+    convDate.setDate(convDate.getDate() - days);
+    convDate.setHours(10, 0, 0, 0); // Set to 10 AM
+    
+    const conv = new Conversation({
+      patientId: patientId,
+      messages: [],
+      history: `Recent wellness check conversation from ${days} days ago.`,
+      analyzedData: {},
+      metadata: { source: 'recent_patient_seed', daysAgo: days },
+      createdAt: convDate,
+      updatedAt: convDate,
+      startTime: convDate,
+      endTime: new Date(convDate.getTime() + 25 * 60 * 1000), // 25 minutes later
+      duration: 25,
+      status: 'completed',
+      callType: 'wellness-check',
+      cost: 0.25, // $0.25 for 25 minutes at $0.10/minute
+      lineItemId: null // Unbilled
+    });
+    await conv.save();
+    
+    // Create messages with varying sentiment
+    const messages = [
+      {
+        role: 'patient',
+        content: i === 0 
+          ? 'Good morning! I am feeling really good today. I had a great week and I am very happy with how things are going. My medications are working well and I have been sleeping better. I feel positive and optimistic about the future.'
+          : i === 1
+          ? 'Hello! I am doing okay today. Some days are better than others, but overall I am managing well. I have been taking my medications as prescribed and trying to stay active. I appreciate the support I receive.'
+          : 'Hi there. I wanted to check in about my health. I have been feeling a bit tired lately, but I am still managing my daily activities. I am following my medication schedule and trying to maintain a routine.'
+      },
+      {
+        role: 'assistant',
+        content: i === 0
+          ? 'That is wonderful to hear! I am so glad you are feeling positive and that your medications are working well. It sounds like you are taking great care of yourself.'
+          : i === 1
+          ? 'Thank you for the update. It is good to hear that you are managing well overall. Consistency with medications and staying active are both important.'
+          : 'Thank you for sharing. It is important to monitor how you are feeling. Let us make sure you are getting enough rest and staying hydrated.'
+      }
+    ];
+    
+    for (const msgData of messages) {
+      const msg = new Message({
+        role: msgData.role,
+        content: msgData.content,
+        conversationId: conv._id
+      });
+      await msg.save();
+      conv.messages.push(msg._id);
+    }
+    
+    await conv.save();
+    recentConversations.push(conv);
+  }
+  
+  console.log(`Created ${recentConversations.length} recent patient conversations (within last 30 days)`);
+  
+  return recentConversations;
+}
+
+/**
+ * Generate fake but realistic sentiment analysis data based on conversation content
+ * @param {string} conversationText - The conversation text
+ * @param {Object} metadata - Optional metadata about the conversation
+ * @returns {Object} Sentiment analysis data
+ */
+function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
+  const lowerText = conversationText.toLowerCase();
+  
+  // Analyze sentiment based on keywords and content
+  let overallSentiment = 'neutral';
+  let sentimentScore = 0;
+  let confidence = 0.85;
+  let concernLevel = 'low';
+  let patientMood = 'Patient appears calm and engaged';
+  let keyEmotions = ['neutral'];
+  let satisfactionIndicators = { positive: [], negative: [] };
+  let summary = 'Patient engaged in routine wellness check conversation.';
+  let recommendations = 'Continue monitoring patient wellness.';
+  
+  // Positive indicators
+  const positiveKeywords = ['good', 'great', 'wonderful', 'excellent', 'happy', 'pleased', 'satisfied', 'feeling well', 'doing well', 'better', 'improving', 'positive', 'optimistic', 'grateful', 'thankful', 'appreciate', 'energy', 'active', 'sharp', 'consistent', 'managing well'];
+  const positiveCount = positiveKeywords.filter(word => lowerText.includes(word)).length;
+  
+  // Negative indicators
+  const negativeKeywords = ['tired', 'exhausted', 'worried', 'concerned', 'frustrated', 'difficult', 'struggling', 'trouble', 'problem', 'issue', 'pain', 'uncomfortable', 'anxious', 'stressed', 'overwhelmed', 'confused', 'forgetful', 'declining'];
+  const negativeCount = negativeKeywords.filter(word => lowerText.includes(word)).length;
+  
+  // Determine overall sentiment
+  if (positiveCount > negativeCount + 2) {
+    overallSentiment = 'positive';
+    sentimentScore = 0.3 + (Math.min(positiveCount, 10) * 0.05);
+    patientMood = 'Patient appears cheerful and optimistic';
+    keyEmotions = ['happiness', 'satisfaction', 'contentment'];
+    summary = 'Patient expressed positive feelings about their health and daily activities.';
+    recommendations = 'Continue current treatment plan. Patient is responding well.';
+    satisfactionIndicators.positive = ['Expressed satisfaction with care', 'Positive outlook on health'];
+  } else if (negativeCount > positiveCount + 2) {
+    overallSentiment = 'negative';
+    sentimentScore = -0.3 - (Math.min(negativeCount, 10) * 0.05);
+    patientMood = 'Patient appears concerned or experiencing some challenges';
+    keyEmotions = ['concern', 'frustration', 'tiredness'];
+    concernLevel = negativeCount > 5 ? 'high' : 'medium';
+    summary = 'Patient expressed some concerns or challenges during the conversation.';
+    recommendations = 'Schedule follow-up to address patient concerns. Monitor closely.';
+    satisfactionIndicators.negative = ['Expressed some concerns', 'May need additional support'];
+  } else if (positiveCount > 0 && negativeCount > 0) {
+    overallSentiment = 'mixed';
+    sentimentScore = (positiveCount - negativeCount) * 0.1;
+    patientMood = 'Patient shows mixed emotions with both positive and concerning elements';
+    keyEmotions = ['mixed', 'cautious', 'hopeful'];
+    concernLevel = 'medium';
+    summary = 'Patient conversation shows a mix of positive and concerning elements.';
+    recommendations = 'Continue monitoring. Address any specific concerns raised.';
+  } else {
+    overallSentiment = 'neutral';
+    sentimentScore = 0;
+    patientMood = 'Patient appears calm and engaged in routine conversation';
+    keyEmotions = ['neutral', 'calm'];
+    summary = 'Patient engaged in routine wellness check conversation.';
+  }
+  
+  // Adjust based on metadata (for declining patient conversations)
+  if (metadata.source === 'declining_patient_seed') {
+    if (metadata.month >= 4) {
+      overallSentiment = 'negative';
+      sentimentScore = -0.4 - (metadata.month - 4) * 0.1;
+      concernLevel = 'high';
+      patientMood = 'Patient showing signs of cognitive decline and increased confusion';
+      keyEmotions = ['confusion', 'frustration', 'concern'];
+      summary = 'Patient showing concerning signs of cognitive decline. Increased confusion and memory issues noted.';
+      recommendations = 'Urgent follow-up recommended. Consider additional support services.';
+      satisfactionIndicators.negative = ['Memory issues', 'Increased confusion', 'Difficulty managing daily tasks'];
+    } else if (metadata.month >= 2) {
+      overallSentiment = 'mixed';
+      sentimentScore = -0.1;
+      concernLevel = 'medium';
+      patientMood = 'Patient showing mild concerns about memory and mood';
+      keyEmotions = ['concern', 'uncertainty'];
+      summary = 'Patient expressing mild concerns about cognitive function and mood.';
+      recommendations = 'Monitor closely. Consider cognitive assessment.';
+    }
+  }
+  
+  // Ensure sentiment score is within bounds
+  sentimentScore = Math.max(-1, Math.min(1, sentimentScore));
+  
+  return {
+    overallSentiment,
+    sentimentScore: Math.round(sentimentScore * 100) / 100, // Round to 2 decimal places
+    confidence,
+    patientMood,
+    keyEmotions,
+    concernLevel,
+    satisfactionIndicators,
+    summary,
+    recommendations,
+    fallback: false
+  };
+}
+
 async function seedDatabase() {
   try {
     // Connect to the database
@@ -403,9 +579,6 @@ async function seedDatabase() {
       throw new Error('caregiverOne not found in inserted caregivers');
     }
 
-    // Insert alerts
-    await insertAlerts(caregiverOneRecord, 'Caregiver', [alertOne, alertTwo, alertThree, expiredAlert]);
-    
     // Create additional alerts for testing
     const alertFour = {
       message: "Patient John Smith missed their scheduled medication dose",
@@ -981,6 +1154,10 @@ async function seedDatabase() {
     // Add some normal conversation data for Barnaby Button (patient2)
     await addNormalPatientConversations(patient2._id);
 
+    // Add recent conversations (within last 30 days) for both patients so sentiment analysis will show data
+    await addRecentPatientConversations(patient1._id);
+    await addRecentPatientConversations(patient2._id);
+
     // Insert conversation-specific alerts
     const conversationAlertThree = {
       ...alertThree,
@@ -1048,9 +1225,6 @@ async function seedDatabase() {
     // Add sentiment analysis to seeded conversations
     console.log('Adding sentiment analysis to seeded conversations...');
     try {
-      const { getOpenAISentimentServiceInstance } = require('../services/openai.sentiment.service');
-      const sentimentService = getOpenAISentimentServiceInstance();
-      
       // Get all conversations for sentiment analysis
       const allConversations = await Conversation.find({
         status: 'completed',
@@ -1081,27 +1255,18 @@ async function seedDatabase() {
             continue;
           }
           
-          // Perform sentiment analysis
-          const analysisResult = await sentimentService.analyzeSentiment(conversationText, {
-            detailed: true
+          // Generate fake but realistic sentiment analysis
+          const sentimentData = generateFakeSentimentAnalysis(conversationText, conversation.metadata || {});
+          
+          // Update conversation with sentiment analysis
+          await Conversation.findByIdAndUpdate(conversation._id, {
+            $set: {
+              'analyzedData.sentiment': sentimentData,
+              'analyzedData.sentimentAnalyzedAt': new Date()
+            }
           });
           
-          if (analysisResult.success) {
-            // Update conversation with sentiment analysis
-            await Conversation.findByIdAndUpdate(conversation._id, {
-              $set: {
-                'analyzedData.sentiment': analysisResult.data,
-                'analyzedData.sentimentAnalyzedAt': new Date()
-              }
-            });
-            
-            console.log(`Added sentiment analysis to conversation ${conversation._id}: ${analysisResult.data.overallSentiment} (${analysisResult.data.sentimentScore})`);
-          } else {
-            console.warn(`Failed to analyze sentiment for conversation ${conversation._id}: ${analysisResult.error}`);
-          }
-          
-          // Add small delay to avoid overwhelming the API
-          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log(`Added sentiment analysis to conversation ${conversation._id}: ${sentimentData.overallSentiment} (${sentimentData.sentimentScore})`);
           
         } catch (error) {
           console.warn(`Error analyzing sentiment for conversation ${conversation._id}:`, error.message);

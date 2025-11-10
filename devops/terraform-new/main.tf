@@ -271,6 +271,14 @@ data "aws_route53_zone" "myphonefriend" {
   private_zone = false
 }
 
+# Route53 zone for biancawellness.com
+# Note: Domain must be registered in Route 53 first via AWS Console
+# After registration, Route 53 will automatically create a hosted zone
+data "aws_route53_zone" "biancawellness" {
+  name         = "biancawellness.com."
+  private_zone = false
+}
+
 data "aws_acm_certificate" "app_cert" {
   domain      = "*.myphonefriend.com"
   statuses    = ["ISSUED"]

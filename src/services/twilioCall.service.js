@@ -7,8 +7,20 @@ const { Conversation, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { chatService, alertService } = require('.');
 
-// Create Twilio client
-const twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
+// Create Twilio client (will be validated before use)
+let twilioClient;
+try {
+  // Only create client if credentials are available
+  if (config.twilio?.accountSid && config.twilio?.authToken) {
+    twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
+    logger.info('[Twilio Service] Twilio client initialized');
+  } else {
+    logger.warn('[Twilio Service] Twilio credentials not available at startup - client will be created on first use');
+  }
+} catch (error) {
+  logger.error(`[Twilio Service] Failed to initialize Twilio client: ${error.message}`);
+}
+
 const { VoiceResponse } = twilio.twiml;
 
 /**
@@ -42,20 +54,57 @@ class TwilioCallService {
       logger.info(`[Twilio Service] Using TwiML URL: ${initialTwiMLUrl}`);
       logger.info(`[Twilio Service] Using callback URL: ${statusCallbackUrl}`);
 
+      // Validate Twilio configuration before making API call
+      if (!config.twilio.accountSid || !config.twilio.authToken) {
+        logger.error(`[Twilio Service] Missing Twilio credentials - accountSid: ${!!config.twilio.accountSid}, authToken: ${!!config.twilio.authToken}`);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Twilio credentials not configured');
+      }
+      
+      if (!config.twilio.phone) {
+        logger.error(`[Twilio Service] Missing Twilio phone number`);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Twilio phone number not configured');
+      }
+
+      // Ensure Twilio client is initialized
+      if (!twilioClient) {
+        logger.info('[Twilio Service] Initializing Twilio client');
+        twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
+      }
+
       // Create call with Twilio
-      const call = await twilioClient.calls.create({
-        url: initialTwiMLUrl,
-        to: patient.phone,
-        from: config.twilio.phone,
-        statusCallback: statusCallbackUrl,
-        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        statusCallbackMethod: 'POST',
-        record: true,
-        answerOnBridge: true,
-        machineDetection: 'DetectMessageEnd', // Detect answering machines
-        machineDetectionTimeout: 10, // Wait 10 seconds for detection
-        timeout: 30 // Ring for 30 seconds before giving up
-      });
+      let call;
+      try {
+        call = await twilioClient.calls.create({
+          url: initialTwiMLUrl,
+          to: patient.phone,
+          from: config.twilio.phone,
+          statusCallback: statusCallbackUrl,
+          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+          statusCallbackMethod: 'POST',
+          record: true,
+          answerOnBridge: true,
+          machineDetection: 'DetectMessageEnd', // Detect answering machines
+          machineDetectionTimeout: 10, // Wait 10 seconds for detection
+          timeout: 30 // Ring for 30 seconds before giving up
+        });
+      } catch (twilioError) {
+        // Log full Twilio error details
+        logger.error(`[Twilio Service] Twilio API error: ${twilioError.message}`);
+        logger.error(`[Twilio Service] Twilio error code: ${twilioError.code}`);
+        logger.error(`[Twilio Service] Twilio error status: ${twilioError.status}`);
+        logger.error(`[Twilio Service] Twilio error details: ${JSON.stringify(twilioError, null, 2)}`);
+        
+        // Provide more helpful error messages
+        if (twilioError.code === 20003 || twilioError.status === 401) {
+          throw new ApiError(httpStatus.UNAUTHORIZED, 'Twilio authentication failed. Please check your Twilio credentials.');
+        } else if (twilioError.code === 21211) {
+          throw new ApiError(httpStatus.BAD_REQUEST, `Invalid phone number format: ${patient.phone}`);
+        } else if (twilioError.code === 21212) {
+          throw new ApiError(httpStatus.BAD_REQUEST, `Invalid caller ID: ${config.twilio.phone}`);
+        } else {
+          throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Twilio API error: ${twilioError.message || 'Unknown error'}`);
+        }
+      }
       
       logger.info(`[Twilio Service] Call initiated with SID: ${call.sid}`);
 
@@ -74,6 +123,7 @@ class TwilioCallService {
       return call.sid;
     } catch (error) {
       logger.error(`[Twilio Service] Error initiating call: ${error.message}`);
+      logger.error(`[Twilio Service] Error stack: ${error.stack}`);
       
       // Clean up conversation if created but call failed
       if (conversation && conversation._id) {
@@ -83,9 +133,14 @@ class TwilioCallService {
         );
       }
       
-      // Re-throw appropriate error
+      // Re-throw appropriate error (ApiError instances already have proper status codes)
       if (error instanceof ApiError) throw error;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to initiate call: ${error.message}`);
+      
+      // For unexpected errors, provide more context
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR, 
+        `Failed to initiate call: ${error.message || 'Unknown error'}`
+      );
     }
   }
 
@@ -154,12 +209,8 @@ class TwilioCallService {
         timeLimit: 1800, // Example: 30 mins
         timeout: 20, // Example: Ring Asterisk for 20 secs
         // answerOnBridge: true, // REMOVED: This was causing initial audio cutoff
-        // Add media stream configuration
-        mediaStream: {
-          track: 'both_tracks', // Enable both inbound and outbound audio
-          format: 'mulaw', // Use μ-law format to match Asterisk
-          sampleRate: 8000 // 8kHz sample rate to match Asterisk
-        }
+        // Note: mediaStream is not supported in Twilio's TwiML Dial verb
+        // Media streams are configured via Twilio's Media Streams API, not TwiML
       });
       
       // Add the SIP endpoint

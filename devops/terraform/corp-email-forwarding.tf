@@ -263,3 +263,16 @@ resource "aws_route53_record" "zoho_dkim" {
   # DKIM public key from Zoho Mail (exact value from Zoho admin)
   records = ["v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDOeiMSBXNisY9pFu8jtlpLxxBz08vn6NZ8PE3MZGrEFg53X60zC4n9p4+ehH9MZQx3QVc9K6gXteUTMLKgKNiP+fBl0y/oHiRPSZK8Ts1/XUjAphPtWiNQs5JhOnl+fPtN7X0LM1Om2+M+u4HL1lqx//8rbZwgYJWqt3tyjY/vMQIDAQAB"]
 }
+
+################################################################################
+# TWILIO DOMAIN VERIFICATION
+# TXT record for Twilio domain verification
+################################################################################
+
+resource "aws_route53_record" "twilio_verification" {
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "_twilio.biancatechnologies.com"
+  type    = "TXT"
+  ttl     = 300
+  records = ["twilio-domain-verification=3577dc5b2f8d5be1321c34cfbbc35bd6"]
+}
