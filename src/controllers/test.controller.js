@@ -27,9 +27,17 @@ const testCleanDB = catchAsync(async (req, res) => {
 });
 
 /**
- * Clean the database (for testing)
+ * Seed the database (for testing/development only)
+ * Only available in development or test environments
  */
 const testSeed = catchAsync(async (req, res) => {
+  // Only allow seeding in development or test environments
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+    return res.status(httpStatus.FORBIDDEN).send({ 
+      message: 'Database seeding is only available in development or test environments' 
+    });
+  }
+  
   const result = await seedDatabase();
   res.status(httpStatus.OK).send({ message: 'Database Seeded', result });
 });

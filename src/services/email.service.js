@@ -52,6 +52,8 @@ async function doInitialization() {
     const useSESInDev = process.env.USE_SES_IN_DEV === 'true' || process.env.USE_SES_IN_DEV === '1';
     const shouldUseSES = config.env === 'production' || config.env === 'staging' || config.env === 'test' || (config.env === 'development' && useSESInDev);
     
+    let sesInitialized = false;
+    
     if (shouldUseSES) {
       logger.info(`Initializing email transport for AWS SES in region: ${config.email.ses.region}`);
       
@@ -75,60 +77,105 @@ async function doInitialization() {
         }
       }
       
-      const sesClient = new SESClient({
-        region: config.email.ses.region,
-      });
-
-      // Test SES connectivity first
       try {
+        const sesClient = new SESClient({
+          region: config.email.ses.region,
+        });
+
+        // Test SES connectivity first
         const { GetSendQuotaCommand } = require('@aws-sdk/client-ses');
         const testCommand = new GetSendQuotaCommand({});
         await sesClient.send(testCommand);
         logger.info('SES connectivity test passed');
+
+        // Create transport with proper SES configuration for AWS SDK v3
+        // Nodemailer expects the AWS SDK module to be passed, not just the command
+        transport = nodemailer.createTransport({
+          SES: { 
+            ses: sesClient, 
+            aws: require('@aws-sdk/client-ses')
+          },
+          sendingRate: 14, // SES default rate limit
+        });
+
+        // Verify the transport
+        await transport.verify();
+        logger.info('Nodemailer transport configured to use AWS SES and verified.');
+        sesInitialized = true;
       } catch (sesError) {
         logger.error('SES connectivity test failed:', sesError);
-        throw new Error(`SES not accessible: ${sesError.message}`);
+        // In development/test, fall back to Ethereal if SES is not available
+        if (config.env === 'development' || config.env === 'test') {
+          logger.warn('SES not available in development/test, falling back to Ethereal');
+          sesInitialized = false;
+        } else {
+          throw new Error(`SES not accessible: ${sesError.message}`);
+        }
       }
-
-      // Create transport with proper SES configuration for AWS SDK v3
-      // Nodemailer expects the AWS SDK module to be passed, not just the command
-      transport = nodemailer.createTransport({
-        SES: { 
-          ses: sesClient, 
-          aws: require('@aws-sdk/client-ses')
-        },
-        sendingRate: 14, // SES default rate limit
-      });
-
-      // Verify the transport
-      await transport.verify();
-      logger.info('Nodemailer transport configured to use AWS SES and verified.');
-      
-    } else { 
-      // Development environment - use Ethereal
-      logger.info('Initializing email transport for Ethereal (development)');
+    }
+    
+    // If SES wasn't initialized (either not configured or failed in dev/test), use Ethereal
+    if (!sesInitialized) {
+      // Development/test environment - use Ethereal
+      logger.info('Initializing email transport for Ethereal (development/test)');
       try {
         etherealTestAccount = await nodemailer.createTestAccount();
-        transport = nodemailer.createTransport({
+        
+        // Ethereal uses STARTTLS on port 587, not SSL on 465
+        // Ensure we use the correct configuration
+        const smtpConfig = {
           host: etherealTestAccount.smtp.host,
-          port: etherealTestAccount.smtp.port,
-          secure: etherealTestAccount.smtp.secure,
+          port: etherealTestAccount.smtp.port || 587, // Default to 587 if not specified
+          secure: false, // Use STARTTLS, not SSL
           auth: {
-            user: etherealTestAccount.user, // Ethereal-generated username
-            pass: etherealTestAccount.pass, // Ethereal-generated password
+            user: etherealTestAccount.user,
+            pass: etherealTestAccount.pass,
           },
           tls: {
-            // do not fail on invalid certs for Ethereal
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
+            ciphers: 'SSLv3' // Allow older cipher suites for compatibility
+          },
+          connectionTimeout: 10000, // 10 second timeout
+          greetingTimeout: 10000,
+          socketTimeout: 10000,
+          // Add connection retry logic
+          pool: false, // Don't use connection pooling to avoid socket issues
+        };
+        
+        transport = nodemailer.createTransport(smtpConfig);
+        
+        // Verify Ethereal transport with retry
+        let verified = false;
+        let retries = 3;
+        while (!verified && retries > 0) {
+          try {
+            await transport.verify();
+            verified = true;
+            logger.info('Nodemailer transport configured to use Ethereal and verified.');
+          } catch (verifyError) {
+            retries--;
+            if (retries > 0) {
+              logger.warn(`Ethereal verification failed, retrying... (${retries} attempts left)`, verifyError.message);
+              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+              // Recreate transport for retry
+              transport = nodemailer.createTransport(smtpConfig);
+            } else {
+              throw verifyError;
+            }
           }
-        });
+        }
         
-        // Verify Ethereal transport
-        await transport.verify();
-        logger.info('Nodemailer transport configured to use Ethereal and verified.');
-        
-        const baseUrl = nodemailer.getTestMessageUrl({ messageId: 'test-id' }).split('/message/test-id')[0];
-        logger.info(`Ethereal Preview URL (base): ${baseUrl}`);
+        // Get Ethereal preview URL (optional, for debugging)
+        try {
+          const testUrl = nodemailer.getTestMessageUrl({ messageId: 'test-id' });
+          if (testUrl && typeof testUrl === 'string') {
+            const baseUrl = testUrl.split('/message/test-id')[0];
+            logger.info(`Ethereal Preview URL (base): ${baseUrl}`);
+          }
+        } catch (urlErr) {
+          // Ignore URL generation errors - not critical
+          logger.debug('Could not generate Ethereal preview URL:', urlErr.message);
+        }
         
       } catch (err) {
         logger.error('Failed to create an Ethereal test account or transport. Using fallback console transport.', err);
@@ -200,22 +247,78 @@ const sendEmail = async (to, subject, text, html) => {
     }
 
     logger.info(`Sending email to ${to} with subject: ${subject}`);
-    const info = await transport.sendMail(mailOptions);
-
-    if (config.env !== 'production' && config.env !== 'test' && etherealTestAccount) {
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        logger.info(`Ethereal message sent! Preview URL: ${previewUrl}`);
-      } else {
-        logger.info(`Ethereal message sent with ID: ${info.messageId}`);
-      } 
-    } else if (info.messageId) { // For SES
-      logger.info(`Email sent successfully to ${to} via SES. Message ID: ${info.messageId}`);
-    } else { // For console transport or other cases
-       logger.info(`Email sent to ${to}. Response: ${JSON.stringify(info)}`);
+    
+    // Retry logic for sending emails (handles transient connection issues)
+    let retries = 3;
+    let lastError;
+    while (retries > 0) {
+      try {
+        const info = await transport.sendMail(mailOptions);
+        
+        if (config.env !== 'production' && config.env !== 'test' && etherealTestAccount) {
+          const previewUrl = nodemailer.getTestMessageUrl(info);
+          if (previewUrl) {
+            logger.info(`Ethereal message sent! Preview URL: ${previewUrl}`);
+          } else {
+            logger.info(`Ethereal message sent with ID: ${info.messageId}`);
+          } 
+        } else if (info.messageId) { // For SES
+          logger.info(`Email sent successfully to ${to} via SES. Message ID: ${info.messageId}`);
+        } else { // For console transport or other cases
+           logger.info(`Email sent to ${to}. Response: ${JSON.stringify(info)}`);
+        }
+        
+        return info;
+      } catch (error) {
+        lastError = error;
+        retries--;
+        
+        // Check if it's a connection error that might be retryable
+        const isRetryable = error.code === 'ESOCKET' || 
+                           error.code === 'ECONNRESET' || 
+                           error.code === 'ETIMEDOUT' ||
+                           error.message.includes('socket') ||
+                           error.message.includes('connection');
+        
+        if (retries > 0 && isRetryable) {
+          logger.warn(`Email send failed (retryable error), retrying... (${retries} attempts left): ${error.message}`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+          
+          // Recreate transport if connection was lost
+          if (error.code === 'ESOCKET' || error.code === 'ECONNRESET') {
+            try {
+              if (etherealTestAccount) {
+                transport = nodemailer.createTransport({
+                  host: etherealTestAccount.smtp.host,
+                  port: etherealTestAccount.smtp.port || 587,
+                  secure: false,
+                  auth: {
+                    user: etherealTestAccount.user,
+                    pass: etherealTestAccount.pass,
+                  },
+                  tls: {
+                    rejectUnauthorized: false,
+                    ciphers: 'SSLv3'
+                  },
+                  connectionTimeout: 10000,
+                  greetingTimeout: 10000,
+                  socketTimeout: 10000,
+                  pool: false,
+                });
+              }
+            } catch (recreateError) {
+              logger.error('Failed to recreate transport:', recreateError);
+            }
+          }
+        } else {
+          // Not retryable or out of retries
+          break;
+        }
+      }
     }
     
-    return info;
+    // If we get here, all retries failed
+    throw lastError;
     
   } catch (error) {
     logger.error(`Failed to send email to ${to}: ${error.message}`, {
@@ -382,7 +485,13 @@ const getStatus = () => {
     fromAddress: config.email?.from,
     etherealAccount: etherealTestAccount ? {
       user: etherealTestAccount.user,
-      host: etherealTestAccount.smtp?.host
+      pass: etherealTestAccount.pass, // Include password for IMAP access
+      host: etherealTestAccount.smtp?.host,
+      imap: {
+        host: 'imap.ethereal.email',
+        port: 993,
+        secure: true
+      }
     } : null
   };
 };

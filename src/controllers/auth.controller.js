@@ -5,7 +5,7 @@ const ApiError = require('../utils/ApiError');
 const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService } = require('../services');
 const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
 const { auditAuthFailure } = require('../middlewares/auditLog');
-const { AuditLog } = require('../models');
+const { AuditLog, Token } = require('../models');
 const i18n = require('i18n');
 
 const register = catchAsync(async (req, res, next) => {
@@ -44,9 +44,31 @@ const register = catchAsync(async (req, res, next) => {
 });
 
 const registerWithInvite = catchAsync(async (req, res) => {
-  const { token, ...caregiverInfo } = req.body;
-  const invite = await tokenService.verifyToken(token);
-  const caregiver = await caregiverService.createCaregiver({ ...caregiverInfo, org: invite.cargiver.org });
+  const { token, password, name, email, phone } = req.body;
+  const { tokenTypes } = require('../config/tokens');
+  const inviteTokenDoc = await tokenService.verifyToken(token, tokenTypes.INVITE);
+  
+  // Get the existing invited caregiver (created when invite was sent)
+  const invitedCaregiver = await caregiverService.getCaregiverById(inviteTokenDoc.caregiver);
+  if (!invitedCaregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Invited caregiver not found');
+  }
+  
+  // Verify the email matches the invite
+  if (invitedCaregiver.email !== email) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Email does not match the invite');
+  }
+  
+  // Update the existing caregiver with password and other info (this will also promote from 'invited' to 'staff')
+  const caregiver = await caregiverService.updateCaregiverById(invitedCaregiver.id, {
+    password,
+    name,
+    phone,
+  });
+  
+  // Delete the invite token since it's been used
+  await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.INVITE });
+  
   const caregiverDTO = CaregiverDTO(caregiver);
   const tokens = await tokenService.generateAuthTokens(caregiver);
   res.status(httpStatus.CREATED).send({ caregiver: caregiverDTO, tokens });
