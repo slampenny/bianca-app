@@ -100,6 +100,16 @@ data "aws_route53_zone" "wordpress_domain" {
   private_zone = false
 }
 
+data "aws_route53_zone" "biancatechnologies" {
+  name         = "biancatechnologies.com."
+  private_zone = false
+}
+
+data "aws_route53_zone" "biancawellness" {
+  name         = "biancawellness.com."
+  private_zone = false
+}
+
 data "aws_subnet" "public_a" {
   id = var.subnet_public_a_id
 }
@@ -272,6 +282,73 @@ resource "aws_iam_instance_profile" "wordpress_profile" {
 }
 
 ################################################################################
+# SECRETS MANAGER FOR WORDPRESS DATABASE CREDENTIALS
+################################################################################
+
+# Generate secure random passwords for WordPress database
+resource "random_password" "wordpress_db_root_password" {
+  length  = 32
+  special = true
+}
+
+resource "random_password" "wordpress_db_password" {
+  length  = 32
+  special = true
+}
+
+# Create or update the secret in Secrets Manager
+resource "aws_secretsmanager_secret" "wordpress_db_credentials" {
+  name        = "bianca-wordpress-db-credentials"
+  description = "WordPress database credentials (root and wordpress user passwords)"
+
+  tags = {
+    Environment = var.environment
+    Project     = "bianca"
+    ManagedBy   = "terraform-wordpress"
+  }
+}
+
+# Store the credentials in Secrets Manager
+# Note: If secret already exists, this will update it
+resource "aws_secretsmanager_secret_version" "wordpress_db_credentials" {
+  secret_id = aws_secretsmanager_secret.wordpress_db_credentials.id
+  secret_string = jsonencode({
+    MYSQL_ROOT_PASSWORD = random_password.wordpress_db_root_password.result
+    MYSQL_PASSWORD      = random_password.wordpress_db_password.result
+    MYSQL_DATABASE      = "wordpress"
+    MYSQL_USER          = "wordpress"
+  })
+
+  lifecycle {
+    ignore_changes = [
+      # Don't recreate secret if it already exists with different values
+      # This preserves existing credentials
+      secret_string
+    ]
+  }
+}
+
+# IAM policy to allow WordPress instance to read from Secrets Manager
+resource "aws_iam_role_policy" "wordpress_secrets_manager" {
+  name = "bianca-wordpress-secrets-manager"
+  role = aws_iam_role.wordpress_instance_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = aws_secretsmanager_secret.wordpress_db_credentials.arn
+      }
+    ]
+  })
+}
+
+################################################################################
 # EBS VOLUMES FOR WORDPRESS PERSISTENCE
 ################################################################################
 
@@ -408,6 +485,8 @@ resource "aws_instance" "wordpress" {
     wp_domain         = var.wp_domain
     s3_backup_bucket  = aws_s3_bucket.wordpress_media.id
     aws_region        = var.aws_region
+    AWS_REGION        = var.aws_region
+    secret_name       = aws_secretsmanager_secret.wordpress_db_credentials.name
     cert_arn          = aws_acm_certificate_validation.wordpress_cert.certificate_arn
   }))
 
@@ -499,7 +578,13 @@ resource "aws_acm_certificate" "wordpress_cert" {
   domain_name       = var.wp_domain
   validation_method = "DNS"
 
-  subject_alternative_names = ["www.${var.wp_domain}"]
+  subject_alternative_names = [
+    "www.${var.wp_domain}",
+    "biancatechnologies.com",
+    "www.biancatechnologies.com",
+    "biancawellness.com",
+    "www.biancawellness.com"
+  ]
 
   lifecycle {
     create_before_destroy = true
@@ -513,16 +598,29 @@ resource "aws_acm_certificate" "wordpress_cert" {
   }
 }
 
+# Map domain names to their Route53 zone IDs for certificate validation
+locals {
+  domain_zone_map = {
+    "myphonefriend.com"              = data.aws_route53_zone.wordpress_domain.zone_id
+    "www.myphonefriend.com"          = data.aws_route53_zone.wordpress_domain.zone_id
+    "biancatechnologies.com"         = data.aws_route53_zone.biancatechnologies.zone_id
+    "www.biancatechnologies.com"     = data.aws_route53_zone.biancatechnologies.zone_id
+    "biancawellness.com"             = data.aws_route53_zone.biancawellness.zone_id
+    "www.biancawellness.com"         = data.aws_route53_zone.biancawellness.zone_id
+  }
+}
+
 resource "aws_route53_record" "wordpress_cert_validation" {
   for_each = {
     for dvo in aws_acm_certificate.wordpress_cert.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
+      name    = dvo.resource_record_name
+      record  = dvo.resource_record_value
+      type    = dvo.resource_record_type
+      zone_id = lookup(local.domain_zone_map, dvo.domain_name, data.aws_route53_zone.wordpress_domain.zone_id)
     }
   }
 
-  zone_id = data.aws_route53_zone.wordpress_domain.zone_id
+  zone_id = each.value.zone_id
   name    = each.value.name
   type    = each.value.type
   records = [each.value.record]
