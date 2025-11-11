@@ -478,7 +478,12 @@ data "aws_route53_zone" "wordpress_domain" {
   private_zone = false
 }
 
-# Request ACM certificate for myphonefriend.com and www.myphonefriend.com
+# Note: Data sources for biancatechnologies and biancawellness zones are already defined
+# in main.tf and corp-email-forwarding.tf, so we reference them directly
+
+# Request ACM certificate for myphonefriend.com, www.myphonefriend.com,
+# biancatechnologies.com, www.biancatechnologies.com,
+# biancawellness.com, and www.biancawellness.com
 # Note: ACM certs can't be used directly by nginx on EC2, but we'll use Route53 validation
 # and still use Let's Encrypt for the actual nginx configuration
 resource "aws_acm_certificate" "wordpress_cert" {
@@ -486,7 +491,13 @@ resource "aws_acm_certificate" "wordpress_cert" {
   domain_name      = var.wp_domain
   validation_method = "DNS"
 
-  subject_alternative_names = ["www.${var.wp_domain}"]
+  subject_alternative_names = [
+    "www.${var.wp_domain}",
+    "biancatechnologies.com",
+    "www.biancatechnologies.com",
+    "biancawellness.com",
+    "www.biancawellness.com"
+  ]
 
   lifecycle {
     create_before_destroy = true
@@ -500,16 +511,30 @@ resource "aws_acm_certificate" "wordpress_cert" {
 }
 
 # Route53 validation records for ACM certificate
+# Each domain needs validation in its own Route53 zone
+locals {
+  # Map domain names to their Route53 zone IDs
+  domain_zone_map = var.create_wordpress ? {
+    "myphonefriend.com"              = data.aws_route53_zone.wordpress_domain[0].zone_id
+    "www.myphonefriend.com"          = data.aws_route53_zone.wordpress_domain[0].zone_id
+    "biancatechnologies.com"         = data.aws_route53_zone.biancatechnologies.zone_id
+    "www.biancatechnologies.com"     = data.aws_route53_zone.biancatechnologies.zone_id
+    "biancawellness.com"             = data.aws_route53_zone.biancawellness.zone_id
+    "www.biancawellness.com"         = data.aws_route53_zone.biancawellness.zone_id
+  } : {}
+}
+
 resource "aws_route53_record" "wordpress_cert_validation" {
   for_each = var.create_wordpress ? {
     for dvo in aws_acm_certificate.wordpress_cert[0].domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
+      name    = dvo.resource_record_name
+      record  = dvo.resource_record_value
+      type    = dvo.resource_record_type
+      zone_id = lookup(local.domain_zone_map, dvo.domain_name, data.aws_route53_zone.wordpress_domain[0].zone_id)
     }
   } : {}
 
-  zone_id = data.aws_route53_zone.wordpress_domain[0].zone_id
+  zone_id = each.value.zone_id
   name    = each.value.name
   type    = each.value.type
   records = [each.value.record]

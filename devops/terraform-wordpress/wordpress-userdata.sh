@@ -38,6 +38,9 @@ if ! command -v aws &> /dev/null; then
     rm -rf aws awscliv2.zip
 fi
 
+# Install jq for JSON parsing
+yum install -y jq
+
 # WordPress directories
 WORDPRESS_DIR="/opt/bianca-wordpress"
 WORDPRESS_DATA_DIR="/opt/wordpress-data"
@@ -93,9 +96,39 @@ else
     echo "Warning: WordPress DB volume /dev/xvdg not found"
 fi
 
-# Generate secure passwords
-DB_ROOT_PASSWORD=$(openssl rand -hex 16)
-DB_PASSWORD=$(openssl rand -hex 16)
+# Retrieve database credentials from AWS Secrets Manager
+# This ensures we use the same credentials every time, even if the instance is recreated
+echo "Retrieving database credentials from AWS Secrets Manager..."
+SECRET_NAME="${secret_name}"
+
+# Try to get the secret, create it with default values if it doesn't exist
+# Note: Use $$ to escape $ for Terraform templatefile
+if ! aws secretsmanager describe-secret --region $${AWS_REGION} --secret-id $${SECRET_NAME} &>/dev/null; then
+    echo "Secret does not exist, creating with default credentials..."
+    # Generate secure passwords for initial creation
+    DB_ROOT_PASSWORD=$(openssl rand -hex 16)
+    DB_PASSWORD=$(openssl rand -hex 16)
+    
+    # Create the secret (this should be done by Terraform, but fallback here)
+    aws secretsmanager create-secret \
+        --region $${AWS_REGION} \
+        --name $${SECRET_NAME} \
+        --secret-string "{\"MYSQL_ROOT_PASSWORD\":\"$${DB_ROOT_PASSWORD}\",\"MYSQL_PASSWORD\":\"$${DB_PASSWORD}\",\"MYSQL_DATABASE\":\"wordpress\",\"MYSQL_USER\":\"wordpress\"}" \
+        --description "WordPress database credentials" || echo "Failed to create secret, using generated passwords"
+else
+    echo "Retrieving existing credentials from Secrets Manager..."
+    SECRET_VALUE=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_NAME} --query SecretString --output text)
+    DB_ROOT_PASSWORD=$(echo $${SECRET_VALUE} | jq -r .MYSQL_ROOT_PASSWORD)
+    DB_PASSWORD=$(echo $${SECRET_VALUE} | jq -r .MYSQL_PASSWORD)
+    
+    if [ -z "$${DB_ROOT_PASSWORD}" ] || [ "$${DB_ROOT_PASSWORD}" = "null" ]; then
+        echo "Warning: Could not retrieve credentials from Secrets Manager, generating new ones..."
+        DB_ROOT_PASSWORD=$(openssl rand -hex 16)
+        DB_PASSWORD=$(openssl rand -hex 16)
+    fi
+fi
+
+echo "Database credentials retrieved successfully"
 
 # Create WordPress docker-compose.yml
 cat > $WORDPRESS_DIR/docker-compose.yml <<EOF
