@@ -100,6 +100,11 @@ const patientSchema = mongoose.Schema(
   }
 );
 
+// Indexes for efficient querying
+patientSchema.index({ org: 1 });
+patientSchema.index({ caregivers: 1 }); // Array index for caregiver lookups
+patientSchema.index({ org: 1, createdAt: -1 }); // For org patient lists
+
 // Plugin to convert mongoose to JSON, and paginate results
 patientSchema.plugin(toJSON);
 patientSchema.plugin(paginate);

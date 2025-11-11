@@ -253,6 +253,13 @@ conversationSchema.statics.aggregateUnchargedConversations = async function (pat
   ]);
 };
 
+// Indexes for efficient querying
+conversationSchema.index({ patientId: 1 });
+conversationSchema.index({ lineItemId: 1 });
+conversationSchema.index({ patientId: 1, lineItemId: 1 }); // Critical for billing queries
+conversationSchema.index({ patientId: 1, startTime: -1 }); // For patient conversation history
+conversationSchema.index({ status: 1, startTime: -1 }); // For status-based queries
+
 // Plugins for JSON conversion and pagination
 conversationSchema.plugin(toJSON);
 conversationSchema.plugin(paginate);

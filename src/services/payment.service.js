@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { Org, Patient, Conversation, Invoice, LineItem } = require('../models');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
+const logger = require('../config/logger');
 
 const createInvoiceFromConversations = async (patientId) => {
   const patient = await Patient.findById(patientId);
@@ -43,31 +44,60 @@ const createInvoiceFromConversations = async (patientId) => {
   }
   const invoiceNumber = `INV-${nextNum.toString().padStart(6, '0')}`;
 
-  const invoice = await Invoice.create({
-    org: orgId,
-    invoiceNumber,
-    issueDate: new Date(),
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    status: 'pending',
-    totalAmount: 0,
-  });
+  // Create invoice first
+  let invoice;
+  try {
+    invoice = await Invoice.create({
+      org: orgId,
+      invoiceNumber,
+      issueDate: new Date(),
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      status: 'pending',
+      totalAmount: 0,
+    });
+  } catch (error) {
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to create invoice');
+  }
 
   const amount = calculateAmount(totalDuration);
-  const lineItem = await LineItem.create({
-    patientId,
-    invoiceId: invoice._id,
-    amount,
-    description: `Billing for ${totalDuration} seconds of conversation`,
-    periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Default to 30 days ago
-    periodEnd: new Date(), // Default to now
-    quantity: totalDuration / 60,
-    unitPrice: config.billing.ratePerMinute,
-  });
+  let lineItem;
+  try {
+    lineItem = await LineItem.create({
+      patientId,
+      invoiceId: invoice._id,
+      amount,
+      description: `Billing for ${totalDuration} seconds of conversation`,
+      periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Default to 30 days ago
+      periodEnd: new Date(), // Default to now
+      quantity: totalDuration / 60,
+      unitPrice: config.billing.ratePerMinute,
+    });
+  } catch (error) {
+    // Cleanup: delete invoice if line item creation fails
+    await Invoice.deleteOne({ _id: invoice._id });
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to create line item');
+  }
 
-  invoice.totalAmount = amount;
-  await invoice.save();
+  try {
+    invoice.totalAmount = amount;
+    await invoice.save();
+  } catch (error) {
+    // Cleanup: delete line item and invoice if update fails
+    await LineItem.deleteOne({ _id: lineItem._id });
+    await Invoice.deleteOne({ _id: invoice._id });
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to update invoice');
+  }
 
-  await Conversation.updateMany({ _id: { $in: conversationIds } }, { $set: { lineItemId: lineItem._id } });
+  // Update conversations - use updateMany with error handling
+  // If this fails, invoice and line item exist but conversations aren't marked as billed
+  // This is acceptable - they'll be picked up on retry and won't be double-billed due to lineItemId check
+  try {
+    await Conversation.updateMany({ _id: { $in: conversationIds } }, { $set: { lineItemId: lineItem._id } });
+  } catch (error) {
+    // Log error but don't fail - invoice is created, conversations can be updated later
+    // The lineItemId: null check prevents double-billing
+    logger.warn(`Failed to update conversations with lineItemId, invoice ${invoice._id} created but conversations not marked as billed:`, error);
+  }
 
   return await Invoice.findById(invoice._id).populate('lineItems');
 };

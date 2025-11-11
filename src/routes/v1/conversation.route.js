@@ -48,8 +48,10 @@ router
  * /conversations/{conversationId}:
  *   post:
  *     summary: Add a message to a conversation
- *     description: Only authorized patients can add messages to conversations.
+ *     description: Add a message to an existing conversation. Only authorized users can add messages.
  *     tags: [Conversations]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: conversationId
@@ -69,17 +71,31 @@ router
  *             properties:
  *               role:
  *                 type: string
- *                 description: The role of the patient adding the message
+ *                 enum: [patient, assistant, system, debug-user]
+ *                 description: The role of the message sender
  *               content:
  *                 type: string
  *                 description: The content of the message
+ *               messageType:
+ *                 type: string
+ *                 enum: [text, assistant_response, user_message, function_call, audio_transcript_delta, debug_user_message]
+ *                 default: text
+ *               metadata:
+ *                 type: object
+ *                 description: Optional metadata for the message
  *     responses:
  *       "200":
- *         description: Message added to conversation
+ *         description: Message added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Conversation'
  *       "400":
- *         description: Bad request
+ *         $ref: '#/components/responses/BadRequest'
  *       "401":
- *         description: Unauthorized
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
  */
 router
   .route('/:conversationId')
@@ -91,33 +107,66 @@ router
 
 /**
  * @swagger
- * /conversations/{id}:
+ * /conversations:
  *   get:
- *     summary: Get a conversation
- *     description: Logged in patients can fetch only their own conversation information. Only admins can fetch other conversation.
+ *     summary: Get conversations (query)
+ *     description: Get conversations with optional query parameters (patientId, status, etc.)
  *     tags: [Conversations]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
+ *       - in: query
+ *         name: patientId
  *         schema:
  *           type: string
- *         description: Conversation id
+ *         description: Filter by patient ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [initiated, in-progress, completed, failed, machine]
+ *         description: Filter by conversation status
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *         description: Sort by field (e.g., startTime:desc)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Maximum number of results
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
  *     responses:
  *       "200":
  *         description: OK
  *         content:
  *           application/json:
  *             schema:
- *                $ref: '#/components/schemas/Conversation'
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Conversation'
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *                 totalResults:
+ *                   type: integer
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":
  *         $ref: '#/components/responses/Forbidden'
- *       "404":
- *         $ref: '#/components/responses/NotFound'
  */
 router
   .route('/')

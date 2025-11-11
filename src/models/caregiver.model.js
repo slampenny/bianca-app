@@ -139,6 +139,12 @@ const caregiverSchema = mongoose.Schema(
   }
 );
 
+// Indexes for efficient querying
+caregiverSchema.index({ org: 1 });
+caregiverSchema.index({ role: 1 }); // For role-based queries
+caregiverSchema.index({ org: 1, role: 1 }); // Compound
+caregiverSchema.index({ patients: 1 }); // Array index for patient lookups
+
 // Plugin to convert mongoose to JSON, and paginate results
 caregiverSchema.plugin(toJSON);
 caregiverSchema.plugin(paginate);

@@ -7,9 +7,46 @@ const openaiController = require('../../controllers/openai.controller');
 const router = express.Router();
 
 /**
- * @route   POST /v1/openai/recovery/:callId
- * @desc    Force recovery of OpenAI connection for a specific call
- * @access  Private
+ * @swagger
+ * tags:
+ *   name: OpenAI
+ *   description: OpenAI Realtime API management and debugging
+ */
+
+/**
+ * @swagger
+ * /openai/recovery/{callId}:
+ *   post:
+ *     summary: Force recovery of OpenAI connection
+ *     description: Force recovery of OpenAI Realtime API connection for a specific call
+ *     tags: [OpenAI]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: callId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Call/conversation ID
+ *     responses:
+ *       "200":
+ *         description: Recovery initiated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
  */
 router.post(
   '/recovery/:callId',
@@ -19,9 +56,42 @@ router.post(
 );
 
 /**
- * @route   GET /v1/openai/status/:callId
- * @desc    Get OpenAI connection status for a specific call
- * @access  Private
+ * @swagger
+ * /openai/status/{callId}:
+ *   get:
+ *     summary: Get OpenAI connection status
+ *     description: Get the current status of OpenAI Realtime API connection for a specific call
+ *     tags: [OpenAI]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: callId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Call/conversation ID
+ *     responses:
+ *       "200":
+ *         description: Status retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 callId:
+ *                   type: string
+ *                 connected:
+ *                   type: boolean
+ *                 status:
+ *                   type: string
+ *                 lastActivity:
+ *                   type: string
+ *                   format: date-time
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
  */
 router.get(
   '/status/:callId',
@@ -31,9 +101,40 @@ router.get(
 );
 
 /**
- * @route   GET /v1/openai/connections
- * @desc    Get all active OpenAI connections
- * @access  Private
+ * @swagger
+ * /openai/connections:
+ *   get:
+ *     summary: Get all active OpenAI connections
+ *     description: Retrieve all active OpenAI Realtime API connections
+ *     tags: [OpenAI]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: Connections retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalConnections:
+ *                   type: integer
+ *                 connections:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       callId:
+ *                         type: string
+ *                       connected:
+ *                         type: boolean
+ *                       status:
+ *                         type: string
+ *                       lastActivity:
+ *                         type: string
+ *                         format: date-time
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.get(
   '/connections',
@@ -42,9 +143,39 @@ router.get(
 );
 
 /**
- * @route   POST /v1/openai/force-response/:callId
- * @desc    Force response generation even with silence (for testing)
- * @access  Private
+ * @swagger
+ * /openai/force-response/{callId}:
+ *   post:
+ *     summary: Force response generation
+ *     description: Force OpenAI to generate a response even with silence (for testing/debugging)
+ *     tags: [OpenAI]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: callId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Call/conversation ID
+ *     responses:
+ *       "200":
+ *         description: Response forced
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
  */
 router.post(
   '/force-response/:callId',
@@ -54,9 +185,42 @@ router.post(
 );
 
 /**
- * @route   POST /v1/openai/upload-debug-audio/:callId
- * @desc    Manually upload debug audio files to S3
- * @access  Private
+ * @swagger
+ * /openai/upload-debug-audio/{callId}:
+ *   post:
+ *     summary: Upload debug audio files
+ *     description: Manually upload debug audio files to S3 for a specific call
+ *     tags: [OpenAI]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: callId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Call/conversation ID
+ *     responses:
+ *       "200":
+ *         description: Audio uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 urls:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: S3 URLs of uploaded audio files
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
  */
 router.post(
   '/upload-debug-audio/:callId',

@@ -106,6 +106,15 @@ invoiceSchema.methods.calculateTotal = async function () {
   return this.totalAmount;
 };
 
+// Indexes for efficient querying
+invoiceSchema.index({ org: 1 });
+invoiceSchema.index({ org: 1, createdAt: -1 }); // For org invoice lists
+invoiceSchema.index({ status: 1, createdAt: -1 }); // For status filtering
+
+lineItemSchema.index({ patientId: 1 });
+lineItemSchema.index({ invoiceId: 1 });
+lineItemSchema.index({ patientId: 1, invoiceId: 1 }); // Compound
+
 invoiceSchema.plugin(toJSON);
 invoiceSchema.plugin(paginate);
 

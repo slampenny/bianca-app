@@ -106,6 +106,8 @@ const analyzeConversationSentiment = catchAsync(async (req, res) => {
   }
 
   // Trigger sentiment analysis
+  // Note: openaiSentimentService exports a function getOpenAISentimentServiceInstance()
+  // that returns a singleton instance, so we need to call it
   const { getOpenAISentimentServiceInstance } = require('../services/openai.sentiment.service');
   const sentimentService = getOpenAISentimentServiceInstance();
   

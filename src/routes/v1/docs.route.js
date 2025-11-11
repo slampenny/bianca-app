@@ -8,6 +8,8 @@ const router = express.Router();
 const specs = swaggerJsdoc({
   swaggerDefinition,
   apis: ['src/docs/*.yml', 'src/routes/v1/*.js'],
+  // Exclude backup files and other non-route files
+  ignore: ['**/*.backup', '**/*.bak', '**/*.old'],
 });
 
 router.get('/swagger.json', (_req, res) => res.json(specs, null, 2));

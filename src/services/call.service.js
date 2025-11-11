@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const { Patient } = require('../models'); // Assuming Patient model includes phone number
-const openAiService = require('./openAiService');
+// Note: openAiService methods are now in openai.realtime.service.js
+// This service may need to be updated to use the new service structure
 const config = require('../config/config');
 const { Call } = require('../models');
 const ApiError = require('../utils/ApiError');
@@ -19,14 +20,9 @@ const getCallById = async (id) => {
  * @param {String} recordingUrl - The URL of the call recording
  */
 const processCallRecording = async (callSid, recordingUrl) => {
-  // Fetch the recording and convert it to text using OpenAI's Whisper
-  const transcribedText = await openAiService.transcribeSpeech(recordingUrl);
-
-  // Send the transcribed text to ChatGPT for a response
-  const chatGptResponse = await openAiService.chatWithGpt(transcribedText);
-
-  // Use Twilio to send the ChatGPT response back as speech
-  await sendResponseAsCall(callSid, chatGptResponse);
+  // TODO: Update to use openai.realtime.service or openai.sentiment.service
+  // This function needs to be refactored to use the current OpenAI service structure
+  throw new ApiError(httpStatus.NOT_IMPLEMENTED, 'processCallRecording needs to be updated to use new OpenAI service structure');
 };
 
 /**
@@ -35,13 +31,9 @@ const processCallRecording = async (callSid, recordingUrl) => {
  * @param {String} textResponse - The text response to be converted to speech
  */
 const sendResponseAsCall = async (callSid, textResponse) => {
-  // Convert the text response to speech using a TTS service
-  const speechUrl = await openAiService.textToSpeech(textResponse);
-
-  // Use Twilio to play the speech URL in the call
-  await twilioClient
-    .calls(callSid)
-    .update({ url: `${config.twilio.playbackUrl}?SpeechUrl=${encodeURIComponent(speechUrl)}` });
+  // TODO: Update to use current Twilio service structure
+  // This function needs to be refactored to use the current Twilio service
+  throw new ApiError(httpStatus.NOT_IMPLEMENTED, 'sendResponseAsCall needs to be updated to use new service structure');
 };
 
 module.exports = {

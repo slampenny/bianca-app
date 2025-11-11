@@ -127,9 +127,99 @@ router.route('/:orgId/caregiver/:caregiverId').delete(auth('updateAny:caregiver'
  */
 router.route('/:orgId/caregiver/:caregiverId/role').patch(auth('updateAny:caregiver'), orgController.setRole);
 
+/**
+ * @swagger
+ * /orgs/{orgId}/invite:
+ *   patch:
+ *     summary: Send organization invite
+ *     description: Send an invitation to join an organization
+ *     tags: [Orgs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to invite
+ *               role:
+ *                 type: string
+ *                 description: "Role to assign (default: staff)"
+ *     responses:
+ *       "200":
+ *         description: Invite sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
 router.route('/:orgId/invite').patch(/* auth('updateOwn:org'), */ orgController.sendInvite);
 
-router.route('/:orgId/verify-invite/{:token}').patch(auth('updateOwn:caregiver'), orgController.verifyInvite);
+/**
+ * @swagger
+ * /orgs/{orgId}/verify-invite/{token}:
+ *   patch:
+ *     summary: Verify organization invite
+ *     description: Verify and accept an organization invitation using the invite token
+ *     tags: [Orgs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization ID
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Invite verification token
+ *     responses:
+ *       "200":
+ *         description: Invite verified and accepted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 org:
+ *                   $ref: '#/components/schemas/Org'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.route('/:orgId/verify-invite/:token').patch(auth('updateOwn:caregiver'), orgController.verifyInvite);
 
 module.exports = router;
 

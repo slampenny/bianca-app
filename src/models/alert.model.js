@@ -60,16 +60,17 @@ const alertSchema = new mongoose.Schema(
   }
 );
 
+// Indexes for efficient querying
+alertSchema.index({ createdBy: 1 });
+alertSchema.index({ relevanceUntil: 1 }); // For relevance filtering
+alertSchema.index({ createdBy: 1, relevanceUntil: 1 }); // Compound for alert queries
+alertSchema.index({ readBy: 1 }); // For read status queries
+alertSchema.index({ createdAt: -1 }); // For sorting
+
 // Plugin to convert mongoose to JSON, and paginate results
 alertSchema.plugin(toJSON);
 alertSchema.plugin(paginate);
 
 const Alert = mongoose.model('Alert', alertSchema);
-Alert.createIndexes({
-  createdBy: 1,
-  visibility: 1,
-  dismissedBy: 1,
-  relevanceUntil: 1,
-});
 
 module.exports = Alert;

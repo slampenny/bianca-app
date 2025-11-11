@@ -302,11 +302,146 @@ module.exports = router;
 
 /**
  * @swagger
+ * /caregivers/{caregiverId}/avatar:
+ *   post:
+ *     summary: Upload caregiver avatar
+ *     description: Upload or update a caregiver's avatar image
+ *     tags: [Caregivers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: caregiverId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Caregiver ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - avatar
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: Avatar image file
+ *     responses:
+ *       "200":
+ *         description: Avatar uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Caregiver'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ *   patch:
+ *     summary: Update caregiver avatar
+ *     description: Update a caregiver's avatar image
+ *     tags: [Caregivers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: caregiverId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Caregiver ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - avatar
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: Avatar image file
+ *     responses:
+ *       "200":
+ *         description: Avatar updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Caregiver'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /caregivers/{caregiverId}/theme:
+ *   patch:
+ *     summary: Update caregiver theme preference
+ *     description: Update the theme preference for a caregiver (healthcare or colorblind)
+ *     tags: [Caregivers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: caregiverId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Caregiver ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - themePreference
+ *             properties:
+ *               themePreference:
+ *                 type: string
+ *                 enum: [healthcare, colorblind]
+ *                 description: Theme preference for accessibility
+ *     responses:
+ *       "200":
+ *         description: Theme preference updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Caregiver'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /caregivers/{caregiverId}/patients:
  *   get:
  *     summary: Get patients for a caregiver
- *     description: Only admins can retrieve patients for a caregiver.
+ *     description: Retrieve all patients assigned to a caregiver
  *     tags: [Caregivers]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: caregiverId
@@ -317,6 +452,12 @@ module.exports = router;
  *     responses:
  *       "200":
  *         description: List of patients retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Patient'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":

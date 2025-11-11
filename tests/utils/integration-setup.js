@@ -38,10 +38,20 @@ jest.mock('../../src/services/ari.client', () => ({
 }));
 
 // Mock other external services that might cause issues
-jest.mock('../../src/services/sns.service', () => ({
-  sendSMS: jest.fn().mockResolvedValue({ success: true }),
-  isConfigured: jest.fn().mockReturnValue(false)
-}));
+jest.mock('../../src/services/sns.service', () => {
+  const mockSNSService = {
+    sendSMS: jest.fn().mockResolvedValue({ success: true }),
+    isConfigured: jest.fn().mockReturnValue(false),
+    testConnectivity: jest.fn().mockResolvedValue(true),
+    sendEmergencyAlert: jest.fn().mockResolvedValue({ success: true })
+  };
+  // Export as both default and named exports to match different import patterns
+  return {
+    __esModule: true,
+    default: mockSNSService,
+    snsService: mockSNSService
+  };
+});
 
 // Removed mock of our own twilioCall.service - we want to test our service, just mock external Twilio library
 
@@ -194,6 +204,19 @@ jest.mock('../../src/config/stripe', () => ({
 }));
 
 // Don't mock paymentMethod.service - we want to test our own business logic
+
+// Mock cache service to prevent initialization issues
+jest.mock('../../src/services/cache.service', () => ({
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue(true),
+  del: jest.fn().mockResolvedValue(true),
+  delPattern: jest.fn().mockResolvedValue(0),
+  exists: jest.fn().mockResolvedValue(false),
+  increment: jest.fn().mockResolvedValue(1),
+  getStats: jest.fn().mockResolvedValue({ type: 'memory', keys: 0 }),
+  flush: jest.fn().mockResolvedValue(true),
+  getCacheType: jest.fn().mockReturnValue('memory')
+}));
 
 // Mock network utilities to prevent external IP lookups
 jest.mock('../../src/utils/network.utils', () => ({

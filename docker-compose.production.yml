@@ -12,6 +12,9 @@ services:
       - WEBSOCKET_URL=wss://api.myphonefriend.com
       # MongoDB for production (using containerized version)
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
+      # Redis for caching (zero cost - runs on same instance, can switch to ElastiCache later)
+      - REDIS_URL=redis://redis:6379
+      - CACHE_TYPE=redis
       # Email configuration
       - EMAIL_FROM=no-replay@myphonefriend.com
       # Asterisk configuration (will be loaded from AWS Secrets Manager)
@@ -49,7 +52,28 @@ services:
       # Mount recordings for production debugging
       - ./devops/asterisk/recordings:/var/spool/asterisk/recording
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - node-network
+
 # Define networks at the top level
 networks:
   node-network:
     driver: bridge
+
+volumes:
+  redis-data:
