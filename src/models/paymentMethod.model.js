@@ -46,6 +46,11 @@ const paymentMethodSchema = mongoose.Schema(
   }
 );
 
+// Indexes for efficient querying
+paymentMethodSchema.index({ org: 1 });
+paymentMethodSchema.index({ org: 1, isDefault: 1 }); // For default payment method lookup
+paymentMethodSchema.index({ org: 1, isDefault: -1, createdAt: -1 }); // For sorted queries
+
 // add plugin that converts mongoose to json
 paymentMethodSchema.plugin(toJSON);
 

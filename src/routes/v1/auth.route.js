@@ -273,9 +273,131 @@ module.exports = router;
 
 /**
  * @swagger
+ * /auth/registerWithInvite:
+ *   post:
+ *     summary: Register with invite token
+ *     description: Register a new caregiver using an invite token from an organization
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *               - phone
+ *               - inviteToken
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *               phone:
+ *                 type: string
+ *               inviteToken:
+ *                 type: string
+ *                 description: Invite token from organization
+ *     responses:
+ *       "201":
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 caregiver:
+ *                   $ref: '#/components/schemas/Caregiver'
+ *                 tokens:
+ *                   $ref: '#/components/schemas/AuthTokens'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /auth/resend-verification-email:
+ *   post:
+ *     summary: Resend verification email
+ *     description: Resend email verification link to the authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       "204":
+ *         description: No content
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /auth/verify-email:
  *   post:
- *     summary: verify email
+ *     summary: Verify email (POST)
+ *     description: Verify email address using token from query parameter or request body
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: The verify email token (can also be in request body)
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: The verify email token
+ *     responses:
+ *       "200":
+ *         description: Email verified successfully (returns HTML page)
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       "400":
+ *         description: Bad request
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       "401":
+ *         description: Verification failed
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *   get:
+ *     summary: Verify email (GET)
+ *     description: Verify email address using token from query parameter (returns HTML page)
  *     tags: [Auth]
  *     parameters:
  *       - in: query
@@ -285,15 +407,61 @@ module.exports = router;
  *           type: string
  *         description: The verify email token
  *     responses:
- *       "204":
- *         description: No content
+ *       "200":
+ *         description: Email verified successfully (returns HTML page)
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       "400":
+ *         description: Bad request
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
  *       "401":
- *         description: verify email failed
+ *         description: Verification failed
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ */
+
+/**
+ * @swagger
+ * /auth/set-password-for-sso:
+ *   post:
+ *     summary: Set password for SSO user
+ *     description: Set a password for a user who registered via SSO (Google/Microsoft)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: At least one number and one letter
+ *     responses:
+ *       "200":
+ *         description: Password set successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
- *             example:
- *               code: 401
- *               message: verify email failed
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Password set successfully
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
  */

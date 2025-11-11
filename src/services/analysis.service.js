@@ -1,7 +1,18 @@
 const httpStatus = require('http-status');
 const { Conversation, Report } = require('../models');
 const ApiError = require('../utils/ApiError');
-const NLPProcessor = require('../utils/NLPProcessor'); // Hypothetical NLP utility
+// Note: NLPProcessor doesn't exist - this service may need refactoring
+// For now, using a simple placeholder
+const NLPProcessor = {
+  analyzeText: (text) => {
+    // Placeholder implementation
+    return {
+      sentiment: 'neutral',
+      keywords: [],
+      summary: text ? text.substring(0, 100) : 'No text provided'
+    };
+  }
+};
 
 /**
  * Analyze conversation data and generate a report

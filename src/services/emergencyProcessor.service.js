@@ -26,7 +26,7 @@ class EmergencyProcessor {
   async initialize() {
     try {
       // Test SNS connectivity if enabled
-      if (config.enableSNSPushNotifications) {
+      if (config.enableSNSPushNotifications && snsService && typeof snsService.testConnectivity === 'function') {
         const snsWorking = await snsService.testConnectivity();
         if (snsWorking) {
           logger.info('SNS service connectivity verified');

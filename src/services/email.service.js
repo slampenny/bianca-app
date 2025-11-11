@@ -50,7 +50,10 @@ async function doInitialization() {
   try {
     // Check if SES should be used in development (via environment variable)
     const useSESInDev = process.env.USE_SES_IN_DEV === 'true' || process.env.USE_SES_IN_DEV === '1';
-    const shouldUseSES = config.env === 'production' || config.env === 'staging' || config.env === 'test' || (config.env === 'development' && useSESInDev);
+    // In test mode, always use Ethereal (skip SES attempt)
+    // In production/staging, always use SES
+    // In development, use SES if USE_SES_IN_DEV is set, otherwise Ethereal
+    const shouldUseSES = (config.env === 'production' || config.env === 'staging') || (config.env === 'development' && useSESInDev);
     
     let sesInitialized = false;
     

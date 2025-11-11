@@ -1,5 +1,5 @@
 const express = require('express');
-const alertService = require('../services/alert.service');
+const { alertService } = require('../services');
 const catchAsync = require('../utils/catchAsync');
 const logger = require('../config/logger');
 

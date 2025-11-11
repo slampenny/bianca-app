@@ -8,6 +8,7 @@ const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client
 
 const logger = require('./logger'); // Assuming logger is available for loadSecrets
 const { AwsContext } = require('twilio/lib/rest/accounts/v1/credential/aws');
+const { buildAllConfigs, applyAllSecrets } = require('./domains');
 
 // Load .env file (if present)
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -92,6 +93,12 @@ const envVarsSchema = Joi.object({
   OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
   OPENAI_MODEL: Joi.string().default('gpt-4o'),
   WEBSOCKET_URL: Joi.string().default('wss://api.myphonefriend.com'), // URL your WebSocket server listens on
+  
+  // Cache configuration (optional - defaults to in-memory)
+  CACHE_TYPE: Joi.string().valid('memory', 'redis').default('memory'),
+  REDIS_URL: Joi.string().optional(), // Redis connection URL (e.g., redis://endpoint:6379)
+  REDIS_ENDPOINT: Joi.string().optional(), // Redis endpoint (alternative to REDIS_URL)
+  REDIS_PORT: Joi.number().optional().default(6379),
 }).unknown();
 
 // Validate environment variables
@@ -100,147 +107,43 @@ if (error) {
   throw new Error(`Config validation error: ${error.message}`);
 }
 
-const defaultAsteriskHost = envVars.ASTERISK_HOST || 'asterisk';
-
 // Build a baseline configuration object based on environment variables
+// Base configuration (not domain-specific)
 const baselineConfig = {
   env: envVars.NODE_ENV,
-  port: envVars.PORT, // Use validated PORT
+  port: envVars.PORT,
   aws: {
     accessKeyId: envVars.AWS_SECRET_ID,
-    secretAccessKey: envVars.AWS_SECRET_KEY, // Optional, if using AWS SDK directly
-    region: envVars.AWS_REGION || 'us-east-2', // Default to us-east-2 if not set
+    secretAccessKey: envVars.AWS_SECRET_KEY,
+    region: envVars.AWS_REGION || 'us-east-2',
     s3: {
-      bucketName: 'bianca-audio-debug', // Example S3 bucket for audio files
+      bucketName: 'bianca-audio-debug',
     },
   },
-  authEnabled: true, // Assuming auth is generally enabled
-  baseUrl: envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`, // Default base URL
-  apiUrl: (envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`) + '/v1', // Default API URL
-  // Frontend URL - should be set via FRONTEND_URL env var:
-  // - Development: http://localhost:8081 (Expo default)
-  // - Staging: https://staging.myphonefriend.com
-  // - Production: https://app.myphonefriend.com
+  authEnabled: true,
+  baseUrl: envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`,
+  apiUrl: (envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`) + '/v1',
   frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? 'https://staging.myphonefriend.com' : 'https://app.myphonefriend.com')),
-  mongoose: {
-    url: (envVars.MONGODB_URL || 'mongodb://localhost:27017/bianca-app') + (envVars.NODE_ENV === 'test' ? '-test' : ''),
-    options: {
-      // Mongoose 8.x: useNewUrlParser and useUnifiedTopology are default and removed
-      // Connection timeouts
-      connectTimeoutMS: 30000,           // How long to wait for initial connection
-      socketTimeoutMS: 60000,            // How long to wait on operations after connection
-      serverSelectionTimeoutMS: 30000,   // How long to wait for server selection (Mongoose 8.x)
-      
-      // Connection pooling
-      maxPoolSize: 10,                   // Maximum number of connections in pool
-      minPoolSize: 2,                    // Minimum number of connections to maintain (Mongoose 8.x)
-      
-      // Keep-alive settings (Mongoose 8.x: use socket-level options, not keepAlive option)
-      // TCP keep-alive is handled at the socket level automatically in Mongoose 8.x
-      // keepAliveInitialDelay is not a valid option in Mongoose 8.x
-      
-      // Write concern
-      retryWrites: true,                 // Safe to retry inserts on transient network errors
-      w: 'majority',                     // Write concern for retryWrites
-      
-      // Mongoose 8.x: Buffer configuration
-      // bufferCommands and bufferMaxEntries are not valid options in Mongoose 8.x
-      // Mongoose 8.x automatically buffers commands when disconnected (default 10s timeout)
-      
-      // Mongoose 8.x: Additional connection options
-      heartbeatFrequencyMS: 10000,       // How often to check connection health (Mongoose 8.x)
-    }
-  },
   billing: { 
-    ratePerMinute: 0.1, // Example billing rate
-    minimumBillableDuration: 30, // Minimum billable duration in seconds
-    enableDailyBilling: true, // Enable automatic daily billing
-    billingTime: '02:00', // Time to run daily billing (24-hour format)
-    autoCharge: true, // Automatically charge payment methods
-    gracePeriodDays: 30 // Days before invoice becomes overdue
-  },
-  jwt: {
-    secret: envVars.JWT_SECRET || 'default-secret-please-change', // Provide a default or ensure it's set via env/secrets
-    accessExpirationMinutes: 30,
-    refreshExpirationDays: 30,
-    resetPasswordExpirationMinutes: 10,
-    verifyEmailExpirationMinutes: 1440, // 24 hours (matches email message)
-    inviteExpirationMinutes: 10080 // 7 days
-  },
-  email: {
-    ses: { // Configuration for AWS SES (used in production/test by email.service.js)
-      region: envVars.AWS_SES_REGION || envVars.AWS_REGION || 'us-east-2', // Default to AWS_REGION if AWS_SES_REGION not set
-    },
-    sns: { // Configuration for AWS SNS (used for emergency notifications)
-      region: envVars.AWS_REGION || 'us-east-2',
-      topicArn: envVars.EMERGENCY_SNS_TOPIC_ARN,
-    },
-    smtp: { // Fallback or alternative SMTP settings (Ethereal in dev is handled by createTestAccount)
-      host: envVars.SMTP_HOST, // Example: 'smtp.ethereal.email' if you want to pin it
-      port: envVars.SMTP_PORT,
-      secure: envVars.SMTP_SECURE === true, // Coerce to boolean, default false if undefined
-      requireTLS: envVars.SMTP_REQUIRETLS === true, // Coerce to boolean, default false if undefined
-      auth: {
-        user: envVars.SMTP_USERNAME,
-        pass: envVars.SMTP_PASSWORD,
-      },
-    },
-    from: envVars.EMAIL_FROM || 'no-replay@myphonefriend.com', // Primary 'from' address
+    ratePerMinute: 0.1,
+    minimumBillableDuration: 30,
+    enableDailyBilling: true,
+    billingTime: '02:00',
+    autoCharge: true,
+    gracePeriodDays: 30
   },
   app: {
     rtpPortRange: process.env.APP_RTP_PORT_RANGE || '20002-30000'
   },
-  asterisk: {
-    maxRetries: process.env.ARI_MAX_RETRIES || 10,
-    retryDelay: process.env.ARI_RETRY_DELAY || 3000,
-    maxRetryDelay: process.env.ARI_MAX_RETRY_DELAY || 30000,
-    operationTimeout: process.env.ARI_OPERATION_TIMEOUT || 30000,
-
-    enabled: envVars.ASTERISK_ENABLED, // Assuming this is disabled by default
-    host: defaultAsteriskHost, // Example URL, replace with actual
-    url: `http://${defaultAsteriskHost}:8088`, // Example URL, replace with actual
-    rtpBiancaHost: envVars.RTP_BIANCA_HOST || 'bianca-app', // Example RTP URL, replace with actual
-    rtpAsteriskHost: envVars.RTP_ASTERISK_HOST || 'asterisk', // Example RTP sender URL, replace with actual
-    externalPort: envVars.EXTERNAL_PORT || 5061, // Example port, replace with actual
-    sipUserName: envVars.SIP_USER_NAME || 'bianca', // Example SIP username, replace with actual
-    username: envVars.ASTERISK_USERNAME || 'myphonefriend', // Example username, replace with actual
-    password: envVars.ARI_PASSWORD
-  },
-  google: { // Assuming this was for Google TTS, keep if used elsewhere
+  google: {
     language: 'en-US',
     name: 'en-US-News-L',
     gender: 'FEMALE',
     encoding: 'MP3'
   },
-  multer: { dest: path.join(__dirname, '../../uploads') }, // File upload destination
-  twilio: {
-    phone: envVars.TWILIO_PHONENUMBER,
-    // Use PUBLIC_TUNNEL_URL primarily for local dev webhook testing, otherwise use API_BASE_URL
-    // This determines the URL Twilio calls back to for webhooks.
-    apiUrl: envVars.PUBLIC_TUNNEL_URL || envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`,
-    accountSid: envVars.TWILIO_ACCOUNTSID,
-    authToken: envVars.TWILIO_AUTHTOKEN,
-    playbackUrl: 'https://default-playback-url.com', // Keep if used elsewhere
-    // **NEW:** WebSocket URL for your backend server handling Twilio Media Streams
-    // Ensure this includes the protocol (wss:// for secure production/tunnels, ws:// for local insecure)
-    websocketUrl: envVars.WEBSOCKET_URL,
-  },
-  openai: {
-    apiKey: envVars.OPENAI_API_KEY,
-    // **NEW:** Realtime model used for the live interaction via WebSocket
-    realtimeModel: envVars.OPENAI_REALTIME_MODEL,
-    realtimeVoice: envVars.OPENAI_REALTIME_VOICE || 'alloy',
-    realtimeSessionConfig: envVars.OPENAI_REALTIME_SESSION_CONFIG || {},
-    idleTimeout: envVars.OPENAI_IDLE_TIMEOUT || 300000, // 5 minutes default
-    model: envVars.OPENAI_MODEL || 'gpt-4o',
-    debugAudio: true, // Enable debug audio for testing
-  },
-  stripe: {
-    secretKey: envVars.STRIPE_SECRET_KEY,
-    publishableKey: envVars.STRIPE_PUBLISHABLE_KEY,
-    // Determine Stripe mode based on key prefix
-    mode: envVars.STRIPE_SECRET_KEY?.startsWith('sk_test_') ? 'test' : 'live'
-  },
+  multer: { dest: path.join(__dirname, '../../uploads') },
+  // Merge domain-specific configurations
+  ...buildAllConfigs(envVars),
 };
 
 // Set production-specific overrides (Restored and updated)
@@ -320,58 +223,10 @@ baselineConfig.loadSecrets = async () => {
         }
     }
 
-    // Email secrets
-    if (secrets.EMAIL_FROM) baselineConfig.email.from = secrets.EMAIL_FROM;
-    if (secrets.AWS_SES_REGION) baselineConfig.email.ses.region = secrets.AWS_SES_REGION;
-    // Load SMTP specific secrets if they exist and are used for other purposes
-    if (secrets.SMTP_HOST) baselineConfig.email.smtp.host = secrets.SMTP_HOST;
-    if (secrets.SMTP_PORT) baselineConfig.email.smtp.port = secrets.SMTP_PORT;
-    if (secrets.SMTP_USERNAME) baselineConfig.email.smtp.auth.user = secrets.SMTP_USERNAME;
-    if (secrets.SMTP_PASSWORD) baselineConfig.email.smtp.auth.pass = secrets.SMTP_PASSWORD;
-    if (typeof secrets.SMTP_SECURE !== 'undefined') baselineConfig.email.smtp.secure = secrets.SMTP_SECURE;
-    if (typeof secrets.SMTP_REQUIRETLS !== 'undefined') baselineConfig.email.smtp.requireTLS = secrets.SMTP_REQUIRETLS;
-
-
-    // Asterisk secrets
-    baselineConfig.asterisk.enabled = true; // Always enable Asterisk
-    if (secrets.ASTERISK_ARI_URL) baselineConfig.asterisk.url = secrets.ASTERISK_ARI_URL; // Use a specific ARI URL from secrets
-    else if (secrets.ASTERISK_HOST) baselineConfig.asterisk.url = `http://${secrets.ASTERISK_HOST}:8088`;
-    if (secrets.RTP_BIANCA_HOST) baselineConfig.asterisk.rtpBiancaHost = secrets.RTP_BIANCA_HOST;
-    // ... other Asterisk secrets like ARI username/password if stored in secrets
-    if (secrets.ASTERISK_USERNAME) baselineConfig.asterisk.username = secrets.ASTERISK_USERNAME;
-    if (secrets.ARI_PASSWORD) baselineConfig.asterisk.password = secrets.ARI_PASSWORD; // Assuming ARI_PASSWORD is for ARI user
-
-    if (secrets.JWT_SECRET) baselineConfig.jwt.secret = secrets.JWT_SECRET;
-    // Email
-    if (secrets.SMTP_USERNAME) baselineConfig.email.smtp.auth.user = secrets.SMTP_USERNAME;
-    if (secrets.SMTP_PASSWORD) baselineConfig.email.smtp.auth.pass = secrets.SMTP_PASSWORD;
-    if (secrets.SMTP_HOST) baselineConfig.email.smtp.host = secrets.SMTP_HOST;
-    if (secrets.SMTP_PORT) baselineConfig.email.smtp.port = secrets.SMTP_PORT;
-    if (secrets.SMTP_FROM) baselineConfig.email.from = secrets.SMTP_FROM;
-    if (typeof secrets.SMTP_SECURE !== 'undefined') baselineConfig.email.smtp.secure = secrets.SMTP_SECURE;
-    if (typeof secrets.SMTP_REQUIRETLS !== 'undefined') baselineConfig.email.smtp.requireTLS = secrets.SMTP_REQUIRETLS;
-    // Twilio - Phone number comes from environment variables, not secrets
-    // if (secrets.TWILIO_PHONENUMBER) baselineConfig.twilio.phone = secrets.TWILIO_PHONENUMBER;
-    if (secrets.TWILIO_ACCOUNTSID) baselineConfig.twilio.accountSid = secrets.TWILIO_ACCOUNTSID;
-    if (secrets.TWILIO_AUTHTOKEN) baselineConfig.twilio.authToken = secrets.TWILIO_AUTHTOKEN;
-    if (secrets.TWILIO_VOICEURL) baselineConfig.twilio.voiceUrl = secrets.TWILIO_VOICEURL; // If still used
-    // URLs should come from environment variables set by Terraform, not secrets
-    // if (secrets.API_BASE_URL) { 
-    //     baselineConfig.twilio.apiUrl = secrets.API_BASE_URL;
-    //     baselineConfig.baseUrl = secrets.API_BASE_URL;
-    //     baselineConfig.apiUrl = secrets.API_BASE_URL + '/v1';
-    // }
-    // if (secrets.WEBSOCKET_URL) baselineConfig.twilio.websocketUrl = secrets.WEBSOCKET_URL;
-    // OpenAI
-    if (secrets.OPENAI_API_KEY) baselineConfig.openai.apiKey = secrets.OPENAI_API_KEY;
-    //if (secrets.OPENAI_REALTIME_MODEL) baselineConfig.openai.realtimeModel = secrets.OPENAI_REALTIME_MODEL; // Load Realtime model from secrets
-    // Stripe
-    if (secrets.STRIPE_SECRET_KEY) {
-      baselineConfig.stripe.secretKey = secrets.STRIPE_SECRET_KEY;
-      baselineConfig.stripe.mode = secrets.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'live';
-    }
-    if (secrets.STRIPE_PUBLISHABLE_KEY) baselineConfig.stripe.publishableKey = secrets.STRIPE_PUBLISHABLE_KEY;
-    // MFA Encryption Key
+    // Apply secrets using domain modules
+    applyAllSecrets(baselineConfig, secrets);
+    
+    // MFA Encryption Key (special case - sets process.env)
     if (secrets.MFA_ENCRYPTION_KEY) {
       process.env.MFA_ENCRYPTION_KEY = secrets.MFA_ENCRYPTION_KEY;
     }

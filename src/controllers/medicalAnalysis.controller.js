@@ -2,11 +2,13 @@
 
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const conversationService = require('../services/conversation.service');
-const patientService = require('../services/patient.service');
-const MedicalPatternAnalyzer = require('../services/ai/medicalPatternAnalyzer.service');
-const baselineManager = require('../services/ai/baselineManager.service');
-const medicalAnalysisScheduler = require('../services/ai/medicalAnalysisScheduler.service');
+const {
+  conversationService,
+  patientService,
+  medicalPatternAnalyzer: MedicalPatternAnalyzer,
+  baselineManager,
+  medicalAnalysisScheduler,
+} = require('../services');
 const { MedicalAnalysis } = require('../models');
 const logger = require('../config/logger');
 

@@ -101,14 +101,33 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
     }
 
     // Create the payment method in our database
-    const dbPaymentMethod = await PaymentMethod.create(paymentMethodData);
+    let dbPaymentMethod;
+    try {
+      dbPaymentMethod = await PaymentMethod.create(paymentMethodData);
+    } catch (error) {
+      // If database creation fails, detach from Stripe to avoid orphaned payment method
+      try {
+        await stripe.paymentMethods.detach(paymentMethodId);
+        logger.info(`Detached payment method ${paymentMethodId} from Stripe due to database creation failure`);
+      } catch (detachError) {
+        logger.error(`Failed to detach payment method ${paymentMethodId} from Stripe after database error:`, detachError);
+      }
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to create payment method in database');
+    }
 
     // Update the org with the payment method reference
-    if (!org.paymentMethods) {
-      org.paymentMethods = [];
+    // If this fails, payment method exists in DB but org doesn't reference it
+    // This is acceptable - can be fixed manually or payment method can be re-attached
+    try {
+      if (!org.paymentMethods) {
+        org.paymentMethods = [];
+      }
+      org.paymentMethods.push(dbPaymentMethod.id);
+      await org.save();
+    } catch (error) {
+      // Log warning but don't fail - payment method is created, org reference can be added later
+      logger.warn(`Failed to update org ${orgId} with payment method reference, payment method ${dbPaymentMethod.id} created:`, error);
     }
-    org.paymentMethods.push(dbPaymentMethod.id);
-    await org.save();
 
     return dbPaymentMethod;
   } catch (error) {

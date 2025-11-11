@@ -138,9 +138,99 @@ module.exports = router;
  *             properties:
  *               token:
  *                 type: string
- *                 description: 6-digit TOTP token
+ *                 description: 6-digit TOTP token or 8-character backup code
  *     responses:
  *       200:
  *         description: MFA successfully enabled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
+
+/**
+ * @swagger
+ * /mfa/disable:
+ *   post:
+ *     summary: Disable MFA
+ *     description: Disable MFA for the authenticated user. Requires current MFA token for verification.
+ *     tags: [MFA]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: 6-digit TOTP token or 8-character backup code
+ *     responses:
+ *       200:
+ *         description: MFA disabled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Invalid token
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /mfa/backup-codes:
+ *   post:
+ *     summary: Regenerate backup codes
+ *     description: Generate new backup codes for MFA. Requires current MFA token for verification.
+ *     tags: [MFA]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: 6-digit TOTP token or 8-character backup code
+ *     responses:
+ *       200:
+ *         description: Backup codes regenerated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 backupCodes:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: New backup codes (8-character codes)
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Invalid token
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 

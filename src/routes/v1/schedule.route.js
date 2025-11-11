@@ -68,18 +68,12 @@ router
  * @swagger
  * /schedules/{scheduleId}:
  *   get:
- *     summary: Get a schedule by ID for a patient
- *     description: Only authorized patients can get a schedule.
+ *     summary: Get a schedule by ID
+ *     description: Get a specific schedule by ID. Only authorized users can access schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: patientId
- *         required: true
- *         schema:
- *           type: string
- *         description: Patient ID
  *       - in: path
  *         name: scheduleId
  *         required: true
@@ -89,23 +83,29 @@ router
  *     responses:
  *       "200":
  *         description: Schedule data retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Schedule'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  *   put:
- *     summary: Update a schedule for a patient
- *     description: Only authorized patients can update schedules.
+ *     summary: Update a schedule
+ *     description: Update an existing schedule. Only authorized users can update schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: scheduleId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Schedule ID
  *     requestBody:
  *       required: true
  *       content:
@@ -118,8 +118,8 @@ router
  *             properties:
  *               frequency:
  *                 type: string
- *                 description: Frequency of the schedule, can be 'daily', 'weekly', or 'monthly'
- *                 enum: ['daily', 'weekly', 'monthly']
+ *                 description: Frequency of the schedule
+ *                 enum: [daily, weekly, monthly]
  *               intervals:
  *                 type: array
  *                 items:
@@ -128,25 +128,31 @@ router
  *     responses:
  *       "200":
  *         description: Schedule updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Schedule'
  *       "400":
  *         $ref: '#/components/responses/BadRequest'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  *   patch:
- *     summary: Patch a schedule for a patient
- *     description: Only authorized patients can patch schedules.
+ *     summary: Patch a schedule
+ *     description: Partially update a schedule. Only authorized users can patch schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: scheduleId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Schedule ID
  *     requestBody:
  *       required: true
  *       content:
@@ -156,40 +162,46 @@ router
  *             properties:
  *               frequency:
  *                 type: string
- *                 description: Frequency of the schedule, can be 'daily', 'weekly', or 'monthly'
- *                 enum: ['daily', 'weekly', 'monthly']
+ *                 enum: [daily, weekly, monthly]
  *               intervals:
  *                 type: array
  *                 items:
  *                   type: number
- *                 description: If frequency is 'weekly', values are 0-6 for days of the week. If 'monthly', values are 1-12 for months.
  *     responses:
  *       "200":
  *         description: Schedule patched
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Schedule'
  *       "400":
  *         $ref: '#/components/responses/BadRequest'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  *   delete:
- *     summary: Delete a schedule for a patient
- *     description: Only authorized patients can delete schedules.
+ *     summary: Delete a schedule
+ *     description: Delete a schedule. Only authorized users can delete schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: scheduleId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Schedule ID
  *     responses:
  *       "204":
  *         description: Schedule deleted
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  */
