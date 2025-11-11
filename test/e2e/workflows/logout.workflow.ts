@@ -95,27 +95,31 @@ export class LogoutWorkflow {
 
   async whenIClickLogoutMultipleTimes() {
     const logoutButton = this.page.locator('[aria-label="profile-logout-button"]')
+    await logoutButton.waitFor({ state: 'visible', timeout: 5000 })
     await logoutButton.click()
     
-    // Wait for logout screen
-    await this.page.waitForTimeout(1000)
-    
+    // Wait for logout confirmation screen to appear
     const confirmButton = this.page.locator('[aria-label="logout-button"]')
+    await confirmButton.waitFor({ state: 'visible', timeout: 10000 })
+    await this.page.waitForTimeout(500) // Small delay to ensure button is ready
     
     // Test rapid clicks: click 3 times as fast as possible
     // The app should handle this gracefully (ideally by disabling the button after first click)
     try {
+      // Click first time (this should work)
+      await confirmButton.click({ timeout: 5000 })
+      
+      // Try additional clicks (these may fail if button is disabled, which is fine)
       await Promise.all([
-        confirmButton.click().catch(() => {}),
-        confirmButton.click().catch(() => {}),
-        confirmButton.click().catch(() => {}),
+        confirmButton.click({ timeout: 1000 }).catch(() => {}),
+        confirmButton.click({ timeout: 1000 }).catch(() => {}),
       ])
     } catch (error) {
-      console.log('Multiple clicks caused expected errors:', error)
+      console.log('Multiple clicks handled gracefully:', error instanceof Error ? error.message : String(error))
     }
     
-    // Wait for navigation, but don't fail if page closes (that's expected after logout)
-    await this.page.waitForTimeout(2000).catch(() => {})
+    // Wait for navigation/logout to complete
+    await this.page.waitForTimeout(3000)
   }
 
   // THEN steps - Assertions

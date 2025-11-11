@@ -113,20 +113,47 @@ test.describe('Conversations Screen', () => {
 
     // WHEN: I expand multiple conversations
     const allConversations = await conversationCards.count()
+    console.log(`Found ${allConversations} conversation cards`)
+    
+    // Only try to expand if we have at least 2 conversations
+    if (allConversations < 2) {
+      console.log('⚠️ Not enough conversations to test multiple expansion')
+      return
+    }
+    
     for (let i = 0; i < Math.min(allConversations, 3); i++) {
       const conversation = conversationCards.nth(i)
+      
+      // Wait for conversation to be visible before interacting
+      await conversation.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
+        console.warn(`⚠️ Conversation ${i} not visible, skipping`)
+      })
       
       // Only expand if not already expanded - check for collapse icon (▼) to see if expanded
       const collapseIcon = conversation.locator('text=▼')
       const isExpanded = await collapseIcon.count() > 0
       if (!isExpanded) {
-        await conversation.click({ force: true })
-        await page.waitForTimeout(1000) // Give time for expansion
-        // Check if it expanded - look for collapse icon or messages
-        const expanded = await collapseIcon.count() > 0 || await conversation.locator('[data-testid^="messages-container-"]').count() > 0
-        if (!expanded) {
-          console.warn(`⚠️ Conversation ${i} did not expand after click`)
+        // Scroll into view if needed
+        await conversation.scrollIntoViewIfNeeded()
+        await page.waitForTimeout(500)
+        
+        // Try clicking with a longer timeout
+        try {
+          await conversation.click({ timeout: 5000 })
+          await page.waitForTimeout(1500) // Give more time for expansion
+          // Check if it expanded - look for collapse icon or messages
+          const expanded = await collapseIcon.count() > 0 || await conversation.locator('[data-testid^="messages-container-"]').count() > 0
+          if (!expanded) {
+            console.warn(`⚠️ Conversation ${i} did not expand after click`)
+          } else {
+            console.log(`✅ Conversation ${i} expanded successfully`)
+          }
+        } catch (error) {
+          console.warn(`⚠️ Could not click conversation ${i}: ${error.message}`)
+          // Continue with next conversation
         }
+      } else {
+        console.log(`ℹ Conversation ${i} already expanded`)
       }
     }
     

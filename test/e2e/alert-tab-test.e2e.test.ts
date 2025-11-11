@@ -70,13 +70,21 @@ test.describe("Alert Tab Test", () => {
     console.log('All button found:', allButtonCount)
     
     if (unreadButtonCount > 0) {
-      const unreadButtonText = await unreadButton.textContent()
-      console.log('Unread button text:', unreadButtonText)
+      try {
+        const unreadButtonText = await unreadButton.first().textContent({ timeout: 3000 })
+        console.log('Unread button text:', unreadButtonText)
+      } catch (error) {
+        console.log('Could not get unread button text:', error instanceof Error ? error.message : String(error))
+      }
     }
     
     if (allButtonCount > 0) {
-      const allButtonText = await allButton.first().textContent()
-      console.log('All button text:', allButtonText)
+      try {
+        const allButtonText = await allButton.first().textContent({ timeout: 3000 })
+        console.log('All button text:', allButtonText)
+      } catch (error) {
+        console.log('Could not get all button text:', error instanceof Error ? error.message : String(error))
+      }
     }
     
     // THEN: Should be able to navigate to alerts and see the discrepancy

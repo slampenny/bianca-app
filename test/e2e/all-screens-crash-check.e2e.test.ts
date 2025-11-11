@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { navigateToHomeTab } from './helpers/navigation'
 
 async function loginIfNeeded(page: any) {
   await page.goto('/')
@@ -129,7 +130,6 @@ test.describe('All Screens Crash Check', () => {
     await loginIfNeeded(page)
     // Navigate to patient first, then schedules
     // Schedules can only be accessed through patient screen
-    const { navigateToHomeTab } = await import('./helpers/navigation')
     await navigateToHomeTab(page).catch(() => {})
     await page.waitForTimeout(1000)
     
