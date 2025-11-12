@@ -128,7 +128,10 @@ export const PrivacyScreen = () => {
   return (
     <View style={styles.container}>
       <ScrollView 
-        style={styles.scrollView} 
+        style={Platform.OS === 'web' ? [styles.scrollView, { 
+          height: '100vh',
+          maxHeight: '100vh',
+        }] : styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         nestedScrollEnabled={true}
         showsVerticalScrollIndicator={true}
@@ -149,15 +152,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     height: '100%',
     width: '100%',
+    ...(Platform.OS === 'web' && {
+      height: '100vh',
+      maxHeight: '100vh',
+      position: 'relative',
+    } as any),
   },
   scrollView: {
     flex: 1,
     height: '100%',
     width: '100%',
     ...(Platform.OS === 'web' && {
+      height: '100%',
+      maxHeight: '100%',
       overflowY: 'auto',
       overflowX: 'hidden',
       WebkitOverflowScrolling: 'touch',
+      position: 'relative',
     } as any),
   },
   contentContainer: {
