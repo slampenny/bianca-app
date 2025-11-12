@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { View, ScrollView, StyleSheet, Platform } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native"
+import type { HomeStackParamList } from "../navigators/navigationTypes"
 import { Picker } from "@react-native-picker/picker"
 import ScheduleComponent from "../components/Schedule"
 import {
@@ -8,10 +10,12 @@ import {
   useUpdateScheduleMutation,
   useDeleteScheduleMutation,
 } from "../services/api/scheduleApi"
+import { useCreateAlertMutation } from "../services/api/alertApi"
 import { getSchedules, setSchedule, getSchedule } from "../store/scheduleSlice"
+import { getPatient } from "../store/patientSlice"
+import { getCurrentUser } from "../store/authSlice"
 import { LoadingScreen } from "./LoadingScreen"
 import { Schedule } from "app/services/api"
-import { getPatient } from "app/store/patientSlice"
 import { spacing } from "app/theme"
 import { logger } from "../utils/logger"
 import { useTheme } from "app/theme/ThemeContext"
@@ -19,18 +23,105 @@ import { translate } from "../i18n"
 import { Text, Button, Card } from "app/components"
 import type { ThemeColors } from "../types"
 
+type SchedulesScreenRouteProp = RouteProp<HomeStackParamList, 'Schedule'>
+
 export const SchedulesScreen = () => {
   const dispatch = useDispatch()
+  const navigation = useNavigation()
+  const route = useRoute<SchedulesScreenRouteProp>()
   const selectedPatient = useSelector(getPatient)
   const selectedSchedule = useSelector(getSchedule)
   const schedules = useSelector(getSchedules)
+  const currentUser = useSelector(getCurrentUser)
+  const isNewPatient = route.params?.isNewPatient ?? false
   const [updateSchedule, { isLoading: isUpdating, isError: isUpdatingError }] =
     useUpdateScheduleMutation()
   const [createNewSchedule, { isLoading: isCreating, isError: isCreatingError }] =
     useCreateScheduleMutation()
   const [deleteSchedule, { isLoading: isDeleting, isError: isDeletingError }] =
     useDeleteScheduleMutation()
+  const [createAlert] = useCreateAlertMutation()
   const { colors, isLoading: themeLoading, currentTheme } = useTheme()
+  
+  // Track if we've already checked for missing schedule to avoid duplicate alerts
+  const hasCheckedForAlert = useRef(false)
+  
+  // Check if user exits without creating a schedule and create alert if needed
+  // Only for new patient creations, not updates
+  // useFocusEffect works for both stack navigation and tab navigation
+  useFocusEffect(
+    React.useCallback(() => {
+      // Reset check flag when screen gains focus
+      hasCheckedForAlert.current = false
+      
+      // Return cleanup function that runs when screen loses focus
+      return () => {
+        // Only check if this is a new patient creation and we haven't checked yet
+        if (!isNewPatient || hasCheckedForAlert.current) {
+          return
+        }
+
+        // Only check if we have a patient and user
+        if (!selectedPatient?.id || !currentUser?.id) {
+          logger.debug('SchedulesScreen blur: Missing patient or user, skipping alert check', {
+            hasPatient: !!selectedPatient?.id,
+            hasUser: !!currentUser?.id
+          })
+          return
+        }
+
+        // Mark as checked to prevent duplicate alerts
+        hasCheckedForAlert.current = true
+
+        // Check if any schedules exist for this patient
+        // Use patient.schedules if available (from API), otherwise fall back to Redux schedules
+        const patientSchedules = selectedPatient.schedules || schedules
+        const hasSchedules = Array.isArray(patientSchedules) && patientSchedules.length > 0
+        
+        logger.debug('SchedulesScreen blur: Checking for missing schedule', {
+          patientId: selectedPatient.id,
+          patientName: selectedPatient.name,
+          hasSchedules,
+          scheduleCount: patientSchedules.length,
+          schedulesSource: selectedPatient.schedules ? 'patient.schedules' : 'Redux'
+        })
+        
+        // If no schedules exist, create an alert
+        if (!hasSchedules) {
+          logger.info(`Creating alert for patient ${selectedPatient.name} with no schedule`)
+          // Use setTimeout to ensure this runs after navigation completes
+          // and doesn't block the navigation
+          setTimeout(async () => {
+            try {
+              // Set relevanceUntil to 30 days from now so the alert doesn't expire immediately
+              const relevanceUntil = new Date()
+              relevanceUntil.setDate(relevanceUntil.getDate() + 30)
+              
+              const result = await createAlert({
+                message: `Patient ${selectedPatient.name} has no schedule configured`,
+                importance: 'medium',
+                alertType: 'patient',
+                relatedPatient: selectedPatient.id,
+                createdBy: currentUser.id,
+                createdModel: 'Caregiver',
+                visibility: 'allCaregivers',
+                relevanceUntil: relevanceUntil.toISOString(),
+              }).unwrap()
+              logger.info(`Alert created successfully for patient ${selectedPatient.name} with no schedule`, result)
+            } catch (error) {
+              logger.error('Failed to create alert for patient without schedule:', error)
+              // Log the full error for debugging
+              if (error && typeof error === 'object') {
+                logger.error('Alert creation error details:', JSON.stringify(error, null, 2))
+              }
+            }
+          }, 100)
+        } else {
+          logger.debug(`Patient ${selectedPatient.name} has ${patientSchedules.length} schedule(s), no alert needed`)
+        }
+      }
+    }, [isNewPatient, selectedPatient, currentUser, schedules, createAlert])
+  )
 
   // Inject CSS for web Picker dropdown theming
   useEffect(() => {
@@ -103,6 +194,7 @@ export const SchedulesScreen = () => {
   const handleScheduleChange = (newSchedule: Schedule) => {
     dispatch(setSchedule(newSchedule))
   }
+
 
   if (themeLoading) {
     return <LoadingScreen />

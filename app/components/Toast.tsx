@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { View, StyleSheet, Animated } from 'react-native'
-import { Text } from 'app/components'
+import { Text } from 'app/components/Text'
 import { useTheme } from 'app/theme/ThemeContext'
 import { spacing } from 'app/theme'
 

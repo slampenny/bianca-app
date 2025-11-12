@@ -198,8 +198,8 @@ export function Header(props: HeaderProps) {
               titleMode === "center" && $titleWrapperCenter,
               titleMode === "flex" && $titleWrapperFlex,
               $titleContainerStyleOverride,
+              { pointerEvents: 'none' },
             ]}
-            pointerEvents="none"
           >
             <Text
               weight="medium"

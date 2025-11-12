@@ -340,11 +340,9 @@ function Checkbox(props: ToggleInputProps & { testID?: string }) {
       >
         <Image
           source={checkboxIcon ? iconRegistry[checkboxIcon] : iconRegistry.check}
-          style={[
-            $checkboxDetail,
-            !!iconTintColor && { tintColor: iconTintColor },
-            $detailStyleOverride,
-          ]}
+          style={[$checkboxDetail, $detailStyleOverride]}
+          tintColor={iconTintColor}
+          resizeMode="contain"
         />
       </Animated.View>
     </View>
@@ -574,7 +572,9 @@ function SwitchAccessibilityLabel(props: ToggleInputProps & { role: "on" | "off"
 
       {switchAccessibilityMode === "icon" && shouldLabelBeVisible && (
         <Image
-          style={[$switchAccessibilityIcon, { tintColor: color }]}
+          style={$switchAccessibilityIcon}
+          tintColor={color}
+          resizeMode="contain"
           source={role === "off" ? iconRegistry.hidden : iconRegistry.view}
         />
       )}
@@ -654,7 +654,7 @@ const $checkboxInner: ViewStyle = {
 const $checkboxDetail: ImageStyle = {
   width: 20,
   height: 20,
-  resizeMode: "contain",
+  // resizeMode moved to Image prop
 }
 
 const $radioInner: ViewStyle = {
@@ -714,7 +714,7 @@ const $switchAccessibility: TextStyle = {
 const $switchAccessibilityIcon: ImageStyle = {
   width: 14,
   height: 14,
-  resizeMode: "contain",
+  // resizeMode moved to Image prop
 }
 
 const $switchAccessibilityLine: ViewStyle = {

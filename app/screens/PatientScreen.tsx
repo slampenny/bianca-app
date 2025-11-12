@@ -343,11 +343,8 @@ function PatientScreen() {
           clearTimeout(successTimeoutRef.current)
         }
         
-        // Navigate back to home screen after successful creation
-        successTimeoutRef.current = setTimeout(() => {
-          navigation.navigate("Home")
-          successTimeoutRef.current = null
-        }, TIMEOUTS.NAVIGATION_DELAY)
+        // Navigate to schedule screen after successful creation (immediately, no delay)
+        navigation.navigate("Schedule", { isNewPatient: true })
       }
     } catch (error) {
       // Errors from createPatient or updatePatient are caught here
@@ -405,9 +402,6 @@ function PatientScreen() {
         accessibilityLabel="patient-screen"
         testID="patient-screen"
       >
-        {/* Display API Errors */}
-        {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-
         {/* Display Success Message */}
         {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
@@ -445,6 +439,9 @@ function PatientScreen() {
             inputWrapperStyle={styles.inputWrapper}
             style={styles.input}
           />
+          
+          {/* Display API Errors under email field */}
+          {apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
 
           <PhoneInputWeb
             label={translate("patientScreen.phoneLabel")}
@@ -655,7 +652,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.palette.angry500, // Red for delete
   },
   error: {
-    // General API error style
+    // General API error style (deprecated - use apiError instead)
     color: colors.palette.angry500, // Red
     textAlign: "center",
     marginBottom: 15,
@@ -666,6 +663,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     borderColor: colors.palette.overlay20,
+  },
+  apiError: {
+    // API error style positioned under email field - visible in both light and dark modes
+    color: colors.palette.angry500 || "#FF4444", // Bright red for visibility
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 8,
+    marginLeft: 4, // Align with input field
+    fontWeight: "500",
+    // Add background for better contrast in dark mode
+    backgroundColor: colors.palette.angry100 || "rgba(255, 68, 68, 0.15)", // Light red background with opacity
+    padding: 8,
+    borderRadius: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.palette.angry500 || "#FF4444",
   },
   fieldError: {
     // Field-specific validation error

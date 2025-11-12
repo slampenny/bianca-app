@@ -5,7 +5,7 @@ import type { DrawerParamList } from "app/navigators/navigationTypes"
 import type { StackNavigationProp } from "@react-navigation/stack"
 import { useSelector } from "react-redux"
 import { getCurrentUser } from "app/store/authSlice"
-import { AutoImage } from "app/components"
+import { AutoImage } from "app/components/AutoImage"
 
 // Use a remote placeholder image URL (e.g., Gravatar's default "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"

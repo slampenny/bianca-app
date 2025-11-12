@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react"
 import { View, StyleSheet } from "react-native"
-import { Button, Text } from "app/components"
+import { Button } from "app/components/Button"
+import { Text } from "app/components/Text"
 import { useGetCallStatusQuery, useEndCallMutation } from "../services/api/callWorkflowApi"
 import { formatDuration } from "../utils/dateUtils"
 import { colors } from "app/theme/colors"

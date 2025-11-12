@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { Platform, Image, View, StyleSheet, Pressable } from "react-native"
-import { Text } from "app/components"
+import { Text } from "app/components/Text"
 import * as ImagePicker from "expo-image-picker"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"

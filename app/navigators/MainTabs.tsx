@@ -120,7 +120,7 @@ function AlertStack() {
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Alert" component={AlertScreen} options={() => ({ title: translate("headers.alerts") })} />
+      <Stack.Screen name="AlertList" component={AlertScreen} options={() => ({ title: translate("headers.alerts") })} />
     </Stack.Navigator>
   )
 }

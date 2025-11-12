@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { View, StyleSheet } from "react-native"
-import { Button, Text } from "app/components"
+import { Button } from "app/components/Button"
+import { Text } from "app/components/Text"
 import { useNavigation } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { initiateCall } from "../services/api/callWorkflowApi"

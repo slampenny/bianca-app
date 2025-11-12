@@ -23,7 +23,7 @@ export type DrawerParamList = {
 export type HomeStackParamList = {
   HomeDetail: undefined
   Patient: undefined
-  Schedule: undefined
+  Schedule: { isNewPatient?: boolean } | undefined
   Conversations: undefined
   Call: undefined
   SentimentAnalysis: {

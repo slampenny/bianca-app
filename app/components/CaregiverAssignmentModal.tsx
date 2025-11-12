@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
 } from "react-native"
 import { useSelector } from "react-redux"
-import { Button, Text } from "./"
+import { Button } from "./Button"
+import { Text } from "./Text"
 import { translate } from "../i18n"
 import {
   useGetCaregiversQuery,

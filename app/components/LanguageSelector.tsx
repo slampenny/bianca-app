@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { View, Pressable, Modal, StyleSheet, FlatList } from "react-native"
-import { Text } from "app/components"
+import { Text } from "app/components/Text"
 import { useTheme } from "app/theme/ThemeContext"
 import { Icon } from "./Icon"
 import { translate } from "../i18n"

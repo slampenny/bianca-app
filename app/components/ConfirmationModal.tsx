@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, StyleSheet, Modal } from 'react-native'
-import { Text, Button } from 'app/components'
+import { Text } from 'app/components/Text'
+import { Button } from 'app/components/Button'
 import { useTheme } from 'app/theme/ThemeContext'
 import { spacing } from 'app/theme'
 
