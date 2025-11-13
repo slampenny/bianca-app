@@ -370,6 +370,36 @@ class TwilioCallService {
       logger.error(`[Twilio Service] Error handling call status: ${error.message}`);
     }
   }
+
+  /**
+   * Hang up a Twilio call
+   * @param {string} callSid - The Twilio Call SID
+   * @returns {Promise<void>}
+   */
+  async hangupCall(callSid) {
+    if (!callSid) {
+      logger.warn('[Twilio Service] hangupCall called without callSid');
+      return;
+    }
+
+    try {
+      // Ensure Twilio client is initialized
+      if (!twilioClient) {
+        if (!config.twilio.accountSid || !config.twilio.authToken) {
+          logger.error('[Twilio Service] Cannot hangup call - Twilio credentials not configured');
+          throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Twilio credentials not configured');
+        }
+        twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
+      }
+
+      // Update the call status to 'completed' which will hang up the call
+      await twilioClient.calls(callSid).update({ status: 'completed' });
+      logger.info(`[Twilio Service] Successfully hung up Twilio call ${callSid}`);
+    } catch (err) {
+      logger.error(`[Twilio Service] Error hanging up call ${callSid}: ${err.message}`);
+      throw err;
+    }
+  }
 }
 
 // Create and export singleton instance
@@ -377,5 +407,6 @@ const twilioCallService = new TwilioCallService();
 module.exports = {
   initiateCall: twilioCallService.initiateCall.bind(twilioCallService),
   generateCallTwiML: twilioCallService.generateCallTwiML.bind(twilioCallService),
+  hangupCall: twilioCallService.hangupCall.bind(twilioCallService),
   handleCallStatus: twilioCallService.handleCallStatus.bind(twilioCallService)
 };

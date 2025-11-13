@@ -33,7 +33,27 @@ async function seedCaregivers(org) {
   const superAdminRecord = await insertCaregiversAndAddToOrg(org, [superAdmin]);
   console.log('Seeded super admin');
   
-  return caregivers.concat(superAdminRecord);
+  // Create an SSO user without a password (for testing SSO account linking)
+  const { Caregiver } = require('../../models');
+  const ssoUser = {
+    name: 'SSO Test User',
+    email: 'sso-unlinked@example.org',
+    phone: '+16045624264',
+    role: 'staff',
+    org: org._id,
+    patients: [],
+    ssoProvider: 'google',
+    ssoProviderId: 'google-oauth2-123456789',
+    password: null, // No password - SSO only
+    isEmailVerified: true,
+  };
+  
+  const ssoUserRecord = await Caregiver.create(ssoUser);
+  org.caregivers.push(ssoUserRecord._id);
+  await org.save();
+  console.log('Seeded SSO user without password:', ssoUser.email);
+  
+  return caregivers.concat(superAdminRecord, [ssoUserRecord]);
 }
 
 module.exports = {

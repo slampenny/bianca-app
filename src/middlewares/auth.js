@@ -43,29 +43,31 @@ const verifyCallback = (req, resolve, reject, requiredRights) => async (err, car
   }
 
   try {
-    const permission = requiredRights[0]; // Take the first permission
-    const [action, resource] = permission.split(':');
+    // Check all provided permissions (OR logic - if any permission is granted, allow access)
+    for (const permission of requiredRights) {
+      const [action, resource] = permission.split(':');
 
-    // Debug: Log the permission check
-    logger.debug(`Checking if ${caregiver.role} can ${action} ${resource}`);
-    const permissionObj = ac.can(caregiver.role);
-    if (typeof permissionObj[action] !== 'function') {
-      logger.error(`Permission method for action "${action}" is not defined for role "${caregiver.role}".`);
-      return reject(new ApiError(httpStatus.FORBIDDEN, 'Authorization configuration error'));
+      // Debug: Log the permission check
+      logger.debug(`Checking if ${caregiver.role} can ${action} ${resource}`);
+      const permissionObj = ac.can(caregiver.role);
+      if (typeof permissionObj[action] !== 'function') {
+        logger.error(`Permission method for action "${action}" is not defined for role "${caregiver.role}".`);
+        continue; // Try next permission instead of failing
+      }
+
+      // Check if this resource exists in AC configuration
+      const permissionCheck = ac.can(caregiver.role)[action](resource);
+      debugPermission(caregiver, action, resource, permissionCheck.granted);
+
+      if (permissionCheck.granted) {
+        logger.debug(`Permission ${permission} granted for ${caregiver.role}`);
+        return resolve();
+      }
     }
 
-    // Check if this resource exists in AC configuration
-    const permissionCheck = ac.can(caregiver.role)[action](resource);
-    debugPermission(caregiver, action, resource, permissionCheck.granted);
-
-    if (permissionCheck.granted) {
-      logger.debug(`Permission ${permission} granted for ${caregiver.role}`);
-      return resolve();
-    }
-
-    // If permission is not granted, log and reject
+    // If no permissions were granted, log and reject
     logger.debug(
-      `Permission ${permission} denied for ${caregiver.role}. Available permissions: ${JSON.stringify(
+      `All permissions denied for ${caregiver.role}. Checked: ${JSON.stringify(requiredRights)}. Available permissions: ${JSON.stringify(
         ac.getGrants()[caregiver.role]
       )}`
     );

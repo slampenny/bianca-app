@@ -1342,9 +1342,18 @@ class OpenAIRealtimeService {
             conn._lastAiSpeechStart = Date.now();
             logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId}`);
             
-            // Create placeholder message when AI starts speaking
-            // This ensures the timestamp reflects when AI actually started speaking
-            await this.createPlaceholderAssistantMessage(callId);
+            // CRITICAL: Only create placeholder if user is NOT currently speaking
+            // If user is speaking, defer placeholder creation until user finishes
+            // This ensures user's message gets finalized first (gets earlier _id), then AI placeholder is created
+            if (!conn._userIsSpeaking) {
+              // User is not speaking - create AI placeholder now
+              await this.createPlaceholderAssistantMessage(callId);
+            } else {
+              // User is still speaking - defer AI placeholder creation
+              // It will be created when user finishes speaking (in speech_stopped handler)
+              logger.info(`[OpenAI Realtime] AI started speaking but user is still speaking - deferring placeholder creation for ${callId}`);
+              conn._pendingAiPlaceholder = true;
+            }
           }
 
           await this.handleResponseAudioDelta(callId, message);
@@ -1412,24 +1421,74 @@ class OpenAIRealtimeService {
             conn._userIsSpeaking = false;
             conn._lastUserSpeechEnd = Date.now();
 
-            // Save user transcript now that user has finished speaking
-            if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
-              logger.info(`[OpenAI Realtime] Saving user transcript now that user finished speaking: "${conn.pendingUserTranscript}"`);
-              await this.saveCompleteMessage(callId, 'patient', conn.pendingUserTranscript);
-              conn.pendingUserTranscript = ''; // Clear the pending transcript
-            }
+            // CRITICAL: Wait a moment for transcription to complete (race condition)
+            // The transcript might arrive via input_audio_transcription.completed AFTER speech_stopped
+            // So we wait a bit, then check again
+            setTimeout(async () => {
+              const currentConn = this.connections.get(callId);
+              if (!currentConn) return;
 
-            // Clean up any placeholder message if user stops speaking without transcript
-            if (conn.activeUserMessageId) {
-              try {
-                const { Message } = require('../models');
-                await Message.findByIdAndDelete(conn.activeUserMessageId);
-                logger.info(`[OpenAI Realtime] Cleaned up placeholder user message for ${callId}`);
-                conn.activeUserMessageId = null;
-              } catch (err) {
-                logger.error(`[OpenAI Realtime] Failed to clean up placeholder user message: ${err.message}`);
+              // Save user transcript now that user has finished speaking
+              // CRITICAL: We MUST update the existing placeholder (not create new) to preserve queue position
+              let userMessageFinalized = false;
+              if (currentConn.pendingUserTranscript && currentConn.pendingUserTranscript.trim()) {
+                logger.info(`[OpenAI Realtime] Saving user transcript now that user finished speaking: "${currentConn.pendingUserTranscript}"`);
+                
+                // Update the existing placeholder message if it exists (preserve original _id and position in queue)
+                if (currentConn.activeUserMessageId) {
+                  try {
+                    const { Message } = require('../models');
+                    // CRITICAL: Verify the message exists before updating
+                    const originalMessage = await Message.findById(currentConn.activeUserMessageId);
+                    if (!originalMessage) {
+                      throw new Error(`Placeholder message ${currentConn.activeUserMessageId} not found`);
+                    }
+                    
+                    // CRITICAL: Update the EXISTING message - this preserves its _id and position in queue
+                    await Message.findByIdAndUpdate(
+                      currentConn.activeUserMessageId,
+                      { 
+                        content: currentConn.pendingUserTranscript.trim(),
+                        messageType: 'user_message',
+                      },
+                      { timestamps: false, runValidators: false } // Disable auto-timestamps
+                    );
+                    logger.info(`[OpenAI Realtime] Updated placeholder user message ${currentConn.activeUserMessageId} with transcript: "${currentConn.pendingUserTranscript}" (preserved _id and queue position)`);
+                    userMessageFinalized = true;
+                    currentConn.activeUserMessageId = null; // Clear the active message ID
+                  } catch (err) {
+                    logger.error(`[OpenAI Realtime] Failed to update placeholder user message: ${err.message}`);
+                    // DO NOT create new message - this would break queue order
+                    // Instead, log error and keep placeholder as-is
+                    logger.error(`[OpenAI Realtime] CRITICAL: Cannot update user placeholder, but not creating new message to preserve queue order`);
+                  }
+                } else {
+                  // No placeholder exists - this shouldn't happen, but create new message as fallback
+                  logger.warn(`[OpenAI Realtime] No active user message ID - creating new message (this may break queue order)`);
+                  await this.saveCompleteMessage(callId, 'patient', currentConn.pendingUserTranscript);
+                  userMessageFinalized = true;
+                }
+                
+                currentConn.pendingUserTranscript = ''; // Clear the pending transcript
+              } else if (currentConn.activeUserMessageId) {
+                // No transcript yet - DON'T delete placeholder, wait for it
+                // The transcript might arrive via input_audio_transcription.completed
+                logger.info(`[OpenAI Realtime] User stopped speaking but transcript not ready yet - keeping placeholder ${currentConn.activeUserMessageId} and waiting for transcript`);
+                // Set a flag to indicate we're waiting for transcript
+                currentConn._waitingForUserTranscript = true;
               }
-            }
+              
+              // CRITICAL: If AI started speaking while user was speaking, create AI placeholder NOW
+              // BUT: This must happen AFTER the user's message update is complete
+              // Only create if user message was successfully finalized
+              if (currentConn._pendingAiPlaceholder && currentConn._aiIsSpeaking && userMessageFinalized) {
+                logger.info(`[OpenAI Realtime] User finished speaking and message finalized - now creating deferred AI placeholder for ${callId}`);
+                await this.createPlaceholderAssistantMessage(callId);
+                currentConn._pendingAiPlaceholder = false;
+              } else if (currentConn._pendingAiPlaceholder && currentConn._aiIsSpeaking) {
+                logger.warn(`[OpenAI Realtime] AI placeholder deferred but user message not finalized - skipping placeholder creation to preserve queue order`);
+              }
+            }, 500); // Wait 500ms for transcription to complete
 
             // STATE MACHINE: Only trigger AI response if we're in the right state
             if (!conn._aiIsSpeaking && this.canAIRespond(callId)) {
@@ -1814,15 +1873,20 @@ class OpenAIRealtimeService {
       if (conn.activeAssistantMessageId) {
         try {
           const { Message } = require('../models');
+          // CRITICAL: Read original timestamp before updating to preserve it
+          const originalMessage = await Message.findById(conn.activeAssistantMessageId);
+          const originalTimestamp = originalMessage?.createdAt;
+          
           await Message.findByIdAndUpdate(
             conn.activeAssistantMessageId,
             { 
               content: conn.pendingAssistantTranscript.trim(),
-              messageType: 'assistant_response'
+              messageType: 'assistant_response',
+              createdAt: originalTimestamp // Explicitly preserve the original timestamp
             },
-            { timestamps: false, runValidators: false } // Preserve original timestamp
+            { timestamps: false, runValidators: false } // Disable auto-timestamps
           );
-          logger.info(`[OpenAI Realtime] Updated placeholder assistant message with transcript: "${conn.pendingAssistantTranscript}"`);
+          logger.info(`[OpenAI Realtime] Updated placeholder assistant message with transcript: "${conn.pendingAssistantTranscript}" (preserved timestamp: ${originalTimestamp?.toISOString()})`);
           conn.activeAssistantMessageId = null; // Clear the active message ID
         } catch (err) {
           logger.error(`[OpenAI Realtime] Failed to update placeholder assistant message: ${err.message}`);
@@ -1890,7 +1954,25 @@ class OpenAIRealtimeService {
             logger.debug(`[Transcript Cleanup] Saving stale user transcript for ${callId} (silent for ${userSilenceTime}ms)`);
 
             try {
-              await this.saveCompleteMessage(callId, 'patient', transcriptToSave);
+              // CRITICAL: If there's an active placeholder, UPDATE it instead of creating a new message
+              if (conn.activeUserMessageId) {
+                logger.info(`[Transcript Cleanup] Updating existing placeholder ${conn.activeUserMessageId} with stale transcript`);
+                const { Message } = require('../models');
+                await Message.findByIdAndUpdate(
+                  conn.activeUserMessageId,
+                  { 
+                    content: transcriptToSave.trim(),
+                    messageType: 'user_message',
+                  },
+                  { timestamps: false, runValidators: false }
+                );
+                conn.activeUserMessageId = null;
+              } else {
+                // No placeholder - create new message (shouldn't happen, but fallback)
+                logger.warn(`[Transcript Cleanup] No placeholder exists - creating new message (may break queue order)`);
+                await this.saveCompleteMessage(callId, 'patient', transcriptToSave);
+              }
+              
               // Only clear if it hasn't changed
               if (conn.pendingUserTranscript === transcriptToSave) {
                 conn.pendingUserTranscript = '';
@@ -2019,7 +2101,7 @@ class OpenAIRealtimeService {
       const conversationService = require('./conversation.service');
       const message = await conversationService.saveRealtimeMessage(
         conn.conversationId,
-        'user',
+        'patient', // Use 'patient' not 'user' - Message model enum only accepts 'patient', 'assistant', 'system', 'debug-user'
         '[Speaking...]', // Placeholder content
         'user_message'
       );
@@ -2126,6 +2208,38 @@ class OpenAIRealtimeService {
     // Store the transcript for saving when user stops speaking
     conn.pendingUserTranscript = message.transcript.trim();
     logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${message.transcript}"`);
+    
+    // CRITICAL: If we're waiting for this transcript (user already stopped speaking), update the placeholder NOW
+    if (conn._waitingForUserTranscript && conn.activeUserMessageId && conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
+      logger.info(`[OpenAI Realtime] Transcript arrived after user stopped speaking - updating placeholder ${conn.activeUserMessageId} now`);
+      try {
+        const { Message } = require('../models');
+        const originalMessage = await Message.findById(conn.activeUserMessageId);
+        if (originalMessage) {
+          await Message.findByIdAndUpdate(
+            conn.activeUserMessageId,
+            { 
+              content: conn.pendingUserTranscript.trim(),
+              messageType: 'user_message',
+            },
+            { timestamps: false, runValidators: false }
+          );
+          logger.info(`[OpenAI Realtime] Updated placeholder user message ${conn.activeUserMessageId} with delayed transcript: "${conn.pendingUserTranscript}"`);
+          conn.activeUserMessageId = null;
+          conn._waitingForUserTranscript = false;
+          conn.pendingUserTranscript = '';
+          
+          // If AI placeholder was deferred, create it now
+          if (conn._pendingAiPlaceholder && conn._aiIsSpeaking) {
+            logger.info(`[OpenAI Realtime] User message finalized - now creating deferred AI placeholder for ${callId}`);
+            await this.createPlaceholderAssistantMessage(callId);
+            conn._pendingAiPlaceholder = false;
+          }
+        }
+      } catch (err) {
+        logger.error(`[OpenAI Realtime] Failed to update placeholder with delayed transcript: ${err.message}`);
+      }
+    }
   }
 
   /**
@@ -3642,9 +3756,27 @@ class OpenAIRealtimeService {
       // SAVE ANY PENDING MESSAGES BEFORE CLEANUP
       if (conn) {
         // Save any pending user message
-        if (conn.pendingUserTranscript) {
+        if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
           logger.info(`[OpenAI Call End] Saving pending user message for ${callId}`);
-          await this.saveCompleteMessage(callId, 'patient', conn.pendingUserTranscript);
+          
+          // CRITICAL: If there's an active placeholder, UPDATE it instead of creating a new message
+          if (conn.activeUserMessageId) {
+            logger.info(`[OpenAI Call End] Updating existing placeholder ${conn.activeUserMessageId} with pending transcript`);
+            const { Message } = require('../models');
+            await Message.findByIdAndUpdate(
+              conn.activeUserMessageId,
+              { 
+                content: conn.pendingUserTranscript.trim(),
+                messageType: 'user_message',
+              },
+              { timestamps: false, runValidators: false }
+            );
+            conn.activeUserMessageId = null;
+          } else {
+            // No placeholder - create new message
+            await this.saveCompleteMessage(callId, 'patient', conn.pendingUserTranscript);
+          }
+          
           conn.pendingUserTranscript = '';
         }
 

@@ -6,10 +6,12 @@ const ScheduleDTO = (schedule) => {
   const patientId = patient ? (typeof patient === 'object' ? patient._id : patient) : null;
 
   // Transform intervals to only include necessary properties
-  const intervalData = intervals.map((interval) => ({
-    day: interval.day,
-    weeks: interval.weeks,
-  }));
+  const intervalData = intervals && Array.isArray(intervals)
+    ? intervals.map((interval) => ({
+        day: interval.day,
+        weeks: interval.weeks,
+      }))
+    : [];
 
   return {
     id,

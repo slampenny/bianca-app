@@ -167,6 +167,27 @@ const getActivePatients = async () => {
   }
 };
 
+/**
+ * Get unassigned patients (patients with no caregivers)
+ * @returns {Promise<Array>}
+ */
+const getUnassignedPatients = async () => {
+  try {
+    // Find patients where caregivers array is empty or doesn't exist
+    // Populate schedules to match the behavior of getPatientById
+    const patients = await Patient.find({
+      $or: [
+        { caregivers: { $exists: false } },
+        { caregivers: { $size: 0 } },
+      ],
+    }).populate('schedules');
+    return patients;
+  } catch (error) {
+    logger.error('Error getting unassigned patients:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   createPatient,
   queryPatients,
@@ -178,4 +199,5 @@ module.exports = {
   removeCaregiver,
   getCaregivers,
   getActivePatients,
+  getUnassignedPatients,
 };
