@@ -62,7 +62,7 @@ const updateOrg = {
           }
           return value;
         }),
-      logo: Joi.string().optional(),
+      logo: Joi.string().allow(null, '').optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

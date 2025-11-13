@@ -99,11 +99,57 @@ const getPatientsByCaregiver = catchAsync(async (req, res) => {
 const getConversationsByPatient = catchAsync(async (req, res) => {
   const { patientId } = req.params;
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  const caregiver = req.caregiver;
 
   const patient = await patientService.getPatientById(patientId);
   logger.info(`Fetching conversations for patient: ${patientId}`, { patient });
   if (!patient) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid patient ID');
+  }
+
+  // Check if the caregiver has access to this patient
+  // For staff users, they can only access conversations of their assigned patients OR conversations they initiated
+  // For orgAdmin users, they can access any conversation in their org
+  // For superAdmin users, they have full access
+  if (caregiver.role === 'staff') {
+    const caregiverDoc = await caregiverService.getCaregiverById(caregiver.id);
+    
+    // Check if caregiver is assigned to this patient (check both directions)
+    const hasPatientAccess = caregiverDoc.patients.some(
+      (p) => {
+        const pId = p._id ? p._id.toString() : p.toString();
+        return pId === patientId.toString();
+      }
+    ) || (patient.caregivers && patient.caregivers.some(
+      (c) => {
+        const cId = c._id ? c._id.toString() : c.toString();
+        return cId === caregiver.id.toString();
+      }
+    ));
+    
+    if (!hasPatientAccess) {
+      // Check if they initiated any conversations for this patient (agentId)
+      const { Conversation } = require('../models');
+      const conversationCount = await Conversation.countDocuments({
+        patientId,
+        agentId: caregiver.id
+      });
+      
+      if (conversationCount === 0) {
+        throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient\'s conversations');
+      }
+    }
+  } else if (caregiver.role === 'orgAdmin') {
+    // OrgAdmin can access conversations in their org
+    if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient\'s conversations');
+    }
+  }
+  // superAdmin has full access, no check needed
+
+  // Ensure proper sorting - default to startTime:desc if not specified
+  if (!options.sortBy) {
+    options.sortBy = 'startTime:desc';
   }
 
   const result = await conversationService.queryConversationsByPatient(patientId, options);
@@ -119,6 +165,11 @@ const getCaregivers = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(caregivers);
 });
 
+const getUnassignedPatients = catchAsync(async (req, res) => {
+  const patients = await patientService.getUnassignedPatients();
+  res.status(httpStatus.OK).send(patients.map((patient) => PatientDTO(patient)));
+});
+
 module.exports = {
   createPatient,
   getPatients,
@@ -131,4 +182,5 @@ module.exports = {
   removeCaregiver,
   getPatientsByCaregiver,
   getCaregivers,
+  getUnassignedPatients,
 };

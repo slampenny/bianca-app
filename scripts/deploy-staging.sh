@@ -290,35 +290,103 @@ echo "🔄 Updating staging containers with new images..."
 
 # Wait for staging instance to be running and get IP
 echo "⏳ Waiting for staging instance to be ready..."
-STAGING_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=pending,running,starting" --query 'Reservations[0].Instances[0].InstanceId' --output text --profile jordan)
+STAGING_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" --query 'Reservations[0].Instances[0].InstanceId' --output text --profile jordan --region us-east-2)
 
-if [ -n "$STAGING_INSTANCE_ID" ] && [ "$STAGING_INSTANCE_ID" != "None" ]; then
-    echo "Found staging instance: $STAGING_INSTANCE_ID"
-    
-    # Wait for instance to be running
+if [ -z "$STAGING_INSTANCE_ID" ] || [ "$STAGING_INSTANCE_ID" == "None" ]; then
+    echo "❌ Staging instance not found. Please check Terraform deployment."
+    exit 1
+fi
+
+echo "Found staging instance: $STAGING_INSTANCE_ID"
+
+# Check instance state and start if stopped
+INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].State.Name' --output text --profile jordan --region us-east-2)
+echo "Instance state: $INSTANCE_STATE"
+
+if [ "$INSTANCE_STATE" == "stopped" ]; then
+    echo "🔄 Starting stopped instance..."
+    aws ec2 start-instances --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region us-east-2
+    echo "⏳ Waiting for instance to start..."
+    aws ec2 wait instance-running --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region us-east-2
+    echo "✅ Instance started"
+fi
+
+# Wait for instance to be running
+if [ "$INSTANCE_STATE" != "running" ]; then
     echo "Waiting for instance to reach running state..."
     aws ec2 wait instance-running --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region us-east-2 || true
-    
-    # Wait a bit more for public IP to be assigned
-    echo "Waiting for public IP assignment..."
+fi
+
+# Wait a bit more for public IP to be assigned
+echo "Waiting for public IP assignment..."
+sleep 10
+
+# Get the public IP
+STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region us-east-2)
+
+# Retry if IP is not yet assigned
+MAX_RETRIES=6
+RETRY_COUNT=0
+while [ -z "$STAGING_IP" ] || [ "$STAGING_IP" == "None" ] || [ "$STAGING_IP" == "null" ]; do
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "❌ Timeout waiting for staging instance IP"
+        exit 1
+    fi
+    echo "Waiting for public IP... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
     sleep 10
-    
-    # Get the public IP
     STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region us-east-2)
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+# Wait for SSH to be ready (instance running doesn't mean SSH is ready)
+echo "⏳ Waiting for SSH to be ready on $STAGING_IP..."
+SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
+SSH_READY=false
+MAX_SSH_RETRIES=30
+SSH_RETRY_COUNT=0
+
+while [ "$SSH_READY" = false ] && [ $SSH_RETRY_COUNT -lt $MAX_SSH_RETRIES ]; do
+    if ssh $SSH_OPTS ec2-user@$STAGING_IP "echo 'SSH ready'" >/dev/null 2>&1; then
+        SSH_READY=true
+        echo "✅ SSH is ready"
+        break
+    fi
+    SSH_RETRY_COUNT=$((SSH_RETRY_COUNT + 1))
+    if [ $((SSH_RETRY_COUNT % 5)) -eq 0 ]; then
+        echo "   Still waiting for SSH... (attempt $SSH_RETRY_COUNT/$MAX_SSH_RETRIES)"
+    fi
+    sleep 2
+done
+
+if [ "$SSH_READY" = false ]; then
+    echo "⚠️  SSH connection failed (likely blocked by firewall/VPN)"
+    echo "🔄 Attempting to use AWS Systems Manager (SSM) instead..."
+    echo "   SSM works over HTTPS (port 443) which is rarely blocked"
     
-    # Retry if IP is not yet assigned
-    MAX_RETRIES=6
-    RETRY_COUNT=0
-    while [ -z "$STAGING_IP" ] || [ "$STAGING_IP" == "None" ] || [ "$STAGING_IP" == "null" ]; do
-        if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-            echo "❌ Timeout waiting for staging instance IP"
-            exit 1
-        fi
-        echo "Waiting for public IP... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
-        sleep 10
-        STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region us-east-2)
-        RETRY_COUNT=$((RETRY_COUNT + 1))
-    done
+    # Check if SSM is available
+    if aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$STAGING_INSTANCE_ID" --profile jordan --region us-east-2 --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null | grep -q "Online"; then
+        echo "✅ SSM is available - using SSM to execute commands"
+        USE_SSM=true
+    else
+        echo "❌ SSM is not available for this instance"
+        echo "💡 Possible issues:"
+        echo "   1. Security group may not allow SSH from your IP address"
+        echo "   2. Instance may still be initializing (check AWS Console)"
+        echo "   3. SSH key may not be in ~/.ssh/bianca-key-pair.pem"
+        echo "   4. SSM agent may not be running on the instance"
+        echo ""
+        echo "   To check security group rules:"
+        echo "   aws ec2 describe-instances --instance-ids $STAGING_INSTANCE_ID --profile jordan --region us-east-2 --query 'Reservations[0].Instances[0].SecurityGroups'"
+        echo ""
+        echo "   To manually test SSH:"
+        echo "   ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@$STAGING_IP"
+        echo ""
+        echo "   To use SSM Session Manager:"
+        echo "   aws ssm start-session --target $STAGING_INSTANCE_ID --profile jordan --region us-east-2"
+        exit 1
+    fi
+else
+    USE_SSM=false
 fi
 
 if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "null" ]; then
@@ -329,10 +397,18 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
     # with secrets from AWS Secrets Manager. Copying local files would overwrite these.
     echo "ℹ️  Using docker-compose.yml created by instance userdata (contains AWS secrets)"
     
-    # Add SSH options to avoid host key verification prompts
-    SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    # Use SSM if SSH failed, otherwise use SSH
+    if [ "$USE_SSM" = true ]; then
+        echo "📡 Using AWS Systems Manager (SSM) to execute commands..."
+        # SSM command execution
+        SSM_COMMAND="aws ssm send-command --instance-ids $STAGING_INSTANCE_ID --document-name 'AWS-RunShellScript' --parameters 'commands=["
+    else
+        # SSH options (already set above)
+        SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    fi
     
-    ssh $SSH_OPTS ec2-user@$STAGING_IP "
+    # Prepare the commands to run
+    DEPLOY_COMMANDS="
       cd /opt/bianca-staging
       
       # Login to ECR
@@ -411,9 +487,9 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
         echo 'Removing existing MongoDB container to avoid conflicts...'
         docker rm -f staging_mongodb 2>/dev/null || true
         # Also try removing by the container ID if name doesn't work
-        EXISTING_MONGODB=$(docker ps -aq --filter 'name=staging_mongodb' | head -1)
-        if [ -n "$EXISTING_MONGODB" ]; then
-          docker rm -f "$EXISTING_MONGODB" 2>/dev/null || true
+        EXISTING_MONGODB=\$(docker ps -aq --filter 'name=staging_mongodb' | head -1)
+        if [ -n \"\$EXISTING_MONGODB\" ]; then
+          docker rm -f \"\$EXISTING_MONGODB\" 2>/dev/null || true
         fi
         echo 'Starting all containers (MongoDB will be recreated)...'
         docker-compose up -d
@@ -428,11 +504,11 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
       MAX_WAIT=30
       WAIT_COUNT=0
       while [ \$WAIT_COUNT -lt \$MAX_WAIT ]; do
-        if docker exec staging_mongodb mongosh --eval 'db.adminCommand("ping")' --quiet >/dev/null 2>&1; then
+        if docker exec staging_mongodb mongosh --eval 'db.adminCommand(\"ping\")' --quiet >/dev/null 2>&1; then
           echo '✅ MongoDB is ready'
           break
         fi
-        echo 'Waiting for MongoDB... (\$((WAIT_COUNT + 1))/\$MAX_WAIT seconds)'
+        echo \"Waiting for MongoDB... (\$((WAIT_COUNT + 1))/\$MAX_WAIT seconds)\"
         sleep 2
         WAIT_COUNT=\$((WAIT_COUNT + 2))
       done
@@ -447,6 +523,74 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
       echo 'Container status:'
       docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E 'staging_|NAMES' || true
     "
+    
+    if [ "$USE_SSM" = true ]; then
+        # For SSM, we need to escape the commands properly for JSON
+        # Convert the multi-line script to a single bash -c command
+        # Escape quotes and newlines for JSON
+        ESCAPED_COMMANDS=$(echo "$DEPLOY_COMMANDS" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+        
+        # Use SSM to execute commands as a single bash script
+        echo "📤 Sending commands via SSM..."
+        COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$STAGING_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "{\"commands\":[\"bash -c \\\"$ESCAPED_COMMANDS\\\"\"]}" \
+            --profile jordan \
+            --region us-east-2 \
+            --query 'Command.CommandId' \
+            --output text 2>&1)
+        
+        if [ -z "$COMMAND_ID" ] || echo "$COMMAND_ID" | grep -qi "error"; then
+            echo "❌ Failed to send SSM command"
+            echo "   Error: $COMMAND_ID"
+            echo ""
+            echo "💡 Alternative: Use SSM Session Manager to deploy manually:"
+            echo "   aws ssm start-session --target $STAGING_INSTANCE_ID --profile jordan --region us-east-2"
+            echo ""
+            echo "   Then run these commands on the instance:"
+            echo "   cd /opt/bianca-staging"
+            echo "   aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+            echo "   docker-compose pull"
+            echo "   docker-compose up -d"
+            exit 1
+        fi
+        
+        echo "⏳ Waiting for SSM command to complete (Command ID: $COMMAND_ID)..."
+        # Wait for command to complete
+        aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$STAGING_INSTANCE_ID" \
+            --profile jordan \
+            --region us-east-2
+        
+        # Get command output
+        echo "📋 Command output:"
+        aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$STAGING_INSTANCE_ID" \
+            --profile jordan \
+            --region us-east-2 \
+            --query '[StandardOutputContent, StandardErrorContent]' \
+            --output text
+        
+        # Check exit status
+        STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$STAGING_INSTANCE_ID" \
+            --profile jordan \
+            --region us-east-2 \
+            --query 'Status' \
+            --output text)
+        
+        if [ "$STATUS" != "Success" ]; then
+            echo "❌ SSM command failed with status: $STATUS"
+            exit 1
+        fi
+    else
+        # Use SSH
+        ssh $SSH_OPTS ec2-user@$STAGING_IP "$DEPLOY_COMMANDS"
+    fi
     
     if [ $? -eq 0 ]; then
         echo "✅ Staging containers updated successfully!"

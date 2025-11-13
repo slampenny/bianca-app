@@ -129,6 +129,13 @@ const getCaregivers = {
   }),
 };
 
+const getUnassignedPatients = {
+  // No params, query, or body needed for this endpoint
+  params: Joi.object().keys({}),
+  query: Joi.object().keys({}),
+  body: Joi.object().keys({}),
+};
+
 module.exports = {
   createPatient,
   getConversationsByPatient,
@@ -138,4 +145,5 @@ module.exports = {
   uploadPatientAvatar,
   deletePatient,
   getCaregivers,
+  getUnassignedPatients,
 };

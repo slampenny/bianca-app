@@ -97,8 +97,9 @@ const getCallStatus = catchAsync(async (req, res) => {
   await conversation.populate('patientId', 'name phone');
   await conversation.populate('agentId', 'name');
   
-  // Ensure messages are fully populated (in case they weren't from getConversationById)
-  // This is important for realtime calls where messages might be added dynamically
+  // CRITICAL: conversation.messages IS THE QUEUE - use it as-is, don't touch it
+  // Messages are added via $push which maintains FIFO order
+  // Just populate it if needed and use it directly - NO MERGING, NO SORTING, NO REORDERING
   if (conversation.messages && conversation.messages.length > 0) {
     // Check if messages are already populated (have content property) or are just ObjectIds
     const firstMessage = conversation.messages[0];
@@ -108,45 +109,8 @@ const getCallStatus = catchAsync(async (req, res) => {
     }
   }
   
-  // For active calls, also check Message collection directly to ensure we get all latest messages
-  // This is important because messages might be saved to Message collection before conversation.messages is updated
-  const { Message } = require('../models');
-  let allMessages = conversation.messages || [];
-  
-  // If this is an active call, also query Message collection to ensure we have all messages
-  if (conversation.status === 'in-progress' || conversation.status === 'initiated') {
-    const directMessages = await Message.find({ conversationId: conversation._id })
-      .sort({ createdAt: 1 })
-      .lean();
-    
-    // Merge messages from both sources, removing duplicates by message ID
-    const messageMap = new Map();
-    
-    // Add messages from conversation.messages (populated)
-    allMessages.forEach(msg => {
-      const msgId = msg._id?.toString() || msg.id?.toString();
-      if (msgId) {
-        messageMap.set(msgId, msg);
-      }
-    });
-    
-    // Add/update with messages from Message collection (might be more up-to-date)
-    directMessages.forEach(msg => {
-      const msgId = msg._id?.toString();
-      if (msgId) {
-        messageMap.set(msgId, msg);
-      }
-    });
-    
-    // Convert back to array and sort by createdAt
-    allMessages = Array.from(messageMap.values()).sort((a, b) => {
-      const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
-      const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
-      return timeA - timeB;
-    });
-    
-    logger.debug(`[CallStatus] Merged messages: ${conversation.messages?.length || 0} from conversation, ${directMessages.length} from Message collection, ${allMessages.length} total`);
-  }
+  // Use conversation.messages directly - it's the queue, in the correct order
+  const allMessages = conversation.messages || [];
   
   // Get AI speaking status from OpenAI realtime service
   let aiSpeakingStatus = {
@@ -185,13 +149,37 @@ const getCallStatus = catchAsync(async (req, res) => {
     return msg;
   });
   
-  // Log message details for debugging
-  logger.debug(`[CallStatus] Returning ${messages.length} messages for conversation ${conversationId}`, {
-    messageCount: messages.length,
-    patientMessageCount: messages.filter(m => m.role === 'patient').length,
-    assistantMessageCount: messages.filter(m => m.role === 'assistant').length,
-    messageRoles: messages.map(m => m.role)
-  });
+  // Log message details for debugging with ordering information
+  logger.info(`[MESSAGE ORDERING] Returning ${messages.length} messages for conversation ${conversationId}`);
+  logger.info(`[MESSAGE ORDERING] Message breakdown: ${messages.filter(m => m.role === 'patient').length} patient, ${messages.filter(m => m.role === 'assistant').length} assistant`);
+  
+  // Log message order with timestamps to verify chronological ordering
+  if (messages.length > 0) {
+    const messageOrder = messages.map((msg, index) => ({
+      index,
+      role: msg.role,
+      timestamp: msg.createdAt ? new Date(msg.createdAt).toISOString() : 'unknown',
+      contentPreview: msg.content ? msg.content.substring(0, 50) + (msg.content.length > 50 ? '...' : '') : 'empty',
+      messageId: msg._id
+    }));
+    logger.info(`[MESSAGE ORDERING] Message chronological order:`, JSON.stringify(messageOrder, null, 2));
+    
+    // Verify ordering is correct (each message should have timestamp >= previous)
+    let orderingCorrect = true;
+    for (let i = 1; i < messages.length; i++) {
+      const prevTime = messages[i-1].createdAt ? new Date(messages[i-1].createdAt).getTime() : 0;
+      const currTime = messages[i].createdAt ? new Date(messages[i].createdAt).getTime() : 0;
+      if (currTime < prevTime) {
+        orderingCorrect = false;
+        logger.error(`[MESSAGE ORDERING] ⚠️ ORDERING ISSUE DETECTED: Message ${i} (${messages[i].role}) has timestamp ${new Date(messages[i].createdAt).toISOString()} which is BEFORE message ${i-1} (${messages[i-1].role}) with timestamp ${new Date(messages[i-1].createdAt).toISOString()}`);
+      }
+    }
+    if (orderingCorrect) {
+      logger.info(`[MESSAGE ORDERING] ✅ Message ordering verified: all messages are in chronological order`);
+    } else {
+      logger.error(`[MESSAGE ORDERING] ❌ Message ordering is INCORRECT - timestamps are out of order!`);
+    }
+  }
   
   const status = {
     conversationId: conversation._id,
@@ -265,6 +253,74 @@ const endCall = catchAsync(async (req, res) => {
   const conversation = await conversationService.getConversationById(conversationId);
   if (!conversation) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
+  }
+
+  // Actually terminate the call by finding the connection and disconnecting everything
+  try {
+    const { getOpenAIRealtimeServiceInstance } = require('../services/openai.realtime.service');
+    const openAIService = getOpenAIRealtimeServiceInstance();
+    
+    // Find the connection by conversationId (same approach as getCallStatus)
+    let connectionFound = false;
+    let callIdToDisconnect = null;
+    
+    for (const [callId, conn] of openAIService.connections.entries()) {
+      if (conn.conversationId && conn.conversationId.toString() === conversationId.toString()) {
+        callIdToDisconnect = callId;
+        connectionFound = true;
+        logger.info(`[CallWorkflow] Found connection for conversation ${conversationId} with callId: ${callId}`);
+        break;
+      }
+    }
+    
+    if (callIdToDisconnect) {
+      // Disconnect OpenAI WebSocket
+      await openAIService.disconnect(callIdToDisconnect);
+      logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket for callId ${callIdToDisconnect}`);
+      
+      // Hang up the Twilio call if we have a callSid
+      if (conversation.callSid) {
+        try {
+          await twilioCallService.hangupCall(conversation.callSid);
+          logger.info(`[CallWorkflow] Hung up Twilio call ${conversation.callSid}`);
+        } catch (err) {
+          logger.warn(`[CallWorkflow] Error hanging up Twilio call: ${err.message}`);
+          // Continue with other cleanup even if Twilio hangup fails
+        }
+      }
+      
+      // Also trigger Asterisk channel cleanup if we have the asteriskChannelId
+      if (conversation.asteriskChannelId) {
+        try {
+          const { channelTracker } = require('../services');
+          await channelTracker.cleanupCall(conversation.asteriskChannelId, 'Call ended by agent');
+          logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${conversation.asteriskChannelId}`);
+        } catch (err) {
+          logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel: ${err.message}`);
+        }
+      }
+    } else {
+      logger.warn(`[CallWorkflow] No active connection found for conversation ${conversationId}`);
+      // Try fallback: disconnect by callSid or asteriskChannelId if connection not found by conversationId
+      if (conversation.callSid) {
+        try {
+          await openAIService.disconnect(conversation.callSid);
+          logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket using callSid fallback: ${conversation.callSid}`);
+        } catch (err) {
+          logger.warn(`[CallWorkflow] Fallback disconnect by callSid failed: ${err.message}`);
+        }
+      } else if (conversation.asteriskChannelId) {
+        try {
+          await openAIService.disconnect(conversation.asteriskChannelId);
+          logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket using asteriskChannelId fallback: ${conversation.asteriskChannelId}`);
+        } catch (err) {
+          logger.warn(`[CallWorkflow] Fallback disconnect by asteriskChannelId failed: ${err.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.error(`[CallWorkflow] Error terminating call: ${err.message}`);
+    // Continue with conversation update even if disconnect fails
   }
 
   conversation.status = 'completed';

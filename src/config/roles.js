@@ -16,6 +16,7 @@ const allRoles = {
     'readOwn:invoice', // Add this for staff to read their invoices
     'readOwn:conversation', // Add this for staff to read conversations of their patients
     'readOwn:medicalAnalysis', // Add this for staff to read medical analysis of their patients
+    'createOwn:medicalAnalysis', // Add this for staff to trigger medical analysis for their patients
   ],
   orgAdmin: [
     // Inherited from staff

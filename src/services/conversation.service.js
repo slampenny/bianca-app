@@ -46,6 +46,9 @@ const getConversationById = async (id) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
   
+  // Return messages in insertion order (as they appear in the messages array)
+  // No sorting - messages are shown in the order they were added
+  
   // Debug logging for message retrieval
   logger.info(`[Conversation Service] Retrieved conversation ${id} with ${conversation.messages?.length || 0} messages`);
   if (conversation.messages && conversation.messages.length > 0) {
@@ -60,6 +63,10 @@ const getConversationsByPatient = async (patientId) => {
   if (!conversations) {
     throw new ApiError(httpStatus.NOT_FOUND, `No conversation found for patient <${patientId}>`);
   }
+  
+  // Return messages in insertion order (as they appear in the messages array)
+  // No sorting - messages are shown in the order they were added
+  
   return conversations;
 };
 
@@ -79,15 +86,34 @@ const queryConversationsByPatient = async (patientId, options) => {
   logger.info(`[Conversation Service] Querying conversations for patient ${patientId} with filter:`, filter);
   logger.info(`[Conversation Service] Options:`, options);
   
+  // Ensure proper sorting - default to startTime:desc, fallback to createdAt:desc if startTime is not available
+  const sortBy = options.sortBy || 'startTime:desc';
+  
   const result = await Conversation.paginate(filter, {
     ...options,
     populate: 'messages',
-    sortBy: options.sortBy || 'startTime:desc',
+    sortBy: sortBy,
   });
+  
+  // Sort results to ensure proper ordering (handle cases where startTime might be null)
+  if (result.results && result.results.length > 0) {
+    result.results.sort((a, b) => {
+      // Use startTime if available, otherwise use createdAt
+      const timeA = a.startTime || a.createdAt || new Date(0);
+      const timeB = b.startTime || b.createdAt || new Date(0);
+      return new Date(timeB) - new Date(timeA); // Descending order (newest first)
+    });
+  }
   
   // Debug logging
   logger.info(`[Conversation Service] Found ${result.totalResults} total conversations, returning ${result.results.length} for page ${result.page}`);
-  logger.info(`[Conversation Service] Conversation IDs:`, result.results.map(c => ({ id: c._id, status: c.status, startTime: c.startTime })));
+  logger.info(`[Conversation Service] Conversation IDs:`, result.results.map(c => ({ 
+    id: c._id, 
+    status: c.status, 
+    startTime: c.startTime,
+    createdAt: c.createdAt,
+    agentId: c.agentId 
+  })));
   
   return result;
 };

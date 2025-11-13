@@ -514,9 +514,52 @@ function calculateOverallHealthScore(analysis) {
 const getMedicalAnalysisResults = catchAsync(async (req, res) => {
   const { patientId } = req.params;
   const { limit = 10 } = req.query;
+  const caregiver = req.caregiver;
 
   try {
-    logger.info('[MedicalAnalysis] Fetching medical analysis results for patient', { patientId, limit });
+    logger.info('[MedicalAnalysis] Fetching medical analysis results for patient', { patientId, limit, caregiverId: caregiver.id, role: caregiver.role });
+    
+    // Validate patient exists and check access
+    const patient = await patientService.getPatientById(patientId);
+    if (!patient) {
+      return res.status(httpStatus.NOT_FOUND).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+
+    // For staff users with readOwn permission, verify they have access to this patient
+    if (caregiver.role === 'staff') {
+      const caregiverDoc = await require('../services').caregiverService.getCaregiverById(caregiver.id);
+      const hasAccess = caregiverDoc.patients.some(
+        (p) => {
+          const pId = p._id ? p._id.toString() : p.toString();
+          return pId === patientId.toString();
+        }
+      ) || (patient.caregivers && patient.caregivers.some(
+        (c) => {
+          const cId = c._id ? c._id.toString() : c.toString();
+          return cId === caregiver.id.toString();
+        }
+      ));
+      
+      if (!hasAccess) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'You do not have access to this patient\'s medical analysis'
+        });
+      }
+    }
+    // For orgAdmin, verify patient belongs to their org
+    else if (caregiver.role === 'orgAdmin') {
+      if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'You do not have access to this patient\'s medical analysis'
+        });
+      }
+    }
+    // superAdmin has full access, no check needed
     
     const results = await conversationService.getMedicalAnalysisResults(patientId, parseInt(limit));
     
@@ -536,15 +579,16 @@ const getMedicalAnalysisResults = catchAsync(async (req, res) => {
 });
 
 /**
- * Trigger medical analysis for a specific patient
+ * Trigger medical analysis for a specific patient (synchronous)
  */
 const triggerPatientAnalysis = catchAsync(async (req, res) => {
   const { patientId } = req.params;
+  const caregiver = req.caregiver;
 
   try {
-    logger.info('[MedicalAnalysis] Triggering medical analysis for patient', { patientId });
+    logger.info('[MedicalAnalysis] Running synchronous medical analysis for patient', { patientId, caregiverId: caregiver.id, role: caregiver.role });
     
-    // Validate patient exists
+    // Validate patient exists and check access
     const patient = await patientService.getPatientById(patientId);
     if (!patient) {
       return res.status(httpStatus.NOT_FOUND).json({
@@ -553,22 +597,103 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
       });
     }
 
-    // Schedule the analysis
-    const job = await medicalAnalysisScheduler.schedulePatientAnalysis(patientId, {
+    // For staff users with createOwn permission, verify they have access to this patient
+    if (caregiver.role === 'staff') {
+      const caregiverDoc = await require('../services').caregiverService.getCaregiverById(caregiver.id);
+      const hasAccess = caregiverDoc.patients.some(
+        (p) => {
+          const pId = p._id ? p._id.toString() : p.toString();
+          return pId === patientId.toString();
+        }
+      ) || (patient.caregivers && patient.caregivers.some(
+        (c) => {
+          const cId = c._id ? c._id.toString() : c.toString();
+          return cId === caregiver.id.toString();
+        }
+      ));
+      
+      if (!hasAccess) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'You do not have access to trigger medical analysis for this patient'
+        });
+      }
+    }
+    // For orgAdmin, verify patient belongs to their org
+    else if (caregiver.role === 'orgAdmin') {
+      if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'You do not have access to trigger medical analysis for this patient'
+        });
+      }
+    }
+    // superAdmin has full access, no check needed
+
+    // Get all patient conversations for comprehensive analysis
+    // For manual triggers, analyze all available data to get the most complete picture
+    const conversations = await conversationService.getConversationsByPatient(patientId);
+
+    if (conversations.length === 0) {
+      const analyzer = new MedicalPatternAnalyzer();
+      return res.status(httpStatus.OK).json({
+        success: true,
+        message: 'No conversations found for analysis period',
+        result: {
+          cognitiveMetrics: analyzer.getDefaultMetrics(),
+          psychiatricMetrics: analyzer.getDefaultMetrics(),
+          vocabularyMetrics: {},
+          warnings: ['No conversations found for analysis period'],
+          confidence: 'none',
+          analysisDate: new Date(),
+          conversationCount: 0,
+          messageCount: 0,
+          totalWords: 0,
+          trigger: 'manual'
+        }
+      });
+    }
+
+    // Get baseline analysis (previous month's result)
+    const baselineResults = await conversationService.getMedicalAnalysisResults(patientId, 1);
+    const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
+
+    // Perform medical pattern analysis synchronously
+    const analyzer = new MedicalPatternAnalyzer();
+    const startTime = Date.now();
+    const analysisResult = await analyzer.analyzeMonth(conversations, baseline);
+    const processingTime = Date.now() - startTime;
+
+    // Store analysis result
+    const resultToStore = {
+      ...analysisResult,
       trigger: 'manual',
-      batchId: `manual-${Date.now()}`
+      batchId: `manual-${Date.now()}`,
+      processingTime
+    };
+
+    await conversationService.storeMedicalAnalysisResult(patientId, resultToStore);
+
+    logger.info('Synchronous medical analysis completed', {
+      patientId,
+      conversationCount: conversations.length,
+      processingTime: `${processingTime}ms`,
+      confidence: analysisResult.confidence
     });
 
     res.status(httpStatus.OK).json({
       success: true,
-      message: 'Medical analysis triggered successfully',
-      jobId: job.attrs._id
+      message: 'Medical analysis completed successfully',
+      result: {
+        ...analysisResult,
+        processingTime
+      }
     });
   } catch (error) {
-    logger.error('Error triggering patient medical analysis:', error);
+    logger.error('Error running synchronous patient medical analysis:', error);
     res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: 'Failed to trigger patient medical analysis',
+      message: 'Failed to run patient medical analysis',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -641,11 +766,12 @@ const getSchedulerStatus = catchAsync(async (req, res) => {
 const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
   const { patientId } = req.params;
   const { timeRange = 'year' } = req.query;
+  const caregiver = req.caregiver;
 
   try {
-    logger.info('[MedicalAnalysis] Fetching trend data for patient', { patientId, timeRange });
+    logger.info('[MedicalAnalysis] Fetching trend data for patient', { patientId, timeRange, caregiverId: caregiver.id, role: caregiver.role });
     
-    // Validate patient exists
+    // Validate patient exists and check access
     const patient = await patientService.getPatientById(patientId);
     if (!patient) {
       return res.status(httpStatus.NOT_FOUND).json({
@@ -653,6 +779,39 @@ const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
         message: 'Patient not found'
       });
     }
+
+    // For staff users with readOwn permission, verify they have access to this patient
+    if (caregiver.role === 'staff') {
+      const caregiverDoc = await require('../services').caregiverService.getCaregiverById(caregiver.id);
+      const hasAccess = caregiverDoc.patients.some(
+        (p) => {
+          const pId = p._id ? p._id.toString() : p.toString();
+          return pId === patientId.toString();
+        }
+      ) || (patient.caregivers && patient.caregivers.some(
+        (c) => {
+          const cId = c._id ? c._id.toString() : c.toString();
+          return cId === caregiver.id.toString();
+        }
+      ));
+      
+      if (!hasAccess) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'You do not have access to this patient\'s medical analysis trends'
+        });
+      }
+    }
+    // For orgAdmin, verify patient belongs to their org
+    else if (caregiver.role === 'orgAdmin') {
+      if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'You do not have access to this patient\'s medical analysis trends'
+        });
+      }
+    }
+    // superAdmin has full access, no check needed
 
     // Calculate date range
     let start, end;

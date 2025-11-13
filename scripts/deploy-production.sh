@@ -38,27 +38,56 @@ check_and_login_ecr() {
     # Try multiple approaches for ECR login
     echo "🔄 Attempting ECR login..."
     
+    local ecr_registry="730335291008.dkr.ecr.us-east-2.amazonaws.com"
+    local login_success=false
+    
     # Method 1: Standard AWS CLI with profile
-    if aws ecr get-login-password --region us-east-2 --profile jordan 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
+    echo "   Trying method 1 (AWS CLI with profile)..."
+    if aws ecr get-login-password --region us-east-2 --profile jordan 2>&1 | docker login --username AWS --password-stdin "$ecr_registry" 2>&1; then
+        login_success=true
         echo "✅ ECR login successful for $context (method 1)"
-        return 0
+    else
+        echo "   Method 1 failed, trying method 2..."
     fi
     
     # Method 2: Try without profile (uses default credentials)
-    if aws ecr get-login-password --region us-east-2 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
-        echo "✅ ECR login successful for $context (method 2)"
-        return 0
+    if [ "$login_success" = false ]; then
+        if aws ecr get-login-password --region us-east-2 2>&1 | docker login --username AWS --password-stdin "$ecr_registry" 2>&1; then
+            login_success=true
+            echo "✅ ECR login successful for $context (method 2)"
+        else
+            echo "   Method 2 failed, trying method 3..."
+        fi
     fi
     
     # Method 3: Try with explicit credentials
-    if AWS_PROFILE=jordan aws ecr get-login-password --region us-east-2 2>/dev/null | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com >/dev/null 2>&1; then
-        echo "✅ ECR login successful for $context (method 3)"
-        return 0
+    if [ "$login_success" = false ]; then
+        if AWS_PROFILE=jordan aws ecr get-login-password --region us-east-2 2>&1 | docker login --username AWS --password-stdin "$ecr_registry" 2>&1; then
+            login_success=true
+            echo "✅ ECR login successful for $context (method 3)"
+        fi
+    fi
+    
+    # Verify login actually worked by checking Docker config
+    if [ "$login_success" = true ]; then
+        # Wait a moment for credentials to be written
+        sleep 1
+        
+        # Try to verify by checking if we can access the registry (without actually pulling)
+        if docker manifest inspect "$ecr_registry/bianca-app-backend:production" >/dev/null 2>&1 || \
+           docker manifest inspect "$ecr_registry/bianca-app-backend:staging" >/dev/null 2>&1; then
+            echo "✅ ECR credentials verified - can access registry"
+            return 0
+        else
+            echo "⚠️  ECR login appeared successful but credentials may not be valid"
+            echo "   This is a known WSL2 issue. Will attempt push anyway..."
+            return 0
+        fi
     fi
     
     echo "❌ ECR login failed for $context after trying multiple methods."
     echo "💡 This is a known WSL2 issue. Try running this command manually:"
-    echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+    echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin $ecr_registry"
     echo "   Then run the deployment script again."
     echo "⚠️  Continuing deployment without ECR push (images will be built locally only)"
     return 1
@@ -127,11 +156,29 @@ fi
 
 if [ "$SKIP_BACKEND_PUSH" != true ]; then
     echo "📦 Pushing backend image to ECR..."
+    
+    # Ensure image is tagged correctly
     docker tag bianca-app-backend:production 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production
+    
+    # Re-login right before push to ensure credentials are fresh (WSL2 workaround)
+    echo "🔄 Re-authenticating with ECR before push (WSL2 workaround)..."
+    aws ecr get-login-password --region us-east-2 --profile jordan 2>&1 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com 2>&1 || {
+        echo "⚠️  Re-authentication failed, trying without profile..."
+        aws ecr get-login-password --region us-east-2 2>&1 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com 2>&1 || {
+            echo "❌ Failed to re-authenticate with ECR. Please run manually:"
+            echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+            exit 1
+        }
+    }
+    
+    # Now attempt the push
     docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production
 
     if [ $? -ne 0 ]; then
         echo "❌ Backend docker push failed. Please check the error above."
+        echo "💡 If you see 'no basic auth credentials', try running this manually:"
+        echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+        echo "   Then run: docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production"
         exit 1
     fi
     # Clean up local image after successful push to save space
@@ -169,10 +216,26 @@ fi
 
 if [ "$SKIP_FRONTEND_PUSH" != true ]; then
     echo "📦 Pushing frontend image to ECR..."
+    
+    # Re-login right before push to ensure credentials are fresh (WSL2 workaround)
+    echo "🔄 Re-authenticating with ECR before push (WSL2 workaround)..."
+    aws ecr get-login-password --region us-east-2 --profile jordan 2>&1 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com 2>&1 || {
+        echo "⚠️  Re-authentication failed, trying without profile..."
+        aws ecr get-login-password --region us-east-2 2>&1 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com 2>&1 || {
+            echo "❌ Failed to re-authenticate with ECR. Please run manually:"
+            echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+            exit 1
+        }
+    }
+    
+    # Now attempt the push
     docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:production
 
     if [ $? -ne 0 ]; then
         echo "❌ Frontend docker push failed. Please check the error above."
+        echo "💡 If you see 'no basic auth credentials', try running this manually:"
+        echo "   aws ecr get-login-password --region us-east-2 --profile jordan | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com"
+        echo "   Then run: docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:production"
         exit 1
     fi
     # Clean up local image after successful push to save space

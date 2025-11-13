@@ -422,7 +422,7 @@ router.post(
  */
 router.get(
   '/results/:patientId',
-  auth('readAny:medicalAnalysis'),
+  auth('readOwn:medicalAnalysis', 'readAny:medicalAnalysis'),
   medicalAnalysisController.getMedicalAnalysisResults
 );
 
@@ -465,7 +465,7 @@ router.get(
  */
 router.post(
   '/trigger-patient/:patientId',
-  auth('createAny:medicalAnalysis'),
+  auth('createOwn:medicalAnalysis', 'createAny:medicalAnalysis'),
   medicalAnalysisController.triggerPatientAnalysis
 );
 
@@ -619,7 +619,7 @@ router.get(
  */
 router.get(
   '/trend/:patientId',
-  auth('readAny:medicalAnalysis'),
+  auth('readOwn:medicalAnalysis', 'readAny:medicalAnalysis'),
   medicalAnalysisController.getMedicalAnalysisTrend
 );
 
