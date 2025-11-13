@@ -355,6 +355,7 @@ const ko: Translations = {
     adminOnlyMessage: "조직 관리자와 슈퍼 관리자만 환자를 추가할 수 있습니다",
     noPatientsFound: "환자를 찾을 수 없습니다",
     viewSchedules: "일정 보기",
+    noScheduleWarning: "⚠ 일정이 설정되지 않음",
   },
   tabs: {
     home: "홈",

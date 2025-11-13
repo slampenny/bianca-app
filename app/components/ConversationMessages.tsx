@@ -13,15 +13,9 @@ interface ConversationMessagesProps {
 export function ConversationMessages({ messages, style, 'data-testid': testId }: ConversationMessagesProps) {
   const { colors } = useTheme()
 
-  // Sort messages by creation time to ensure proper ordering
-  const sortedMessages = React.useMemo(() => {
-    // Create a copy of the messages array to avoid mutating the original
-    return [...messages].sort((a, b) => {
-      const timeA = new Date(a.createdAt || 0).getTime()
-      const timeB = new Date(b.createdAt || 0).getTime()
-      return timeA - timeB
-    })
-  }, [messages])
+  // Backend returns messages in insertion order (as they were added)
+  // No sorting - show them in the order they were added
+  const sortedMessages = messages || []
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -186,7 +180,7 @@ export function ConversationMessages({ messages, style, 'data-testid': testId }:
   const styles = createStyles(colors)
   
   return (
-    <View style={[styles.container, style]} data-testid={testId}>
+    <View style={[styles.container, style]} data-testid={testId || "conversation-messages"}>
       {sortedMessages.length > 0 ? (
         sortedMessages.map((message, index) => renderMessage(message, index))
       ) : (

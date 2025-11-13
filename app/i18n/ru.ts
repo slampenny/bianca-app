@@ -471,6 +471,7 @@ const ru: Translations = {
     adminOnlyMessage: "Только администраторы организации и суперадминистраторы могут добавлять пациентов",
     noPatientsFound: "Пациенты не найдены",
     viewSchedules: "Просмотр расписаний",
+    noScheduleWarning: "⚠ Расписание не установлено",
   },
   tabs: {
     home: "Главная",

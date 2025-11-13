@@ -635,7 +635,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.palette.neutral300, // Grey out background when disabled
   },
   buttonText: {
-    color: colors.palette.neutral100,
+    // Use neutral900 for colored buttons (same as Button component presets)
+    // This ensures white/light text on colored backgrounds in both light and dark mode
+    color: colors.palette?.neutral900 || colors.palette?.neutral100 || "#FFFFFF",
     fontSize: 16, // Slightly smaller font for more text
     fontWeight: "600",
     textAlign: "center",

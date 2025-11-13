@@ -309,6 +309,7 @@ const PaymentForm: React.FC<{
                       <Button
                         text={translate("paymentScreen.setDefault")}
                         onPress={() => handleSetDefault(method.id)}
+                        preset="default"
                         style={styles.actionButton}
                         textStyle={styles.actionButtonText}
                         testID={`set-default-button-${method.id}`}
@@ -317,8 +318,9 @@ const PaymentForm: React.FC<{
                     <Button
                       text={translate("paymentScreen.remove")}
                       onPress={() => handleDeletePaymentMethod(method.id)}
-                      style={[styles.actionButton, styles.removeButton]}
-                      textStyle={[styles.actionButtonText, styles.removeButtonText]}
+                      preset="danger"
+                      style={styles.actionButton}
+                      textStyle={styles.actionButtonText}
                       testID={`remove-button-${method.id}`}
                     />
                   </View>
@@ -368,7 +370,7 @@ const PaymentForm: React.FC<{
         cancelText={translate("common.cancel")}
         onConfirm={confirmationModal.onConfirm}
         onCancel={() => setConfirmationModal(prev => ({ ...prev, visible: false }))}
-        confirmButtonStyle={styles.deleteConfirmButton}
+        confirmButtonStyle={{ backgroundColor: themeColors.palette.angry500 }}
         testID="delete-payment-method-modal"
       />
     </View>
@@ -540,14 +542,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  removeButton: {
-    backgroundColor: colors.palette.angry100,
-    borderWidth: 1,
-    borderColor: colors.palette.angry300,
-  },
-  removeButtonText: {
-    color: colors.palette.angry600,
-  },
   formContainer: {
     padding: spacing.lg,
     borderRadius: 8,
@@ -569,9 +563,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: 4,
     marginBottom: spacing.md,
-  },
-  deleteConfirmButton: {
-    backgroundColor: colors.palette.angry500,
   },
 })
 

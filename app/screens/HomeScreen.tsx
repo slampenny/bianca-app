@@ -118,15 +118,23 @@ export function HomeScreen() {
   }
 
   const renderPatient = ({ item }: { item: Patient }) => {
+    const hasNoSchedule = !item.schedules || item.schedules.length === 0
+    const cardStyle = hasNoSchedule 
+      ? [styles.patientCard, styles.patientCardWarning]
+      : styles.patientCard
+    
     return (
       <Card
-        style={styles.patientCard}
+        style={cardStyle}
         testID={`patient-card-${item.id}`}
         accessibilityLabel={`patient-card-${item.name}`}
         LeftComponent={<AutoImage source={{ uri: item.avatar }} style={styles.avatar} />}
         content={item.name}
         contentStyle={styles.patientName}
         ContentTextProps={{ testID: `patient-name-${item.name}` }}
+        footer={hasNoSchedule ? translate("homeScreen.noScheduleWarning") : undefined}
+        footerStyle={hasNoSchedule ? styles.warningFooter : undefined}
+        FooterTextProps={hasNoSchedule ? { testID: `no-schedule-warning-${item.name}` } : undefined}
         RightComponent={
           <View style={styles.buttonContainer}>
             <Button
@@ -313,6 +321,17 @@ const createStyles = (colors: any) => StyleSheet.create({
 
     // Android elevation
     elevation: 2,
+  },
+  patientCardWarning: {
+    backgroundColor: colors.palette.warning100 || colors.palette.warning200 || "#FEF3C7",
+    borderWidth: 1,
+    borderColor: colors.palette.warning300 || colors.palette.warning400 || "#FCD34D",
+  },
+  warningFooter: {
+    color: colors.palette.warning700 || colors.palette.warning800 || "#B45309",
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 4,
   },
   patientInfo: {
     alignItems: "center",

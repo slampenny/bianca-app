@@ -12,10 +12,10 @@ import {
 } from "../services/api/scheduleApi"
 import { useCreateAlertMutation } from "../services/api/alertApi"
 import { getSchedules, setSchedule, getSchedule } from "../store/scheduleSlice"
-import { getPatient } from "../store/patientSlice"
+import { getPatient, setPatient } from "../store/patientSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { LoadingScreen } from "./LoadingScreen"
-import { Schedule } from "app/services/api"
+import { Schedule, Patient } from "app/services/api"
 import { spacing } from "app/theme"
 import { logger } from "../utils/logger"
 import { useTheme } from "app/theme/ThemeContext"
@@ -185,7 +185,24 @@ export const SchedulesScreen = () => {
 
   const handleDelete = async () => {
     if (selectedSchedule && selectedSchedule.id) {
-      await deleteSchedule({ scheduleId: selectedSchedule.id })
+      try {
+        await deleteSchedule({ scheduleId: selectedSchedule.id }).unwrap()
+        
+        // Update the patient in Redux to reflect the deleted schedule
+        // This will also update the patient in the patients list (handled by setPatient reducer)
+        if (selectedPatient) {
+          const updatedSchedules = schedules.filter((s) => s.id !== selectedSchedule.id)
+          const updatedPatient: Patient = {
+            ...selectedPatient,
+            schedules: updatedSchedules,
+          }
+          
+          // Update the patient in Redux (setPatient will also update the patients list)
+          dispatch(setPatient(updatedPatient))
+        }
+      } catch (error) {
+        logger.error("Failed to delete schedule:", error)
+      }
     } else {
       logger.error("No schedule selected to delete.")
     }
@@ -288,14 +305,16 @@ export const SchedulesScreen = () => {
         testID="schedule-save-button"
         accessibilityLabel="schedule-save-button"
       />
-      <Button
-        text={translate("scheduleScreen.deleteSchedule")}
-        onPress={handleDelete}
-        style={styles.button}
-        preset="danger"
-        testID="schedule-delete-button"
-        accessibilityLabel="schedule-delete-button"
-      />
+      {schedules && schedules.length > 0 && selectedSchedule && selectedSchedule.id && (
+        <Button
+          text={translate("scheduleScreen.deleteSchedule")}
+          onPress={handleDelete}
+          style={styles.button}
+          preset="danger"
+          testID="schedule-delete-button"
+          accessibilityLabel="schedule-delete-button"
+        />
+      )}
     </ScrollView>
   )
 }

@@ -471,6 +471,7 @@ const ja: Translations = {
     adminOnlyMessage: "組織管理者とスーパー管理者のみが患者を追加できます",
     noPatientsFound: "患者が見つかりません",
     viewSchedules: "スケジュールを表示",
+    noScheduleWarning: "⚠ スケジュールが設定されていません",
   },
   tabs: {
     home: "ホーム",

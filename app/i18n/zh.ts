@@ -471,6 +471,7 @@ const zh: Translations = {
     adminOnlyMessage: "只有组织管理员和超级管理员可以添加患者",
     noPatientsFound: "未找到患者",
     viewSchedules: "查看日程",
+    noScheduleWarning: "⚠ 未设置日程",
   },
   tabs: {
     home: "首页",

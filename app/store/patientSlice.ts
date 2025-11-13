@@ -21,6 +21,17 @@ export const patientSlice = createSlice({
     setPatient: (state, action: PayloadAction<Patient | null>) => {
       logger.debug("setPatient called with:", action.payload)
       state.patient = action.payload
+      // Also update the patient in the patients list for all caregivers
+      if (action.payload && action.payload.caregivers) {
+        action.payload.caregivers.forEach((caregiverId: string) => {
+          if (state.patients[caregiverId]) {
+            const index = state.patients[caregiverId].findIndex((p) => p.id === action.payload!.id)
+            if (index !== -1) {
+              state.patients[caregiverId][index] = action.payload
+            }
+          }
+        })
+      }
     },
     setPatientsForCaregiver: (
       state,

@@ -33,7 +33,8 @@ const Toast: React.FC<ToastProps> = ({
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: 8,
-      zIndex: 1000,
+      zIndex: 9999, // Very high z-index to ensure it appears above modal
+      elevation: 9999, // Android elevation
     },
     message: {
       color: colors.palette.neutral100,

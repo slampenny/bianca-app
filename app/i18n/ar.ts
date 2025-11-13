@@ -355,6 +355,7 @@ const ar: Translations = {
     adminOnlyMessage: "يمكن فقط لمديري المنظمة والمديرين العامين إضافة المرضى",
     noPatientsFound: "لم يتم العثور على مرضى",
     viewSchedules: "عرض الجداول",
+    noScheduleWarning: "⚠ لم يتم تعيين جدول",
   },
   tabs: {
     home: "الرئيسية",

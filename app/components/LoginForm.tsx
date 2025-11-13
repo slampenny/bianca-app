@@ -11,8 +11,6 @@ import { SSOLoginButtons } from "./SSOLoginButtons"
 import { translate } from "../i18n"
 import { navigationRef } from "../navigators/navigationUtilities"
 import { logger } from "../utils/logger"
-import { useToast } from "../hooks/useToast"
-import Toast from "./Toast"
 import { AuthModalContext } from "../contexts/AuthModalContext"
 
 // Temporary interfaces to avoid import issues
@@ -40,6 +38,7 @@ interface LoginFormProps {
   showForgotPasswordButton?: boolean
   showSSOButtons?: boolean
   compact?: boolean // If true, hide header and some buttons for modal use
+  onError?: (message: string) => void // Callback to show error in parent (e.g., modal toast)
 }
 
 export const LoginForm: FC<LoginFormProps> = ({
@@ -53,6 +52,7 @@ export const LoginForm: FC<LoginFormProps> = ({
   showForgotPasswordButton = true,
   showSSOButtons = true,
   compact = false,
+  onError,
 }) => {
   const dispatch = useDispatch()
   // Get auth modal context to close modal after successful login (if available)
@@ -65,7 +65,7 @@ export const LoginForm: FC<LoginFormProps> = ({
   // navigationRef is available globally and doesn't require being inside NavigationContainer
   const [loginAPI] = useLoginMutation()
   const { colors, isLoading: themeLoading } = useTheme()
-  const { toast, showError, hideToast } = useToast()
+  // Note: Removed toast - errors now show in error container above button
 
   const authPasswordInput = useRef<TextInput>(null)
   const validationError = useSelector(getValidationError)
@@ -131,27 +131,65 @@ export const LoginForm: FC<LoginFormProps> = ({
       console.error('Error status:', error?.status)
       
       // RTK Query errors: when .unwrap() throws, error structure is:
-      // - error.status: HTTP status code (e.g., 401)
+      // - error.status: HTTP status code (e.g., 401) or 'CUSTOM_ERROR'
       // - error.data: Response body from backend (e.g., { code: 401, message: "..." })
+      // - error.error: For CUSTOM_ERROR, format is {status: 'CUSTOM_ERROR', error: 'message'}
       const errorData = error?.data
       const errorStatus = error?.status
+      const customError = error?.error
       
-      // Backend returns: { code: 401, message: "Incorrect email or password" }
-      // So error.data.message should contain the message
-      let errorMessage = errorData?.message
+      // Handle CUSTOM_ERROR format: {error: {status: 'CUSTOM_ERROR', error: 'Authentication cancelled'}}
+      let errorMessage = null
+      if (customError && customError.status === 'CUSTOM_ERROR' && customError.error) {
+        errorMessage = customError.error
+      } else if (errorData?.message) {
+        // Standard RTK Query error format: {data: {message: "..."}}
+        errorMessage = errorData.message
+      } else if (errorData?.error) {
+        errorMessage = errorData.error
+      } else if (typeof errorData === 'string') {
+        errorMessage = errorData
+      }
       
       // Check for SSO account linking requirement FIRST
-      const requiresLinking = errorData?.requiresPasswordLinking || error?.requiresPasswordLinking
-      const ssoProvider = errorData?.ssoProvider || error?.ssoProvider
+      // RTK Query error structure: error.data contains the response body
+      // For 403 status, check if requiresPasswordLinking is in the error data
+      const requiresLinking = 
+        errorData?.requiresPasswordLinking === true || 
+        errorData?.requiresPasswordLinking === 'true' || 
+        errorData?.requiresPasswordLinking === 1 ||
+        (errorStatus === 403 && (errorMessage?.toLowerCase().includes('sso') || errorMessage?.toLowerCase().includes('link')))
       
-      if (requiresLinking === true || requiresLinking === 'true') {
+      logger.debug('SSO linking check:', { 
+        requiresLinking, 
+        errorData, 
+        errorStatus, 
+        errorMessage,
+        hasRequiresPasswordLinking: !!errorData?.requiresPasswordLinking,
+        compact,
+        hasOnError: !!onError
+      })
+      
+      const ssoProvider = errorData?.ssoProvider || error?.ssoProvider || 'google'
+      
+      if (requiresLinking) {
         logger.debug('✅ SSO account linking required')
-        if (onSSOAccountLinking) {
-          // Parent component handles navigation
+        const linkingErrorMessage = errorMessage || "This account was created with SSO. Please link your account by setting a password or using SSO login."
+        
+        // In modal/compact mode, always show error (don't navigate to link account screen)
+        // Only navigate if we're in full-screen mode AND onSSOAccountLinking is provided
+        if (compact) {
+          // Modal mode - show error in error container above button, don't navigate
+          logger.debug('✅ Modal mode: Showing error in error container', { linkingErrorMessage })
+          setErrorMessage(linkingErrorMessage) // Show error above button
+        } else if (onSSOAccountLinking) {
+          // Full-screen mode - parent component can handle navigation
+          logger.debug('✅ Full-screen mode: Navigating to SSO account linking screen')
           onSSOAccountLinking(authEmail, ssoProvider || 'google')
         } else {
-          // Modal mode - show error message
-          setErrorMessage("SSO account linking required. Please use the main login screen.")
+          // Full-screen mode but no callback - show error message
+          logger.debug('✅ Full-screen mode (no callback): Showing error message')
+          setErrorMessage(linkingErrorMessage)
         }
         setIsLoading(false)
         return
@@ -159,12 +197,14 @@ export const LoginForm: FC<LoginFormProps> = ({
       
       // Check for email verification error
       if (errorMessage?.includes('verify your email') || errorMessage?.includes('verification')) {
+        const verificationErrorMessage = errorMessage || "Please verify your email address before logging in."
+        
         if (onEmailVerificationRequired) {
           // Parent component handles navigation
           onEmailVerificationRequired(authEmail)
         } else {
-          // Modal mode - show error message
-          setErrorMessage("Please verify your email address before logging in.")
+          // Show error message in error container
+          setErrorMessage(verificationErrorMessage)
         }
         setIsLoading(false)
         return
@@ -190,11 +230,8 @@ export const LoginForm: FC<LoginFormProps> = ({
       }
       
       // Always set error message - this ensures it's displayed even if error structure is unexpected
-      logger.debug('Setting error message:', finalErrorMessage, 'from error:', { status: errorStatus, data: errorData })
-      setErrorMessage(finalErrorMessage)
-      
-      // Also show toast notification for better visibility
-      showError(finalErrorMessage)
+      logger.debug('Setting error message:', finalErrorMessage, 'from error:', { status: errorStatus, data: errorData, customError })
+      setErrorMessage(finalErrorMessage) // Show error above button
     } finally {
       setIsLoading(false)
     }
@@ -261,15 +298,6 @@ export const LoginForm: FC<LoginFormProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Toast notification for errors */}
-      <Toast
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        onHide={hideToast}
-        testID="login-toast"
-      />
-      
       {/* App Branding */}
       {!compact && (
         <View style={styles.brandingContainer}>
@@ -278,7 +306,7 @@ export const LoginForm: FC<LoginFormProps> = ({
               source={require("../../assets/images/icon.png")} 
               style={styles.appIcon}
               resizeMode="contain"
-              accessibilityLabel="MyPhoneFriend App Icon"
+              accessibilityLabel="Bianca App Icon"
               testID="app-icon"
               // Web-specific: ensure no default styling interferes
               {...(Platform.OS === 'web' && {
@@ -294,28 +322,11 @@ export const LoginForm: FC<LoginFormProps> = ({
               })}
             />
           </View>
-          <Text style={styles.appName}>MyPhoneFriend</Text>
+          <Text style={styles.appName}>Bianca</Text>
           <Text style={styles.appTagline}>{translate("loginScreen.tagline") || "Wellness Check Communication"}</Text>
         </View>
       )}
       
-      {errorMessage ? (
-        <View 
-          style={styles.errorContainer} 
-          testID="login-error-container" 
-          accessibilityLabel="login-error"
-          accessibilityRole="alert"
-        >
-          <Text 
-            testID="login-error" 
-            accessibilityLabel="login-error" 
-            accessibilityRole="alert"
-            style={styles.errorText}
-          >
-            {errorMessage}
-          </Text>
-        </View>
-      ) : null}
       <TextField
         testID="email-input"
         accessibilityLabel="email-input"
@@ -351,6 +362,26 @@ export const LoginForm: FC<LoginFormProps> = ({
         style={styles.input}
         editable={true}
       />
+      
+      {/* Error message displayed above login button */}
+      {errorMessage ? (
+        <View 
+          style={styles.errorContainer} 
+          testID="login-error-container" 
+          accessibilityLabel="login-error"
+          accessibilityRole="alert"
+        >
+          <Text 
+            testID="login-error" 
+            accessibilityLabel="login-error" 
+            accessibilityRole="alert"
+            style={styles.errorText}
+          >
+            {errorMessage}
+          </Text>
+        </View>
+      ) : null}
+      
       <Button
         testID="login-button"
         accessibilityLabel="login-button"
@@ -453,6 +484,10 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     paddingHorizontal: 12, // Reduced from 16
     paddingVertical: 8, // Reduced from 12
     width: "100%",
+    minHeight: 40, // Ensure minimum height for visibility
+    zIndex: 10,
+    elevation: 5, // For Android
+    importantForAccessibility: "yes" as const,
   },
   errorText: {
     color: colors.palette.biancaError || "#dc2626",

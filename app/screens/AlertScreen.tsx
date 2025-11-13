@@ -336,7 +336,7 @@ export function AlertScreen() {
         {filteredAlerts.length === 0 ? (
           <View style={styles.emptyStateContainer} testID="alert-empty-state">
             <View style={styles.emptyStateIcon}>
-              <Ionicons name="checkmark-circle-outline" size={64} color={colors.palette.biancaButtonSelected} />
+              <Ionicons name="checkmark-circle-outline" size={64} color={colors.palette.success500 || colors.palette.neutral100 || "#FFFFFF"} />
             </View>
             <Text style={styles.emptyStateTitle}>{translate("alertScreen.noAlertsTitle")}</Text>
             <Text style={styles.emptyStateSubtitle}>{translate("alertScreen.noAlertsSubtitle")}</Text>

@@ -14,14 +14,10 @@ import {
   useGetMedicalAnalysisResultsQuery,
   useGetMedicalAnalysisTrendQuery,
   useTriggerMedicalAnalysisMutation,
-  useGetMedicalAnalysisStatusQuery
 } from "../services/api/medicalAnalysisApi"
 import { 
   MedicalAnalysisResult, 
   MedicalAnalysisConfidence,
-  CognitiveMetrics,
-  PsychiatricMetrics,
-  VocabularyMetrics 
 } from "../services/api/api.types"
 import { HomeStackParamList } from "../navigators/navigationTypes"
 import { getPatient } from "../store/patientSlice"
@@ -44,14 +40,27 @@ export function MedicalAnalysisScreen() {
   const patientId = routePatientId || selectedPatient?.id
   const patientName = routePatientName || selectedPatient?.name
 
+  // Expandable sections state
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['cognitive', 'psychiatric', 'vocabulary']))
+
   // RTK Query hooks
   const {
     data: analysisData,
     isLoading,
-    error: analysisError
+    error: analysisError,
+    refetch: refetchResults
   } = useGetMedicalAnalysisResultsQuery(
     { patientId: patientId || '', limit: 5 },
-    { skip: !patientId }
+    { 
+      skip: !patientId,
+      // Don't retry on 403 errors (permission denied)
+      retry: (failureCount, error: any) => {
+        if (error?.status === 403) {
+          return false
+        }
+        return failureCount < 3
+      }
+    }
   )
 
   const {
@@ -60,21 +69,24 @@ export function MedicalAnalysisScreen() {
     error: trendError
   } = useGetMedicalAnalysisTrendQuery(
     { patientId: patientId || '', timeRange: 'month' },
-    { skip: !patientId }
-  )
-
-  // Handle trend errors
-  React.useEffect(() => {
-    if (trendError) {
-      console.error('Error fetching trend data:', trendError)
+    { 
+      skip: !patientId,
+      // Don't retry on 403 errors (permission denied)
+      retry: (failureCount, error: any) => {
+        if (error?.status === 403) {
+          return false
+        }
+        return failureCount < 3
+      }
     }
-  }, [trendError])
+  )
 
   const [triggerAnalysis, { isLoading: isTriggering, error: triggerError }] = useTriggerMedicalAnalysisMutation()
 
   const analysisResults = analysisData?.results || []
+  const latestAnalysis = analysisResults[0] as MedicalAnalysisResult | undefined
 
-  // Handle analysis errors
+  // Handle errors
   React.useEffect(() => {
     if (analysisError) {
       console.error('Error loading medical analysis results:', analysisError)
@@ -84,9 +96,8 @@ export function MedicalAnalysisScreen() {
       }
       showError(errorMessage)
     }
-  }, [analysisError])
+  }, [analysisError, showError])
 
-  // Handle trigger errors
   React.useEffect(() => {
     if (triggerError) {
       console.error('Error triggering medical analysis:', triggerError)
@@ -96,7 +107,7 @@ export function MedicalAnalysisScreen() {
       }
       showError(errorMessage)
     }
-  }, [triggerError])
+  }, [triggerError, showError])
 
   const handleTriggerAnalysis = useCallback(async () => {
     if (!patientId) return
@@ -108,16 +119,25 @@ export function MedicalAnalysisScreen() {
       
       if (result.success) {
         showSuccess(translate('medicalAnalysis.triggerSuccess'))
-        // RTK Query will automatically refetch results after 10 seconds
-        // No manual polling needed!
+        // Immediately refetch since analysis is now synchronous
+        refetchResults()
       } else {
         showError(result.message || translate('medicalAnalysis.triggerFailed'))
       }
     } catch (error) {
-      // Error is handled by the useEffect above
       console.error('Trigger analysis failed:', error)
     }
-  }, [patientId, triggerAnalysis])
+  }, [patientId, triggerAnalysis, refetchResults, showSuccess, showError])
+
+  const toggleSection = (section: string) => {
+    const newExpanded = new Set(expandedSections)
+    if (newExpanded.has(section)) {
+      newExpanded.delete(section)
+    } else {
+      newExpanded.add(section)
+    }
+    setExpandedSections(newExpanded)
+  }
 
   if (themeLoading) {
     return null
@@ -137,7 +157,60 @@ export function MedicalAnalysisScreen() {
     )
   }
 
-  const latestAnalysis = analysisResults[0]
+  // Helper functions for plain language analysis
+  const getCognitiveInterpretation = (metrics: any) => {
+    if (!metrics) return translate('medicalAnalysis.noDataAvailable')
+    
+    const riskScore = metrics.riskScore || 0
+    const fillerDensity = (metrics.fillerWordDensity || 0) * 100
+    const vagueDensity = (metrics.vagueReferenceDensity || 0) * 100
+    
+    if (riskScore < 30) {
+      return translate('medicalAnalysis.cognitiveInterpretation.normal')
+    } else if (riskScore < 50) {
+      return translate('medicalAnalysis.cognitiveInterpretation.mildConcern')
+    } else if (riskScore < 70) {
+      return translate('medicalAnalysis.cognitiveInterpretation.moderateConcern')
+    } else {
+      return translate('medicalAnalysis.cognitiveInterpretation.significantConcern')
+    }
+  }
+
+  const getPsychiatricInterpretation = (metrics: any) => {
+    if (!metrics) return translate('medicalAnalysis.noDataAvailable')
+    
+    const overallRisk = metrics.overallRiskScore || 0
+    const depression = metrics.depressionScore || 0
+    const anxiety = metrics.anxietyScore || 0
+    const hasCrisis = metrics.crisisIndicators?.hasCrisisIndicators || false
+    
+    if (hasCrisis) {
+      return translate('medicalAnalysis.psychiatricInterpretation.crisis')
+    } else if (overallRisk < 40) {
+      return translate('medicalAnalysis.psychiatricInterpretation.stable')
+    } else if (overallRisk < 60) {
+      return translate('medicalAnalysis.psychiatricInterpretation.mildConcern')
+    } else if (overallRisk < 80) {
+      return translate('medicalAnalysis.psychiatricInterpretation.moderateConcern')
+    } else {
+      return translate('medicalAnalysis.psychiatricInterpretation.significantConcern')
+    }
+  }
+
+  const getVocabularyInterpretation = (metrics: any) => {
+    if (!metrics) return translate('medicalAnalysis.noDataAvailable')
+    
+    const complexity = metrics.complexityScore || 0
+    const typeTokenRatio = metrics.typeTokenRatio || 0
+    
+    if (complexity >= 70) {
+      return translate('medicalAnalysis.vocabularyInterpretation.strong')
+    } else if (complexity >= 50) {
+      return translate('medicalAnalysis.vocabularyInterpretation.average')
+    } else {
+      return translate('medicalAnalysis.vocabularyInterpretation.limited')
+    }
+  }
 
   const getConfidenceColor = (confidence: MedicalAnalysisConfidence) => {
     switch (confidence) {
@@ -149,26 +222,54 @@ export function MedicalAnalysisScreen() {
     }
   }
 
+  const getConfidenceColorWithOpacity = (confidence: MedicalAnalysisConfidence, opacity: number = 0.1) => {
+    const color = getConfidenceColor(confidence)
+    if (!color) return colors.palette.neutral600
+    // If color is already a string (like rgba or hex), try to add opacity
+    if (typeof color === 'string') {
+      // If it's rgba format, replace the opacity
+      if (color.includes('rgba')) {
+        return color.replace(/[\d\.]+\)$/g, `${opacity})`)
+      }
+      // If it's rgb format, convert to rgba
+      if (color.includes('rgb(')) {
+        return color.replace('rgb(', 'rgba(').replace(')', `, ${opacity})`)
+      }
+      // If it's hex, convert to rgba (simplified - assumes 6 char hex)
+      if (color.startsWith('#')) {
+        const r = parseInt(color.slice(1, 3), 16)
+        const g = parseInt(color.slice(3, 5), 16)
+        const b = parseInt(color.slice(5, 7), 16)
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`
+      }
+      // Fallback: return original color
+      return color
+    }
+    // If it's not a string, return default
+    return colors.palette.neutral600
+  }
+
   const getRiskLevel = (score: number) => {
     if (score >= 70) return { level: translate('medicalAnalysis.high'), color: colors.palette.biancaError }
     if (score >= 40) return { level: translate('medicalAnalysis.medium'), color: colors.palette.biancaWarning }
     return { level: translate('medicalAnalysis.low'), color: colors.palette.biancaSuccess }
   }
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'improving': return 'trending-up'
-      case 'declining': return 'trending-down'
-      default: return 'remove'
-    }
+  // Helper to invert risk scores for display (lower risk = higher health percentage)
+  // Use this for scores where lower is better (cognitive risk, psychiatric overall risk)
+  // These show as "health percentage" where higher is better
+  const invertRiskScore = (riskScore: number | undefined): number | undefined => {
+    if (riskScore === undefined || riskScore === null) return undefined
+    return Math.round(100 - riskScore)
   }
 
-  const getTrendColor = (trend: string) => {
-    switch (trend) {
-      case 'improving': return colors.palette.biancaSuccess
-      case 'declining': return colors.palette.biancaError
-      default: return colors.palette.neutral500
-    }
+  // Helper to get health level for inverted scores (for display purposes)
+  // When we invert a risk score, we need to invert the risk level logic too
+  const getHealthLevel = (invertedScore: number) => {
+    // Inverted: high risk (70+) becomes low health (30-), low risk (0-30) becomes high health (70+)
+    if (invertedScore >= 70) return { level: translate('medicalAnalysis.good'), color: colors.palette.biancaSuccess }
+    if (invertedScore >= 40) return { level: translate('medicalAnalysis.fair'), color: colors.palette.biancaWarning }
+    return { level: translate('medicalAnalysis.poor'), color: colors.palette.biancaError }
   }
 
   return (
@@ -178,6 +279,15 @@ export function MedicalAnalysisScreen() {
         <Text style={styles.patientName}>{patientName}</Text>
       </View>
 
+      {/* Medical Disclaimer */}
+      <View style={styles.disclaimerContainer}>
+        <Ionicons name="medical" size={20} color={colors.palette.biancaWarning} />
+        <Text style={styles.disclaimerText}>
+          {translate("medicalAnalysis.disclaimer")}
+        </Text>
+      </View>
+
+      {/* Trigger Button */}
       <View style={styles.actions}>
         <Pressable 
           style={[
@@ -201,266 +311,337 @@ export function MedicalAnalysisScreen() {
             {isTriggering ? translate('medicalAnalysis.triggering') : translate('medicalAnalysis.triggerAnalysis')}
           </Text>
         </Pressable>
-
       </View>
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.palette.primary500} />
           <Text style={styles.loadingText}>{translate("medicalAnalysis.loadingResults")}</Text>
         </View>
-      ) : analysisResults.length === 0 ? (
+      ) : !latestAnalysis ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="analytics" size={48} color={colors.palette.neutral600} />
           <Text style={styles.emptyText}>{translate("medicalAnalysis.noResultsAvailable")}</Text>
           <Text style={styles.emptySubtext}>{translate("medicalAnalysis.triggerToGetStarted")}</Text>
         </View>
       ) : (
-        <ScrollView style={styles.resultsContainer}>
-          {(() => {
-            logger.debug('Total analysis results:', analysisResults.length)
-            
-            // Get the most recent analysis result
-            const latestResult = analysisResults
-              .filter((result, index, self) => 
-                // Keep only unique results based on analysis date
-                index === self.findIndex(r => 
-                  new Date(r.analysisDate).getTime() === new Date(result.analysisDate).getTime()
-                )
-              )
-              .sort((a, b) => new Date(b.analysisDate).getTime() - new Date(a.analysisDate).getTime()) // Sort by date, newest first
-              [0] // Get only the most recent result
-            
-            // Get all results for time series (sorted by date)
-            const timeSeriesData = analysisResults
-              .filter((result, index, self) => 
-                index === self.findIndex(r => 
-                  new Date(r.analysisDate).getTime() === new Date(result.analysisDate).getTime()
-                )
-              )
-              .sort((a, b) => new Date(a.analysisDate).getTime() - new Date(b.analysisDate).getTime()) // Sort chronologically for chart
-            
-            logger.debug('Latest result:', latestResult)
-            logger.debug('Latest result cognitive metrics:', latestResult?.cognitiveMetrics)
-            logger.debug('Latest result psychiatric metrics:', latestResult?.psychiatricMetrics)
-            logger.debug('Latest result vocabulary metrics:', latestResult?.vocabularyMetrics)
-            logger.debug('Cognitive risk score:', latestResult?.cognitiveMetrics?.riskScore)
-            logger.debug('Psychiatric overall risk score:', latestResult?.psychiatricMetrics?.overallRiskScore)
-            logger.debug('Vocabulary complexity score:', latestResult?.vocabularyMetrics?.complexityScore)
-            
-            // Debug: Show all properties of each metric object
-            logger.debug('Cognitive metrics keys:', latestResult?.cognitiveMetrics ? Object.keys(latestResult.cognitiveMetrics) : 'no cognitive metrics')
-            logger.debug('Psychiatric metrics keys:', latestResult?.psychiatricMetrics ? Object.keys(latestResult.psychiatricMetrics) : 'no psychiatric metrics')
-            logger.debug('Vocabulary metrics keys:', latestResult?.vocabularyMetrics ? Object.keys(latestResult.vocabularyMetrics) : 'no vocabulary metrics')
-            logger.debug('Time series data points:', timeSeriesData.length)
-            logger.debug('Trend data:', trendData)
-            logger.debug('Trend data structure:', {
-              hasTrendData: !!trendData,
-              hasTrend: !!trendData?.trend,
-              hasSummary: !!trendData?.trend?.summary,
-              summaryKeys: trendData?.trend?.summary ? Object.keys(trendData.trend.summary) : 'no summary'
-            })
-            
-            if (!latestResult) {
-              return (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="analytics" size={48} color={colors.palette.neutral600} />
-                  <Text style={styles.emptyText}>{translate("medicalAnalysis.noResultsAvailable")}</Text>
-                  <Text style={styles.emptySubtext}>{translate("medicalAnalysis.triggerToGetStarted")}</Text>
-                </View>
-              )
-            }
-            
-            return (
-              <>
-                {/* Latest Analysis Card */}
-                <View style={styles.resultCard}>
-              <View style={styles.resultHeader}>
-                <Text style={styles.resultDate}>
-                  {new Date(latestResult.analysisDate).toLocaleDateString()}
+        <ScrollView style={styles.resultsContainer} showsVerticalScrollIndicator={false}>
+          {/* Overview Section */}
+          <View style={styles.overviewCard}>
+            <View style={styles.overviewHeader}>
+              <Text style={styles.sectionTitle}>{translate("medicalAnalysis.overview")}</Text>
+              <View style={[styles.confidenceBadge, { backgroundColor: getConfidenceColorWithOpacity(latestAnalysis.confidence, 0.1) }]}>
+                <View 
+                  style={[
+                    styles.confidenceDot, 
+                    { backgroundColor: getConfidenceColor(latestAnalysis.confidence) || colors.palette.neutral600 }
+                  ]} 
+                />
+                <Text style={styles.confidenceText}>
+                  {(latestAnalysis.confidence || 'none').toUpperCase()} {translate("medicalAnalysis.confidence")}
                 </Text>
-                <View style={styles.confidenceBadge}>
-                  <View 
-                    style={[
-                      styles.confidenceDot, 
-                      { backgroundColor: getConfidenceColor(latestResult.confidence) }
-                    ]} 
-                  />
-                  <Text style={styles.confidenceText}>
-                    {latestResult.confidence.toUpperCase()}
-                  </Text>
-                </View>
               </View>
-
-              <View style={styles.metricsGrid}>
-                {/* Cognitive Metrics */}
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricTitle}>{translate("medicalAnalysis.cognitiveHealth")}</Text>
-                  <View style={styles.metricValue}>
-                    <Text style={styles.metricNumber}>
-                      {latestResult.cognitiveMetrics?.riskScore ?? '--'}
-                    </Text>
-                    <Text style={styles.metricUnit}>/100</Text>
-                  </View>
-                  <Text style={[
-                    styles.metricLevel, 
-                    { color: getRiskLevel(latestResult.cognitiveMetrics?.riskScore ?? 0).color }
-                  ]}>
-                    {getRiskLevel(latestResult.cognitiveMetrics?.riskScore ?? 0).level} {translate("medicalAnalysis.risk")}
-                  </Text>
-                </View>
-
-                {/* Psychiatric Metrics */}
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricTitle}>{translate("medicalAnalysis.mentalHealth")}</Text>
-                  <View style={styles.metricValue}>
-                    <Text style={styles.metricNumber}>
-                      {latestResult.psychiatricMetrics?.overallRiskScore ?? '--'}
-                    </Text>
-                    <Text style={styles.metricUnit}>/100</Text>
-                  </View>
-                  <Text style={[
-                    styles.metricLevel, 
-                    { color: getRiskLevel(latestResult.psychiatricMetrics?.overallRiskScore ?? 0).color }
-                  ]}>
-                    {getRiskLevel(latestResult.psychiatricMetrics?.overallRiskScore ?? 0).level} {translate("medicalAnalysis.risk")}
-                  </Text>
-                </View>
-
-                {/* Vocabulary Metrics */}
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricTitle}>{translate("medicalAnalysis.language")}</Text>
-                  <View style={styles.metricValue}>
-                    <Text style={styles.metricNumber}>
-                      {latestResult.vocabularyMetrics?.complexityScore ?? '--'}
-                    </Text>
-                    <Text style={styles.metricUnit}>/100</Text>
-                  </View>
-                  <Text style={[
-                    styles.metricLevel, 
-                    { color: getRiskLevel(100 - (latestResult.vocabularyMetrics?.complexityScore ?? 0)).color }
-                  ]}>
-                    {(latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 70 ? translate('medicalAnalysis.good') : 
-                     (latestResult.vocabularyMetrics?.complexityScore ?? 0) >= 40 ? translate('medicalAnalysis.fair') : translate('medicalAnalysis.poor')}
-                  </Text>
-                </View>
+            </View>
+            <Text style={styles.overviewDate}>
+              {new Date(latestAnalysis.analysisDate).toLocaleDateString()}
+            </Text>
+            <View style={styles.overviewStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{latestAnalysis.conversationCount || 0}</Text>
+                <Text style={styles.statLabel}>{translate("medicalAnalysis.conversations")}</Text>
               </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{latestAnalysis.messageCount || 0}</Text>
+                <Text style={styles.statLabel}>{translate("medicalAnalysis.messages")}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{latestAnalysis.totalWords || 0}</Text>
+                <Text style={styles.statLabel}>{translate("medicalAnalysis.totalWords")}</Text>
+              </View>
+            </View>
+          </View>
 
-              {/* Warnings */}
-              {latestResult.warnings && latestResult.warnings.length > 0 && (
-                <View style={styles.warningsContainer}>
-                  <Text style={styles.warningsTitle}>{translate("medicalAnalysis.warningsInsights")}</Text>
-                  {latestResult.warnings.map((warning, warningIndex) => (
-                    <View key={warningIndex} style={styles.warningItem}>
-                      <Ionicons name="warning" size={16} color={colors.palette.biancaWarning} />
-                      <Text style={styles.warningText}>{warning}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Analysis Details */}
-              <View style={styles.detailsContainer}>
-                <Text style={styles.detailsTitle}>{translate("medicalAnalysis.analysisDetails")}</Text>
-                <View style={styles.detailsGrid}>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.conversations")}</Text>
-                    <Text style={styles.detailValue}>{latestResult.conversationCount ?? '--'}</Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.messages")}</Text>
-                    <Text style={styles.detailValue}>{latestResult.messageCount ?? '--'}</Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.totalWords")}</Text>
-                    <Text style={styles.detailValue}>{latestResult.totalWords ?? '--'}</Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>{translate("medicalAnalysis.trigger")}</Text>
-                    <Text style={styles.detailValue}>{latestResult.trigger ?? '--'}</Text>
-                  </View>
-                </View>
+          {/* Cognitive Health Section */}
+          <Pressable 
+            style={styles.sectionCard}
+            onPress={() => toggleSection('cognitive')}
+          >
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <Ionicons name="brain" size={24} color={colors.palette.primary500} />
+                <Text style={styles.sectionTitle}>{translate("medicalAnalysis.cognitiveHealth")}</Text>
+              </View>
+              <Ionicons 
+                name={expandedSections.has('cognitive') ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={colors.palette.neutral600} 
+              />
+            </View>
+            
+            <View style={styles.sectionSummary}>
+              <View style={styles.scoreContainer}>
+                <Text style={styles.scoreValue}>
+                  {invertRiskScore(latestAnalysis.cognitiveMetrics?.riskScore)?.toFixed(0) || '--'}
+                </Text>
+                <Text style={styles.scoreLabel}>%</Text>
+              </View>
+              <View style={styles.riskBadge}>
+                <View 
+                  style={[
+                    styles.riskDot, 
+                    { backgroundColor: getHealthLevel(invertRiskScore(latestAnalysis.cognitiveMetrics?.riskScore) || 0).color }
+                  ]} 
+                />
+                <Text style={[styles.riskText, { color: getHealthLevel(invertRiskScore(latestAnalysis.cognitiveMetrics?.riskScore) || 0).color }]}>
+                  {getHealthLevel(invertRiskScore(latestAnalysis.cognitiveMetrics?.riskScore) || 0).level}
+                </Text>
               </View>
             </View>
 
-            {/* Time Series Chart */}
-            {(trendData?.trend?.summary || timeSeriesData.length >= 1) && (
-              <View style={styles.chartContainer}>
-                <Text style={styles.chartTitle}>{translate("medicalAnalysis.trendsOverTime")}</Text>
-                {trendData?.trend?.summary ? (
-                  <View style={styles.trendsContainer}>
-                    <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.cognitiveHealth")}</Text>
-                      <View style={styles.trendValue}>
-                        <Ionicons 
-                          name={getTrendIcon(trendData.trend.summary.cognitiveTrend)} 
-                          size={20} 
-                          color={getTrendColor(trendData.trend.summary.cognitiveTrend)} 
-                        />
-                        <Text style={[styles.trendText, { color: getTrendColor(trendData.trend.summary.cognitiveTrend) }]}>
-                          {trendData.trend.summary.cognitiveTrend}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.mentalHealth")}</Text>
-                      <View style={styles.trendValue}>
-                        <Ionicons 
-                          name={getTrendIcon(trendData.trend.summary.psychiatricTrend)} 
-                          size={20} 
-                          color={getTrendColor(trendData.trend.summary.psychiatricTrend)} 
-                        />
-                        <Text style={[styles.trendText, { color: getTrendColor(trendData.trend.summary.psychiatricTrend) }]}>
-                          {trendData.trend.summary.psychiatricTrend}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.language")}</Text>
-                      <View style={styles.trendValue}>
-                        <Ionicons 
-                          name={getTrendIcon(trendData.trend.summary.vocabularyTrend)} 
-                          size={20} 
-                          color={getTrendColor(trendData.trend.summary.vocabularyTrend)} 
-                        />
-                        <Text style={[styles.trendText, { color: getTrendColor(trendData.trend.summary.vocabularyTrend) }]}>
-                          {trendData.trend.summary.vocabularyTrend}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.trendItem}>
-                      <Text style={styles.trendLabel}>{translate("medicalAnalysis.overallHealth")}</Text>
-                      <View style={styles.trendValue}>
-                        <Text style={styles.trendText}>
-                          {trendData.trend.totalAnalyses} {translate("medicalAnalysis.analyses")}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.chartPlaceholder}>
-                    <Ionicons name="trending-up" size={48} color={colors.palette.neutral400} />
-                    <Text style={styles.chartPlaceholderText}>
-                      {translate("medicalAnalysis.trendAnalysisComingSoon")}
-                    </Text>
-                    <Text style={styles.chartSubtext}>
-                      {timeSeriesData.length} {translate("medicalAnalysis.analysisResultsAvailable")}
+            <Text style={styles.interpretationText}>
+              {getCognitiveInterpretation(latestAnalysis.cognitiveMetrics)}
+            </Text>
+
+            {expandedSections.has('cognitive') && latestAnalysis.cognitiveMetrics && (
+              <View style={styles.detailsContainer}>
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{translate("medicalAnalysis.fillerWords")}</Text>
+                  <Text style={styles.metricValue}>
+                    {((latestAnalysis.cognitiveMetrics.fillerWordDensity || 0) * 100).toFixed(1)}%
+                  </Text>
+                </View>
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{translate("medicalAnalysis.vagueReferences")}</Text>
+                  <Text style={styles.metricValue}>
+                    {((latestAnalysis.cognitiveMetrics.vagueReferenceDensity || 0) * 100).toFixed(1)}%
+                  </Text>
+                </View>
+                {latestAnalysis.cognitiveMetrics.temporalConfusionCount !== undefined && (
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>{translate("medicalAnalysis.temporalConfusion")}</Text>
+                    <Text style={styles.metricValue}>
+                      {latestAnalysis.cognitiveMetrics.temporalConfusionCount}
                     </Text>
                   </View>
                 )}
-                
-                {trendData?.trend?.totalAnalyses > 0 && (
-                  <Text style={styles.chartSubtext}>
-                    {translate("medicalAnalysis.basedOn")} {trendData.trend.totalAnalyses} {translate("medicalAnalysis.analysisResultsOver")} {trendData.trend.timeRange}
-                  </Text>
+                {latestAnalysis.cognitiveMetrics.wordFindingDifficultyCount !== undefined && (
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>{translate("medicalAnalysis.wordFinding")}</Text>
+                    <Text style={styles.metricValue}>
+                      {latestAnalysis.cognitiveMetrics.wordFindingDifficultyCount}
+                    </Text>
+                  </View>
+                )}
+                {latestAnalysis.cognitiveMetrics.repetitionScore !== undefined && (
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>{translate("medicalAnalysis.repetition")}</Text>
+                    <Text style={styles.metricValue}>
+                      {latestAnalysis.cognitiveMetrics.repetitionScore.toFixed(1)}%
+                    </Text>
+                  </View>
+                )}
+                {latestAnalysis.cognitiveMetrics.informationDensity?.score !== undefined && (
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>{translate("medicalAnalysis.informationDensity")}</Text>
+                    <Text style={styles.metricValue}>
+                      {latestAnalysis.cognitiveMetrics.informationDensity.score.toFixed(1)}%
+                    </Text>
+                  </View>
                 )}
               </View>
             )}
-              </>
-            )
-          })()}
+          </Pressable>
+
+          {/* Mental Health Section */}
+          <Pressable 
+            style={styles.sectionCard}
+            onPress={() => toggleSection('psychiatric')}
+          >
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <Ionicons name="heart" size={24} color={colors.palette.biancaError} />
+                <Text style={styles.sectionTitle}>{translate("medicalAnalysis.mentalHealth")}</Text>
+              </View>
+              <Ionicons 
+                name={expandedSections.has('psychiatric') ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={colors.palette.neutral600} 
+              />
+            </View>
+
+            {/* Crisis Alert */}
+            {latestAnalysis.psychiatricMetrics?.crisisIndicators?.hasCrisisIndicators && (
+              <View style={styles.crisisAlert}>
+                <Ionicons name="warning" size={20} color={colors.palette.biancaError} />
+                <Text style={styles.crisisText}>
+                  {translate("medicalAnalysis.crisisIndicators")}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.sectionSummary}>
+              <View style={styles.scoreContainer}>
+                <Text style={styles.scoreValue}>
+                  {invertRiskScore(latestAnalysis.psychiatricMetrics?.overallRiskScore)?.toFixed(0) || '--'}
+                </Text>
+                <Text style={styles.scoreLabel}>%</Text>
+              </View>
+              <View style={styles.riskBadge}>
+                <View 
+                  style={[
+                    styles.riskDot, 
+                    { backgroundColor: getHealthLevel(invertRiskScore(latestAnalysis.psychiatricMetrics?.overallRiskScore) || 0).color }
+                  ]} 
+                />
+                <Text style={[styles.riskText, { color: getHealthLevel(invertRiskScore(latestAnalysis.psychiatricMetrics?.overallRiskScore) || 0).color }]}>
+                  {getHealthLevel(invertRiskScore(latestAnalysis.psychiatricMetrics?.overallRiskScore) || 0).level}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.interpretationText}>
+              {getPsychiatricInterpretation(latestAnalysis.psychiatricMetrics)}
+            </Text>
+
+            {expandedSections.has('psychiatric') && latestAnalysis.psychiatricMetrics && (
+              <View style={styles.detailsContainer}>
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{translate("medicalAnalysis.depressionScore")}</Text>
+                  <Text style={[styles.metricValue, { color: getRiskLevel(latestAnalysis.psychiatricMetrics.depressionScore || 0).color }]}>
+                    {(latestAnalysis.psychiatricMetrics.depressionScore || 0).toFixed(0)}%
+                  </Text>
+                </View>
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{translate("medicalAnalysis.anxietyScore")}</Text>
+                  <Text style={[styles.metricValue, { color: getRiskLevel(latestAnalysis.psychiatricMetrics.anxietyScore || 0).color }]}>
+                    {(latestAnalysis.psychiatricMetrics.anxietyScore || 0).toFixed(0)}%
+                  </Text>
+                </View>
+                {latestAnalysis.psychiatricMetrics.emotionalTone && (
+                  <>
+                    <View style={styles.metricRow}>
+                      <Text style={styles.metricLabel}>{translate("medicalAnalysis.emotionalTone")}</Text>
+                      <Text style={styles.metricValue}>
+                        {latestAnalysis.psychiatricMetrics.emotionalTone.dominantTone || 'neutral'}
+                      </Text>
+                    </View>
+                    <View style={styles.metricRow}>
+                      <Text style={styles.metricLabel}>{translate("medicalAnalysis.negativeRatio")}</Text>
+                      <Text style={styles.metricValue}>
+                        {(latestAnalysis.psychiatricMetrics.emotionalTone.negativeRatio * 100).toFixed(1)}%
+                      </Text>
+                    </View>
+                  </>
+                )}
+                {latestAnalysis.psychiatricMetrics.protectiveFactors !== undefined && (
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>{translate("medicalAnalysis.protectiveFactors")}</Text>
+                    <Text style={styles.metricValue}>
+                      {latestAnalysis.psychiatricMetrics.protectiveFactors}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </Pressable>
+
+          {/* Language & Vocabulary Section */}
+          <Pressable 
+            style={styles.sectionCard}
+            onPress={() => toggleSection('vocabulary')}
+          >
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <Ionicons name="chatbubbles" size={24} color={colors.palette.biancaSuccess} />
+                <Text style={styles.sectionTitle}>{translate("medicalAnalysis.language")}</Text>
+              </View>
+              <Ionicons 
+                name={expandedSections.has('vocabulary') ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={colors.palette.neutral600} 
+              />
+            </View>
+
+            <View style={styles.sectionSummary}>
+              <View style={styles.scoreContainer}>
+                <Text style={styles.scoreValue}>
+                  {latestAnalysis.vocabularyMetrics?.complexityScore?.toFixed(0) || '--'}
+                </Text>
+                <Text style={styles.scoreLabel}>%</Text>
+              </View>
+              <View style={styles.riskBadge}>
+                <Text style={[styles.riskText, { color: getRiskLevel(100 - (latestAnalysis.vocabularyMetrics?.complexityScore || 0)).color }]}>
+                  {(latestAnalysis.vocabularyMetrics?.complexityScore || 0) >= 70 ? translate('medicalAnalysis.good') : 
+                   (latestAnalysis.vocabularyMetrics?.complexityScore || 0) >= 40 ? translate('medicalAnalysis.fair') : translate('medicalAnalysis.poor')}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.interpretationText}>
+              {getVocabularyInterpretation(latestAnalysis.vocabularyMetrics)}
+            </Text>
+
+            {expandedSections.has('vocabulary') && latestAnalysis.vocabularyMetrics && (
+              <View style={styles.detailsContainer}>
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{translate("medicalAnalysis.typeTokenRatio")}</Text>
+                  <Text style={styles.metricValue}>
+                    {(latestAnalysis.vocabularyMetrics.typeTokenRatio * 100).toFixed(1)}%
+                  </Text>
+                </View>
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{translate("medicalAnalysis.avgWordLength")}</Text>
+                  <Text style={styles.metricValue}>
+                    {latestAnalysis.vocabularyMetrics.avgWordLength?.toFixed(1) || '--'}
+                  </Text>
+                </View>
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{translate("medicalAnalysis.avgSentenceLength")}</Text>
+                  <Text style={styles.metricValue}>
+                    {latestAnalysis.vocabularyMetrics.avgSentenceLength?.toFixed(1) || '--'}
+                  </Text>
+                </View>
+                {latestAnalysis.vocabularyMetrics.uniqueWords !== undefined && (
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>{translate("medicalAnalysis.uniqueWords")}</Text>
+                    <Text style={styles.metricValue}>
+                      {latestAnalysis.vocabularyMetrics.uniqueWords}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </Pressable>
+
+          {/* Key Indicators Section */}
+          {latestAnalysis.cognitiveMetrics?.indicators && latestAnalysis.cognitiveMetrics.indicators.length > 0 && (
+            <View style={styles.indicatorsCard}>
+              <Text style={styles.sectionTitle}>{translate("medicalAnalysis.keyIndicators")}</Text>
+              {latestAnalysis.cognitiveMetrics.indicators.map((indicator: any, index: number) => (
+                <View key={index} style={styles.indicatorItem}>
+                  <Ionicons 
+                    name="information-circle" 
+                    size={16} 
+                    color={indicator.severity === 'high' ? colors.palette.biancaError : colors.palette.biancaWarning} 
+                  />
+                  <Text style={styles.indicatorText}>{indicator.message || indicator}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Warnings Section */}
+          {latestAnalysis.warnings && latestAnalysis.warnings.length > 0 && (
+            <View style={styles.warningsCard}>
+              <Text style={styles.sectionTitle}>{translate("medicalAnalysis.warningsInsights")}</Text>
+              {latestAnalysis.warnings.map((warning, index) => (
+                <View key={index} style={styles.warningItem}>
+                  <Ionicons name="warning" size={16} color={colors.palette.biancaWarning} />
+                  <Text style={styles.warningText}>{warning}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
       <Toast
@@ -493,6 +674,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     color: colors.palette.neutral600,
   },
+  disclaimerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.palette.neutral100,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.palette.biancaWarning,
+    gap: 8,
+  },
+  disclaimerText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.palette.neutral700,
+    lineHeight: 16,
+  },
   actions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -511,6 +710,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.palette.primary500,
     flex: 1,
   },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
@@ -521,6 +723,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
+    gap: 16,
   },
   loadingText: {
     fontSize: 16,
@@ -565,7 +768,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   resultsContainer: {
     paddingHorizontal: 20,
   },
-  resultCard: {
+  overviewCard: {
     backgroundColor: colors.palette.neutral100,
     borderRadius: 12,
     padding: 16,
@@ -573,20 +776,98 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.palette.neutral300,
   },
-  resultHeader: {
+  overviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  overviewDate: {
+    fontSize: 14,
+    color: colors.palette.neutral600,
     marginBottom: 16,
   },
-  resultDate: {
-    fontSize: 16,
+  overviewStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.palette.biancaHeader,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.palette.neutral600,
+    marginTop: 4,
+  },
+  sectionCard: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral300,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: colors.palette.biancaHeader,
+  },
+  sectionSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  scoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  scoreValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.palette.biancaHeader,
+  },
+  scoreLabel: {
+    fontSize: 16,
+    color: colors.palette.neutral600,
+  },
+  riskBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  riskDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  riskText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   confidenceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 6,
   },
   confidenceDot: {
@@ -599,154 +880,87 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.palette.neutral700,
   },
-  metricsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  metricCard: {
-    flex: 1,
-    backgroundColor: colors.palette.neutral200,
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-  },
-  metricTitle: {
-    fontSize: 12,
-    fontWeight: '600',
+  interpretationText: {
+    fontSize: 14,
     color: colors.palette.neutral700,
-    marginBottom: 8,
-    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
-  metricValue: {
+  detailsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
+  },
+  metricRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 4,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
   },
-  metricNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.palette.biancaHeader,
-  },
-  metricUnit: {
+  metricLabel: {
     fontSize: 14,
     color: colors.palette.neutral600,
-    marginLeft: 2,
   },
-  metricLevel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  warningsContainer: {
-    marginBottom: 16,
-  },
-  warningsTitle: {
+  metricValue: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.palette.biancaHeader,
-    marginBottom: 8,
+  },
+  crisisAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.palette.biancaError + '20',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  crisisText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.palette.biancaError,
+  },
+  indicatorsCard: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.palette.neutral300,
+  },
+  indicatorItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 8,
+  },
+  indicatorText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.palette.neutral700,
+    lineHeight: 20,
+  },
+  warningsCard: {
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.palette.biancaWarning,
   },
   warningItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    marginBottom: 4,
+    marginTop: 8,
   },
   warningText: {
+    flex: 1,
     fontSize: 14,
     color: colors.palette.neutral700,
-    flex: 1,
-  },
-  detailsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: colors.palette.neutral300,
-    paddingTop: 16,
-  },
-  detailsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.palette.biancaHeader,
-    marginBottom: 12,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  detailItem: {
-    flex: 1,
-    minWidth: '45%',
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: colors.palette.neutral600,
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.palette.biancaHeader,
-  },
-  chartContainer: {
-    backgroundColor: colors.palette.neutral100,
-    borderRadius: 12,
-    padding: 20,
-    marginTop: 20,
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.palette.neutral900,
-    marginBottom: 16,
-  },
-  trendsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  trendItem: {
-    width: '48%',
-    backgroundColor: colors.palette.neutral50,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  trendLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.palette.neutral700,
-    marginBottom: 8,
-  },
-  trendValue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  trendText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 6,
-    textTransform: 'capitalize',
-  },
-  chartPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    backgroundColor: colors.palette.neutral50,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.palette.neutral200,
-    borderStyle: 'dashed',
-  },
-  chartPlaceholderText: {
-    fontSize: 16,
-    color: colors.palette.neutral600,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  chartSubtext: {
-    fontSize: 14,
-    color: colors.palette.neutral500,
-    marginTop: 4,
-    textAlign: 'center',
+    lineHeight: 20,
   },
 })

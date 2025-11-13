@@ -114,6 +114,7 @@ const fr: Translations = {
     adminOnlyMessage: "Seuls les administrateurs d'organisation et les super administrateurs peuvent ajouter des patients",
     noPatientsFound: "Aucun patient trouvé",
     viewSchedules: "Voir les plannings",
+    noScheduleWarning: "⚠ Aucun planning configuré",
   },
   tabs: {
     home: "Accueil",

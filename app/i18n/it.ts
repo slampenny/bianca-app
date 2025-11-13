@@ -552,6 +552,7 @@ const it: Translations = {
     adminOnlyMessage: "Solo gli amministratori dell'organizzazione e i super amministratori possono aggiungere pazienti",
     noPatientsFound: "Nessun paziente trovato",
     viewSchedules: "Visualizza programmi",
+    noScheduleWarning: "⚠ Nessun programma configurato",
   },
   tabs: {
     home: "Home",

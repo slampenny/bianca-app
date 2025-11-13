@@ -63,9 +63,9 @@ export const medicalAnalysisApi = createApi({
       ],
     }),
 
-    // Trigger medical analysis for a specific patient
+    // Trigger medical analysis for a specific patient (synchronous)
     triggerMedicalAnalysis: builder.mutation<
-      { success: boolean; message: string; jobId?: string; batchId?: string },
+      { success: boolean; message: string; result?: any },
       { patientId: string }
     >({
       query: ({ patientId }) => {
@@ -81,33 +81,15 @@ export const medicalAnalysisApi = createApi({
         }
       },
       async onQueryStarted({ patientId }, { dispatch, queryFulfilled }) {
-        let timeoutId: NodeJS.Timeout | null = null
         try {
           await queryFulfilled
-          // Wait 10 seconds before invalidating cache to give job time to complete
-          timeoutId = setTimeout(() => {
-            dispatch(medicalAnalysisApi.util.invalidateTags([
-              { type: "MedicalAnalysisResult", id: patientId },
-              { type: "MedicalAnalysisTrend", id: `${patientId}-month` }
-            ]))
-            timeoutId = null
-          }, 10000)
+          // Immediately invalidate cache since analysis is now synchronous
+          dispatch(medicalAnalysisApi.util.invalidateTags([
+            { type: "MedicalAnalysisResult", id: patientId },
+            { type: "MedicalAnalysisTrend", id: `${patientId}-month` }
+          ]))
         } catch (error) {
-          // Don't invalidate cache if the trigger failed
-          // Clean up timeout if mutation was cancelled
-          if (timeoutId) {
-            clearTimeout(timeoutId)
-            timeoutId = null
-          }
           logger.error('Trigger failed, not invalidating cache:', error)
-        }
-        
-        // Return cleanup function to clear timeout if query is cancelled
-        return () => {
-          if (timeoutId) {
-            clearTimeout(timeoutId)
-            timeoutId = null
-          }
         }
       },
     }),

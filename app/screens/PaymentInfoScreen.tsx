@@ -704,6 +704,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screenContainer: {
     flex: 1,
     backgroundColor: colors.palette.neutral200,
+    padding: spacing.md,
   },
   scrollContainer: {
     flex: 1,

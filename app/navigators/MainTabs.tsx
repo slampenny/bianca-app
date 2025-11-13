@@ -151,12 +151,13 @@ function ReportsStack() {
   
   return (
     <Stack.Navigator
+      initialRouteName="ReportsList"
       screenOptions={({ route, navigation }) => ({
         headerShown: true,
         header: (props) => <CustomHeader {...props} />,
       })}
     >
-      <Stack.Screen name="Reports" component={ReportsScreen} options={() => ({ title: translate("headers.reports") })} />
+      <Stack.Screen name="ReportsList" component={ReportsScreen} options={() => ({ title: translate("headers.reports") })} />
       <Stack.Screen name="SentimentReport" component={SentimentAnalysisScreen} options={() => ({ title: translate("headers.sentimentAnalysis") })} />
       <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={() => ({ title: translate("headers.medicalAnalysis") })} />
       <Stack.Screen name="HealthReport" component={HealthReportScreen} options={() => ({ title: translate("headers.mentalHealthReport") })} />

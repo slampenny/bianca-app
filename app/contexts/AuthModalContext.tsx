@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
-import { Modal, View, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Text } from "react-native"
+import { Modal, View, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Text, ScrollView } from "react-native"
 import { LoginForm } from "../components/LoginForm"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "../store/authSlice"
 import { setShowAuthModalCallback, notifyAuthSuccess, notifyAuthCancelled } from "../services/api/baseQueryWithAuth"
 import { useTheme } from "../theme/ThemeContext"
 import type { ThemeColors } from "../types"
+import { useToast } from "../hooks/useToast"
+import Toast from "../components/Toast"
 
 interface AuthModalContextType {
   showAuthModal: () => void
@@ -31,6 +33,7 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   const [isVisible, setIsVisible] = useState(false)
   const isAuthenticatedUser = useSelector(isAuthenticated)
   const { colors } = useTheme()
+  const { toast, showError, hideToast } = useToast()
   
   // Use refs to track previous state and prevent unwanted modal closures
   const wasAuthenticatedRef = React.useRef(isAuthenticatedUser)
@@ -109,18 +112,30 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
                   <Text style={styles.closeButtonText}>✕</Text>
                 </Pressable>
               </View>
-              <View style={styles.loginContainer}>
+              <ScrollView 
+                style={styles.loginContainer}
+                contentContainerStyle={styles.loginContainerContent}
+                showsVerticalScrollIndicator={true}
+              >
                 <LoginForm
                   onLoginSuccess={handleLoginSuccess}
                   showRegisterButton={false}
                   showForgotPasswordButton={false}
                   showSSOButtons={true}
                   compact={true}
+                  onError={showError}
                 />
-              </View>
+              </ScrollView>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
+        <Toast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onHide={hideToast}
+          testID="auth-modal-toast"
+        />
       </Modal>
     </AuthModalContext.Provider>
   )
@@ -170,8 +185,12 @@ const createStyles = (colors: ThemeColors) =>
     },
     loginContainer: {
       flex: 1,
+    },
+    loginContainerContent: {
       paddingHorizontal: 20,
       paddingBottom: 20,
+      paddingTop: 10,
+      minHeight: 200, // Ensure enough space for error message
     },
   })
 

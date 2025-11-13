@@ -528,6 +528,7 @@ const de: Translations = {
     adminOnlyMessage: "Nur Organisationsadministratoren und Superadministratoren können Patienten hinzufügen",
     noPatientsFound: "Keine Patienten gefunden",
     viewSchedules: "Zeitpläne anzeigen",
+    noScheduleWarning: "⚠ Kein Zeitplan konfiguriert",
   },
   tabs: {
     home: "Start",

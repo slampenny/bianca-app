@@ -471,6 +471,7 @@ const pt: Translations = {
     adminOnlyMessage: "Apenas administradores de organização e super administradores podem adicionar pacientes",
     noPatientsFound: "Nenhum paciente encontrado",
     viewSchedules: "Ver agendas",
+    noScheduleWarning: "⚠ Nenhum horário configurado",
   },
   tabs: {
     home: "Início",
