@@ -113,8 +113,19 @@ resource "aws_iam_policy" "github_actions_deploy" {
         }
       },
       {
-        # SSM SendCommand on instances - must allow on instances without tag condition
-        # because the condition is evaluated on the instance, not the document
+        # SSM SendCommand requires permissions on BOTH the document AND the instances
+        # Allow on the SSM document (AWS managed document)
+        Effect = "Allow"
+        Action = [
+          "ssm:SendCommand"
+        ]
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript",
+          "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:document/AWS-RunShellScript"
+        ]
+      },
+      {
+        # Allow SendCommand on EC2 instances with tag condition
         Effect = "Allow"
         Action = [
           "ssm:SendCommand"
@@ -127,14 +138,6 @@ resource "aws_iam_policy" "github_actions_deploy" {
             "ec2:ResourceTag/Name" = "bianca-staging"
           }
         }
-      },
-      {
-        # SSM document permissions - must allow on the document itself
-        Effect = "Allow"
-        Action = [
-          "ssm:SendCommand"
-        ]
-        Resource = "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript"
       },
       {
         # Get command results and describe instances
