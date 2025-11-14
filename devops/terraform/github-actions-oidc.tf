@@ -40,7 +40,8 @@ resource "aws_iam_role" "github_actions" {
           }
           StringLike = {
             # Only allow from the backend repository (where the workflow runs)
-            "token.actions.githubusercontent.com:sub" = "repo:slampenny/bianca-backend-app:*"
+            # Note: Repository name is bianca-app-backend (not bianca-backend-app)
+            "token.actions.githubusercontent.com:sub" = "repo:slampenny/bianca-app-backend:*"
           }
         }
       }
