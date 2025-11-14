@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   View,
+  Switch,
 } from "react-native"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
@@ -25,7 +26,9 @@ import { getCaregiver } from "../store/caregiverSlice"
 import { getInviteToken } from "../store/authSlice"
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
 import { useGetMFAStatusQuery } from "../services/api/mfaApi"
+import { useUpdateTelemetryOptInMutation } from "../services/api/telemetryApi"
 import { LoadingScreen } from "./LoadingScreen"
+import telemetry from "../services/telemetry/telemetry.service"
 import { useTheme } from "app/theme/ThemeContext"
 import { navigationRef } from "app/navigators/navigationUtilities"
 import { Button } from "app/components"
@@ -53,6 +56,10 @@ function ProfileScreen() {
   
   // MFA status
   const { data: mfaStatus } = useGetMFAStatusQuery()
+  
+  // Telemetry opt-in
+  const [updateTelemetryOptIn] = useUpdateTelemetryOptInMutation()
+  const [telemetryOptIn, setTelemetryOptIn] = useState<boolean | null>(null)
 
   // Form state
   const [name, setName] = useState("")
@@ -68,6 +75,15 @@ function ProfileScreen() {
   
   // Timeout ref for navigation delay
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Load telemetry opt-in status
+  useEffect(() => {
+    const loadTelemetryOptIn = async () => {
+      const optIn = await telemetry.getOptIn()
+      setTelemetryOptIn(optIn)
+    }
+    loadTelemetryOptIn()
+  }, [])
 
   // When setting the avatar state in ProfileScreen
   useEffect(() => {
@@ -296,6 +312,39 @@ function ProfileScreen() {
             <LanguageSelector testID="language-selector" />
             <ThemeSelector testID="theme-selector" />
 
+            {/* Telemetry Opt-in Toggle */}
+            <View style={styles.telemetryContainer}>
+              <View style={styles.telemetryLabelContainer}>
+                <Text style={styles.telemetryLabel}>
+                  {translate("profileScreen.telemetryOptIn") || "Share anonymous usage data"}
+                </Text>
+                <Text style={styles.telemetryDescription}>
+                  {translate("profileScreen.telemetryDescription") || "Help us improve the app by sharing anonymous usage data. No personal information is collected."}
+                </Text>
+              </View>
+              <Switch
+                value={telemetryOptIn === true}
+                onValueChange={async (value) => {
+                  setTelemetryOptIn(value)
+                  try {
+                    await updateTelemetryOptIn({ optIn: value }).unwrap()
+                    await telemetry.setOptIn(value)
+                    if (value) {
+                      showInfo(translate("profileScreen.telemetryEnabled") || "Telemetry enabled")
+                    } else {
+                      showInfo(translate("profileScreen.telemetryDisabled") || "Telemetry disabled")
+                    }
+                  } catch (error) {
+                    logger.error("Failed to update telemetry opt-in:", error)
+                    // Revert on error
+                    setTelemetryOptIn(!value)
+                  }
+                }}
+                testID="telemetry-opt-in-switch"
+                accessibilityLabel="telemetry-opt-in-switch"
+              />
+            </View>
+
             <Button
               text={mfaStatus?.mfaEnabled 
                 ? (translate("mfa.manageMFA") || "Manage Multi-Factor Authentication")
@@ -386,6 +435,28 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   mfaButton: {
     marginBottom: 15,
+  },
+  telemetryContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 15,
+    paddingVertical: 10,
+  },
+  telemetryLabelContainer: {
+    flex: 1,
+    marginRight: 15,
+  },
+  telemetryLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text,
+    marginBottom: 4,
+  },
+  telemetryDescription: {
+    fontSize: 14,
+    color: colors.palette.neutral600,
+    lineHeight: 20,
   },
   success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
   unverifiedBanner: {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { View, StyleSheet, Pressable, Dimensions, Modal, TouchableWithoutFeedback, ScrollView } from "react-native"
 import { useTheme } from "app/theme/ThemeContext"
 import { Ionicons } from "@expo/vector-icons"
@@ -10,6 +10,7 @@ import { Patient } from "../services/api/api.types"
 import { translate } from "../i18n"
 import { Button, Text } from "app/components"
 import { logger } from "../utils/logger"
+import telemetry from "../services/telemetry/telemetry.service"
 
 const { width } = Dimensions.get('window')
 const buttonSize = Math.min((width - 60) / 2, 160) // Max 160px width, responsive
@@ -32,10 +33,17 @@ export function ReportsScreen() {
   )
   const patients = useSelector(patientsSelector)
 
+  // Track screen view
+  useEffect(() => {
+    telemetry.trackScreen('ReportsScreen')
+  }, [])
+
   const handleSentimentPress = () => {
     if (selectedPatient) {
       // Set the patient in Redux state
       dispatch(setPatient(selectedPatient))
+      // Track feature usage
+      telemetry.trackFeature('sentiment_analysis', 'opened')
       // Navigate to sentiment analysis screen
       navigation.navigate("SentimentReport" as never)
     }
@@ -45,6 +53,8 @@ export function ReportsScreen() {
     if (selectedPatient) {
       // Set the patient in Redux state
       dispatch(setPatient(selectedPatient))
+      // Track feature usage
+      telemetry.trackFeature('medical_analysis', 'opened')
       // Navigate to medical analysis screen
       navigation.navigate("MedicalAnalysis" as never)
     }
@@ -54,6 +64,8 @@ export function ReportsScreen() {
     if (selectedPatient) {
       // Set the patient in Redux state
       dispatch(setPatient(selectedPatient))
+      // Track feature usage
+      telemetry.trackFeature('fraud_abuse_analysis', 'opened')
       // Navigate to fraud/abuse analysis screen
       navigation.navigate("FraudAbuseAnalysis" as never)
     }

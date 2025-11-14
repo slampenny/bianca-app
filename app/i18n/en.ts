@@ -851,6 +851,10 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     suspiciousBehaviorCount: "Suspicious Behavior Count",
   },
   profileScreen: {
+    telemetryOptIn: "Share anonymous usage data",
+    telemetryDescription: "Help us improve the app by sharing anonymous usage data. No personal information is collected.",
+    telemetryEnabled: "Telemetry enabled",
+    telemetryDisabled: "Telemetry disabled",
     languageSelector: "Language / Idioma",
     selectLanguage: "Select Language",
     theme: "Theme",
