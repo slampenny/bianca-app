@@ -114,14 +114,15 @@ resource "aws_iam_policy" "github_actions_deploy" {
       },
       {
         # SSM SendCommand requires permissions on BOTH the document AND the instances
-        # AWS managed documents can use either format, so allow both
+        # For AWS managed documents, allow on all documents in the region
+        # This is necessary because AWS managed documents may use different ARN formats
         Effect = "Allow"
         Action = [
           "ssm:SendCommand"
         ]
         Resource = [
-          "arn:aws:ssm:*::document/AWS-RunShellScript",
-          "arn:aws:ssm:*:*:document/AWS-RunShellScript"
+          "arn:aws:ssm:${var.aws_region}::document/*",
+          "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:document/*"
         ]
       },
       {
@@ -144,7 +145,9 @@ resource "aws_iam_policy" "github_actions_deploy" {
         Effect = "Allow"
         Action = [
           "ssm:GetCommandInvocation",
-          "ssm:DescribeInstanceInformation"
+          "ssm:DescribeInstanceInformation",
+          "ssm:ListCommands",
+          "ssm:ListCommandInvocations"
         ]
         Resource = "*"
       },
