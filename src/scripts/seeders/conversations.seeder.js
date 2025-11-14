@@ -152,10 +152,206 @@ async function seedConversations(patient) {
   return conversations;
 }
 
+/**
+ * Add fraud/abuse pattern conversations for testing
+ * Creates conversations showing financial exploitation, abuse, and neglect patterns
+ * @param {string} patientId - The patient ID to add conversations for
+ */
+async function addFraudAbuseConversations(patientId) {
+  console.log('Adding fraud/abuse pattern conversations for patient:', patientId);
+  
+  const conversations = [];
+  const now = new Date();
+  
+  // Financial exploitation conversations (escalating over time)
+  const financialDates = [
+    new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000), // 60 days ago
+    new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000), // 45 days ago
+    new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+    new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
+    new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),  // 5 days ago
+  ];
+  
+  const financialMessages = [
+    'I met someone new online and they seem really nice. They said they need help with something.',
+    'This new friend I met asked if I could send them some money. They said it was urgent and they would pay me back. I think I should help them.',
+    'I sent five thousand dollars to my new friend through Western Union. They said it was an emergency and I needed to act now. They told me not to tell anyone about it.',
+    'I got a call from someone saying I won a prize and I need to send them money for taxes. They said I need to send ten thousand dollars immediately or I will lose the prize. This is urgent!',
+    'I need to send more money. They said I won a lottery and I need to verify my identity with gift cards. I bought five thousand dollars in gift cards. They said this is my last chance to claim the money. Don\'t tell anyone about this.'
+  ];
+  
+  for (let i = 0; i < financialDates.length; i++) {
+    const conv = new Conversation({
+      patientId: patientId,
+      messages: [],
+      history: `Financial exploitation pattern conversation ${i + 1}`,
+      analyzedData: {},
+      metadata: { source: 'fraud_abuse_seed', type: 'financial', sequence: i + 1 },
+      createdAt: financialDates[i],
+      updatedAt: financialDates[i],
+      startTime: financialDates[i],
+      endTime: new Date(financialDates[i].getTime() + 20 * 60 * 1000),
+      duration: 20,
+      status: 'completed',
+      callType: 'wellness-check',
+      cost: 0.20,
+      lineItemId: null
+    });
+    await conv.save();
+    
+    const msg = new Message({
+      role: 'patient',
+      content: financialMessages[i],
+      conversationId: conv._id
+    });
+    await msg.save();
+    
+    conv.messages.push(msg._id);
+    await conv.save();
+    conversations.push(conv);
+  }
+  
+  // Physical abuse conversations
+  const abuseDates = [
+    new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000),
+    new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000),
+    new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000),
+  ];
+  
+  const abuseMessages = [
+    'I fell down yesterday and I have a bruise on my arm. I don\'t really remember how it happened. It was an accident I think.',
+    'I have a cut on my face. I bumped into something. I am afraid to talk about it. I don\'t want to get in trouble.',
+    'Someone hit me and I have a black eye. They said I deserved it because I did something wrong. I am scared of them. I don\'t want to tell anyone because they said they would hurt me more if I did.'
+  ];
+  
+  for (let i = 0; i < abuseDates.length; i++) {
+    const conv = new Conversation({
+      patientId: patientId,
+      messages: [],
+      history: `Physical abuse pattern conversation ${i + 1}`,
+      analyzedData: {},
+      metadata: { source: 'fraud_abuse_seed', type: 'physical_abuse', sequence: i + 1 },
+      createdAt: abuseDates[i],
+      updatedAt: abuseDates[i],
+      startTime: abuseDates[i],
+      endTime: new Date(abuseDates[i].getTime() + 15 * 60 * 1000),
+      duration: 15,
+      status: 'completed',
+      callType: 'wellness-check',
+      cost: 0.15,
+      lineItemId: null
+    });
+    await conv.save();
+    
+    const msg = new Message({
+      role: 'patient',
+      content: abuseMessages[i],
+      conversationId: conv._id
+    });
+    await msg.save();
+    
+    conv.messages.push(msg._id);
+    await conv.save();
+    conversations.push(conv);
+  }
+  
+  // Emotional abuse and isolation conversations
+  const emotionalDates = [
+    new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000),
+    new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000),
+    new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000),
+  ];
+  
+  const emotionalMessages = [
+    'I am not allowed to talk to my friends anymore. They said I can\'t see them. I feel isolated and alone.',
+    'I am afraid to do anything because they control everything I do. They tell me what to do and I have to ask permission for everything. I feel worthless.',
+    'They threatened me and said they would leave if I don\'t do what they say. I am walking on eggshells. I don\'t want to upset them. I can\'t talk to anyone about this.'
+  ];
+  
+  for (let i = 0; i < emotionalDates.length; i++) {
+    const conv = new Conversation({
+      patientId: patientId,
+      messages: [],
+      history: `Emotional abuse pattern conversation ${i + 1}`,
+      analyzedData: {},
+      metadata: { source: 'fraud_abuse_seed', type: 'emotional_abuse', sequence: i + 1 },
+      createdAt: emotionalDates[i],
+      updatedAt: emotionalDates[i],
+      startTime: emotionalDates[i],
+      endTime: new Date(emotionalDates[i].getTime() + 18 * 60 * 1000),
+      duration: 18,
+      status: 'completed',
+      callType: 'wellness-check',
+      cost: 0.18,
+      lineItemId: null
+    });
+    await conv.save();
+    
+    const msg = new Message({
+      role: 'patient',
+      content: emotionalMessages[i],
+      conversationId: conv._id
+    });
+    await msg.save();
+    
+    conv.messages.push(msg._id);
+    await conv.save();
+    conversations.push(conv);
+  }
+  
+  // Neglect conversations
+  const neglectDates = [
+    new Date(now.getTime() - 50 * 24 * 60 * 60 * 1000),
+    new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000),
+    new Date(now.getTime() - 12 * 24 * 60 * 60 * 1000),
+  ];
+  
+  const neglectMessages = [
+    'I haven\'t eaten in two days. There is no food in the house. I am hungry and I don\'t know what to do.',
+    'I haven\'t taken my medication in a week. I ran out and no one will help me get more. I need medical care but I can\'t see a doctor.',
+    'I have been left alone for days. No one visits me. No one calls. I am all alone and I feel forgotten. I need help but there is no one here.'
+  ];
+  
+  for (let i = 0; i < neglectDates.length; i++) {
+    const conv = new Conversation({
+      patientId: patientId,
+      messages: [],
+      history: `Neglect pattern conversation ${i + 1}`,
+      analyzedData: {},
+      metadata: { source: 'fraud_abuse_seed', type: 'neglect', sequence: i + 1 },
+      createdAt: neglectDates[i],
+      updatedAt: neglectDates[i],
+      startTime: neglectDates[i],
+      endTime: new Date(neglectDates[i].getTime() + 22 * 60 * 1000),
+      duration: 22,
+      status: 'completed',
+      callType: 'wellness-check',
+      cost: 0.22,
+      lineItemId: null
+    });
+    await conv.save();
+    
+    const msg = new Message({
+      role: 'patient',
+      content: neglectMessages[i],
+      conversationId: conv._id
+    });
+    await msg.save();
+    
+    conv.messages.push(msg._id);
+    await conv.save();
+    conversations.push(conv);
+  }
+  
+  console.log(`Added ${conversations.length} fraud/abuse pattern conversations`);
+  return conversations;
+}
+
 module.exports = {
   seedConversations,
   addDecliningPatientConversations,
   addNormalPatientConversations,
   addRecentPatientConversations,
+  addFraudAbuseConversations,
 };
 

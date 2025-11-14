@@ -60,6 +60,21 @@ async function seedDatabase() {
     const patient1 = patients[0];
     const patient2 = patients[1];
 
+    // Create a third patient for fraud/abuse testing
+    const patient3 = new Patient({
+      name: 'Vulnerable Victim',
+      email: 'vulnerable@example.org',
+      phone: '1234567892',
+      caregivers: [caregiverOneRecord.id],
+      org: caregiverOneRecord.org,
+      schedules: [],
+      isActive: true
+    });
+    await patient3.save();
+    caregiverOneRecord.patients.push(patient3._id);
+    await caregiverOneRecord.save();
+    patients.push(patient3);
+
     // Seed conversations
     const conversations = await conversationsSeeder.seedConversations(patient1);
     
@@ -68,6 +83,9 @@ async function seedDatabase() {
     await conversationsSeeder.addNormalPatientConversations(patient2._id);
     await conversationsSeeder.addRecentPatientConversations(patient1._id);
     await conversationsSeeder.addRecentPatientConversations(patient2._id);
+    
+    // Add fraud/abuse pattern conversations for patient3
+    await conversationsSeeder.addFraudAbuseConversations(patient3._id);
 
     // Seed schedules
     await schedulesSeeder.seedSchedules(patients);
@@ -125,7 +143,7 @@ async function seedDatabase() {
     return { 
       org, 
       caregiver: caregiverOneRecord, 
-      patients: [patient1, patient2], 
+      patients: [patient1, patient2, patient3], 
       invoice, 
       paymentMethods 
     };

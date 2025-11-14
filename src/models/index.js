@@ -15,6 +15,7 @@ module.exports.Message = Message;
 module.exports.Conversation = Conversation;
 module.exports.MedicalAnalysis = require('./medicalAnalysis.model');
 module.exports.MedicalBaseline = require('./medicalBaseline.model');
+module.exports.FraudAbuseAnalysis = require('./fraudAbuseAnalysis.model');
 module.exports.PaymentMethod = require('./paymentMethod.model');
 module.exports.Report = require('./report.model');
 module.exports.Schedule = require('./schedule.model');
