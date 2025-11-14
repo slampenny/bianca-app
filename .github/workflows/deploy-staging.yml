@@ -90,6 +90,11 @@ jobs:
           wait
           echo "✅ All images pushed successfully!"
 
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
       - name: Deploy infrastructure (if changed)
         working-directory: backend/devops/terraform
         run: |
