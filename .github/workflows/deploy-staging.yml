@@ -100,11 +100,18 @@ jobs:
         working-directory: backend/devops/terraform
         run: |
           terraform init
+          
+          echo "📋 Running terraform plan..."
           PLAN_OUTPUT=$(terraform plan -no-color -input=false 2>&1)
           PLAN_EXIT=$?
           
+          # Always show the plan output for debugging
+          echo "$PLAN_OUTPUT"
+          
           if [ $PLAN_EXIT -ne 0 ]; then
-            echo "❌ Terraform plan failed"
+            echo "❌ Terraform plan failed with exit code $PLAN_EXIT"
+            echo "Plan output:"
+            echo "$PLAN_OUTPUT"
             exit 1
           elif echo "$PLAN_OUTPUT" | grep -q "No changes"; then
             echo "✅ No infrastructure changes detected. Skipping Terraform apply."
