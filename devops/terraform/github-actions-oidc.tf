@@ -183,6 +183,84 @@ resource "aws_iam_policy" "github_actions_deploy" {
         Resource = [
           "arn:aws:dynamodb:${var.aws_region}:${var.aws_account_id}:table/terraform-state-lock"
         ]
+      },
+      {
+        # Terraform needs read-only access to query all resources in state
+        # These are read-only operations required for terraform plan/apply
+        Effect = "Allow"
+        Action = [
+          # EC2 read operations
+          "ec2:DescribeImages",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeInternetGateways",
+          "ec2:DescribeNatGateways",
+          "ec2:DescribeNetworkAcls",
+          "ec2:DescribeVpcAttribute",
+          "ec2:DescribeTags",
+          # ELBv2 (ALB) read operations
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DescribeRules",
+          "elasticloadbalancing:DescribeListeners",
+          # Route53 read operations
+          "route53:ListHostedZones",
+          "route53:GetHostedZone",
+          "route53:ListResourceRecordSets",
+          # ACM read operations
+          "acm:ListCertificates",
+          "acm:DescribeCertificate",
+          # IAM read operations (for resources Terraform manages)
+          "iam:GetRole",
+          "iam:GetPolicy",
+          "iam:GetOpenIDConnectProvider",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListInstanceProfilesForRole",
+          # KMS read operations
+          "kms:DescribeKey",
+          "kms:ListKeys",
+          "kms:ListAliases",
+          # S3 read operations (beyond state bucket)
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketLifecycleConfiguration",
+          "s3:GetBucketLogging",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketOwnershipControls",
+          "s3:GetBucketAcl",
+          "s3:GetBucketCors",
+          "s3:GetBucketWebsite",
+          # EFS read operations
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets",
+          # ECS read operations
+          "ecs:DescribeClusters",
+          "ecs:DescribeServices",
+          "ecs:DescribeTaskDefinition",
+          "ecs:ListTasks",
+          # ECR read operations (already have some, adding DescribeRepositories)
+          "ecr:DescribeRepositories",
+          # CloudWatch Logs read operations
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          # EventBridge read operations
+          "events:DescribeRule",
+          "events:ListRules",
+          # SES read operations
+          "ses:GetIdentityVerificationAttributes",
+          "ses:DescribeReceiptRuleSet",
+          "ses:ListIdentities",
+          # SNS read operations
+          "sns:GetTopicAttributes",
+          "sns:ListTopics"
+        ]
+        Resource = "*"
       }
     ]
   })
