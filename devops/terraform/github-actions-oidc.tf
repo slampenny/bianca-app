@@ -88,9 +88,19 @@ resource "aws_iam_policy" "github_actions_deploy" {
         ]
       },
       {
+        # DescribeInstances is a list operation and cannot use resource-based conditions
+        # It needs to be allowed without conditions to list instances
         Effect = "Allow"
         Action = [
           "ec2:DescribeInstances",
+          "ec2:DescribeInstanceStatus"
+        ]
+        Resource = "*"
+      },
+      {
+        # Start/Stop operations can use resource-based conditions
+        Effect = "Allow"
+        Action = [
           "ec2:StartInstances",
           "ec2:StopInstances"
         ]
