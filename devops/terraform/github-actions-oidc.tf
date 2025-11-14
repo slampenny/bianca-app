@@ -64,6 +64,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
     Version = "2012-10-17"
     Statement = [
       {
+        # GetAuthorizationToken must be allowed with Resource: "*" (cannot be restricted to specific repos)
         Effect = "Allow"
         Action = [
           "ecr:GetAuthorizationToken"
