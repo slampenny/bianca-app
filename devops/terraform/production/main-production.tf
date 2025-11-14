@@ -1,6 +1,9 @@
 provider "aws" {
-  region  = var.aws_region
-  profile = var.aws_profile
+  region = var.aws_region
+  
+  # Only use profile if explicitly set (for local development)
+  # In CI/CD (GitHub Actions), use environment variables instead
+  profile = var.aws_profile != "" ? var.aws_profile : null
 }
 
 ################################################################################
@@ -14,9 +17,9 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS CLI profile to use for authentication."
+  description = "AWS CLI profile to use for authentication (leave empty to use environment variables)."
   type        = string
-  default     = "jordan"
+  default     = ""
 }
 
 variable "aws_account_id" {

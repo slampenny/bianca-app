@@ -112,26 +112,37 @@ resource "aws_iam_policy" "github_actions_deploy" {
         }
       },
       {
+        # SSM SendCommand on instances - must allow on instances without tag condition
+        # because the condition is evaluated on the instance, not the document
         Effect = "Allow"
         Action = [
-          "ssm:SendCommand",
-          "ssm:GetCommandInvocation",
-          "ssm:DescribeInstanceInformation"
+          "ssm:SendCommand"
         ]
-        Resource = "*"
+        Resource = [
+          "arn:aws:ec2:${var.aws_region}:${var.aws_account_id}:instance/*"
+        ]
         Condition = {
           StringEquals = {
-            "ssm:resourceTag/Name" = "bianca-staging"
+            "ec2:ResourceTag/Name" = "bianca-staging"
           }
         }
       },
       {
+        # SSM document permissions - must allow on the document itself
         Effect = "Allow"
         Action = [
-          "ssm:SendCommand",
-          "ssm:GetCommandInvocation"
+          "ssm:SendCommand"
         ]
-        Resource = "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:document/AWS-RunShellScript"
+        Resource = "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript"
+      },
+      {
+        # Get command results and describe instances
+        Effect = "Allow"
+        Action = [
+          "ssm:GetCommandInvocation",
+          "ssm:DescribeInstanceInformation"
+        ]
+        Resource = "*"
       },
       {
         Effect = "Allow"
