@@ -29,8 +29,9 @@ jobs:
         with:
           repository: slampenny/bianca-app-frontend
           path: frontend
-          # GITHUB_TOKEN should work if both repos are in same org
-          # If it fails, you may need to add a PAT as a secret
+          token: ${{ secrets.FRONTEND_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+        id: checkout-frontend
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -55,10 +56,17 @@ jobs:
           docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-backend:staging . &
           BACKEND_PID=$!
           
-          cd ../frontend
-          docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-frontend:staging \
-            -f devops/Dockerfile --build-arg BUILD_ENV=staging . &
-          FRONTEND_PID=$!
+          # Only build frontend if checkout succeeded
+          if [ "${{ steps.checkout-frontend.outcome }}" == "success" ] && [ -d "../frontend" ]; then
+            cd ../frontend
+            docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-frontend:staging \
+              -f devops/Dockerfile --build-arg BUILD_ENV=staging . &
+            FRONTEND_PID=$!
+            BUILD_FRONTEND=true
+          else
+            echo "⚠️  Frontend checkout failed or not available, skipping frontend build"
+            BUILD_FRONTEND=false
+          fi
           
           cd ../backend/devops/asterisk
           docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-asterisk:staging . &
@@ -66,13 +74,17 @@ jobs:
           
           # Wait for all builds
           wait $BACKEND_PID && echo "✅ Backend build complete" || exit 1
-          wait $FRONTEND_PID && echo "✅ Frontend build complete" || exit 1
+          if [ "$BUILD_FRONTEND" = true ]; then
+            wait $FRONTEND_PID && echo "✅ Frontend build complete" || exit 1
+          fi
           wait $ASTERISK_PID && echo "✅ Asterisk build complete" || exit 1
           
           # Push all images in parallel
           echo "📦 Pushing images to ECR in parallel..."
           docker push ${{ env.ECR_REGISTRY }}/bianca-app-backend:staging &
-          docker push ${{ env.ECR_REGISTRY }}/bianca-app-frontend:staging &
+          if [ "$BUILD_FRONTEND" = true ]; then
+            docker push ${{ env.ECR_REGISTRY }}/bianca-app-frontend:staging &
+          fi
           docker push ${{ env.ECR_REGISTRY }}/bianca-app-asterisk:staging &
           
           wait
