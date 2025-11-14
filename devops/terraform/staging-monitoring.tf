@@ -101,4 +101,9 @@ resource "aws_cloudwatch_dashboard" "staging_costs" {
       }
     ]
   })
+
+  # Ignore changes to dashboard_body when instance ID changes (prevents unnecessary updates)
+  lifecycle {
+    ignore_changes = [dashboard_body]
+  }
 }

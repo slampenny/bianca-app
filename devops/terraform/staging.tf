@@ -583,12 +583,13 @@ resource "aws_iam_role_policy" "staging_lambda_policy" {
 
 # Lambda for auto-stop (saves money)
 resource "aws_lambda_function" "staging_auto_stop" {
-  filename      = "staging-auto-stop.zip"
-  function_name = "bianca-staging-auto-stop"
-  role          = aws_iam_role.staging_lambda_role.arn
-  handler       = "index.handler"
-  runtime       = "python3.12"
-  timeout       = 60
+  filename         = data.archive_file.staging_auto_stop.output_path
+  function_name    = "bianca-staging-auto-stop"
+  role             = aws_iam_role.staging_lambda_role.arn
+  handler          = "index.handler"
+  runtime          = "python3.12"
+  timeout          = 60
+  source_code_hash = data.archive_file.staging_auto_stop.output_base64sha256
 
   environment {
     variables = {
