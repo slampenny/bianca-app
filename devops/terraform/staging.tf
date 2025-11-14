@@ -397,6 +397,29 @@ resource "aws_lb_target_group" "staging_frontend" {
   }
 }
 
+# Analytics Target Group (PostHog on port 8000)
+resource "aws_lb_target_group" "staging_analytics" {
+  name     = "bianca-staging-analytics-tg"
+  port     = 8000
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.staging.id
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200,302"
+    path                = "/"
+    timeout             = 5
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name        = "bianca-staging-analytics-tg"
+    Environment = "staging"
+  }
+}
+
 resource "aws_lb_target_group_attachment" "staging_api" {
   target_group_arn = aws_lb_target_group.staging_api.arn
   target_id        = aws_instance.staging.id
@@ -407,6 +430,12 @@ resource "aws_lb_target_group_attachment" "staging_frontend" {
   target_group_arn = aws_lb_target_group.staging_frontend.arn
   target_id        = aws_instance.staging.id
   port             = 80
+}
+
+resource "aws_lb_target_group_attachment" "staging_analytics" {
+  target_group_arn = aws_lb_target_group.staging_analytics.arn
+  target_id        = aws_instance.staging.id
+  port             = 8000
 }
 
 # ALB Listener for HTTP to HTTPS redirect
@@ -493,6 +522,19 @@ resource "aws_route53_record" "staging_frontend" {
   }
 }
 
+# Route 53 for staging analytics (PostHog)
+resource "aws_route53_record" "staging_analytics" {
+  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  name    = "staging-analytics.myphonefriend.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.staging.dns_name
+    zone_id                = aws_lb.staging.zone_id
+    evaluate_target_health = false
+  }
+}
+
 # ACM Certificate for staging (uses the same wildcard cert as production)
 data "aws_acm_certificate" "staging_cert" {
   domain      = "*.myphonefriend.com"
@@ -527,6 +569,23 @@ resource "aws_lb_listener_rule" "staging_api_https_rule" {
   condition {
     path_pattern {
       values = ["/api/*", "/health", "/admin/*"]
+    }
+  }
+}
+
+# HTTPS Listener Rule for Analytics (PostHog)
+resource "aws_lb_listener_rule" "staging_analytics_https_rule" {
+  listener_arn = aws_lb_listener.staging_https.arn
+  priority     = 90
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.staging_analytics.arn
+  }
+
+  condition {
+    host_header {
+      values = ["staging-analytics.myphonefriend.com"]
     }
   }
 }
@@ -581,26 +640,7 @@ resource "aws_iam_role_policy" "staging_lambda_policy" {
   })
 }
 
-# Lambda for auto-stop (saves money)
-resource "aws_lambda_function" "staging_auto_stop" {
-  filename      = "staging-auto-stop.zip"
-  function_name = "bianca-staging-auto-stop"
-  role          = aws_iam_role.staging_lambda_role.arn
-  handler       = "index.handler"
-  runtime       = "python3.12"
-  timeout       = 60
-
-  environment {
-    variables = {
-      INSTANCE_ID = aws_instance.staging.id
-    }
-  }
-
-  depends_on = [
-    aws_iam_role_policy.staging_lambda_policy,
-    data.archive_file.staging_auto_stop
-  ]
-}
+# Lambda for auto-stop (saves money) - moved below data.archive_file
 
 data "archive_file" "staging_auto_stop" {
   type        = "zip"
@@ -638,6 +678,28 @@ def handler(event, context):
 EOF
     filename = "index.py"
   }
+}
+
+# Use source_code_hash to prevent unnecessary Lambda updates when code hasn't changed
+resource "aws_lambda_function" "staging_auto_stop" {
+  filename         = data.archive_file.staging_auto_stop.output_path
+  function_name    = "bianca-staging-auto-stop"
+  role             = aws_iam_role.staging_lambda_role.arn
+  handler          = "index.handler"
+  runtime          = "python3.12"
+  timeout          = 60
+  source_code_hash = data.archive_file.staging_auto_stop.output_base64sha256
+
+  environment {
+    variables = {
+      INSTANCE_ID = aws_instance.staging.id
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy.staging_lambda_policy,
+    data.archive_file.staging_auto_stop
+  ]
 }
 
 # CloudWatch Event to check every 30 minutes

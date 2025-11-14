@@ -2751,6 +2751,13 @@
   dependencies:
     debug "^4.3.1"
 
+"@posthog/core@1.5.2":
+  version "1.5.2"
+  resolved "https://registry.yarnpkg.com/@posthog/core/-/core-1.5.2.tgz#06f1277c5ac9a3d5a17bc3800172a392e594f44c"
+  integrity sha512-iedUP3EnOPPxTA2VaIrsrd29lSZnUV+ZrMnvY56timRVeZAXoYCkmjfIs3KBAsF8OUT5h1GXLSkoQdrV0r31OQ==
+  dependencies:
+    cross-spawn "^7.0.6"
+
 "@pothos/core@^3.41.0":
   version "3.41.2"
   resolved "https://registry.yarnpkg.com/@pothos/core/-/core-3.41.2.tgz#aee26de2971c3872435344bc34ce0abf9a9454bd"
@@ -5855,7 +5862,7 @@ cross-inspect@1.0.1:
   dependencies:
     tslib "^2.4.0"
 
-cross-spawn@^7.0.0, cross-spawn@^7.0.1, cross-spawn@^7.0.2, cross-spawn@^7.0.3:
+cross-spawn@^7.0.0, cross-spawn@^7.0.1, cross-spawn@^7.0.2, cross-spawn@^7.0.3, cross-spawn@^7.0.6:
   version "7.0.6"
   resolved "https://registry.yarnpkg.com/cross-spawn/-/cross-spawn-7.0.6.tgz#8a58fe78f00dcd70c370451759dfbfaf03e8ee9f"
   integrity sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==
@@ -9989,6 +9996,13 @@ postgres-interval@^1.1.0:
   integrity sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==
   dependencies:
     xtend "^4.0.0"
+
+posthog-node@^5.11.2:
+  version "5.11.2"
+  resolved "https://registry.yarnpkg.com/posthog-node/-/posthog-node-5.11.2.tgz#4983d07c5a5bfee674576ce33204d5510db11059"
+  integrity sha512-z+XekcBUmGePMsjPlGaEF2bJFiDHKHYPQjS4OEw4YPDQz8s7Owuim/L7xNX+6UJkyIRniBza9iC7bW8yrGTv1g==
+  dependencies:
+    "@posthog/core" "1.5.2"
 
 prelude-ls@^1.2.1:
   version "1.2.1"

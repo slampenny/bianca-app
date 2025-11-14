@@ -125,6 +125,12 @@ const caregiverSchema = mongoose.Schema(
       default: 'en',
       required: false,
     },
+    // Telemetry opt-in (HIPAA compliance: user must explicitly opt in)
+    telemetryOptIn: {
+      type: Boolean,
+      default: null, // null = not set, false = opted out, true = opted in
+      required: false,
+    },
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
   {

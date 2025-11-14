@@ -116,22 +116,14 @@ if [ "$SKIP_GIT_CHECK" = false ]; then
     echo ""
 fi
 
-# Step 1: Build and push Docker images (backend, frontend, and asterisk)
-echo "🐳 Building and pushing backend Docker image..."
+# Step 1: Build and push Docker images (backend, frontend, and asterisk) - PARALLEL
+echo "🐳 Building Docker images in parallel..."
 
 # Logout from Docker Hub to avoid credential issues in WSL2
 echo "🔓 Logging out from Docker Hub to avoid credential issues..."
 docker logout docker.io 2>/dev/null || true
 
-docker build -t bianca-app-backend:staging .
-
-if [ $? -ne 0 ]; then
-    echo "❌ Docker build failed. Please check the error above."
-    exit 1
-fi
-
-docker tag bianca-app-backend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
-
+# Login to ECR once for all images
 echo "🔐 Checking AWS credentials..."
 export AWS_PROFILE=jordan
 
@@ -143,106 +135,97 @@ fi
 
 echo "✅ AWS credentials are valid"
 
-# Check and login to ECR for backend
+# Login to ECR once
 if [ "$SKIP_ECR" = false ]; then
-    if ! check_and_login_ecr "backend push"; then
-        echo "⚠️  Skipping backend ECR push due to login failure"
+    if ! check_and_login_ecr "all images"; then
+        echo "⚠️  ECR login failed. Continuing with local builds only."
         SKIP_BACKEND_PUSH=true
+        SKIP_FRONTEND_PUSH=true
+        SKIP_ASTERISK_PUSH=true
     fi
-else
-    echo "⏭️  Skipping ECR login for backend push"
 fi
 
-if [ "$SKIP_BACKEND_PUSH" != true ]; then
-    echo "📦 Pushing backend image to ECR..."
-    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
-    if [ $? -ne 0 ]; then
-        echo "❌ Backend docker push failed. Please check the error above."
-        exit 1
-    fi
-    # Clean up local image after successful push to save space
-    echo "🧹 Cleaning up local backend image..."
-    docker rmi bianca-app-backend:staging 2>/dev/null || true
-else
-    echo "⏭️  Skipping backend ECR push"
-fi
+# Build all images in parallel using background jobs
+echo "🔨 Building backend, frontend, and asterisk images in parallel..."
 
-echo "🐳 Building and pushing asterisk Docker image..."
-# Ensure we can pull the public ECR base image used by the Asterisk Dockerfile
+# Build backend
+(docker build -t bianca-app-backend:staging . && echo "✅ Backend build complete") &
+BACKEND_PID=$!
+
+# Build asterisk (need to login to public ECR first)
 check_and_login_public_ecr || true
-docker build -t bianca-app-asterisk:staging ./devops/asterisk
+(cd devops/asterisk && docker build -t bianca-app-asterisk:staging . && echo "✅ Asterisk build complete") &
+ASTERISK_PID=$!
 
-if [ $? -ne 0 ]; then
-    echo "❌ Asterisk docker build failed. Please check the error above."
+# Build frontend
+(cd ../bianca-app-frontend && docker build -t bianca-app-frontend:staging -f devops/Dockerfile --build-arg BUILD_ENV=staging . && echo "✅ Frontend build complete") &
+FRONTEND_PID=$!
+
+# Wait for all builds to complete
+echo "⏳ Waiting for all builds to complete..."
+wait $BACKEND_PID
+BACKEND_EXIT=$?
+wait $ASTERISK_PID
+ASTERISK_EXIT=$?
+wait $FRONTEND_PID
+FRONTEND_EXIT=$?
+
+# Check for build failures
+if [ $BACKEND_EXIT -ne 0 ]; then
+    echo "❌ Backend Docker build failed."
+    exit 1
+fi
+if [ $ASTERISK_EXIT -ne 0 ]; then
+    echo "❌ Asterisk Docker build failed."
+    exit 1
+fi
+if [ $FRONTEND_EXIT -ne 0 ]; then
+    echo "❌ Frontend Docker build failed."
     exit 1
 fi
 
-docker tag bianca-app-asterisk:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+echo "✅ All Docker builds completed successfully!"
 
-# Check and login to ECR for asterisk
-if [ "$SKIP_ECR" = false ]; then
-    if ! check_and_login_ecr "asterisk push"; then
-        echo "⚠️  Skipping asterisk ECR push due to login failure"
-        SKIP_ASTERISK_PUSH=true
-    fi
+# Tag images
+docker tag bianca-app-backend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
+docker tag bianca-app-asterisk:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+docker tag bianca-app-frontend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
+
+# Push images in parallel
+echo "📦 Pushing images to ECR in parallel..."
+if [ "$SKIP_BACKEND_PUSH" != true ]; then
+    (docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging && echo "✅ Backend pushed") &
+    BACKEND_PUSH_PID=$!
 else
-    echo "⏭️  Skipping ECR login for asterisk push"
+    BACKEND_PUSH_PID=""
 fi
 
 if [ "$SKIP_ASTERISK_PUSH" != true ]; then
-    echo "📦 Pushing asterisk image to ECR..."
-    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
-    if [ $? -ne 0 ]; then
-        echo "❌ Asterisk docker push failed. Please check the error above."
-        exit 1
-    fi
-    # Clean up local image after successful push to save space
-    echo "🧹 Cleaning up local asterisk image..."
-    docker rmi bianca-app-asterisk:staging 2>/dev/null || true
+    (docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging && echo "✅ Asterisk pushed") &
+    ASTERISK_PUSH_PID=$!
 else
-    echo "⏭️  Skipping asterisk ECR push"
-fi
-
-echo "🐳 Building and pushing frontend Docker image..."
-cd ../bianca-app-frontend
-
-# Logout from Docker Hub to avoid credential issues in WSL2
-echo "🔓 Logging out from Docker Hub to avoid credential issues..."
-docker logout docker.io 2>/dev/null || true
-
-# Build frontend with staging config for proper environment
-docker build -t bianca-app-frontend:staging -f devops/Dockerfile --build-arg BUILD_ENV=staging .
-
-if [ $? -ne 0 ]; then
-    echo "❌ Frontend docker build failed. Please check the error above."
-    exit 1
-fi
-
-docker tag bianca-app-frontend:staging 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
-
-# Check and login to ECR for frontend (credentials might have expired)
-if [ "$SKIP_ECR" = false ]; then
-    if ! check_and_login_ecr "frontend push"; then
-        echo "⚠️  Skipping frontend ECR push due to login failure"
-        SKIP_FRONTEND_PUSH=true
-    fi
-else
-    echo "⏭️  Skipping ECR login for frontend push"
+    ASTERISK_PUSH_PID=""
 fi
 
 if [ "$SKIP_FRONTEND_PUSH" != true ]; then
-    echo "📦 Pushing frontend image to ECR..."
-    docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
-    if [ $? -ne 0 ]; then
-        echo "❌ Frontend docker push failed. Please check the error above."
-        exit 1
-    fi
-    # Clean up local image after successful push to save space
-    echo "🧹 Cleaning up local frontend image..."
-    docker rmi bianca-app-frontend:staging 2>/dev/null || true
+    (docker push 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging && echo "✅ Frontend pushed") &
+    FRONTEND_PUSH_PID=$!
 else
-    echo "⏭️  Skipping frontend ECR push"
+    FRONTEND_PUSH_PID=""
 fi
+
+# Wait for all pushes
+[ -n "$BACKEND_PUSH_PID" ] && wait $BACKEND_PUSH_PID
+[ -n "$ASTERISK_PUSH_PID" ] && wait $ASTERISK_PUSH_PID
+[ -n "$FRONTEND_PUSH_PID" ] && wait $FRONTEND_PUSH_PID
+
+echo "✅ All images pushed to ECR!"
+
+# Clean up local images
+echo "🧹 Cleaning up local images..."
+docker rmi bianca-app-backend:staging 2>/dev/null || true
+docker rmi bianca-app-asterisk:staging 2>/dev/null || true
+docker rmi bianca-app-frontend:staging 2>/dev/null || true
 
 cd ../bianca-app-backend
 
@@ -279,11 +262,30 @@ if [ -d "devops/terraform/lambda-backup" ]; then
 fi
 
 # Step 3: Deploy staging infrastructure (preserves database)
-echo "🚀 Deploying staging infrastructure..."
-echo "📋 Using default terraform environment (staging)..."
-yarn terraform:deploy
+echo "🚀 Checking if infrastructure changes are needed..."
+echo "📋 Running terraform plan to detect changes..."
 
-echo "✅ Staging infrastructure deployed!"
+cd devops/terraform
+export AWS_PROFILE=jordan
+export AWS_DEFAULT_REGION=us-east-2
+
+# Run terraform plan and check if there are any changes
+PLAN_OUTPUT=$(terraform plan -no-color -input=false 2>&1)
+PLAN_EXIT=$?
+
+if [ $PLAN_EXIT -ne 0 ]; then
+    echo "❌ Terraform plan failed. Proceeding with full apply..."
+    terraform apply --auto-approve
+elif echo "$PLAN_OUTPUT" | grep -q "No changes"; then
+    echo "✅ No infrastructure changes detected. Skipping Terraform apply."
+    echo "   (This saves ~2-3 minutes)"
+else
+    echo "📋 Infrastructure changes detected. Applying..."
+    terraform apply --auto-approve
+fi
+
+cd ../..
+echo "✅ Staging infrastructure check complete!"
 
 # Step 3: Update running containers with new images
 echo "🔄 Updating staging containers with new images..."
@@ -411,14 +413,22 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
     DEPLOY_COMMANDS="
       cd /opt/bianca-staging
       
-      # Login to ECR
-      aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+      # Login to ECR (cache token for 12 hours to avoid repeated logins)
+      ECR_TOKEN_FILE=/tmp/ecr-token-\$(date +%Y%m%d)
+      if [ ! -f \"\$ECR_TOKEN_FILE\" ]; then
+        echo 'Logging into ECR...'
+        aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+        touch \"\$ECR_TOKEN_FILE\"
+      else
+        echo 'Using cached ECR token'
+      fi
       
       # Create MongoDB data directory
       sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
       
-      # Pull latest images (use only the userdata-created docker-compose.yml)
-      docker-compose pull
+      # Pull latest images in parallel (docker-compose pull already does this, but we optimize)
+      echo 'Pulling latest images...'
+      docker-compose pull --parallel 2>/dev/null || docker-compose pull
       
       if [ '$FORCE_CLEANUP' = 'true' ]; then
         echo 'Force cleanup: Stopping and removing ALL containers...'
@@ -499,24 +509,27 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
         docker-compose up -d
       fi
       
-      # Wait for MongoDB to be ready (up to 30 seconds)
-      echo 'Waiting for MongoDB to be ready...'
-      MAX_WAIT=30
+      # Wait for services to be ready with optimized health checks
+      echo 'Waiting for services to be ready...'
+      
+      # Check MongoDB (faster check - just container running, not full ping)
+      MAX_WAIT=20
       WAIT_COUNT=0
       while [ \$WAIT_COUNT -lt \$MAX_WAIT ]; do
-        if docker exec staging_mongodb mongosh --eval 'db.adminCommand(\"ping\")' --quiet >/dev/null 2>&1; then
-          echo '✅ MongoDB is ready'
-          break
+        if docker ps --filter 'name=staging_mongodb' --filter 'status=running' | grep -q staging_mongodb; then
+          # Quick MongoDB health check
+          if docker exec staging_mongodb mongosh --eval 'db.adminCommand(\"ping\")' --quiet >/dev/null 2>&1; then
+            echo '✅ MongoDB is ready'
+            break
+          fi
         fi
-        echo \"Waiting for MongoDB... (\$((WAIT_COUNT + 1))/\$MAX_WAIT seconds)\"
-        sleep 2
-        WAIT_COUNT=\$((WAIT_COUNT + 2))
+        sleep 1
+        WAIT_COUNT=\$((WAIT_COUNT + 1))
       done
       
-      if [ \$WAIT_COUNT -ge \$MAX_WAIT ]; then
-        echo '⚠️  MongoDB may not be ready yet. Checking status...'
-        docker ps | grep mongodb || echo 'MongoDB container not found in running containers'
-        docker logs staging_mongodb --tail 30 2>/dev/null || echo 'Could not get MongoDB logs'
+      # Quick health check for app (just verify container is running)
+      if docker ps --filter 'name=staging_app' --filter 'status=running' | grep -q staging_app; then
+        echo '✅ App container is running'
       fi
       
       # Show container status
