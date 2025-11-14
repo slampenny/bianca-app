@@ -25,6 +25,7 @@ import {
   callWorkflowApi,
   sentimentApi,
   medicalAnalysisApi,
+  fraudAbuseAnalysisApi,
   stripeApi,
 } from "../services/api/"
 
@@ -44,6 +45,7 @@ const apiServices = {
   callWorkflowApi,
   sentimentApi,
   medicalAnalysisApi,
+  fraudAbuseAnalysisApi,
   stripeApi,
 } as const
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"

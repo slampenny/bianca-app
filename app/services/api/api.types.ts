@@ -405,3 +405,130 @@ export interface MedicalAnalysisSummary {
   criticalWarnings: string[]
   recentAnalyses: MedicalAnalysisTrendPoint[]
 }
+
+// Fraud and Abuse Analysis Types
+export type FraudAbuseConfidence = "high" | "medium" | "low" | "none"
+
+export interface FinancialRiskMetrics {
+  riskScore: number
+  confidence: FraudAbuseConfidence
+  indicators: Array<{
+    type: string
+    severity: "low" | "medium" | "high"
+    message: string
+  }>
+  largeAmountMentions: number
+  transferMethodMentions: number
+  scamIndicatorMentions: number
+  urgencyMentions: number
+  helpRequestMentions: number
+  relationshipMoneyMentions: number
+  temporalPatterns: {
+    hasEscalation: boolean
+    trend: "increasing" | "decreasing" | "stable" | "insufficient_data"
+    recentAverage?: number
+    earlierAverage?: number
+  }
+  flaggedPhrases: string[]
+}
+
+export interface AbuseRiskMetrics {
+  riskScore: number
+  confidence: FraudAbuseConfidence
+  indicators: Array<{
+    type: string
+    severity: "low" | "medium" | "high"
+    message: string
+  }>
+  physicalAbuseScore: number
+  emotionalAbuseScore: number
+  neglectScore: number
+  injuryMentions: number
+  isolationMentions: number
+  fearMentions: number
+  basicNeedsMentions: number
+  temporalPatterns: {
+    hasEscalation: boolean
+    trend: "increasing" | "decreasing" | "stable" | "insufficient_data"
+    recentAverage?: number
+    earlierAverage?: number
+  }
+  flaggedPhrases: string[]
+}
+
+export interface RelationshipRiskMetrics {
+  riskScore: number
+  confidence: FraudAbuseConfidence
+  indicators: Array<{
+    type: string
+    severity: "low" | "medium" | "high"
+    message: string
+  }>
+  newPeopleCount: number
+  isolationCount: number
+  controlCount: number
+  dependencyCount: number
+  suspiciousBehaviorCount: number
+  temporalChanges: {
+    hasChanges: boolean
+    hasIsolationIncrease?: boolean
+    hasNewPeopleIncrease?: boolean
+    trend: "increasing" | "decreasing" | "stable" | "insufficient_data"
+    earlyPeriod?: { count: number; messages: number }
+    middlePeriod?: { count: number; messages: number }
+    latePeriod?: { count: number; messages: number }
+  }
+  flaggedPeople: Array<{
+    context: string
+    timestamp: string
+    conversationId: string
+  }>
+  relationshipTimeline: Array<{
+    timestamp: string
+    type: "new_person" | "isolation"
+    excerpt: string
+  }>
+}
+
+export interface FraudAbuseAnalysisResult {
+  id?: string
+  patientId: string
+  analysisDate: string
+  timeRange: "month" | "quarter" | "year" | "custom"
+  conversationCount: number
+  messageCount: number
+  totalWords: number
+  financialRisk: FinancialRiskMetrics
+  abuseRisk: AbuseRiskMetrics
+  relationshipRisk: RelationshipRiskMetrics
+  overallRiskScore: number
+  confidence: FraudAbuseConfidence
+  warnings: string[]
+  recommendations: Array<{
+    category: "financial" | "abuse" | "neglect" | "relationship" | "overall" | "general"
+    priority: "low" | "medium" | "high"
+    action: string
+    description: string
+  }>
+  changeFromBaseline?: {
+    financial?: {
+      riskScore: number
+      largeAmountMentions: number
+      transferMethodMentions: number
+    }
+    abuse?: {
+      riskScore: number
+      physicalAbuseScore: number
+      emotionalAbuseScore: number
+      neglectScore: number
+    }
+    relationship?: {
+      riskScore: number
+      newPeopleCount: number
+      isolationCount: number
+    }
+    overall?: {
+      riskScore: number
+    }
+  }
+}

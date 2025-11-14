@@ -1,4 +1,12 @@
 import { defineConfig } from '@playwright/test'
+import * as fs from 'fs'
+import * as path from 'path'
+
+// Create logs directory if it doesn't exist
+const logsDir = path.join(__dirname, 'test-logs')
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true })
+}
 
 export default defineConfig({
   timeout: 60000, // Increase timeout for integration tests
@@ -13,6 +21,8 @@ export default defineConfig({
     video: 'retain-on-failure',
     testIdAttribute: 'accessibilityLabel', // Use accessibilityLabel for React Native Web
   },
+  // Capture console logs and errors
+  globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
   projects: [
     {
       name: 'chromium',

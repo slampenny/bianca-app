@@ -24,6 +24,7 @@ import {
   HealthReportScreen,
   SentimentAnalysisScreen,
   MedicalAnalysisScreen,
+  FraudAbuseAnalysisScreen,
   MFASetupScreen,
 } from "app/screens"
 import { DrawerParamList } from "./navigationTypes"
@@ -160,6 +161,7 @@ function ReportsStack() {
       <Stack.Screen name="ReportsList" component={ReportsScreen} options={() => ({ title: translate("headers.reports") })} />
       <Stack.Screen name="SentimentReport" component={SentimentAnalysisScreen} options={() => ({ title: translate("headers.sentimentAnalysis") })} />
       <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={() => ({ title: translate("headers.medicalAnalysis") })} />
+      <Stack.Screen name="FraudAbuseAnalysis" component={FraudAbuseAnalysisScreen} options={() => ({ title: translate("headers.fraudAbuseAnalysis") })} />
       <Stack.Screen name="HealthReport" component={HealthReportScreen} options={() => ({ title: translate("headers.mentalHealthReport") })} />
     </Stack.Navigator>
   )

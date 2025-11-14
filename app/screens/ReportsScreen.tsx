@@ -50,6 +50,15 @@ export function ReportsScreen() {
     }
   }
 
+  const handleFraudAbusePress = () => {
+    if (selectedPatient) {
+      // Set the patient in Redux state
+      dispatch(setPatient(selectedPatient))
+      // Navigate to fraud/abuse analysis screen
+      navigation.navigate("FraudAbuseAnalysis" as never)
+    }
+  }
+
   const handleComingSoonPress = () => {
     // TODO: Show coming soon message
     logger.debug("Coming soon pressed")
@@ -127,18 +136,23 @@ export function ReportsScreen() {
         {/* Bottom Row */}
         <View style={styles.row}>
           <Button 
-            preset="default"
-            style={[styles.button, styles.comingSoonButton, { width: buttonSize, height: buttonSize }]} 
-            onPress={handleComingSoonPress}
-            testID="coming-soon-button-1"
+            preset="primary"
+            style={[
+              styles.button, 
+              { width: buttonSize, height: buttonSize },
+              !selectedPatient && styles.buttonDisabled
+            ]} 
+            onPress={handleFraudAbusePress}
+            disabled={!selectedPatient}
+            testID="fraud-abuse-reports-button"
           >
             <View style={styles.buttonContent}>
               <Ionicons 
-                name="time" 
+                name="shield" 
                 size={32} 
-                color={colors.palette.neutral600}
+                color={colors.palette.neutral100}
               />
-              <Text style={[styles.buttonText, styles.comingSoonText]}>{translate("reportsScreen.comingSoon")}</Text>
+              <Text style={styles.buttonText}>{translate("reportsScreen.fraudAbuseAnalysis")}</Text>
             </View>
           </Button>
           

@@ -34,6 +34,10 @@ export type HomeStackParamList = {
     patientId?: string
     patientName?: string
   } | undefined
+  FraudAbuseAnalysis: {
+    patientId?: string
+    patientName?: string
+  } | undefined
   Privacy: undefined
   PrivacyPractices: undefined
   Terms: undefined
