@@ -127,7 +127,8 @@ resource "aws_iam_policy" "github_actions_deploy" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:PutObject"
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = [
           "arn:aws:s3:::bianca-terraform-state/*"
@@ -136,7 +137,8 @@ resource "aws_iam_policy" "github_actions_deploy" {
       {
         Effect = "Allow"
         Action = [
-          "s3:ListBucket"
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
         ]
         Resource = [
           "arn:aws:s3:::bianca-terraform-state"
@@ -147,7 +149,8 @@ resource "aws_iam_policy" "github_actions_deploy" {
         Action = [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
-          "dynamodb:DeleteItem"
+          "dynamodb:DeleteItem",
+          "dynamodb:DescribeTable"
         ]
         Resource = [
           "arn:aws:dynamodb:${var.aws_region}:${var.aws_account_id}:table/terraform-state-lock"
