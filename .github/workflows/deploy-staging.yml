@@ -20,7 +20,8 @@ jobs:
     steps:
       - name: Checkout backend code
         uses: actions/checkout@v4
-        path: backend
+        with:
+          path: backend
 
       - name: Checkout frontend code
         uses: actions/checkout@v4
