@@ -30,6 +30,10 @@ module.exports.psychiatricPatternDetector = require('./ai/psychiatricPatternDete
 module.exports.repetitionMemoryAnalyzer = require('./ai/repetitionMemoryAnalyzer.service');
 module.exports.speechPatternAnalyzer = require('./ai/speechPatternAnalyzer.service');
 module.exports.vocabularyAnalyzer = require('./ai/vocabularyAnalyzer.service');
+module.exports.fraudAbuseAnalyzer = require('./ai/fraudAbuseAnalyzer.service');
+module.exports.financialExploitationDetector = require('./ai/financialExploitationDetector.service');
+module.exports.abuseNeglectDetector = require('./ai/abuseNeglectDetector.service');
+module.exports.relationshipPatternAnalyzer = require('./ai/relationshipPatternAnalyzer.service');
 
 // Voice & Audio Services
 // Note: ari.client exports functions (startAriClient, getAriClientInstance, shutdownAriClient)

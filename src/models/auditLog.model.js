@@ -90,6 +90,7 @@ const auditLogSchema = mongoose.Schema(
         'org',
         'alert',
         'medicalAnalysis',
+        'fraudAbuseAnalysis',
         'payment',
         'invoice',
         'report',

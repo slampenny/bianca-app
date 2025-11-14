@@ -35,6 +35,11 @@ const PHI_ROUTES = {
   'GET /v1/medical-analysis/:patientId/baseline': { action: 'READ', resource: 'medicalAnalysis', phiAccessed: true },
   'POST /v1/medical-analysis/:patientId/baseline': { action: 'CREATE', resource: 'medicalAnalysis', phiAccessed: true },
 
+  // Fraud/abuse analysis routes (contain PHI)
+  'GET /v1/fraud-abuse-analysis/:patientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
+  'GET /v1/fraud-abuse-analysis/results/:patientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
+  'POST /v1/fraud-abuse-analysis/trigger-patient/:patientId': { action: 'CREATE', resource: 'fraudAbuseAnalysis', phiAccessed: true },
+
   // Sentiment analysis routes
   'GET /v1/sentiment/patient/:patientId/trend': { action: 'READ', resource: 'patient', phiAccessed: true },
   'GET /v1/sentiment/patient/:patientId/summary': { action: 'READ', resource: 'patient', phiAccessed: true },
