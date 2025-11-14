@@ -122,6 +122,13 @@ jobs:
             echo "✅ Terraform apply completed"
           fi
 
+      - name: Setup SSH key
+        run: |
+          # Store SSH private key from GitHub Secrets
+          echo "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" > /tmp/staging-key.pem
+          chmod 600 /tmp/staging-key.pem
+          echo "✅ SSH key configured"
+
       - name: Update staging containers
         run: |
           # Get staging instance ID (check for running instances first)
@@ -152,78 +159,63 @@ jobs:
           
           echo "📡 Updating containers on instance: $INSTANCE_ID"
           
-          # Verify instance is ready for SSM (wait up to 60 seconds)
-          echo "⏳ Waiting for SSM agent to be ready..."
+          # Get instance public IP for SSH
+          echo "⏳ Getting instance public IP..."
+          INSTANCE_IP=$(aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          
+          if [ -z "$INSTANCE_IP" ] || [ "$INSTANCE_IP" == "None" ]; then
+            echo "❌ Could not get instance public IP"
+            exit 1
+          fi
+          
+          echo "📡 Connecting to instance: $INSTANCE_IP"
+          
+          # Wait for SSH to be ready (up to 60 seconds)
+          echo "⏳ Waiting for SSH to be ready..."
           for i in {1..12}; do
-            if aws ssm describe-instance-information \
-              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
-              --region ${{ env.AWS_REGION }} \
-              --query 'InstanceInformationList[0].PingStatus' \
-              --output text 2>/dev/null | grep -q "Online"; then
-              echo "✅ SSM agent is online"
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP "echo 'SSH ready'" 2>/dev/null; then
+              echo "✅ SSH is ready"
               break
             fi
             if [ $i -eq 12 ]; then
-              echo "⚠️  SSM agent not ready after 60 seconds, proceeding anyway..."
+              echo "⚠️  SSH not ready after 60 seconds, proceeding anyway..."
             else
-              echo "   Waiting for SSM agent... ($i/12)"
+              echo "   Waiting for SSH... ($i/12)"
               sleep 5
             fi
           done
           
-          # Use SSM to update containers with optimized commands
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=[
-              "cd /opt/bianca-staging",
-              "ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)",
-              "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then",
-              "  aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com",
-              "  touch \"$ECR_TOKEN_FILE\"",
-              "fi",
-              "docker-compose pull --parallel 2>/dev/null || docker-compose pull",
-              "docker-compose up -d",
-              "sleep 5",
-              "docker ps --format \"table {{.Names}}\t{{.Status}}\" | grep staging_ || true"
-            ]' \
-            --region ${{ env.AWS_REGION }} \
-            --query 'Command.CommandId' \
-            --output text)
+          # Use SSH to update containers (simpler than SSM, no IAM permission issues)
+          ssh -o StrictHostKeyChecking=no -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP << 'EOF'
+            cd /opt/bianca-staging
+            
+            # ECR login (cache token for the day)
+            ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
+            if [ ! -f "$ECR_TOKEN_FILE" ]; then
+              aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+              touch "$ECR_TOKEN_FILE"
+            fi
+            
+            # Pull latest images
+            docker-compose pull --parallel 2>/dev/null || docker-compose pull
+            
+            # Update containers
+            docker-compose up -d
+            
+            # Show status
+            sleep 5
+            docker ps --format "table {{.Names}}\t{{.Status}}" | grep staging_ || true
+EOF
           
-          if [ -z "$COMMAND_ID" ]; then
-            echo "❌ Failed to send SSM command"
+          # SSH command executes synchronously, so if we get here, it succeeded
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment completed successfully!"
+          else
+            echo "❌ Deployment failed"
             exit 1
           fi
-          
-          echo "⏳ Waiting for deployment to complete (Command ID: $COMMAND_ID)..."
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" \
-            --region ${{ env.AWS_REGION }}
-          
-          # Get command output
-          OUTPUT=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" \
-            --region ${{ env.AWS_REGION }} \
-            --query '[StandardOutputContent, StandardErrorContent]' \
-            --output text)
-          
-          echo "📋 Deployment output:"
-          echo "$OUTPUT"
-          
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" \
-            --region ${{ env.AWS_REGION }} \
-            --query 'Status' \
-            --output text)
-          
-          if [ "$STATUS" != "Success" ]; then
-            echo "❌ Deployment failed with status: $STATUS"
-            exit 1
-          fi
-          
-          echo "✅ Deployment completed successfully!"
 
