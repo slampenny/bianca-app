@@ -16,6 +16,7 @@ jobs:
     permissions:
       contents: read
       id-token: write  # Required for OIDC
+      actions: read  # Required to checkout other repos
     
     steps:
       - name: Checkout backend code
@@ -28,7 +29,8 @@ jobs:
         with:
           repository: slampenny/bianca-app-frontend
           path: frontend
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN should work if both repos are in same org
+          # If it fails, you may need to add a PAT as a secret
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
