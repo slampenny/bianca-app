@@ -1,0 +1,176 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch: # Allow manual triggers
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: 730335291008.dkr.ecr.us-east-2.amazonaws.com
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout backend code
+        uses: actions/checkout@v4
+        path: backend
+
+      - name: Checkout frontend code
+        uses: actions/checkout@v4
+        with:
+          repository: slampenny/bianca-app-frontend
+          path: frontend
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-Staging-Deploy
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push images in parallel
+        run: |
+          # Build all images in parallel using background jobs
+          echo "🔨 Building images in parallel..."
+          
+          cd backend
+          docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-backend:staging . &
+          BACKEND_PID=$!
+          
+          cd ../frontend
+          docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-frontend:staging \
+            -f devops/Dockerfile --build-arg BUILD_ENV=staging . &
+          FRONTEND_PID=$!
+          
+          cd ../backend/devops/asterisk
+          docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-asterisk:staging . &
+          ASTERISK_PID=$!
+          
+          # Wait for all builds
+          wait $BACKEND_PID && echo "✅ Backend build complete" || exit 1
+          wait $FRONTEND_PID && echo "✅ Frontend build complete" || exit 1
+          wait $ASTERISK_PID && echo "✅ Asterisk build complete" || exit 1
+          
+          # Push all images in parallel
+          echo "📦 Pushing images to ECR in parallel..."
+          docker push ${{ env.ECR_REGISTRY }}/bianca-app-backend:staging &
+          docker push ${{ env.ECR_REGISTRY }}/bianca-app-frontend:staging &
+          docker push ${{ env.ECR_REGISTRY }}/bianca-app-asterisk:staging &
+          
+          wait
+          echo "✅ All images pushed successfully!"
+
+      - name: Deploy infrastructure (if changed)
+        working-directory: backend/devops/terraform
+        run: |
+          terraform init
+          PLAN_OUTPUT=$(terraform plan -no-color -input=false 2>&1)
+          PLAN_EXIT=$?
+          
+          if [ $PLAN_EXIT -ne 0 ]; then
+            echo "❌ Terraform plan failed"
+            exit 1
+          elif echo "$PLAN_OUTPUT" | grep -q "No changes"; then
+            echo "✅ No infrastructure changes detected. Skipping Terraform apply."
+          else
+            echo "📋 Infrastructure changes detected. Applying..."
+            terraform apply -auto-approve
+          fi
+
+      - name: Update staging containers
+        run: |
+          # Get staging instance ID (check for running instances first)
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text --region ${{ env.AWS_REGION }})
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
+            echo "⚠️  Staging instance not running. Checking if it exists..."
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=bianca-staging" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text --region ${{ env.AWS_REGION }})
+            
+            if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
+              echo "❌ Staging instance not found"
+              exit 1
+            fi
+            
+            echo "🔄 Starting stopped instance..."
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+            echo "⏳ Waiting for instance to start..."
+            aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+            echo "✅ Instance started"
+            sleep 10  # Give instance time to initialize
+          fi
+          
+          echo "📡 Updating containers on instance: $INSTANCE_ID"
+          
+          # Use SSM to update containers with optimized commands
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /opt/bianca-staging",
+              "ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)",
+              "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then",
+              "  aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com",
+              "  touch \"$ECR_TOKEN_FILE\"",
+              "fi",
+              "docker-compose pull --parallel 2>/dev/null || docker-compose pull",
+              "docker-compose up -d",
+              "sleep 5",
+              "docker ps --format \"table {{.Names}}\t{{.Status}}\" | grep staging_ || true"
+            ]' \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Command.CommandId' \
+            --output text)
+          
+          if [ -z "$COMMAND_ID" ]; then
+            echo "❌ Failed to send SSM command"
+            exit 1
+          fi
+          
+          echo "⏳ Waiting for deployment to complete (Command ID: $COMMAND_ID)..."
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --region ${{ env.AWS_REGION }}
+          
+          # Get command output
+          OUTPUT=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --region ${{ env.AWS_REGION }} \
+            --query '[StandardOutputContent, StandardErrorContent]' \
+            --output text)
+          
+          echo "📋 Deployment output:"
+          echo "$OUTPUT"
+          
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Status' \
+            --output text)
+          
+          if [ "$STATUS" != "Success" ]; then
+            echo "❌ Deployment failed with status: $STATUS"
+            exit 1
+          fi
+          
+          echo "✅ Deployment completed successfully!"
+
