@@ -56,6 +56,7 @@ resource "aws_cloudwatch_metric_alarm" "staging_low_network" {
 }
 
 # CloudWatch Dashboard for staging costs
+# Use lifecycle ignore_changes to prevent drift when instance ID changes
 resource "aws_cloudwatch_dashboard" "staging_costs" {
   dashboard_name = "Bianca-Staging-Costs"
 
@@ -101,4 +102,9 @@ resource "aws_cloudwatch_dashboard" "staging_costs" {
       }
     ]
   })
+
+  # Ignore changes to dashboard_body when instance ID changes (prevents unnecessary updates)
+  lifecycle {
+    ignore_changes = [dashboard_body]
+  }
 }

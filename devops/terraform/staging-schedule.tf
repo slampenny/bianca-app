@@ -3,12 +3,13 @@
 
 # Lambda function to start/stop instance on schedule
 resource "aws_lambda_function" "staging_scheduler" {
-  filename      = "staging-scheduler.zip"
-  function_name = "bianca-staging-scheduler"
-  role          = aws_iam_role.staging_lambda_role.arn
-  handler       = "index.handler"
-  runtime       = "python3.12"
-  timeout       = 60
+  filename         = data.archive_file.staging_scheduler.output_path
+  function_name    = "bianca-staging-scheduler"
+  role             = aws_iam_role.staging_lambda_role.arn
+  handler          = "index.handler"
+  runtime          = "python3.12"
+  timeout          = 60
+  source_code_hash = data.archive_file.staging_scheduler.output_base64sha256
 
   environment {
     variables = {

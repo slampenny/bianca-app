@@ -66,6 +66,11 @@ const PHI_ROUTES = {
   'GET /v1/patients/:id/export': { action: 'EXPORT', resource: 'patient', phiAccessed: true, highRisk: true },
   'GET /v1/conversations/:id/export': { action: 'EXPORT', resource: 'conversation', phiAccessed: true, highRisk: true },
   'POST /v1/reports/export': { action: 'EXPORT', resource: 'report', phiAccessed: true, highRisk: true },
+
+  // Telemetry routes (no PHI, but audited for compliance)
+  'POST /v1/telemetry/track': { action: 'CREATE', resource: 'telemetry', phiAccessed: false },
+  'POST /v1/telemetry/identify': { action: 'CREATE', resource: 'telemetry', phiAccessed: false },
+  'POST /v1/telemetry/opt-in': { action: 'UPDATE', resource: 'telemetry', phiAccessed: false },
 };
 
 // Authentication events that need auditing
