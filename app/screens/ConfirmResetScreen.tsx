@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
@@ -14,70 +14,140 @@ import { logger } from "../utils/logger"
 import { TIMEOUTS } from "../constants"
 import type { ErrorResponse } from "../types"
 
-const createStyles = (colors: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.palette.neutral100,
-    padding: spacing.lg,
-  },
-  screenContentContainer: {
-    flexGrow: 1,
-    padding: spacing.lg,
-  },
-  content: {
-    flex: 1,
-    padding: spacing.md,
-  },
-  title: {
-    color: colors.palette.neutral800,
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: spacing.md,
-  },
-  subtitle: {
-    color: colors.palette.neutral600,
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-    lineHeight: 24,
-  },
-  errorText: {
-    color: colors.palette.angry500,
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: colors.palette.angry100,
-    borderRadius: 4,
-  },
-  form: {
-    marginTop: spacing.lg,
-  },
-  textField: {
-    marginBottom: spacing.md,
-  },
-  resetButton: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  backButton: {
-    marginTop: spacing.sm,
-  },
-  message: {
-    color: colors.palette.neutral600,
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-    lineHeight: 24,
-  },
-  formContainer: {
-    marginBottom: spacing.lg,
-  },
-  buttonContainer: {
-    marginTop: spacing.lg,
-  },
-})
+const createStyles = (colors: any) => {
+  if (!colors || !colors.palette) {
+    // Return default styles if colors is not available
+    return StyleSheet.create({
+      container: {
+        flex: 1,
+        backgroundColor: "#FFFFFF",
+        padding: spacing.lg,
+      },
+      screenContentContainer: {
+        flexGrow: 1,
+        padding: spacing.lg,
+      },
+      content: {
+        flex: 1,
+        padding: spacing.md,
+      },
+      title: {
+        color: "#000000",
+        fontSize: 24,
+        fontWeight: "bold",
+        textAlign: "center",
+        marginBottom: spacing.md,
+      },
+      subtitle: {
+        color: "#666666",
+        fontSize: 16,
+        textAlign: "center",
+        marginBottom: spacing.xl,
+        lineHeight: 24,
+      },
+      errorText: {
+        color: "#FF0000",
+        fontSize: 14,
+        textAlign: "center",
+        marginBottom: spacing.md,
+        padding: spacing.sm,
+        backgroundColor: "#FFE5E5",
+        borderRadius: 4,
+      },
+      form: {
+        marginTop: spacing.lg,
+      },
+      textField: {
+        marginBottom: spacing.md,
+      },
+      resetButton: {
+        marginTop: spacing.lg,
+        marginBottom: spacing.md,
+      },
+      backButton: {
+        marginTop: spacing.sm,
+      },
+      message: {
+        color: "#666666",
+        fontSize: 16,
+        textAlign: "center",
+        marginBottom: spacing.xl,
+        lineHeight: 24,
+      },
+      formContainer: {
+        marginBottom: spacing.lg,
+      },
+      buttonContainer: {
+        marginTop: spacing.lg,
+      },
+    })
+  }
+
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.palette.neutral100,
+      padding: spacing.lg,
+    },
+    screenContentContainer: {
+      flexGrow: 1,
+      padding: spacing.lg,
+    },
+    content: {
+      flex: 1,
+      padding: spacing.md,
+    },
+    title: {
+      color: colors.palette.neutral800,
+      fontSize: 24,
+      fontWeight: "bold",
+      textAlign: "center",
+      marginBottom: spacing.md,
+    },
+    subtitle: {
+      color: colors.palette.neutral600,
+      fontSize: 16,
+      textAlign: "center",
+      marginBottom: spacing.xl,
+      lineHeight: 24,
+    },
+    errorText: {
+      color: colors.palette.angry500,
+      fontSize: 14,
+      textAlign: "center",
+      marginBottom: spacing.md,
+      padding: spacing.sm,
+      backgroundColor: colors.palette.angry100,
+      borderRadius: 4,
+    },
+    form: {
+      marginTop: spacing.lg,
+    },
+    textField: {
+      marginBottom: spacing.md,
+    },
+    resetButton: {
+      marginTop: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    backButton: {
+      marginTop: spacing.sm,
+    },
+    message: {
+      color: colors.palette.neutral600,
+      fontSize: 16,
+      textAlign: "center",
+      marginBottom: spacing.xl,
+      lineHeight: 24,
+    },
+    formContainer: {
+      marginBottom: spacing.lg,
+    },
+    buttonContainer: {
+      marginTop: spacing.lg,
+    },
+  })
+}
 
 type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
 
@@ -88,11 +158,17 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const { colors, isLoading: themeLoading } = useTheme()
   const { toast, showError, hideToast } = useToast()
 
+  // Memoize styles to ensure they're only created when colors is available
+  const styles = useMemo(() => {
+    if (themeLoading || !colors) {
+      return createStyles(null) // Use fallback styles
+    }
+    return createStyles(colors)
+  }, [colors, themeLoading])
+
   if (themeLoading || !colors) {
     return null
   }
-
-  const styles = createStyles(colors)
 
   const [resetPassword, { isLoading }] = useResetPasswordMutation()
   const [newPassword, setNewPassword] = useState("")
