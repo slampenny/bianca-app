@@ -321,12 +321,13 @@ jobs:
             echo '🔍 Checking image versions:' &&
             docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}' | grep 'bianca-app\|ECR' | head -5 || true
           "
-          
-          # SSH command executes synchronously, so if we get here, it succeeded
-          if [ $? -eq 0 ]; then
-            echo "✅ Deployment completed successfully!"
-          else
-            echo "❌ Deployment failed"
-            exit 1
+            
+            # SSH command executes synchronously, so if we get here, it succeeded
+            if [ $? -eq 0 ]; then
+              echo "✅ Deployment completed successfully!"
+            else
+              echo "❌ Deployment failed"
+              exit 1
+            fi
           fi
 
