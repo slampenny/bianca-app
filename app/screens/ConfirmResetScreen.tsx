@@ -20,12 +20,49 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.palette.neutral100,
     padding: spacing.lg,
   },
+  screenContentContainer: {
+    flexGrow: 1,
+    padding: spacing.lg,
+  },
+  content: {
+    flex: 1,
+    padding: spacing.md,
+  },
   title: {
     color: colors.palette.neutral800,
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: spacing.md,
+  },
+  subtitle: {
+    color: colors.palette.neutral600,
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  errorText: {
+    color: colors.palette.angry500,
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    backgroundColor: colors.palette.angry100,
+    borderRadius: 4,
+  },
+  form: {
+    marginTop: spacing.lg,
+  },
+  textField: {
+    marginBottom: spacing.md,
+  },
+  resetButton: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  backButton: {
+    marginTop: spacing.sm,
   },
   message: {
     color: colors.palette.neutral600,
@@ -189,7 +226,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   return (
     <Screen 
       preset="auto" 
-      contentContainerStyle={$screenContentContainer}
+      contentContainerStyle={styles.screenContentContainer}
       safeAreaEdges={["top"]}
     >
       <Header 
@@ -198,27 +235,27 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
         onLeftPress={() => navigation.goBack()}
       />
       
-      <View style={$content}>
+      <View style={styles.content}>
         <Text 
           preset="heading" 
           text={translate("confirmResetScreen.title")} 
-          style={$title}
+          style={styles.title}
         />
         
         <Text 
           preset="default"
           text={translate("confirmResetScreen.subtitle")}
-          style={$subtitle}
+          style={styles.subtitle}
         />
 
         {generalError ? (
           <Text 
             text={generalError}
-            style={$errorText}
+            style={styles.errorText}
           />
         ) : null}
 
-        <View style={$form}>
+        <View style={styles.form}>
           <TextField
             value={newPassword}
             onChangeText={(text) => {
@@ -230,7 +267,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
             secureTextEntry
             status={passwordError ? "error" : undefined}
             helper={passwordError}
-            containerStyle={$textField}
+            containerStyle={styles.textField}
           />
 
           <TextField
@@ -244,21 +281,21 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
             secureTextEntry
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError}
-            containerStyle={$textField}
+            containerStyle={styles.textField}
           />
 
           <Button
             text={isLoading ? "Resetting Password..." : "Reset Password"}
             onPress={handleConfirmReset}
             disabled={isLoading || !newPassword || !confirmPassword}
-            style={$resetButton}
+            style={styles.resetButton}
           />
 
           <Button
             text="Back to Login"
             onPress={() => navigation.navigate("Login")}
             preset="default"
-            style={$backButton}
+            style={styles.backButton}
           />
         </View>
       </View>
