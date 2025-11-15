@@ -81,8 +81,13 @@ const defaultStyles = StyleSheet.create({
 })
 
 const createStyles = (colors: any) => {
-  // Always check if colors exists and has palette before accessing
-  if (typeof colors === 'undefined' || colors === null || typeof colors.palette === 'undefined' || colors.palette === null) {
+  // Always check if colors exists FIRST before accessing colors.palette
+  // Accessing colors.palette when colors is undefined will throw "colors is not defined"
+  if (typeof colors === 'undefined' || colors === null) {
+    return defaultStyles
+  }
+  // Now safe to check colors.palette
+  if (typeof colors.palette === 'undefined' || colors.palette === null) {
     return defaultStyles
   }
 
@@ -172,8 +177,13 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
 
   // Memoize styles to ensure they're only created when colors is available
   const styles = useMemo(() => {
-    // Always use fallback styles if colors is not available or doesn't have palette
-    if (themeLoading || typeof colors === 'undefined' || colors === null || typeof colors.palette === 'undefined' || colors.palette === null) {
+    // Always use fallback styles if colors is not available
+    // Check colors FIRST before accessing colors.palette to avoid "colors is not defined" error
+    if (themeLoading || typeof colors === 'undefined' || colors === null) {
+      return defaultStyles
+    }
+    // Now safe to check colors.palette
+    if (typeof colors.palette === 'undefined' || colors.palette === null) {
       return defaultStyles
     }
     return createStyles(colors)
