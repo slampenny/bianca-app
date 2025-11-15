@@ -88,7 +88,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const { colors, isLoading: themeLoading } = useTheme()
   const { toast, showError, hideToast } = useToast()
 
-  if (themeLoading) {
+  if (themeLoading || !colors) {
     return null
   }
 
