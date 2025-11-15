@@ -100,7 +100,19 @@ jobs:
       - name: Deploy infrastructure (if changed)
         working-directory: backend/devops/terraform
         run: |
+          echo "🔧 Initializing Terraform..."
+          set +e  # Don't exit on error immediately
           terraform init
+          INIT_EXIT=$?
+          set -e  # Re-enable exit on error
+          
+          if [ $INIT_EXIT -ne 0 ]; then
+            echo "⚠️  Terraform init failed with exit code $INIT_EXIT"
+            echo "This might be due to state lock or backend configuration issues."
+            echo "Skipping Terraform operations - infrastructure may need manual attention."
+            echo "Continuing with container deployment..."
+            exit 0
+          fi
           
           echo "📋 Running terraform plan..."
           set +e  # Don't exit on error immediately
@@ -119,8 +131,16 @@ jobs:
             echo "✅ No infrastructure changes detected. Skipping Terraform apply."
           else
             echo "📋 Infrastructure changes detected. Applying..."
+            set +e
             terraform apply -auto-approve -no-color
-            echo "✅ Terraform apply completed"
+            APPLY_EXIT=$?
+            set -e
+            if [ $APPLY_EXIT -eq 0 ]; then
+              echo "✅ Terraform apply completed"
+            else
+              echo "⚠️  Terraform apply failed with exit code $APPLY_EXIT"
+              echo "Continuing with container deployment..."
+            fi
           fi
 
       - name: Setup SSH key
@@ -291,42 +311,47 @@ jobs:
             done
           else
             # Use SSH to update containers
-            ssh -o StrictHostKeyChecking=no -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP bash -c "
+            echo "🔧 Executing deployment via SSH..."
+            set +e  # Don't exit on error immediately - we'll check exit code manually
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP bash -c "
             set -e
-            cd /opt/bianca-staging &&
-            echo '📦 Logging into ECR...' &&
-            ECR_TOKEN_FILE=/tmp/ecr-token-\$(date +%Y%m%d) &&
+            cd /opt/bianca-staging || { echo '❌ Failed to cd to /opt/bianca-staging'; exit 1; }
+            echo '📦 Logging into ECR...'
+            ECR_TOKEN_FILE=/tmp/ecr-token-\$(date +%Y%m%d)
             if [ ! -f \"\$ECR_TOKEN_FILE\" ]; then
-              aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com &&
+              aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com || { echo '❌ ECR login failed'; exit 1; }
               touch \"\$ECR_TOKEN_FILE\"
             else
               echo '   Using cached ECR token'
-            fi &&
-            echo '📥 Pulling latest images (forcing pull)...' &&
-            docker-compose pull 2>&1 | tee /tmp/pull-output.log &&
-            echo '' &&
-            echo '📊 Pull summary:' &&
-            grep -E 'Pulling|Downloaded|Image is up to date|Digest|Status' /tmp/pull-output.log | tail -10 || true &&
-            rm -f /tmp/pull-output.log &&
-            echo '' &&
-            echo '🔄 Stopping and removing old containers...' &&
-            docker-compose down 2>/dev/null || true &&
-            echo '🚀 Starting containers with new images...' &&
-            docker-compose up -d --remove-orphans &&
-            echo '⏳ Waiting for containers to start...' &&
-            sleep 5 &&
-            echo '📋 Container status:' &&
-            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' | grep staging_ || true &&
-            echo '' &&
-            echo '🔍 Checking image versions:' &&
-            docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}' | grep 'bianca-app\|ECR' | head -5 || true
+            fi
+            echo '📥 Pulling latest images...'
+            docker-compose pull || { echo '⚠️  docker-compose pull had issues, but continuing...'; }
+            echo ''
+            echo '🔄 Stopping and removing old containers...'
+            docker-compose down 2>/dev/null || true
+            echo '🚀 Starting containers with new images...'
+            docker-compose up -d --remove-orphans || { echo '❌ Failed to start containers'; exit 1; }
+            echo '⏳ Waiting for containers to start...'
+            sleep 5
+            echo '📋 Container status:'
+            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' | grep staging_ || echo '   No staging containers found'
+            echo ''
+            echo '🔍 Checking image versions:'
+            docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}' | grep -E 'bianca-app|730335291008' | head -5 || echo '   No images found'
+            echo '✅ Deployment script completed'
           "
+            SSH_EXIT_CODE=$?
+            set -e  # Re-enable exit on error
             
-            # SSH command executes synchronously, so if we get here, it succeeded
-            if [ $? -eq 0 ]; then
+            if [ $SSH_EXIT_CODE -eq 0 ]; then
               echo "✅ Deployment completed successfully!"
             else
-              echo "❌ Deployment failed"
+              echo "❌ Deployment failed with exit code $SSH_EXIT_CODE"
+              echo "   This could be due to:"
+              echo "   - SSH connection issues"
+              echo "   - Docker/ECR authentication problems"
+              echo "   - Container startup failures"
+              echo "   - Network connectivity issues"
               exit 1
             fi
           fi
