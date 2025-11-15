@@ -253,6 +253,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "ecs:ListTasks",
           # ECR read operations (already have some, adding DescribeRepositories)
           "ecr:DescribeRepositories",
+          "ecr:ListTagsForResource",
           # CloudWatch Logs read operations
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",

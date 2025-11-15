@@ -192,16 +192,27 @@ jobs:
           
           # Use SSH to update containers (simpler than SSM, no IAM permission issues)
           ssh -o StrictHostKeyChecking=no -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP bash -c "
+            set -e
             cd /opt/bianca-staging &&
+            echo '📦 Logging into ECR...' &&
             ECR_TOKEN_FILE=/tmp/ecr-token-\$(date +%Y%m%d) &&
             if [ ! -f \"\$ECR_TOKEN_FILE\" ]; then
               aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com &&
               touch \"\$ECR_TOKEN_FILE\"
+            else
+              echo '   Using cached ECR token'
             fi &&
-            docker-compose pull --parallel 2>/dev/null || docker-compose pull &&
-            docker-compose up -d &&
+            echo '📥 Pulling latest images...' &&
+            docker-compose pull --quiet 2>&1 | grep -E 'Pulling|Downloaded|Image is up to date' || true &&
+            echo '🔄 Updating containers...' &&
+            docker-compose up -d --remove-orphans &&
+            echo '⏳ Waiting for containers to start...' &&
             sleep 5 &&
-            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep staging_ || true
+            echo '📋 Container status:' &&
+            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' | grep staging_ || true &&
+            echo '' &&
+            echo '🔍 Checking image versions:' &&
+            docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}' | grep 'bianca-app\|ECR' | head -5 || true
           "
           
           # SSH command executes synchronously, so if we get here, it succeeded
