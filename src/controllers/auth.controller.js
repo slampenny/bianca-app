@@ -2,6 +2,7 @@ const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const config = require('../config/config');
 const ApiError = require('../utils/ApiError');
+const logger = require('../utils/logger');
 const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService } = require('../services');
 const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
 const { auditAuthFailure } = require('../middlewares/auditLog');
@@ -244,8 +245,22 @@ const refreshTokens = catchAsync(async (req, res) => {
 });
 
 const forgotPassword = catchAsync(async (req, res) => {
-  const resetPasswordToken = await tokenService.generateResetPasswordToken(req.body.email);
-  await emailService.sendResetPasswordEmail(req.body.email, resetPasswordToken);
+  try {
+    const resetPasswordToken = await tokenService.generateResetPasswordToken(req.body.email);
+    await emailService.sendResetPasswordEmail(req.body.email, resetPasswordToken);
+  } catch (error) {
+    // Security best practice: Don't reveal if email exists or not
+    // Always return success to prevent email enumeration attacks
+    // Log the error for debugging purposes
+    if (error.statusCode === httpStatus.NOT_FOUND) {
+      logger.debug(`Password reset requested for non-existent email: ${req.body.email}`);
+    } else {
+      // Re-throw other errors (validation, email service failures, etc.)
+      throw error;
+    }
+  }
+  // Always return success (204) regardless of whether email exists
+  // This prevents attackers from enumerating valid email addresses
   res.status(httpStatus.NO_CONTENT).send();
 });
 
