@@ -14,6 +14,9 @@ import { logger } from "../utils/logger"
 import { TIMEOUTS } from "../constants"
 import type { ErrorResponse } from "../types"
 
+// Module-level log to confirm this file is loaded
+console.log('🔵 ConfirmResetScreen module loaded - v2.1 - Build: 2025-11-15-08:30')
+
 // Default fallback styles
 const defaultStyles = StyleSheet.create({
   container: {
@@ -155,10 +158,21 @@ const createStyles = (colors: any) => {
 type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
 
 export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
+  console.log('🟢 ConfirmResetScreen component rendering...')
+  
   const { navigation } = props
   const route = useRoute()
   const nav = useNavigation()
-  const { colors, isLoading: themeLoading } = useTheme()
+  
+  console.log('🟡 About to call useTheme()...')
+  const themeResult = useTheme()
+  console.log('🟡 useTheme() returned:', { 
+    hasColors: !!themeResult?.colors, 
+    isLoading: themeResult?.isLoading,
+    keys: themeResult ? Object.keys(themeResult).slice(0, 5) : 'undefined'
+  })
+  
+  const { colors, isLoading: themeLoading } = themeResult || { colors: undefined, isLoading: true }
   const { toast, showError, hideToast } = useToast()
   
   // Extract token from route params or URL query string (for web compatibility)
@@ -166,7 +180,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
 
   // Debug: Log to confirm new build is loaded
   useEffect(() => {
-    console.log('✅ ConfirmResetScreen v2.0 - NEW BUILD LOADED - Build timestamp: 2025-11-15-08:15')
+    console.log('✅ ConfirmResetScreen v2.1 - Component mounted')
     console.log('✅ Colors available:', !!colors, 'Theme loading:', themeLoading)
     console.log('✅ Colors object:', colors ? Object.keys(colors).slice(0, 5) : 'undefined')
   }, [colors, themeLoading])
@@ -177,6 +191,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
     console.log('⏳ Waiting for theme... themeLoading:', themeLoading, 'colors:', !!colors)
     return null
   }
+  
+  console.log('🟢 Theme ready, creating styles...')
 
   // Create styles - useTheme() always returns colors, but double-check just in case
   const styles = createStyles(colors)
