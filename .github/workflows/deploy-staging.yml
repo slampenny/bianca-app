@@ -154,8 +154,11 @@ jobs:
             aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
             echo "⏳ Waiting for instance to start..."
             aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
-            echo "✅ Instance started"
-            sleep 10  # Give instance time to initialize
+            echo "✅ Instance started, waiting for SSH service to be ready..."
+            sleep 30  # Give instance time to initialize SSH service
+            INSTANCE_JUST_STARTED=true
+          else
+            INSTANCE_JUST_STARTED=false
           fi
           
           echo "📡 Updating containers on instance: $INSTANCE_ID"
@@ -175,20 +178,37 @@ jobs:
           
           echo "📡 Connecting to instance: $INSTANCE_IP"
           
-          # Wait for SSH to be ready (up to 60 seconds)
-          echo "⏳ Waiting for SSH to be ready..."
-          for i in {1..12}; do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP "echo 'SSH ready'" 2>/dev/null; then
+          # Wait for SSH to be ready (longer wait if instance was just started)
+          if [ "$INSTANCE_JUST_STARTED" = "true" ]; then
+            MAX_ATTEMPTS=24  # 2 minutes for newly started instances
+            echo "⏳ Waiting for SSH to be ready (instance was just started, allowing up to 2 minutes)..."
+          else
+            MAX_ATTEMPTS=12  # 1 minute for already running instances
+            echo "⏳ Waiting for SSH to be ready..."
+          fi
+          
+          SSH_READY=false
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP "echo 'SSH ready'" 2>/dev/null; then
               echo "✅ SSH is ready"
+              SSH_READY=true
               break
             fi
-            if [ $i -eq 12 ]; then
-              echo "⚠️  SSH not ready after 60 seconds, proceeding anyway..."
+            if [ $i -eq $MAX_ATTEMPTS ]; then
+              echo "⚠️  SSH not ready after $((MAX_ATTEMPTS * 5)) seconds"
             else
-              echo "   Waiting for SSH... ($i/12)"
+              echo "   Waiting for SSH... ($i/$MAX_ATTEMPTS)"
               sleep 5
             fi
           done
+          
+          if [ "$SSH_READY" != "true" ]; then
+            echo "❌ SSH connection failed. Cannot proceed with deployment."
+            echo "   Instance IP: $INSTANCE_IP"
+            echo "   Instance ID: $INSTANCE_ID"
+            echo "   Check security group rules and instance status."
+            exit 1
+          fi
           
           # Use SSH to update containers (simpler than SSM, no IAM permission issues)
           ssh -o StrictHostKeyChecking=no -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP bash -c "
