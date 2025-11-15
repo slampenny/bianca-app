@@ -180,7 +180,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   }, [colors, themeLoading])
 
   // Early return if theme is still loading or colors is not available
-  if (themeLoading || !colors || !colors.palette) {
+  // Use optional chaining to safely check palette without throwing if colors is undefined
+  if (themeLoading || !colors || !colors?.palette) {
     return null
   }
 
