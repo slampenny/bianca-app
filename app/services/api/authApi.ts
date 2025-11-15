@@ -65,7 +65,7 @@ export const authApi = createApi({
       query: ({ token, password }) => ({
         url: `/auth/reset-password?token=${token}`,
         method: "POST",
-        body: password,
+        body: { password },
       }),
     }),
     sendVerificationEmail: builder.mutation<void, Caregiver>({
