@@ -194,6 +194,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "ec2:DescribeAvailabilityZones",
           "ec2:DescribeVpcs",
           "ec2:DescribeAddresses",
+          "ec2:DescribeVolumes",
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
           "ec2:DescribeRouteTables",
@@ -204,19 +205,25 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "ec2:DescribeTags",
           # ELBv2 (ALB) read operations
           "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeLoadBalancerAttributes",
           "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetGroupAttributes",
           "elasticloadbalancing:DescribeTargetHealth",
           "elasticloadbalancing:DescribeRules",
           "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeTags",
           # Route53 read operations
           "route53:ListHostedZones",
           "route53:GetHostedZone",
           "route53:ListResourceRecordSets",
+          "route53:ListTagsForResource",
           # ACM read operations
           "acm:ListCertificates",
           "acm:DescribeCertificate",
+          "acm:GetCertificate",
           # IAM read operations (for resources Terraform manages)
           "iam:GetRole",
+          "iam:GetRolePolicy",
           "iam:GetPolicy",
           "iam:GetOpenIDConnectProvider",
           "iam:ListRolePolicies",
@@ -252,13 +259,15 @@ resource "aws_iam_policy" "github_actions_deploy" {
           # EventBridge read operations
           "events:DescribeRule",
           "events:ListRules",
+          "events:ListTagsForResource",
           # SES read operations
           "ses:GetIdentityVerificationAttributes",
           "ses:DescribeReceiptRuleSet",
           "ses:ListIdentities",
           # SNS read operations
           "sns:GetTopicAttributes",
-          "sns:ListTopics"
+          "sns:ListTopics",
+          "sns:ListTagsForResource"
         ]
         Resource = "*"
       }
