@@ -228,6 +228,63 @@ jobs:
           echo "📤 Uploading deployment package to S3..."
           aws s3 cp deployment.zip "s3://${S3_BUCKET}/${S3_KEY}" --region ${{ env.AWS_REGION }}
           
+          # Check for existing deployments
+          echo "🔍 Checking for existing deployments..."
+          EXISTING_DEPLOYMENT=$(aws deploy list-deployments \
+            --application-name bianca-staging \
+            --deployment-group-name bianca-staging-ec2 \
+            --include-only-statuses Created InProgress Queued InProgress ReadyStop \
+            --max-items 1 \
+            --region ${{ env.AWS_REGION }} \
+            --query 'deployments[0]' \
+            --output text 2>/dev/null || echo "None")
+          
+          if [ "$EXISTING_DEPLOYMENT" != "None" ] && [ -n "$EXISTING_DEPLOYMENT" ]; then
+            echo "⚠️  Found existing deployment: $EXISTING_DEPLOYMENT"
+            EXISTING_STATUS=$(aws deploy get-deployment \
+              --deployment-id "$EXISTING_DEPLOYMENT" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'deploymentInfo.status' \
+              --output text 2>/dev/null || echo "Unknown")
+            
+            echo "   Status: $EXISTING_STATUS"
+            
+            if [ "$EXISTING_STATUS" = "InProgress" ] || [ "$EXISTING_STATUS" = "Created" ] || [ "$EXISTING_STATUS" = "Queued" ]; then
+              echo "⏳ Waiting for existing deployment to complete (up to 10 minutes)..."
+              # Wait for existing deployment
+              for i in {1..60}; do
+                STATUS=$(aws deploy get-deployment \
+                  --deployment-id "$EXISTING_DEPLOYMENT" \
+                  --region ${{ env.AWS_REGION }} \
+                  --query 'deploymentInfo.status' \
+                  --output text 2>/dev/null || echo "Unknown")
+                
+                if [ "$STATUS" = "Succeeded" ]; then
+                  echo "✅ Existing deployment completed successfully!"
+                  echo "   Creating new deployment with latest code..."
+                  break
+                elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Stopped" ]; then
+                  echo "⚠️  Existing deployment failed/stopped. Creating new deployment..."
+                  break
+                fi
+                
+                if [ $i -eq 60 ]; then
+                  echo "⚠️  Existing deployment still in progress after 10 minutes. Stopping it and creating new one..."
+                  aws deploy stop-deployment \
+                    --deployment-id "$EXISTING_DEPLOYMENT" \
+                    --region ${{ env.AWS_REGION }} 2>/dev/null || true
+                  sleep 5
+                  break
+                fi
+                
+                echo "   Waiting... ($i/60) - Status: $STATUS"
+                sleep 10
+              done
+            elif [ "$EXISTING_STATUS" = "Failed" ] || [ "$EXISTING_STATUS" = "Stopped" ]; then
+              echo "   Previous deployment failed/stopped. Creating new deployment..."
+            fi
+          fi
+          
           # Create CodeDeploy deployment
           echo "🚀 Creating CodeDeploy deployment..."
           DEPLOYMENT_ID=$(aws deploy create-deployment \
@@ -236,7 +293,47 @@ jobs:
             --s3-location bucket=${S3_BUCKET},key=${S3_KEY},bundleType=zip \
             --region ${{ env.AWS_REGION }} \
             --query 'deploymentId' \
-            --output text)
+            --output text 2>&1)
+          
+          # Check if deployment creation failed due to limit
+          if echo "$DEPLOYMENT_ID" | grep -q "DeploymentLimitExceededException"; then
+            echo "⚠️  Deployment limit exceeded. Waiting 30 seconds and retrying..."
+            sleep 30
+            # Try to stop any stuck deployments
+            STUCK_DEPLOYMENTS=$(aws deploy list-deployments \
+              --application-name bianca-staging \
+              --deployment-group-name bianca-staging-ec2 \
+              --include-only-statuses Created InProgress Queued \
+              --max-items 5 \
+              --region ${{ env.AWS_REGION }} \
+              --query 'deployments[*]' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$STUCK_DEPLOYMENTS" ]; then
+              echo "   Stopping stuck deployments..."
+              for DEP_ID in $STUCK_DEPLOYMENTS; do
+                aws deploy stop-deployment \
+                  --deployment-id "$DEP_ID" \
+                  --region ${{ env.AWS_REGION }} 2>/dev/null || true
+              done
+              sleep 10
+            fi
+            
+            # Retry creating deployment
+            DEPLOYMENT_ID=$(aws deploy create-deployment \
+              --application-name bianca-staging \
+              --deployment-group-name bianca-staging-ec2 \
+              --s3-location bucket=${S3_BUCKET},key=${S3_KEY},bundleType=zip \
+              --region ${{ env.AWS_REGION }} \
+              --query 'deploymentId' \
+              --output text 2>&1)
+          fi
+          
+          # Check if we got a valid deployment ID
+          if echo "$DEPLOYMENT_ID" | grep -q "Exception\|Error"; then
+            echo "❌ Failed to create deployment: $DEPLOYMENT_ID"
+            exit 1
+          fi
           
           echo "⏳ Deployment ID: $DEPLOYMENT_ID"
           echo "⏳ Waiting for deployment to complete (up to 15 minutes)..."
