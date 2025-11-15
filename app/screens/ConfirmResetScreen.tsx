@@ -164,12 +164,21 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   // Extract token from route params or URL query string (for web compatibility)
   const [token, setToken] = useState<string | undefined>((route.params as any)?.token)
 
-  // Early return if theme is still loading (same pattern as other screens)
-  if (themeLoading) {
+  // Debug: Log to confirm new build is loaded
+  useEffect(() => {
+    console.log('✅ ConfirmResetScreen v2.0 - NEW BUILD LOADED - Build timestamp: 2025-11-15-08:15')
+    console.log('✅ Colors available:', !!colors, 'Theme loading:', themeLoading)
+    console.log('✅ Colors object:', colors ? Object.keys(colors).slice(0, 5) : 'undefined')
+  }, [colors, themeLoading])
+
+  // Early return if theme is still loading OR colors is not available
+  // This prevents child components (Screen, Header, Text) from accessing undefined colors
+  if (themeLoading || !colors) {
+    console.log('⏳ Waiting for theme... themeLoading:', themeLoading, 'colors:', !!colors)
     return null
   }
 
-  // Create styles - useTheme() always returns colors, so this is safe
+  // Create styles - useTheme() always returns colors, but double-check just in case
   const styles = createStyles(colors)
 
   // Extract token from URL on web (React Navigation might not parse query params automatically)
