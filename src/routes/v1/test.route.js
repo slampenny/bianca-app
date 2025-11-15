@@ -291,4 +291,67 @@ router.post('/get-email', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/generate-reset-password-link:
+ *   post:
+ *     summary: Generate reset password link for testing
+ *     description: Returns the reset password link that would be sent in an email (for E2E testing)
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       "200":
+ *         description: Reset password link information
+ *       "404":
+ *         description: Caregiver not found
+ */
+router.post('/generate-reset-password-link', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    if (!tokenService || !caregiverService) {
+      return res.status(503).json({ error: 'Required services not available' });
+    }
+
+    // Find caregiver by email
+    const caregiver = await caregiverService.getCaregiverByEmail(email);
+    if (!caregiver) {
+      return res.status(404).json({ error: 'Caregiver not found' });
+    }
+
+    // Generate reset password token
+    const resetPasswordToken = await tokenService.generateResetPasswordToken(email);
+    
+    // Build the reset password link (same format as email service)
+    const frontendLink = `${config.frontendUrl}/reset-password?token=${resetPasswordToken}`;
+    
+    res.json({
+      details: {
+        resetPasswordLink: {
+          frontend: frontendLink,
+        },
+        token: resetPasswordToken,
+      },
+    });
+  } catch (err) {
+    logger.error('Error generating reset password link for test:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
