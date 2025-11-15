@@ -16,7 +16,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - CACHE_TYPE=redis
       # Email configuration
-      - EMAIL_FROM=no-replay@myphonefriend.com
+      - EMAIL_FROM=no-reply@myphonefriend.com
       # Asterisk configuration (will be loaded from AWS Secrets Manager)
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_ENABLED=true

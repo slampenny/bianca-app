@@ -19,7 +19,7 @@ services:
       - REDIS_URL=redis://localhost:6379
       - CACHE_TYPE=redis
       # Email configuration
-      - EMAIL_FROM=no-replay@myphonefriend.com
+      - EMAIL_FROM=no-reply@myphonefriend.com
       # Enable EC2 metadata service for IAM role credentials
       - AWS_EC2_METADATA_DISABLED=false
     # Don't mount ~/.aws - use EC2 instance IAM role via metadata service
