@@ -183,6 +183,77 @@ jobs:
             sleep 60
           fi
           
+          # Check and install CodeDeploy agent if needed
+          echo "🔍 Checking CodeDeploy agent status..."
+          SSM_READY=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Inactive")
+          
+          if [ "$SSM_READY" = "Online" ]; then
+            echo "   SSM is available. Checking CodeDeploy agent..."
+            AGENT_CHECK_CMD_ID=$(aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters 'commands=["systemctl is-active codedeploy-agent || echo \"NOT_INSTALLED\""]' \
+              --region ${{ env.AWS_REGION }} \
+              --output text \
+              --query 'Command.CommandId' 2>/dev/null || echo "")
+            
+            if [ -n "$AGENT_CHECK_CMD_ID" ]; then
+              sleep 5
+              AGENT_STATUS=$(aws ssm get-command-invocation \
+                --command-id "$AGENT_CHECK_CMD_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --region ${{ env.AWS_REGION }} \
+                --query 'StandardOutputContent' \
+                --output text 2>/dev/null | tr -d '\n' || echo "unknown")
+              
+              if [ "$AGENT_STATUS" != "active" ] && [ "$AGENT_STATUS" != "inactive" ]; then
+                echo "⚠️  CodeDeploy agent not installed. Installing now..."
+                INSTALL_CMD_ID=$(aws ssm send-command \
+                  --instance-ids "$INSTANCE_ID" \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters 'commands=["sudo yum install -y ruby wget", "cd /tmp", "sudo wget https://aws-codedeploy-us-east-2.s3.us-east-2.amazonaws.com/latest/install", "sudo chmod +x ./install", "sudo ./install auto", "sudo systemctl enable codedeploy-agent", "sudo systemctl start codedeploy-agent", "sleep 5", "sudo systemctl status codedeploy-agent | head -5"]' \
+                  --region ${{ env.AWS_REGION }} \
+                  --output text \
+                  --query 'Command.CommandId' 2>/dev/null || echo "")
+                
+                if [ -n "$INSTALL_CMD_ID" ]; then
+                  echo "   Waiting for agent installation (up to 2 minutes)..."
+                  for i in {1..24}; do
+                    INSTALL_STATUS=$(aws ssm get-command-invocation \
+                      --command-id "$INSTALL_CMD_ID" \
+                      --instance-id "$INSTANCE_ID" \
+                      --region ${{ env.AWS_REGION }} \
+                      --query 'Status' \
+                      --output text 2>/dev/null || echo "Unknown")
+                    
+                    if [ "$INSTALL_STATUS" = "Success" ] || [ "$INSTALL_STATUS" = "Failed" ]; then
+                      aws ssm get-command-invocation \
+                        --command-id "$INSTALL_CMD_ID" \
+                        --instance-id "$INSTANCE_ID" \
+                        --region ${{ env.AWS_REGION }} \
+                        --query 'StandardOutputContent' \
+                        --output text 2>/dev/null | tail -10
+                      break
+                    fi
+                    sleep 5
+                  done
+                  echo "   Waiting 30 seconds for agent to initialize..."
+                  sleep 30
+                fi
+              else
+                echo "✅ CodeDeploy agent is installed (status: $AGENT_STATUS)"
+              fi
+            fi
+          else
+            echo "⚠️  SSM is not available. CodeDeploy agent may not be installed."
+            echo "   The instance may need to be recreated to get the updated userdata."
+            echo "   Continuing anyway - deployment will fail if agent is not installed..."
+          fi
+          
           echo "📦 Packaging deployment artifacts..."
           
           # Get the workspace root (where GitHub Actions checks out code)
