@@ -190,26 +190,18 @@ jobs:
           done
           
           # Use SSH to update containers (simpler than SSM, no IAM permission issues)
-          ssh -o StrictHostKeyChecking=no -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP << 'EOF'
-            cd /opt/bianca-staging
-            
-            # ECR login (cache token for the day)
-            ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
-            if [ ! -f "$ECR_TOKEN_FILE" ]; then
-              aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
-              touch "$ECR_TOKEN_FILE"
-            fi
-            
-            # Pull latest images
-            docker-compose pull --parallel 2>/dev/null || docker-compose pull
-            
-            # Update containers
-            docker-compose up -d
-            
-            # Show status
-            sleep 5
-            docker ps --format "table {{.Names}}\t{{.Status}}" | grep staging_ || true
-EOF
+          ssh -o StrictHostKeyChecking=no -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP bash -c "
+            cd /opt/bianca-staging &&
+            ECR_TOKEN_FILE=/tmp/ecr-token-\$(date +%Y%m%d) &&
+            if [ ! -f \"\$ECR_TOKEN_FILE\" ]; then
+              aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com &&
+              touch \"\$ECR_TOKEN_FILE\"
+            fi &&
+            docker-compose pull --parallel 2>/dev/null || docker-compose pull &&
+            docker-compose up -d &&
+            sleep 5 &&
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | grep staging_ || true
+          "
           
           # SSH command executes synchronously, so if we get here, it succeeded
           if [ $? -eq 0 ]; then
