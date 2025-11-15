@@ -36,15 +36,20 @@ if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     fi
 fi
 
-# Ensure we're on staging branch or merge staging into current branch
+# Determine deployment mode
+DEPLOY_FROM_CURRENT_BRANCH=false
+
 if [ "$CURRENT_BRANCH" != "staging" ]; then
     echo -e "${YELLOW}⚠️  You're on '$CURRENT_BRANCH', not 'staging'${NC}"
     echo "   Options:"
-    echo "   1. Switch to staging branch and merge your changes"
-    echo "   2. Push current branch and merge to staging on GitHub"
-    read -p "   Switch to staging branch? (Y/n) " -n 1 -r
+    echo "   1. Deploy directly from '$CURRENT_BRANCH' (without merging to staging)"
+    echo "   2. Switch to staging branch and merge your changes"
+    read -p "   Deploy from current branch? (Y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        DEPLOY_FROM_CURRENT_BRANCH=true
+        echo -e "${BLUE}✅ Will deploy from '$CURRENT_BRANCH' branch${NC}"
+    else
         # Stash any uncommitted changes
         if ! git diff-index --quiet HEAD -- 2>/dev/null; then
             echo "   Stashing uncommitted changes..."
@@ -120,70 +125,113 @@ echo ""
 REPO=$(git remote get-url origin 2>/dev/null | sed -E 's/.*github.com[:/]([^/]+\/[^/]+)(\.git)?$/\1/')
 echo -e "${BLUE}📦 Repository: $REPO${NC}"
 
-# Push to staging
-echo ""
-echo -e "${BLUE}📤 Pushing to staging branch...${NC}"
-if git push origin staging; then
-    echo -e "${GREEN}✅ Push successful!${NC}"
-else
-    echo -e "${RED}❌ Push failed!${NC}"
-    exit 1
-fi
-
-# Wait a moment for GitHub to register the push
-echo ""
-echo -e "${BLUE}⏳ Waiting for workflow to start...${NC}"
-sleep 5
-
-# Get the latest workflow run
-echo ""
-echo -e "${BLUE}🔍 Finding workflow run...${NC}"
-
-# Try to use GitHub CLI to get workflow run
+# Deploy based on mode
 RUN_ID=""
 RUN_URL=""
 
-# Check if 'gh run' command is available
-if gh run list --help &> /dev/null; then
-    # Wait for workflow to appear (up to 30 seconds)
-    MAX_WAIT=30
-    WAIT_COUNT=0
-    
-    while [ -z "$RUN_ID" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-        RUN_ID=$(gh run list --workflow=deploy-staging.yml --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
-        if [ -z "$RUN_ID" ]; then
-            sleep 2
-            WAIT_COUNT=$((WAIT_COUNT + 2))
-            echo -n "."
-        fi
-    done
+if [ "$DEPLOY_FROM_CURRENT_BRANCH" = true ]; then
+    # Deploy from current branch using workflow_dispatch
     echo ""
+    echo -e "${BLUE}📤 Pushing '$CURRENT_BRANCH' branch to remote...${NC}"
+    if ! git push origin "$CURRENT_BRANCH" 2>/dev/null; then
+        echo -e "${YELLOW}⚠️  Branch '$CURRENT_BRANCH' not on remote yet, pushing...${NC}"
+        git push -u origin "$CURRENT_BRANCH" || {
+            echo -e "${RED}❌ Push failed!${NC}"
+            exit 1
+        }
+    fi
+    echo -e "${GREEN}✅ Push successful!${NC}"
     
-    if [ -n "$RUN_ID" ]; then
-        RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
-        echo -e "${GREEN}✅ Found workflow run: $RUN_ID${NC}"
-        echo ""
-        echo -e "${BLUE}📊 Watching deployment logs...${NC}"
-        echo -e "${BLUE}   (Press Ctrl+C to stop watching, but deployment will continue)${NC}"
-        echo ""
+    echo ""
+    echo -e "${BLUE}🚀 Triggering workflow for branch '$CURRENT_BRANCH'...${NC}"
+    
+    # Trigger workflow with branch parameter
+    if gh workflow run deploy-staging.yml --ref "$CURRENT_BRANCH" -f branch="$CURRENT_BRANCH" 2>/dev/null; then
+        echo -e "${GREEN}✅ Workflow triggered!${NC}"
+    else
+        echo -e "${RED}❌ Failed to trigger workflow${NC}"
+        echo "   Make sure you have permission to trigger workflows"
+        exit 1
+    fi
+    
+    # Wait a moment for workflow to start
+    echo ""
+    echo -e "${BLUE}⏳ Waiting for workflow to start...${NC}"
+    sleep 5
+    
+    # Get the latest workflow run
+    echo ""
+    echo -e "${BLUE}🔍 Finding workflow run...${NC}"
+    
+    if gh run list --workflow=deploy-staging.yml --help &> /dev/null; then
+        MAX_WAIT=30
+        WAIT_COUNT=0
         
-        # Try to watch the logs
-        if gh run watch "$RUN_ID" 2>/dev/null; then
-            # Successfully watched
-            :
-        else
-            echo ""
-            echo -e "${YELLOW}⚠️  Could not watch logs in real-time${NC}"
-            echo "   View logs at: $RUN_URL"
-        fi
+        while [ -z "$RUN_ID" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+            RUN_ID=$(gh run list --workflow=deploy-staging.yml --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
+            if [ -z "$RUN_ID" ]; then
+                sleep 2
+                WAIT_COUNT=$((WAIT_COUNT + 2))
+                echo -n "."
+            fi
+        done
+        echo ""
     fi
 else
-    echo -e "${YELLOW}⚠️  GitHub CLI 'run' commands not available${NC}"
-    echo "   (You may need to update GitHub CLI: https://cli.github.com/)"
-    RUN_URL="https://github.com/$REPO/actions"
+    # Traditional deployment: push to staging branch
+    echo ""
+    echo -e "${BLUE}📤 Pushing to staging branch...${NC}"
+    if git push origin staging; then
+        echo -e "${GREEN}✅ Push successful!${NC}"
+    else
+        echo -e "${RED}❌ Push failed!${NC}"
+        exit 1
+    fi
+    
+    # Wait a moment for GitHub to register the push
+    echo ""
+    echo -e "${BLUE}⏳ Waiting for workflow to start...${NC}"
+    sleep 5
+    
+    # Get the latest workflow run
+    echo ""
+    echo -e "${BLUE}🔍 Finding workflow run...${NC}"
+    
+    if gh run list --workflow=deploy-staging.yml --help &> /dev/null; then
+        MAX_WAIT=30
+        WAIT_COUNT=0
+        
+        while [ -z "$RUN_ID" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+            RUN_ID=$(gh run list --workflow=deploy-staging.yml --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
+            if [ -z "$RUN_ID" ]; then
+                sleep 2
+                WAIT_COUNT=$((WAIT_COUNT + 2))
+                echo -n "."
+            fi
+        done
+        echo ""
+    fi
 fi
 
-if [ -z "$RUN_ID" ]; then
+# Watch the workflow run
+if [ -n "$RUN_ID" ]; then
+    RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
+    echo -e "${GREEN}✅ Found workflow run: $RUN_ID${NC}"
+    echo ""
+    echo -e "${BLUE}📊 Watching deployment logs...${NC}"
+    echo -e "${BLUE}   (Press Ctrl+C to stop watching, but deployment will continue)${NC}"
+    echo ""
+    
+    # Try to watch the logs
+    if gh run watch "$RUN_ID" 2>/dev/null; then
+        # Successfully watched
+        :
+    else
+        echo ""
+        echo -e "${YELLOW}⚠️  Could not watch logs in real-time${NC}"
+        echo "   View logs at: $RUN_URL"
+    fi
+else
     echo -e "${YELLOW}⚠️  Could not find workflow run automatically${NC}"
     RUN_URL="https://github.com/$REPO/actions"
 fi
