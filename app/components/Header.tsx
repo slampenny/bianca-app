@@ -231,6 +231,7 @@ export function Header(props: HeaderProps) {
  */
 function HeaderAction(props: HeaderActionProps) {
   const { backgroundColor, icon, text, tx, txOptions, onPress, ActionComponent, iconColor } = props
+  const { colors } = useTheme() // Add useTheme() to get colors
 
   const content = tx ? translate(tx, txOptions) : text
 
@@ -244,14 +245,14 @@ function HeaderAction(props: HeaderActionProps) {
         disabled={!onPress}
         activeOpacity={0.8}
       >
-        <Text weight="medium" size="md" text={content} style={[{ color: colors.tint || colors.palette.primary500 || colors.palette.biancaHeader }]} />
+        <Text weight="medium" size="md" text={content} style={[{ color: colors?.tint || colors?.palette?.primary500 || colors?.palette?.biancaHeader }]} />
       </TouchableOpacity>
     )
   }
 
   if (icon) {
     // Use theme-aware icon color if not explicitly provided
-    const iconColorValue = iconColor || colors.tint || colors.palette.primary500 || colors.palette.biancaHeader || colors.text
+    const iconColorValue = iconColor || colors?.tint || colors?.palette?.primary500 || colors?.palette?.biancaHeader || colors?.text
     return (
       <Icon
         size={24}
