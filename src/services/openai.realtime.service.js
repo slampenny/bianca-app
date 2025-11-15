@@ -43,6 +43,7 @@ const { CONVERSATION_STATES: NEW_CONVERSATION_STATES, StateMachine } = require('
 const CONSTANTS = require('./ai/realtime/constants');
 const ReconnectionManager = require('./ai/realtime/reconnection.manager');
 const AudioProcessor = require('./ai/realtime/audio.processor');
+const ConnectionManager = require('./ai/realtime/connection.manager');
 
 // STRANGLER FIG: Keep old constants for backward compatibility
 // These will be removed once all code is migrated
@@ -86,9 +87,13 @@ class OpenAIRealtimeService {
     this.pendingReconnections = this.reconnectionManager.pendingReconnections;
     this.globalReconnectTimer = null; // Managed by reconnectionManager
     
+    // STRANGLER FIG: Use new ConnectionManager module
+    this.connectionManager = new ConnectionManager();
+    // Keep old map for backward compatibility (will delegate to connectionManager)
+    this.connectionTimeouts = this.connectionManager.connectionTimeouts;
+    
     this.isReconnecting = new Map(); // callId -> boolean
     this.reconnectAttempts = new Map(); // callId -> number
-    this.connectionTimeouts = new Map(); // callId -> connection timeout
     this._healthCheckInterval = null; // Store interval ID
 
     this.notifyCallback = null;
@@ -425,30 +430,27 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * STRANGLER FIG: Connection timeout methods now delegate to ConnectionManager
+   */
+  
+  /**
    * Clear connection timeout
    */
   clearConnectionTimeout(callId) {
-    if (this.connectionTimeouts.has(callId)) {
-      clearTimeout(this.connectionTimeouts.get(callId));
-      this.connectionTimeouts.delete(callId);
-    }
+    this.connectionManager.clearConnectionTimeout(callId);
   }
 
   /**
    * Set connection timeout with unified handling
    */
   setConnectionTimeout(callId, duration = CONSTANTS.CONNECTION_TIMEOUT) {
-    this.clearConnectionTimeout(callId);
-
-    const timeoutId = setTimeout(() => {
+    this.connectionManager.setConnectionTimeout(callId, duration, (callId) => {
       const conn = this.connections.get(callId);
       if (conn && !conn.sessionReady) {
         logger.error(`[OpenAI Realtime] Connection timeout for ${callId} after ${duration}ms`);
         this.handleConnectionTimeout(callId);
       }
-    }, duration);
-
-    this.connectionTimeouts.set(callId, timeoutId);
+    });
   }
 
   /**
@@ -471,39 +473,24 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * STRANGLER FIG: Connection methods now delegate to ConnectionManager
+   */
+  
+  /**
    * Attach all WebSocket event handlers immediately after creation
    */
   attachWebSocketHandlers(ws, callId) {
-    ws.on('open', () => this.handleOpen(callId));
-
-    ws.on('message', async (data) => {
-      try {
-        await this.handleMessage(callId, data);
-      } catch (err) {
-        logger.error(`[OpenAI Realtime] Unhandled error in message handler for ${callId}: ${err.message}`, err);
-        // Don't crash the connection, just log the error
-      }
+    ConnectionManager.attachWebSocketHandlers(ws, callId, {
+      onOpen: (callId) => this.handleOpen(callId),
+      onMessage: (callId, data) => this.handleMessage(callId, data),
+      onError: (callId, error) => this.handleError(callId, error),
+      onClose: (callId, code, reason) => this.handleClose(callId, code, reason),
     });
-
-    ws.on('error', (error) => this.handleError(callId, error));
-    ws.on('close', (code, reason) => this.handleClose(callId, code, reason));
   }
 
   isConnectionReady(callId) {
     const connection = this.connections.get(callId);
-    const ready =
-      connection &&
-      connection.webSocket && // Changed from 'ws' to 'webSocket'
-      connection.webSocket.readyState === WebSocket.OPEN &&
-      connection.sessionReady === true;
-
-    logger.debug(
-      `[OpenAI Realtime] Connection ready check for ${callId}: ${ready ? 'YES' : 'NO'
-      } (exists: ${!!connection}, ws: ${!!connection?.webSocket}, wsState: ${connection?.webSocket?.readyState
-      }, sessionReady: ${connection?.sessionReady})`
-    );
-
-    return ready;
+    return ConnectionManager.isConnectionReady(connection);
   }
 
   /**
@@ -746,27 +733,17 @@ class OpenAIRealtimeService {
     this.updateConnectionStatus(callId, 'connecting');
     connectionState.lastActivity = Date.now();
 
+    // STRANGLER FIG: Use ConnectionManager to create connection
     // Clear any existing timeout before creating a new connection
     this.clearConnectionTimeout(callId);
 
-    const model = config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17';
-    const voice = config.openai.realtimeVoice || 'alloy';
-    const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
-    logger.info(`[OpenAI Realtime] Connecting to ${wsUrl} for callId: ${callId}`);
-
     try {
-      // Create WebSocket with immediate event handler setup (like test method)
-      const ws = new WebSocket(wsUrl, {
-        headers: {
-          Authorization: `Bearer ${config.openai.apiKey}`,
-          'OpenAI-Beta': 'realtime=v1',
-        },
-      });
-
-      // Attach all handlers immediately (like test method)
-      this.attachWebSocketHandlers(ws, callId);
-
-      connectionState.webSocket = ws;
+      // Create WebSocket using ConnectionManager
+      const ws = ConnectionManager.createConnection(
+        connectionState,
+        callId,
+        (ws, callId) => this.attachWebSocketHandlers(ws, callId)
+      );
 
       // Set a single timeout for the entire connection + handshake process
       this.setConnectionTimeout(callId);
@@ -892,6 +869,10 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * STRANGLER FIG: Connection status and health methods now delegate to ConnectionManager
+   */
+  
+  /**
    * Update connection status safely
    */
   updateConnectionStatus(callId, status) {
@@ -900,11 +881,7 @@ class OpenAIRealtimeService {
       logger.warn(`[OpenAI Realtime] UpdateStatus: Attempted to update non-existent connection ${callId} to ${status}`);
       return;
     }
-    const oldStatus = conn.status;
-    if (oldStatus === status) return;
-    conn.status = status;
-    conn.lastActivity = Date.now();
-    logger.info(`[OpenAI Realtime] Connection ${callId} status: ${oldStatus} -> ${status}`);
+    ConnectionManager.updateConnectionStatus(conn, status);
   }
 
   /**
@@ -913,22 +890,9 @@ class OpenAIRealtimeService {
   async checkConnectionHealth(callId) {
     const conn = this.connections.get(callId);
     if (!conn) return false;
-
-    const isHealthy = conn.webSocket?.readyState === WebSocket.OPEN && conn.sessionReady && conn.status === 'connected';
-
-    // Enhanced health monitoring
-    if (!isHealthy) {
-      const timeSinceLastActivity = Date.now() - conn.lastActivity;
-      const maxInactivityTime = 30000; // 30 seconds
-
-      if (timeSinceLastActivity > maxInactivityTime && conn.status === 'connected') {
-        logger.warn(`[OpenAI Realtime] Connection ${callId} appears stuck (${timeSinceLastActivity}ms since last activity). Triggering recovery.`);
-        this.handleConnectionError(callId, new Error('Connection timeout - no activity'));
-        return false;
-      }
-    }
-
-    return isHealthy;
+    return ConnectionManager.checkConnectionHealth(conn, (error) => {
+      this.handleConnectionError(callId, error);
+    });
   }
 
   async handleSessionCreated(callId, message) {
