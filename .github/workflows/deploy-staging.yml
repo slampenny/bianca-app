@@ -360,6 +360,7 @@ jobs:
           if [ "$USE_SSM" = "true" ]; then
             # Use SSM to update containers
             echo "📡 Executing deployment via SSM..."
+            set +e  # Don't exit on error - we'll check the exit code
             aws ssm send-command \
               --instance-ids "$INSTANCE_ID" \
               --document-name "AWS-RunShellScript" \
@@ -378,7 +379,60 @@ jobs:
               ]' \
               --region ${{ env.AWS_REGION }} \
               --output text \
-              --query 'Command.CommandId' > /tmp/ssm-command-id.txt
+              --query 'Command.CommandId' > /tmp/ssm-command-id.txt 2>&1
+            SSM_SEND_EXIT=$?
+            set -e
+            
+            if [ $SSM_SEND_EXIT -ne 0 ] || [ ! -s /tmp/ssm-command-id.txt ]; then
+              echo "❌ SSM SendCommand failed (exit code: $SSM_SEND_EXIT)"
+              cat /tmp/ssm-command-id.txt || true
+              echo ""
+              echo "⚠️  SSM SendCommand permission issue detected. Attempting instance reboot to fix..."
+              
+              INSTANCE_STATE=$(aws ec2 describe-instances \
+                --instance-ids "$INSTANCE_ID" \
+                --query 'Reservations[0].Instances[0].State.Name' \
+                --output text \
+                --region ${{ env.AWS_REGION }})
+              
+              if [ "$INSTANCE_STATE" = "running" ]; then
+                echo "   Rebooting instance to refresh IAM permissions..."
+                aws ec2 reboot-instances --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+                echo "   ⏳ Waiting 60 seconds for instance to reboot..."
+                sleep 60
+                aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }} || true
+                echo "   ⏳ Waiting additional 30 seconds for services to start..."
+                sleep 30
+                
+                # Retry SSM SendCommand after reboot
+                echo "   🔄 Retrying SSM SendCommand after reboot..."
+                aws ssm send-command \
+                  --instance-ids "$INSTANCE_ID" \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters 'commands=[
+                    "cd /opt/bianca-staging",
+                    "ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)",
+                    "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"$ECR_TOKEN_FILE\"; else echo \"Using cached ECR token\"; fi",
+                    "echo \"📥 Pulling latest images...\"",
+                    "docker-compose pull",
+                    "echo \"🔄 Stopping old containers...\"",
+                    "docker-compose down 2>/dev/null || true",
+                    "echo \"🚀 Starting containers...\"",
+                    "docker-compose up -d --remove-orphans",
+                    "sleep 5",
+                    "docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\" | grep staging_ || true"
+                  ]' \
+                  --region ${{ env.AWS_REGION }} \
+                  --output text \
+                  --query 'Command.CommandId' > /tmp/ssm-command-id.txt || {
+                    echo "   ❌ SSM SendCommand still failing after reboot"
+                    exit 1
+                  }
+              else
+                echo "   ❌ Instance is not running (state: $INSTANCE_STATE)"
+                exit 1
+              fi
+            fi
             
             COMMAND_ID=$(cat /tmp/ssm-command-id.txt)
             echo "⏳ Waiting for SSM command to complete..."
