@@ -367,19 +367,17 @@ jobs:
               --parameters 'commands=[
                 "cd /opt/bianca-staging",
                 "ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)",
-                "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"$ECR_TOKEN_FILE\"; else echo \"Using cached ECR token\"; fi",
-                "echo \"🧹 Cleaning up Docker to free space...\"",
-                "docker system prune -f --volumes || true",
-                "docker image prune -af || true",
-                "echo \"📥 Pulling latest images...\"",
-                "docker-compose pull",
+                "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"$ECR_TOKEN_FILE\"; else echo \"Using cached ECR token\"; fi",
+                "echo \"📥 Pulling latest images (with timeout)...\"",
+                "timeout 300 docker-compose pull || { echo \"⚠️  Pull timed out or failed, continuing...\"; }",
                 "echo \"🔄 Stopping old containers...\"",
-                "docker-compose down 2>/dev/null || true",
+                "timeout 60 docker-compose down 2>/dev/null || true",
                 "echo \"🚀 Starting containers...\"",
-                "docker-compose up -d --remove-orphans",
+                "timeout 120 docker-compose up -d --remove-orphans || { echo \"❌ Failed to start containers\"; exit 1; }",
                 "sleep 5",
                 "docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\" | grep staging_ || true"
               ]' \
+              --timeout-seconds 600 \
               --region ${{ env.AWS_REGION }} \
               --output text \
               --query 'Command.CommandId' > /tmp/ssm-command-id.txt 2>&1
@@ -415,16 +413,17 @@ jobs:
                   --parameters 'commands=[
                     "cd /opt/bianca-staging",
                     "ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)",
-                    "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"$ECR_TOKEN_FILE\"; else echo \"Using cached ECR token\"; fi",
-                    "echo \"📥 Pulling latest images...\"",
-                    "docker-compose pull",
+                    "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"$ECR_TOKEN_FILE\"; else echo \"Using cached ECR token\"; fi",
+                    "echo \"📥 Pulling latest images (with timeout)...\"",
+                    "timeout 300 docker-compose pull || { echo \"⚠️  Pull timed out or failed, continuing...\"; }",
                     "echo \"🔄 Stopping old containers...\"",
-                    "docker-compose down 2>/dev/null || true",
+                    "timeout 60 docker-compose down 2>/dev/null || true",
                     "echo \"🚀 Starting containers...\"",
-                    "docker-compose up -d --remove-orphans",
+                    "timeout 120 docker-compose up -d --remove-orphans || { echo \"❌ Failed to start containers\"; exit 1; }",
                     "sleep 5",
                     "docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\" | grep staging_ || true"
                   ]' \
+                  --timeout-seconds 600 \
                   --region ${{ env.AWS_REGION }} \
                   --output text \
                   --query 'Command.CommandId' > /tmp/ssm-command-id.txt || {
@@ -438,9 +437,9 @@ jobs:
             fi
             
             COMMAND_ID=$(cat /tmp/ssm-command-id.txt)
-            echo "⏳ Waiting for SSM command to complete..."
+            echo "⏳ Waiting for SSM command to complete (up to 10 minutes)..."
             
-            # Wait for command to complete (up to 5 minutes)
+            # Wait for command to complete (up to 10 minutes, checking every 10 seconds)
             for i in {1..60}; do
               STATUS=$(aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
@@ -460,21 +459,36 @@ jobs:
                 break
               elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
                 echo "❌ SSM command failed with status: $STATUS"
+                echo "📋 Command output:"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --query 'StandardOutputContent' \
+                  --output text \
+                  --region ${{ env.AWS_REGION }} 2>/dev/null | tail -50 || true
+                echo "📋 Command error:"
                 aws ssm get-command-invocation \
                   --command-id "$COMMAND_ID" \
                   --instance-id "$INSTANCE_ID" \
                   --query 'StandardErrorContent' \
                   --output text \
-                  --region ${{ env.AWS_REGION }} || true
+                  --region ${{ env.AWS_REGION }} 2>/dev/null || true
                 exit 1
               fi
               
               if [ $i -eq 60 ]; then
-                echo "❌ SSM command timed out after 5 minutes"
+                echo "❌ SSM command timed out after 10 minutes"
+                echo "📋 Partial command output:"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --query 'StandardOutputContent' \
+                  --output text \
+                  --region ${{ env.AWS_REGION }} 2>/dev/null | tail -50 || true
                 exit 1
               fi
               
-              sleep 5
+              sleep 10
             done
           else
             # Use SSH to update containers
@@ -483,24 +497,21 @@ jobs:
             ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP bash -c "
             set -e
             cd /opt/bianca-staging || { echo '❌ Failed to cd to /opt/bianca-staging'; exit 1; }
-            echo '🧹 Cleaning up Docker to free space...'
-            docker system prune -f --volumes || true
-            docker image prune -af || true
             echo '📦 Logging into ECR...'
             ECR_TOKEN_FILE=/tmp/ecr-token-\$(date +%Y%m%d)
             if [ ! -f \"\$ECR_TOKEN_FILE\" ]; then
-              aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com || { echo '❌ ECR login failed'; exit 1; }
+              timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com || { echo '❌ ECR login failed'; exit 1; }
               touch \"\$ECR_TOKEN_FILE\"
             else
               echo '   Using cached ECR token'
             fi
-            echo '📥 Pulling latest images...'
-            docker-compose pull || { echo '⚠️  docker-compose pull had issues, but continuing...'; }
+            echo '📥 Pulling latest images (with timeout)...'
+            timeout 300 docker-compose pull || { echo '⚠️  docker-compose pull had issues, but continuing...'; }
             echo ''
             echo '🔄 Stopping and removing old containers...'
-            docker-compose down 2>/dev/null || true
+            timeout 60 docker-compose down 2>/dev/null || true
             echo '🚀 Starting containers with new images...'
-            docker-compose up -d --remove-orphans || { echo '❌ Failed to start containers'; exit 1; }
+            timeout 120 docker-compose up -d --remove-orphans || { echo '❌ Failed to start containers'; exit 1; }
             echo '⏳ Waiting for containers to start...'
             sleep 5
             echo '📋 Container status:'
