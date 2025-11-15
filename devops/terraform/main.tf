@@ -1,6 +1,9 @@
 provider "aws" {
-  region  = var.aws_region
-  profile = var.aws_profile
+  region = var.aws_region
+  
+  # Only use profile if explicitly set (for local development)
+  # In CI/CD (GitHub Actions), use environment variables instead
+  profile = var.aws_profile != "" ? var.aws_profile : null
 }
 
 ################################################################################
@@ -14,9 +17,9 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "AWS CLI profile to use for authentication."
+  description = "AWS CLI profile to use for authentication (leave empty to use environment variables)."
   type        = string
-  default     = "jordan"
+  default     = ""
 }
 
 variable "aws_account_id" {
@@ -1936,6 +1939,10 @@ resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
 
 resource "aws_ses_domain_identity" "ses_domain" {
   domain = "myphonefriend.com"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_route53_record" "ses_verification_record" {
@@ -1944,10 +1951,18 @@ resource "aws_route53_record" "ses_verification_record" {
   type    = "TXT"
   ttl     = 600
   records = [aws_ses_domain_identity.ses_domain.verification_token]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_ses_domain_dkim" "ses_dkim" {
   domain = aws_ses_domain_identity.ses_domain.domain
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_route53_record" "ses_dkim_records" {
@@ -1957,6 +1972,10 @@ resource "aws_route53_record" "ses_dkim_records" {
   type    = "CNAME"
   ttl     = 600
   records = ["${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # SPF Record - Authorize SES to send emails for this domain
