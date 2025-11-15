@@ -202,6 +202,8 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "ec2:DescribeNetworkAcls",
           "ec2:DescribeVpcAttribute",
           "ec2:DescribeVpcEndpoints",
+          "ec2:DescribePrefixLists",
+          "ec2:DescribeLaunchTemplates",
           "ec2:DescribeTags",
           # ELBv2 (ALB) read operations
           "elasticloadbalancing:DescribeLoadBalancers",
@@ -239,6 +241,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "kms:GetKeyRotationStatus",
           "kms:ListKeys",
           "kms:ListAliases",
+          "kms:ListResourceTags",
           # S3 read operations (beyond state bucket)
           "s3:GetBucketPublicAccessBlock",
           "s3:GetBucketVersioning",
@@ -250,9 +253,11 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "s3:GetBucketCors",
           "s3:GetBucketWebsite",
           "s3:GetAccelerateConfiguration",
+          "s3:GetBucketRequestPayment",
           # EFS read operations
           "elasticfilesystem:DescribeFileSystems",
           "elasticfilesystem:DescribeMountTargets",
+          "elasticfilesystem:DescribeLifecycleConfiguration",
           # ECS read operations
           "ecs:DescribeClusters",
           "ecs:DescribeServices",
@@ -271,7 +276,9 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "events:ListTagsForResource",
           # SES read operations
           "ses:GetIdentityVerificationAttributes",
+          "ses:GetIdentityDkimAttributes",
           "ses:DescribeReceiptRuleSet",
+          "ses:DescribeActiveReceiptRuleSet",
           "ses:ListIdentities",
           # SNS read operations
           "sns:GetTopicAttributes",
@@ -281,7 +288,12 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "servicediscovery:GetNamespace",
           "servicediscovery:ListNamespaces",
           "servicediscovery:GetService",
-          "servicediscovery:ListServices"
+          "servicediscovery:ListServices",
+          "servicediscovery:ListTagsForResource",
+          # Lambda read operations
+          "lambda:GetFunction",
+          "lambda:ListFunctions",
+          "lambda:ListTags"
         ]
         Resource = "*"
       }
