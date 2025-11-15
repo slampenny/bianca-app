@@ -85,14 +85,18 @@ const defaultStyles = StyleSheet.create({
 
 const createStyles = (colors: any) => {
   // useTheme() always returns colors, but add safety check just in case
-  if (!colors || !colors.palette) {
+  // Use optional chaining to safely access colors.palette
+  if (!colors || !colors?.palette) {
     return defaultStyles
   }
 
+  // Safely extract palette with fallbacks
+  const palette = colors?.palette || {}
+  
   return StyleSheet.create({
       container: {
         flex: 1,
-        backgroundColor: colors.palette.neutral100,
+        backgroundColor: palette.neutral100 || defaultStyles.container.backgroundColor,
         padding: spacing.lg,
       },
       screenContentContainer: {
@@ -104,26 +108,26 @@ const createStyles = (colors: any) => {
         padding: spacing.md,
       },
       title: {
-        color: colors.palette.neutral800,
+        color: palette.neutral800 || defaultStyles.title.color,
         fontSize: 24,
         fontWeight: "bold",
         textAlign: "center",
         marginBottom: spacing.md,
       },
       subtitle: {
-        color: colors.palette.neutral600,
+        color: palette.neutral600 || defaultStyles.subtitle.color,
         fontSize: 16,
         textAlign: "center",
         marginBottom: spacing.xl,
         lineHeight: 24,
       },
       errorText: {
-        color: colors.palette.angry500,
+        color: palette.angry500 || defaultStyles.errorText.color,
         fontSize: 14,
         textAlign: "center",
         marginBottom: spacing.md,
         padding: spacing.sm,
-        backgroundColor: colors.palette.angry100,
+        backgroundColor: palette.angry100 || defaultStyles.errorText.backgroundColor,
         borderRadius: 4,
       },
       form: {
@@ -140,7 +144,7 @@ const createStyles = (colors: any) => {
         marginTop: spacing.sm,
       },
       message: {
-        color: colors.palette.neutral600,
+        color: palette.neutral600 || defaultStyles.message.color,
         fontSize: 16,
         textAlign: "center",
         marginBottom: spacing.xl,
