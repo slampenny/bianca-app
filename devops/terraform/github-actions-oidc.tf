@@ -194,6 +194,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "ec2:DescribeAvailabilityZones",
           "ec2:DescribeVpcs",
           "ec2:DescribeAddresses",
+          "ec2:DescribeAddressesAttribute",
           "ec2:DescribeVolumes",
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
@@ -211,6 +212,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "elasticloadbalancing:DescribeTargetHealth",
           "elasticloadbalancing:DescribeRules",
           "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeListenerAttributes",
           "elasticloadbalancing:DescribeTags",
           # Route53 read operations
           "route53:ListHostedZones",
@@ -221,16 +223,20 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "acm:ListCertificates",
           "acm:DescribeCertificate",
           "acm:GetCertificate",
+          "acm:ListTagsForCertificate",
           # IAM read operations (for resources Terraform manages)
           "iam:GetRole",
           "iam:GetRolePolicy",
           "iam:GetPolicy",
+          "iam:GetPolicyVersion",
           "iam:GetOpenIDConnectProvider",
+          "iam:GetInstanceProfile",
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
           "iam:ListInstanceProfilesForRole",
           # KMS read operations
           "kms:DescribeKey",
+          "kms:GetKeyPolicy",
           "kms:ListKeys",
           "kms:ListAliases",
           # S3 read operations (beyond state bucket)
@@ -243,6 +249,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "s3:GetBucketAcl",
           "s3:GetBucketCors",
           "s3:GetBucketWebsite",
+          "s3:GetAccelerateConfiguration",
           # EFS read operations
           "elasticfilesystem:DescribeFileSystems",
           "elasticfilesystem:DescribeMountTargets",
@@ -257,6 +264,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           # CloudWatch Logs read operations
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
+          "logs:ListTagsForResource",
           # EventBridge read operations
           "events:DescribeRule",
           "events:ListRules",
