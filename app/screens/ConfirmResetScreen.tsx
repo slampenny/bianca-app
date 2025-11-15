@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from "react"
-import { View, ViewStyle, StyleSheet } from "react-native"
+import { View, ViewStyle, StyleSheet, Linking } from "react-native"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
 import { StackScreenProps } from "@react-navigation/stack"
-import { useRoute } from "@react-navigation/native"
+import { useRoute, useNavigation } from "@react-navigation/native"
 import { useResetPasswordMutation } from "../services/api/authApi"
 import { Button, Text, TextField, Screen, Header } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
@@ -157,9 +157,12 @@ type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "Confir
 export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const { navigation } = props
   const route = useRoute()
-  const token = (route.params as any)?.token
+  const nav = useNavigation()
   const { colors, isLoading: themeLoading } = useTheme()
   const { toast, showError, hideToast } = useToast()
+  
+  // Extract token from route params or URL query string (for web compatibility)
+  const [token, setToken] = useState<string | undefined>((route.params as any)?.token)
 
   // Early return if theme is still loading (same pattern as other screens)
   if (themeLoading) {
@@ -168,6 +171,78 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
 
   // Create styles - useTheme() always returns colors, so this is safe
   const styles = createStyles(colors)
+
+  // Extract token from URL on web (React Navigation might not parse query params automatically)
+  useEffect(() => {
+    const extractTokenFromUrl = async () => {
+      // If we already have a token from route params, use it
+      if (token) {
+        return
+      }
+
+      try {
+        // On web: Check window.location for query parameters
+        if (typeof window !== 'undefined' && window.location) {
+          const urlParams = new URLSearchParams(window.location.search)
+          const urlToken = urlParams.get('token')
+          if (urlToken) {
+            setToken(urlToken)
+            nav.setParams({ token: urlToken } as any)
+            return
+          }
+        }
+
+        // On mobile: Check Linking for deep link URL
+        const initialUrl = await Linking.getInitialURL()
+        if (initialUrl) {
+          try {
+            const urlObj = new URL(initialUrl)
+            const urlToken = urlObj.searchParams.get('token')
+            if (urlToken) {
+              setToken(urlToken)
+              nav.setParams({ token: urlToken } as any)
+              return
+            }
+          } catch (e) {
+            // URL parsing failed, try regex as fallback
+            const tokenMatch = initialUrl.match(/[?&]token=([^&]+)/)
+            if (tokenMatch && tokenMatch[1]) {
+              const decodedToken = decodeURIComponent(tokenMatch[1])
+              setToken(decodedToken)
+              nav.setParams({ token: decodedToken } as any)
+              return
+            }
+          }
+        }
+
+        // Also listen for URL changes (in case link is opened while app is running)
+        const subscription = Linking.addEventListener('url', (event) => {
+          try {
+            const urlObj = new URL(event.url)
+            const urlToken = urlObj.searchParams.get('token')
+            if (urlToken && !token) {
+              setToken(urlToken)
+              nav.setParams({ token: urlToken } as any)
+            }
+          } catch (e) {
+            // Try regex fallback
+            const tokenMatch = event.url.match(/[?&]token=([^&]+)/)
+            if (tokenMatch && tokenMatch[1] && !token) {
+              const decodedToken = decodeURIComponent(tokenMatch[1])
+              setToken(decodedToken)
+              nav.setParams({ token: decodedToken } as any)
+            }
+          }
+        })
+
+        return () => subscription.remove()
+      } catch (error) {
+        logger.error("Error extracting token from URL:", error)
+      }
+    }
+
+    extractTokenFromUrl()
+  }, [token, nav])
 
   const [resetPassword, { isLoading }] = useResetPasswordMutation()
   const [newPassword, setNewPassword] = useState("")
