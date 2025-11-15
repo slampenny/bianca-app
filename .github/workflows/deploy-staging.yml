@@ -190,7 +190,14 @@ jobs:
           cd "$DEPLOY_DIR"
           
           # Copy appspec.yml and scripts
-          cp -r backend/devops/codedeploy/* .
+          # The backend code is checked out to the 'backend' directory
+          if [ -d "backend/devops/codedeploy" ]; then
+            cp -r backend/devops/codedeploy/* .
+          else
+            echo "❌ CodeDeploy directory not found at backend/devops/codedeploy"
+            ls -la backend/devops/ || echo "backend/devops/ doesn't exist"
+            exit 1
+          fi
           
           # Copy docker-compose.yml from staging directory structure
           mkdir -p /opt/bianca-staging
