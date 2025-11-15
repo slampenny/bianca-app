@@ -285,9 +285,10 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
           />
 
           <Button
-            text={isLoading ? "Resetting Password..." : "Reset Password"}
+            text="Reset Password"
             onPress={handleConfirmReset}
             disabled={isLoading || !newPassword || !confirmPassword}
+            loading={isLoading}
             style={styles.resetButton}
           />
 

@@ -2075,13 +2075,6 @@
   dependencies:
     playwright "1.53.2"
 
-"@posthog/core@1.5.2":
-  version "1.5.2"
-  resolved "https://registry.yarnpkg.com/@posthog/core/-/core-1.5.2.tgz#06f1277c5ac9a3d5a17bc3800172a392e594f44c"
-  integrity sha512-iedUP3EnOPPxTA2VaIrsrd29lSZnUV+ZrMnvY56timRVeZAXoYCkmjfIs3KBAsF8OUT5h1GXLSkoQdrV0r31OQ==
-  dependencies:
-    cross-spawn "^7.0.6"
-
 "@radix-ui/react-compose-refs@1.0.0":
   version "1.0.0"
   resolved "https://registry.npmjs.org/@radix-ui/react-compose-refs/-/react-compose-refs-1.0.0.tgz"
@@ -9615,13 +9608,6 @@ postcss@~8.4.32:
     nanoid "^3.3.7"
     picocolors "^1.1.1"
     source-map-js "^1.2.1"
-
-posthog-react-native@^4.11.0:
-  version "4.11.0"
-  resolved "https://registry.yarnpkg.com/posthog-react-native/-/posthog-react-native-4.11.0.tgz#d7c0ff698e5bab1b3aeb90a10e621223306e8342"
-  integrity sha512-f/QCyUrW0qWTfiH78IHpDOf5KQVX/p0POa2Pad4THBM0gfkHXd7jTNoz7sVoRLbfBRyTFFjsXlZKqXUt1mfKtg==
-  dependencies:
-    "@posthog/core" "1.5.2"
 
 postinstall-prepare@1.0.1:
   version "1.0.1"
