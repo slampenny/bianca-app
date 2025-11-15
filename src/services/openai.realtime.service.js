@@ -38,60 +38,14 @@ const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw
 const { emergencyProcessor } = require('./emergencyProcessor.service');
 const { getConversationContextWindow } = require('../utils/conversationContextWindow');
 
-/**
- * Conversation State Machine
- * Handles the flow of conversation states to prevent race conditions and dual responses
- */
-const CONVERSATION_STATES = {
-  INITIALIZING: 'initializing',           // Call setup, WebSocket connecting
-  WAITING_FOR_GREETING: 'waiting_for_greeting', // Initial greeting being generated
-  GREETING_ACTIVE: 'greeting_active',     // AI is speaking the initial greeting
-  GREETING_COMPLETE: 'greeting_complete', // Greeting finished, waiting for user
-  USER_SPEAKING: 'user_speaking',         // User is speaking
-  AI_RESPONDING: 'ai_responding',         // AI is generating/playing response
-  CONVERSATION_ACTIVE: 'conversation_active', // Normal conversation flow
-  CALL_ENDING: 'call_ending',             // Call is being terminated
-  ERROR: 'error'                          // Error state
-};
+// STRANGLER FIG: Import new modular components (backward compatible)
+const { CONVERSATION_STATES: NEW_CONVERSATION_STATES, StateMachine } = require('./ai/realtime/state.machine');
+const CONSTANTS = require('./ai/realtime/constants');
 
-/**
- * State transition rules - what states can transition to what
- */
-const STATE_TRANSITIONS = {
-  [CONVERSATION_STATES.INITIALIZING]: [CONVERSATION_STATES.WAITING_FOR_GREETING, CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.WAITING_FOR_GREETING]: [CONVERSATION_STATES.GREETING_ACTIVE, CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.GREETING_ACTIVE]: [CONVERSATION_STATES.GREETING_COMPLETE, CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.GREETING_COMPLETE]: [CONVERSATION_STATES.USER_SPEAKING, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.USER_SPEAKING]: [CONVERSATION_STATES.AI_RESPONDING, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.AI_RESPONDING]: [CONVERSATION_STATES.CONVERSATION_ACTIVE, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.CONVERSATION_ACTIVE]: [CONVERSATION_STATES.USER_SPEAKING, CONVERSATION_STATES.AI_RESPONDING, CONVERSATION_STATES.CALL_ENDING, CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.CALL_ENDING]: [CONVERSATION_STATES.ERROR],
-  [CONVERSATION_STATES.ERROR]: [CONVERSATION_STATES.INITIALIZING] // Can recover from error
-};
-
-/**
- * Constants for configuration
- */
-const CONSTANTS = {
-  MAX_PENDING_CHUNKS: 200, // Increased back from 100
-  RECONNECT_MAX_ATTEMPTS: 5,
-  RECONNECT_BASE_DELAY: 1000,
-  COMMIT_DEBOUNCE_DELAY: 100, // Conservative: 100ms instead of 50ms
-  CONNECTION_TIMEOUT: 15000,
-  DEFAULT_SAMPLE_RATE: 24000,
-  ASTERISK_SAMPLE_RATE: 8000,
-  OPENAI_PCM_OUTPUT_RATE: 24000,
-  TEST_CONNECTION_TIMEOUT: 20000,
-  AUDIO_BATCH_SIZE: 20, // Conservative: 20 instead of 10
-  MIN_AUDIO_DURATION_MS: 40, // Conservative: 40ms instead of 20ms
-  MIN_AUDIO_BYTES: 320, // Conservative: 320 bytes instead of 160
-  INITIAL_SILENCE_MS: 100, // Conservative: 100ms instead of 50ms
-  AUDIO_QUALITY_CHECK_INTERVAL: 5000,
-  MAX_CONSECUTIVE_SILENCE_CHUNKS: 50,
-  SPEECH_END_SILENCE_MS: 1200, // Conservative: 1200ms instead of 800ms
-  MIN_SPEECH_DURATION_MS: 800, // Conservative: 800ms instead of 500ms
-  GRACE_PERIOD_MS: 3000, // Grace period after greeting completion
-};
+// STRANGLER FIG: Keep old constants for backward compatibility
+// These will be removed once all code is migrated
+const CONVERSATION_STATES = NEW_CONVERSATION_STATES;
+const STATE_TRANSITIONS = require('./ai/realtime/state.machine').STATE_TRANSITIONS;
 
 const fs = require('fs'); // Fallback for local saving if S3 fails or is not configured
 const path = require('path'); // For local saving
@@ -144,20 +98,17 @@ class OpenAIRealtimeService {
    */
 
   /**
+   * STRANGLER FIG: State machine methods now delegate to modular StateMachine
+   * Old methods kept for backward compatibility - they wrap the new module
+   */
+  
+  /**
    * Initialize conversation state for a new call
    */
   initializeConversationState(callId) {
     const conn = this.connections.get(callId);
     if (!conn) return;
-
-    conn.conversationState = CONVERSATION_STATES.INITIALIZING;
-    conn.stateHistory = [{
-      state: CONVERSATION_STATES.INITIALIZING,
-      timestamp: Date.now(),
-      reason: 'call_initialized'
-    }];
-    
-    logger.info(`[State Machine] Initialized conversation state for ${callId}: ${conn.conversationState}`);
+    StateMachine.initialize(conn);
   }
 
   /**
@@ -169,32 +120,7 @@ class OpenAIRealtimeService {
       logger.error(`[State Machine] Cannot transition state for ${callId} - no connection`);
       return false;
     }
-
-    const currentState = conn.conversationState;
-    const allowedTransitions = STATE_TRANSITIONS[currentState] || [];
-
-    if (!allowedTransitions.includes(newState)) {
-      logger.warn(`[State Machine] Invalid state transition for ${callId}: ${currentState} -> ${newState}. Allowed: ${allowedTransitions.join(', ')}`);
-      return false;
-    }
-
-    const previousState = conn.conversationState;
-    conn.conversationState = newState;
-    conn.stateHistory = conn.stateHistory || [];
-    conn.stateHistory.push({
-      state: newState,
-      timestamp: Date.now(),
-      reason: reason,
-      previousState: previousState
-    });
-
-    // Keep only last 10 state transitions to prevent memory bloat
-    if (conn.stateHistory.length > 10) {
-      conn.stateHistory = conn.stateHistory.slice(-10);
-    }
-
-    logger.info(`[State Machine] ${callId}: ${previousState} -> ${newState} (${reason})`);
-    return true;
+    return StateMachine.transition(conn, newState, reason);
   }
 
   /**
@@ -203,10 +129,7 @@ class OpenAIRealtimeService {
   canTransitionTo(callId, newState) {
     const conn = this.connections.get(callId);
     if (!conn) return false;
-
-    const currentState = conn.conversationState;
-    const allowedTransitions = STATE_TRANSITIONS[currentState] || [];
-    return allowedTransitions.includes(newState);
+    return StateMachine.canTransitionTo(conn, newState);
   }
 
   /**
@@ -214,30 +137,25 @@ class OpenAIRealtimeService {
    */
   getConversationState(callId) {
     const conn = this.connections.get(callId);
-    return conn ? conn.conversationState : null;
+    return StateMachine.getCurrentState(conn);
   }
 
   /**
    * Check if we're in a state where AI can respond
    */
   canAIRespond(callId) {
-    const state = this.getConversationState(callId);
-    return [
-      CONVERSATION_STATES.WAITING_FOR_GREETING,
-      CONVERSATION_STATES.GREETING_COMPLETE,
-      CONVERSATION_STATES.CONVERSATION_ACTIVE
-    ].includes(state);
+    const conn = this.connections.get(callId);
+    if (!conn) return false;
+    return StateMachine.canAIRespond(conn);
   }
 
   /**
    * Check if we're in a state where user can speak
    */
   canUserSpeak(callId) {
-    const state = this.getConversationState(callId);
-    return [
-      CONVERSATION_STATES.GREETING_COMPLETE,
-      CONVERSATION_STATES.CONVERSATION_ACTIVE
-    ].includes(state);
+    const conn = this.connections.get(callId);
+    if (!conn) return false;
+    return StateMachine.canUserSpeak(conn);
   }
 
   /**
@@ -245,10 +163,8 @@ class OpenAIRealtimeService {
    */
   isInGracePeriod(callId) {
     const conn = this.connections.get(callId);
-    if (!conn || !conn._initialGreetingCompletedAt) return false;
-
-    const timeSinceGreeting = Date.now() - conn._initialGreetingCompletedAt;
-    return timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS;
+    if (!conn) return false;
+    return StateMachine.isInGracePeriod(conn, CONSTANTS.GRACE_PERIOD_MS);
   }
 
   /**
