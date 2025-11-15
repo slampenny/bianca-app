@@ -205,6 +205,20 @@ docker tag bianca-app-backend:production 730335291008.dkr.ecr.us-east-2.amazonaw
 docker tag bianca-app-asterisk:production 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:production
 docker tag bianca-app-frontend:production 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:production
 
+# Re-authenticate with ECR right before pushing (credentials may have expired during build)
+echo "🔐 Re-authenticating with ECR before push..."
+export DOCKER_CONFIG=/tmp/docker-nocreds
+mkdir -p "$DOCKER_CONFIG"
+printf '{}' > "$DOCKER_CONFIG/config.json"
+if ! aws ecr get-login-password --region us-east-2 --profile jordan 2>&1 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com 2>&1; then
+    echo "⚠️  Re-authentication failed, trying without profile..."
+    aws ecr get-login-password --region us-east-2 2>&1 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com 2>&1 || {
+        echo "❌ ECR re-authentication failed. Cannot push images."
+        exit 1
+    }
+fi
+echo "✅ ECR re-authentication successful"
+
 # Push images in parallel
 echo "📦 Pushing images to ECR in parallel..."
 if [ "$SKIP_BACKEND_PUSH" != true ]; then
