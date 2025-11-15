@@ -189,7 +189,7 @@ export const VerifyEmailScreen = () => {
     }
   }, [token, navigation, verifyEmail])
 
-  if (themeLoading) {
+  if (themeLoading || !colors) {
     return null
   }
 
@@ -199,7 +199,7 @@ export const VerifyEmailScreen = () => {
     return (
       <Screen preset="fixed" style={styles.container} contentContainerStyle={styles.container}>
         <View style={styles.contentWrapper}>
-          <Text preset="heading" text="✓" style={[styles.title, { fontSize: 64, color: colors.palette.biancaSuccess || colors.palette.success500 || "#10b981" }]} />
+          <Text preset="heading" text="✓" style={[styles.title, { fontSize: 64, color: colors?.palette?.biancaSuccess || colors?.palette?.success500 || "#10b981" }]} />
           <Text preset="heading" tx="emailVerifiedScreen.title" style={styles.title} />
           <Text preset="default" tx="emailVerifiedScreen.redirecting" style={styles.message} />
         </View>
@@ -211,7 +211,7 @@ export const VerifyEmailScreen = () => {
     return (
       <Screen preset="fixed" style={styles.container} contentContainerStyle={styles.container}>
         <View style={styles.contentWrapper}>
-          <Text preset="heading" text="⚠️" style={[styles.title, { fontSize: 64, color: colors.palette.biancaError || colors.palette.error500 || "#ef4444" }]} />
+          <Text preset="heading" text="⚠️" style={[styles.title, { fontSize: 64, color: colors?.palette?.biancaError || colors?.palette?.error500 || "#ef4444" }]} />
           <Text preset="heading" tx="emailVerificationFailedPage.title" style={styles.title} />
           <Text preset="default" text={errorMessage} style={styles.errorMessage} />
           <View style={styles.buttonContainer}>
