@@ -155,18 +155,24 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const { navigation } = props
   const route = useRoute()
   const token = (route.params as any)?.token
-  const { colors, isLoading: themeLoading } = useTheme()
+  const themeContext = useTheme()
   const { toast, showError, hideToast } = useToast()
+
+  // Safely extract colors with fallback
+  const colors = themeContext?.colors
+  const themeLoading = themeContext?.isLoading ?? true
 
   // Memoize styles to ensure they're only created when colors is available
   const styles = useMemo(() => {
-    if (themeLoading || !colors) {
+    // Always use fallback styles if colors is not available or doesn't have palette
+    if (themeLoading || !colors || !colors.palette) {
       return createStyles(null) // Use fallback styles
     }
     return createStyles(colors)
   }, [colors, themeLoading])
 
-  if (themeLoading || !colors) {
+  // Early return if theme is still loading or colors is not available
+  if (themeLoading || !colors || !colors.palette) {
     return null
   }
 
