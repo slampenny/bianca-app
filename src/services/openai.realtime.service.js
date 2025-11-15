@@ -44,6 +44,7 @@ const CONSTANTS = require('./ai/realtime/constants');
 const ReconnectionManager = require('./ai/realtime/reconnection.manager');
 const AudioProcessor = require('./ai/realtime/audio.processor');
 const ConnectionManager = require('./ai/realtime/connection.manager');
+const MessageHandler = require('./ai/realtime/message.handler');
 
 // STRANGLER FIG: Keep old constants for backward compatibility
 // These will be removed once all code is migrated
@@ -955,12 +956,15 @@ class OpenAIRealtimeService {
     }
   }
 
+  /**
+   * STRANGLER FIG: Message handling now uses MessageHandler for parsing
+   */
+  
   async handleOpenAIMessageInternal(callId, data) {
-    let message;
-    try {
-      message = JSON.parse(data);
-    } catch (err) {
-      logger.error(`[OpenAI Realtime] Failed JSON parse for ${callId}: ${err.message}`);
+    // Use MessageHandler to parse message
+    const message = MessageHandler.parseMessage(data);
+    if (!message) {
+      logger.error(`[OpenAI Realtime] Failed to parse message for ${callId}`);
       return;
     }
 
@@ -990,7 +994,18 @@ class OpenAIRealtimeService {
           break;
 
         case 'response.content_part.added':
-          await this.handleContentPartAdded(callId, message);
+          // STRANGLER FIG: Use MessageHandler for content part processing
+          MessageHandler.handleContentPartAdded(
+            conn,
+            message,
+            (text, sessionId) => {
+              this.notify(callId, 'openai_text_delta', {
+                text,
+                sessionId
+              });
+            },
+            (audioBase64) => this.processAudioResponse(callId, audioBase64)
+          );
           break;
 
         case 'response.audio.delta':
@@ -1014,7 +1029,12 @@ class OpenAIRealtimeService {
             }
           }
 
-          await this.handleResponseAudioDelta(callId, message);
+          // STRANGLER FIG: Use MessageHandler for audio delta processing
+          MessageHandler.handleResponseAudioDelta(
+            conn,
+            message,
+            (audioBase64) => this.processAudioResponse(callId, audioBase64)
+          );
           break;
 
         case 'conversation.item.created':
@@ -1031,11 +1051,13 @@ class OpenAIRealtimeService {
           break;
 
         case 'response.audio_transcript.delta':
-          await this.handleResponseAudioTranscriptDelta(callId, message);
+          // STRANGLER FIG: Use MessageHandler for audio transcript delta
+          MessageHandler.handleResponseAudioTranscriptDelta(conn, message);
           break;
 
         case 'response.audio_transcript.done':
-          await this.handleResponseAudioTranscriptDone(callId, message);
+          // STRANGLER FIG: Use MessageHandler for audio transcript done
+          MessageHandler.handleResponseAudioTranscriptDone(conn, message);
           break;
 
         case 'input_audio_buffer.speech_started':
@@ -1274,6 +1296,10 @@ class OpenAIRealtimeService {
   /**
    * Handle session.created - Send session.update immediately like test method
    */
+  /**
+   * STRANGLER FIG: Session handling now uses MessageHandler for config building
+   */
+  
   async handleSessionCreated(callId, message) {
     const conn = this.connections.get(callId);
     if (!conn) return;
@@ -1281,30 +1307,8 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Session CREATED for ${callId}, Session ID: ${message.session.id}`);
     conn.sessionId = message.session.id;
 
-    // CRITICAL: Add turn detection to prevent AI from talking over user
-    const sessionConfig = {
-      type: 'session.update',
-      session: {
-        modalities: ['text', 'audio'],
-        instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant.',
-        voice: config.openai.realtimeVoice || 'alloy',
-        input_audio_format: 'g711_ulaw',
-        output_audio_format: 'g711_ulaw',
-
-        // CRITICAL: Add turn detection to prevent interruptions
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.5,              // Keep at 0.5 for balanced detection
-          prefix_padding_ms: 300,      // Keep original
-          silence_duration_ms: 1200    // Increase to 1200ms for more natural pauses
-        },
-
-        // Add input transcription for debugging
-        input_audio_transcription: {
-          model: 'whisper-1',
-        }
-      },
-    };
+    // Use MessageHandler to build session config
+    const sessionConfig = MessageHandler.buildSessionConfig(conn);
 
     logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId}`);
     logger.debug(`[OpenAI Realtime] Session config: ${JSON.stringify(sessionConfig.session, null, 2)}`);
@@ -1390,119 +1394,43 @@ class OpenAIRealtimeService {
     }
   }
 
+  /**
+   * STRANGLER FIG: These methods are now handled by MessageHandler in the switch statement
+   * Keeping method stubs for backward compatibility (they're called from switch statement)
+   */
+  
   async handleResponseAudioDelta(callId, message) {
-    // <<<< NEW HANDLER
-    logger.info(`[OpenAI Realtime] handleResponseAudioDelta CALLED for ${callId} with message type: ${message.type}`);
-    logger.info(`[OpenAI Realtime] Message delta check for ${callId}: delta exists=${!!message.delta}, type=${typeof message.delta}, length=${message.delta?.length}`);
-
-    if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
-      logger.warn(
-        `[OpenAI Realtime] Received 'response.audio.delta' for ${callId} but 'message.delta' (audio data) is missing or empty.`
-      );
-      return;
-    }
-
-    logger.info(`[OpenAI Realtime] Validation passed for ${callId}, calling processAudioResponse with delta length: ${message.delta.length}`);
-
     const conn = this.connections.get(callId);
-    if (conn) {
-      if (!conn._openaiChunkCount) conn._openaiChunkCount = 0;
-      conn._openaiChunkCount++;
-
-      // Log first few chunks for debugging
-      if (conn._openaiChunkCount <= 5 || conn._openaiChunkCount % 50 === 0) {
-        logger.info(`[OpenAI Realtime] Processing response.audio.delta #${conn._openaiChunkCount} for ${callId}, data length: ${message.delta.length}`);
-      }
-    }
-
-    await this.processAudioResponse(callId, message.delta);
+    MessageHandler.handleResponseAudioDelta(
+      conn,
+      message,
+      (audioBase64) => this.processAudioResponse(callId, audioBase64)
+    );
   }
 
-  /**
-   * Handle content part added
-   * 
-   * MESSAGE FLOW LOGIC:
-   * 1. When AI generates text, it comes through here as 'response.content_part.added'
-   * 2. We accumulate the text in pendingAssistantTranscript (don't save yet)
-   * 3. Text is saved later when AI finishes speaking (response.done) or becomes stale
-   * 4. This ensures AI messages are saved with timestamps reflecting when AI finished speaking
-   * 5. User messages follow the same pattern - accumulated then saved when user stops speaking
-   */
   async handleContentPartAdded(callId, message) {
-    const part = message.part;
-    if (!part) {
-      logger.warn(`[OpenAI Realtime] No part in content_part.added message for ${callId}`);
-      return;
-    }
-
-    if (part.type === 'text') {
-      logger.info(`[OpenAI Realtime] Received TEXT content part for ${callId}: "${part.text}"`);
-
-      // Accumulate AI text instead of saving immediately (like user transcription)
-      const conn = this.connections.get(callId);
-      if (conn) {
-        conn.pendingAssistantTranscript += (conn.pendingAssistantTranscript ? ' ' : '') + part.text;
-        conn.lastAssistantTextTime = Date.now();
-        logger.info(`[OpenAI Realtime] Accumulated assistant text: "${conn.pendingAssistantTranscript}"`);
-      } else {
-        logger.warn(`[OpenAI Realtime] No connection found for ${callId} when trying to accumulate AI text`);
-      }
-
-      this.notify(callId, 'openai_text_delta', {
-        text: part.text,
-        sessionId: this.connections.get(callId)?.sessionId
-      });
-
-    } else if (part.type === 'audio') {
-      logger.info(`[OpenAI Realtime] Received 'response.content_part.added' with part_type=audio for ${callId}.`);
-      if (part.audio && typeof part.audio === 'string' && part.audio.length > 0) {
-        await this.processAudioResponse(callId, part.audio);
-      }
-    } else {
-      logger.debug(`[OpenAI Realtime] Unhandled part type '${part.type}' in response.content_part.added for ${callId}`);
-    }
+    const conn = this.connections.get(callId);
+    MessageHandler.handleContentPartAdded(
+      conn,
+      message,
+      (text, sessionId) => {
+        this.notify(callId, 'openai_text_delta', {
+          text,
+          sessionId
+        });
+      },
+      (audioBase64) => this.processAudioResponse(callId, audioBase64)
+    );
   }
 
-  /**
-   * Handle audio transcript deltas - ENHANCED to save transcripts
-   * 
-   * MESSAGE FLOW LOGIC:
-   * This handles audio transcripts of what the AI is saying (different from text content).
-   * We should NOT accumulate this in pendingAssistantTranscript since we already have the text content.
-   * Audio transcripts are typically used for debugging/monitoring, not for saving to conversation.
-   */
   async handleResponseAudioTranscriptDelta(callId, message) {
-    if (!message.delta) return;
-
     const conn = this.connections.get(callId);
-    if (!conn) return;
-
-    logger.info(`[OpenAI Realtime] Audio transcript delta for ${callId}: "${message.delta}"`);
-
-    // Don't accumulate audio transcripts - we already have the text content
-    // Audio transcripts are for monitoring/debugging, not for conversation storage
-    logger.debug(`[OpenAI Realtime] Skipping audio transcript accumulation - using text content instead`);
+    MessageHandler.handleResponseAudioTranscriptDelta(conn, message);
   }
 
-  /**
-   * Handle audio transcript done - Store transcript for later saving
-   * 
-   * MESSAGE FLOW LOGIC:
-   * This handles the final audio transcript from the AI (response.audio_transcript.done).
-   * We store the transcript but don't save it yet - it will be saved when response.done fires.
-   * This ensures AI messages get timestamps when AI finishes speaking, not when transcript is ready.
-   */
   async handleResponseAudioTranscriptDone(callId, message) {
-    if (!message.transcript) return;
-
     const conn = this.connections.get(callId);
-    if (!conn) return;
-
-    logger.info(`[OpenAI Realtime] AI audio transcript completed for ${callId}: "${message.transcript}"`);
-
-    // Store the transcript for saving when AI finishes speaking (response.done)
-    conn.pendingAssistantTranscript = message.transcript.trim();
-    logger.info(`[OpenAI Realtime] Stored assistant transcript for later saving: "${message.transcript}"`);
+    MessageHandler.handleResponseAudioTranscriptDone(conn, message);
   }
 
   /**
@@ -2071,29 +1999,27 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Handle conversation items
+   * STRANGLER FIG: Conversation item handling now uses MessageHandler
    */
+  
   async handleConversationItem(callId, item, dbConversationId) {
     if (!item) return;
 
     try {
-      // Skip saving completed messages here - they're now saved when speakers finish
-      // (AI text is accumulated and saved in handleResponseDone, user transcription in handleInputAudioTranscriptionCompleted)
-      if (item.type === 'message' && item.status === 'completed') {
-        logger.debug(`[OpenAI Realtime] Skipping immediate save of ${item.role} message - will be saved when speaker finishes`);
-      }
-
-      // Only save completed audio transcripts
-      if (item.audio?.transcript && dbConversationId) {
-        const conversationService = require('./conversation.service');
-        await conversationService.saveRealtimeMessage(
-          dbConversationId,
-          item.role,
-          item.audio.transcript,
-          item.role === 'assistant' ? 'assistant_response' : 'user_message'
-        );
-        logger.info(`[OpenAI Realtime] Saved ${item.role} audio transcript to conversation ${dbConversationId}`);
-      }
+      // Use MessageHandler to process conversation item
+      await MessageHandler.handleConversationItem(
+        item,
+        dbConversationId,
+        async (conversationId, role, transcript, messageType) => {
+          const conversationService = require('./conversation.service');
+          await conversationService.saveRealtimeMessage(
+            conversationId,
+            role,
+            transcript,
+            messageType
+          );
+        }
+      );
 
       // Handle function calls
       if (item.type === 'function_call') {
