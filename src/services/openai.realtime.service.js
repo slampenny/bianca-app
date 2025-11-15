@@ -41,6 +41,7 @@ const { getConversationContextWindow } = require('../utils/conversationContextWi
 // STRANGLER FIG: Import new modular components (backward compatible)
 const { CONVERSATION_STATES: NEW_CONVERSATION_STATES, StateMachine } = require('./ai/realtime/state.machine');
 const CONSTANTS = require('./ai/realtime/constants');
+const ReconnectionManager = require('./ai/realtime/reconnection.manager');
 
 // STRANGLER FIG: Keep old constants for backward compatibility
 // These will be removed once all code is migrated
@@ -78,9 +79,11 @@ class OpenAIRealtimeService {
     this.pendingCommits = new Map(); // callId -> timestamp when commit was requested
     this.globalCommitTimer = null; // Single timer for all commits
     
-    // OPTIMIZATION: Batch reconnection timer system instead of per-call timeouts
-    this.pendingReconnections = new Map(); // callId -> { executeAt: timestamp, attempt: number }
-    this.globalReconnectTimer = null; // Single timer for all reconnections
+    // STRANGLER FIG: Use new ReconnectionManager module
+    this.reconnectionManager = new ReconnectionManager();
+    // Keep old maps for backward compatibility (will delegate to reconnectionManager)
+    this.pendingReconnections = this.reconnectionManager.pendingReconnections;
+    this.globalReconnectTimer = null; // Managed by reconnectionManager
     
     this.isReconnecting = new Map(); // callId -> boolean
     this.reconnectAttempts = new Map(); // callId -> number
@@ -208,85 +211,38 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * STRANGLER FIG: Reconnection methods now delegate to ReconnectionManager
+   * Old methods kept for backward compatibility - they wrap the new module
+   */
+  
+  /**
    * OPTIMIZATION: Start global reconnection timer that processes ALL pending reconnections
    */
   startGlobalReconnectTimer() {
-    if (this.globalReconnectTimer) return; // Already running
-    
-    this.globalReconnectTimer = setInterval(() => {
-      const now = Date.now();
-      const reconnectsToProcess = [];
-      
-      // Find reconnections that are ready (past their executeAt time)
-      for (const [callId, reconnectData] of this.pendingReconnections) {
-        if (now >= reconnectData.executeAt) {
-          reconnectsToProcess.push({ callId, attempt: reconnectData.attempt });
-        }
-      }
-      
-      // Process all ready reconnections
-      for (const { callId, attempt } of reconnectsToProcess) {
-        try {
-          this.pendingReconnections.delete(callId);
-          this.attemptReconnect(callId);
-          logger.info(`[OpenAI Realtime] 🚀 BATCH: Processed reconnect for ${callId} (attempt: ${attempt})`);
-        } catch (err) {
-          logger.error(`[OpenAI Realtime] Batch reconnect error for ${callId}: ${err.message}`);
-          this.pendingReconnections.delete(callId); // Remove failed reconnect
-        }
-      }
-      
-      // Stop timer if no more pending reconnections
-      if (this.pendingReconnections.size === 0) {
-        this.stopGlobalReconnectTimer();
-      }
-      
-    }, 500); // Check every 500ms for reconnections (less frequent than commits)
-    
-    logger.info(`[OpenAI Realtime] 🚀 OPTIMIZATION: Started global batch reconnect timer`);
+    this.reconnectionManager.startGlobalReconnectTimer((callId) => this.attemptReconnect(callId));
+    this.globalReconnectTimer = this.reconnectionManager.globalReconnectTimer;
   }
 
   /**
    * OPTIMIZATION: Stop global reconnect timer when no pending reconnections
    */
   stopGlobalReconnectTimer() {
-    if (this.globalReconnectTimer) {
-      clearInterval(this.globalReconnectTimer);
-      this.globalReconnectTimer = null;
-      logger.info('[OpenAI Realtime] 🛑 OPTIMIZATION: Stopped global batch reconnect timer');
-    }
+    this.reconnectionManager.stopGlobalReconnectTimer();
+    this.globalReconnectTimer = null;
   }
 
   /**
    * OPTIMIZATION: Schedule a reconnection attempt using batch system
    */
   scheduleReconnect(callId, delay, attempt = 0) {
-    const executeAt = Date.now() + delay;
-    
-    // Don't schedule if already pending
-    if (this.pendingReconnections.has(callId)) {
-      logger.debug(`[OpenAI Realtime] 🚀 BATCH: Reconnect already scheduled for ${callId}, skipping`);
-      return;
-    }
-    
-    // Add to pending reconnections
-    this.pendingReconnections.set(callId, { executeAt, attempt });
-    
-    // Start global timer if this is the first pending reconnection
-    if (this.pendingReconnections.size === 1) {
-      this.startGlobalReconnectTimer();
-    }
-    
-    logger.info(`[OpenAI Realtime] 🚀 BATCH: Scheduled reconnect for ${callId} in ${delay}ms (attempt: ${attempt}, total pending: ${this.pendingReconnections.size})`);
+    this.reconnectionManager.scheduleReconnect(callId, delay, attempt);
   }
 
   /**
    * Calculate backoff delay for reconnection attempts
    */
   calculateBackoffDelay(attempt) {
-    const expBackoff = Math.min(CONSTANTS.RECONNECT_BASE_DELAY * Math.pow(2, attempt), 30000);
-    const jitter = expBackoff * 0.2 * (Math.random() * 2 - 1); // +/- 20% jitter
-    return Math.floor(expBackoff + jitter);
+    return this.reconnectionManager.calculateBackoffDelay(attempt);
   }
 
   /**
@@ -983,32 +939,15 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Handle connection errors consistently with enhanced recovery
+   * STRANGLER FIG: Handle connection errors - uses ReconnectionManager for error classification
    */
   handleConnectionError(callId, error) {
     this.clearConnectionTimeout(callId);
     this.updateConnectionStatus(callId, 'error');
 
-    // Enhanced error classification and recovery
+    // Use ReconnectionManager to classify error
+    const { shouldReconnect, recoveryAction } = this.reconnectionManager.classifyError(error);
     const errorMessage = error.message || error.toString();
-    let shouldReconnect = true;
-    let recoveryAction = 'reconnect';
-
-    // Classify errors for appropriate recovery
-    if (errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
-      logger.warn(`[OpenAI Realtime] Network connectivity issue for ${callId}: ${errorMessage}`);
-      recoveryAction = 'network_retry';
-    } else if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
-      logger.error(`[OpenAI Realtime] Authentication error for ${callId}: ${errorMessage}`);
-      shouldReconnect = false; // Don't retry auth errors
-      recoveryAction = 'auth_failure';
-    } else if (errorMessage.includes('rate limit') || errorMessage.includes('quota')) {
-      logger.warn(`[OpenAI Realtime] Rate limit/quota issue for ${callId}: ${errorMessage}`);
-      recoveryAction = 'rate_limit_retry';
-    } else {
-      logger.error(`[OpenAI Realtime] General connection error for ${callId}: ${errorMessage}`);
-      recoveryAction = 'general_retry';
-    }
 
     this.notify(callId, 'openai_connection_error', {
       error: errorMessage,
@@ -2226,14 +2165,10 @@ class OpenAIRealtimeService {
         }
 
         // OPTIMIZATION: Remove from pending reconnections
+        // STRANGLER FIG: Use reconnectionManager to remove pending reconnect
         if (this.pendingReconnections.has(callId)) {
-          this.pendingReconnections.delete(callId);
+          this.reconnectionManager.removePendingReconnect(callId);
           logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending reconnections`);
-          
-          // Stop global timer if no more pending reconnections
-          if (this.pendingReconnections.size === 0) {
-            this.stopGlobalReconnectTimer();
-          }
         }
       }
     } else if (errorMsg.includes('Conversation already has an active response')) {
@@ -2988,15 +2923,10 @@ class OpenAIRealtimeService {
         }
       }
 
-      // OPTIMIZATION: Remove from pending reconnections
+      // STRANGLER FIG: Use reconnectionManager to remove pending reconnect
       if (this.pendingReconnections.has(callId)) {
-        this.pendingReconnections.delete(callId);
+        this.reconnectionManager.removePendingReconnect(callId);
         logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending reconnections (buffer error recovery)`);
-        
-        // Stop global timer if no more pending reconnections
-        if (this.pendingReconnections.size === 0) {
-          this.stopGlobalReconnectTimer();
-        }
       }
 
       logger.info(`[OpenAI Realtime] Successfully recovered from buffer error for ${callId} (OpenAI already cleared buffer)`);
@@ -3236,15 +3166,10 @@ class OpenAIRealtimeService {
       }
     }
 
-    // OPTIMIZATION: Remove from pending reconnections
+    // STRANGLER FIG: Use reconnectionManager to remove pending reconnect
     if (this.pendingReconnections.has(callId)) {
-      this.pendingReconnections.delete(callId);
+      this.reconnectionManager.removePendingReconnect(callId);
       logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending reconnections (disconnect)`);
-      
-      // Stop global timer if no more pending reconnections
-      if (this.pendingReconnections.size === 0) {
-        this.stopGlobalReconnectTimer();
-      }
     }
 
     if (conn.webSocket) {
@@ -3294,14 +3219,10 @@ class OpenAIRealtimeService {
     }
 
     // OPTIMIZATION: Remove from pending reconnections
+    // STRANGLER FIG: Use reconnectionManager to remove pending reconnect
     if (this.pendingReconnections.has(callId)) {
-      this.pendingReconnections.delete(callId);
+      this.reconnectionManager.removePendingReconnect(callId);
       logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending reconnections (cleanup)`);
-      
-      // Stop global timer if no more pending reconnections
-      if (this.pendingReconnections.size === 0) {
-        this.stopGlobalReconnectTimer();
-      }
     }
 
     if (this.pendingAudio.has(callId)) {
