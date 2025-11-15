@@ -276,7 +276,12 @@ resource "aws_iam_policy" "github_actions_deploy" {
           # SNS read operations
           "sns:GetTopicAttributes",
           "sns:ListTopics",
-          "sns:ListTagsForResource"
+          "sns:ListTagsForResource",
+          # Service Discovery read operations
+          "servicediscovery:GetNamespace",
+          "servicediscovery:ListNamespaces",
+          "servicediscovery:GetService",
+          "servicediscovery:ListServices"
         ]
         Resource = "*"
       }
