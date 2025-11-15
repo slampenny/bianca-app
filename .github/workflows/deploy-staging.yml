@@ -202,9 +202,16 @@ jobs:
             else
               echo '   Using cached ECR token'
             fi &&
-            echo '📥 Pulling latest images...' &&
-            docker-compose pull --quiet 2>&1 | grep -E 'Pulling|Downloaded|Image is up to date' || true &&
-            echo '🔄 Updating containers...' &&
+            echo '📥 Pulling latest images (forcing pull)...' &&
+            docker-compose pull 2>&1 | tee /tmp/pull-output.log &&
+            echo '' &&
+            echo '📊 Pull summary:' &&
+            grep -E 'Pulling|Downloaded|Image is up to date|Digest|Status' /tmp/pull-output.log | tail -10 || true &&
+            rm -f /tmp/pull-output.log &&
+            echo '' &&
+            echo '🔄 Stopping and removing old containers...' &&
+            docker-compose down 2>/dev/null || true &&
+            echo '🚀 Starting containers with new images...' &&
             docker-compose up -d --remove-orphans &&
             echo '⏳ Waiting for containers to start...' &&
             sleep 5 &&
