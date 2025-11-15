@@ -201,6 +201,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "ec2:DescribeNatGateways",
           "ec2:DescribeNetworkAcls",
           "ec2:DescribeVpcAttribute",
+          "ec2:DescribeVpcEndpoints",
           "ec2:DescribeTags",
           # ELBv2 (ALB) read operations
           "elasticloadbalancing:DescribeLoadBalancers",
@@ -235,6 +236,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
           # KMS read operations
           "kms:DescribeKey",
           "kms:GetKeyPolicy",
+          "kms:GetKeyRotationStatus",
           "kms:ListKeys",
           "kms:ListAliases",
           # S3 read operations (beyond state bucket)
