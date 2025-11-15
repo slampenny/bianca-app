@@ -157,7 +157,107 @@ jobs:
           chmod 600 /tmp/staging-key.pem
           echo "✅ SSH key configured"
 
-      - name: Update staging containers
+      - name: Deploy to staging using CodeDeploy
+        run: |
+          echo "🚀 Deploying to staging using AWS CodeDeploy..."
+          
+          # Get staging instance ID
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          
+          if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "⚠️  No running staging instance found. Starting instance..."
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=bianca-staging" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+            echo "⏳ Waiting for instance to start..."
+            aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+            echo "⏳ Waiting 60 seconds for services to initialize..."
+            sleep 60
+          fi
+          
+          echo "📦 Packaging deployment artifacts..."
+          
+          # Create deployment package
+          DEPLOY_DIR=$(mktemp -d)
+          cd "$DEPLOY_DIR"
+          
+          # Copy appspec.yml and scripts
+          cp -r backend/devops/codedeploy/* .
+          
+          # Copy docker-compose.yml from staging directory structure
+          mkdir -p /opt/bianca-staging
+          # We'll use the docker-compose.yml that's already on the instance
+          # CodeDeploy will just trigger the deployment hooks
+          
+          # Create a simple deployment package
+          zip -r deployment.zip . -x "*.git*" "*.DS_Store*"
+          
+          # Upload to S3
+          S3_BUCKET="bianca-codedeploy-artifacts-730335291008"
+          S3_KEY="staging/deployment-$(date +%Y%m%d-%H%M%S).zip"
+          
+          echo "📤 Uploading deployment package to S3..."
+          aws s3 cp deployment.zip "s3://${S3_BUCKET}/${S3_KEY}" --region ${{ env.AWS_REGION }}
+          
+          # Create CodeDeploy deployment
+          echo "🚀 Creating CodeDeploy deployment..."
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name bianca-staging \
+            --deployment-group-name bianca-staging-ec2 \
+            --s3-location bucket=${S3_BUCKET},key=${S3_KEY},bundleType=zip \
+            --region ${{ env.AWS_REGION }} \
+            --query 'deploymentId' \
+            --output text)
+          
+          echo "⏳ Deployment ID: $DEPLOYMENT_ID"
+          echo "⏳ Waiting for deployment to complete (up to 15 minutes)..."
+          
+          # Wait for deployment to complete
+          for i in {1..90}; do
+            STATUS=$(aws deploy get-deployment \
+              --deployment-id "$DEPLOYMENT_ID" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'deploymentInfo.status' \
+              --output text 2>/dev/null || echo "Unknown")
+            
+            echo "   Status: $STATUS ($i/90)"
+            
+            if [ "$STATUS" = "Succeeded" ]; then
+              echo "✅ Deployment completed successfully!"
+              exit 0
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Stopped" ]; then
+              echo "❌ Deployment failed with status: $STATUS"
+              echo "📋 Deployment details:"
+              aws deploy get-deployment \
+                --deployment-id "$DEPLOYMENT_ID" \
+                --region ${{ env.AWS_REGION }} \
+                --query 'deploymentInfo' \
+                --output json || true
+              exit 1
+            fi
+            
+            sleep 10
+          done
+          
+          echo "⚠️  Deployment timed out after 15 minutes"
+          echo "📋 Final status:"
+          aws deploy get-deployment \
+            --deployment-id "$DEPLOYMENT_ID" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'deploymentInfo.status' \
+            --output text || true
+          exit 1
+
+      - name: Update staging containers (Legacy - will be removed)
+        if: false  # Disabled - using CodeDeploy instead
         run: |
           # Get staging instance ID (check for running instances first)
           INSTANCE_ID=$(aws ec2 describe-instances \

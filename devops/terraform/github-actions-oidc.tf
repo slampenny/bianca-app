@@ -293,9 +293,52 @@ resource "aws_iam_policy" "github_actions_deploy" {
           # Lambda read operations
           "lambda:GetFunction",
           "lambda:ListFunctions",
-          "lambda:ListTags"
+          "lambda:ListTags",
+          # CodeDeploy operations
+          "codedeploy:CreateDeployment",
+          "codedeploy:GetApplication",
+          "codedeploy:GetApplicationRevision",
+          "codedeploy:GetDeployment",
+          "codedeploy:GetDeploymentConfig",
+          "codedeploy:RegisterApplicationRevision",
+          "codedeploy:ListApplications",
+          "codedeploy:ListDeploymentGroups",
+          "codedeploy:ListDeployments",
+          # S3 operations for CodeDeploy artifacts
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket"
         ]
         Resource = "*"
+      },
+      {
+        # CodeDeploy S3 bucket access
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::bianca-codedeploy-artifacts-*",
+          "arn:aws:s3:::bianca-codedeploy-artifacts-*/*"
+        ]
+      },
+      {
+        # CodeDeploy application and deployment group access
+        Effect = "Allow"
+        Action = [
+          "codedeploy:CreateDeployment",
+          "codedeploy:GetApplication",
+          "codedeploy:GetApplicationRevision",
+          "codedeploy:GetDeployment",
+          "codedeploy:GetDeploymentConfig",
+          "codedeploy:RegisterApplicationRevision"
+        ]
+        Resource = [
+          "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:application:bianca-staging",
+          "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentgroup:bianca-staging/*"
+        ]
       }
     ]
   })

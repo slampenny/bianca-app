@@ -13,7 +13,7 @@ echo "Starting staging setup..."
 
 # Update and install packages
 yum update -y
-yum install -y docker git jq
+yum install -y docker git jq ruby wget
 
 # Start Docker
 systemctl start docker
@@ -338,6 +338,16 @@ systemctl enable bianca-staging
 
 # Setup cron for ECR refresh
 echo "0 */6 * * * root aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com" > /etc/cron.d/ecr-refresh
+
+# Install CodeDeploy agent
+echo "Installing CodeDeploy agent..."
+cd /home/ec2-user
+wget https://aws-codedeploy-${AWS_REGION}.s3.${AWS_REGION}.amazonaws.com/latest/install
+chmod +x ./install
+./install auto
+service codedeploy-agent start
+systemctl enable codedeploy-agent
+echo "CodeDeploy agent installed and started"
 
 # Wait and check
 sleep 20
