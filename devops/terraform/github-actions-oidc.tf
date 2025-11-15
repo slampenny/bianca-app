@@ -127,7 +127,9 @@ resource "aws_iam_policy" "github_actions_deploy" {
         ]
       },
       {
-        # Allow SendCommand on EC2 instances with tag condition
+        # Allow SendCommand on EC2 instances
+        # Note: SSM SendCommand does not support ec2:ResourceTag conditions
+        # We rely on the instance tag for identification, but the permission must be granted without condition
         Effect = "Allow"
         Action = [
           "ssm:SendCommand"
@@ -135,11 +137,6 @@ resource "aws_iam_policy" "github_actions_deploy" {
         Resource = [
           "arn:aws:ec2:${var.aws_region}:${var.aws_account_id}:instance/*"
         ]
-        Condition = {
-          StringEquals = {
-            "ec2:ResourceTag/Name" = "bianca-staging"
-          }
-        }
       },
       {
         # Get command results and describe instances
