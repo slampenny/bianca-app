@@ -342,7 +342,7 @@ echo "0 */6 * * * root aws ecr get-login-password --region $${AWS_REGION} | dock
 # Install CodeDeploy agent
 echo "Installing CodeDeploy agent..."
 cd /home/ec2-user
-wget https://aws-codedeploy-${AWS_REGION}.s3.${AWS_REGION}.amazonaws.com/latest/install
+wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install
 chmod +x ./install
 ./install auto
 service codedeploy-agent start
