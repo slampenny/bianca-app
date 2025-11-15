@@ -368,6 +368,9 @@ jobs:
                 "cd /opt/bianca-staging",
                 "ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)",
                 "if [ ! -f \"$ECR_TOKEN_FILE\" ]; then aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"$ECR_TOKEN_FILE\"; else echo \"Using cached ECR token\"; fi",
+                "echo \"🧹 Cleaning up Docker to free space...\"",
+                "docker system prune -f --volumes || true",
+                "docker image prune -af || true",
                 "echo \"📥 Pulling latest images...\"",
                 "docker-compose pull",
                 "echo \"🔄 Stopping old containers...\"",
@@ -480,6 +483,9 @@ jobs:
             ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /tmp/staging-key.pem ec2-user@$INSTANCE_IP bash -c "
             set -e
             cd /opt/bianca-staging || { echo '❌ Failed to cd to /opt/bianca-staging'; exit 1; }
+            echo '🧹 Cleaning up Docker to free space...'
+            docker system prune -f --volumes || true
+            docker image prune -af || true
             echo '📦 Logging into ECR...'
             ECR_TOKEN_FILE=/tmp/ecr-token-\$(date +%Y%m%d)
             if [ ! -f \"\$ECR_TOKEN_FILE\" ]; then
