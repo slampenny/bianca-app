@@ -14,13 +14,83 @@ import { logger } from "../utils/logger"
 import { TIMEOUTS } from "../constants"
 import type { ErrorResponse } from "../types"
 
+// Default fallback styles
+const defaultStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    padding: spacing.lg,
+  },
+  screenContentContainer: {
+    flexGrow: 1,
+    padding: spacing.lg,
+  },
+  content: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  title: {
+    color: "#000000",
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: spacing.md,
+  },
+  subtitle: {
+    color: "#666666",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  errorText: {
+    color: "#FF0000",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    backgroundColor: "#FFE5E5",
+    borderRadius: 4,
+  },
+  form: {
+    marginTop: spacing.lg,
+  },
+  textField: {
+    marginBottom: spacing.md,
+  },
+  resetButton: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  backButton: {
+    marginTop: spacing.sm,
+  },
+  message: {
+    color: "#666666",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  formContainer: {
+    marginBottom: spacing.lg,
+  },
+  buttonContainer: {
+    marginTop: spacing.lg,
+  },
+})
+
 const createStyles = (colors: any) => {
-  if (!colors || !colors.palette) {
-    // Return default styles if colors is not available
+  // Always check if colors exists and has palette before accessing
+  if (typeof colors === 'undefined' || colors === null || typeof colors.palette === 'undefined' || colors.palette === null) {
+    return defaultStyles
+  }
+
+  try {
     return StyleSheet.create({
       container: {
         flex: 1,
-        backgroundColor: "#FFFFFF",
+        backgroundColor: colors.palette.neutral100,
         padding: spacing.lg,
       },
       screenContentContainer: {
@@ -32,26 +102,26 @@ const createStyles = (colors: any) => {
         padding: spacing.md,
       },
       title: {
-        color: "#000000",
+        color: colors.palette.neutral800,
         fontSize: 24,
         fontWeight: "bold",
         textAlign: "center",
         marginBottom: spacing.md,
       },
       subtitle: {
-        color: "#666666",
+        color: colors.palette.neutral600,
         fontSize: 16,
         textAlign: "center",
         marginBottom: spacing.xl,
         lineHeight: 24,
       },
       errorText: {
-        color: "#FF0000",
+        color: colors.palette.angry500,
         fontSize: 14,
         textAlign: "center",
         marginBottom: spacing.md,
         padding: spacing.sm,
-        backgroundColor: "#FFE5E5",
+        backgroundColor: colors.palette.angry100,
         borderRadius: 4,
       },
       form: {
@@ -68,7 +138,7 @@ const createStyles = (colors: any) => {
         marginTop: spacing.sm,
       },
       message: {
-        color: "#666666",
+        color: colors.palette.neutral600,
         fontSize: 16,
         textAlign: "center",
         marginBottom: spacing.xl,
@@ -81,72 +151,10 @@ const createStyles = (colors: any) => {
         marginTop: spacing.lg,
       },
     })
+  } catch (error) {
+    // If anything goes wrong, return default styles
+    return defaultStyles
   }
-
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.palette.neutral100,
-      padding: spacing.lg,
-    },
-    screenContentContainer: {
-      flexGrow: 1,
-      padding: spacing.lg,
-    },
-    content: {
-      flex: 1,
-      padding: spacing.md,
-    },
-    title: {
-      color: colors.palette.neutral800,
-      fontSize: 24,
-      fontWeight: "bold",
-      textAlign: "center",
-      marginBottom: spacing.md,
-    },
-    subtitle: {
-      color: colors.palette.neutral600,
-      fontSize: 16,
-      textAlign: "center",
-      marginBottom: spacing.xl,
-      lineHeight: 24,
-    },
-    errorText: {
-      color: colors.palette.angry500,
-      fontSize: 14,
-      textAlign: "center",
-      marginBottom: spacing.md,
-      padding: spacing.sm,
-      backgroundColor: colors.palette.angry100,
-      borderRadius: 4,
-    },
-    form: {
-      marginTop: spacing.lg,
-    },
-    textField: {
-      marginBottom: spacing.md,
-    },
-    resetButton: {
-      marginTop: spacing.lg,
-      marginBottom: spacing.md,
-    },
-    backButton: {
-      marginTop: spacing.sm,
-    },
-    message: {
-      color: colors.palette.neutral600,
-      fontSize: 16,
-      textAlign: "center",
-      marginBottom: spacing.xl,
-      lineHeight: 24,
-    },
-    formContainer: {
-      marginBottom: spacing.lg,
-    },
-    buttonContainer: {
-      marginTop: spacing.lg,
-    },
-  })
 }
 
 type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
@@ -165,8 +173,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   // Memoize styles to ensure they're only created when colors is available
   const styles = useMemo(() => {
     // Always use fallback styles if colors is not available or doesn't have palette
-    if (themeLoading || !colors || !colors.palette) {
-      return createStyles(null) // Use fallback styles
+    if (themeLoading || typeof colors === 'undefined' || colors === null || typeof colors.palette === 'undefined' || colors.palette === null) {
+      return defaultStyles
     }
     return createStyles(colors)
   }, [colors, themeLoading])
