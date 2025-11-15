@@ -177,26 +177,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   
   // Extract token from route params or URL query string (for web compatibility)
   const [token, setToken] = useState<string | undefined>((route.params as any)?.token)
-
-  // Debug: Log to confirm new build is loaded
-  useEffect(() => {
-    console.log('✅ ConfirmResetScreen v2.1 - Component mounted')
-    console.log('✅ Colors available:', !!colors, 'Theme loading:', themeLoading)
-    console.log('✅ Colors object:', colors ? Object.keys(colors).slice(0, 5) : 'undefined')
-  }, [colors, themeLoading])
-
-  // Early return if theme is still loading OR colors is not available
-  // This prevents child components (Screen, Header, Text) from accessing undefined colors
-  if (themeLoading || !colors) {
-    console.log('⏳ Waiting for theme... themeLoading:', themeLoading, 'colors:', !!colors)
-    return null
-  }
   
-  console.log('🟢 Theme ready, creating styles...')
-
-  // Create styles - useTheme() always returns colors, but double-check just in case
-  const styles = createStyles(colors)
-
+  // IMPORTANT: All hooks must be called before any early returns to avoid React Hooks violations
   // Extract token from URL on web (React Navigation might not parse query params automatically)
   useEffect(() => {
     const extractTokenFromUrl = async () => {
@@ -301,6 +283,19 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
       }
     }
   }, [token, navigation])
+  
+  // Early return if theme is still loading OR colors is not available
+  // This prevents child components (Screen, Header, Text) from accessing undefined colors
+  // IMPORTANT: This must be AFTER all hooks are called
+  if (themeLoading || !colors) {
+    console.log('⏳ Waiting for theme... themeLoading:', themeLoading, 'colors:', !!colors)
+    return null
+  }
+  
+  console.log('🟢 Theme ready, creating styles...')
+
+  // Create styles - useTheme() always returns colors, but double-check just in case
+  const styles = createStyles(colors)
 
   const validateForm = () => {
     let isValid = true
