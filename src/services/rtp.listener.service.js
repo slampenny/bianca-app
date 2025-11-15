@@ -27,10 +27,18 @@ class RtpListener {
         this.isShuttingDown = false;
         
         // Audio buffering for OpenAI
+        // Optimized for lower latency
         this.audioBuffer = Buffer.alloc(0);
         this.lastFlushTime = Date.now();
-        this.flushInterval = 100; // Flush every 100ms
-        this.minAudioBytes = 320; // Minimum 40ms of audio (8kHz * 0.04s = 320 bytes)
+        this.flushInterval = 50; // Reduced from 100ms for faster audio delivery
+        this.minAudioBytes = 160; // Reduced from 320 (20ms instead of 40ms at 8kHz)
+        
+        // Smart gap detection - adaptive buffering
+        this.lastSequenceNumber = null;
+        this.gapCount = 0;
+        this.stablePeriodStart = Date.now();
+        this.adaptiveMinAudioBytes = 160; // Start at minimum, adjust if gaps detected
+        this.STABLE_PERIOD_MS = 5000; // 5 seconds of stability before reducing buffer
         
         // Start flush timer
         this.flushTimer = setInterval(() => {
@@ -124,16 +132,47 @@ class RtpListener {
 
         // Process the audio payload
         try {
+            // Smart gap detection - check for sequence number gaps
+            if (this.lastSequenceNumber !== null) {
+                const expectedNext = (this.lastSequenceNumber + 1) % 65536;
+                const actualSeq = rtpPacket.sequenceNumber;
+                const gap = (actualSeq - expectedNext + 65536) % 65536;
+                
+                if (gap > 1 && gap < 100) { // Gap detected (ignore wraparound)
+                    this.gapCount++;
+                    logger.warn(`[RTP Listener ${this.port}] Gap detected for ${this.callId}: expected ${expectedNext}, got ${actualSeq} (gap: ${gap} packets)`);
+                    
+                    // Increase buffer temporarily to handle gaps
+                    if (this.adaptiveMinAudioBytes < 320) { // Max 40ms buffer
+                        this.adaptiveMinAudioBytes = Math.min(this.adaptiveMinAudioBytes + 40, 320);
+                        this.stablePeriodStart = Date.now(); // Reset stability timer
+                        logger.info(`[RTP Listener ${this.port}] Increased buffer to ${this.adaptiveMinAudioBytes} bytes (${this.adaptiveMinAudioBytes / 8}ms) for ${this.callId}`);
+                    }
+                } else if (gap === 1) {
+                    // No gap - check if we can reduce buffer after stable period
+                    const stableDuration = Date.now() - this.stablePeriodStart;
+                    if (stableDuration > this.STABLE_PERIOD_MS && this.adaptiveMinAudioBytes > 160) {
+                        this.adaptiveMinAudioBytes = Math.max(this.adaptiveMinAudioBytes - 40, 160);
+                        logger.info(`[RTP Listener ${this.port}] Reduced buffer to ${this.adaptiveMinAudioBytes} bytes (${this.adaptiveMinAudioBytes / 8}ms) for ${this.callId} after stable period`);
+                    }
+                }
+            }
+            this.lastSequenceNumber = rtpPacket.sequenceNumber;
+            
+            // Normalize audio level for better transcription in noisy environments
+            let normalizedPayload = this.normalizeAudioLevel(rtpPacket.payload);
+            
             // Buffer the audio payload for OpenAI
-            this.audioBuffer = Buffer.concat([this.audioBuffer, rtpPacket.payload]);
+            this.audioBuffer = Buffer.concat([this.audioBuffer, normalizedPayload]);
             
             // Log first few packets to confirm we're receiving data
             if (this.stats.packetsReceived <= 5) {
-                logger.info(`[RTP Listener ${this.port}] Buffered ${rtpPacket.payload.length} bytes, total buffer: ${this.audioBuffer.length} bytes for call ${this.callId}`);
+                logger.info(`[RTP Listener ${this.port}] Buffered ${normalizedPayload.length} bytes, total buffer: ${this.audioBuffer.length} bytes for call ${this.callId}`);
             }
             
-            // Check if we have enough audio to send
-            if (this.audioBuffer.length >= this.minAudioBytes) {
+            // Check if we have enough audio to send (use adaptive buffer size)
+            const minBytesToSend = Math.max(this.minAudioBytes, this.adaptiveMinAudioBytes);
+            if (this.audioBuffer.length >= minBytesToSend) {
                 const audioBase64 = this.audioBuffer.toString('base64');
                 
                 if (audioBase64 && audioBase64.length > 0) {
@@ -152,6 +191,54 @@ class RtpListener {
             logger.error(`[RTP Listener ${this.port}] Error processing audio: ${err.message}`);
             this.stats.errors++;
         }
+    }
+
+    /**
+     * Normalize audio level for better transcription in noisy environments
+     * Simple gain adjustment (0.5x-2x) for μ-law audio
+     */
+    normalizeAudioLevel(audioBuffer) {
+        if (!audioBuffer || audioBuffer.length === 0) {
+            return audioBuffer;
+        }
+        
+        // Calculate average audio level (μ-law is logarithmic)
+        let sum = 0;
+        for (let i = 0; i < audioBuffer.length; i++) {
+            // μ-law values range from 0-255, with 127 being silence
+            const sample = audioBuffer[i];
+            const distanceFromSilence = Math.abs(sample - 127);
+            sum += distanceFromSilence;
+        }
+        const avgLevel = sum / audioBuffer.length;
+        
+        // If audio is too quiet (avg < 20), increase gain
+        // If audio is too loud (avg > 80), decrease gain
+        let gain = 1.0;
+        if (avgLevel < 20) {
+            gain = 1.5; // Increase quiet audio
+        } else if (avgLevel > 80) {
+            gain = 0.7; // Decrease very loud audio
+        }
+        
+        // Apply gain (simple linear adjustment for μ-law)
+        if (gain !== 1.0) {
+            const normalized = Buffer.alloc(audioBuffer.length);
+            for (let i = 0; i < audioBuffer.length; i++) {
+                let sample = audioBuffer[i];
+                // Convert to linear, apply gain, convert back
+                // Simplified: just adjust around silence point
+                if (sample !== 127) { // Not silence
+                    const adjusted = Math.round(127 + (sample - 127) * gain);
+                    normalized[i] = Math.max(0, Math.min(255, adjusted));
+                } else {
+                    normalized[i] = sample; // Keep silence
+                }
+            }
+            return normalized;
+        }
+        
+        return audioBuffer;
     }
 
     parseRtpPacket(buffer) {

@@ -42,11 +42,12 @@ class MessageHandler {
         output_audio_format: 'g711_ulaw',
 
         // CRITICAL: Add turn detection to prevent interruptions
+        // Optimized for lower latency while maintaining quality
         turn_detection: {
           type: 'server_vad',
           threshold: 0.5,              // Keep at 0.5 for balanced detection
-          prefix_padding_ms: 300,      // Keep original
-          silence_duration_ms: 1200    // Increase to 1200ms for more natural pauses
+          prefix_padding_ms: 200,      // Reduced from 300ms for faster response
+          silence_duration_ms: 800     // Reduced from 1200ms for more conversational feel
         },
 
         // Add input transcription for debugging
