@@ -236,12 +236,115 @@ jobs:
               echo "✅ SSM is available, using SSM instead of SSH"
               USE_SSM=true
             else
-              echo "❌ Both SSH and SSM are unavailable. Cannot proceed with deployment."
+              echo "⚠️  Both SSH and SSM are unavailable."
               echo "   Instance IP: $INSTANCE_IP"
               echo "   Instance ID: $INSTANCE_ID"
               echo "   SSM Status: $SSM_READY"
-              echo "   The instance may need to be restarted or checked manually."
-              exit 1
+              echo ""
+              echo "🔄 Attempting to restart the instance to fix connectivity issues..."
+              
+              # Check instance state
+              INSTANCE_STATE=$(aws ec2 describe-instances \
+                --instance-ids "$INSTANCE_ID" \
+                --query 'Reservations[0].Instances[0].State.Name' \
+                --output text \
+                --region ${{ env.AWS_REGION }})
+              
+              echo "   Current instance state: $INSTANCE_STATE"
+              
+              if [ "$INSTANCE_STATE" = "running" ]; then
+                echo "   Instance is running but not responding. Attempting reboot..."
+                aws ec2 reboot-instances --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+                echo "   ⏳ Waiting 60 seconds for instance to reboot..."
+                sleep 60
+                
+                # Wait for instance to be running again
+                echo "   ⏳ Waiting for instance to be in running state..."
+                aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }} || true
+                echo "   ⏳ Waiting additional 30 seconds for services to start..."
+                sleep 30
+                
+                # Get new IP (might have changed)
+                INSTANCE_IP=$(aws ec2 describe-instances \
+                  --instance-ids "$INSTANCE_ID" \
+                  --region ${{ env.AWS_REGION }} \
+                  --query 'Reservations[0].Instances[0].PublicIpAddress' \
+                  --output text)
+                
+                echo "   New instance IP: $INSTANCE_IP"
+                echo "   ⏳ Waiting for SSM agent to come online (up to 2 minutes)..."
+                
+                # Wait for SSM to come online
+                SSM_WAIT_COUNT=0
+                SSM_MAX_WAIT=24
+                while [ $SSM_WAIT_COUNT -lt $SSM_MAX_WAIT ]; do
+                  SSM_STATUS=$(aws ssm describe-instance-information \
+                    --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+                    --query 'InstanceInformationList[0].PingStatus' \
+                    --output text \
+                    --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Inactive")
+                  
+                  if [ "$SSM_STATUS" = "Online" ]; then
+                    echo "   ✅ SSM is now online!"
+                    USE_SSM=true
+                    break
+                  fi
+                  
+                  SSM_WAIT_COUNT=$((SSM_WAIT_COUNT + 1))
+                  echo "   Waiting for SSM... ($SSM_WAIT_COUNT/$SSM_MAX_WAIT) - Status: $SSM_STATUS"
+                  sleep 5
+                done
+                
+                if [ "$SSM_STATUS" != "Online" ]; then
+                  echo "   ❌ SSM did not come online after reboot"
+                  echo "   The instance may need manual intervention."
+                  echo "   Please check the instance in the AWS console."
+                  exit 1
+                fi
+              else
+                echo "   Instance is not running (state: $INSTANCE_STATE). Starting instance..."
+                aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+                echo "   ⏳ Waiting for instance to start..."
+                aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }}
+                echo "   ⏳ Waiting 60 seconds for services to initialize..."
+                sleep 60
+                
+                # Get new IP
+                INSTANCE_IP=$(aws ec2 describe-instances \
+                  --instance-ids "$INSTANCE_ID" \
+                  --region ${{ env.AWS_REGION }} \
+                  --query 'Reservations[0].Instances[0].PublicIpAddress' \
+                  --output text)
+                
+                echo "   Instance IP: $INSTANCE_IP"
+                echo "   ⏳ Waiting for SSM agent to come online..."
+                
+                # Wait for SSM
+                SSM_WAIT_COUNT=0
+                SSM_MAX_WAIT=24
+                while [ $SSM_WAIT_COUNT -lt $SSM_MAX_WAIT ]; do
+                  SSM_STATUS=$(aws ssm describe-instance-information \
+                    --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+                    --query 'InstanceInformationList[0].PingStatus' \
+                    --output text \
+                    --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Inactive")
+                  
+                  if [ "$SSM_STATUS" = "Online" ]; then
+                    echo "   ✅ SSM is now online!"
+                    USE_SSM=true
+                    break
+                  fi
+                  
+                  SSM_WAIT_COUNT=$((SSM_WAIT_COUNT + 1))
+                  echo "   Waiting for SSM... ($SSM_WAIT_COUNT/$SSM_MAX_WAIT) - Status: $SSM_STATUS"
+                  sleep 5
+                done
+                
+                if [ "$SSM_STATUS" != "Online" ]; then
+                  echo "   ❌ SSM did not come online after start"
+                  exit 1
+                fi
+              fi
             fi
           else
             USE_SSM=false

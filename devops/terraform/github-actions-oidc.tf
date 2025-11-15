@@ -99,11 +99,12 @@ resource "aws_iam_policy" "github_actions_deploy" {
         Resource = "*"
       },
       {
-        # Start/Stop operations can use resource-based conditions
+        # Start/Stop/Reboot operations can use resource-based conditions
         Effect = "Allow"
         Action = [
           "ec2:StartInstances",
-          "ec2:StopInstances"
+          "ec2:StopInstances",
+          "ec2:RebootInstances"
         ]
         Resource = "*"
         Condition = {
