@@ -81,18 +81,12 @@ const defaultStyles = StyleSheet.create({
 })
 
 const createStyles = (colors: any) => {
-  // Always check if colors exists FIRST before accessing colors.palette
-  // Accessing colors.palette when colors is undefined will throw "colors is not defined"
-  if (typeof colors === 'undefined' || colors === null) {
-    return defaultStyles
-  }
-  // Now safe to check colors.palette
-  if (typeof colors.palette === 'undefined' || colors.palette === null) {
+  // useTheme() always returns colors, but add safety check just in case
+  if (!colors || !colors.palette) {
     return defaultStyles
   }
 
-  try {
-    return StyleSheet.create({
+  return StyleSheet.create({
       container: {
         flex: 1,
         backgroundColor: colors.palette.neutral100,
@@ -156,10 +150,6 @@ const createStyles = (colors: any) => {
         marginTop: spacing.lg,
       },
     })
-  } catch (error) {
-    // If anything goes wrong, return default styles
-    return defaultStyles
-  }
 }
 
 type ConfirmResetScreenRouteProp = StackScreenProps<LoginStackParamList, "ConfirmReset">
@@ -168,32 +158,16 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
   const { navigation } = props
   const route = useRoute()
   const token = (route.params as any)?.token
-  const themeContext = useTheme()
+  const { colors, isLoading: themeLoading } = useTheme()
   const { toast, showError, hideToast } = useToast()
 
-  // Safely extract colors with fallback
-  const colors = themeContext?.colors
-  const themeLoading = themeContext?.isLoading ?? true
-
-  // Memoize styles to ensure they're only created when colors is available
-  const styles = useMemo(() => {
-    // Always use fallback styles if colors is not available
-    // Check colors FIRST before accessing colors.palette to avoid "colors is not defined" error
-    if (themeLoading || typeof colors === 'undefined' || colors === null) {
-      return defaultStyles
-    }
-    // Now safe to check colors.palette
-    if (typeof colors.palette === 'undefined' || colors.palette === null) {
-      return defaultStyles
-    }
-    return createStyles(colors)
-  }, [colors, themeLoading])
-
-  // Early return if theme is still loading or colors is not available
-  // Use optional chaining to safely check palette without throwing if colors is undefined
-  if (themeLoading || !colors || !colors?.palette) {
+  // Early return if theme is still loading (same pattern as other screens)
+  if (themeLoading) {
     return null
   }
+
+  // Create styles - useTheme() always returns colors, so this is safe
+  const styles = createStyles(colors)
 
   const [resetPassword, { isLoading }] = useResetPasswordMutation()
   const [newPassword, setNewPassword] = useState("")
