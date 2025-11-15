@@ -185,17 +185,31 @@ jobs:
           
           echo "📦 Packaging deployment artifacts..."
           
+          # Get the workspace root (where GitHub Actions checks out code)
+          WORKSPACE_ROOT="$GITHUB_WORKSPACE"
+          if [ -z "$WORKSPACE_ROOT" ]; then
+            # Fallback: assume we're in the repo root
+            WORKSPACE_ROOT=$(pwd)
+          fi
+          
+          echo "   Workspace root: $WORKSPACE_ROOT"
+          
           # Create deployment package
           DEPLOY_DIR=$(mktemp -d)
           cd "$DEPLOY_DIR"
           
-          # Copy appspec.yml and scripts
-          # The backend code is checked out to the 'backend' directory
-          if [ -d "backend/devops/codedeploy" ]; then
-            cp -r backend/devops/codedeploy/* .
+          # Copy appspec.yml and scripts from the backend directory
+          # The backend code is checked out to the 'backend' directory in the workspace
+          CODEDEPLOY_SOURCE="$WORKSPACE_ROOT/backend/devops/codedeploy"
+          if [ -d "$CODEDEPLOY_SOURCE" ]; then
+            echo "   Copying CodeDeploy files from $CODEDEPLOY_SOURCE..."
+            cp -r "$CODEDEPLOY_SOURCE"/* .
           else
-            echo "❌ CodeDeploy directory not found at backend/devops/codedeploy"
-            ls -la backend/devops/ || echo "backend/devops/ doesn't exist"
+            echo "❌ CodeDeploy directory not found at $CODEDEPLOY_SOURCE"
+            echo "   Current directory: $(pwd)"
+            echo "   Workspace root: $WORKSPACE_ROOT"
+            ls -la "$WORKSPACE_ROOT/backend/devops/" 2>/dev/null || echo "backend/devops/ doesn't exist"
+            ls -la "$WORKSPACE_ROOT/" 2>/dev/null | head -20
             exit 1
           fi
           
