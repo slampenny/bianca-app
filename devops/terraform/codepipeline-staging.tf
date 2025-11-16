@@ -30,11 +30,6 @@ resource "aws_codebuild_project" "staging_build" {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     }
-    environment_variable {
-      name  = "GITHUB_TOKEN"
-      type  = "SECRETS_MANAGER"
-      value = "github-token"
-    }
   }
 
   source {
@@ -134,13 +129,6 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           "ec2:DescribeInstanceInformation"
         ]
         Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
-        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:github-token-*"
       }
     ]
   })
@@ -266,6 +254,21 @@ resource "aws_codepipeline" "staging" {
         OutputArtifactFormat = "CODE_ZIP"
       }
     }
+    action {
+      name             = "FrontendSource"
+      category         = "Source"
+      owner            = "AWS"
+      provider         = "CodeStarSourceConnection"
+      version          = "1"
+      output_artifacts = ["FrontendSourceOutput"]
+      configuration = {
+        ConnectionArn        = var.github_app_connection_arn
+        FullRepositoryId     = "slampenny/bianca-app-frontend"
+        BranchName           = "staging"
+        OutputArtifactFormat = "CODE_ZIP"
+      }
+      run_order = 1
+    }
   }
 
   stage {
@@ -276,7 +279,7 @@ resource "aws_codepipeline" "staging" {
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
-      input_artifacts  = ["SourceOutput"]
+      input_artifacts  = ["SourceOutput", "FrontendSourceOutput"]
       output_artifacts = ["BuildOutput"]
       configuration = {
         ProjectName = aws_codebuild_project.staging_build.name

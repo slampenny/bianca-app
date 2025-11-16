@@ -15,21 +15,25 @@ phases:
       - echo Source directory is $CODEBUILD_SRC_DIR
       - ls -la | head -10
       - |
-        # Clone frontend repository
-        echo "📥 Cloning frontend repository..."
-        if [ -n "$GITHUB_TOKEN" ]; then
-          git clone https://${GITHUB_TOKEN}@github.com/slampenny/bianca-app-frontend.git /tmp/frontend || echo "⚠️  Frontend clone failed, will try without token"
+        # Extract frontend from CodePipeline artifact
+        echo "📥 Extracting frontend from CodePipeline artifact..."
+        # CodeBuild provides artifacts in directories named after the artifact
+        # The second input artifact (FrontendSourceOutput) will be in a subdirectory
+        FRONTEND_DIR=$(find $CODEBUILD_SRC_DIR -type d -name "*FrontendSourceOutput*" | head -1)
+        if [ -z "$FRONTEND_DIR" ]; then
+          # Try alternative location
+          FRONTEND_DIR="$CODEBUILD_SRC_DIR_FrontendSourceOutput"
         fi
-        if [ ! -d "/tmp/frontend" ]; then
-          git clone https://github.com/slampenny/bianca-app-frontend.git /tmp/frontend || echo "⚠️  Frontend clone failed"
-        fi
-        if [ -d "/tmp/frontend" ]; then
-          cd /tmp/frontend
-          git checkout staging || git checkout main || echo "⚠️  Could not checkout staging/main branch"
-          cd -
-          echo "✅ Frontend repository cloned"
+        if [ -n "$FRONTEND_DIR" ] && [ -d "$FRONTEND_DIR" ]; then
+          cp -r "$FRONTEND_DIR" /tmp/frontend
+          echo "✅ Frontend extracted from artifact at $FRONTEND_DIR"
         else
-          echo "❌ Failed to clone frontend repository"
+          echo "⚠️  Frontend artifact not found, checking available directories..."
+          echo "   CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
+          ls -la $CODEBUILD_SRC_DIR/ || true
+          # Try to find any frontend-related directories
+          find $CODEBUILD_SRC_DIR -maxdepth 2 -type d | head -10 || true
+          echo "❌ Failed to find frontend artifact"
           exit 1
         fi
       - |
