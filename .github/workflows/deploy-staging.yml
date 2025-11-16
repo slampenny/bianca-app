@@ -301,14 +301,39 @@ jobs:
           
           # Check for existing deployments
           echo "🔍 Checking for existing deployments..."
+          # Check for active deployments (multiple status filters to catch all)
           EXISTING_DEPLOYMENT=$(aws deploy list-deployments \
             --application-name bianca-staging \
             --deployment-group-name bianca-staging-ec2 \
-            --include-only-statuses Created InProgress Queued InProgress ReadyStop \
+            --include-only-statuses Created InProgress Queued Ready \
             --max-items 1 \
             --region ${{ env.AWS_REGION }} \
             --query 'deployments[0]' \
             --output text 2>/dev/null || echo "None")
+          
+          # If no active deployment found, check the most recent one to see if it's actually active
+          if [ "$EXISTING_DEPLOYMENT" = "None" ] || [ -z "$EXISTING_DEPLOYMENT" ]; then
+            RECENT_DEP=$(aws deploy list-deployments \
+              --application-name bianca-staging \
+              --deployment-group-name bianca-staging-ec2 \
+              --max-items 1 \
+              --region ${{ env.AWS_REGION }} \
+              --query 'deployments[0]' \
+              --output text 2>/dev/null || echo "None")
+            
+            if [ "$RECENT_DEP" != "None" ] && [ -n "$RECENT_DEP" ]; then
+              RECENT_STATUS=$(aws deploy get-deployment \
+                --deployment-id "$RECENT_DEP" \
+                --region ${{ env.AWS_REGION }} \
+                --query 'deploymentInfo.status' \
+                --output text 2>/dev/null || echo "Unknown")
+              
+              if [ "$RECENT_STATUS" = "InProgress" ] || [ "$RECENT_STATUS" = "Created" ] || [ "$RECENT_STATUS" = "Queued" ] || [ "$RECENT_STATUS" = "Ready" ]; then
+                EXISTING_DEPLOYMENT="$RECENT_DEP"
+                echo "   Found active deployment via recent check: $EXISTING_DEPLOYMENT"
+              fi
+            fi
+          fi
           
           if [ "$EXISTING_DEPLOYMENT" != "None" ] && [ -n "$EXISTING_DEPLOYMENT" ]; then
             echo "⚠️  Found existing deployment: $EXISTING_DEPLOYMENT"
