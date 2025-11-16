@@ -11,45 +11,40 @@ phases:
   build:
     commands:
       - echo Building backend image...
-      - echo "Current directory: $(pwd)"
-      - echo "Source directory: $CODEBUILD_SRC_DIR"
+      - echo Current directory: $(pwd)
+      - echo Source directory: $CODEBUILD_SRC_DIR
       - ls -la | head -10
       - docker build -t $ECR_REGISTRY/bianca-backend:latest -t $ECR_REGISTRY/bianca-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION .
       - docker push $ECR_REGISTRY/bianca-backend:latest
       - docker push $ECR_REGISTRY/bianca-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION
-      - echo "⚠️  Frontend build skipped (separate repository)"
-      - echo "Frontend should be built separately or added to monorepo"
+      - echo Frontend build skipped - separate repository
 
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Preparing CodeDeploy artifacts...
-      - echo "Current directory: $(pwd)"
-      - echo "Source directory: $CODEBUILD_SRC_DIR"
+      - echo Current directory: $(pwd)
+      - echo Source directory: $CODEBUILD_SRC_DIR
       - ls -la $CODEBUILD_SRC_DIR/ | head -20
       - |
         # Copy CodeDeploy files to artifact output directory
         # CodeDeploy expects appspec.yml and scripts/ in the artifact root
-        # The artifact output directory is automatically created by CodeBuild
-        
-        # Repository is at root level, codedeploy files are in devops/codedeploy
         if [ -d "$CODEBUILD_SRC_DIR/devops/codedeploy" ]; then
-          echo "Found devops/codedeploy structure"
+          echo Found devops/codedeploy structure
           cp -r $CODEBUILD_SRC_DIR/devops/codedeploy/* .
         else
-          echo "ERROR: Could not find codedeploy directory"
-          echo "Looking in: $CODEBUILD_SRC_DIR"
+          echo ERROR: Could not find codedeploy directory
+          echo Looking in: $CODEBUILD_SRC_DIR
           find $CODEBUILD_SRC_DIR -name "appspec.yml" -type f 2>/dev/null | head -5
           exit 1
         fi
-        
-        echo "CodeDeploy artifacts prepared:"
+        echo CodeDeploy artifacts prepared:
         ls -la
         if [ -f "appspec.yml" ]; then
-          echo "✅ appspec.yml found"
+          echo appspec.yml found
           cat appspec.yml | head -5
         else
-          echo "❌ appspec.yml NOT found"
+          echo appspec.yml NOT found
           exit 1
         fi
 
@@ -57,4 +52,3 @@ artifacts:
   files:
     - '**/*'
   name: BuildOutput
-
