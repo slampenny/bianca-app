@@ -18,45 +18,41 @@ phases:
         # Extract frontend from CodePipeline artifact
         echo "📥 Extracting frontend from CodePipeline artifact..."
         echo "   CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
-        # CodeBuild extracts multiple artifacts to sibling directories
-        # Parent directory contains both artifacts
         CODEBUILD_BASE_DIR=$(dirname "$CODEBUILD_SRC_DIR")
         echo "   CODEBUILD_BASE_DIR: $CODEBUILD_BASE_DIR"
-        echo "   Listing base directory:"
+        echo "   Full directory tree of base:"
+        find "$CODEBUILD_BASE_DIR" -maxdepth 3 -type d | sort | head -20
+        echo "   All files/dirs in base:"
         ls -la "$CODEBUILD_BASE_DIR/" || true
-        # CodeBuild typically extracts artifacts to numbered subdirectories
-        # First artifact (SourceOutput) is in src/, second (FrontendSourceOutput) might be in src1/ or similar
+        # CodeBuild with multiple input artifacts extracts them to /codebuild/output/src*/src
+        # We need to find the second src* directory
         FRONTEND_FOUND=false
-        # Check for numbered subdirectories (src1, src2, etc.)
-        for dir in "$CODEBUILD_BASE_DIR"/src*; do
+        # Check all src* directories in the output folder
+        OUTPUT_DIR=$(dirname "$CODEBUILD_BASE_DIR")
+        echo "   OUTPUT_DIR: $OUTPUT_DIR"
+        echo "   Checking output directory:"
+        ls -la "$OUTPUT_DIR/" || true
+        for dir in "$OUTPUT_DIR"/src*/src; do
           if [ -d "$dir" ] && [ "$dir" != "$CODEBUILD_SRC_DIR" ]; then
-            echo "   Checking alternative source directory: $dir"
-            # Check if this looks like the frontend repo (has package.json, devops/Dockerfile, etc.)
+            echo "   Checking directory: $dir"
+            ls -la "$dir/" | head -5 || true
+            # Check if this looks like the frontend repo
             if [ -f "$dir/package.json" ] && [ -f "$dir/devops/Dockerfile" ]; then
-              echo "   Found frontend at: $dir"
+              echo "   ✅ Found frontend at: $dir"
               cp -r "$dir" /tmp/frontend
               FRONTEND_FOUND=true
               break
             fi
           fi
         done
-        # Also check for FrontendSourceOutput directory name
-        if [ "$FRONTEND_FOUND" = "false" ]; then
-          FRONTEND_DIR=$(find "$CODEBUILD_BASE_DIR" -maxdepth 2 -type d -name "*FrontendSourceOutput*" 2>/dev/null | head -1)
-          if [ -n "$FRONTEND_DIR" ] && [ -d "$FRONTEND_DIR" ]; then
-            echo "   Found frontend at: $FRONTEND_DIR"
-            cp -r "$FRONTEND_DIR" /tmp/frontend
-            FRONTEND_FOUND=true
-          fi
-        fi
         if [ "$FRONTEND_FOUND" = "true" ]; then
           echo "✅ Frontend extracted successfully"
           ls -la /tmp/frontend/ | head -10
         else
           echo "❌ Failed to find frontend artifact"
-          echo "   Searched in: $CODEBUILD_BASE_DIR"
-          echo "   Available directories:"
-          find "$CODEBUILD_BASE_DIR" -maxdepth 2 -type d | head -10
+          echo "   Searched in: $OUTPUT_DIR"
+          echo "   All src directories found:"
+          find "$OUTPUT_DIR" -maxdepth 2 -type d -name "src*" | head -10
           exit 1
         fi
       - |
