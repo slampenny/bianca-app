@@ -126,8 +126,7 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           "ssm:ListCommands",
           "ssm:ListCommandInvocations",
           "ec2:DescribeInstances",
-          "ec2:DescribeInstanceInformation",
-          "ec2:RebootInstances"
+          "ec2:DescribeInstanceInformation"
         ]
         Resource = "*"
       }
