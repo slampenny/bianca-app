@@ -107,17 +107,21 @@ phases:
     commands:
       - echo Build completed
       - echo Packaging CodeDeploy artifacts...
-      - echo Verifying scripts exist...
-      - ls -la devops/codedeploy/scripts/
-      - echo Checking before_install.sh content...
-      - head -5 devops/codedeploy/scripts/before_install.sh
-      - wc -l devops/codedeploy/scripts/before_install.sh
-      - cp devops/codedeploy/appspec.yml appspec.yml
-      - cp -r devops/codedeploy/scripts scripts
-      - echo Verifying copied scripts...
-      - ls -la scripts/
-      - wc -l scripts/before_install.sh
-      - echo CodeDeploy artifacts packaged
+      - |
+        # Ensure we're in the backend source directory
+        cd "$CODEBUILD_SRC_DIR"
+        pwd
+        echo Verifying scripts exist...
+        ls -la devops/codedeploy/scripts/
+        echo Checking before_install.sh content...
+        head -5 devops/codedeploy/scripts/before_install.sh
+        wc -l devops/codedeploy/scripts/before_install.sh
+        cp devops/codedeploy/appspec.yml appspec.yml
+        cp -r devops/codedeploy/scripts scripts
+        echo Verifying copied scripts...
+        ls -la scripts/
+        wc -l scripts/before_install.sh
+        echo CodeDeploy artifacts packaged
 
 artifacts:
   files:
