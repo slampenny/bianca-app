@@ -33,7 +33,7 @@ resource "aws_codebuild_project" "staging_build" {
     environment_variable {
       name  = "GITHUB_TOKEN"
       type  = "SECRETS_MANAGER"
-      value = "github-token-codebuild"
+      value = "github-token"
     }
   }
 
@@ -140,7 +140,7 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:github-token-codebuild-*"
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:github-token-*"
       }
     ]
   })
