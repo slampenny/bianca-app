@@ -18,41 +18,49 @@ phases:
         # Extract frontend from CodePipeline artifact
         echo "📥 Extracting frontend from CodePipeline artifact..."
         echo "   CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
-        CODEBUILD_BASE_DIR=$(dirname "$CODEBUILD_SRC_DIR")
-        echo "   CODEBUILD_BASE_DIR: $CODEBUILD_BASE_DIR"
-        echo "   Full directory tree of base:"
-        find "$CODEBUILD_BASE_DIR" -maxdepth 3 -type d | sort | head -20
-        echo "   All files/dirs in base:"
-        ls -la "$CODEBUILD_BASE_DIR/" || true
-        # CodeBuild with multiple input artifacts extracts them to /codebuild/output/src*/src
-        # We need to find the second src* directory
+        # CodeBuild extracts multiple artifacts to s3/00, s3/01, etc.
+        # Primary source (backend) is in s3/00, secondary (frontend) is in s3/01
+        S3_DIR=$(dirname "$CODEBUILD_SRC_DIR")
+        echo "   S3 directory: $S3_DIR"
+        echo "   Listing s3 directory:"
+        ls -la "$S3_DIR/" || true
         FRONTEND_FOUND=false
-        # Check all src* directories in the output folder
-        OUTPUT_DIR=$(dirname "$CODEBUILD_BASE_DIR")
-        echo "   OUTPUT_DIR: $OUTPUT_DIR"
-        echo "   Checking output directory:"
-        ls -la "$OUTPUT_DIR/" || true
-        for dir in "$OUTPUT_DIR"/src*/src; do
-          if [ -d "$dir" ] && [ "$dir" != "$CODEBUILD_SRC_DIR" ]; then
-            echo "   Checking directory: $dir"
-            ls -la "$dir/" | head -5 || true
-            # Check if this looks like the frontend repo
-            if [ -f "$dir/package.json" ] && [ -f "$dir/devops/Dockerfile" ]; then
-              echo "   ✅ Found frontend at: $dir"
-              cp -r "$dir" /tmp/frontend
-              FRONTEND_FOUND=true
-              break
-            fi
+        # Check s3/01 for frontend (second artifact)
+        FRONTEND_DIR="$S3_DIR/01"
+        if [ -d "$FRONTEND_DIR" ]; then
+          echo "   Checking directory: $FRONTEND_DIR"
+          ls -la "$FRONTEND_DIR/" | head -10 || true
+          # Check if this looks like the frontend repo
+          if [ -f "$FRONTEND_DIR/package.json" ] && [ -f "$FRONTEND_DIR/devops/Dockerfile" ]; then
+            echo "   ✅ Found frontend at: $FRONTEND_DIR"
+            cp -r "$FRONTEND_DIR" /tmp/frontend
+            FRONTEND_FOUND=true
+          else
+            echo "   ⚠️  Directory exists but doesn't look like frontend"
           fi
-        done
+        else
+          echo "   ⚠️  s3/01 directory not found, searching for frontend..."
+          # Fallback: search for any directory with package.json and devops/Dockerfile
+          for dir in "$S3_DIR"/*; do
+            if [ -d "$dir" ] && [ "$dir" != "$(dirname "$CODEBUILD_SRC_DIR")/00" ]; then
+              echo "   Checking: $dir"
+              if [ -f "$dir/package.json" ] && [ -f "$dir/devops/Dockerfile" ]; then
+                echo "   ✅ Found frontend at: $dir"
+                cp -r "$dir" /tmp/frontend
+                FRONTEND_FOUND=true
+                break
+              fi
+            fi
+          done
+        fi
         if [ "$FRONTEND_FOUND" = "true" ]; then
           echo "✅ Frontend extracted successfully"
           ls -la /tmp/frontend/ | head -10
         else
           echo "❌ Failed to find frontend artifact"
-          echo "   Searched in: $OUTPUT_DIR"
-          echo "   All src directories found:"
-          find "$OUTPUT_DIR" -maxdepth 2 -type d -name "src*" | head -10
+          echo "   Searched in: $S3_DIR"
+          echo "   Available directories:"
+          ls -la "$S3_DIR/" || true
           exit 1
         fi
       - |
