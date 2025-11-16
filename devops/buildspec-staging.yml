@@ -59,11 +59,26 @@ phases:
         echo "Deploying containers via SSM..."
         ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
         
+        # Create commands array as JSON
+        cat > /tmp/ssm-commands.json << 'EOF'
+        [
+          "cd /opt/bianca-staging",
+          "if [ ! -f /tmp/ecr-token-$(date +%Y%m%d) ]; then timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch /tmp/ecr-token-$(date +%Y%m%d); else echo Using cached ECR token; fi",
+          "echo Pulling latest images",
+          "timeout 300 docker-compose pull || echo Pull timed out",
+          "echo Stopping old containers",
+          "timeout 60 docker-compose down 2>/dev/null || true",
+          "echo Starting containers",
+          "timeout 120 docker-compose up -d --remove-orphans || { echo Failed to start containers; exit 1; }",
+          "sleep 5",
+          "docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' | grep staging_ || true"
+        ]
+        EOF
+        
         CMD_ID=$(aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --parameters commands="cd /opt/bianca-staging,if [ ! -f $ECR_TOKEN_FILE ]; then timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch $ECR_TOKEN_FILE; else echo Using cached ECR token; fi,
-echo 📥 Pulling latest images,timeout 300 docker-compose pull || echo ⚠️ Pull timed out,echo 🔄 Stopping old containers,timeout 60 docker-compose down 2>/dev/null || true,echo 🚀 Starting containers,timeout 120 docker-compose up -d --remove-orphans || { echo ❌ Failed to start containers; exit 1; },sleep 5,docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\" | grep staging_ || true" \
+          --parameters file:///tmp/ssm-commands.json \
           --timeout-seconds 600 \
           --region $AWS_DEFAULT_REGION \
           --output text \
