@@ -14,8 +14,9 @@ phases:
       - pwd
       - echo Source directory is $CODEBUILD_SRC_DIR
       - ls -la | head -10
-      - docker build -t $ECR_REGISTRY/bianca-app-backend:latest -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+      - docker build -t $ECR_REGISTRY/bianca-app-backend:latest -t $ECR_REGISTRY/bianca-app-backend:staging -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION .
       - docker push $ECR_REGISTRY/bianca-app-backend:latest
+      - docker push $ECR_REGISTRY/bianca-app-backend:staging
       - docker push $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION
       - echo Frontend build skipped - separate repository
 
