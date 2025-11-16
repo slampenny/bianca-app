@@ -358,13 +358,27 @@ jobs:
           
           # Create CodeDeploy deployment
           echo "🚀 Creating CodeDeploy deployment..."
-          DEPLOYMENT_ID=$(aws deploy create-deployment \
+          DEPLOYMENT_OUTPUT=$(aws deploy create-deployment \
             --application-name bianca-staging \
             --deployment-group-name bianca-staging-ec2 \
             --s3-location bucket=${S3_BUCKET},key=${S3_KEY},bundleType=zip \
             --region ${{ env.AWS_REGION }} \
-            --query 'deploymentId' \
-            --output text 2>&1)
+            --output json 2>&1)
+          
+          # Check if deployment creation failed
+          if echo "$DEPLOYMENT_OUTPUT" | grep -q "Exception\|Error"; then
+            echo "❌ Failed to create deployment:"
+            echo "$DEPLOYMENT_OUTPUT"
+            exit 1
+          fi
+          
+          DEPLOYMENT_ID=$(echo "$DEPLOYMENT_OUTPUT" | python3 -c "import sys, json; d = json.load(sys.stdin); print(d.get('deploymentId', ''))" 2>/dev/null || echo "")
+          
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "❌ Failed to extract deployment ID from output:"
+            echo "$DEPLOYMENT_OUTPUT"
+            exit 1
+          fi
           
           # Check if deployment creation failed due to limit
           if echo "$DEPLOYMENT_ID" | grep -q "DeploymentLimitExceededException"; then
