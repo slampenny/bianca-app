@@ -260,21 +260,8 @@ resource "aws_codepipeline" "staging" {
     }
   }
 
-  stage {
-    name = "Deploy"
-    action {
-      name            = "Deploy"
-      category        = "Deploy"
-      owner           = "AWS"
-      provider        = "CodeDeploy"
-      version         = "1"
-      input_artifacts = ["BuildOutput"]
-      configuration = {
-        ApplicationName     = aws_codedeploy_app.staging.name
-        DeploymentGroupName = aws_codedeploy_deployment_group.staging.deployment_group_name
-      }
-    }
-  }
+        # Deploy stage removed - deployment now happens in CodeBuild post_build phase via SSM
+        # This bypasses CodeDeploy agent issues
 
   tags = {
     Name        = "bianca-staging-pipeline"

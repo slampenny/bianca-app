@@ -22,31 +22,108 @@ phases:
   post_build:
     commands:
       - echo Build completed
-      - echo Preparing CodeDeploy artifacts...
-      - pwd
-      - echo Source directory is $CODEBUILD_SRC_DIR
-      - ls -la $CODEBUILD_SRC_DIR/ | head -20
+      - echo Deploying directly to staging instance via SSM...
       - |
-        # Copy CodeDeploy files to artifact output directory
-        # CodeDeploy expects appspec.yml and scripts/ in the artifact root
-        if [ -d "$CODEBUILD_SRC_DIR/devops/codedeploy" ]; then
-          echo Found devops/codedeploy structure
-          cp -r $CODEBUILD_SRC_DIR/devops/codedeploy/* .
-        else
-          echo ERROR: Could not find codedeploy directory
-          echo Looking in: $CODEBUILD_SRC_DIR
-          find $CODEBUILD_SRC_DIR -name "appspec.yml" -type f 2>/dev/null | head -5
+        # Get staging instance ID
+        INSTANCE_ID=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].InstanceId' \
+          --output text \
+          --region $AWS_DEFAULT_REGION)
+        
+        if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+          echo "ERROR: No running staging instance found"
           exit 1
         fi
-        echo CodeDeploy artifacts prepared:
-        ls -la
-        if [ -f "appspec.yml" ]; then
-          echo appspec.yml found
-          cat appspec.yml | head -5
-        else
-          echo appspec.yml NOT found
-          exit 1
-        fi
+        
+        echo "Found staging instance: $INSTANCE_ID"
+        
+        # Wait for SSM to be ready
+        echo "Waiting for SSM agent to be ready..."
+        for i in {1..30}; do
+          SSM_STATUS=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text \
+            --region $AWS_DEFAULT_REGION 2>/dev/null || echo "Inactive")
+          
+          if [ "$SSM_STATUS" = "Online" ]; then
+            echo "SSM agent is online"
+            break
+          fi
+          echo "Waiting for SSM... ($i/30)"
+          sleep 10
+        done
+        
+        # Deploy via SSM
+        echo "Deploying containers via SSM..."
+        ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
+        
+        CMD_ID=$(aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --parameters 'commands=[
+            "cd /opt/bianca-staging",
+            "if [ ! -f \"'"$ECR_TOKEN_FILE"'\" ]; then timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"'"$ECR_TOKEN_FILE"'\"; else echo \"Using cached ECR token\"; fi",
+            "echo \"📥 Pulling latest images (with timeout)...\"",
+            "timeout 300 docker-compose pull || { echo \"⚠️  Pull timed out or failed, continuing...\"; }",
+            "echo \"🔄 Stopping old containers...\"",
+            "timeout 60 docker-compose down 2>/dev/null || true",
+            "echo \"🚀 Starting containers...\"",
+            "timeout 120 docker-compose up -d --remove-orphans || { echo \"❌ Failed to start containers\"; exit 1; }",
+            "sleep 5",
+            "docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\" | grep staging_ || true"
+          ]' \
+          --timeout-seconds 600 \
+          --region $AWS_DEFAULT_REGION \
+          --output text \
+          --query 'Command.CommandId')
+        
+        echo "SSM Command ID: $CMD_ID"
+        echo "Waiting for deployment to complete (up to 10 minutes)..."
+        
+        # Wait for command to complete
+        for i in {1..60}; do
+          CMD_STATUS=$(aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --region $AWS_DEFAULT_REGION \
+            --query 'Status' \
+            --output text 2>&1)
+          
+          if [ "$CMD_STATUS" = "Success" ]; then
+            echo "✅ Deployment succeeded!"
+            aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region $AWS_DEFAULT_REGION \
+              --query 'StandardOutputContent' \
+              --output text
+            exit 0
+          elif [ "$CMD_STATUS" = "Failed" ] || [ "$CMD_STATUS" = "Cancelled" ] || [ "$CMD_STATUS" = "TimedOut" ]; then
+            echo "❌ Deployment failed with status: $CMD_STATUS"
+            aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region $AWS_DEFAULT_REGION \
+              --query 'StandardErrorContent' \
+              --output text
+            exit 1
+          fi
+          
+          if [ $i -eq 60 ]; then
+            echo "❌ Deployment timed out after 10 minutes"
+            aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region $AWS_DEFAULT_REGION \
+              --query 'StandardOutputContent' \
+              --output text | tail -20
+            exit 1
+          fi
+          
+          sleep 10
+        done
 
 artifacts:
   files:
