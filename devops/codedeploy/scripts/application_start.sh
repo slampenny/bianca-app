@@ -7,11 +7,9 @@ echo "🚀 ApplicationStart: Starting new containers..."
 
 cd /opt/bianca-staging
 
-# Replace docker-compose.yml if we have a new one
-if [ -f "docker-compose.yml.new" ]; then
-  echo "   Updating docker-compose.yml..."
-  mv docker-compose.yml.new docker-compose.yml
-fi
+# Stop any existing containers first
+echo "   Stopping any existing containers..."
+docker-compose down 2>/dev/null || true
 
 # Start containers with timeout
 if [ -f "docker-compose.yml" ]; then
@@ -32,4 +30,5 @@ else
 fi
 
 echo "✅ ApplicationStart completed"
+
 
