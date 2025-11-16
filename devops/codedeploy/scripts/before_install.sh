@@ -5,14 +5,13 @@ set -e
 
 echo "🧹 BeforeInstall: Cleaning up old deployment artifacts..."
 
-# Clean up old deployment directory if it exists
-if [ -d "/opt/bianca-staging-deploy" ]; then
-  echo "   Removing old deployment directory..."
-  rm -rf /opt/bianca-staging-deploy
-fi
+# Ensure deployment directory exists (appspec.yml destination)
+mkdir -p /opt/bianca-staging
 
-# Ensure deployment directory exists
-mkdir -p /opt/bianca-staging-deploy
+# Ensure docker-compose.yml exists (it should be created by userdata, but verify)
+if [ ! -f "/opt/bianca-staging/docker-compose.yml" ]; then
+  echo "⚠️  docker-compose.yml not found, but continuing (will be created by userdata if needed)"
+fi
 
 echo "✅ BeforeInstall completed"
 
