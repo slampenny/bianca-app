@@ -35,15 +35,13 @@ phases:
         # CodeDeploy expects appspec.yml and scripts/ in the artifact root
         # The artifact output directory is automatically created by CodeBuild
         
-        # Check if we're in a monorepo structure (backend/ subdirectory) or root
-        if [ -d "$CODEBUILD_SRC_DIR/backend/devops/codedeploy" ]; then
-          echo "Found backend/devops/codedeploy structure"
-          cp -r $CODEBUILD_SRC_DIR/backend/devops/codedeploy/* .
-        elif [ -d "$CODEBUILD_SRC_DIR/devops/codedeploy" ]; then
+        # Repository is at root level, codedeploy files are in devops/codedeploy
+        if [ -d "$CODEBUILD_SRC_DIR/devops/codedeploy" ]; then
           echo "Found devops/codedeploy structure"
           cp -r $CODEBUILD_SRC_DIR/devops/codedeploy/* .
         else
           echo "ERROR: Could not find codedeploy directory"
+          echo "Looking in: $CODEBUILD_SRC_DIR"
           find $CODEBUILD_SRC_DIR -name "appspec.yml" -type f 2>/dev/null | head -5
           exit 1
         fi
