@@ -1,10 +1,12 @@
 name: Deploy to Staging
 
+# DISABLED: Using AWS CodePipeline instead
+# This workflow is kept for manual triggers only if needed
 on:
-  push:
-    branches:
-      - staging
-  workflow_dispatch: # Allow manual triggers
+  # push:
+  #   branches:
+  #     - staging
+  workflow_dispatch: # Allow manual triggers only
     inputs:
       branch:
         description: 'Branch to deploy (defaults to staging)'

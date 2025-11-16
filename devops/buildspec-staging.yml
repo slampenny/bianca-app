@@ -10,15 +10,34 @@ phases:
 
   build:
     commands:
-      - echo Building backend image...
+      - echo Building backend and asterisk images...
       - pwd
       - echo Source directory is $CODEBUILD_SRC_DIR
       - ls -la | head -10
-      - docker build -t $ECR_REGISTRY/bianca-app-backend:latest -t $ECR_REGISTRY/bianca-app-backend:staging -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION .
-      - docker push $ECR_REGISTRY/bianca-app-backend:latest
-      - docker push $ECR_REGISTRY/bianca-app-backend:staging
-      - docker push $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION
-      - echo Frontend build skipped - separate repository
+      - |
+        # Build backend image
+        echo "🔨 Building backend image..."
+        docker build -t $ECR_REGISTRY/bianca-app-backend:latest \
+                     -t $ECR_REGISTRY/bianca-app-backend:staging \
+                     -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+        echo "✅ Backend build complete"
+      - |
+        # Build asterisk image
+        echo "🔨 Building asterisk image..."
+        cd devops/asterisk
+        docker build -t $ECR_REGISTRY/bianca-app-asterisk:staging .
+        cd ../..
+        echo "✅ Asterisk build complete"
+      - |
+        # Push all images
+        echo "📦 Pushing backend images..."
+        docker push $ECR_REGISTRY/bianca-app-backend:latest
+        docker push $ECR_REGISTRY/bianca-app-backend:staging
+        docker push $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION
+        echo "📦 Pushing asterisk image..."
+        docker push $ECR_REGISTRY/bianca-app-asterisk:staging
+        echo "✅ All images pushed successfully"
+      - echo "ℹ️  Note: Frontend build skipped - separate repository (should be built separately or already exists in ECR)"
 
   post_build:
     commands:
