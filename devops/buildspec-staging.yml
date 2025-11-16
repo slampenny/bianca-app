@@ -40,18 +40,28 @@ phases:
         
         # Wait for SSM to be ready
         echo "Waiting for SSM agent to be ready..."
-        for i in {1..30}; do
+        MAX_WAIT=30
+        i=1
+        while [ $i -le $MAX_WAIT ]; do
           SSM_STATUS=$(aws ssm describe-instance-information \
             --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
             --query 'InstanceInformationList[0].PingStatus' \
             --output text \
             --region $AWS_DEFAULT_REGION 2>/dev/null || echo "Inactive")
           
+          echo "SSM Status: $SSM_STATUS (attempt $i/$MAX_WAIT)"
+          
           if [ "$SSM_STATUS" = "Online" ]; then
             echo "SSM agent is online"
             break
           fi
-          echo "Waiting for SSM... ($i/30)"
+          
+          if [ $i -eq $MAX_WAIT ]; then
+            echo "WARNING: SSM agent not online after $MAX_WAIT attempts. Status: $SSM_STATUS"
+            echo "Attempting to send command anyway..."
+          fi
+          
+          i=$((i + 1))
           sleep 10
         done
         
