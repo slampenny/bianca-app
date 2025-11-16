@@ -10,10 +10,28 @@ phases:
 
   build:
     commands:
-      - echo Building backend and asterisk images...
+      - echo Building backend, frontend, and asterisk images...
       - pwd
       - echo Source directory is $CODEBUILD_SRC_DIR
       - ls -la | head -10
+      - |
+        # Clone frontend repository
+        echo "📥 Cloning frontend repository..."
+        if [ -n "$GITHUB_TOKEN" ]; then
+          git clone https://${GITHUB_TOKEN}@github.com/slampenny/bianca-app-frontend.git /tmp/frontend || echo "⚠️  Frontend clone failed, will try without token"
+        fi
+        if [ ! -d "/tmp/frontend" ]; then
+          git clone https://github.com/slampenny/bianca-app-frontend.git /tmp/frontend || echo "⚠️  Frontend clone failed"
+        fi
+        if [ -d "/tmp/frontend" ]; then
+          cd /tmp/frontend
+          git checkout staging || git checkout main || echo "⚠️  Could not checkout staging/main branch"
+          cd -
+          echo "✅ Frontend repository cloned"
+        else
+          echo "❌ Failed to clone frontend repository"
+          exit 1
+        fi
       - |
         # Build backend image
         echo "🔨 Building backend image..."
@@ -29,6 +47,20 @@ phases:
         cd ../..
         echo "✅ Asterisk build complete"
       - |
+        # Build frontend image
+        if [ -d "/tmp/frontend" ]; then
+          echo "🔨 Building frontend image..."
+          cd /tmp/frontend
+          docker build -t $ECR_REGISTRY/bianca-app-frontend:staging \
+                       -f devops/Dockerfile \
+                       --build-arg BUILD_ENV=staging .
+          cd -
+          echo "✅ Frontend build complete"
+        else
+          echo "❌ Frontend directory not found, skipping frontend build"
+          exit 1
+        fi
+      - |
         # Push all images
         echo "📦 Pushing backend images..."
         docker push $ECR_REGISTRY/bianca-app-backend:latest
@@ -36,8 +68,9 @@ phases:
         docker push $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION
         echo "📦 Pushing asterisk image..."
         docker push $ECR_REGISTRY/bianca-app-asterisk:staging
+        echo "📦 Pushing frontend image..."
+        docker push $ECR_REGISTRY/bianca-app-frontend:staging
         echo "✅ All images pushed successfully"
-      - echo "ℹ️  Note: Frontend build skipped - separate repository (should be built separately or already exists in ECR)"
 
   post_build:
     commands:
