@@ -62,18 +62,8 @@ phases:
         CMD_ID=$(aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --parameters 'commands=[
-            "cd /opt/bianca-staging",
-            "if [ ! -f \"'"$ECR_TOKEN_FILE"'\" ]; then timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch \"'"$ECR_TOKEN_FILE"'\"; else echo \"Using cached ECR token\"; fi",
-            "echo \"📥 Pulling latest images (with timeout)...\"",
-            "timeout 300 docker-compose pull || { echo \"⚠️  Pull timed out or failed, continuing...\"; }",
-            "echo \"🔄 Stopping old containers...\"",
-            "timeout 60 docker-compose down 2>/dev/null || true",
-            "echo \"🚀 Starting containers...\"",
-            "timeout 120 docker-compose up -d --remove-orphans || { echo \"❌ Failed to start containers\"; exit 1; }",
-            "sleep 5",
-            "docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\" | grep staging_ || true"
-          ]' \
+          --parameters commands="cd /opt/bianca-staging,if [ ! -f $ECR_TOKEN_FILE ]; then timeout 30 aws ecr get-login-password --region us-east-2 | timeout 30 docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com && touch $ECR_TOKEN_FILE; else echo Using cached ECR token; fi,
+echo 📥 Pulling latest images,timeout 300 docker-compose pull || echo ⚠️ Pull timed out,echo 🔄 Stopping old containers,timeout 60 docker-compose down 2>/dev/null || true,echo 🚀 Starting containers,timeout 120 docker-compose up -d --remove-orphans || { echo ❌ Failed to start containers; exit 1; },sleep 5,docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\" | grep staging_ || true" \
           --timeout-seconds 600 \
           --region $AWS_DEFAULT_REGION \
           --output text \
