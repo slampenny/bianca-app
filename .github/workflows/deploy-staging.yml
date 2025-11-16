@@ -61,25 +61,30 @@ jobs:
           # Build all images in parallel using background jobs
           echo "🔨 Building images in parallel..."
           
+          # Build backend image
           cd backend
           docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-backend:staging . &
           BACKEND_PID=$!
+          cd ..
           
           # Only build frontend if checkout succeeded
-          if [ "${{ steps.checkout-frontend.outcome }}" == "success" ] && [ -d "../frontend" ]; then
-            cd ../frontend
+          if [ "${{ steps.checkout-frontend.outcome }}" == "success" ] && [ -d "frontend" ]; then
+            cd frontend
             docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-frontend:staging \
               -f devops/Dockerfile --build-arg BUILD_ENV=staging . &
             FRONTEND_PID=$!
             BUILD_FRONTEND=true
+            cd ..
           else
             echo "⚠️  Frontend checkout failed or not available, skipping frontend build"
             BUILD_FRONTEND=false
           fi
           
-          cd ../backend/devops/asterisk
+          # Build asterisk image
+          cd backend/devops/asterisk
           docker build -t ${{ env.ECR_REGISTRY }}/bianca-app-asterisk:staging . &
           ASTERISK_PID=$!
+          cd ../../..
           
           # Wait for all builds
           wait $BACKEND_PID && echo "✅ Backend build complete" || exit 1
