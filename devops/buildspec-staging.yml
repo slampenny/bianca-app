@@ -117,7 +117,10 @@ phases:
         head -5 devops/codedeploy/scripts/before_install.sh
         wc -l devops/codedeploy/scripts/before_install.sh
         cp devops/codedeploy/appspec.yml appspec.yml
-        cp -r devops/codedeploy/scripts scripts
+        # Copy scripts directory contents (not the directory itself)
+        mkdir -p scripts
+        cp devops/codedeploy/scripts/* scripts/
+        chmod +x scripts/*.sh
         echo Verifying copied scripts...
         ls -la scripts/
         wc -l scripts/before_install.sh
