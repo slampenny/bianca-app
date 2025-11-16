@@ -189,7 +189,8 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
         ]
         Resource = [
           aws_codedeploy_app.staging.arn,
-          "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentgroup:bianca-staging/*"
+          "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentgroup:bianca-staging/*",
+          "arn:aws:codedeploy:${var.aws_region}:${var.aws_account_id}:deploymentconfig:CodeDeployDefault.AllAtOnce"
         ]
       },
       {
