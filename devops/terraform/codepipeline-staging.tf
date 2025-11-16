@@ -252,7 +252,6 @@ resource "aws_codepipeline" "staging" {
         FullRepositoryId     = "${var.github_owner}/${var.github_repo}"
         BranchName           = "staging"
         OutputArtifactFormat = "CODE_ZIP"
-        DetectChanges        = true
       }
     }
     action {
@@ -267,7 +266,6 @@ resource "aws_codepipeline" "staging" {
         FullRepositoryId     = "slampenny/bianca-app-frontend"
         BranchName           = "staging"
         OutputArtifactFormat = "CODE_ZIP"
-        DetectChanges        = true
       }
       run_order = 1
     }
