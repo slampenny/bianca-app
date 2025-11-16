@@ -339,6 +339,13 @@ systemctl enable bianca-staging
 # Setup cron for ECR refresh
 echo "0 */6 * * * root aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com" > /etc/cron.d/ecr-refresh
 
+# Install and start SSM agent (required for SSM commands)
+echo "Installing and starting SSM agent..."
+yum install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+echo "SSM agent installed and started"
+
 # Install CodeDeploy agent
 echo "Installing CodeDeploy agent..."
 cd /home/ec2-user

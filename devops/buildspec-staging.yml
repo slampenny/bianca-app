@@ -38,7 +38,7 @@ phases:
         
         echo "Found staging instance: $INSTANCE_ID"
         
-        # Wait for SSM to be ready
+        # Wait for SSM to be ready (should be installed and started by userdata)
         echo "Waiting for SSM agent to be ready..."
         MAX_WAIT=30
         i=1
@@ -60,44 +60,11 @@ phases:
           sleep 10
         done
         
-        # Check final SSM status
         if [ "$SSM_STATUS" != "Online" ]; then
           echo "ERROR: SSM agent is not online. Status: $SSM_STATUS"
-          echo "The SSM agent must be 'Online' to deploy. Possible solutions:"
-          echo "1. Restart the EC2 instance to restart the SSM agent"
-          echo "2. Check security groups allow outbound HTTPS to SSM endpoints"
-          echo "3. Verify the instance IAM role has SSM permissions"
-          echo ""
-          echo "Attempting to restart the instance to fix SSM connectivity..."
-          aws ec2 reboot-instances --instance-ids "$INSTANCE_ID" --region $AWS_DEFAULT_REGION 2>&1 || echo "Could not reboot instance"
-          echo "Waiting 60 seconds for instance to restart..."
-          sleep 60
-          
-          # Wait again for SSM after reboot
-          echo "Waiting for SSM agent after reboot..."
-          i=1
-          while [ $i -le 20 ]; do
-            SSM_STATUS=$(aws ssm describe-instance-information \
-              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
-              --query 'InstanceInformationList[0].PingStatus' \
-              --output text \
-              --region $AWS_DEFAULT_REGION 2>/dev/null || echo "Inactive")
-            
-            echo "SSM Status after reboot: $SSM_STATUS (attempt $i/20)"
-            
-            if [ "$SSM_STATUS" = "Online" ]; then
-              echo "SSM agent is now online after reboot"
-              break
-            fi
-            
-            i=$((i + 1))
-            sleep 10
-          done
-          
-          if [ "$SSM_STATUS" != "Online" ]; then
-            echo "ERROR: SSM agent still not online after reboot. Cannot deploy."
-            exit 1
-          fi
+          echo "The SSM agent must be installed and running on the instance."
+          echo "Check that userdata installed amazon-ssm-agent and started the service."
+          exit 1
         fi
         
         # Deploy via SSM
