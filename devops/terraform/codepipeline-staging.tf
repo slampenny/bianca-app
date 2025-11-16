@@ -117,6 +117,18 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           aws_s3_bucket.codedeploy_artifacts.arn,
           "${aws_s3_bucket.codedeploy_artifacts.arn}/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:SendCommand",
+          "ssm:GetCommandInvocation",
+          "ssm:ListCommands",
+          "ssm:ListCommandInvocations",
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceInformation"
+        ]
+        Resource = "*"
       }
     ]
   })
