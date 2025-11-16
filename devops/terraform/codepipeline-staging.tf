@@ -30,6 +30,11 @@ resource "aws_codebuild_project" "staging_build" {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     }
+    environment_variable {
+      name  = "GITHUB_TOKEN"
+      type  = "SECRETS_MANAGER"
+      value = "github-token-codebuild"
+    }
   }
 
   source {
@@ -129,6 +134,13 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           "ec2:DescribeInstanceInformation"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:github-token-codebuild-*"
       }
     ]
   })
