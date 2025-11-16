@@ -17,26 +17,44 @@ phases:
       - |
         # Extract frontend from CodePipeline artifact
         echo "📥 Extracting frontend from CodePipeline artifact..."
-        # CodeBuild extracts multiple input artifacts to subdirectories
-        # First artifact (SourceOutput) is in $CODEBUILD_SRC_DIR
-        # Second artifact (FrontendSourceOutput) is in $CODEBUILD_SRC_DIR_FrontendSourceOutput
+        echo "   CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
+        echo "   Listing all environment variables with CODEBUILD_SRC:"
+        env | grep CODEBUILD_SRC || true
+        echo "   Listing root directory:"
+        ls -la / || true
+        echo "   Listing CODEBUILD_SRC_DIR:"
+        ls -la $CODEBUILD_SRC_DIR/ || true
+        # CodeBuild extracts multiple input artifacts - check common locations
+        FRONTEND_FOUND=false
+        # Try the standard location first
         if [ -d "$CODEBUILD_SRC_DIR_FrontendSourceOutput" ]; then
+          echo "   Found at: $CODEBUILD_SRC_DIR_FrontendSourceOutput"
           cp -r "$CODEBUILD_SRC_DIR_FrontendSourceOutput" /tmp/frontend
-          echo "✅ Frontend extracted from artifact"
+          FRONTEND_FOUND=true
+        # Try alternative naming
+        elif [ -d "${CODEBUILD_SRC_DIR}/FrontendSourceOutput" ]; then
+          echo "   Found at: ${CODEBUILD_SRC_DIR}/FrontendSourceOutput"
+          cp -r "${CODEBUILD_SRC_DIR}/FrontendSourceOutput" /tmp/frontend
+          FRONTEND_FOUND=true
+        # Search for it
         else
-          echo "⚠️  Checking artifact locations..."
-          echo "   CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
-          echo "   CODEBUILD_SRC_DIR_FrontendSourceOutput: $CODEBUILD_SRC_DIR_FrontendSourceOutput"
-          ls -la $CODEBUILD_SRC_DIR/ || true
-          # CodeBuild may extract to a different location - try finding it
-          FRONTEND_DIR=$(find $CODEBUILD_SRC_DIR -maxdepth 3 -type d -name "*frontend*" -o -name "*Frontend*" | grep -v node_modules | head -1)
+          echo "   Searching for frontend artifact..."
+          FRONTEND_DIR=$(find / -maxdepth 5 -type d -name "*FrontendSourceOutput*" 2>/dev/null | head -1)
           if [ -n "$FRONTEND_DIR" ] && [ -d "$FRONTEND_DIR" ]; then
+            echo "   Found at: $FRONTEND_DIR"
             cp -r "$FRONTEND_DIR" /tmp/frontend
-            echo "✅ Frontend found at alternative location: $FRONTEND_DIR"
-          else
-            echo "❌ Failed to find frontend artifact"
-            exit 1
+            FRONTEND_FOUND=true
           fi
+        fi
+        if [ "$FRONTEND_FOUND" = "true" ]; then
+          echo "✅ Frontend extracted successfully"
+          ls -la /tmp/frontend/ | head -10
+        else
+          echo "❌ Failed to find frontend artifact"
+          echo "   Searched locations:"
+          echo "     - $CODEBUILD_SRC_DIR_FrontendSourceOutput"
+          echo "     - ${CODEBUILD_SRC_DIR}/FrontendSourceOutput"
+          exit 1
         fi
       - |
         # Build backend image
