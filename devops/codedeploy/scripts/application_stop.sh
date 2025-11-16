@@ -5,7 +5,11 @@ set -e
 
 echo "🛑 ApplicationStop: Stopping old containers..."
 
-cd /opt/bianca-staging
+# Navigate to staging directory
+cd /opt/bianca-staging || {
+  echo "⚠️  /opt/bianca-staging not found, skipping stop"
+  exit 0
+}
 
 # Stop containers with timeout to prevent hangs
 if [ -f "docker-compose.yml" ]; then
@@ -14,7 +18,7 @@ if [ -f "docker-compose.yml" ]; then
     echo "⚠️  Container stop had issues, but continuing..."
   }
 else
-  echo "   No docker-compose.yml found, skipping stop"
+  echo "   No docker-compose.yml found, skipping stop (containers may not be running yet)"
 fi
 
 echo "✅ ApplicationStop completed"

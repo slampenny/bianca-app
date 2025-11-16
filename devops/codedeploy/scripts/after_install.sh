@@ -5,8 +5,6 @@ set -e
 
 echo "📥 AfterInstall: Pulling Docker images and preparing deployment..."
 
-cd /opt/bianca-staging-deploy
-
 # Login to ECR if needed
 ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
 if [ ! -f "$ECR_TOKEN_FILE" ]; then
