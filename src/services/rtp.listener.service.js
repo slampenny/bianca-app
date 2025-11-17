@@ -3,6 +3,7 @@ const dgram = require('dgram');
 const { Buffer } = require('buffer');
 const logger = require('../config/logger');
 const openAIService = require('./openai.realtime.service');
+const noiseReductionService = require('./audio/noise-reduction.service');
 
 const RTP_HEADER_MIN_LENGTH = 12;
 const MAX_PACKET_SIZE = 65507;
@@ -159,12 +160,15 @@ class RtpListener {
             }
             this.lastSequenceNumber = rtpPacket.sequenceNumber;
             
-            // Buffer the audio payload for OpenAI
-            this.audioBuffer = Buffer.concat([this.audioBuffer, rtpPacket.payload]);
+            // Apply noise reduction processing (Stage 1: Noise Gate)
+            const processedPayload = noiseReductionService.processAudio(rtpPacket.payload, this.callId);
+            
+            // Buffer the processed audio payload for OpenAI
+            this.audioBuffer = Buffer.concat([this.audioBuffer, processedPayload]);
             
             // Log first few packets to confirm we're receiving data
             if (this.stats.packetsReceived <= 5) {
-                logger.info(`[RTP Listener ${this.port}] Buffered ${rtpPacket.payload.length} bytes, total buffer: ${this.audioBuffer.length} bytes for call ${this.callId}`);
+                logger.info(`[RTP Listener ${this.port}] Buffered ${processedPayload.length} bytes, total buffer: ${this.audioBuffer.length} bytes for call ${this.callId}`);
             }
             
             // Check if we have enough audio to send (use adaptive buffer size)

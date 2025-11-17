@@ -140,6 +140,14 @@ const baselineConfig = {
   app: {
     rtpPortRange: process.env.APP_RTP_PORT_RANGE || '20002-30000'
   },
+  audio: {
+    noiseReduction: {
+      noiseGateEnabled: process.env.AUDIO_NOISE_GATE_ENABLED !== 'false', // Default: true
+      noiseGateThreshold: parseFloat(process.env.AUDIO_NOISE_GATE_THRESHOLD) || 0.1, // Default: 0.1 (10% energy)
+      primarySpeakerEnabled: process.env.AUDIO_PRIMARY_SPEAKER_ENABLED === 'true', // Default: false
+      adaptiveNoiseReductionEnabled: process.env.AUDIO_ADAPTIVE_NOISE_REDUCTION_ENABLED === 'true', // Default: false
+    }
+  },
   google: {
     language: 'en-US',
     name: 'en-US-News-L',
