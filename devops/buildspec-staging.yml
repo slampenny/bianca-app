@@ -82,7 +82,8 @@ phases:
         if [ -d "/tmp/frontend" ]; then
           echo "🔨 Building frontend image..."
           cd /tmp/frontend
-          docker build -t $ECR_REGISTRY/bianca-app-frontend:staging \
+          docker build -t $ECR_REGISTRY/bianca-app-frontend:latest \
+                       -t $ECR_REGISTRY/bianca-app-frontend:staging \
                        -f devops/Dockerfile \
                        --build-arg BUILD_ENV=staging .
           cd -
@@ -99,7 +100,8 @@ phases:
         docker push $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION
         echo "📦 Pushing asterisk image..."
         docker push $ECR_REGISTRY/bianca-app-asterisk:staging
-        echo "📦 Pushing frontend image..."
+        echo "📦 Pushing frontend images..."
+        docker push $ECR_REGISTRY/bianca-app-frontend:latest
         docker push $ECR_REGISTRY/bianca-app-frontend:staging
         echo "✅ All images pushed successfully"
 
