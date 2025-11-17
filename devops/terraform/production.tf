@@ -237,7 +237,7 @@ resource "aws_launch_template" "production" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size = 20  # Same as staging for cost optimization
+      volume_size = 50  # Increased from 20GB to 50GB to prevent disk space issues
       volume_type = "gp3"
     }
   }
