@@ -282,7 +282,8 @@ resource "aws_codepipeline" "staging" {
       input_artifacts  = ["SourceOutput", "FrontendSourceOutput"]
       output_artifacts = ["BuildOutput"]
       configuration = {
-        ProjectName = aws_codebuild_project.staging_build.name
+        ProjectName   = aws_codebuild_project.staging_build.name
+        PrimarySource = "SourceOutput"
       }
     }
   }

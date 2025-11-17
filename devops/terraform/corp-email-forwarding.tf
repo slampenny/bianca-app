@@ -1,19 +1,16 @@
 ############################################################
-# Corporate Email Forwarding for biancatechnologies.com
+# Corporate Email for biancatechnologies.com
 # 
-# ⚠️ DISABLED - MIGRATED TO ZOHO MAIL
-# All resources below are commented out because biancatechnologies.com now uses Zoho Mail.
-# Email is handled directly by Zoho - no SES/Lambda forwarding needed.
+# NOTE: This domain uses Zoho Mail for receiving emails (MX records point to Zoho).
+# However, SES domain identity and DKIM are enabled for SENDING emails via AWS SES.
 #
-# IMPORTANT: If you run terraform apply, these resources will NOT be recreated.
-# This prevents conflicts with Zoho Mail MX records and infrastructure.
+# This configuration:
+# - Creates SES domain identity + DKIM (for sending emails via SES)
+# - Creates Route53 records: SES verification TXT, DKIM CNAME records
+# - Does NOT create MX records (Zoho Mail handles receiving)
+# - Does NOT create SES receipt rules (Zoho Mail handles receiving)
 #
-# This configuration previously:
-# - Created SES domain identity + DKIM
-# - Created Route53 records: MX, SPF, DKIM, DMARC (if zone exists)
-# - Added SES receipt rules to existing active rule set
-#   'myphonefriend-email-forwarding' to forward to Lambda
-# - Stored raw emails in S3 prior to forwarding
+# Zoho Mail records (MX, SPF, Zoho DKIM) are managed separately below.
 ############################################################
 
 # locals {
@@ -40,14 +37,28 @@ data "aws_route53_zone" "biancatechnologies" {
   private_zone = false
 }
 
-# # ---------------- SES DOMAIN IDENTIFICATION ----------------
-# resource "aws_ses_domain_identity" "corp" {
-#   domain = local.corp_domain
-# }
+# ---------------- SES DOMAIN IDENTIFICATION ----------------
+# Note: SES domain identity and DKIM are enabled for sending emails via SES
+# MX records remain with Zoho Mail (not managed by Terraform)
+locals {
+  corp_domain = "biancatechnologies.com"
+}
 
-# resource "aws_ses_domain_dkim" "corp" {
-#   domain = aws_ses_domain_identity.corp.domain
-# }
+resource "aws_ses_domain_identity" "corp" {
+  domain = local.corp_domain
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_ses_domain_dkim" "corp" {
+  domain = aws_ses_domain_identity.corp.domain
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
 
 # # MAIL FROM domain configuration
 # # This is used for bounce and complaint handling
@@ -103,15 +114,19 @@ data "aws_route53_zone" "biancatechnologies" {
 #   }
 # }
 
-# # ---------------- ROUTE53 RECORDS (conditional) -------------
-# # Create records only if the hosted zone exists in Route53
-# resource "aws_route53_record" "corp_verification" {
-#   zone_id = data.aws_route53_zone.corp.zone_id
-#   name    = "_amazonses.${local.corp_domain}"
-#   type    = "TXT"
-#   ttl     = 300
-#   records = [aws_ses_domain_identity.corp.verification_token]
-# }
+# ---------------- ROUTE53 RECORDS -------------
+# SES Domain Verification Record
+resource "aws_route53_record" "corp_verification" {
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "_amazonses.${local.corp_domain}"
+  type    = "TXT"
+  ttl     = 600
+  records = [aws_ses_domain_identity.corp.verification_token]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
 
 # ⚠️ CRITICAL - DISABLED!
 # This MX record would override Zoho Mail MX records!
@@ -154,18 +169,21 @@ data "aws_route53_zone" "biancatechnologies" {
 #   }
 # }
 
-# # resource "aws_route53_record" "corp_dkim" {
-#   count   = 3
-#   zone_id = data.aws_route53_zone.corp.zone_id
-#   name    = "${element(aws_ses_domain_dkim.corp.dkim_tokens, count.index)}._domainkey.${local.corp_domain}"
-#   type    = "CNAME"
-#   ttl     = 300
-#   records = ["${element(aws_ses_domain_dkim.corp.dkim_tokens, count.index)}.dkim.amazonses.com"]
-#
-#   lifecycle {
-#     create_before_destroy = true
-#   }
-# }
+# AWS SES DKIM Records - Required for SES email sending
+# These records are separate from Zoho Mail DKIM (zmail._domainkey)
+resource "aws_route53_record" "corp_dkim" {
+  count   = 3
+  zone_id = data.aws_route53_zone.biancatechnologies.zone_id
+  name    = "${element(aws_ses_domain_dkim.corp.dkim_tokens, count.index)}._domainkey.${local.corp_domain}"
+  type    = "CNAME"
+  ttl     = 600
+  records = ["${element(aws_ses_domain_dkim.corp.dkim_tokens, count.index)}.dkim.amazonses.com"]
+
+  lifecycle {
+    prevent_destroy = true
+    create_before_destroy = true
+  }
+}
 
 # ⚠️ DISABLED - Using Zoho Mail, no SES receipt rules needed
 # # --------------- SES RECEIPT RULES (into existing set) ---------------

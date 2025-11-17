@@ -102,6 +102,7 @@ resource "aws_iam_role_policy" "staging_codedeploy_policy" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
+          "s3:GetObjectVersion",
           "s3:ListBucket"
         ]
         Resource = [
@@ -117,6 +118,22 @@ resource "aws_iam_role_policy" "staging_codedeploy_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "codedeploy:PutLifecycleEventHookExecutionStatus",
+          "codedeploy:GetDeployment",
+          "codedeploy:GetDeploymentConfig",
+          "codedeploy:GetApplication",
+          "codedeploy:GetApplicationRevision",
+          "codedeploy:ListApplicationRevisions",
+          "codedeploy:RegisterApplicationRevision",
+          "codedeploy:BatchGetDeploymentInstances",
+          "codedeploy:ListDeploymentInstances",
+          "codedeploy:GetDeploymentInstance"
+        ]
+        Resource = "*"
       }
     ]
   })
