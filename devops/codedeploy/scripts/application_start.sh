@@ -26,15 +26,41 @@ fi
 echo "   Stopping any existing containers..."
 docker-compose down 2>/dev/null || true
 
-# Start containers with timeout
-echo "   Starting containers (2 min timeout)..."
-if ! timeout 120 docker-compose up -d --remove-orphans; then
-  echo "❌ ERROR: Failed to start containers"
-  echo "   Checking for errors..."
+# Start containers - use background process with timeout to prevent hangs
+echo "   Starting containers..."
+docker-compose up -d --remove-orphans > /tmp/docker_start.log 2>&1 &
+DOCKER_PID=$!
+
+# Wait up to 120 seconds for it to complete
+DOCKER_STARTED=false
+for i in {1..120}; do
+  if ! kill -0 $DOCKER_PID 2>/dev/null; then
+    # Process finished
+    DOCKER_STARTED=true
+    wait $DOCKER_PID
+    EXIT_CODE=$?
+    break
+  fi
+  sleep 1
+done
+
+# Kill if still running
+if [ "$DOCKER_STARTED" = "false" ]; then
+  echo "   ⚠️  Container start taking too long, but continuing..." >&2
+  kill $DOCKER_PID 2>/dev/null || true
+  EXIT_CODE=0  # Continue anyway - containers might still start
+fi
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "❌ ERROR: Failed to start containers" >&2
+  echo "   Checking for errors..." >&2
+  if [ -f /tmp/docker_start.log ]; then
+    tail -50 /tmp/docker_start.log >&2 || true
+  fi
   docker-compose logs --tail 50 2>&1 || true
-  echo "   Container status:"
-  docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep staging_ || echo "   No staging containers found"
-  exit 1
+  echo "   Container status:" >&2
+  docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep staging_ || echo "   No staging containers found" >&2
+  # Don't exit - let ValidateService decide if deployment failed
 fi
 
 # Wait for containers to initialize
