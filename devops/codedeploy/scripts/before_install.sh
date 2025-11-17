@@ -83,7 +83,7 @@ services:
       - bianca-network
 
   app:
-    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-backend:latest
+    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-backend:staging
     container_name: staging_app
     restart: unless-stopped
     ports:
@@ -125,7 +125,7 @@ services:
       - bianca-network
 
   frontend:
-    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-frontend:latest
+    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-frontend:staging
     container_name: staging_frontend
     restart: unless-stopped
     ports:
