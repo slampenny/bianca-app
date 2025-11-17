@@ -20,10 +20,27 @@ AWS_ACCOUNT_ID="730335291008"
 SECRET_ID="MySecretsManagerSecret"
 
 echo "   Fetching secrets from AWS Secrets Manager..."
-ARI_PASSWORD=$(aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text | jq -r .ARI_PASSWORD)
-BIANCA_PASSWORD=$(aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text | jq -r .BIANCA_PASSWORD)
-POSTHOG_API_KEY=$(aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text | jq -r '.POSTHOG_API_KEY // empty')
-POSTHOG_SECRET_KEY=$(aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text | jq -r '.POSTHOG_SECRET_KEY // empty')
+# Fetch all secrets at once with timeout to avoid hanging
+SECRET_JSON=$(timeout 30 aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text 2>&1)
+if [ $? -ne 0 ] || [ -z "$SECRET_JSON" ]; then
+  echo "❌ ERROR: Failed to fetch secrets from Secrets Manager"
+  echo "   Error: $SECRET_JSON"
+  exit 1
+fi
+
+# Parse secrets with error handling
+ARI_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.ARI_PASSWORD // empty' 2>/dev/null)
+BIANCA_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.BIANCA_PASSWORD // empty' 2>/dev/null)
+POSTHOG_API_KEY=$(echo "$SECRET_JSON" | jq -r '.POSTHOG_API_KEY // empty' 2>/dev/null)
+POSTHOG_SECRET_KEY=$(echo "$SECRET_JSON" | jq -r '.POSTHOG_SECRET_KEY // empty' 2>/dev/null)
+
+# Verify required secrets
+if [ -z "$ARI_PASSWORD" ] || [ -z "$BIANCA_PASSWORD" ]; then
+  echo "❌ ERROR: Required secrets (ARI_PASSWORD or BIANCA_PASSWORD) are missing"
+  exit 1
+fi
+
+echo "   ✅ Secrets fetched successfully"
 
 # Create docker-compose.yml
 echo "   Creating docker-compose.yml..."
