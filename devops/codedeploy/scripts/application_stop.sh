@@ -7,47 +7,30 @@ set +e
 echo "🛑 ApplicationStop: Stopping old containers..."
 
 # Navigate to staging directory
-cd /opt/bianca-staging || {
+cd /opt/bianca-staging 2>/dev/null || {
   echo "⚠️  /opt/bianca-staging not found, skipping stop" >&2
   exit 0
 }
 
-# Stop containers - use background process with timeout to prevent hangs
+# Simple approach: just kill and remove containers directly
+# Don't use docker-compose down which can hang
+echo "   Stopping containers directly..."
+
+# Stop all staging containers by name
+docker stop staging_app staging_frontend staging_nginx staging_mongodb staging_asterisk staging_posthog staging_posthog_db staging_posthog_redis 2>/dev/null || true
+
+# Remove containers
+docker rm staging_app staging_frontend staging_nginx staging_mongodb staging_asterisk staging_posthog staging_posthog_db staging_posthog_redis 2>/dev/null || true
+
+# Also try docker-compose if it exists, but don't wait for it
 if [ -f "docker-compose.yml" ]; then
-  echo "   Stopping containers..."
-  
-  # Start docker-compose down in background
-  docker-compose down > /tmp/docker_stop.log 2>&1 &
-  DOCKER_PID=$!
-  
-  # Wait up to 60 seconds for it to complete
-  DOCKER_STOPPED=false
-  for i in {1..60}; do
-    if ! kill -0 $DOCKER_PID 2>/dev/null; then
-      # Process finished
-      DOCKER_STOPPED=true
-      wait $DOCKER_PID
-      EXIT_CODE=$?
-      break
-    fi
-    sleep 1
-  done
-  
-  # Kill if still running
-  if [ "$DOCKER_STOPPED" = "false" ]; then
-    echo "   ⚠️  Container stop taking too long, forcing stop..." >&2
-    kill -9 $DOCKER_PID 2>/dev/null || true
-    # Force stop containers
-    docker-compose kill 2>/dev/null || true
-    docker-compose down --remove-orphans 2>/dev/null || true
-  fi
-  
-  if [ -f /tmp/docker_stop.log ]; then
-    echo "   Stop output:"
-    tail -20 /tmp/docker_stop.log || true
-  fi
-else
-  echo "   No docker-compose.yml found, skipping stop (containers may not be running yet)"
+  echo "   Attempting docker-compose cleanup (non-blocking)..."
+  # Start in background and don't wait
+  docker-compose down --remove-orphans > /dev/null 2>&1 &
+  # Give it 5 seconds max
+  sleep 5
+  # Kill it if still running
+  kill %1 2>/dev/null || true
 fi
 
 echo "✅ ApplicationStop completed"
