@@ -1,7 +1,8 @@
 #!/bin/bash
 # BeforeInstall hook - Create docker-compose.yml and nginx.conf
 
-set -e
+# Don't use set -e - we want to capture and report errors properly
+set +e
 
 echo "🧹 BeforeInstall: Setting up docker-compose.yml and nginx.conf..."
 
@@ -44,11 +45,11 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 if [ -z "$SECRET_JSON" ] || [ "$SECRET_JSON" = "None" ] || [ $EXIT_CODE -ne 0 ]; then
-  echo "❌ ERROR: Failed to fetch secrets from Secrets Manager after $MAX_RETRIES attempts"
-  echo "   Secret ID: $SECRET_ID"
-  echo "   Region: $AWS_REGION"
-  echo "   Exit code: $EXIT_CODE"
-  echo "   Output: $SECRET_JSON"
+  echo "❌ ERROR: Failed to fetch secrets from Secrets Manager after $MAX_RETRIES attempts" >&2
+  echo "   Secret ID: $SECRET_ID" >&2
+  echo "   Region: $AWS_REGION" >&2
+  echo "   Exit code: $EXIT_CODE" >&2
+  echo "   Output: $SECRET_JSON" >&2
   exit 1
 fi
 
@@ -59,7 +60,9 @@ BIANCA_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.BIANCA_PASSWORD // empty' 2>/dev
 
 # Verify required secrets
 if [ -z "$ARI_PASSWORD" ] || [ -z "$BIANCA_PASSWORD" ]; then
-  echo "❌ ERROR: Required secrets (ARI_PASSWORD or BIANCA_PASSWORD) are missing"
+  echo "❌ ERROR: Required secrets are missing" >&2
+  echo "   ARI_PASSWORD: ${ARI_PASSWORD:+SET}${ARI_PASSWORD:-MISSING}" >&2
+  echo "   BIANCA_PASSWORD: ${BIANCA_PASSWORD:+SET}${BIANCA_PASSWORD:-MISSING}" >&2
   exit 1
 fi
 
