@@ -1,39 +1,49 @@
 #!/bin/bash
 # ApplicationStop hook - Stop old containers gracefully
 
-# Don't use set -e - we want to handle errors gracefully
-set +e
+# Output to both stdout and stderr so CodeDeploy captures it
+exec > >(tee /tmp/application_stop.log) 2>&1
 
-echo "🛑 ApplicationStop: Stopping old containers..." >&2
+echo "🛑 ApplicationStop: Stopping old containers..."
+echo "   Script started at $(date)"
 
 # Navigate to staging directory
-cd /opt/bianca-staging 2>/dev/null || {
-  echo "⚠️  /opt/bianca-staging not found, skipping stop" >&2
+if ! cd /opt/bianca-staging 2>/dev/null; then
+  echo "⚠️  /opt/bianca-staging not found, skipping stop"
   exit 0
-}
+fi
 
-# Simple approach: just kill and remove containers directly
-# Don't use docker-compose down which can hang
-echo "   Stopping containers directly..." >&2
+echo "   Current directory: $(pwd)"
+echo "   Listing containers before stop..."
+docker ps --format "{{.Names}}\t{{.Status}}" | grep staging_ || echo "   No staging containers running"
 
-# Stop all staging containers by name (with timeout per container)
-echo "   Stopping containers..." >&2
-for container in staging_app staging_frontend staging_nginx staging_mongodb staging_asterisk staging_posthog staging_posthog_db staging_posthog_redis; do
+# Stop all staging containers by name
+echo "   Stopping containers..."
+CONTAINERS="staging_app staging_frontend staging_nginx staging_mongodb staging_asterisk staging_posthog staging_posthog_db staging_posthog_redis"
+for container in $CONTAINERS; do
   if docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
-    echo "   Stopping $container..." >&2
-    docker stop $container 2>&1 || echo "   ⚠️  Failed to stop $container" >&2
+    echo "   Stopping $container..."
+    if ! docker stop $container 2>&1; then
+      echo "   ⚠️  Failed to stop $container, trying kill..."
+      docker kill $container 2>&1 || true
+    fi
+  else
+    echo "   $container not running, skipping"
   fi
 done
 
 # Remove containers
-echo "   Removing containers..." >&2
-for container in staging_app staging_frontend staging_nginx staging_mongodb staging_asterisk staging_posthog staging_posthog_db staging_posthog_redis; do
-  docker rm $container 2>&1 || true
+echo "   Removing containers..."
+for container in $CONTAINERS; do
+  if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
+    echo "   Removing $container..."
+    docker rm $container 2>&1 || echo "   ⚠️  Failed to remove $container (may not exist)"
+  fi
 done
 
-# Skip docker-compose entirely - it can hang
-# Just rely on direct docker commands above
+echo "   Listing containers after stop..."
+docker ps --format "{{.Names}}\t{{.Status}}" | grep staging_ || echo "   No staging containers running (expected)"
 
-echo "✅ ApplicationStop completed" >&2
+echo "✅ ApplicationStop completed at $(date)"
 exit 0
 
