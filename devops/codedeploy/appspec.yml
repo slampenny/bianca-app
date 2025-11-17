@@ -16,10 +16,8 @@ hooks:
     - location: scripts/application_start.sh
       timeout: 300
       runas: root
-  ApplicationStop:
-    - location: scripts/application_stop.sh
-      timeout: 300
-      runas: root
+  # ApplicationStop removed - ApplicationStart handles container stopping with docker-compose down
+  # This avoids CodeDeploy agent issues with lifecycle event processing
   ValidateService:
     - location: scripts/validate_service.sh
       timeout: 300
