@@ -19,6 +19,19 @@ yum install -y docker git jq ruby wget
 systemctl start docker
 systemctl enable docker
 
+# Configure Docker log rotation to prevent disk space issues
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'DOCKER_EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DOCKER_EOF
+systemctl restart docker
+
 # Add ec2-user to docker group
 usermod -a -G docker ec2-user
 
