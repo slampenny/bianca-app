@@ -21,10 +21,33 @@ SECRET_ID="MySecretsManagerSecret"
 
 echo "   Fetching secrets from AWS Secrets Manager..."
 # Fetch all secrets at once with timeout to avoid hanging
-SECRET_JSON=$(timeout 30 aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text 2>&1)
-if [ $? -ne 0 ] || [ -z "$SECRET_JSON" ]; then
-  echo "❌ ERROR: Failed to fetch secrets from Secrets Manager"
-  echo "   Error: $SECRET_JSON"
+# Use a background process with timeout to ensure it doesn't hang forever
+SECRET_JSON=""
+(
+  SECRET_JSON_TMP=$(aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text 2>&1)
+  echo "$SECRET_JSON_TMP" > /tmp/secret_output.txt
+) &
+SECRET_PID=$!
+
+# Wait up to 30 seconds for the secret fetch
+SECRET_FETCHED=false
+for i in {1..30}; do
+  if [ -f /tmp/secret_output.txt ]; then
+    SECRET_JSON=$(cat /tmp/secret_output.txt)
+    SECRET_FETCHED=true
+    break
+  fi
+  sleep 1
+done
+
+# Kill the background process if it's still running
+kill $SECRET_PID 2>/dev/null || true
+wait $SECRET_PID 2>/dev/null || true
+
+if [ "$SECRET_FETCHED" = "false" ] || [ -z "$SECRET_JSON" ] || [ "$SECRET_JSON" = "None" ]; then
+  echo "❌ ERROR: Failed to fetch secrets from Secrets Manager (timeout or error)"
+  echo "   Attempted to fetch secret: $SECRET_ID"
+  echo "   Region: $AWS_REGION"
   exit 1
 fi
 
