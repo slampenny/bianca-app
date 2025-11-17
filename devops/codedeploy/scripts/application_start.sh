@@ -1,34 +1,86 @@
 #!/bin/bash
 # ApplicationStart hook - Start new containers
 
-set -e
+# Don't use set -e - we want to handle errors gracefully and provide diagnostics
 
 echo "🚀 ApplicationStart: Starting new containers..."
 
-cd /opt/bianca-staging
+cd /opt/bianca-staging || {
+  echo "❌ ERROR: Cannot cd to /opt/bianca-staging"
+  exit 1
+}
+
+# Verify required files exist
+if [ ! -f "docker-compose.yml" ]; then
+  echo "❌ ERROR: docker-compose.yml not found in /opt/bianca-staging"
+  ls -la /opt/bianca-staging/ || true
+  exit 1
+fi
+
+if [ ! -f "nginx.conf" ]; then
+  echo "❌ ERROR: nginx.conf not found in /opt/bianca-staging"
+  exit 1
+fi
 
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
 docker-compose down 2>/dev/null || true
 
 # Start containers with timeout
-if [ -f "docker-compose.yml" ]; then
-  echo "   Starting containers (2 min timeout)..."
-  timeout 120 docker-compose up -d --remove-orphans || {
-    echo "❌ Failed to start containers"
-    exit 1
-  }
-  
-  echo "   Waiting 5 seconds for containers to initialize..."
-  sleep 5
-  
+echo "   Starting containers (2 min timeout)..."
+if ! timeout 120 docker-compose up -d --remove-orphans; then
+  echo "❌ ERROR: Failed to start containers"
+  echo "   Checking for errors..."
+  docker-compose logs --tail 50 2>&1 || true
   echo "   Container status:"
-  docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep staging_ || echo "   No staging containers found"
-else
-  echo "❌ docker-compose.yml not found"
+  docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep staging_ || echo "   No staging containers found"
   exit 1
 fi
 
+# Wait for containers to initialize
+echo "   Waiting 15 seconds for containers to initialize..."
+sleep 15
+
+# Check container status
+echo ""
+echo "   Container status:"
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep staging_ || echo "   ⚠️  No staging containers found"
+
+# Verify nginx is listening on port 80
+echo ""
+echo "   Verifying port 80 is listening..."
+if ss -tlnp 2>/dev/null | grep :80 > /dev/null || netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
+  echo "   ✅ Port 80 is listening"
+else
+  echo "   ⚠️  WARNING: Port 80 is NOT listening"
+  echo "   Checking nginx container..."
+  docker logs staging_nginx --tail 20 2>&1 || echo "   Nginx container not found"
+fi
+
+# Check if containers are running
+echo ""
+echo "   Checking container health..."
+NGINX_RUNNING=$(docker ps --filter "name=staging_nginx" --format "{{.Names}}" | wc -l)
+FRONTEND_RUNNING=$(docker ps --filter "name=staging_frontend" --format "{{.Names}}" | wc -l)
+APP_RUNNING=$(docker ps --filter "name=staging_app" --format "{{.Names}}" | wc -l)
+
+if [ "$NGINX_RUNNING" -eq 0 ]; then
+  echo "   ⚠️  WARNING: Nginx container is not running"
+  docker ps -a --filter "name=staging_nginx" --format "{{.Names}}\t{{.Status}}" || true
+  docker logs staging_nginx --tail 30 2>&1 || true
+fi
+
+if [ "$FRONTEND_RUNNING" -eq 0 ]; then
+  echo "   ⚠️  WARNING: Frontend container is not running"
+  docker logs staging_frontend --tail 20 2>&1 || true
+fi
+
+if [ "$APP_RUNNING" -eq 0 ]; then
+  echo "   ⚠️  WARNING: App container is not running"
+  docker logs staging_app --tail 20 2>&1 || true
+fi
+
+echo ""
 echo "✅ ApplicationStart completed"
 
 
