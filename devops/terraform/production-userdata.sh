@@ -28,6 +28,20 @@ yum update -y
 yum install -y docker
 systemctl start docker
 systemctl enable docker
+
+# Configure Docker log rotation to prevent disk space issues
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'DOCKER_EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DOCKER_EOF
+systemctl restart docker
+
 usermod -a -G docker ec2-user
 
 # Install Docker Compose

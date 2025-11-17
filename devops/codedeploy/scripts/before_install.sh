@@ -6,6 +6,21 @@ set +e
 
 echo "🧹 BeforeInstall: Setting up docker-compose.yml and nginx.conf..."
 
+# Configure Docker log rotation to prevent disk space issues
+echo "   Configuring Docker log rotation..."
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'DOCKER_EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DOCKER_EOF
+# Restart Docker to apply new log rotation settings
+systemctl restart docker || echo "   ⚠️  Docker restart failed, continuing..."
+
 # Ensure deployment directory exists
 mkdir -p /opt/bianca-staging
 cd /opt/bianca-staging
