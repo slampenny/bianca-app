@@ -20,34 +20,35 @@ AWS_ACCOUNT_ID="730335291008"
 SECRET_ID="MySecretsManagerSecret"
 
 echo "   Fetching secrets from AWS Secrets Manager..."
-# Fetch all secrets at once with timeout to avoid hanging
-# Use a background process with timeout to ensure it doesn't hang forever
+# Fetch all secrets at once - use a simple approach with error handling
+# Try to fetch with a reasonable wait, but don't hang forever
 SECRET_JSON=""
-(
-  SECRET_JSON_TMP=$(aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text 2>&1)
-  echo "$SECRET_JSON_TMP" > /tmp/secret_output.txt
-) &
-SECRET_PID=$!
+RETRY_COUNT=0
+MAX_RETRIES=3
 
-# Wait up to 30 seconds for the secret fetch
-SECRET_FETCHED=false
-for i in {1..30}; do
-  if [ -f /tmp/secret_output.txt ]; then
-    SECRET_JSON=$(cat /tmp/secret_output.txt)
-    SECRET_FETCHED=true
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  echo "   Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES..."
+  SECRET_JSON=$(aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text 2>&1)
+  EXIT_CODE=$?
+  
+  if [ $EXIT_CODE -eq 0 ] && [ -n "$SECRET_JSON" ] && [ "$SECRET_JSON" != "None" ]; then
+    echo "   ✅ Secrets fetched successfully"
     break
   fi
-  sleep 1
+  
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+    echo "   ⚠️  Retry in 2 seconds..."
+    sleep 2
+  fi
 done
 
-# Kill the background process if it's still running
-kill $SECRET_PID 2>/dev/null || true
-wait $SECRET_PID 2>/dev/null || true
-
-if [ "$SECRET_FETCHED" = "false" ] || [ -z "$SECRET_JSON" ] || [ "$SECRET_JSON" = "None" ]; then
-  echo "❌ ERROR: Failed to fetch secrets from Secrets Manager (timeout or error)"
-  echo "   Attempted to fetch secret: $SECRET_ID"
+if [ -z "$SECRET_JSON" ] || [ "$SECRET_JSON" = "None" ] || [ $EXIT_CODE -ne 0 ]; then
+  echo "❌ ERROR: Failed to fetch secrets from Secrets Manager after $MAX_RETRIES attempts"
+  echo "   Secret ID: $SECRET_ID"
   echo "   Region: $AWS_REGION"
+  echo "   Exit code: $EXIT_CODE"
+  echo "   Output: $SECRET_JSON"
   exit 1
 fi
 
