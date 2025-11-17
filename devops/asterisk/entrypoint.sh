@@ -37,11 +37,13 @@ echo "=== End Environment Variables ==="
 
 # Templating configs
 echo "Templating configuration files..."
+# Only substitute specific environment variables to avoid replacing Asterisk variables like ${EXTEN}
+ENV_VARS='$EXTERNAL_ADDRESS $PRIVATE_ADDRESS $ARI_PASSWORD $BIANCA_PASSWORD $RTP_START_PORT $RTP_END_PORT'
 for template in "$ASTERISK_CONF_DIR"/*.template; do
   [ -e "$template" ] || continue
   conf_file="${template%.template}"
   echo "Processing template: $template -> $conf_file"
-  envsubst < "$template" > "$conf_file"
+  envsubst "$ENV_VARS" < "$template" > "$conf_file"
   
   # Debug: Show the content of rtp.conf if it's being processed
   if [[ "$conf_file" == *"rtp.conf" ]]; then
