@@ -80,13 +80,48 @@ echo "SSM agent installed and started"
 
 # Install CodeDeploy agent
 echo "Installing CodeDeploy agent..."
-cd /home/ec2-user
-wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install
+cd /tmp
+# Remove any existing installation
+sudo yum remove -y codedeploy-agent 2>/dev/null || true
+sudo systemctl stop codedeploy-agent 2>/dev/null || true
+
+# Download and install
+if ! wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install -O install; then
+    echo "ERROR: Failed to download CodeDeploy agent installer"
+    exit 1
+fi
 chmod +x ./install
-./install auto
-service codedeploy-agent start
-systemctl enable codedeploy-agent
-echo "CodeDeploy agent installed and started"
+if ! sudo ./install auto; then
+    echo "ERROR: Failed to install CodeDeploy agent"
+    exit 1
+fi
+
+# Enable and start
+sudo systemctl enable codedeploy-agent
+if ! sudo systemctl start codedeploy-agent; then
+    echo "ERROR: Failed to start CodeDeploy agent"
+    sudo systemctl status codedeploy-agent --no-pager || true
+    exit 1
+fi
+
+# Wait and verify
+sleep 10
+for i in {1..6}; do
+    if sudo systemctl is-active --quiet codedeploy-agent; then
+        echo "✅ CodeDeploy agent is running"
+        sudo systemctl status codedeploy-agent --no-pager | head -10
+        break
+    fi
+    echo "Waiting for agent to start (attempt $i/6)..."
+    sleep 5
+done
+
+if ! sudo systemctl is-active --quiet codedeploy-agent; then
+    echo "❌ WARNING: CodeDeploy agent failed to start"
+    sudo systemctl status codedeploy-agent --no-pager || true
+    sudo tail -50 /var/log/aws/codedeploy-agent/codedeploy-agent.log 2>&1 || echo "Log file not found"
+    # Don't exit - let the instance continue, but log the issue
+fi
 
 echo "==================================="
 echo "Infrastructure setup complete!"
