@@ -31,8 +31,7 @@ fi
 # Parse secrets with error handling
 ARI_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.ARI_PASSWORD // empty' 2>/dev/null)
 BIANCA_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.BIANCA_PASSWORD // empty' 2>/dev/null)
-POSTHOG_API_KEY=$(echo "$SECRET_JSON" | jq -r '.POSTHOG_API_KEY // empty' 2>/dev/null)
-POSTHOG_SECRET_KEY=$(echo "$SECRET_JSON" | jq -r '.POSTHOG_SECRET_KEY // empty' 2>/dev/null)
+# PostHog removed - no longer used
 
 # Verify required secrets
 if [ -z "$ARI_PASSWORD" ] || [ -z "$BIANCA_PASSWORD" ]; then
@@ -112,15 +111,12 @@ services:
       - NETWORK_MODE=DOCKER_COMPOSE
       - APP_RTP_PORT_RANGE=20002-30000
       - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:$AWS_REGION:$AWS_ACCOUNT_ID:bianca-emergency-alerts
-      - TELEMETRY_ENABLED=true
-      - POSTHOG_API_KEY=$POSTHOG_API_KEY
-      - POSTHOG_HOST=http://posthog:8000
+      - TELEMETRY_ENABLED=false
     volumes:
       - ~/.aws:/root/.aws:ro
     depends_on:
       - mongodb
       - asterisk
-      - posthog
     networks:
       - bianca-network
 
@@ -149,65 +145,8 @@ services:
     networks:
       - bianca-network
 
-  posthog:
-    image: posthog/posthog:release-1.30.0
-    container_name: staging_posthog
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - POSTHOG_SECRET_KEY=$POSTHOG_SECRET_KEY
-      - SITE_URL=https://staging-analytics.myphonefriend.com
-      - DATABASE_URL=postgres://posthog:posthog@posthog-db:5432/posthog
-      - REDIS_URL=redis://posthog-redis:6379
-      - DISABLE_SECURE_SSL_REDIRECT=true
-      - SECURE_COOKIES=false
-      - DEBUG=1
-    depends_on:
-      posthog-db:
-        condition: service_healthy
-      posthog-redis:
-        condition: service_healthy
-    networks:
-      - bianca-network
-
-  posthog-db:
-    image: postgres:12-alpine
-    container_name: staging_posthog_db
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=posthog
-      - POSTGRES_PASSWORD=posthog
-      - POSTGRES_DB=posthog
-    volumes:
-      - posthog-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U posthog"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - bianca-network
-
-  posthog-redis:
-    image: redis:7-alpine
-    container_name: staging_posthog_redis
-    restart: unless-stopped
-    volumes:
-      - posthog-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    networks:
-      - bianca-network
-
 volumes:
   asterisk_logs:
-  posthog-db-data:
-  posthog-redis-data:
 
 networks:
   bianca-network:
