@@ -305,5 +305,226 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       expect(duration).toBeLessThan(100);
     });
   });
+
+  describe('Primary Speaker Detection - Stage 3', () => {
+    beforeEach(() => {
+      // Enable primary speaker detection, disable noise gate for cleaner tests
+      noiseReductionService.primarySpeakerEnabled = true;
+      noiseReductionService.noiseGateEnabled = false; // Disable noise gate for these tests
+      noiseReductionService.resetStats();
+    });
+
+    afterEach(() => {
+      // Restore defaults
+      noiseReductionService.primarySpeakerEnabled = false;
+      noiseReductionService.noiseGateEnabled = true;
+    });
+
+    it('should preserve audio when primary speaker detected', () => {
+      const callId = 'test-call-primary';
+      
+      // Create high-energy audio (primary speaker) - consistent high energy
+      const highEnergyBuffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        highEnergyBuffer[i] = i % 2 === 0 ? 100 : 150; // Loud speech
+      }
+      
+      // Process multiple packets to build history (need enough to establish pattern)
+      for (let i = 0; i < 20; i++) {
+        noiseReductionService.processAudio(highEnergyBuffer, callId);
+      }
+      
+      // After history is built, should preserve primary speaker audio
+      const result = noiseReductionService.processAudio(highEnergyBuffer, callId);
+      
+      // Should preserve original (not reduced) - check that it's not all silence
+      const isAllSilence = result.every(byte => byte === 0x7F);
+      expect(isAllSilence).toBe(false);
+      
+      // Check that energy is preserved (not significantly reduced)
+      let originalEnergy = 0;
+      let resultEnergy = 0;
+      for (let i = 0; i < 160; i++) {
+        originalEnergy += Math.abs(highEnergyBuffer[i] - 127);
+        resultEnergy += Math.abs(result[i] - 127);
+      }
+      // Result should have at least 80% of original energy (allowing for small variations)
+      expect(resultEnergy).toBeGreaterThan(originalEnergy * 0.8);
+      
+      const stats = noiseReductionService.getStats();
+      expect(stats.primarySpeakerPreserved).toBeGreaterThan(0);
+    });
+
+    it('should reduce volume when background audio detected', () => {
+      const callId = 'test-call-background';
+      
+      // First, establish a high-energy baseline (primary speaker)
+      const highEnergyBuffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        highEnergyBuffer[i] = i % 2 === 0 ? 100 : 150; // Loud speech
+      }
+      
+      // Build history with high energy
+      for (let i = 0; i < 10; i++) {
+        noiseReductionService.processAudio(highEnergyBuffer, callId);
+      }
+      
+      // Now send lower-energy audio (background/TV)
+      const lowEnergyBuffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        lowEnergyBuffer[i] = 127 + (i % 5) - 2; // Quiet background
+      }
+      
+      const result = noiseReductionService.processAudio(lowEnergyBuffer, callId);
+      
+      // Should be reduced (not identical)
+      expect(Buffer.compare(result, lowEnergyBuffer)).not.toBe(0);
+      
+      // Check that volume was reduced (values closer to silence)
+      let reducedCount = 0;
+      for (let i = 0; i < result.length; i++) {
+        const originalDist = Math.abs(lowEnergyBuffer[i] - 127);
+        const reducedDist = Math.abs(result[i] - 127);
+        if (reducedDist < originalDist) {
+          reducedCount++;
+        }
+      }
+      expect(reducedCount).toBeGreaterThan(0);
+      
+      const stats = noiseReductionService.getStats();
+      expect(stats.primarySpeakerFiltered).toBeGreaterThan(0);
+    });
+
+    it('should preserve audio during initial learning period', () => {
+      const callId = 'test-call-learning';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      // First few packets should be preserved (learning period)
+      for (let i = 0; i < 3; i++) {
+        const result = noiseReductionService.processAudio(buffer, callId);
+        expect(Buffer.compare(result, buffer)).toBe(0);
+      }
+    });
+
+    it('should track energy history per call', () => {
+      const callId1 = 'test-call-1';
+      const callId2 = 'test-call-2';
+      
+      const buffer1 = Buffer.alloc(160);
+      const buffer2 = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer1[i] = 100; // Call 1: medium energy
+        buffer2[i] = 150; // Call 2: high energy
+      }
+      
+      // Process packets for both calls
+      for (let i = 0; i < 10; i++) {
+        noiseReductionService.processAudio(buffer1, callId1);
+        noiseReductionService.processAudio(buffer2, callId2);
+      }
+      
+      // Both should have independent histories
+      // Call 2 should have higher energy, so its audio should be preserved
+      const result1 = noiseReductionService.processAudio(buffer1, callId1);
+      const result2 = noiseReductionService.processAudio(buffer2, callId2);
+      
+      // Both should be processed (may be preserved or reduced based on their own history)
+      expect(result1.length).toBe(160);
+      expect(result2.length).toBe(160);
+    });
+
+    it('should cleanup call history', () => {
+      const callId = 'test-call-cleanup';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      // Build history
+      for (let i = 0; i < 10; i++) {
+        noiseReductionService.processAudio(buffer, callId);
+      }
+      
+      // Cleanup
+      noiseReductionService.cleanupCall(callId);
+      
+      // History should be cleared
+      // Next packet should start fresh (preserved during learning)
+      const result = noiseReductionService.processAudio(buffer, callId);
+      expect(Buffer.compare(result, buffer)).toBe(0);
+    });
+
+    it('should respect primarySpeakerEnabled = false', () => {
+      noiseReductionService.primarySpeakerEnabled = false;
+      
+      const callId = 'test-call-disabled';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      // Build history
+      for (let i = 0; i < 10; i++) {
+        noiseReductionService.processAudio(buffer, callId);
+      }
+      
+      const result = noiseReductionService.processAudio(buffer, callId);
+      
+      // Should be unchanged (primary speaker detection disabled)
+      expect(Buffer.compare(result, buffer)).toBe(0);
+      
+      const stats = noiseReductionService.getStats();
+      expect(stats.primarySpeakerPreserved).toBe(0);
+      expect(stats.primarySpeakerFiltered).toBe(0);
+    });
+
+    it('should handle multiple speakers (primary vs background)', () => {
+      const callId = 'test-call-multi-speaker';
+      
+      // Establish primary speaker (loud, consistent)
+      const primaryBuffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        primaryBuffer[i] = 100 + Math.sin(i / 10) * 30; // Loud, varying speech
+      }
+      
+      // Build history with primary speaker (need enough to establish pattern)
+      for (let i = 0; i < 20; i++) {
+        noiseReductionService.processAudio(primaryBuffer, callId);
+      }
+      
+      // Now send background speaker (quieter, different pattern)
+      const backgroundBuffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        backgroundBuffer[i] = 127 + Math.sin(i / 5) * 10; // Quieter background
+      }
+      
+      const primaryResult = noiseReductionService.processAudio(primaryBuffer, callId);
+      const backgroundResult = noiseReductionService.processAudio(backgroundBuffer, callId);
+      
+      // Primary should be preserved (high energy), background should be reduced
+      let primaryOriginalEnergy = 0;
+      let primaryResultEnergy = 0;
+      for (let i = 0; i < 160; i++) {
+        primaryOriginalEnergy += Math.abs(primaryBuffer[i] - 127);
+        primaryResultEnergy += Math.abs(primaryResult[i] - 127);
+      }
+      expect(primaryResultEnergy).toBeGreaterThan(primaryOriginalEnergy * 0.8);
+      
+      // Background should be reduced
+      expect(Buffer.compare(backgroundResult, backgroundBuffer)).not.toBe(0);
+      
+      // Background energy should be less than original
+      let backgroundOriginalEnergy = 0;
+      let backgroundResultEnergy = 0;
+      for (let i = 0; i < 160; i++) {
+        backgroundOriginalEnergy += Math.abs(backgroundBuffer[i] - 127);
+        backgroundResultEnergy += Math.abs(backgroundResult[i] - 127);
+      }
+      expect(backgroundResultEnergy).toBeLessThan(backgroundOriginalEnergy * 0.8);
+    });
+  });
 });
 
