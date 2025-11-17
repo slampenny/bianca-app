@@ -914,11 +914,12 @@ class OpenAIRealtimeService {
         output_audio_format: 'g711_ulaw',
 
         // CRITICAL: Add turn detection to prevent interruptions
+        // Optimized for noisy environments (Phase 1: OpenAI VAD Tuning)
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,              // Keep at 0.5 for balanced detection
-          prefix_padding_ms: 300,      // Keep original
-          silence_duration_ms: 1200    // Increase to 1200ms for more natural pauses
+          threshold: 0.6,              // Increased from 0.5 - more selective (ignores quiet background)
+          prefix_padding_ms: 300,      // Keep at 300ms to capture speech start
+          silence_duration_ms: 1000    // Optimized for noisy environments - wait longer to confirm speech end
         },
 
         // Add input transcription for debugging
