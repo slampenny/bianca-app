@@ -246,7 +246,7 @@ resource "aws_launch_template" "production" {
     region         = var.aws_region
     aws_account_id = var.aws_account_id
     environment    = "production"
-    eip_address    = aws_eip.production.public_ip  # Pass EIP so it's always correct
+    eip_address    = aws_eip.production.public_ip
   }))
 
   # Force recreation when userdata changes
