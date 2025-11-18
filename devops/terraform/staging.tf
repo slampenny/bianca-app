@@ -720,7 +720,7 @@ resource "aws_cloudwatch_log_group" "staging_app_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_mongodb_logs" {
   name              = "/bianca/staging/mongodb"
-  retention_in_days = 2555  # 7 years for HIPAA compliance
+  retention_in_days = 2557  # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-mongodb-logs"
@@ -731,7 +731,7 @@ resource "aws_cloudwatch_log_group" "staging_mongodb_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_asterisk_logs" {
   name              = "/bianca/staging/asterisk"
-  retention_in_days = 2555  # 7 years for HIPAA compliance
+  retention_in_days = 2557  # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-asterisk-logs"
@@ -742,7 +742,7 @@ resource "aws_cloudwatch_log_group" "staging_asterisk_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_nginx_logs" {
   name              = "/bianca/staging/nginx"
-  retention_in_days = 2555  # 7 years for HIPAA compliance
+  retention_in_days = 2557  # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-nginx-logs"
@@ -753,7 +753,7 @@ resource "aws_cloudwatch_log_group" "staging_nginx_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_frontend_logs" {
   name              = "/bianca/staging/frontend"
-  retention_in_days = 2555  # 7 years for HIPAA compliance
+  retention_in_days = 2557  # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-frontend-logs"
