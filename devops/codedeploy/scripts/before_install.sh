@@ -6,6 +6,46 @@ set +e
 
 echo "🧹 BeforeInstall: Setting up docker-compose.yml and nginx.conf..."
 
+# Detect environment from instance Name tag
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+AWS_REGION="us-east-2"
+INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
+
+# Determine environment based on instance name
+if echo "$INSTANCE_NAME" | grep -qi "production"; then
+  ENVIRONMENT="production"
+  DEPLOY_DIR="/opt/bianca-production"
+  CONTAINER_PREFIX="production"
+  IMAGE_TAG="production"
+  NODE_ENV="production"
+  API_BASE_URL="https://api.myphonefriend.com"
+  WEBSOCKET_URL="wss://api.myphonefriend.com"
+  FRONTEND_URL="https://myphonefriend.com"
+  SERVER_NAME_FRONTEND="myphonefriend.com"
+  SERVER_NAME_API="api.myphonefriend.com"
+  YARN_COMMAND="yarn start"
+  CLOUDWATCH_LOG_PREFIX="/bianca/production"
+else
+  # Default to staging
+  ENVIRONMENT="staging"
+  DEPLOY_DIR="/opt/bianca-staging"
+  CONTAINER_PREFIX="staging"
+  IMAGE_TAG="staging"
+  NODE_ENV="staging"
+  API_BASE_URL="https://staging-api.myphonefriend.com"
+  WEBSOCKET_URL="wss://staging-api.myphonefriend.com"
+  FRONTEND_URL="https://staging.myphonefriend.com"
+  SERVER_NAME_FRONTEND="staging.myphonefriend.com"
+  SERVER_NAME_API="staging-api.myphonefriend.com"
+  YARN_COMMAND="yarn dev:staging"
+  CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+fi
+
+echo "   Detected environment: $ENVIRONMENT"
+echo "   Deployment directory: $DEPLOY_DIR"
+echo "   Container prefix: $CONTAINER_PREFIX"
+echo "   Image tag: $IMAGE_TAG"
+
 # Configure Docker log rotation to prevent disk space issues
 echo "   Configuring Docker log rotation..."
 mkdir -p /etc/docker
@@ -22,16 +62,14 @@ DOCKER_EOF
 systemctl restart docker || echo "   ⚠️  Docker restart failed, continuing..."
 
 # Ensure deployment directory exists
-mkdir -p /opt/bianca-staging
-cd /opt/bianca-staging
+mkdir -p "$DEPLOY_DIR"
+cd "$DEPLOY_DIR"
 
 # Get instance metadata
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
 # Get secrets from AWS Secrets Manager
-AWS_REGION="us-east-2"
 AWS_ACCOUNT_ID="730335291008"
 SECRET_ID="MySecretsManagerSecret"
 
@@ -91,7 +129,7 @@ version: '3.8'
 services:
   mongodb:
     image: mongo:4.4
-    container_name: staging_mongodb
+    container_name: ${CONTAINER_PREFIX}_mongodb
     restart: unless-stopped
     ports:
       - "127.0.0.1:27017:27017"
@@ -99,7 +137,7 @@ services:
     logging:
       driver: "awslogs"
       options:
-        awslogs-group: "/bianca/staging/mongodb"
+        awslogs-group: "${CLOUDWATCH_LOG_PREFIX}/mongodb"
         awslogs-region: "$AWS_REGION"
         awslogs-create-group: "true"
     volumes:
@@ -108,8 +146,8 @@ services:
       - bianca-network
 
   asterisk:
-    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-asterisk:staging
-    container_name: staging_asterisk
+    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-asterisk:${IMAGE_TAG}
+    container_name: ${CONTAINER_PREFIX}_asterisk
     restart: unless-stopped
     ports:
       - "5060:5060/udp"
@@ -119,7 +157,7 @@ services:
     logging:
       driver: "awslogs"
       options:
-        awslogs-group: "/bianca/staging/asterisk"
+        awslogs-group: "${CLOUDWATCH_LOG_PREFIX}/asterisk"
         awslogs-region: "$AWS_REGION"
         awslogs-create-group: "true"
     environment:
@@ -136,26 +174,26 @@ services:
       - bianca-network
 
   app:
-    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-backend:staging
-    container_name: staging_app
+    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-backend:${IMAGE_TAG}
+    container_name: ${CONTAINER_PREFIX}_app
     restart: unless-stopped
     ports:
       - "3000:3000"
-    command: ["yarn", "dev:staging"]
+    command: sh -c "$YARN_COMMAND"
     logging:
       driver: "awslogs"
       options:
-        awslogs-group: "/bianca/staging/app"
+        awslogs-group: "${CLOUDWATCH_LOG_PREFIX}/app"
         awslogs-region: "$AWS_REGION"
         awslogs-create-group: "true"
     environment:
       - AWS_REGION=$AWS_REGION
       - AWS_SECRET_ID=MySecretsManagerSecret
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
-      - NODE_ENV=staging
-      - API_BASE_URL=https://staging-api.myphonefriend.com
-      - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
-      - FRONTEND_URL=https://staging.myphonefriend.com
+      - NODE_ENV=$NODE_ENV
+      - API_BASE_URL=$API_BASE_URL
+      - WEBSOCKET_URL=$WEBSOCKET_URL
+      - FRONTEND_URL=$FRONTEND_URL
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=$PUBLIC_IP
@@ -165,7 +203,7 @@ services:
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
       - RTP_LISTENER_HOST=0.0.0.0
-      - RTP_BIANCA_HOST=staging_app
+      - RTP_BIANCA_HOST=${CONTAINER_PREFIX}_app
       - RTP_ASTERISK_HOST=asterisk
       - USE_PRIVATE_NETWORK_FOR_RTP=true
       - NETWORK_MODE=DOCKER_COMPOSE
@@ -181,15 +219,15 @@ services:
       - bianca-network
 
   frontend:
-    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-frontend:staging
-    container_name: staging_frontend
+    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-frontend:${IMAGE_TAG}
+    container_name: ${CONTAINER_PREFIX}_frontend
     restart: unless-stopped
     ports:
       - "3001:80"
     logging:
       driver: "awslogs"
       options:
-        awslogs-group: "/bianca/staging/frontend"
+        awslogs-group: "${CLOUDWATCH_LOG_PREFIX}/frontend"
         awslogs-region: "$AWS_REGION"
         awslogs-create-group: "true"
     depends_on:
@@ -199,14 +237,14 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: staging_nginx
+    container_name: ${CONTAINER_PREFIX}_nginx
     restart: unless-stopped
     ports:
       - "80:80"
     logging:
       driver: "awslogs"
       options:
-        awslogs-group: "/bianca/staging/nginx"
+        awslogs-group: "${CLOUDWATCH_LOG_PREFIX}/nginx"
         awslogs-region: "$AWS_REGION"
         awslogs-create-group: "true"
     volumes:
@@ -227,35 +265,35 @@ EOF
 
 # Create nginx config
 echo "   Creating nginx.conf..."
-cat > nginx.conf <<'EOF'
+cat > nginx.conf <<EOF
 server {
     listen 80;
-    server_name staging.myphonefriend.com;
+    server_name $SERVER_NAME_FRONTEND;
     
     location / {
         proxy_pass http://frontend:80;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
     }
 }
 
 server {
     listen 80;
-    server_name staging-api.myphonefriend.com;
+    server_name $SERVER_NAME_API;
     
     location / {
         proxy_pass http://app:3000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
-        proxy_cache_bypass $http_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
+        proxy_cache_bypass \$http_upgrade;
     }
 }
 EOF
