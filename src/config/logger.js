@@ -70,10 +70,9 @@ const phiRedactor = winston.format((info) => {
   const shouldRedactEmails = !(isDebugLog && isStagingOrDev);
   
   // Apply PHI redaction patterns
-  PHI_PATTERNS.forEach(({ pattern, replacement }) => {
+  PHI_PATTERNS.forEach(({ pattern, replacement, isEmail }) => {
     // Skip email redaction in debug logs for staging/development
-    // Check if this is the email pattern by checking the replacement value
-    if (!shouldRedactEmails && replacement === '[EMAIL_REDACTED]') {
+    if (!shouldRedactEmails && isEmail) {
       return; // Skip email pattern
     }
     message = message.replace(pattern, replacement);
