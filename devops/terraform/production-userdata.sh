@@ -28,6 +28,20 @@ yum update -y
 yum install -y docker
 systemctl start docker
 systemctl enable docker
+
+# Configure Docker log rotation to prevent disk space issues
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'DOCKER_EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DOCKER_EOF
+systemctl restart docker
+
 usermod -a -G docker ec2-user
 
 # Install Docker Compose
@@ -41,6 +55,50 @@ unzip awscliv2.zip
 
 # Install jq for JSON parsing
 yum install -y jq
+
+# Install CodeDeploy agent
+echo "Installing CodeDeploy agent..."
+cd /tmp
+# Use region from Terraform template variable
+REGION="${region}"
+if wget https://aws-codedeploy-$${REGION}.s3.$${REGION}.amazonaws.com/latest/install -O install; then
+    chmod +x ./install
+    if sudo ./install auto; then
+        echo "✅ CodeDeploy agent installed successfully"
+    else
+        echo "❌ ERROR: Failed to install CodeDeploy agent"
+        exit 1
+    fi
+else
+    echo "❌ ERROR: Failed to download CodeDeploy agent installer"
+    exit 1
+fi
+
+sudo systemctl enable codedeploy-agent
+if ! sudo systemctl start codedeploy-agent; then
+    echo "❌ ERROR: Failed to start CodeDeploy agent"
+    sudo systemctl status codedeploy-agent --no-pager || true
+    exit 1
+fi
+
+# Wait and verify
+sleep 10
+for i in {1..6}; do
+    if sudo systemctl is-active --quiet codedeploy-agent; then
+        echo "✅ CodeDeploy agent is running"
+        sudo systemctl status codedeploy-agent --no-pager | head -10
+        break
+    fi
+    echo "Waiting for agent to start (attempt $i/6)..."
+    sleep 5
+done
+
+if ! sudo systemctl is-active --quiet codedeploy-agent; then
+    echo "❌ WARNING: CodeDeploy agent failed to start"
+    sudo systemctl status codedeploy-agent --no-pager || true
+    sudo tail -50 /var/log/aws/codedeploy-agent/codedeploy-agent.log 2>&1 || echo "Log file not found"
+    # Don't exit - let the instance continue, but log the issue
+fi
 
 # Create application directory
 mkdir -p /opt/bianca-production

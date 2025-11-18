@@ -3,6 +3,7 @@ const dgram = require('dgram');
 const { Buffer } = require('buffer');
 const logger = require('../config/logger');
 const openAIService = require('./openai.realtime.service');
+const noiseReductionService = require('./audio/noise-reduction.service');
 
 const RTP_HEADER_MIN_LENGTH = 12;
 const MAX_PACKET_SIZE = 65507;
@@ -159,15 +160,15 @@ class RtpListener {
             }
             this.lastSequenceNumber = rtpPacket.sequenceNumber;
             
-            // Normalize audio level for better transcription in noisy environments
-            let normalizedPayload = this.normalizeAudioLevel(rtpPacket.payload);
+            // Apply noise reduction processing (Stage 1: Noise Gate)
+            const processedPayload = noiseReductionService.processAudio(rtpPacket.payload, this.callId);
             
-            // Buffer the audio payload for OpenAI
-            this.audioBuffer = Buffer.concat([this.audioBuffer, normalizedPayload]);
+            // Buffer the processed audio payload for OpenAI
+            this.audioBuffer = Buffer.concat([this.audioBuffer, processedPayload]);
             
             // Log first few packets to confirm we're receiving data
             if (this.stats.packetsReceived <= 5) {
-                logger.info(`[RTP Listener ${this.port}] Buffered ${normalizedPayload.length} bytes, total buffer: ${this.audioBuffer.length} bytes for call ${this.callId}`);
+                logger.info(`[RTP Listener ${this.port}] Buffered ${processedPayload.length} bytes, total buffer: ${this.audioBuffer.length} bytes for call ${this.callId}`);
             }
             
             // Check if we have enough audio to send (use adaptive buffer size)
@@ -193,53 +194,6 @@ class RtpListener {
         }
     }
 
-    /**
-     * Normalize audio level for better transcription in noisy environments
-     * Simple gain adjustment (0.5x-2x) for μ-law audio
-     */
-    normalizeAudioLevel(audioBuffer) {
-        if (!audioBuffer || audioBuffer.length === 0) {
-            return audioBuffer;
-        }
-        
-        // Calculate average audio level (μ-law is logarithmic)
-        let sum = 0;
-        for (let i = 0; i < audioBuffer.length; i++) {
-            // μ-law values range from 0-255, with 127 being silence
-            const sample = audioBuffer[i];
-            const distanceFromSilence = Math.abs(sample - 127);
-            sum += distanceFromSilence;
-        }
-        const avgLevel = sum / audioBuffer.length;
-        
-        // If audio is too quiet (avg < 20), increase gain
-        // If audio is too loud (avg > 80), decrease gain
-        let gain = 1.0;
-        if (avgLevel < 20) {
-            gain = 1.5; // Increase quiet audio
-        } else if (avgLevel > 80) {
-            gain = 0.7; // Decrease very loud audio
-        }
-        
-        // Apply gain (simple linear adjustment for μ-law)
-        if (gain !== 1.0) {
-            const normalized = Buffer.alloc(audioBuffer.length);
-            for (let i = 0; i < audioBuffer.length; i++) {
-                let sample = audioBuffer[i];
-                // Convert to linear, apply gain, convert back
-                // Simplified: just adjust around silence point
-                if (sample !== 127) { // Not silence
-                    const adjusted = Math.round(127 + (sample - 127) * gain);
-                    normalized[i] = Math.max(0, Math.min(255, adjusted));
-                } else {
-                    normalized[i] = sample; // Keep silence
-                }
-            }
-            return normalized;
-        }
-        
-        return audioBuffer;
-    }
 
     parseRtpPacket(buffer) {
         if (!buffer || buffer.length < RTP_HEADER_MIN_LENGTH) {

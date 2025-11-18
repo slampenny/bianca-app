@@ -97,6 +97,7 @@ rtp_symmetric=yes
 [twilio-identify]
 type=identify
 endpoint=twilio-trunk
+; Match by IP address - Twilio's SIP IP ranges
 match=54.172.60.0/23
 match=34.203.250.0/23
 match=34.216.110.128/25

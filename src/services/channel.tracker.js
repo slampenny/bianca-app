@@ -343,6 +343,16 @@ class ChannelTracker {
                 cleanupErrors.push(`RTP sender: ${err.message}`);
             }
             
+            // Step 2.5: Cleanup noise reduction service (energy history)
+            try {
+                const noiseReductionService = require('./audio/noise-reduction.service');
+                noiseReductionService.cleanupCall(primarySid);
+                logger.info(`[Tracker] Cleaned up noise reduction service for ${primarySid}`);
+            } catch (err) {
+                logger.warn(`[Tracker] Error cleaning up noise reduction service: ${err.message}`);
+                cleanupErrors.push(`Noise reduction: ${err.message}`);
+            }
+            
             // Step 3: Disconnect OpenAI service
             try {
                 const openAIService = require('./openai.realtime.service');

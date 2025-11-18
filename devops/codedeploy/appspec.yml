@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /opt/bianca-staging
+    destination: /opt/bianca-deployment
 hooks:
   BeforeInstall:
     - location: scripts/before_install.sh

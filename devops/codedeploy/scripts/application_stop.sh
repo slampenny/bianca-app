@@ -6,9 +6,23 @@ set +e  # Don't exit on errors
 
 echo "🛑 ApplicationStop: Stopping old containers..."
 
+# Detect environment from instance Name tag
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+AWS_REGION="us-east-2"
+INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
+
+# Determine environment based on instance name
+if echo "$INSTANCE_NAME" | grep -qi "production"; then
+  DEPLOY_DIR="/opt/bianca-production"
+  CONTAINER_PREFIX="production"
+else
+  DEPLOY_DIR="/opt/bianca-staging"
+  CONTAINER_PREFIX="staging"
+fi
+
 # Change to deployment directory
-if ! cd /opt/bianca-staging 2>/dev/null; then
-  echo "   ⚠️  /opt/bianca-staging not found, nothing to stop"
+if ! cd "$DEPLOY_DIR" 2>/dev/null; then
+  echo "   ⚠️  $DEPLOY_DIR not found, nothing to stop"
   exit 0
 fi
 
@@ -33,7 +47,7 @@ if [ -f "docker-compose.yml" ] && command -v docker-compose >/dev/null 2>&1; the
 else
   echo "   docker-compose.yml not found or docker-compose not available, stopping individual containers..."
   # Fallback: stop individual containers
-  CONTAINERS="staging_app staging_frontend staging_nginx staging_mongodb staging_asterisk staging_posthog staging_posthog_db staging_posthog_redis"
+  CONTAINERS="${CONTAINER_PREFIX}_app ${CONTAINER_PREFIX}_frontend ${CONTAINER_PREFIX}_nginx ${CONTAINER_PREFIX}_mongodb ${CONTAINER_PREFIX}_asterisk ${CONTAINER_PREFIX}_posthog ${CONTAINER_PREFIX}_posthog_db ${CONTAINER_PREFIX}_posthog_redis"
   
   for container in $CONTAINERS; do
     # Check if container exists before trying to stop it
