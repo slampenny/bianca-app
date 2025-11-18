@@ -506,7 +506,7 @@ resource "aws_route53_record" "production_sip" {
 # Production CloudWatch Log Groups for HIPAA Compliance (7-year retention)
 resource "aws_cloudwatch_log_group" "production_app_logs" {
   name              = "/bianca/production/app"
-  retention_in_days = 2555  # 7 years for HIPAA compliance (§164.316(b)(2)(i))
+  retention_in_days = 2557  # 7 years for HIPAA compliance (§164.316(b)(2)(i)) - closest valid value
 
   tags = {
     Name        = "bianca-production-app-logs"
