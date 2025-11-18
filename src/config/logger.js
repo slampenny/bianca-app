@@ -62,7 +62,11 @@ const phiRedactor = winston.format((info) => {
   
   // In staging/development, don't redact emails in debug logs for troubleshooting
   const isDebugLog = info.level === 'debug';
-  const isStagingOrDev = process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'development';
+  // Check NODE_ENV or fallback to checking if we're in staging based on other indicators
+  const nodeEnv = process.env.NODE_ENV || '';
+  const isStagingOrDev = nodeEnv === 'staging' || nodeEnv === 'development' || 
+                         process.env.API_BASE_URL?.includes('staging') ||
+                         process.env.FRONTEND_URL?.includes('staging');
   const shouldRedactEmails = !(isDebugLog && isStagingOrDev);
   
   // Apply PHI redaction patterns
