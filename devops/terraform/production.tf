@@ -237,7 +237,7 @@ resource "aws_launch_template" "production" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size = 20  # Same as staging for cost optimization
+      volume_size = 50  # Increased from 20GB to 50GB to prevent disk space issues
       volume_type = "gp3"
     }
   }
@@ -246,7 +246,7 @@ resource "aws_launch_template" "production" {
     region         = var.aws_region
     aws_account_id = var.aws_account_id
     environment    = "production"
-    eip_address    = aws_eip.production.public_ip  # Pass EIP so it's always correct
+    eip_address    = aws_eip.production.public_ip
   }))
 
   # Force recreation when userdata changes
@@ -503,13 +503,59 @@ resource "aws_route53_record" "production_sip" {
   }
 }
 
-# Production CloudWatch Log Group
-resource "aws_cloudwatch_log_group" "production_logs" {
-  name              = "/bianca/production"
-  retention_in_days = 30  # Longer retention for production
+# Production CloudWatch Log Groups for HIPAA Compliance (7-year retention)
+resource "aws_cloudwatch_log_group" "production_app_logs" {
+  name              = "/bianca/production/app"
+  retention_in_days = 2557  # 7 years for HIPAA compliance (§164.316(b)(2)(i)) - closest valid value
 
   tags = {
+    Name        = "bianca-production-app-logs"
     Environment = "production"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "production_mongodb_logs" {
+  name              = "/bianca/production/mongodb"
+  retention_in_days = 2557  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-production-mongodb-logs"
+    Environment = "production"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "production_asterisk_logs" {
+  name              = "/bianca/production/asterisk"
+  retention_in_days = 2557  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-production-asterisk-logs"
+    Environment = "production"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "production_nginx_logs" {
+  name              = "/bianca/production/nginx"
+  retention_in_days = 2557  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-production-nginx-logs"
+    Environment = "production"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "production_frontend_logs" {
+  name              = "/bianca/production/frontend"
+  retention_in_days = 2557  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-production-frontend-logs"
+    Environment = "production"
+    HIPAA       = "true"
   }
 }
 
