@@ -3,7 +3,7 @@ import { Modal, View, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Tex
 import { LoginForm } from "../components/LoginForm"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "../store/authSlice"
-import { setShowAuthModalCallback, notifyAuthSuccess, notifyAuthCancelled } from "../services/api/baseQueryWithAuth"
+import { setShowAuthModalCallback, notifyAuthSuccess, notifyAuthCancelled, getInitialErrorMessage, clearInitialErrorMessage } from "../services/api/baseQueryWithAuth"
 import { useTheme } from "../theme/ThemeContext"
 import type { ThemeColors } from "../types"
 import { useToast } from "../hooks/useToast"
@@ -31,6 +31,7 @@ interface AuthModalProviderProps {
 
 export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }) => {
   const [isVisible, setIsVisible] = useState(false)
+  const [initialErrorMessage, setInitialErrorMessage] = useState<string | null>(null)
   const isAuthenticatedUser = useSelector(isAuthenticated)
   const { colors } = useTheme()
   const { toast, showError, hideToast } = useToast()
@@ -39,14 +40,26 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   const wasAuthenticatedRef = React.useRef(isAuthenticatedUser)
   const modalWasExplicitlyOpenedRef = React.useRef(false)
 
-  const showAuthModal = useCallback(() => {
+  const showAuthModal = useCallback((errorMessage?: string) => {
     setIsVisible(true)
     modalWasExplicitlyOpenedRef.current = true
+    // Store the initial error message that triggered the modal
+    if (errorMessage) {
+      setInitialErrorMessage(errorMessage)
+    } else {
+      // If no error message provided, try to get it from baseQueryWithAuth
+      const storedMessage = getInitialErrorMessage()
+      if (storedMessage) {
+        setInitialErrorMessage(storedMessage)
+      }
+    }
   }, [])
 
   const hideAuthModal = useCallback(() => {
     setIsVisible(false)
     modalWasExplicitlyOpenedRef.current = false
+    setInitialErrorMessage(null)
+    clearInitialErrorMessage()
     notifyAuthCancelled()
   }, [])
 
@@ -73,6 +86,8 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
       // User logged in successfully - close modal and retry pending requests
       setIsVisible(false)
       modalWasExplicitlyOpenedRef.current = false
+      setInitialErrorMessage(null)
+      clearInitialErrorMessage()
       
       // Force a small delay to ensure state is fully updated
       setTimeout(() => {
@@ -124,6 +139,7 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
                   showSSOButtons={true}
                   compact={true}
                   onError={showError}
+                  initialErrorMessage={initialErrorMessage}
                 />
               </ScrollView>
             </Pressable>

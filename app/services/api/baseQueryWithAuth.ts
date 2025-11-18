@@ -3,7 +3,7 @@ import { DEFAULT_API_CONFIG } from "./api"
 import { RootState } from "../../store/store"
 
 // Event emitter for auth modal - we'll use a simple callback pattern
-let showAuthModalCallback: (() => void) | null = null
+let showAuthModalCallback: ((initialErrorMessage?: string) => void) | null = null
 
 interface PendingRequest {
   args: string | FetchArgs
@@ -15,9 +15,18 @@ interface PendingRequest {
 
 let pendingRequests: PendingRequest[] = []
 let isAuthModalShowing = false
+let initialErrorMessage: string | null = null
 
-export function setShowAuthModalCallback(callback: (() => void) | null) {
+export function setShowAuthModalCallback(callback: ((initialErrorMessage?: string) => void) | null) {
   showAuthModalCallback = callback
+}
+
+export function getInitialErrorMessage(): string | null {
+  return initialErrorMessage
+}
+
+export function clearInitialErrorMessage() {
+  initialErrorMessage = null
 }
 
 export function notifyAuthSuccess() {
@@ -25,6 +34,7 @@ export function notifyAuthSuccess() {
   const requests = [...pendingRequests]
   pendingRequests = []
   isAuthModalShowing = false
+  clearInitialErrorMessage()
   
   // Use setTimeout to ensure this happens after auth state is updated
   setTimeout(() => {
@@ -55,6 +65,7 @@ export function notifyAuthCancelled() {
   const requests = [...pendingRequests]
   pendingRequests = []
   isAuthModalShowing = false
+  clearInitialErrorMessage()
   
   requests.forEach(({ reject }) => {
     reject({ error: { status: 'CUSTOM_ERROR', error: 'Authentication cancelled' } })
@@ -80,12 +91,33 @@ function baseQueryWithReauth(
     let result = await baseQuery(args, api, extraOptions)
 
     // If we get a 401, show the login modal
+    // BUT: Don't intercept 401s from the login endpoint itself (those are invalid credentials, not expired tokens)
     if (result.error && result.error.status === 401) {
+      // Check if this is the login endpoint - if so, don't intercept (let the error propagate)
+      const url = typeof args === 'string' ? args : (args as FetchArgs).url || ''
+      const isLoginEndpoint = url.includes('/auth/login') || url.includes('/v1/auth/login')
+      
+      if (isLoginEndpoint) {
+        // Login endpoint 401 = invalid credentials, not expired token
+        // Let the error propagate so LoginForm can handle it
+        return result
+      }
+      
+      // Extract error message from the 401 response
+      const errorMessage = 
+        (result.error.data && typeof result.error.data === 'object' && 'message' in result.error.data)
+          ? String(result.error.data.message)
+          : (result.error.data && typeof result.error.data === 'string')
+          ? result.error.data
+          : 'Your session has expired. Please sign in again.'
+      
       // Only show modal if callback is set (modal is ready)
       if (showAuthModalCallback && !isAuthModalShowing) {
         isAuthModalShowing = true
-        // Show the modal immediately
-        showAuthModalCallback()
+        // Store the initial error message
+        initialErrorMessage = errorMessage
+        // Show the modal immediately with the error message
+        showAuthModalCallback(errorMessage)
         
         // Return a promise that will resolve when auth succeeds
         return new Promise((resolve, reject) => {
@@ -94,6 +126,7 @@ function baseQueryWithReauth(
         })
       } else if (isAuthModalShowing) {
         // Modal is already showing, just queue this request
+        // Don't update the initial error message - keep the original one
         return new Promise((resolve, reject) => {
           pendingRequests.push({ args, api, extraOptions, resolve, reject })
         })

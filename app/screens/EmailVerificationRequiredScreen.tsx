@@ -89,6 +89,7 @@ export const EmailVerificationRequiredScreen = () => {
   const [errorMessage, setErrorMessage] = useState("")
   const { colors, isLoading: themeLoading } = useTheme()
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isResendingRef = useRef(false) // Prevent duplicate button clicks
 
   useEffect(() => {
     // Set email from route params or Redux if not already set
@@ -116,6 +117,12 @@ export const EmailVerificationRequiredScreen = () => {
   const styles = createStyles(colors)
 
   const handleResendEmail = async () => {
+    // Prevent duplicate clicks - if already processing, ignore
+    if (isResendingRef.current || isLoading) {
+      logger.debug("Resend already in progress, ignoring duplicate click")
+      return
+    }
+
     // Clear previous error and success messages
     setErrorMessage("")
     setEmailSent(false)
@@ -124,6 +131,9 @@ export const EmailVerificationRequiredScreen = () => {
       setErrorMessage(translate("emailVerificationScreen.errorNoEmail"))
       return
     }
+
+    // Mark as processing
+    isResendingRef.current = true
 
     try {
       logger.debug("Attempting to resend verification email to:", email.trim())
@@ -154,6 +164,9 @@ export const EmailVerificationRequiredScreen = () => {
       const errorMsg = error?.data?.message || error?.message || translate("emailVerificationScreen.errorSendFailed")
       setErrorMessage(errorMsg)
       setEmailSent(false) // Clear success state if error occurs
+    } finally {
+      // Always reset the processing flag
+      isResendingRef.current = false
     }
   }
 
@@ -205,7 +218,7 @@ export const EmailVerificationRequiredScreen = () => {
             title={translate("emailVerificationScreen.resendButton")}
             onPress={handleResendEmail}
             loading={isLoading}
-            disabled={!email.trim()}
+            disabled={!email.trim() || isLoading}
             testID="resend-verification-button"
           />
           

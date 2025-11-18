@@ -39,6 +39,7 @@ interface LoginFormProps {
   showSSOButtons?: boolean
   compact?: boolean // If true, hide header and some buttons for modal use
   onError?: (message: string) => void // Callback to show error in parent (e.g., modal toast)
+  initialErrorMessage?: string | null // Initial error message to display (e.g., from 401 that triggered modal)
 }
 
 export const LoginForm: FC<LoginFormProps> = ({
@@ -53,6 +54,7 @@ export const LoginForm: FC<LoginFormProps> = ({
   showSSOButtons = true,
   compact = false,
   onError,
+  initialErrorMessage,
 }) => {
   const dispatch = useDispatch()
   // Get auth modal context to close modal after successful login (if available)
@@ -73,8 +75,15 @@ export const LoginForm: FC<LoginFormProps> = ({
 
   const [authPassword, setAuthPassword] = useState("")
   const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true)
-  const [errorMessage, setErrorMessage] = useState("")
+  const [errorMessage, setErrorMessage] = useState(initialErrorMessage || "")
   const [isLoading, setIsLoading] = useState(false)
+
+  // Update error message when initialErrorMessage changes (e.g., modal opens with error)
+  useEffect(() => {
+    if (initialErrorMessage) {
+      setErrorMessage(initialErrorMessage)
+    }
+  }, [initialErrorMessage])
 
   useEffect(() => {
     // No default credentials for production
@@ -343,6 +352,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
         editable={true}
+        disabled={false}
       />
       <TextField
         testID="password-input"
@@ -361,6 +371,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
         editable={true}
+        disabled={false}
       />
       
       {/* Error message displayed above login button */}

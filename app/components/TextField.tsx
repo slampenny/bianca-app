@@ -66,6 +66,8 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
 
   const { colors: themeColors } = useTheme()
   const input = useRef<TextInput>(null)
+  // IMPORTANT: Only "disabled" status disables the input, NOT "error" status
+  // Error status is purely visual (red border) and should never make inputs uneditable
   const disabled = TextInputProps.editable === false || status === "disabled"
   const placeholderContent = placeholderTx
     ? translate(placeholderTx, placeholderTxOptions)

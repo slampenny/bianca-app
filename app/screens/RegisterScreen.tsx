@@ -286,6 +286,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
             }}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={true}
             status={emailError ? "error" : undefined}
             helper={emailError || undefined}
           />
@@ -303,9 +304,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
               setPhone(text)
               clearFieldError("phone")
             }}
+            editable={true}
+            disabled={false}
             status={phoneError ? "error" : undefined}
             helper={phoneError || undefined}
-            editable={true}
           />
           {/* {phoneError ? <Text style={styles.fieldErrorText}>{phoneError}</Text> : null} */}
         </View>
@@ -366,6 +368,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           accessibilityLabel="register-submit"
           onPress={handleRegister}
           disabled={isLoading}
+          loading={isLoading}
           tx="registerScreen.title"
           preset="primary"
           style={styles.registerButton}
