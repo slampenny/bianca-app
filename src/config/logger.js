@@ -68,7 +68,8 @@ const phiRedactor = winston.format((info) => {
   // Apply PHI redaction patterns
   PHI_PATTERNS.forEach(({ pattern, replacement }) => {
     // Skip email redaction in debug logs for staging/development
-    if (!shouldRedactEmails && pattern.source.includes('@')) {
+    // Check if this is the email pattern by checking the replacement value
+    if (!shouldRedactEmails && replacement === '[EMAIL_REDACTED]') {
       return; // Skip email pattern
     }
     message = message.replace(pattern, replacement);
