@@ -699,3 +699,63 @@ output "staging_frontend_s3_bucket" {
   value = aws_s3_bucket.staging_frontend.bucket
   description = "Staging frontend S3 bucket name"
 }
+
+################################################################################
+# CloudWatch Log Groups for HIPAA Compliance (7-year retention)
+################################################################################
+
+# Staging application logs (Docker containers)
+resource "aws_cloudwatch_log_group" "staging_app_logs" {
+  name              = "/bianca/staging/app"
+  retention_in_days = 2555  # 7 years for HIPAA compliance (§164.316(b)(2)(i))
+
+  tags = {
+    Name        = "bianca-staging-app-logs"
+    Environment = "staging"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "staging_mongodb_logs" {
+  name              = "/bianca/staging/mongodb"
+  retention_in_days = 2555  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-staging-mongodb-logs"
+    Environment = "staging"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "staging_asterisk_logs" {
+  name              = "/bianca/staging/asterisk"
+  retention_in_days = 2555  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-staging-asterisk-logs"
+    Environment = "staging"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "staging_nginx_logs" {
+  name              = "/bianca/staging/nginx"
+  retention_in_days = 2555  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-staging-nginx-logs"
+    Environment = "staging"
+    HIPAA       = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "staging_frontend_logs" {
+  name              = "/bianca/staging/frontend"
+  retention_in_days = 2555  # 7 years for HIPAA compliance
+
+  tags = {
+    Name        = "bianca-staging-frontend-logs"
+    Environment = "staging"
+    HIPAA       = "true"
+  }
+}

@@ -96,6 +96,12 @@ services:
     ports:
       - "127.0.0.1:27017:27017"
     command: mongod --wiredTigerCacheSizeGB 0.5
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/bianca/staging/mongodb"
+        awslogs-region: "$AWS_REGION"
+        awslogs-stream-prefix: "mongodb"
     volumes:
       - /opt/mongodb-data:/data/db
     networks:
@@ -110,6 +116,12 @@ services:
       - "5061:5061/tcp"
       - "10000-10100:10000-10100/udp"
       - "8088:8088"
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/bianca/staging/asterisk"
+        awslogs-region: "$AWS_REGION"
+        awslogs-stream-prefix: "asterisk"
     environment:
       - EXTERNAL_ADDRESS=$PUBLIC_IP
       - PRIVATE_ADDRESS=$PRIVATE_IP
@@ -130,6 +142,12 @@ services:
     ports:
       - "3000:3000"
     command: ["yarn", "dev:staging"]
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/bianca/staging/app"
+        awslogs-region: "$AWS_REGION"
+        awslogs-stream-prefix: "app"
     environment:
       - AWS_REGION=$AWS_REGION
       - AWS_SECRET_ID=MySecretsManagerSecret
@@ -168,6 +186,12 @@ services:
     restart: unless-stopped
     ports:
       - "3001:80"
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/bianca/staging/frontend"
+        awslogs-region: "$AWS_REGION"
+        awslogs-stream-prefix: "frontend"
     depends_on:
       - app
     networks:
@@ -179,6 +203,12 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/bianca/staging/nginx"
+        awslogs-region: "$AWS_REGION"
+        awslogs-stream-prefix: "nginx"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
