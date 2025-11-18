@@ -90,12 +90,24 @@ const login = catchAsync(async (req, res, next) => {
 
     // Step 1.5: Check email verification status
     if (!caregiver.isEmailVerified) {
-      // Send verification email if not already sent recently
-      try {
-        const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
-      } catch (emailError) {
-        console.error('Failed to resend verification email:', emailError);
+      // Send verification email if not already sent recently (within last 60 seconds)
+      // This prevents duplicate emails if user tries to login immediately after registration
+      const recentToken = await Token.findOne({
+        caregiver: caregiver.id,
+        type: tokenTypes.VERIFY_EMAIL,
+        blacklisted: false,
+        createdAt: { $gte: new Date(Date.now() - 60 * 1000) } // Within last 60 seconds
+      }).sort({ createdAt: -1 });
+      
+      if (!recentToken) {
+        try {
+          const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+          await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
+        } catch (emailError) {
+          console.error('Failed to resend verification email:', emailError);
+        }
+      } else {
+        logger.debug(`Verification email sent recently for ${email}, skipping duplicate send during login`);
       }
       
       throw new ApiError(httpStatus.FORBIDDEN, 'Please verify your email before logging in. A verification email has been sent.');
@@ -330,6 +342,22 @@ const resendVerificationEmail = catchAsync(async (req, res) => {
   // Check if already verified
   if (caregiver.isEmailVerified) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email is already verified');
+  }
+  
+  // Check if a verification email was sent recently (within last 60 seconds)
+  // This prevents duplicate emails if user clicks resend too quickly
+  const recentToken = await Token.findOne({
+    caregiver: caregiver.id,
+    type: tokenTypes.VERIFY_EMAIL,
+    blacklisted: false,
+    createdAt: { $gte: new Date(Date.now() - 60 * 1000) } // Within last 60 seconds
+  }).sort({ createdAt: -1 });
+  
+  if (recentToken) {
+    logger.debug(`Verification email sent recently for ${email}, skipping duplicate send`);
+    return res.status(httpStatus.OK).send({ 
+      message: 'Verification email was sent recently. Please check your inbox and wait a moment before requesting another.' 
+    });
   }
   
   // Generate and send new verification token
