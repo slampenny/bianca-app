@@ -5,6 +5,16 @@ set -e
 
 echo "📥 AfterInstall: Pulling Docker images and preparing deployment..."
 
+# Clean up Docker to free up space before pulling new images
+echo "   Cleaning up Docker (removing unused images, containers, volumes)..."
+docker system prune -af --volumes || {
+  echo "⚠️  Docker cleanup had some issues, but continuing..."
+}
+
+# Check available disk space
+AVAILABLE_SPACE=$(df -h / | awk 'NR==2 {print $4}' | sed 's/G//')
+echo "   Available disk space: ${AVAILABLE_SPACE}G"
+
 # Login to ECR if needed
 ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
 if [ ! -f "$ECR_TOKEN_FILE" ]; then
