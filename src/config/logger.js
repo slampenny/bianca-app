@@ -11,8 +11,8 @@ const winston = require('winston');
 
 // PHI Redaction Patterns
 const PHI_PATTERNS = [
-  // Email addresses
-  { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, replacement: '[EMAIL_REDACTED]' },
+  // Email addresses (marked so we can skip in debug logs for staging/dev)
+  { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, replacement: '[EMAIL_REDACTED]', isEmail: true },
   
   // Phone numbers (various formats)
   { pattern: /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, replacement: '[PHONE_REDACTED]' },
