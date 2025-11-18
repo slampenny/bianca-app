@@ -90,7 +90,8 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
       ? translate(placeholderTx, placeholderTxOptions)
       : placeholder
     
-    const isEditable = editable !== false && !disabled
+    // Check all conditions that would make the input uneditable
+    const isEditable = editable !== false && !disabled && status !== 'disabled'
     
     const inputWrapperStyles = [
       {
