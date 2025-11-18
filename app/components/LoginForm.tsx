@@ -343,6 +343,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
         editable={true}
+        disabled={false}
       />
       <TextField
         testID="password-input"
@@ -361,6 +362,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
         editable={true}
+        disabled={false}
       />
       
       {/* Error message displayed above login button */}
