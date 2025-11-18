@@ -185,11 +185,6 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   }, [shouldRegister]) // Dependencies adjusted - removed state variables causing potential extra runs
 
   const handleRegister = () => {
-    // Prevent duplicate clicks - if already loading or shouldRegister is true, ignore
-    if (isLoading || shouldRegister) {
-      logger.debug("Registration already in progress, ignoring duplicate click")
-      return
-    }
     setGeneralError("") // Clear previous general errors before attempting registration
     setShouldRegister(true) // Trigger the useEffect hook
   }
