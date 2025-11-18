@@ -54,19 +54,29 @@ const PHI_PATTERNS = [
 
 /**
  * Custom Winston format for PHI redaction
+ * In staging/development, debug logs don't redact emails for troubleshooting
  */
 const phiRedactor = winston.format((info) => {
   // Convert message to string if it's an object
   let message = typeof info.message === 'string' ? info.message : JSON.stringify(info.message);
   
-  // Apply all PHI redaction patterns
+  // In staging/development, don't redact emails in debug logs for troubleshooting
+  const isDebugLog = info.level === 'debug';
+  const isStagingOrDev = process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'development';
+  const shouldRedactEmails = !(isDebugLog && isStagingOrDev);
+  
+  // Apply PHI redaction patterns
   PHI_PATTERNS.forEach(({ pattern, replacement }) => {
+    // Skip email redaction in debug logs for staging/development
+    if (!shouldRedactEmails && pattern.source.includes('@')) {
+      return; // Skip email pattern
+    }
     message = message.replace(pattern, replacement);
   });
   
   // Redact any remaining sensitive data in metadata
   if (info.meta && typeof info.meta === 'object') {
-    info.meta = redactObject(info.meta);
+    info.meta = redactObject(info.meta, shouldRedactEmails);
   }
   
   info.message = message;
@@ -75,19 +85,26 @@ const phiRedactor = winston.format((info) => {
 
 /**
  * Recursively redact sensitive fields from objects
+ * @param {Object} obj - Object to redact
+ * @param {boolean} shouldRedactEmails - Whether to redact emails (false for debug logs in staging/dev)
  */
-function redactObject(obj) {
+function redactObject(obj, shouldRedactEmails = true) {
   if (typeof obj !== 'object' || obj === null) {
     return obj;
   }
   
   const redacted = Array.isArray(obj) ? [] : {};
   const sensitiveFields = [
-    'email', 'phone', 'phoneNumber', 'ssn', 'dateOfBirth', 'dob',
+    'phone', 'phoneNumber', 'ssn', 'dateOfBirth', 'dob',
     'address', 'medicalRecordNumber', 'diagnosis', 'medication',
     'symptoms', 'transcript', 'transcription', 'text', 'password',
     'token', 'secret', 'apiKey'
   ];
+  
+  // Add email to sensitive fields only if we should redact emails
+  if (shouldRedactEmails) {
+    sensitiveFields.push('email');
+  }
   
   for (const key in obj) {
     if (obj.hasOwnProperty(key)) {
@@ -97,7 +114,7 @@ function redactObject(obj) {
       }
       // Recursively redact nested objects
       else if (typeof obj[key] === 'object' && obj[key] !== null) {
-        redacted[key] = redactObject(obj[key]);
+        redacted[key] = redactObject(obj[key], shouldRedactEmails);
       }
       // Keep other values
       else {
