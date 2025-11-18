@@ -101,7 +101,7 @@ services:
       options:
         awslogs-group: "/bianca/staging/mongodb"
         awslogs-region: "$AWS_REGION"
-        awslogs-stream-prefix: "mongodb"
+        awslogs-create-group: "true"
     volumes:
       - /opt/mongodb-data:/data/db
     networks:
@@ -121,7 +121,7 @@ services:
       options:
         awslogs-group: "/bianca/staging/asterisk"
         awslogs-region: "$AWS_REGION"
-        awslogs-stream-prefix: "asterisk"
+        awslogs-create-group: "true"
     environment:
       - EXTERNAL_ADDRESS=$PUBLIC_IP
       - PRIVATE_ADDRESS=$PRIVATE_IP
@@ -147,7 +147,7 @@ services:
       options:
         awslogs-group: "/bianca/staging/app"
         awslogs-region: "$AWS_REGION"
-        awslogs-stream-prefix: "app"
+        awslogs-create-group: "true"
     environment:
       - AWS_REGION=$AWS_REGION
       - AWS_SECRET_ID=MySecretsManagerSecret
@@ -191,7 +191,7 @@ services:
       options:
         awslogs-group: "/bianca/staging/frontend"
         awslogs-region: "$AWS_REGION"
-        awslogs-stream-prefix: "frontend"
+        awslogs-create-group: "true"
     depends_on:
       - app
     networks:
@@ -208,7 +208,7 @@ services:
       options:
         awslogs-group: "/bianca/staging/nginx"
         awslogs-region: "$AWS_REGION"
-        awslogs-stream-prefix: "nginx"
+        awslogs-create-group: "true"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
