@@ -366,6 +366,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           accessibilityLabel="register-submit"
           onPress={handleRegister}
           disabled={isLoading}
+          loading={isLoading}
           tx="registerScreen.title"
           preset="primary"
           style={styles.registerButton}
