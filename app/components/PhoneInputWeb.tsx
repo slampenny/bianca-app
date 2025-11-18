@@ -90,6 +90,8 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
       ? translate(placeholderTx, placeholderTxOptions)
       : placeholder
     
+    // IMPORTANT: Only "disabled" status disables the input, NOT "error" status
+    // Error status is purely visual (red border) and should never make inputs uneditable
     // Check all conditions that would make the input uneditable
     const isEditable = editable !== false && !disabled && status !== 'disabled'
     
