@@ -219,10 +219,12 @@ resource "aws_iam_role_policy" "staging_instance_policy" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret",
           
-          # CloudWatch Logs
+          # CloudWatch Logs (HIPAA-compliant 7-year retention)
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
           
           # SES permissions
           "ses:GetSendQuota",
@@ -707,7 +709,7 @@ output "staging_frontend_s3_bucket" {
 # Staging application logs (Docker containers)
 resource "aws_cloudwatch_log_group" "staging_app_logs" {
   name              = "/bianca/staging/app"
-  retention_in_days = 2555  # 7 years for HIPAA compliance (§164.316(b)(2)(i))
+  retention_in_days = 2557  # 7 years for HIPAA compliance (§164.316(b)(2)(i)) - closest valid value
 
   tags = {
     Name        = "bianca-staging-app-logs"
@@ -758,4 +760,44 @@ resource "aws_cloudwatch_log_group" "staging_frontend_logs" {
     Environment = "staging"
     HIPAA       = "true"
   }
+}
+
+################################################################################
+# SES Bounce/Complaint Notifications (SNS)
+################################################################################
+
+# SNS Topic for SES bounce and complaint notifications
+resource "aws_sns_topic" "ses_bounce_complaint_notifications" {
+  name = "bianca-staging-ses-bounce-complaint"
+
+  tags = {
+    Name        = "bianca-staging-ses-bounce-complaint"
+    Environment = "staging"
+    Purpose     = "SES bounce and complaint notifications"
+  }
+}
+
+# Subscribe email address to receive bounce/complaint notifications
+resource "aws_sns_topic_subscription" "ses_bounce_complaint_email" {
+  topic_arn = aws_sns_topic.ses_bounce_complaint_notifications.arn
+  protocol  = "email"
+  endpoint  = "jlapp@biancatechnologies.com"  # Change this to your monitoring email
+
+  # Note: AWS will send a confirmation email that must be clicked
+}
+
+# Configure SES to send bounce notifications to SNS
+resource "aws_ses_identity_notification_topic" "bounce_notification" {
+  topic_arn                = aws_sns_topic.ses_bounce_complaint_notifications.arn
+  notification_type        = "Bounce"
+  identity                 = "myphonefriend.com"
+  include_original_headers = true
+}
+
+# Configure SES to send complaint notifications to SNS
+resource "aws_ses_identity_notification_topic" "complaint_notification" {
+  topic_arn                = aws_sns_topic.ses_bounce_complaint_notifications.arn
+  notification_type        = "Complaint"
+  identity                 = "myphonefriend.com"
+  include_original_headers = true
 }
