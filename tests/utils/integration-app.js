@@ -31,6 +31,7 @@ const fraudAbuseAnalysisRoute = require('../../src/routes/v1/fraudAbuseAnalysis.
 const telemetryRoute = require('../../src/routes/v1/telemetry.route');
 const emergencyPhraseRoute = require('../../src/routes/v1/emergencyPhrase.route');
 const mfaRoute = require('../../src/routes/v1/mfa.route');
+const phoneVerificationRoute = require('../../src/routes/v1/phoneVerification.route');
 // const testRoute = require('../../src/routes/v1/test.route'); // Skip test route to avoid timeout issues
 
 const app = express();
@@ -101,6 +102,7 @@ router.use('/fraud-abuse-analysis', fraudAbuseAnalysisRoute);
 router.use('/telemetry', telemetryRoute);
 router.use('/emergency-phrases', emergencyPhraseRoute);
 router.use('/mfa', mfaRoute);
+router.use('/phone-verification', phoneVerificationRoute);
 // router.use('/test', testRoute); // Skip test route to avoid timeout issues
 
 app.use('/v1', router);

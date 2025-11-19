@@ -51,6 +51,7 @@ module.exports.localizedEmergencyDetector = require('./localizedEmergencyDetecto
 // Storage Services
 module.exports.s3Service = require('./s3.service');
 module.exports.snsService = require('./sns.service');
+module.exports.smsVerificationService = require('./smsVerification.service');
 
 // Other Services
 module.exports.channelTracker = require('./channel.tracker');
