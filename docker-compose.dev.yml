@@ -11,7 +11,7 @@ services:
       - .env
     environment:
       - NODE_ENV=development
-      - USE_SES_IN_DEV=${USE_SES_IN_DEV:-true}
+      - USE_SES_IN_DEV=${USE_SES_IN_DEV:-false}  # Default to Ethereal for local dev (set to true if you want SES)
       - AWS_PROFILE=${AWS_PROFILE:-jordan}
       - AWS_REGION=${AWS_REGION:-us-east-2}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8081}

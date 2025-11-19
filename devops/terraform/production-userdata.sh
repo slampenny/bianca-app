@@ -56,6 +56,10 @@ unzip awscliv2.zip
 # Install jq for JSON parsing
 yum install -y jq
 
+# Install Ruby (required for CodeDeploy agent installer)
+echo "Installing Ruby (required for CodeDeploy agent)..."
+yum install -y ruby
+
 # Install CodeDeploy agent
 echo "Installing CodeDeploy agent..."
 cd /tmp

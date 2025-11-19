@@ -63,6 +63,21 @@ router.get('/service-status', auth(), async (req, res) => {
     },
   };
 
+  // Check email service status
+  try {
+    const emailService = require('../../services/email.service');
+    const emailStatus = emailService.getStatus();
+    serviceStatus.services.email = {
+      initialized: emailStatus.initialized,
+      hasTransport: emailStatus.hasTransport,
+      environment: emailStatus.environment,
+      etherealAvailable: !!emailStatus.etherealAccount,
+      fromAddress: emailStatus.fromAddress,
+    };
+  } catch (err) {
+    serviceStatus.services.email = { error: err.message };
+  }
+
   // Check connections if services are loaded
   if (ariClient) {
     try {
@@ -89,10 +104,10 @@ router.get('/service-status', auth(), async (req, res) => {
   }
 
   // Overall health
-  const failedServices = Object.values(serviceStatus.services).filter((s) => !s.loaded).length;
+  const failedServices = Object.values(serviceStatus.services).filter((s) => !s.loaded || s.error).length;
   serviceStatus.health = {
-    totalServices: 3,
-    loadedServices: 3 - failedServices,
+    totalServices: 4,
+    loadedServices: 4 - failedServices,
     failedServices: failedServices,
     overallHealth: failedServices === 0 ? 'HEALTHY' : 'DEGRADED',
   };
