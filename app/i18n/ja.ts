@@ -157,6 +157,11 @@ const ja: Translations = {
     message: "My Phone Friendアカウントが正常に認証されました。",
     redirecting: "アプリにリダイレクトしています...",
   },
+  phoneVerificationBanner: {
+    title: "電話番号を確認してください",
+    message: "緊急アラートと重要な通知を受信するには、電話番号を確認してください。",
+    verifyButton: "今すぐ確認",
+  },
   conversationsScreen: {
     title: "会話",
     yesterday: "昨日",

@@ -183,6 +183,11 @@ const fr: Translations = {
     message: "Votre compte My Phone Friend a été vérifié avec succès.",
     redirecting: "Redirection vers l'application...",
   },
+  phoneVerificationBanner: {
+    title: "Vérifiez votre numéro de téléphone",
+    message: "Veuillez vérifier votre numéro de téléphone pour recevoir des alertes d'urgence et des notifications importantes.",
+    verifyButton: "Vérifier maintenant",
+  },
   ssoLinkingScreen: {
     title: "Lier votre compte",
     message: "Ce compte a été créé avec {{provider}}. Pour utiliser la connexion par e-mail/mot de passe, veuillez définir un mot de passe ci-dessous, ou continuez avec {{provider}}.",

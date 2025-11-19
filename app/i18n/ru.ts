@@ -157,6 +157,11 @@ const ru: Translations = {
     message: "Ваша учетная запись My Phone Friend была успешно подтверждена.",
     redirecting: "Перенаправление в приложение...",
   },
+  phoneVerificationBanner: {
+    title: "Подтвердите свой номер телефона",
+    message: "Пожалуйста, подтвердите свой номер телефона, чтобы получать экстренные оповещения и важные уведомления.",
+    verifyButton: "Подтвердить сейчас",
+  },
   conversationsScreen: {
     title: "Разговоры",
     yesterday: "Вчера",

@@ -1,12 +1,11 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
+import { createApi } from "@reduxjs/toolkit/query/react"
 import { DEFAULT_API_CONFIG } from "./api"
 import { Alert, Org, Caregiver, Patient, AuthTokens } from "./api.types"
+import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const authApi = createApi({
   reducerPath: "authApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: DEFAULT_API_CONFIG.url,
-  }),
+  baseQuery: baseQueryWithReauth(DEFAULT_API_CONFIG.url),
   endpoints: (builder) => ({
     register: builder.mutation<
       { message: string; caregiver: Caregiver; requiresEmailVerification: boolean },
@@ -104,6 +103,35 @@ export const authApi = createApi({
         },
       }),
     }),
+    sendPhoneVerificationCode: builder.mutation<
+      { success: boolean; message: string; expiresAt: string; phoneNumber: string },
+      { phoneNumber?: string }
+    >({
+      query: (data) => ({
+        url: "/phone-verification/send-code",
+        method: "POST",
+        body: data,
+      }),
+    }),
+    verifyPhoneCode: builder.mutation<
+      { success: boolean; message: string },
+      { code: string }
+    >({
+      query: (data) => ({
+        url: "/phone-verification/verify",
+        method: "POST",
+        body: data,
+      }),
+    }),
+    resendPhoneVerificationCode: builder.mutation<
+      { success: boolean; message: string; expiresAt: string; phoneNumber: string },
+      void
+    >({
+      query: () => ({
+        url: "/phone-verification/resend",
+        method: "POST",
+      }),
+    }),
   }),
 })
 
@@ -119,4 +147,7 @@ export const {
   useResendVerificationEmailMutation,
   useSetPasswordForSSOMutation,
   useVerifyEmailMutation,
+  useSendPhoneVerificationCodeMutation,
+  useVerifyPhoneCodeMutation,
+  useResendPhoneVerificationCodeMutation,
 } = authApi

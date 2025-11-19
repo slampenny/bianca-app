@@ -238,6 +238,11 @@ const it: Translations = {
     message: "Il tuo account My Phone Friend è stato verificato con successo.",
     redirecting: "Reindirizzamento all'app...",
   },
+  phoneVerificationBanner: {
+    title: "Verifica il tuo numero di telefono",
+    message: "Si prega di verificare il tuo numero di telefono per ricevere avvisi di emergenza e notifiche importanti.",
+    verifyButton: "Verifica ora",
+  },
   conversationsScreen: {
     title: "Conversazioni",
     yesterday: "Ieri",

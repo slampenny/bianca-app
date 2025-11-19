@@ -157,6 +157,11 @@ const pt: Translations = {
     message: "Sua conta My Phone Friend foi verificada com sucesso.",
     redirecting: "Redirecionando para o aplicativo...",
   },
+  phoneVerificationBanner: {
+    title: "Verifique seu número de telefone",
+    message: "Por favor, verifique seu número de telefone para receber alertas de emergência e notificações importantes.",
+    verifyButton: "Verificar agora",
+  },
   conversationsScreen: {
     title: "Conversas",
     yesterday: "Ontem",

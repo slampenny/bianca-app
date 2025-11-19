@@ -1,5 +1,5 @@
 import { createStackNavigator } from "@react-navigation/stack"
-import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, SignupScreen, SSOAccountLinkingScreen, MFAVerificationScreen } from "app/screens"
+import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, SSOAccountLinkingScreen, MFAVerificationScreen } from "app/screens"
 import MainTabs from "./MainTabs"
 import { AppStackParamList, LoginStackParamList } from "./navigationTypes"
 import { translate } from "app/i18n"
@@ -38,6 +38,7 @@ export const AuthStack = () => {
       />
       <Stack.Screen name="EmailVerified" component={EmailVerifiedScreen} />
       <Stack.Screen name="EmailVerificationRequired" component={EmailVerificationRequiredScreen} />
+      <Stack.Screen name="VerifyPhone" component={VerifyPhoneScreen} />
     </Stack.Navigator>
   )
 }

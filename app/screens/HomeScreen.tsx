@@ -17,6 +17,7 @@ import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
 import { logger } from "../utils/logger"
+import { PhoneVerificationBanner } from "../components/PhoneVerificationBanner"
 
 
 export function HomeScreen() {
@@ -189,6 +190,9 @@ export function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle} testID="home-header" accessibilityLabel="home-header">{translate("homeScreen.welcome", { name: currentUser ? currentUser.name : translate("homeScreen.guest") })}</Text>
       </View>
+
+      {/* Phone Verification Banner */}
+      <PhoneVerificationBanner />
 
       {/* Patient List */}
       <FlatList

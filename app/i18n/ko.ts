@@ -215,6 +215,11 @@ const ko: Translations = {
     message: "My Phone Friend 계정이 성공적으로 확인되었습니다.",
     redirecting: "앱으로 리디렉션 중...",
   },
+  phoneVerificationBanner: {
+    title: "전화번호를 확인하세요",
+    message: "긴급 알림 및 중요한 알림을 받으려면 전화번호를 확인해주세요.",
+    verifyButton: "지금 확인",
+  },
   conversationsScreen: {
     title: "대화",
     yesterday: "어제",

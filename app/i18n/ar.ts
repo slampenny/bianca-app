@@ -213,6 +213,11 @@ const ar: Translations = {
     message: "تم التحقق من حساب My Phone Friend بنجاح.",
     redirecting: "إعادة توجيهك إلى التطبيق...",
   },
+  phoneVerificationBanner: {
+    title: "تحقق من رقم هاتفك",
+    message: "يرجى التحقق من رقم هاتفك لتلقي تنبيهات الطوارئ والإشعارات المهمة.",
+    verifyButton: "تحقق الآن",
+  },
   conversationsScreen: {
     title: "المحادثات",
     yesterday: "أمس",

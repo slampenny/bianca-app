@@ -285,29 +285,67 @@ function ProfileScreen() {
               inputWrapperStyle={styles.inputWrapper}
               style={styles.input}
             />
-            <TextField
-              placeholderTx="profileScreen.emailPlaceholder"
-              value={email}
-              onChangeText={validateEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              containerStyle={styles.inputContainer}
-              inputWrapperStyle={styles.inputWrapper}
-              style={styles.input}
-              status={emailError ? "error" : undefined}
-              helper={emailError || undefined}
-            />
-            <TextField
-              placeholderTx="profileScreen.phonePlaceholder"
-              value={phone}
-              onChangeText={validatePhone}
-              keyboardType="phone-pad"
-              containerStyle={styles.inputContainer}
-              inputWrapperStyle={styles.inputWrapper}
-              style={styles.input}
-              status={phoneError ? "error" : undefined}
-              helper={phoneError || undefined}
-            />
+            <View style={styles.inputContainer}>
+              <TextField
+                placeholderTx="profileScreen.emailPlaceholder"
+                value={email}
+                onChangeText={validateEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                containerStyle={styles.inputContainer}
+                inputWrapperStyle={styles.inputWrapper}
+                style={styles.input}
+                status={emailError ? "error" : undefined}
+                helper={emailError || undefined}
+              />
+              {currentUser?.isEmailVerified ? (
+                <View style={styles.verificationStatus}>
+                  <Text style={styles.verificationText}>
+                    ✓ {translate("profileScreen.emailVerified") || "Email Verified"}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.verificationStatus}>
+                  <Text style={styles.verificationWarning}>
+                    ⏳ {translate("profileScreen.emailNotVerified") || "Email Not Verified"}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.inputContainer}>
+              <TextField
+                placeholderTx="profileScreen.phonePlaceholder"
+                value={phone}
+                onChangeText={validatePhone}
+                keyboardType="phone-pad"
+                containerStyle={styles.inputContainer}
+                inputWrapperStyle={styles.inputWrapper}
+                style={styles.input}
+                status={phoneError ? "error" : undefined}
+                helper={phoneError || undefined}
+              />
+              {currentUser?.isPhoneVerified ? (
+                <View style={styles.verificationStatus}>
+                  <Text style={styles.verificationText}>
+                    ✓ {translate("profileScreen.phoneVerified") || "Phone Verified"}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.verificationStatus}>
+                  <Text style={styles.verificationWarning}>
+                    ⏳ {translate("profileScreen.phoneNotVerified") || "Phone Not Verified"}
+                  </Text>
+                  <Button
+                    text={translate("profileScreen.verifyPhone") || "Verify Phone"}
+                    onPress={() => navigation.navigate("VerifyPhone" as never)}
+                    preset="link"
+                    style={styles.verifyButton}
+                    testID="verify-phone-button"
+                    accessibilityLabel="Verify phone button"
+                  />
+                </View>
+              )}
+            </View>
 
             <LanguageSelector testID="language-selector" />
             <ThemeSelector testID="theme-selector" />
@@ -435,6 +473,28 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   mfaButton: {
     marginBottom: 15,
+  },
+  verificationStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  verificationText: {
+    color: colors.palette.biancaSuccess || colors.palette.success500 || "#10b981",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  verificationWarning: {
+    color: colors.palette.biancaWarning || colors.palette.warning500 || "#f59e0b",
+    fontSize: 14,
+    fontWeight: "500",
+    marginRight: 8,
+  },
+  verifyButton: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    minHeight: 0,
   },
   telemetryContainer: {
     flexDirection: "row",

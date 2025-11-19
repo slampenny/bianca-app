@@ -157,6 +157,11 @@ const zh: Translations = {
     message: "您的 My Phone Friend 帐户已成功验证。",
     redirecting: "正在重定向到应用程序...",
   },
+  phoneVerificationBanner: {
+    title: "验证您的电话号码",
+    message: "请验证您的电话号码以接收紧急警报和重要通知。",
+    verifyButton: "立即验证",
+  },
   conversationsScreen: {
     title: "对话",
     yesterday: "昨天",
