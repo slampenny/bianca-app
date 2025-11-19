@@ -1,9 +1,124 @@
 # Build Notes - Major Refactor
 
-**Version:** Major Refactor  
-**Date:** November 7, 2025  
-**Commit:** `61b997a`  
-**Branch:** `main`
+---
+
+## November 18, 2025 - Invite Caregiver Workflow Fixes & E2E Testing
+
+**Version:** Critical Bug Fixes & Testing Infrastructure  
+**Date:** November 18, 2025  
+**Commit:** `c31f7f3`  
+**Branch:** `main` → `staging`
+
+### Overview
+
+This release includes critical fixes for the invite caregiver workflow, specifically addressing a crash when users click the invite email link. The login modal was fixed to properly close after successful authentication, and comprehensive end-to-end tests were added using Ethereal email integration.
+
+---
+
+### 🐛 Critical Bug Fixes
+
+#### 1. **SignupScreen URL Token Extraction Fix (CRITICAL)**
+- **Issue:** App crashed when users clicked invite email links
+- **Root Cause:** `SignupScreen` only checked `route.params.token`, but React Navigation doesn't automatically parse URL query parameters on web (`?token=...`)
+- **Solution:** Added comprehensive URL token extraction logic
+- **Implementation:**
+  - Extracts token from `window.location.search` on web
+  - Extracts token from deep links on mobile using `Linking`
+  - Listens for URL changes in case link is opened while app is running
+  - Added 1-second delay before showing "Invalid token" error to allow URL extraction to complete
+  - Proper cleanup of event listeners and timeouts
+- **Files Modified:**
+  - `app/screens/SignupScreen.tsx` - Added URL token extraction (100 lines changed)
+- **Impact:**
+  - ✅ Fixes crash when clicking invite email links
+  - ✅ Handles tokens from route params, URL query params, and deep links
+  - ✅ Prevents premature error messages during token extraction
+
+#### 2. **Login Modal Not Closing Fix**
+- **Issue:** Login modal remained visible after successful login
+- **Root Cause:** `LoginForm` wasn't explicitly calling `hideAuthModal()` after email/password login (SSO login was working correctly)
+- **Solution:** Added explicit `hideAuthModal()` call after successful email/password login
+- **Files Modified:**
+  - `app/components/LoginForm.tsx` - Added `hideAuthModal()` call after login success (6 lines changed)
+- **Impact:**
+  - ✅ Login modal now closes immediately after successful authentication
+  - ✅ Consistent behavior between email/password and SSO login
+
+---
+
+### 🧪 Testing Infrastructure
+
+#### 1. **Comprehensive Invite Caregiver E2E Tests**
+- **Feature:** Created end-to-end tests for invite caregiver workflow using real Ethereal email
+- **Implementation:**
+  - Tests complete workflow: admin login → send invite → retrieve email → click link → complete signup
+  - Uses Ethereal email service for real email integration
+  - Handles read-only form fields when invite token is present
+  - Verifies invite email link format
+- **Files Added:**
+  - `test/e2e/invite-caregiver-workflow.e2e.test.ts` - Comprehensive E2E tests (295 lines)
+- **Test Coverage:**
+  - ✅ Complete invite caregiver workflow end-to-end
+  - ✅ Invite email link format verification
+  - ✅ Handles read-only form fields correctly
+  - ✅ All tests passing with real Ethereal email
+- **Impact:**
+  - ✅ Prevents regression of invite workflow issues
+  - ✅ Validates email delivery and link format
+  - ✅ Ensures signup process works correctly
+
+#### 2. **Test Reliability Improvements**
+- **Read-only Field Handling:** Tests now properly handle read-only form fields by removing readonly attribute and setting values directly
+- **URL Token Extraction:** Tests verify that tokens are correctly extracted from email links
+- **Error Handling:** Tests verify proper error messages for invalid/expired tokens
+
+---
+
+### 📋 Files Changed Summary
+
+- `app/screens/SignupScreen.tsx` - 100 lines changed (URL token extraction)
+- `app/components/LoginForm.tsx` - 6 lines changed (login modal fix)
+- `test/e2e/invite-caregiver-workflow.e2e.test.ts` - 295 lines (new E2E tests)
+
+---
+
+### 🚀 Deployment Notes
+
+#### Staging Deployment
+- Changes merged from `main` to `staging` via fast-forward merge
+- Commit: `c31f7f3`
+- All changes pushed to remote `staging` branch
+
+#### Testing Before Production
+1. Verify invite email links work correctly in staging
+2. Confirm login modal closes after successful login
+3. Run E2E tests to ensure invite workflow is working
+
+---
+
+### 🔍 Known Issues & Notes
+
+1. **URL Token Extraction:**
+   - Works on web (extracts from `window.location.search`)
+   - Works on mobile (extracts from deep links)
+   - Has 1-second delay before showing "Invalid token" error to allow extraction
+
+2. **Ethereal Email Testing:**
+   - Requires backend to be running with `USE_SES_IN_DEV=false`
+   - Tests use real Ethereal email service for integration testing
+
+---
+
+### 📝 Next Steps
+
+1. Monitor staging deployment for invite workflow issues
+2. Verify email delivery in staging environment
+3. Test invite workflow with real users in staging
+4. Consider adding more E2E tests for other email workflows
+
+---
+
+## November 7, 2025 - Major Refactor
 
 ## Overview
 
