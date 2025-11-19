@@ -77,6 +77,29 @@ const caregiverSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Phone Verification
+    isPhoneVerified: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    phoneVerificationCode: {
+      type: String,
+      select: false, // Don't return in queries by default
+    },
+    phoneVerificationCodeExpires: {
+      type: Date,
+      select: false,
+    },
+    phoneVerificationAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    phoneVerifiedAt: {
+      type: Date,
+      select: false,
+    },
     // HIPAA Compliance: Multi-Factor Authentication
     mfaEnabled: {
       type: Boolean,
@@ -150,6 +173,7 @@ caregiverSchema.index({ org: 1 });
 caregiverSchema.index({ role: 1 }); // For role-based queries
 caregiverSchema.index({ org: 1, role: 1 }); // Compound
 caregiverSchema.index({ patients: 1 }); // Array index for patient lookups
+caregiverSchema.index({ phone: 1, isPhoneVerified: 1 }); // Compound index for phone verification queries
 
 // Plugin to convert mongoose to JSON, and paginate results
 caregiverSchema.plugin(toJSON);

@@ -7,3 +7,4 @@ module.exports.sentimentValidation = require('./sentiment.validation');
 module.exports.orgValidation = require('./org.validation');
 module.exports.patientValidation = require('./patient.validation');
 module.exports.twilioCallValidation = require('./twilioCall.validation');
+module.exports.phoneVerificationValidation = require('./phoneVerification.validation');

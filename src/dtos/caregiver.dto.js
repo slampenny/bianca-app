@@ -3,7 +3,7 @@ const PatientDTO = require('./patient.dto');
 const OrgDTO = require('./org.dto');
 
 const CaregiverDTO = (caregiver) => {
-  const { _id, name, avatar, email, phone, role, isEmailVerified, org, patients } = caregiver;
+  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, patients } = caregiver;
 
   const id = _id;
 
@@ -21,6 +21,7 @@ const CaregiverDTO = (caregiver) => {
     phone,
     role,
     isEmailVerified,
+    isPhoneVerified: isPhoneVerified || false, // Default to false if not set
     org: orgId,
     patients: patientIds,
   };

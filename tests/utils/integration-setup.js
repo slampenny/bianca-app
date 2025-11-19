@@ -43,7 +43,18 @@ jest.mock('../../src/services/sns.service', () => {
     sendSMS: jest.fn().mockResolvedValue({ success: true }),
     isConfigured: jest.fn().mockReturnValue(false),
     testConnectivity: jest.fn().mockResolvedValue(true),
-    sendEmergencyAlert: jest.fn().mockResolvedValue({ success: true })
+    sendEmergencyAlert: jest.fn().mockResolvedValue({ success: true }),
+    sendToPhone: jest.fn().mockResolvedValue({ MessageId: 'test-message-id-123' }),
+    formatPhoneNumber: jest.fn().mockImplementation((phone) => {
+      if (!phone) return null;
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      }
+      return phone.startsWith('+') ? phone : `+${phone}`;
+    }),
+    isValidPhoneNumber: jest.fn().mockReturnValue(true),
+    get isInitialized() { return true; }
   };
   // Export as both default and named exports to match different import patterns
   return {
