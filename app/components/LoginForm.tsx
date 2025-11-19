@@ -129,6 +129,12 @@ export const LoginForm: FC<LoginFormProps> = ({
           dispatch(setOrg(result.org))
         }
         
+        // Explicitly close auth modal after successful login
+        // This ensures the modal closes even if the AuthModalContext effect doesn't trigger
+        if (hideAuthModal) {
+          hideAuthModal()
+        }
+        
         // Call success callback if provided
         if (onLoginSuccess) {
           onLoginSuccess()
