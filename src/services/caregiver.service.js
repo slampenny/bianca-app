@@ -3,6 +3,45 @@ const mongoose = require('mongoose');
 const { Org, Caregiver, Patient } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+
+/**
+ * Normalize phone number to E.164 format (+1XXXXXXXXXX)
+ * @param {string} phone - Phone number in any format
+ * @returns {string|null} - Normalized phone number in E.164 format, or null if invalid
+ */
+const normalizePhoneToE164 = (phone) => {
+  if (!phone) return null;
+  
+  // If already in E.164 format, return as-is
+  if (phone.startsWith('+')) {
+    const e164Regex = /^\+[1-9]\d{9,14}$/;
+    if (e164Regex.test(phone)) {
+      return phone;
+    }
+    return null; // Invalid E.164 format
+  }
+  
+  // Remove all non-digit characters
+  const digits = phone.replace(/\D/g, '');
+  
+  // Convert 10-digit US number to E.164 format
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  
+  // Convert 11-digit number starting with 1 to E.164 format
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  
+  // If longer, assume it's an international number and add +
+  if (digits.length > 11) {
+    return `+${digits}`;
+  }
+  
+  // Invalid format
+  return null;
+};
 /**
  * Create a caregiver
  * @param {ObjectId} orgId
@@ -12,6 +51,15 @@ const logger = require('../config/logger');
 const createCaregiver = async (orgId, caregiverBody) => {
   if (await Caregiver.isEmailTaken(caregiverBody.email)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+  }
+
+  // Normalize phone number to E.164 format if provided
+  if (caregiverBody.phone) {
+    const normalizedPhone = normalizePhoneToE164(caregiverBody.phone);
+    if (!normalizedPhone) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid phone number format. Please use 10 digits or E.164 format (e.g., +1234567890)');
+    }
+    caregiverBody.phone = normalizedPhone;
   }
 
   // Add org to caregiver
@@ -127,6 +175,15 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
   }
   if (updateBody.email && (await Caregiver.isEmailTaken(updateBody.email, caregiverId))) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+  }
+  
+  // Normalize phone number to E.164 format if provided
+  if (updateBody.phone) {
+    const normalizedPhone = normalizePhoneToE164(updateBody.phone);
+    if (!normalizedPhone) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid phone number format. Please use 10 digits or E.164 format (e.g., +1234567890)');
+    }
+    updateBody.phone = normalizedPhone;
   }
   
   // If this is an unverified or invited user completing their profile with a phone number, promote them appropriately
