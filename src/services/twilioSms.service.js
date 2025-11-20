@@ -22,12 +22,13 @@ class TwilioSMSService {
     try {
       if (!config.twilio?.accountSid || !config.twilio?.authToken) {
         logger.warn('[Twilio SMS] Twilio credentials not available - SMS will not work');
+        logger.warn(`[Twilio SMS] Missing - accountSid: ${!config.twilio?.accountSid}, authToken: ${!config.twilio?.authToken}`);
         return;
       }
 
       this.twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
       this.isInitialized = true;
-      logger.info('[Twilio SMS] Twilio SMS client initialized');
+      logger.info('[Twilio SMS] Twilio SMS client initialized successfully');
     } catch (error) {
       logger.error('[Twilio SMS] Failed to initialize Twilio client:', error);
       this.isInitialized = false;
@@ -39,6 +40,7 @@ class TwilioSMSService {
    */
   reinitialize() {
     logger.info('[Twilio SMS] Re-initializing Twilio client...');
+    logger.info(`[Twilio SMS] Config check - accountSid: ${!!config.twilio?.accountSid}, authToken: ${!!config.twilio?.authToken}, phone: ${config.twilio?.phone || 'null'}`);
     this.isInitialized = false;
     this.twilioClient = null;
     this.initializeTwilio();
