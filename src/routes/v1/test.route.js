@@ -369,4 +369,81 @@ router.post('/generate-reset-password-link', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/send-sms-patient-0:
+ *   post:
+ *     summary: Send test SMS to patient 0 phone number
+ *     description: Sends a test SMS message to the hardcoded patient 0 phone number (6045624263) for debugging SMS delivery
+ *     tags: [Test]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: SMS sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 messageId:
+ *                   type: string
+ *                 phoneNumber:
+ *                   type: string
+ *                   description: Masked phone number
+ *       "500":
+ *         description: Failed to send SMS
+ */
+router.post('/send-sms-patient-0', auth(), async (req, res) => {
+  try {
+    const { snsService } = require('../../services/sns.service');
+    const logger = require('../../config/logger');
+    
+    // Hardcoded phone number for patient 0: 6045624263
+    // Format as E.164: +16045624263
+    const patient0Phone = '+16045624263';
+    const testMessage = `Test SMS from Bianca staging - Patient 0. Timestamp: ${new Date().toISOString()}. If you receive this, SMS delivery is working!`;
+    
+    logger.info(`[Test Route] Sending test SMS to patient 0: ${patient0Phone}`);
+    
+    // Check if SNS service is initialized
+    if (!snsService || !snsService.isInitialized) {
+      return res.status(503).json({
+        success: false,
+        error: 'SNS service not initialized',
+        snsStatus: snsService ? snsService.getStatus() : null
+      });
+    }
+    
+    // Send SMS using the SNS service
+    const response = await snsService.sendToPhone(patient0Phone, testMessage, {
+      severity: 'INFO',
+      category: 'test',
+      patientId: 'patient-0'
+    });
+    
+    logger.info(`[Test Route] SMS sent successfully to ${patient0Phone}, MessageId: ${response.MessageId}`);
+    
+    res.json({
+      success: true,
+      message: 'SMS sent successfully',
+      messageId: response.MessageId,
+      phoneNumber: '+1 (604) ***-4263', // Masked for privacy
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('[Test Route] Error sending test SMS:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      errorName: error.name,
+      details: error.stack
+    });
+  }
+});
+
 module.exports = router;
