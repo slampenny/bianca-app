@@ -150,14 +150,9 @@ export const VerifyEmailScreen = () => {
         const result = await verifyEmail({ token }).unwrap()
         
         if (result.success) {
-          // Verification successful - redirect directly to home screen
-          // Since they verified, we know it's them - skip the intermediate screen
-          if (navigationRef.isReady()) {
-            navigationRef.navigate("MainTabs" as never)
-          } else {
-            // Fallback: navigate to home via navigation
-            navigation.navigate("MainTabs" as never)
-          }
+          // Verification successful - navigate to EmailVerifiedScreen which shows success message
+          // and then redirects to home (not login) since we know it's them
+          navigation.navigate("EmailVerified" as never)
         } else {
           // Verification failed - backend returns HTML, try to extract error message
           setStatus("error")

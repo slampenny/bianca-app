@@ -70,20 +70,26 @@ export const EmailVerifiedScreen = () => {
   const styles = createStyles(colors)
 
   useEffect(() => {
-    // Show success message briefly, then navigate
-    const timer = setTimeout(() => {
-      if (isLoggedIn) {
-        // User is logged in - navigate to home screen using navigationRef
-        // This allows navigation across stacks
-        if (navigationRef.isReady()) {
-          navigationRef.navigate("MainTabs")
-        } else {
-          // Fallback: navigate to Login, AppNavigator will handle stack switch
-          navigation.navigate("Login" as never)
-        }
+    // If user logs out while on this screen, immediately navigate away
+    if (!isLoggedIn) {
+      // User logged out - navigate to login immediately
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("Login")
       } else {
-        // User is not logged in, go to login
         navigation.navigate("Login" as never)
+      }
+      return
+    }
+
+    // Show success message briefly, then navigate to home
+    // Since they verified, we know it's them - redirect to home screen
+    const timer = setTimeout(() => {
+      // Always redirect to home - if not logged in, AppNavigator will handle showing login
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("MainTabs")
+      } else {
+        // Fallback: navigate to home via navigation
+        navigation.navigate("MainTabs" as never)
       }
     }, 2000)
 

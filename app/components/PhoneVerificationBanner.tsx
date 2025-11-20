@@ -19,21 +19,34 @@ export const PhoneVerificationBanner: React.FC<PhoneVerificationBannerProps> = (
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
   const { colors } = useTheme()
 
+  // Debug logging (only in development)
+  if (process.env.NODE_ENV === 'development' && currentUser) {
+    console.log('[PhoneVerificationBanner] Debug:', {
+      hasUser: !!currentUser,
+      hasPhone: !!currentUser.phone,
+      phone: currentUser.phone ? `${currentUser.phone.substring(0, 3)}***` : 'none',
+      isPhoneVerified: currentUser.isPhoneVerified,
+      isPhoneVerifiedType: typeof currentUser.isPhoneVerified,
+      shouldShow: !currentUser.isPhoneVerified && !!currentUser.phone && currentUser.phone.trim() !== ''
+    })
+  }
+
   // Only show banner if:
   // 1. User exists
-  // 2. User has a phone number
+  // 2. User has a phone number (not empty string)
   // 3. User is NOT phone verified (explicitly check for false/undefined, not just truthy)
   if (!currentUser) {
     return null
   }
   
   // Check if user has a phone number
-  if (!currentUser.phone || currentUser.phone.trim() === '') {
+  if (!currentUser.phone || typeof currentUser.phone !== 'string' || currentUser.phone.trim() === '') {
     return null
   }
   
   // Check if phone is verified - explicitly check for true (not just truthy)
   // isPhoneVerified should be false or undefined for unverified users
+  // The DTO defaults it to false, but we check explicitly for true to be safe
   if (currentUser.isPhoneVerified === true) {
     return null
   }
