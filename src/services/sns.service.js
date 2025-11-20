@@ -1,47 +1,41 @@
 // src/services/sns.service.js
 
-const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 const { config: emergencyConfig } = require('../config/emergency.config');
 const { twilioSmsService } = require('./twilioSms.service');
-const config = require('../config/config');
 const logger = require('../config/logger');
 
 /**
- * AWS SNS Service for Emergency Push Notifications
- * NOTE: Now uses Twilio for SMS sending (more reliable than SNS)
- * This service maintains the same interface for backward compatibility
+ * Emergency Alert Service (uses Twilio for SMS)
+ * NOTE: This service now uses Twilio for SMS sending instead of AWS SNS
+ * The name "SNSService" is kept for backward compatibility with existing code
  */
 class SNSService {
   constructor() {
-    this.snsClient = null;
     this.isInitialized = false;
-    // Use Twilio for SMS instead of SNS
-    this.useTwilioForSMS = true;
-    this.initializeSNS();
+    this.initialize();
   }
 
   /**
-   * Initialize SNS client
+   * Initialize service (checks Twilio SMS availability)
    */
-  async initializeSNS() {
+  async initialize() {
     try {
       if (!emergencyConfig.enableSNSPushNotifications) {
-        logger.info('SNS push notifications disabled in configuration');
+        logger.info('Emergency push notifications disabled in configuration');
         return;
       }
 
-      // Use config.aws.region (same as S3 service) - reads from AWS_REGION env var
-      const region = config.aws.region || 'us-east-2';
-      
-      this.snsClient = new SNSClient({
-        region: region,
-        // AWS SDK will automatically use credentials from environment, IAM role, or credentials file
-      });
-
-      this.isInitialized = true;
-      logger.info(`SNS service initialized for region: ${region}`);
+      // Service is initialized if Twilio SMS is available
+      if (twilioSmsService && twilioSmsService.isInitialized) {
+        this.isInitialized = true;
+        logger.info('Emergency alert service initialized (using Twilio SMS)');
+      } else {
+        logger.warn('Emergency alert service: Twilio SMS not yet initialized');
+        // Will initialize lazily when first used
+        this.isInitialized = false;
+      }
     } catch (error) {
-      logger.error('Failed to initialize SNS service:', error);
+      logger.error('Failed to initialize emergency alert service:', error);
       this.isInitialized = false;
     }
   }
@@ -59,16 +53,20 @@ class SNSService {
    */
   async sendEmergencyAlert(alertData, caregivers = []) {
     try {
-      // Check if Twilio SMS is available (preferred) or SNS is initialized
-      const twilioAvailable = this.useTwilioForSMS && twilioSmsService && twilioSmsService.isInitialized;
-      const snsAvailable = this.isInitialized;
-      
-      if (!twilioAvailable && !snsAvailable) {
-        return { success: false, reason: 'SMS service not initialized (Twilio or SNS)' };
-      }
-      
       if (!emergencyConfig.enableSNSPushNotifications) {
         return { success: false, reason: 'Emergency notifications disabled in config' };
+      }
+
+      if (!twilioSmsService) {
+        return { success: false, reason: 'Twilio SMS service not available' };
+      }
+
+      // Try to initialize Twilio if not already initialized (lazy init)
+      if (!twilioSmsService.isInitialized) {
+        twilioSmsService.reinitialize();
+        if (!twilioSmsService.isInitialized) {
+          return { success: false, reason: 'Twilio SMS service not initialized' };
+        }
       }
 
       if (!caregivers || caregivers.length === 0) {
@@ -79,23 +77,30 @@ class SNSService {
       // Create message based on severity
       const message = this.createMessage(alertData);
       
-      // Get unique phone numbers from caregivers
-      const phoneNumbers = this.extractPhoneNumbers(caregivers);
+      // Get unique phone numbers from caregivers using Twilio service
+      const phoneNumbers = twilioSmsService.extractPhoneNumbers(caregivers);
       
       if (phoneNumbers.length === 0) {
         logger.warn('No valid phone numbers found in caregiver list');
         return { success: false, reason: 'No valid phone numbers' };
       }
 
-      // Send to each phone number
+      // Send to each phone number using Twilio
       const results = await Promise.allSettled(
-        phoneNumbers.map(phoneNumber => this.sendToPhone(phoneNumber, message, alertData))
+        phoneNumbers.map(phoneNumber => 
+          twilioSmsService.sendSMS(phoneNumber, message, {
+            severity: alertData?.severity,
+            category: alertData?.category,
+            patientId: alertData?.patientId,
+            alertType: 'emergency'
+          })
+        )
       );
 
       const successful = results.filter(result => result.status === 'fulfilled').length;
       const failed = results.filter(result => result.status === 'rejected').length;
 
-      logger.info(`Emergency alert sent: ${successful} successful, ${failed} failed`);
+      logger.info(`Emergency alert sent via Twilio: ${successful} successful, ${failed} failed`);
 
       return {
         success: successful > 0,
@@ -103,9 +108,10 @@ class SNSService {
         failed,
         total: phoneNumbers.length,
         results: results.map((result, index) => ({
-          phoneNumber: phoneNumbers[index],
+          phoneNumber: twilioSmsService.maskPhoneNumber(phoneNumbers[index]),
           success: result.status === 'fulfilled',
-          error: result.status === 'rejected' ? result.reason.message : null
+          error: result.status === 'rejected' ? result.reason.message : null,
+          messageSid: result.status === 'fulfilled' ? result.value.messageSid : null
         }))
       };
     } catch (error) {
@@ -114,53 +120,6 @@ class SNSService {
     }
   }
 
-  /**
-   * Send SMS to a specific phone number
-   * @private
-   * NOTE: Now uses Twilio instead of SNS for better reliability
-   */
-  async sendToPhone(phoneNumber, message, alertData) {
-    try {
-      // Use Twilio for SMS (more reliable than SNS)
-      if (this.useTwilioForSMS && twilioSmsService && twilioSmsService.isInitialized) {
-        const formattedPhone = twilioSmsService.formatPhoneNumber(phoneNumber);
-        if (!formattedPhone) {
-          throw new Error(`Invalid phone number format: ${phoneNumber}`);
-        }
-
-        const response = await twilioSmsService.sendSMS(formattedPhone, message, {
-          severity: alertData?.severity,
-          category: alertData?.category,
-          patientId: alertData?.patientId
-        });
-
-        logger.debug(`[SNS Service] SMS sent via Twilio to ${formattedPhone}: ${response.messageSid}`);
-        
-        // Return in SNS-compatible format for backward compatibility
-        return {
-          MessageId: response.messageSid, // Map Twilio messageSid to MessageId
-          ...response
-        };
-      }
-
-      // Fallback to SNS if Twilio not available (shouldn't happen in production)
-      logger.warn('[SNS Service] Twilio not available, falling back to SNS');
-      const formattedPhone = this.formatPhoneNumber(phoneNumber);
-      
-      const command = new PublishCommand({
-        PhoneNumber: formattedPhone,
-        Message: message
-      });
-
-      const response = await this.snsClient.send(command);
-      logger.debug(`SMS sent via SNS to ${formattedPhone}: ${response.MessageId}`);
-      
-      return response;
-    } catch (error) {
-      logger.error(`Failed to send SMS to ${phoneNumber}:`, error);
-      throw error;
-    }
-  }
 
   /**
    * Create message text based on alert data
@@ -177,90 +136,23 @@ class SNSService {
       .replace('{timestamp}', new Date().toLocaleString());
   }
 
-  /**
-   * Extract and validate phone numbers from caregivers
-   * @private
-   */
-  extractPhoneNumbers(caregivers) {
-    const phoneNumbers = new Set();
-    
-    caregivers.forEach(caregiver => {
-      if (caregiver.phone) {
-        const formattedPhone = this.formatPhoneNumber(caregiver.phone);
-        if (this.isValidPhoneNumber(formattedPhone)) {
-          phoneNumbers.add(formattedPhone);
-        }
-      }
-    });
-
-    return Array.from(phoneNumbers);
-  }
 
   /**
-   * Format phone number for SMS
-   * @private
-   */
-  formatPhoneNumber(phone) {
-    if (!phone) return null;
-    
-    // Remove all non-digit characters
-    const digits = phone.replace(/\D/g, '');
-    
-    // Add +1 if it's a 10-digit US number
-    if (digits.length === 10) {
-      return `+1${digits}`;
-    }
-    
-    // Add + if it's an 11-digit number starting with 1
-    if (digits.length === 11 && digits.startsWith('1')) {
-      return `+${digits}`;
-    }
-    
-    // Return as-is if it already has country code
-    if (digits.length > 11) {
-      return `+${digits}`;
-    }
-    
-    return phone; // Return original if we can't format
-  }
-
-  /**
-   * Validate phone number format
-   * @private
-   */
-  isValidPhoneNumber(phone) {
-    if (!phone) return false;
-    
-    // Basic validation - should start with + and have 10-15 digits
-    const phoneRegex = /^\+[1-9]\d{9,14}$/;
-    return phoneRegex.test(phone);
-  }
-
-  /**
-   * Test SNS connectivity
-   * @returns {Promise<boolean>} - Whether SNS is working
+   * Test SMS connectivity (tests Twilio)
+   * @returns {Promise<boolean>} - Whether SMS is working
    */
   async testConnectivity() {
-    try {
-      if (!this.isInitialized) {
-        return false;
-      }
-
-      // Test connectivity by checking if we can create a PublishCommand
-      // This is a lightweight operation that validates the SNS client
-      const { PublishCommand } = require('@aws-sdk/client-sns');
-      const testCommand = new PublishCommand({
-        PhoneNumber: '+1234567890', // Dummy number for testing
-        Message: 'Test message'
-      });
-
-      // We don't actually send the message, just validate the command creation
-      logger.info('SNS connectivity test passed - client is properly configured');
-      return true;
-    } catch (error) {
-      logger.error('SNS connectivity test failed:', error);
+    if (!emergencyConfig.enableSNSPushNotifications) {
+      logger.info('Emergency push notifications disabled, skipping connectivity test.');
       return false;
     }
+    
+    if (!twilioSmsService) {
+      logger.error('Twilio SMS service not available for connectivity test.');
+      return false;
+    }
+    
+    return twilioSmsService.testConnectivity();
   }
 
   /**
@@ -271,10 +163,8 @@ class SNSService {
     return {
       isInitialized: this.isInitialized,
       isEnabled: emergencyConfig.enableSNSPushNotifications,
-      region: process.env.AWS_REGION || 'us-east-2',
-      directSMS: true,
-      usingTwilio: this.useTwilioForSMS && twilioSmsService && twilioSmsService.isInitialized,
-      twilioStatus: twilioSmsService ? twilioSmsService.getStatus() : null
+      smsProvider: 'Twilio',
+      twilioSmsServiceStatus: twilioSmsService ? twilioSmsService.getStatus() : null
     };
   }
 }

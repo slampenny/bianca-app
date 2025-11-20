@@ -200,6 +200,26 @@ class TwilioSMSService {
   }
 
   /**
+   * Extract and validate phone numbers from caregivers
+   * @param {Array} caregivers - Array of caregiver objects with phone numbers
+   * @returns {Array<string>} Array of unique, formatted phone numbers
+   */
+  extractPhoneNumbers(caregivers) {
+    const phoneNumbers = new Set();
+    
+    caregivers.forEach(caregiver => {
+      if (caregiver.phone) {
+        const formattedPhone = this.formatPhoneNumber(caregiver.phone);
+        if (formattedPhone && this.isValidPhoneNumber(formattedPhone)) {
+          phoneNumbers.add(formattedPhone);
+        }
+      }
+    });
+
+    return Array.from(phoneNumbers);
+  }
+
+  /**
    * Get service status
    * @returns {Object} Service status information
    */
