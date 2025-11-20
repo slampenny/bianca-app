@@ -49,11 +49,14 @@ WORDPRESS_DB_DIR="/opt/wordpress-db"
 # Create WordPress directories
 mkdir -p $WORDPRESS_DIR
 mkdir -p $WORDPRESS_DATA_DIR/wp-content
+mkdir -p $WORDPRESS_DATA_DIR/wp-content/uploads
 mkdir -p $WORDPRESS_DB_DIR
 
 # Set permissions
 chown -R ec2-user:ec2-user $WORDPRESS_DIR
-chown -R ec2-user:ec2-user $WORDPRESS_DATA_DIR
+# WordPress container runs as www-data (UID 33), so wp-content must be owned by UID 33
+chown -R 33:33 $WORDPRESS_DATA_DIR/wp-content
+chmod -R 775 $WORDPRESS_DATA_DIR/wp-content
 
 # Setup EBS volumes
 echo "Setting up EBS volumes..."
@@ -70,8 +73,11 @@ if [ -b /dev/xvdf ]; then
     mount /dev/xvdf $WORDPRESS_DATA_DIR || echo "Mount failed, may already be mounted"
     grep -q "/dev/xvdf" /etc/fstab || echo "/dev/xvdf $WORDPRESS_DATA_DIR ext4 defaults,nofail 0 2" >> /etc/fstab
     
-    chown -R ec2-user:ec2-user $WORDPRESS_DATA_DIR
-    chmod -R 755 $WORDPRESS_DATA_DIR
+    # Ensure wp-content directory exists
+    mkdir -p $WORDPRESS_DATA_DIR/wp-content/uploads
+    # WordPress container runs as www-data (UID 33), so wp-content must be owned by UID 33
+    chown -R 33:33 $WORDPRESS_DATA_DIR/wp-content
+    chmod -R 775 $WORDPRESS_DATA_DIR/wp-content
     echo "WordPress data volume mounted"
 else
     echo "Warning: WordPress data volume /dev/xvdf not found"
@@ -243,6 +249,11 @@ chmod -R 755 $WORDPRESS_DIR
 
 # Start WordPress services (without nginx first - SSL cert needed)
 cd $WORDPRESS_DIR
+# Ensure uploads directory has correct permissions before starting
+mkdir -p $WORDPRESS_DATA_DIR/wp-content/uploads
+chown -R 33:33 $WORDPRESS_DATA_DIR/wp-content
+chmod -R 775 $WORDPRESS_DATA_DIR/wp-content
+
 docker-compose up -d wordpress-db wordpress
 
 # Wait for WordPress to be ready
