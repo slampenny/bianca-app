@@ -1,6 +1,6 @@
 // src/services/smsVerification.service.js
 
-const { snsService } = require('./sns.service');
+const { twilioSmsService } = require('./twilioSms.service');
 const logger = require('../config/logger');
 const { Caregiver } = require('../models');
 const ApiError = require('../utils/ApiError');
@@ -8,11 +8,11 @@ const httpStatus = require('http-status');
 
 /**
  * SMS Verification Service
- * Handles phone number verification via AWS SNS
+ * Handles phone number verification via Twilio SMS
  */
 class SMSVerificationService {
   constructor() {
-    this.snsService = snsService; // Use existing SNS service
+    this.twilioSmsService = twilioSmsService; // Use Twilio SMS service
   }
 
   /**
@@ -29,33 +29,19 @@ class SMSVerificationService {
    * @returns {string} Masked phone number
    */
   maskPhoneNumber(phone) {
-    if (!phone) return '';
-    
-    // Format: +1234567890 -> +1 (234) ***-7890
-    const match = phone.match(/^(\+\d{1,2})(\d{3})(\d{3})(\d{4})$/);
-    if (match) {
-      return `${match[1]} (${match[2]}) ***-${match[4]}`;
-    }
-    
-    // Fallback: format as (XXX) XXX-XXXX
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length === 10) {
-      return `(${digits.slice(0, 3)}) ***-${digits.slice(6)}`;
-    }
-    
-    return phone;
+    return this.twilioSmsService.maskPhoneNumber(phone);
   }
 
   /**
-   * Send verification code via SMS using AWS SNS
+   * Send verification code via SMS using Twilio
    * @param {string} phoneNumber - Phone number (will be formatted)
    * @param {string} caregiverId - Caregiver ID
    * @returns {Promise<Object>} Verification code details
    */
   async sendVerificationCode(phoneNumber, caregiverId) {
     try {
-      // Validate SNS service
-      if (!this.snsService || !this.snsService.isInitialized) {
+      // Validate Twilio SMS service
+      if (!this.twilioSmsService || !this.twilioSmsService.isInitialized) {
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'SMS service not configured');
       }
 
@@ -86,28 +72,26 @@ class SMSVerificationService {
         );
       }
 
-      // Format phone number (reuse existing SNS service method)
-      const formattedPhone = this.snsService.formatPhoneNumber(phoneNumber || caregiver.phone);
+      // Format phone number using Twilio SMS service
+      const formattedPhone = this.twilioSmsService.formatPhoneNumber(phoneNumber || caregiver.phone);
       if (!formattedPhone) {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Phone number is required');
       }
       
-      if (!this.snsService.isValidPhoneNumber(formattedPhone)) {
+      if (!this.twilioSmsService.isValidPhoneNumber(formattedPhone)) {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid phone number format');
       }
 
       // Create SMS message
       const message = `Your Bianca verification code is: ${code}. This code expires in 10 minutes.`;
 
-      // Send SMS via SNS (reuse existing sendToPhone method)
-      // Note: sendToPhone expects alertData, but we can pass minimal data
-      const response = await this.snsService.sendToPhone(formattedPhone, message, {
-        severity: 'INFO',
+      // Send SMS via Twilio
+      const response = await this.twilioSmsService.sendSMS(formattedPhone, message, {
         category: 'phone_verification',
-        patientId: caregiverId
+        caregiverId: caregiverId
       });
 
-      logger.info(`[SMS Verification] Code sent to ${formattedPhone}, MessageId: ${response.MessageId}`);
+      logger.info(`[SMS Verification] Code sent to ${formattedPhone}, MessageSid: ${response.messageSid}`);
 
       // Store verification code in database
       // Use select to include fields that are normally excluded
@@ -118,9 +102,9 @@ class SMSVerificationService {
       await caregiverWithCode.save();
 
       return {
-        messageId: response.MessageId,
+        messageId: response.messageSid, // Twilio uses messageSid instead of MessageId
         expiresAt,
-        phoneNumber: this.maskPhoneNumber(formattedPhone)
+        phoneNumber: this.twilioSmsService.maskPhoneNumber(formattedPhone)
       };
     } catch (error) {
       logger.error(`[SMS Verification] Error sending code: ${error.message}`);
@@ -129,12 +113,12 @@ class SMSVerificationService {
         throw error;
       }
 
-      // Handle AWS SNS-specific errors
-      if (error.name === 'InvalidParameter' || error.name === 'InvalidParameterException') {
+      // Handle Twilio-specific errors
+      if (error.code === 21211) {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid phone number format');
-      } else if (error.name === 'AuthorizationError' || error.name === 'AuthorizationErrorException') {
+      } else if (error.code === 20003 || error.status === 401) {
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'SMS service authentication failed');
-      } else if (error.name === 'Throttling' || error.name === 'ThrottlingException') {
+      } else if (error.code === 20429 || error.status === 429) {
         throw new ApiError(httpStatus.TOO_MANY_REQUESTS, 'SMS service rate limit exceeded. Please try again later.');
       }
 

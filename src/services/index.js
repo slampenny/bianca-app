@@ -14,6 +14,7 @@ module.exports.scheduleService = require('./schedule.service');
 module.exports.testService = require('./test.service');
 module.exports.tokenService = require('./token.service');
 module.exports.twilioCallService = require('./twilioCall.service');
+module.exports.twilioSmsService = require('./twilioSms.service');
 module.exports.callService = require('./call.service');
 
 // AI Services
