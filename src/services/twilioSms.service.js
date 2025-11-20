@@ -99,8 +99,12 @@ class TwilioSMSService {
    */
   async sendSMS(phoneNumber, message, options = {}) {
     try {
+      // Lazy initialization - try to initialize if not already done
       if (!this.isInitialized || !this.twilioClient) {
-        throw new Error('Twilio SMS service not initialized');
+        this.initializeTwilio();
+        if (!this.isInitialized || !this.twilioClient) {
+          throw new Error('Twilio SMS service not initialized');
+        }
       }
 
       if (!config.twilio?.phone) {
