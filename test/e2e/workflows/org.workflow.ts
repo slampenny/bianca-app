@@ -21,7 +21,7 @@ export class OrgWorkflow {
     await navigateToOrgScreen(this.page).catch(() => {
       console.log('⚠️ Could not navigate to org screen')
     })
-      await this.page.waitForTimeout(2000) // Allow org screen to load
+    await this.page.waitForTimeout(2000) // Allow org screen to load
     } else {
       console.log('⚠️ Org tab not found - may not be available')
     }
