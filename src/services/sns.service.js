@@ -112,21 +112,9 @@ class SNSService {
       
       const command = new PublishCommand({
         PhoneNumber: formattedPhone,  // Send directly to phone number
-        Message: message,
-        MessageAttributes: {
-          'severity': {
-            DataType: 'String',
-            StringValue: alertData.severity
-          },
-          'patientId': {
-            DataType: 'String',
-            StringValue: alertData.patientId
-          },
-          'category': {
-            DataType: 'String',
-            StringValue: alertData.category
-          }
-        }
+        Message: message
+        // Note: MessageAttributes are NOT supported for SMS in SNS
+        // They are ignored and can potentially cause issues, so we don't include them
       });
 
       const response = await this.snsClient.send(command);
