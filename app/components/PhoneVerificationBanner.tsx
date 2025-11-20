@@ -19,8 +19,22 @@ export const PhoneVerificationBanner: React.FC<PhoneVerificationBannerProps> = (
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
   const { colors } = useTheme()
 
-  // Only show banner if user is not phone verified
-  if (!currentUser || currentUser.isPhoneVerified) {
+  // Only show banner if:
+  // 1. User exists
+  // 2. User has a phone number
+  // 3. User is NOT phone verified (explicitly check for false/undefined, not just truthy)
+  if (!currentUser) {
+    return null
+  }
+  
+  // Check if user has a phone number
+  if (!currentUser.phone || currentUser.phone.trim() === '') {
+    return null
+  }
+  
+  // Check if phone is verified - explicitly check for true (not just truthy)
+  // isPhoneVerified should be false or undefined for unverified users
+  if (currentUser.isPhoneVerified === true) {
     return null
   }
 
