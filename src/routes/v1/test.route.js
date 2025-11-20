@@ -459,4 +459,100 @@ router.post('/send-sms-patient-0', auth(), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/clean:
+ *   post:
+ *     summary: Clean test database
+ *     description: Clears all test data from the database (development/test only)
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: Database cleaned successfully
+ *       "500":
+ *         description: Error cleaning database
+ */
+router.post('/clean', async (req, res) => {
+  try {
+    // Only allow in development/test environments
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'Database cleaning is not allowed in production' });
+    }
+
+    const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../../models');
+    
+    logger.info('Cleaning test database...');
+    
+    // Clear all collections
+    await Org.deleteMany({});
+    await Caregiver.deleteMany({});
+    await Patient.deleteMany({});
+    await Alert.deleteMany({});
+    await Conversation.deleteMany({});
+    await Message.deleteMany({});
+    await Schedule.deleteMany({});
+    await PaymentMethod.deleteMany({});
+    await Invoice.deleteMany({});
+    
+    logger.info('Database cleaned successfully');
+    
+    res.json({
+      success: true,
+      message: 'Database cleaned successfully'
+    });
+  } catch (error) {
+    logger.error('Error cleaning database:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /test/seed:
+ *   post:
+ *     summary: Seed test database
+ *     description: Seeds the database with test data (development/test only)
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: Database seeded successfully
+ *       "500":
+ *         description: Error seeding database
+ */
+router.post('/seed', async (req, res) => {
+  try {
+    // Only allow in development/test environments
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'Database seeding is not allowed in production' });
+    }
+
+    const seedDatabase = require('../../scripts/seedDatabase');
+    
+    logger.info('Seeding test database...');
+    
+    const result = await seedDatabase();
+    
+    logger.info('Database seeded successfully');
+    
+    res.json({
+      success: true,
+      message: 'Database seeded successfully',
+      data: {
+        org: result.org ? result.org._id : null,
+        caregiver: result.caregiver ? result.caregiver._id : null,
+        patients: result.patients ? result.patients.map(p => p._id) : []
+      }
+    });
+  } catch (error) {
+    logger.error('Error seeding database:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
