@@ -24,7 +24,9 @@ const defaultConfig = {
 
   // Alert system settings
   enableAlertsAPI: true,
-  enableSNSPushNotifications: process.env.AWS_REGION ? true : false,
+  // Enable SNS in staging/production (AWS_REGION should be set as env var, same as S3/SES)
+  // In development, only enable if AWS_REGION is explicitly set
+  enableSNSPushNotifications: (process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production') || !!process.env.AWS_REGION,
   
   // SNS notification settings (will use main config)
   sns: {

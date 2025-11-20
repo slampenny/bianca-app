@@ -2464,8 +2464,43 @@ resource "aws_iam_role_policy_attachment" "ecs_task_sns_sms_policy_attachment" {
   policy_arn = aws_iam_policy.ecs_task_sns_sms_policy.arn
 }
 
+################################################################################
+# SNS SMS ACCOUNT CONFIGURATION (REQUIRED FOR UNVERIFIED NUMBERS)
+################################################################################
+
+# IMPORTANT: AWS SNS SMS attributes are account-level settings that MUST be
+# configured manually when porting to a new AWS account. These settings are NOT
+# managed by Terraform because AWS doesn't provide a native resource for them.
+#
+# REQUIRED SETTING: DefaultSMSType must be set to "Transactional" to send SMS
+# to unverified phone numbers (required for phone verification codes).
+#
+# To configure after porting to a new account, run:
+#
+#   aws sns set-sms-attributes \
+#     --attributes DefaultSMSType=Transactional \
+#     --region ${var.aws_region} \
+#     --profile <your-profile>
+#
+# Or use the provided script:
+#
+#   ./scripts/configure-sns-sms.sh --region ${var.aws_region} --profile <your-profile>
+#
+# Verify the setting:
+#
+#   aws sns get-sms-attributes --region ${var.aws_region} --query 'attributes.DefaultSMSType'
+#
+# This should return: "Transactional"
+#
+# For more details, see: AWS_SMS_SETUP_VERIFICATION.md
+
 # Output for SNS SMS capability
 output "sns_sms_enabled" {
   description = "SNS SMS notifications are enabled for direct phone number messaging"
   value       = "SMS can be sent directly to any phone number without subscriptions"
+}
+
+output "sns_sms_configuration_note" {
+  description = "Important note about SMS account configuration"
+  value       = "DefaultSMSType must be set to 'Transactional' manually when porting to a new account. See comments in main.tf for instructions."
 }

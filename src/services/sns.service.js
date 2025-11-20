@@ -25,13 +25,16 @@ class SNSService {
         return;
       }
 
+      // Use config.aws.region (same as S3 service) - reads from AWS_REGION env var
+      const region = config.aws.region || 'us-east-2';
+      
       this.snsClient = new SNSClient({
-        region: process.env.AWS_REGION || 'us-east-2',
+        region: region,
         // AWS SDK will automatically use credentials from environment, IAM role, or credentials file
       });
 
       this.isInitialized = true;
-      logger.info(`SNS service initialized for region: ${process.env.AWS_REGION || 'us-east-2'}`);
+      logger.info(`SNS service initialized for region: ${region}`);
     } catch (error) {
       logger.error('Failed to initialize SNS service:', error);
       this.isInitialized = false;
