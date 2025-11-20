@@ -67,12 +67,15 @@ export function generateUniqueTestData(prefix: string = 'test') {
 // Registration test data
 export function generateRegistrationData() {
   const timestamp = Date.now();
+  // Generate a valid 10-digit phone number and format as E.164 (+1XXXXXXXXXX)
+  const last4 = timestamp.toString().slice(-4);
+  const phoneDigits = `604555${last4}`; // 10 digits
   return {
     name: "Valid User",
     email: `valid_success_${timestamp}@example.org`,
     password: "StrongPass!1",
     confirmPassword: "StrongPass!1",
-    phone: `123456${timestamp.toString().slice(-4)}`,
+    phone: phoneDigits, // Will be formatted by the form or backend
   };
 }
 

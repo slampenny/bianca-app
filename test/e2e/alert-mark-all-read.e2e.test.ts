@@ -74,8 +74,42 @@ test.describe("Alert Mark All Read Test", () => {
     })
     console.log('Redux alert counts:', alertCounts)
     
-    // Click "Mark All as Read" button
-    const markAllButton = page.getByTestId('mark-all-checkbox').or(page.getByLabel('mark-all-checkbox'))
+    // Wait for alerts to load and check if we have any alerts
+    await page.waitForTimeout(2000) // Give time for alerts to load
+    
+    // Check if we have alerts first
+    const alertItems = page.locator('[data-testid="alert-item"]')
+    const alertCount = await alertItems.count()
+    console.log(`Found ${alertCount} alert items`)
+    
+    if (alertCount === 0) {
+      console.log('⚠️ No alerts found - database may not be seeded correctly')
+      // Try waiting a bit more for alerts to load
+      await page.waitForTimeout(3000)
+      const alertCountAfter = await alertItems.count()
+      if (alertCountAfter === 0) {
+        // Check Redux state to see if alerts exist but aren't rendered
+        const reduxAlerts = await page.evaluate(() => {
+          const store = (window as any).__REDUX_STORE__ || (window as any).store
+          if (store && store.getState) {
+            const state = store.getState()
+            return state.alert?.alerts || []
+          }
+          return []
+        })
+        console.log(`Redux has ${reduxAlerts.length} alerts, but UI shows ${alertCountAfter}`)
+        if (reduxAlerts.length === 0) {
+          throw new Error('No alerts available - database seeding may have failed')
+        }
+        // Alerts exist in Redux but not in UI - might be a rendering issue
+        console.log('⚠️ Alerts exist in Redux but not visible in UI - may be a rendering issue')
+      }
+    }
+    
+    // Click "Mark All as Read" button (only shown if alerts.length > 0)
+    // Wait a bit more for the button to appear after alerts load
+    await page.waitForTimeout(1000)
+    const markAllButton = page.getByTestId('mark-all-checkbox')
     const markAllButtonCount = await markAllButton.count()
     
     if (markAllButtonCount > 0) {

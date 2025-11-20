@@ -59,8 +59,27 @@ test.describe('Phone Verification Flow', () => {
     }
 
     // Step 4: Click "Verify Phone" button (using accessibility label for React Native Web)
-    const verifyPhoneButton = page.locator('[aria-label="Verify phone button"], [data-testid="verify-phone-button"]').first()
-    await verifyPhoneButton.waitFor({ timeout: 10000, state: 'visible' })
+    // Try banner button first (more likely to be visible), then profile verify button
+    const bannerButton = page.locator('[data-testid="phone-verification-banner-button"]').first()
+    const profileVerifyButton = page.locator('[data-testid="verify-phone-button"]').first()
+    const anyVerifyButton = page.locator('[aria-label="Verify phone button"]').first()
+    
+    // Wait for any verify button to be visible (banner or profile)
+    let verifyPhoneButton = null
+    try {
+      await bannerButton.waitFor({ timeout: 5000, state: 'visible' })
+      verifyPhoneButton = bannerButton
+    } catch {
+      try {
+        await profileVerifyButton.waitFor({ timeout: 5000, state: 'visible' })
+        verifyPhoneButton = profileVerifyButton
+      } catch {
+        // Fallback: try any button with the aria-label
+        await anyVerifyButton.waitFor({ timeout: 5000, state: 'visible' })
+        verifyPhoneButton = anyVerifyButton
+      }
+    }
+    
     await verifyPhoneButton.click()
 
     // Step 5: Wait for VerifyPhoneScreen to load
@@ -441,9 +460,18 @@ test.describe('Phone Verification Flow', () => {
     expect(verifiedVisible || notVerifiedVisible).toBe(true)
 
     if (notVerifiedVisible) {
-      // Should also show verify button (using accessibility label)
-      const verifyButton = page.locator('[aria-label="Verify phone button"], [data-testid="verify-phone-button"]').first()
-      await expect(verifyButton).toBeVisible()
+      // Should also show verify button (try banner button first, then profile verify button)
+      const bannerButton = page.locator('[data-testid="phone-verification-banner-button"]').first()
+      const profileVerifyButton = page.locator('[data-testid="verify-phone-button"]').first()
+      
+      // Check if banner button is visible
+      const bannerVisible = await bannerButton.isVisible({ timeout: 2000 }).catch(() => false)
+      if (bannerVisible) {
+        await expect(bannerButton).toBeVisible()
+      } else {
+        // Fallback to profile verify button
+        await expect(profileVerifyButton).toBeVisible()
+      }
     }
 
     console.log('✅ Phone verification status displayed in profile')
