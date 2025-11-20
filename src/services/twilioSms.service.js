@@ -220,6 +220,27 @@ class TwilioSMSService {
   }
 
   /**
+   * Test Twilio SMS connectivity
+   * @returns {Promise<boolean>} - Whether Twilio SMS is working
+   */
+  async testConnectivity() {
+    try {
+      if (!this.isInitialized) {
+        logger.warn('[Twilio SMS] Connectivity test skipped: Service not initialized.');
+        return false;
+      }
+      // A lightweight way to test connectivity without sending an actual SMS
+      // Check if the client can access account details (requires 'read' permissions)
+      await this.twilioClient.api.v2010.accounts(config.twilio.accountSid).fetch();
+      logger.info('[Twilio SMS] Connectivity test passed: Twilio client can access account.');
+      return true;
+    } catch (error) {
+      logger.error(`[Twilio SMS] Connectivity test failed: ${error.message}`, error);
+      return false;
+    }
+  }
+
+  /**
    * Get service status
    * @returns {Object} Service status information
    */
