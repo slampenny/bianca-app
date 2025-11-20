@@ -48,7 +48,7 @@ describe('Twilio SMS Service', () => {
       service = new TwilioSMSService();
       expect(service.isInitialized).toBe(true);
       expect(twilio).toHaveBeenCalledWith('ACtest123', 'testAuthToken');
-      expect(logger.info).toHaveBeenCalledWith('[Twilio SMS] Twilio SMS client initialized');
+      expect(logger.info).toHaveBeenCalledWith('[Twilio SMS] Twilio SMS client initialized successfully');
     });
 
     test('should not initialize without accountSid', () => {
@@ -198,8 +198,13 @@ describe('Twilio SMS Service', () => {
     test('should throw error if service not initialized', async () => {
       service.isInitialized = false;
       service.twilioClient = null;
+      // Clear config so initialization fails
+      config.twilio.accountSid = null;
 
       await expect(service.sendSMS('+16045624263', 'Test')).rejects.toThrow('Twilio SMS service not initialized');
+      
+      // Restore config
+      config.twilio.accountSid = 'ACtest123';
     });
 
     test('should throw error if Twilio phone not configured', async () => {

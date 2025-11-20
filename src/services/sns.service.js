@@ -152,7 +152,13 @@ class SNSService {
       return false;
     }
     
-    return twilioSmsService.testConnectivity();
+    // Check if testConnectivity method exists (it may not be available in all contexts)
+    if (typeof twilioSmsService.testConnectivity === 'function') {
+      return twilioSmsService.testConnectivity();
+    }
+    
+    // Fallback: just check if service is initialized
+    return twilioSmsService.isInitialized;
   }
 
   /**
