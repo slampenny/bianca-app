@@ -15,6 +15,16 @@ async function startServer() {
     await config.loadSecrets();
     logger.info(`Environment: ${config.env}`);
 
+    // Re-initialize Twilio SMS service after secrets are loaded
+    try {
+      const { twilioSmsService } = require('./services/twilioSms.service');
+      if (twilioSmsService && typeof twilioSmsService.reinitialize === 'function') {
+        twilioSmsService.reinitialize();
+      }
+    } catch (twilioError) {
+      logger.warn('Could not re-initialize Twilio SMS service:', twilioError);
+    }
+
     // Import Express app (after config is loaded)
     const app = require('./app');
 
