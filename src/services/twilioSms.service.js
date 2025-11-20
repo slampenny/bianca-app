@@ -35,6 +35,16 @@ class TwilioSMSService {
   }
 
   /**
+   * Re-initialize Twilio client (useful after secrets are loaded)
+   */
+  reinitialize() {
+    logger.info('[Twilio SMS] Re-initializing Twilio client...');
+    this.isInitialized = false;
+    this.twilioClient = null;
+    this.initializeTwilio();
+  }
+
+  /**
    * Format phone number for Twilio (E.164 format)
    * @param {string} phone - Phone number in any format
    * @returns {string|null} Formatted phone number or null if invalid
