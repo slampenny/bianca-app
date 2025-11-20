@@ -78,6 +78,20 @@ router.get('/service-status', auth(), async (req, res) => {
     serviceStatus.services.email = { error: err.message };
   }
 
+  // Check SNS service status
+  try {
+    const { snsService } = require('../../services/sns.service');
+    const snsStatus = snsService.getStatus();
+    serviceStatus.services.sns = {
+      initialized: snsStatus.isInitialized,
+      enabled: snsStatus.isEnabled,
+      region: snsStatus.region,
+      directSMS: snsStatus.directSMS,
+    };
+  } catch (err) {
+    serviceStatus.services.sns = { error: err.message };
+  }
+
   // Check connections if services are loaded
   if (ariClient) {
     try {
