@@ -414,7 +414,7 @@ router.post('/generate-reset-password-link', async (req, res) => {
  */
 router.post('/send-sms-patient-0', auth(), async (req, res) => {
   try {
-    const { snsService } = require('../../services/sns.service');
+    const { twilioSmsService } = require('../../services/twilioSms.service');
     const logger = require('../../config/logger');
     
     // Hardcoded phone number for patient 0: 6045624263
@@ -424,29 +424,28 @@ router.post('/send-sms-patient-0', auth(), async (req, res) => {
     
     logger.info(`[Test Route] Sending test SMS to patient 0: ${patient0Phone}`);
     
-    // Check if SNS service is initialized
-    if (!snsService || !snsService.isInitialized) {
+    // Check if Twilio SMS service is initialized
+    if (!twilioSmsService || !twilioSmsService.isInitialized) {
       return res.status(503).json({
         success: false,
-        error: 'SNS service not initialized',
-        snsStatus: snsService ? snsService.getStatus() : null
+        error: 'Twilio SMS service not initialized',
+        twilioStatus: twilioSmsService ? twilioSmsService.getStatus() : null
       });
     }
     
-    // Send SMS using the SNS service
-    const response = await snsService.sendToPhone(patient0Phone, testMessage, {
-      severity: 'INFO',
+    // Send SMS using Twilio
+    const response = await twilioSmsService.sendSMS(patient0Phone, testMessage, {
       category: 'test',
       patientId: 'patient-0'
     });
     
-    logger.info(`[Test Route] SMS sent successfully to ${patient0Phone}, MessageId: ${response.MessageId}`);
+    logger.info(`[Test Route] SMS sent successfully to ${patient0Phone}, MessageSid: ${response.messageSid}`);
     
     res.json({
       success: true,
       message: 'SMS sent successfully',
-      messageId: response.MessageId,
-      phoneNumber: '+1 (604) ***-4263', // Masked for privacy
+      messageId: response.messageSid, // Twilio uses messageSid
+      phoneNumber: twilioSmsService.maskPhoneNumber(patient0Phone),
       timestamp: new Date().toISOString()
     });
   } catch (error) {

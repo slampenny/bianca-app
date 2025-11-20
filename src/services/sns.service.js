@@ -2,16 +2,21 @@
 
 const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 const { config: emergencyConfig } = require('../config/emergency.config');
+const { twilioSmsService } = require('./twilioSms.service');
 const config = require('../config/config');
 const logger = require('../config/logger');
 
 /**
  * AWS SNS Service for Emergency Push Notifications
+ * NOTE: Now uses Twilio for SMS sending (more reliable than SNS)
+ * This service maintains the same interface for backward compatibility
  */
 class SNSService {
   constructor() {
     this.snsClient = null;
     this.isInitialized = false;
+    // Use Twilio for SMS instead of SNS
+    this.useTwilioForSMS = true;
     this.initializeSNS();
   }
 
@@ -54,8 +59,16 @@ class SNSService {
    */
   async sendEmergencyAlert(alertData, caregivers = []) {
     try {
-      if (!this.isInitialized || !emergencyConfig.enableSNSPushNotifications) {
-        return { success: false, reason: 'SNS not initialized or disabled' };
+      // Check if Twilio SMS is available (preferred) or SNS is initialized
+      const twilioAvailable = this.useTwilioForSMS && twilioSmsService && twilioSmsService.isInitialized;
+      const snsAvailable = this.isInitialized;
+      
+      if (!twilioAvailable && !snsAvailable) {
+        return { success: false, reason: 'SMS service not initialized (Twilio or SNS)' };
+      }
+      
+      if (!emergencyConfig.enableSNSPushNotifications) {
+        return { success: false, reason: 'Emergency notifications disabled in config' };
       }
 
       if (!caregivers || caregivers.length === 0) {
@@ -104,21 +117,43 @@ class SNSService {
   /**
    * Send SMS to a specific phone number
    * @private
+   * NOTE: Now uses Twilio instead of SNS for better reliability
    */
   async sendToPhone(phoneNumber, message, alertData) {
     try {
-      // Format phone number for SNS (ensure it starts with +)
+      // Use Twilio for SMS (more reliable than SNS)
+      if (this.useTwilioForSMS && twilioSmsService && twilioSmsService.isInitialized) {
+        const formattedPhone = twilioSmsService.formatPhoneNumber(phoneNumber);
+        if (!formattedPhone) {
+          throw new Error(`Invalid phone number format: ${phoneNumber}`);
+        }
+
+        const response = await twilioSmsService.sendSMS(formattedPhone, message, {
+          severity: alertData?.severity,
+          category: alertData?.category,
+          patientId: alertData?.patientId
+        });
+
+        logger.debug(`[SNS Service] SMS sent via Twilio to ${formattedPhone}: ${response.messageSid}`);
+        
+        // Return in SNS-compatible format for backward compatibility
+        return {
+          MessageId: response.messageSid, // Map Twilio messageSid to MessageId
+          ...response
+        };
+      }
+
+      // Fallback to SNS if Twilio not available (shouldn't happen in production)
+      logger.warn('[SNS Service] Twilio not available, falling back to SNS');
       const formattedPhone = this.formatPhoneNumber(phoneNumber);
       
       const command = new PublishCommand({
-        PhoneNumber: formattedPhone,  // Send directly to phone number
+        PhoneNumber: formattedPhone,
         Message: message
-        // Note: MessageAttributes are NOT supported for SMS in SNS
-        // They are ignored and can potentially cause issues, so we don't include them
       });
 
       const response = await this.snsClient.send(command);
-      logger.debug(`SMS sent successfully to ${formattedPhone}: ${response.MessageId}`);
+      logger.debug(`SMS sent via SNS to ${formattedPhone}: ${response.MessageId}`);
       
       return response;
     } catch (error) {
@@ -237,7 +272,9 @@ class SNSService {
       isInitialized: this.isInitialized,
       isEnabled: emergencyConfig.enableSNSPushNotifications,
       region: process.env.AWS_REGION || 'us-east-2',
-      directSMS: true
+      directSMS: true,
+      usingTwilio: this.useTwilioForSMS && twilioSmsService && twilioSmsService.isInitialized,
+      twilioStatus: twilioSmsService ? twilioSmsService.getStatus() : null
     };
   }
 }
