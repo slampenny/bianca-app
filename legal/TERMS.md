@@ -1,15 +1,15 @@
-## MyPhoneFriend - Terms of Service
+## Bianca Technologies Inc. - Terms of Service
 
 **Effective Date:** January 5, 2025
 **Last Updated:** January 5, 2025
 
-Please read these Terms of Service ("Terms", "Terms of Service") carefully before using the MyPhoneFriend mobile application (the "App") and related services (collectively, the "Service") operated by MyPhoneFriend ("us", "we", or "our").
+Please read these Terms of Service ("Terms", "Terms of Service") carefully before using the Bianca Technologies Inc. mobile application (the "App") and related services (collectively, the "Service") operated by Bianca Technologies Inc. ("us", "we", or "our").
 
 Your access to and use of the Service is conditioned upon your acceptance of and compliance with these Terms. These Terms apply to all visitors, users, and others who wish to access or use the Service. By accessing or using the Service you agree to be bound by these Terms. If you disagree with any part of the terms then you do not have permission to access the Service.
 
 **1. DESCRIPTION OF SERVICE**
 
-MyPhoneFriend is a mobile application designed to facilitate wellness checks through AI-assisted phone calls. Users (including individuals, family members, or authorized personnel from organizations like retirement homes) can use the App to initiate or manage these calls. The Service may involve recording calls, transcribing calls using AI, and analyzing content to provide summaries or insights related to wellness (**subject to necessary consents as outlined herein and in our Privacy Policy**).
+Bianca Technologies Inc. is a mobile application designed to facilitate wellness checks through AI-assisted phone calls. Users (including individuals, family members, or authorized personnel from organizations like retirement homes) can use the App to initiate or manage these calls. The Service may involve recording calls, transcribing calls using AI, and analyzing content to provide summaries or insights related to wellness (**subject to necessary consents as outlined herein and in our Privacy Policy**).
 
 **2. IMPORTANT DISCLAIMERS**
 
@@ -85,8 +85,8 @@ We reserve the right, at our sole discretion, to modify or replace these Terms a
 
 If you have any questions about these Terms, please contact us:
 
-MyPhoneFriend
+Bianca Technologies Inc.
 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
-legal@myphonefriend.com
+legal@biancawellness.com
 +1-604-562-4263
 
