@@ -1,9 +1,9 @@
-# MyPhoneFriend - Data Safety Declaration
+# Bianca Technologies Inc. - Data Safety Declaration
 
 **Effective Date:** January 5, 2025  
 **Last Updated:** January 5, 2025
 
-This Data Safety Declaration provides transparency about how MyPhoneFriend collects, uses, and protects your data. This information is designed to help users understand our data practices and is required for app store compliance.
+This Data Safety Declaration provides transparency about how Bianca Technologies Inc. collects, uses, and protects your data. This information is designed to help users understand our data practices and is required for app store compliance.
 
 ## 📊 DATA COLLECTION OVERVIEW
 
@@ -178,15 +178,15 @@ This Data Safety Declaration provides transparency about how MyPhoneFriend colle
 ## 📧 CONTACT INFORMATION
 
 ### Data Protection Officer
-- **Email**: privacy@myphonefriend.com
+- **Email**: privacy@biancawellness.com
 - **Response Time**: Within 48 hours for privacy inquiries
 
 ### General Support
-- **Email**: support@myphonefriend.com
+- **Email**: support@biancawellness.com
 - **Phone**: +1-604-562-4263
 
 ### Legal Requests
-- **Email**: legal@myphonefriend.com
+- **Email**: legal@biancawellness.com
 - **Address**: 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 
 ## 📋 COMPLIANCE DECLARATIONS

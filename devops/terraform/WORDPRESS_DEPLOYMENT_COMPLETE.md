@@ -6,7 +6,7 @@
 ## Deployment Summary
 
 ✅ **WordPress instance created**: `i-0c212fd606476f74a`  
-✅ **DNS records updated**: `myphonefriend.com` and `www.myphonefriend.com` → WordPress instance  
+✅ **DNS records updated**: `biancawellness.com` and `www.biancawellness.com` → WordPress instance  
 ✅ **App subdomains unchanged**: All app subdomains remain untouched  
 ✅ **SSL configured**: Let's Encrypt certificate setup in user_data  
 
@@ -40,8 +40,8 @@
 
 2. **Via Domain** (after DNS propagates):
    ```
-   http://myphonefriend.com
-   https://myphonefriend.com (once SSL cert is obtained)
+   http://biancawellness.com
+   https://biancawellness.com (once SSL cert is obtained)
    ```
 
 ## SSL Certificate
@@ -54,7 +54,7 @@ terraform output wordpress_ssh_command
 
 # Then run:
 cd /opt/bianca-wordpress
-certbot certonly --standalone -d myphonefriend.com -d www.myphonefriend.com
+certbot certonly --standalone -d biancawellness.com -d www.biancawellness.com
 docker-compose restart nginx
 ```
 
@@ -85,8 +85,8 @@ sudo docker logs bianca-wordpress-db
 ### DNS Not Propagated
 ```bash
 # Check DNS
-dig myphonefriend.com
-nslookup myphonefriend.com
+dig biancawellness.com
+nslookup biancawellness.com
 
 # Should show WordPress instance IP
 ```
@@ -101,10 +101,10 @@ nslookup myphonefriend.com
 1. **EIP Limit**: WordPress doesn't use Elastic IP (limit reached). Uses auto-assigned IP which is static while instance runs.
 
 2. **App Isolation**: WordPress deployment does NOT affect app subdomains:
-   - `api.myphonefriend.com` - **UNCHANGED** ✓
-   - `app.myphonefriend.com` - **UNCHANGED** ✓
-   - `staging.myphonefriend.com` - **UNCHANGED** ✓
-   - `staging-api.myphonefriend.com` - **UNCHANGED** ✓
+   - `api.biancawellness.com` - **UNCHANGED** ✓
+   - `app.biancawellness.com` - **UNCHANGED** ✓
+   - `staging.biancawellness.com` - **UNCHANGED** ✓
+   - `staging-api.biancawellness.com` - **UNCHANGED** ✓
 
 3. **Reproducibility**: All Terraform code is saved in `wordpress.tf` and can be reproduced by running:
    ```bash

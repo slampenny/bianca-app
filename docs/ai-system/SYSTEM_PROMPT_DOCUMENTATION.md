@@ -331,10 +331,10 @@ The AI is trained to recognize and respond to emergency situations:
 - **Backup Systems**: Redundant systems to ensure continuous operation
 
 ### Contact Information
-- **Technical Issues**: support@myphonefriend.com
+- **Technical Issues**: support@biancawellness.com
 - **Emergency Support**: +1-604-562-4263
-- **Compliance Questions**: compliance@myphonefriend.com
-- **General Inquiries**: info@myphonefriend.com
+- **Compliance Questions**: compliance@biancawellness.com
+- **General Inquiries**: info@biancawellness.com
 
 ---
 

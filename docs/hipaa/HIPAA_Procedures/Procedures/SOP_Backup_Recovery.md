@@ -636,7 +636,7 @@ db.caregivers.findOne()
 npm run start
 
 # Run smoke tests
-curl https://api.myphonefriend.com/health
+curl https://api.biancawellness.com/health
 # Should return 200 OK
 
 # Test critical endpoints
@@ -983,7 +983,7 @@ aws sns create-topic --name bianca-backup-alerts
 aws sns subscribe \
   --topic-arn "arn:aws:sns:us-east-2:ACCOUNT:bianca-backup-alerts" \
   --protocol email \
-  --notification-endpoint devops@myphonefriend.com
+  --notification-endpoint devops@biancawellness.com
 ```
 
 ---
@@ -1121,8 +1121,8 @@ mongodump --uri="${MONGODB_URL}" \
 ## 22. CONTACTS
 
 ### Internal:
-- **DevOps Lead**: devops@myphonefriend.com | [Phone]
-- **Security Officer**: security@myphonefriend.com | [Phone]
+- **DevOps Lead**: devops@biancawellness.com | [Phone]
+- **Security Officer**: security@biancawellness.com | [Phone]
 - **CTO**: [Email] | [Phone]
 
 ### External:
@@ -1161,7 +1161,7 @@ mongodump --uri="${MONGODB_URL}" \
 
 **CRITICAL**: Test your backups regularly. An untested backup is not a backup.
 
-**For Questions**: Contact DevOps Lead at devops@myphonefriend.com
+**For Questions**: Contact DevOps Lead at devops@biancawellness.com
 
 
 

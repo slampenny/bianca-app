@@ -130,7 +130,7 @@ yarn test:maestro      # Mobile E2E tests
 
 ## 📞 Support
 
-- **Email**: support@myphonefriend.com
+- **Email**: support@biancawellness.com
 - **Phone**: +1-604-562-4263
 - **Address**: 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 

@@ -30,7 +30,8 @@ const register = catchAsync(async (req, res, next) => {
   // Send verification email automatically after registration
   try {
     const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
+    const locale = caregiver.preferredLanguage || 'en';
+    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
   } catch (emailError) {
     console.error('Failed to send verification email during registration:', emailError);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Registration successful but verification email failed. Please contact support.');
@@ -93,7 +94,8 @@ const login = catchAsync(async (req, res, next) => {
       // Send verification email if not already sent recently
       try {
         const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
+        const locale = caregiver.preferredLanguage || 'en';
+        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
       } catch (emailError) {
         console.error('Failed to resend verification email:', emailError);
       }
@@ -246,8 +248,12 @@ const refreshTokens = catchAsync(async (req, res) => {
 
 const forgotPassword = catchAsync(async (req, res) => {
   try {
+    // Get caregiver to retrieve preferred language
+    const caregiver = await caregiverService.getCaregiverByEmail(req.body.email);
+    const locale = caregiver?.preferredLanguage || 'en';
+    
     const resetPasswordToken = await tokenService.generateResetPasswordToken(req.body.email);
-    await emailService.sendResetPasswordEmail(req.body.email, resetPasswordToken);
+    await emailService.sendResetPasswordEmail(req.body.email, resetPasswordToken, locale);
   } catch (error) {
     // Security best practice: Don't reveal if email exists or not
     // Always return success to prevent email enumeration attacks
@@ -310,7 +316,8 @@ const setPasswordForSSO = catchAsync(async (req, res) => {
 
 const sendVerificationEmail = catchAsync(async (req, res) => {
   const verifyEmailToken = await tokenService.generateVerifyEmailToken(req.body.caregiver);
-  await emailService.sendVerificationEmail(req.body.caregiver.email, verifyEmailToken, req.body.caregiver.name);
+  const locale = req.body.caregiver.preferredLanguage || 'en';
+  await emailService.sendVerificationEmail(req.body.caregiver.email, verifyEmailToken, req.body.caregiver.name, locale);
   res.status(httpStatus.NO_CONTENT).send();
 });
 
@@ -335,7 +342,8 @@ const resendVerificationEmail = catchAsync(async (req, res) => {
   // Generate and send new verification token
   try {
     const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name);
+    const locale = caregiver.preferredLanguage || 'en';
+    await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
     res.status(httpStatus.OK).send({ message: 'Verification email sent successfully' });
   } catch (emailError) {
     console.error('Failed to resend verification email:', emailError);

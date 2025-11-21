@@ -312,7 +312,7 @@ This document provides a complete index of all documentation in the MyPhoneFrien
 ## 📞 Support
 
 For questions about documentation organization or Notion upload:
-- **Email**: support@myphonefriend.com
+- **Email**: support@biancawellness.com
 - **Phone**: +1-604-562-4263
 
 ---

@@ -121,7 +121,7 @@ privacyPractices: "Avis sur les pratiques de confidentialité HIPAA"
    - Never share with advertisers
 
 5. **Contact Info** - How to reach you
-   - privacy@myphonefriend.com
+   - privacy@biancawellness.com
    - +1-604-562-4263
    - How to file HHS complaint
 
@@ -301,7 +301,7 @@ Privacy Policy  │  HIPAA Privacy Practices  │  Terms
 ## 🌐 NEXT STEP: Add to Website
 
 **Also add to your website** at:
-- URL: `www.myphonefriend.com/privacy-practices`
+- URL: `www.biancawellness.com/privacy-practices`
 - Location: `bianca-app-frontend/legal/NOTICE_OF_PRIVACY_PRACTICES.md` (full version)
 
 **Quick implementation**:

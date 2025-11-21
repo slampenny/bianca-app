@@ -143,9 +143,9 @@ We understand you may have questions or concerns. We are here to help.
 
 **Contact Information**:
 - **Phone**: [Toll-free number, available [hours]]
-- **Email**: privacy@myphonefriend.com
+- **Email**: privacy@biancawellness.com
 - **Mail**: MyPhoneFriend Privacy Office, [Address]
-- **Website**: www.myphonefriend.com/security-incident
+- **Website**: www.biancawellness.com/security-incident
 
 **Dedicated Support**:
 We have established a dedicated support line to answer your questions about this incident. Call [TOLL-FREE NUMBER] Monday-Friday, 9 AM - 8 PM EST.
@@ -161,7 +161,7 @@ Under HIPAA, you have the right to:
 - **File a complaint** with us or with the U.S. Department of Health and Human Services
 
 **To file a complaint**:
-- **With us**: privacy@myphonefriend.com or [Address]
+- **With us**: privacy@biancawellness.com or [Address]
 - **With HHS**: 
   - Online: https://www.hhs.gov/hipaa/filing-a-complaint
   - Phone: 1-800-368-1019

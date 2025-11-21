@@ -38,7 +38,7 @@
 ### Public Pages (Must Have):
 
 ```
-www.myphonefriend.com/
+www.biancawellness.com/
 │
 ├── /privacy                    ✅ Privacy Policy (general)
 │   → Use: PRIVACY.md
@@ -75,20 +75,20 @@ www.myphonefriend.com/
 ```
 Legal Information
 ├── Privacy Policy
-│   → Links to: www.myphonefriend.com/privacy
+│   → Links to: www.biancawellness.com/privacy
 │   → Shows: PRIVACY.md content
 │
 ├── Notice of Privacy Practices  🆕 ADD THIS
-│   → Links to: www.myphonefriend.com/privacy-practices
+│   → Links to: www.biancawellness.com/privacy-practices
 │   → Shows: NOTICE_OF_PRIVACY_PRACTICES.md content
 │   → Required: Show to patients at first signup
 │
 ├── Terms of Service
-│   → Links to: www.myphonefriend.com/terms
+│   → Links to: www.biancawellness.com/terms
 │   → Shows: TERMS.md content
 │
 └── Security & Data Safety
-    → Links to: www.myphonefriend.com/security
+    → Links to: www.biancawellness.com/security
     → Shows: DATA_SAFETY.md content
 ```
 
@@ -195,10 +195,10 @@ export default function PrivacyPracticesPage() {
 
 ### Public Website (Anyone Can See):
 ```
-www.myphonefriend.com/privacy              ← General Privacy Policy
-www.myphonefriend.com/privacy-practices    ← HIPAA Notice (NEW)
-www.myphonefriend.com/terms                ← Terms of Service  
-www.myphonefriend.com/security             ← Security info
+www.biancawellness.com/privacy              ← General Privacy Policy
+www.biancawellness.com/privacy-practices    ← HIPAA Notice (NEW)
+www.biancawellness.com/terms                ← Terms of Service  
+www.biancawellness.com/security             ← Security info
 ```
 
 ### Mobile App (Patients):

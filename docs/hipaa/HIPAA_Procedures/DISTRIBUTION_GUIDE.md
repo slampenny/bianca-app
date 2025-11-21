@@ -60,7 +60,7 @@
 **Format**: Written document (paper or electronic)  
 **Where**: 
 - Give to patients when they sign up
-- Post on website: https://www.myphonefriend.com/privacy-practices
+- Post on website: https://www.biancawellness.com/privacy-practices
 - Make available in app
 - Provide upon request
 
@@ -84,7 +84,7 @@
 **Requirement**: Consumer protection laws, HIPAA  
 **Who Gets It**: Anyone can read  
 **Where**: 
-- Public website: https://www.myphonefriend.com/privacy
+- Public website: https://www.biancawellness.com/privacy
 - App stores (Apple, Google)
 - Link in app footer
 
@@ -102,7 +102,7 @@
 **Where**:
 - Apple App Store listing
 - Google Play Store listing
-- Website: https://www.myphonefriend.com/security
+- Website: https://www.biancawellness.com/security
 
 **Status**: ✅ ALREADY EXISTS  
 **Location**: `bianca-app-frontend/legal/DATA_SAFETY.md`
@@ -197,7 +197,7 @@ Please review the updated documents at: [Link to internal system]
 
 You have 30 days to review and sign acknowledgment.
 
-Questions? Contact security@myphonefriend.com
+Questions? Contact security@biancawellness.com
 
 - HIPAA Security Officer
 ```
@@ -234,26 +234,26 @@ Questions? Contact security@myphonefriend.com
 **Required Pages**:
 
 1. **Privacy Policy** ✅ You have this
-   - URL: https://www.myphonefriend.com/privacy
+   - URL: https://www.biancawellness.com/privacy
    - Covers: Data collection, use, sharing
    - Required by: Consumer protection, CCPA, GDPR
 
 2. **Notice of Privacy Practices (NPP)** 🟡 Create this
-   - URL: https://www.myphonefriend.com/privacy-practices
+   - URL: https://www.biancawellness.com/privacy-practices
    - Covers: HIPAA-specific rights and practices
    - Required by: HIPAA §164.520
 
 3. **Security Information** ✅ You have this
-   - URL: https://www.myphonefriend.com/security
+   - URL: https://www.biancawellness.com/security
    - Covers: How you protect data
    - Required by: Transparency, marketing
 
 4. **Terms of Service** (Check if you have)
-   - URL: https://www.myphonefriend.com/terms
+   - URL: https://www.biancawellness.com/terms
    - Covers: Legal terms, limitations, rights
 
 5. **HIPAA Compliance Statement** 🟡 Create this
-   - URL: https://www.myphonefriend.com/hipaa-compliance
+   - URL: https://www.biancawellness.com/hipaa-compliance
    - Covers: High-level compliance statement
    - Required by: Customer confidence, B2B sales
 
@@ -445,7 +445,7 @@ Ensure it's published on your website
 
 **Website** (public):
 ```
-https://www.myphonefriend.com/
+https://www.biancawellness.com/
 ├── /privacy            ✅ Privacy Policy (exists)
 ├── /privacy-practices  🟡 Notice of Privacy Practices (CREATE THIS)
 ├── /security           ✅ Security Info (exists)
@@ -487,7 +487,7 @@ Required Actions:
 These policies are CONFIDENTIAL and for internal use only. 
 Do not share outside the company.
 
-Questions? Contact security@myphonefriend.com
+Questions? Contact security@biancawellness.com
 
 - HIPAA Security Officer
 ```
@@ -559,7 +559,7 @@ You have the right to:
 
 ## COMPLAINTS
 If you believe your privacy rights have been violated:
-- File with us: privacy@myphonefriend.com
+- File with us: privacy@biancawellness.com
 - File with HHS: www.hhs.gov/hipaa/filing-a-complaint
 
 You will not be retaliated against for filing a complaint.
@@ -568,7 +568,7 @@ You will not be retaliated against for filing a complaint.
 We reserve the right to change this notice...
 
 ## CONTACT
-Privacy Officer: privacy@myphonefriend.com
+Privacy Officer: privacy@biancawellness.com
 [Address]
 [Phone]
 ```

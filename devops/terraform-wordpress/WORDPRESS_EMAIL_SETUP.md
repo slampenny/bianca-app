@@ -16,7 +16,7 @@ WordPress containers don't have email capabilities by default. The WordPress con
 
 ## Prerequisites
 
-1. ✅ **SES Domain Verified**: The domain `myphonefriend.com` should be verified in AWS SES
+1. ✅ **SES Domain Verified**: The domain `biancawellness.com` should be verified in AWS SES
 2. ✅ **IAM Permissions**: The WordPress EC2 instance has SES permissions (already configured)
 3. ✅ **SES Out of Sandbox**: If SES is in sandbox mode, you can only send to verified email addresses
 4. ⚠️ **SES SMTP Credentials**: You need to create SMTP credentials in AWS SES Console (IAM role won't work for SMTP)
@@ -111,7 +111,7 @@ sudo docker exec bianca-wordpress wp mail test your-email@example.com --allow-ro
 ```
 
 Or test via WordPress admin:
-1. Go to `https://myphonefriend.com/wp-admin`
+1. Go to `https://biancawellness.com/wp-admin`
 2. Navigate to **WP Mail SMTP → Tools → Email Test**
 3. Enter your email and send
 
@@ -152,7 +152,7 @@ function configure_ses_smtp($phpmailer) {
     $phpmailer->Username = getenv('SES_SMTP_USERNAME') ?: '';
     $phpmailer->Password = getenv('SES_SMTP_PASSWORD') ?: '';
     
-    $phpmailer->From = 'noreply@myphonefriend.com';
+    $phpmailer->From = 'noreply@biancawellness.com';
     $phpmailer->FromName = 'My Phone Friend';
     
     // Enable debugging if needed
@@ -257,7 +257,7 @@ Then update the docker-compose.yml to use this custom image.
 4. **Check SES Domain Verification**:
    ```bash
    aws ses get-identity-verification-attributes \
-     --identities myphonefriend.com \
+     --identities biancawellness.com \
      --region us-east-2
    ```
    Should show `VerificationStatus: Success`
@@ -266,7 +266,7 @@ Then update the docker-compose.yml to use this custom image.
    ```bash
    # SSH into WordPress instance
    aws ses send-email \
-     --from noreply@myphonefriend.com \
+     --from noreply@biancawellness.com \
      --to your-email@example.com \
      --subject "Test Email" \
      --text "This is a test" \
@@ -289,7 +289,7 @@ Then update the docker-compose.yml to use this custom image.
 
 ## Verification Checklist
 
-- [ ] SES domain `myphonefriend.com` is verified
+- [ ] SES domain `biancawellness.com` is verified
 - [ ] DKIM records are configured (3 CNAME records)
 - [ ] SPF record is configured
 - [ ] WordPress SMTP plugin is installed and configured

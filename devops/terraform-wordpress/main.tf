@@ -496,6 +496,20 @@ resource "aws_instance" "wordpress" {
     encrypted   = true
   }
 
+  # Enable detailed monitoring for auto-recovery
+  monitoring = true
+
+  # Enable auto-recovery if instance fails health checks
+  # This will automatically restart the instance if it becomes impaired
+  # AWS will migrate the instance to new hardware while preserving:
+  # - Instance ID
+  # - Private IP addresses
+  # - Elastic IP addresses
+  # - All instance metadata
+  maintenance_options {
+    auto_recovery = "default"
+  }
+
   tags = {
     Name        = "bianca-wordpress"
     Environment = var.environment
@@ -688,6 +702,127 @@ resource "aws_route53_record" "wordpress_www" {
 # The WordPress instance has IAM permissions to send emails via SES (configured above).
 # WordPress itself needs to be configured to use SES via an SMTP plugin.
 # See WORDPRESS_EMAIL_SETUP.md for instructions.
+
+################################################################################
+# CLOUDWATCH MONITORING & AUTO-RECOVERY
+################################################################################
+
+# SNS Topic for WordPress alerts
+resource "aws_sns_topic" "wordpress_alerts" {
+  name = "bianca-wordpress-alerts"
+  
+  tags = {
+    Environment = var.environment
+    Project     = "bianca"
+    Purpose     = "WordPress monitoring alerts"
+    ManagedBy   = "terraform-wordpress"
+  }
+}
+
+# CloudWatch Alarm: System Status Check Failed
+# Triggers auto-recovery when instance becomes impaired
+resource "aws_cloudwatch_metric_alarm" "wordpress_system_status_failed" {
+  alarm_name          = "wordpress-system-status-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "StatusCheckFailed_System"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Maximum"
+  threshold           = "0"
+  alarm_description   = "This metric monitors WordPress instance system status check failures. Auto-recovery will be triggered."
+  alarm_actions       = [
+    # Auto-recovery is handled by maintenance_options.auto_recovery above
+    # This alarm is for monitoring/alerting purposes
+    aws_sns_topic.wordpress_alerts.arn
+  ]
+
+  dimensions = {
+    InstanceId = aws_instance.wordpress.id
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = "bianca"
+    ManagedBy   = "terraform-wordpress"
+  }
+}
+
+# CloudWatch Alarm: Instance Status Check Failed
+# Alerts when application/OS issues occur (auto-recovery handles system issues)
+resource "aws_cloudwatch_metric_alarm" "wordpress_instance_status_failed" {
+  alarm_name          = "wordpress-instance-status-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "StatusCheckFailed_Instance"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Maximum"
+  threshold           = "0"
+  alarm_description   = "This metric monitors WordPress instance status check failures (application/OS issues). May require manual intervention."
+  alarm_actions       = [aws_sns_topic.wordpress_alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.wordpress.id
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = "bianca"
+    ManagedBy   = "terraform-wordpress"
+  }
+}
+
+# CloudWatch Alarm: ALB Target Health
+# Alerts when WordPress site becomes unavailable (target unhealthy)
+resource "aws_cloudwatch_metric_alarm" "wordpress_alb_target_unhealthy" {
+  alarm_name          = "wordpress-alb-target-unhealthy"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "UnHealthyHostCount"
+  namespace           = "AWS/ApplicationELB"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "0"
+  alarm_description   = "This metric monitors WordPress ALB target health. Alerts when site becomes unavailable."
+  alarm_actions       = [aws_sns_topic.wordpress_alerts.arn]
+
+  dimensions = {
+    TargetGroup  = aws_lb_target_group.wordpress.arn_suffix
+    LoadBalancer = aws_lb.wordpress.arn_suffix
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = "bianca"
+    ManagedBy   = "terraform-wordpress"
+  }
+}
+
+# CloudWatch Alarm: High CPU Usage
+# Alerts when instance might be under resource pressure
+resource "aws_cloudwatch_metric_alarm" "wordpress_high_cpu" {
+  alarm_name          = "wordpress-high-cpu"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "This metric monitors WordPress instance CPU utilization. High CPU may indicate resource constraints."
+  alarm_actions       = [aws_sns_topic.wordpress_alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.wordpress.id
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = "bianca"
+    ManagedBy   = "terraform-wordpress"
+  }
+}
 
 ################################################################################
 # OUTPUTS

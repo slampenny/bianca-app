@@ -1318,7 +1318,7 @@ Next Month's Focus:
 
 ---
 
-**For Questions**: Contact HIPAA Security Officer at security@myphonefriend.com
+**For Questions**: Contact HIPAA Security Officer at security@biancawellness.com
 
 **Remember**: Audit log review is required by HIPAA. Missing reviews = compliance violation.
 

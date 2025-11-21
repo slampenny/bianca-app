@@ -73,8 +73,8 @@ Once you push to `staging` branch:
 ## 🔍 Monitoring
 
 - Check workflow runs: GitHub Actions tab
-- Check deployment: `https://staging-api.myphonefriend.com/health`
-- Check PostHog: `https://staging-analytics.myphonefriend.com`
+- Check deployment: `https://staging-api.biancawellness.com/health`
+- Check PostHog: `https://staging-analytics.biancawellness.com`
 
 ## 🐛 Troubleshooting
 

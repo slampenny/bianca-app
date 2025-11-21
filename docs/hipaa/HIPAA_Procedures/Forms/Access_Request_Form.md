@@ -270,7 +270,7 @@ I have reviewed this request and confirm it complies with minimum necessary stan
 **For Hiring Managers**:
 1. Complete Sections 1-6
 2. Sign in Section 8 (Manager Approval)
-3. Email to security@myphonefriend.com
+3. Email to security@biancawellness.com
 4. Expect approval within 1-2 business days
 
 **For Security Officer**:
@@ -298,7 +298,7 @@ I have reviewed this request and confirm it complies with minimum necessary stan
 **Last Updated**: October 15, 2025  
 **Next Review**: October 15, 2026
 
-**Questions?** Contact HIPAA Security Officer at security@myphonefriend.com
+**Questions?** Contact HIPAA Security Officer at security@biancawellness.com
 
 
 

@@ -7,6 +7,10 @@ CONFLUENCE_URL="${CONFLUENCE_URL:-https://biancatechnologies.atlassian.net}"
 SPACE_KEY="${SPACE_KEY:-BTD}"
 DOCS_DIR="bianca-app-backend/docs"
 
+# Determine script directory and calculate path to .env
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../.env}"
+
 echo "=========================================="
 echo "Complete Documentation Importer"
 echo "=========================================="
@@ -23,12 +27,36 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-# Get credentials
+# Load credentials from .env file
+if [ -f "$ENV_FILE" ]; then
+    echo "Loading credentials from .env file..."
+    # Read .env file and export variables (handles comments, empty lines, and quoted values)
+    set -a
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line// }" ]] && continue
+        # Remove leading/trailing whitespace
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        # Export the variable (handles KEY=VALUE format)
+        if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            export "$line" 2>/dev/null || true
+        fi
+    done < "$ENV_FILE"
+    set +a
+    echo "✅ Loaded .env file"
+else
+    echo "⚠️  Warning: .env file not found at $ENV_FILE"
+    echo "   Falling back to environment variables or interactive input"
+fi
+
+# Get credentials (from .env, environment, or interactive)
 if [ -z "$CONFLUENCE_EMAIL" ]; then
     if [ -t 0 ]; then
         read -p "Enter your Confluence email: " CONFLUENCE_EMAIL
     else
-        echo "Error: CONFLUENCE_EMAIL environment variable is required"
+        echo "Error: CONFLUENCE_EMAIL not found in .env file or environment variables"
+        echo "   Add CONFLUENCE_EMAIL=your-email@example.com to $ENV_FILE"
         exit 1
     fi
 fi
@@ -44,7 +72,8 @@ if [ -z "$CONFLUENCE_API_TOKEN" ]; then
         read -sp "Enter your Confluence API token: " CONFLUENCE_API_TOKEN
         echo ""
     else
-        echo "Error: CONFLUENCE_API_TOKEN environment variable is required"
+        echo "Error: CONFLUENCE_API_TOKEN not found in .env file or environment variables"
+        echo "   Add CONFLUENCE_API_TOKEN=your-token to $ENV_FILE"
         exit 1
     fi
 fi
@@ -208,9 +237,9 @@ convert_markdown_to_confluence() {
 declare -A CATEGORY_MAP
 CATEGORY_MAP["hipaa"]="🔒 HIPAA Compliance"
 CATEGORY_MAP["legal"]="📜 Legal & Privacy"
-CATEGORY_MAP["deployment"]="🚀 Deployment"
+CATEGORY_MAP["deployment"]="🚀 Deployment & Operations"
 CATEGORY_MAP["technical"]="⚙️ Technical Documentation"
-CATEGORY_MAP["testing"]="🧪 Testing"
+CATEGORY_MAP["planning"]="📋 Planning & Refactoring"
 CATEGORY_MAP["organization"]="📋 Organization"
 CATEGORY_MAP["ai-system"]="🤖 AI & Machine Learning"
 CATEGORY_MAP["root"]="📚 General Documentation"
@@ -222,8 +251,12 @@ IMPORTED=0
 SKIPPED=0
 FAILED=0
 
-# Process all markdown files
-find "$DOCS_DIR" -name "*.md" -type f | sort | while read filepath; do
+# Process all markdown files (exclude archive and README files in subdirectories)
+find "$DOCS_DIR" -name "*.md" -type f \
+    -not -path "*/archive-obsolete-2025-11/*" \
+    -not -path "*/archive-*/*" \
+    -not -name "README.md" \
+    | sort | while read filepath; do
     # Get relative path from docs directory
     rel_path=${filepath#$DOCS_DIR/}
     
@@ -240,9 +273,9 @@ find "$DOCS_DIR" -name "*.md" -type f | sort | while read filepath; do
     elif [[ "$rel_path" == technical/* ]]; then
         category="technical"
         sub_path=${rel_path#technical/}
-    elif [[ "$rel_path" == testing/* ]]; then
-        category="testing"
-        sub_path=${rel_path#testing/}
+    elif [[ "$rel_path" == planning/* ]]; then
+        category="planning"
+        sub_path=${rel_path#planning/}
     elif [[ "$rel_path" == organization/* ]]; then
         category="organization"
         sub_path=${rel_path#organization/}

@@ -124,13 +124,13 @@ After WordPress is set up and DNS has propagated:
 
 1. SSH to instance: `terraform output wordpress_ssh_command`
 2. Stop nginx: `cd /opt/bianca-wordpress && sudo docker-compose stop nginx`
-3. Get SSL cert: `sudo certbot certonly --standalone -d myphonefriend.com -d www.myphonefriend.com`
+3. Get SSL cert: `sudo certbot certonly --standalone -d biancawellness.com -d www.biancawellness.com`
 4. Update nginx.conf to include HTTPS server block
 5. Restart nginx: `sudo docker-compose start nginx`
 
 Or use certbot nginx plugin (if DNS is fully propagated):
 ```bash
-sudo certbot --nginx -d myphonefriend.com -d www.myphonefriend.com
+sudo certbot --nginx -d biancawellness.com -d www.biancawellness.com
 ```
 
 ---

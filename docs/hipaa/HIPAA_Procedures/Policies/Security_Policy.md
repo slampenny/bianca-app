@@ -606,7 +606,7 @@ All vendors with ePHI access must provide:
 ### 22.2 Phishing Protection
 - **Training**: Annual phishing awareness training
 - **Simulation**: Quarterly phishing tests
-- **Reporting**: Report suspicious emails to security@myphonefriend.com
+- **Reporting**: Report suspicious emails to security@biancawellness.com
 - **Response**: Immediate investigation of phishing attempts
 
 ---
@@ -848,7 +848,7 @@ I acknowledge that I have read, understood, and agree to comply with this Inform
 ---
 
 **Policy Owner**: HIPAA Security Officer  
-**Questions**: security@myphonefriend.com  
+**Questions**: security@biancawellness.com  
 **Emergency**: [Emergency contact]
 
 ---

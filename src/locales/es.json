@@ -26,5 +26,13 @@
 		"helpExpired": "Por favor solicite un nuevo correo de verificación desde la pantalla de inicio de sesión.",
 		"helpGeneric": "Si cree que esto es un error, por favor contacte al soporte.",
 		"loginButton": "Ir al inicio de sesión"
+	},
+	"smsVerification": {
+		"message": "Su código de verificación de Bianca es: %s. Este código expira en 10 minutos."
+	},
+	"emergencyAlert": {
+		"CRITICAL": "🚨 EMERGENCIA CRÍTICA: %s - %s: %s",
+		"HIGH": "⚠️ ALTA PRIORIDAD: %s - %s: %s",
+		"MEDIUM": "📢 ALERTA: %s - %s: %s"
 	}
 }

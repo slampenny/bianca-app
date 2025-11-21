@@ -26,5 +26,13 @@
 		"helpExpired": "Please request a new verification email from the login screen.",
 		"helpGeneric": "If you believe this is an error, please contact support.",
 		"loginButton": "Go to Login"
+	},
+	"smsVerification": {
+		"message": "Your Bianca verification code is: %s. This code expires in 10 minutes."
+	},
+	"emergencyAlert": {
+		"CRITICAL": "🚨 CRITICAL EMERGENCY: %s - %s: %s",
+		"HIGH": "⚠️ HIGH PRIORITY: %s - %s: %s",
+		"MEDIUM": "📢 ALERT: %s - %s: %s"
 	}
 }

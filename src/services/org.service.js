@@ -167,7 +167,17 @@ const sendInvite = async (orgId, name, email, phone) => {
     // Generate invite token and send email
     const inviteToken = await tokenService.generateInviteToken(caregiver);
     const inviteLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
-    await emailService.sendInviteEmail(email, inviteLink);
+    // Get inviter's preferred language for the invite email
+    // If inviter is not found, default to English
+    let locale = 'en';
+    if (inviterId) {
+      const inviter = await Caregiver.findById(inviterId).select('preferredLanguage');
+      if (inviter?.preferredLanguage) {
+        locale = inviter.preferredLanguage;
+      }
+    }
+    
+    await emailService.sendInviteEmail(email, inviteLink, locale);
 
     return { caregiver, inviteToken };
   }

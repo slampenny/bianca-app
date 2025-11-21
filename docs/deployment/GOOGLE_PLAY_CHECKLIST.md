@@ -18,8 +18,8 @@
 - [ ] Permissions properly declared in app.json
 
 ### ✅ Legal Documents
-- [ ] Privacy Policy created and accessible at `https://app.myphonefriend.com/privacy`
-- [ ] Terms of Service created and accessible at `https://app.myphonefriend.com/terms`
+- [ ] Privacy Policy created and accessible at `https://app.biancawellness.com/privacy`
+- [ ] Terms of Service created and accessible at `https://app.biancawellness.com/terms`
 - [ ] Legal links component added to app screens
 - [ ] Privacy policy covers call recording consent
 - [ ] Terms include medical disclaimers
@@ -44,7 +44,7 @@
 - [ ] No console errors in production build
 
 ### ✅ API Configuration
-- [ ] Production API URL configured: `https://app.myphonefriend.com/v1`
+- [ ] Production API URL configured: `https://app.biancawellness.com/v1`
 - [ ] WebSocket URL configured for production
 - [ ] All environment variables set correctly
 - [ ] API endpoints tested in production environment

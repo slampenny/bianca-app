@@ -988,7 +988,7 @@ Date: ___________________________________
 
 **REMEMBER**: The goal of sanctions is to protect patients and maintain compliance, not to punish employees. We encourage a culture of reporting, learning, and improvement.
 
-**Questions?** Contact HIPAA Security Officer at security@myphonefriend.com
+**Questions?** Contact HIPAA Security Officer at security@biancawellness.com
 
 
 

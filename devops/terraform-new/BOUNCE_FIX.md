@@ -15,17 +15,17 @@ Modified Terraform configuration to add corporate email rules to the existing `m
 
 ### Result:
 - ✅ Corporate email rules now in active rule set
-- ✅ Both myphonefriend.com and biancatechnologies.com emails will work
-- ✅ No disruption to existing myphonefriend.com email forwarding
+- ✅ Both biancawellness.com and biancatechnologies.com emails will work
+- ✅ No disruption to existing biancawellness.com email forwarding
 
 ## Current Configuration
 
 **Active Rule Set**: `myphonefriend-email-forwarding`
 
 **Rules in Active Set**:
-- `legal-email-forwarding` → legal@myphonefriend.com
-- `support-email-forwarding` → support@myphonefriend.com  
-- `privacy-email-forwarding` → privacy@myphonefriend.com
+- `legal-email-forwarding` → legal@biancawellness.com
+- `support-email-forwarding` → support@biancawellness.com  
+- `privacy-email-forwarding` → privacy@biancawellness.com
 - `bianca-corp-email-jlapp` → jlapp@biancatechnologies.com ✨ NEW
 - `bianca-corp-email-vthaker` → vthaker@biancatechnologies.com ✨ NEW
 

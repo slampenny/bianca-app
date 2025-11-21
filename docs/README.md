@@ -21,7 +21,7 @@ Welcome to the comprehensive documentation for MyPhoneFriend Backend. This hub p
 
 ### 🔧 **Integration & Setup**
 - [Emergency Integration Guide](../EMERGENCY_INTEGRATION_GUIDE.md) - Emergency system integration
-- [SNS Setup Guide](../SNS_SETUP_GUIDE.md) - AWS SNS configuration
+- [Twilio Configuration](./technical/TWILIO_CONFIGURATION.md) - Twilio setup for voice and SMS
 - [Call Workflow](../CALL_WORKFLOW_README.md) - Call processing workflows
 
 ### 🛠️ **Development**
@@ -43,7 +43,7 @@ Welcome to the comprehensive documentation for MyPhoneFriend Backend. This hub p
 - [AI Test Suite](AI_TEST_SUITE.md) - Complete AI testing overview
 
 ### For DevOps/Integration
-- [SNS Setup Guide](../SNS_SETUP_GUIDE.md) - AWS SNS configuration
+- [Twilio Configuration](./technical/TWILIO_CONFIGURATION.md) - Twilio setup for voice and SMS
 - [Emergency Integration Guide](../EMERGENCY_INTEGRATION_GUIDE.md) - Emergency system setup
 - [Call Workflow](../CALL_WORKFLOW_README.md) - Call processing setup
 

@@ -1,0 +1,39 @@
+{
+	"sendResetPasswordEmail": {
+		"subject": "My Phone Friend - Passwort-Reset-Anfrage",
+		"text": "Liebe Pflegekraft,\n\nWir haben eine Anfrage zum Zurücksetzen des Passworts Ihres My Phone Friend-Kontos erhalten.\n\nUm Ihr Passwort zurückzusetzen, klicken Sie bitte auf den untenstehenden Link:\n\n%s\n\nDieser Reset-Link läuft aus Sicherheitsgründen in 1 Stunde ab.\n\nWenn Sie keine Passwort-Zurücksetzung angefordert haben, ignorieren Sie bitte diese E-Mail. Ihr Konto bleibt sicher.\n\nMit freundlichen Grüßen,\nDas My Phone Friend Team\n\n---\nMy Phone Friend - Sichere Gesundheitskommunikation\nDiese E-Mail wurde von einer verifizierten Domain gesendet: myphonefriend.com"
+	},
+	"sendVerificationEmail": {
+		"subject": "My Phone Friend - Bitte verifizieren Sie Ihre E-Mail-Adresse",
+		"text": "Liebe Pflegekraft,\n\nVielen Dank, dass Sie Ihr My Phone Friend-Konto erstellt haben! Um Ihre Registrierung abzuschließen und die Kontosicherheit zu gewährleisten, verifizieren Sie bitte Ihre E-Mail-Adresse.\n\nKlicken Sie auf den untenstehenden Link, um Ihre E-Mail zu verifizieren:\n\n%s\n\nDieser Verifizierungslink läuft aus Sicherheitsgründen in 24 Stunden ab.\n\nWenn Sie kein My Phone Friend-Konto erstellt haben, ignorieren Sie bitte diese E-Mail.\n\nWillkommen bei der sicheren Gesundheitskommunikation!\n\nMit freundlichen Grüßen,\nDas My Phone Friend Team\n\n---\nMy Phone Friend - Sichere Gesundheitskommunikation\nDiese E-Mail wurde von einer verifizierten Domain gesendet: myphonefriend.com"
+	},
+	"inviteEmail": {
+		"subject": "Willkommen bei My Phone Friend - Einladung zum Beitritt",
+		"text": "Liebe Pflegekraft,\n\nSie wurden eingeladen, My Phone Friend beizutreten, einer sicheren Plattform für Gesundheitskommunikation.\n\nUm Ihre Einladung anzunehmen und Ihr Konto einzurichten, klicken Sie bitte auf den untenstehenden Link:\n\n%s\n\nDiese Einladung läuft aus Sicherheitsgründen in 7 Tagen ab.\n\nWenn Sie diese Einladung nicht erwartet haben, ignorieren Sie bitte diese E-Mail.\n\nMit freundlichen Grüßen,\nDas My Phone Friend Team\n\n---\nMy Phone Friend - Sichere Gesundheitskommunikation\nDiese E-Mail wurde von einer verifizierten Domain gesendet: myphonefriend.com"
+	},
+	"emailVerifiedPage": {
+		"title": "E-Mail verifiziert!",
+		"titleAlreadyVerified": "Bereits verifiziert",
+		"message": "Ihr My Phone Friend-Konto wurde erfolgreich verifiziert.",
+		"messageAlreadyVerified": "Ihre E-Mail ist bereits verifiziert. Sie können sich anmelden.",
+		"redirecting": "Weiterleitung zur App...",
+		"continueButton": "Zur App fortfahren"
+	},
+	"emailVerificationFailedPage": {
+		"title": "Verifizierung fehlgeschlagen",
+		"messageInvalid": "Dieser Verifizierungslink ist ungültig oder abgelaufen.",
+		"messageExpired": "Dieser Verifizierungslink ist abgelaufen.",
+		"helpExpired": "Bitte fordern Sie eine neue Verifizierungs-E-Mail vom Anmeldebildschirm an.",
+		"helpGeneric": "Wenn Sie glauben, dass dies ein Fehler ist, kontaktieren Sie bitte den Support.",
+		"loginButton": "Zur Anmeldung gehen"
+	},
+	"smsVerification": {
+		"message": "Ihr Bianca-Verifizierungscode lautet: %s. Dieser Code läuft in 10 Minuten ab."
+	},
+	"emergencyAlert": {
+		"CRITICAL": "🚨 KRITISCHER NOTFALL: %s - %s: %s",
+		"HIGH": "⚠️ HOHE PRIORITÄT: %s - %s: %s",
+		"MEDIUM": "📢 WARNUNG: %s - %s: %s"
+	}
+}
+

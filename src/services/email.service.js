@@ -7,8 +7,9 @@ const config = require('../config/config'); // Your application's config file
 const logger = require('../config/logger'); // Your application's logger
 
 // Configure i18n for email service
+// Support all languages that frontend supports
 i18n.configure({
-  locales: ['en', 'es'],
+  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
   directory: `${__dirname}/../locales`,
   objectNotation: true,
   defaultLocale: 'en',
@@ -17,7 +18,7 @@ i18n.configure({
   },
 });
 
-// Set locale to English for email service
+// Default locale - will be overridden per-email based on user preference
 i18n.setLocale('en');
 
 let transport;
@@ -339,9 +340,14 @@ const sendEmail = async (to, subject, text, html) => {
  * Send invite email
  * @param {string} to
  * @param {string} inviteLink
+ * @param {string} [locale='en'] - User's preferred language
  * @returns {Promise}
  */
-const sendInviteEmail = async (to, inviteLink) => {
+const sendInviteEmail = async (to, inviteLink, locale = 'en') => {
+  // Set locale for this email
+  const previousLocale = i18n.getLocale();
+  i18n.setLocale(locale);
+  
   const subject = i18n.__ ? i18n.__('inviteEmail.subject') : 'Welcome to My Phone Friend - Invitation to Join';
   
   let text;
@@ -369,22 +375,31 @@ const sendInviteEmail = async (to, inviteLink) => {
         <p style="color: #555; line-height: 1.6; margin-top: 30px;">Welcome to secure healthcare communication!</p>
         <p style="color: #555; line-height: 1.6;">Best regards,<br>The My Phone Friend Team</p>
         <hr style="border: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: myphonefriend.com</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
       </div>
     </div>
   `;
   
   await sendEmail(to, subject, text, html);
-  logger.info(`Invite email successfully queued for ${to}`);
+  
+  // Restore previous locale
+  i18n.setLocale(previousLocale);
+  
+  logger.info(`Invite email successfully queued for ${to} (locale: ${locale})`);
 };
 
 /**
  * Send reset password email
  * @param {string} to
  * @param {string} token
+ * @param {string} [locale='en'] - User's preferred language
  * @returns {Promise}
  */
-const sendResetPasswordEmail = async (to, token) => {
+const sendResetPasswordEmail = async (to, token, locale = 'en') => {
+  // Set locale for this email
+  const previousLocale = i18n.getLocale();
+  i18n.setLocale(locale);
+  
   const subject = i18n.__ ? i18n.__('sendResetPasswordEmail.subject') : 'My Phone Friend - Password Reset Request';
   const resetLink = `${config.frontendUrl}/reset-password?token=${token}`;
   
@@ -412,13 +427,17 @@ const sendResetPasswordEmail = async (to, token) => {
         <p style="color: #777; font-size: 14px;">If you did not request a password reset, please ignore this email. Your account remains secure.</p>
         <p style="color: #555; line-height: 1.6; margin-top: 30px;">Best regards,<br>The My Phone Friend Team</p>
         <hr style="border: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: myphonefriend.com</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
       </div>
     </div>
   `;
   
   await sendEmail(to, subject, text, html);
-  logger.info(`Reset password email successfully queued for ${to}`);
+  
+  // Restore previous locale
+  i18n.setLocale(previousLocale);
+  
+  logger.info(`Reset password email successfully queued for ${to} (locale: ${locale})`);
 };
 
 /**
@@ -426,9 +445,14 @@ const sendResetPasswordEmail = async (to, token) => {
  * @param {string} to
  * @param {string} token
  * @param {string} [caregiverName] - Optional caregiver name for personalization
+ * @param {string} [locale='en'] - User's preferred language
  * @returns {Promise}
  */
-const sendVerificationEmail = async (to, token, caregiverName = null) => {
+const sendVerificationEmail = async (to, token, caregiverName = null, locale = 'en') => {
+  // Set locale for this email
+  const previousLocale = i18n.getLocale();
+  i18n.setLocale(locale);
+  
   const subject = i18n.__ ? i18n.__('sendVerificationEmail.subject') : 'My Phone Friend - Please Verify Your Email Address';
   
   // Always use frontend URL - frontend will handle routing to backend
@@ -466,13 +490,17 @@ const sendVerificationEmail = async (to, token, caregiverName = null) => {
         <p style="color: #555; line-height: 1.6; margin-top: 30px;">Welcome to secure healthcare communication!</p>
         <p style="color: #555; line-height: 1.6;">Best regards,<br>The My Phone Friend Team</p>
         <hr style="border: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: myphonefriend.com</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
       </div>
     </div>
   `;
   
   await sendEmail(to, subject, text, html);
-  logger.info(`Verification email successfully queued for ${to}`);
+  
+  // Restore previous locale
+  i18n.setLocale(previousLocale);
+  
+  logger.info(`Verification email successfully queued for ${to} (locale: ${locale})`);
 };
 
 /**

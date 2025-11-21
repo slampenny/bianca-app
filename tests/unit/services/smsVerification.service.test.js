@@ -32,11 +32,25 @@ describe('SMS Verification Service', () => {
     if (twilioSmsService.formatPhoneNumber) {
       jest.spyOn(twilioSmsService, 'formatPhoneNumber').mockImplementation((phone) => {
         if (!phone) return null;
+        // Remove all non-digit characters for processing
         const digits = phone.replace(/\D/g, '');
+        
+        // If already in E.164 format (+ followed by digits), return as-is if valid
+        if (phone.startsWith('+') && digits.length >= 10 && digits.length <= 15) {
+          return phone;
+        }
+        
+        // Add +1 if it's a 10-digit US/Canada number
         if (digits.length === 10) {
           return `+1${digits}`;
         }
-        return phone.startsWith('+') ? phone : `+${phone}`;
+        
+        // Add + if it's an 11-digit number starting with 1
+        if (digits.length === 11 && digits.startsWith('1')) {
+          return `+${digits}`;
+        }
+        
+        return null; // Invalid format
       });
     }
     if (twilioSmsService.isValidPhoneNumber) {

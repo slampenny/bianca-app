@@ -2,7 +2,7 @@
 
 ## Web Frontend Deployment
 
-### Option 1: Deploy to app.myphonefriend.com (Recommended)
+### Option 1: Deploy to app.biancawellness.com (Recommended)
 
 1. **Build the web version:**
    ```bash
@@ -21,12 +21,12 @@
 
 3. **Configure custom domain:**
    - In Vercel dashboard, go to your project settings
-   - Add custom domain: `app.myphonefriend.com`
+   - Add custom domain: `app.biancawellness.com`
    - Update DNS records to point to Vercel
 
 ### Option 2: Deploy to subdomain
 
-Deploy to `web.app.myphonefriend.com`:
+Deploy to `web.app.biancawellness.com`:
 ```bash
 vercel --prod --name bianca-web
 ```
@@ -50,8 +50,8 @@ vercel --prod --name bianca-web
    - App title: "MyPhoneFriend"
    - Short description: "AI-powered wellness check calls"
    - Full description: Use your existing app description
-   - Privacy Policy URL: `https://app.myphonefriend.com/privacy`
-   - Terms of Service URL: `https://app.myphonefriend.com/terms`
+   - Privacy Policy URL: `https://app.biancawellness.com/privacy`
+   - Terms of Service URL: `https://app.biancawellness.com/terms`
 
 ### Build and Submit
 
@@ -68,11 +68,11 @@ vercel --prod --name bianca-web
 ### Required App Store Information
 
 #### Privacy Policy
-- URL: `https://app.myphonefriend.com/privacy`
+- URL: `https://app.biancawellness.com/privacy`
 - Already created in `legal/PRIVACY.md`
 
 #### Terms of Service  
-- URL: `https://app.myphonefriend.com/terms`
+- URL: `https://app.biancawellness.com/terms`
 - Already created in `legal/TERMS.md`
 
 #### App Permissions
@@ -156,7 +156,7 @@ Ensure these are set in your deployment environment:
 
 ```bash
 # Production API URL
-API_URL=https://app.myphonefriend.com/v1
+API_URL=https://app.biancawellness.com/v1
 
 # Google Play Store credentials
 GOOGLE_SERVICE_ACCOUNT_KEY_PATH=./google-service-account.json

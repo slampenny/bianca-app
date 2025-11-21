@@ -478,8 +478,8 @@ Use this checklist when evaluating new vendors:
 ## CONTACTS
 
 **Internal**:
-- Security Officer: security@myphonefriend.com
-- Legal Counsel: legal@myphonefriend.com
+- Security Officer: security@biancawellness.com
+- Legal Counsel: legal@biancawellness.com
 
 **External Vendors**:
 - Azure: Azure support portal

@@ -36,3 +36,4 @@ echo "If the issue persists, you may need to restart the WordPress container:"
 echo "  cd /opt/bianca-wordpress"
 echo "  docker-compose restart wordpress"
 
+

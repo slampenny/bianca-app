@@ -3,6 +3,18 @@
 const { config: emergencyConfig } = require('../config/emergency.config');
 const { twilioSmsService } = require('./twilioSms.service');
 const logger = require('../config/logger');
+const i18n = require('i18n');
+
+// Configure i18n for emergency alerts (same config as email service)
+i18n.configure({
+  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
+  directory: `${__dirname}/../locales`,
+  objectNotation: true,
+  defaultLocale: 'en',
+  logWarnFn(msg) {
+    // do nothing
+  },
+});
 
 /**
  * Emergency Alert Service (uses Twilio for SMS)
@@ -74,9 +86,6 @@ class SNSService {
         return { success: false, reason: 'No caregivers to notify' };
       }
 
-      // Create message based on severity
-      const message = this.createMessage(alertData);
-      
       // Get unique phone numbers from caregivers using Twilio service
       const phoneNumbers = twilioSmsService.extractPhoneNumbers(caregivers);
       
@@ -85,17 +94,38 @@ class SNSService {
         return { success: false, reason: 'No valid phone numbers' };
       }
 
-      // Send to each phone number using Twilio
+      // Create a map of phone number to caregiver for locale lookup
+      const phoneToCaregiver = new Map();
+      caregivers.forEach(caregiver => {
+        const phone = twilioSmsService.formatPhoneNumber(caregiver.phone);
+        if (phone) {
+          phoneToCaregiver.set(phone, caregiver);
+        }
+      });
+
+      // Send to each phone number using Twilio with localized messages
+      const previousLocale = i18n.getLocale();
       const results = await Promise.allSettled(
-        phoneNumbers.map(phoneNumber => 
-          twilioSmsService.sendSMS(phoneNumber, message, {
+        phoneNumbers.map(phoneNumber => {
+          // Get caregiver's preferred language for this phone number
+          const caregiver = phoneToCaregiver.get(phoneNumber);
+          const locale = caregiver?.preferredLanguage || 'en';
+          
+          // Create localized message for this caregiver (createMessage handles locale internally)
+          const message = this.createMessage(alertData, locale);
+          
+          return twilioSmsService.sendSMS(phoneNumber, message, {
             severity: alertData?.severity,
             category: alertData?.category,
             patientId: alertData?.patientId,
-            alertType: 'emergency'
-          })
-        )
+            alertType: 'emergency',
+            locale: locale
+          });
+        })
       );
+      
+      // Restore previous locale
+      i18n.setLocale(previousLocale);
 
       const successful = results.filter(result => result.status === 'fulfilled').length;
       const failed = results.filter(result => result.status === 'rejected').length;
@@ -123,16 +153,41 @@ class SNSService {
 
   /**
    * Create message text based on alert data
+   * @param {Object} alertData - Alert information
+   * @param {string} [locale='en'] - Locale for message
    * @private
    */
-  createMessage(alertData) {
-    const template = emergencyConfig.sns.messageTemplate[alertData.severity] || 
-                    emergencyConfig.sns.messageTemplate.MEDIUM;
+  createMessage(alertData, locale = 'en') {
+    const patientName = alertData.patientName || 'Unknown Patient';
+    const category = alertData.category || 'Unknown';
+    const phrase = alertData.phrase || 'Emergency detected';
+    const severityKey = alertData.severity || 'MEDIUM';
+    
+    // Try to use localized template from i18n
+    if (i18n.__) {
+      const previousLocale = i18n.getLocale();
+      i18n.setLocale(locale);
+      const template = i18n.__(`emergencyAlert.${severityKey}`);
+      i18n.setLocale(previousLocale);
+      
+      // If template found and valid (not the key itself), use it
+      if (template && !template.includes('emergencyAlert.')) {
+        // Replace placeholders in order: patientName, category, phrase
+        return template
+          .replace('%s', patientName)
+          .replace('%s', category)
+          .replace('%s', phrase);
+      }
+    }
+    
+    // Fallback to config template or default
+    const template = emergencyConfig.sns.messageTemplate[severityKey] || 
+                     emergencyConfig.sns.messageTemplate.MEDIUM;
 
     return template
-      .replace('{patientName}', alertData.patientName || 'Unknown Patient')
-      .replace('{category}', alertData.category || 'Unknown')
-      .replace('{phrase}', alertData.phrase || 'Emergency detected')
+      .replace('{patientName}', patientName)
+      .replace('{category}', category)
+      .replace('{phrase}', phrase)
       .replace('{timestamp}', new Date().toLocaleString());
   }
 
