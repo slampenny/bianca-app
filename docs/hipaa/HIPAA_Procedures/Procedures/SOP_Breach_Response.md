@@ -113,7 +113,7 @@ db.caregivers.updateOne(
 **Within 1 Hour**:
 
 **Step 1: Notify Security Officer**
-- **Email**: security@myphonefriend.com
+- **Email**: security@biancawellness.com
 - **Phone**: [Security Officer phone]
 - **Information needed**:
   - What happened?
@@ -888,8 +888,8 @@ const stats = await breachDetectionService.getBreachStatistics(30);
 ## 22. CONTACTS
 
 ### Internal:
-- **Security Officer**: security@myphonefriend.com | [Phone]
-- **Legal**: legal@myphonefriend.com | [Phone]
+- **Security Officer**: security@biancawellness.com | [Phone]
+- **Legal**: legal@biancawellness.com | [Phone]
 - **CEO**: [Email] | [Phone]
 - **CTO**: [Email] | [Phone]
 

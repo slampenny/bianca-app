@@ -184,7 +184,7 @@ Only access the minimum PHI needed to do your job.
 - ✅ Report potential breaches within 1 hour
 - ✅ Report lost/stolen devices immediately
 - ✅ Report policy violations
-- ✅ Contact: security@myphonefriend.com
+- ✅ Contact: security@biancawellness.com
 
 **5. Complete Training**
 - ✅ Annual HIPAA training (this training)
@@ -235,7 +235,7 @@ Your account will be suspended unless you click here: [malicious link]
 **How to Protect**:
 - ✅ Verify sender email carefully
 - ✅ Never click suspicious links
-- ✅ Report to security@myphonefriend.com
+- ✅ Report to security@biancawellness.com
 - ✅ When in doubt, don't click
 
 **2. Social Engineering**
@@ -432,7 +432,7 @@ Your account will be suspended unless you click here: [malicious link]
 ### How to Report
 
 **Method 1: Email** (non-emergency)
-- **To**: security@myphonefriend.com
+- **To**: security@biancawellness.com
 - **Subject**: Security Incident Report
 - **Include**: What happened, when, who involved
 
@@ -600,7 +600,7 @@ Click here to update your credentials: [link]
 
 **What to Do**:
 1. Don't click anything
-2. Forward to security@myphonefriend.com
+2. Forward to security@biancawellness.com
 3. Delete the email
 4. Pat yourself on the back for recognizing phishing!
 
@@ -821,7 +821,7 @@ Audit logs in our system:
 │  • Take PHI home on personal devices            │
 │                                                  │
 │ 🚨 REPORT TO:                                   │
-│  security@myphonefriend.com                     │
+│  security@biancawellness.com                     │
 │  Phone: [Security Officer]                      │
 │                                                  │
 │ REMEMBER: All access is logged and reviewed!    │
@@ -877,7 +877,7 @@ Audit logs in our system:
 
 **Questions about this training?**  
 Contact: HIPAA Security Officer  
-Email: security@myphonefriend.com  
+Email: security@biancawellness.com  
 Phone: [Security Officer phone]
 
 ---

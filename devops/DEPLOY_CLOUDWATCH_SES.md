@@ -20,7 +20,7 @@
 ### 3. SES Bounce/Complaint Notifications
 - SNS Topic: `bianca-staging-ses-bounce-complaint`
 - Email subscription: `jlapp@biancatechnologies.com`
-- Configured for `myphonefriend.com` domain
+- Configured for `biancawellness.com` domain
 - Includes original headers for debugging
 
 ## Deployment Steps
@@ -49,10 +49,10 @@ TOPIC_ARN=$(aws sns create-topic --profile jordan --name "bianca-staging-ses-bou
 aws sns subscribe --profile jordan --topic-arn "$TOPIC_ARN" --protocol email --notification-endpoint "jlapp@biancatechnologies.com"
 
 # Configure SES Notifications
-aws ses set-identity-notification-topic --profile jordan --identity "myphonefriend.com" --notification-type Bounce --sns-topic "$TOPIC_ARN"
-aws ses set-identity-notification-topic --profile jordan --identity "myphonefriend.com" --notification-type Complaint --sns-topic "$TOPIC_ARN"
-aws ses set-identity-headers-in-notifications-enabled --profile jordan --identity "myphonefriend.com" --notification-type Bounce --enabled
-aws ses set-identity-headers-in-notifications-enabled --profile jordan --identity "myphonefriend.com" --notification-type Complaint --enabled
+aws ses set-identity-notification-topic --profile jordan --identity "biancawellness.com" --notification-type Bounce --sns-topic "$TOPIC_ARN"
+aws ses set-identity-notification-topic --profile jordan --identity "biancawellness.com" --notification-type Complaint --sns-topic "$TOPIC_ARN"
+aws ses set-identity-headers-in-notifications-enabled --profile jordan --identity "biancawellness.com" --notification-type Bounce --enabled
+aws ses set-identity-headers-in-notifications-enabled --profile jordan --identity "biancawellness.com" --notification-type Complaint --enabled
 ```
 
 ## After Deployment
@@ -72,6 +72,6 @@ aws logs describe-log-groups --profile jordan --log-group-name-prefix "/bianca/s
 aws sns list-topics --profile jordan --query "Topics[?contains(TopicArn, 'ses-bounce-complaint')]"
 
 # Check SES Notification Configuration
-aws ses get-identity-notification-attributes --profile jordan --identities myphonefriend.com
+aws ses get-identity-notification-attributes --profile jordan --identities biancawellness.com
 ```
 

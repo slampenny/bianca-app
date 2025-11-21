@@ -12,16 +12,16 @@ terraform apply -var="create_wordpress=true"
 ## Safety Guarantees
 
 ✅ **App subdomains are UNTOUCHED**:
-- `api.myphonefriend.com` - **UNCHANGED** ✓
-- `app.myphonefriend.com` - **UNCHANGED** ✓
-- `staging.myphonefriend.com` - **UNCHANGED** ✓
-- `staging-api.myphonefriend.com` - **UNCHANGED** ✓
-- `sip.myphonefriend.com` - **UNCHANGED** ✓
-- `staging-sip.myphonefriend.com` - **UNCHANGED** ✓
+- `api.biancawellness.com` - **UNCHANGED** ✓
+- `app.biancawellness.com` - **UNCHANGED** ✓
+- `staging.biancawellness.com` - **UNCHANGED** ✓
+- `staging-api.biancawellness.com` - **UNCHANGED** ✓
+- `sip.biancawellness.com` - **UNCHANGED** ✓
+- `staging-sip.biancawellness.com` - **UNCHANGED** ✓
 
 ✅ **WordPress only manages**:
-- `myphonefriend.com` (root domain)
-- `www.myphonefriend.com`
+- `biancawellness.com` (root domain)
+- `www.biancawellness.com`
 
 ## Verification Steps
 
@@ -33,26 +33,26 @@ terraform apply -var="create_wordpress=true"
 2. **Check DNS records**:
    ```bash
    terraform output wordpress_elastic_ip
-   dig myphonefriend.com
-   dig www.myphonefriend.com
+   dig biancawellness.com
+   dig www.biancawellness.com
    ```
 
 3. **Verify app subdomains unchanged**:
    ```bash
-   dig api.myphonefriend.com
-   dig app.myphonefriend.com
-   dig staging.myphonefriend.com
+   dig api.biancawellness.com
+   dig app.biancawellness.com
+   dig staging.biancawellness.com
    ```
 
 4. **Test WordPress**:
    ```bash
    curl -I http://$(terraform output -raw wordpress_instance_ip)
-   curl -I https://myphonefriend.com
+   curl -I https://biancawellness.com
    ```
 
 5. **Check SSL**:
    ```bash
-   openssl s_client -connect myphonefriend.com:443 -servername myphonefriend.com < /dev/null 2>/dev/null | grep -E "subject|issuer"
+   openssl s_client -connect biancawellness.com:443 -servername biancawellness.com < /dev/null 2>/dev/null | grep -E "subject|issuer"
    ```
 
 ## Troubleshooting
@@ -66,18 +66,18 @@ If WordPress isn't responding:
 ## Next Steps After Deployment
 
 1. **Complete WordPress Setup**:
-   - Visit `https://myphonefriend.com`
+   - Visit `https://biancawellness.com`
    - Complete WordPress installation wizard
    - Create admin account
 
 2. **Verify SSL Certificate**:
    - Let's Encrypt certificate should be obtained automatically
-   - Check with: `curl -I https://myphonefriend.com`
+   - Check with: `curl -I https://biancawellness.com`
 
 3. **Test App Subdomains Still Work**:
-   - Verify `https://app.myphonefriend.com` still works
-   - Verify `https://api.myphonefriend.com` still works
-   - Verify `https://staging.myphonefriend.com` still works
+   - Verify `https://app.biancawellness.com` still works
+   - Verify `https://api.biancawellness.com` still works
+   - Verify `https://staging.biancawellness.com` still works
 
 ---
 

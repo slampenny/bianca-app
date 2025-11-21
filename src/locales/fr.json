@@ -1,0 +1,39 @@
+{
+	"sendResetPasswordEmail": {
+		"subject": "My Phone Friend - Demande de réinitialisation du mot de passe",
+		"text": "Cher soignant,\n\nNous avons reçu une demande de réinitialisation du mot de passe de votre compte My Phone Friend.\n\nPour réinitialiser votre mot de passe, veuillez cliquer sur le lien ci-dessous:\n\n%s\n\nCe lien de réinitialisation expirera dans 1 heure pour des raisons de sécurité.\n\nSi vous n'avez pas demandé de réinitialisation de mot de passe, veuillez ignorer cet e-mail. Votre compte reste sécurisé.\n\nCordialement,\nL'équipe My Phone Friend\n\n---\nMy Phone Friend - Communication de santé sécurisée\nCet e-mail a été envoyé depuis un domaine vérifié: myphonefriend.com"
+	},
+	"sendVerificationEmail": {
+		"subject": "My Phone Friend - Veuillez vérifier votre adresse e-mail",
+		"text": "Cher soignant,\n\nMerci d'avoir créé votre compte My Phone Friend! Pour compléter votre inscription et assurer la sécurité du compte, veuillez vérifier votre adresse e-mail.\n\nCliquez sur le lien ci-dessous pour vérifier votre e-mail:\n\n%s\n\nCe lien de vérification expirera dans 24 heures pour des raisons de sécurité.\n\nSi vous n'avez pas créé de compte My Phone Friend, veuillez ignorer cet e-mail.\n\nBienvenue dans la communication de santé sécurisée!\n\nCordialement,\nL'équipe My Phone Friend\n\n---\nMy Phone Friend - Communication de santé sécurisée\nCet e-mail a été envoyé depuis un domaine vérifié: myphonefriend.com"
+	},
+	"inviteEmail": {
+		"subject": "Bienvenue sur My Phone Friend - Invitation à rejoindre",
+		"text": "Cher soignant,\n\nVous avez été invité à rejoindre My Phone Friend, une plateforme sécurisée pour la communication de santé.\n\nPour accepter votre invitation et configurer votre compte, veuillez cliquer sur le lien ci-dessous:\n\n%s\n\nCette invitation expirera dans 7 jours pour des raisons de sécurité.\n\nSi vous ne vous attendiez pas à cette invitation, veuillez ignorer cet e-mail.\n\nCordialement,\nL'équipe My Phone Friend\n\n---\nMy Phone Friend - Communication de santé sécurisée\nCet e-mail a été envoyé depuis un domaine vérifié: myphonefriend.com"
+	},
+	"emailVerifiedPage": {
+		"title": "E-mail vérifié!",
+		"titleAlreadyVerified": "Déjà vérifié",
+		"message": "Votre compte My Phone Friend a été vérifié avec succès.",
+		"messageAlreadyVerified": "Votre e-mail est déjà vérifié. Vous pouvez procéder à la connexion.",
+		"redirecting": "Redirection vers l'application...",
+		"continueButton": "Continuer vers l'application"
+	},
+	"emailVerificationFailedPage": {
+		"title": "Échec de la vérification",
+		"messageInvalid": "Ce lien de vérification est invalide ou a expiré.",
+		"messageExpired": "Ce lien de vérification a expiré.",
+		"helpExpired": "Veuillez demander un nouvel e-mail de vérification depuis l'écran de connexion.",
+		"helpGeneric": "Si vous pensez qu'il s'agit d'une erreur, veuillez contacter le support.",
+		"loginButton": "Aller à la connexion"
+	},
+	"smsVerification": {
+		"message": "Votre code de vérification Bianca est: %s. Ce code expire dans 10 minutes."
+	},
+	"emergencyAlert": {
+		"CRITICAL": "🚨 URGENCE CRITIQUE: %s - %s: %s",
+		"HIGH": "⚠️ HAUTE PRIORITÉ: %s - %s: %s",
+		"MEDIUM": "📢 ALERTE: %s - %s: %s"
+	}
+}
+

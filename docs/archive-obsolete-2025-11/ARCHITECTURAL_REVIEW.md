@@ -2,34 +2,31 @@
 **Date:** January 2025  
 **Codebase:** bianca-app-backend  
 **Framework:** Node.js 18+ with Express.js 4.x  
-**Database:** MongoDB with Mongoose 8.19.3  
-**Review Type:** Comprehensive Full-Stack Architecture Analysis
+**Database:** MongoDB with Mongoose 5.7.7
 
 ---
 
 ## Executive Summary
 
-The backend is a **production-ready healthcare communication platform** built with enterprise-grade security and HIPAA compliance. The architecture follows a **layered MVC pattern** with clear separation of concerns, robust error handling, and extensive security measures.
+The backend is a comprehensive healthcare communication platform built with enterprise-grade security and HIPAA compliance. The architecture follows a layered MVC pattern with clear separation of concerns, robust error handling, and extensive security measures.
 
-### Overall Health Score: **8.5/10** ⭐⭐⭐⭐
+### Overall Health Score: **8.0/10** ⭐
 
 **Strengths:**
 - ✅ Well-organized layered architecture (Routes → Controllers → Services → Models)
 - ✅ Comprehensive HIPAA compliance implementation (95% complete)
-- ✅ Robust error handling and validation patterns
-- ✅ Strong security measures (MFA, audit logging, session timeout, breach detection)
-- ✅ Excellent separation of concerns
-- ✅ Comprehensive testing strategy (unit + integration)
-- ✅ Production-ready deployment configuration (Docker, ECS, Terraform)
-- ✅ Modern Mongoose version (8.19.3) - **Upgraded from previous review**
-- ✅ Well-documented codebase with architectural documentation
+- ✅ Robust error handling and validation
+- ✅ Strong security measures (MFA, audit logging, session timeout)
+- ✅ Good separation of concerns
+- ✅ Comprehensive testing strategy
+- ✅ Production-ready deployment configuration
 
 **Areas for Improvement:**
-- ⚠️ Some services have high complexity (e.g., `openai.realtime.service.js` is 4,049 lines)
+- ⚠️ Mongoose version is outdated (5.7.7, current is 8.x)
+- ⚠️ Some services have high complexity (e.g., `openai.realtime.service.js` is 4000+ lines)
 - ⚠️ Mixed patterns for dependency injection (direct requires vs. service index)
-- ⚠️ No database transaction support identified (MongoDB transactions not used)
-- ⚠️ Missing caching layer (Redis) for performance optimization
-- ⚠️ Limited API documentation (Swagger setup exists but incomplete)
+- ⚠️ Some configuration complexity in `config.js` (380+ lines)
+- ⚠️ Limited use of TypeScript (JavaScript only)
 
 ---
 
@@ -39,33 +36,23 @@ The backend is a **production-ready healthcare communication platform** built wi
 
 ```
 src/
-├── api/              # API utilities (audio processing, LangChain integration)
-├── config/           # Configuration files (logger, passport, agenda, roles, etc.)
+├── api/              # API utilities (audio processing, etc.)
+├── config/           # Configuration files (logger, passport, agenda, etc.)
 ├── controllers/      # Request handlers (20+ controllers)
 ├── docs/             # Documentation
 ├── dtos/             # Data Transfer Objects
-├── locales/          # Internationalization (en, es)
-├── middlewares/      # Express middlewares (auth, validation, error handling, HIPAA)
+├── locales/          # Internationalization
+├── middlewares/      # Express middlewares (auth, validation, error handling)
 ├── models/           # Mongoose models (15+ models)
-├── routes/           # API route definitions (v1 API)
-├── scripts/          # Utility scripts (seeding, testing, billing, etc.)
-├── services/         # Business logic layer (30+ services)
-│   └── ai/          # AI-specific services (medical analysis, pattern detection)
-├── templates/        # Email templates and prompts
+├── routes/            # API route definitions
+├── scripts/          # Utility scripts (seeding, testing, etc.)
+├── services/         # Business logic layer (25+ services)
+├── templates/        # Email templates
 ├── utils/            # Utility functions
 └── validations/      # Joi validation schemas
 ```
 
 **Assessment:** ✅ Excellent organization with clear separation of concerns
-
-**Key Statistics:**
-- **Total JavaScript Files:** 188 files
-- **Largest Files:**
-  - `openai.realtime.service.js`: 4,049 lines
-  - `test.route.js`: 3,490 lines (test routes only)
-  - `ari.client.js`: 2,447 lines
-  - `seedDatabase.old.js`: 1,329 lines (legacy)
-  - `conversation.service.js`: 1,155 lines
 
 ### 1.2 Technology Stack
 
@@ -73,30 +60,27 @@ src/
 - **Node.js 18+** - Runtime environment
 - **Express.js 4.17.1** - Web framework
 - **MongoDB Atlas** - NoSQL database
-- **Mongoose 8.19.3** - ODM (✅ Upgraded from 5.7.7)
+- **Mongoose 5.7.7** - ODM (⚠️ Outdated)
 
 **Security & Authentication:**
-- **JWT** (jsonwebtoken) - Stateless authentication
+- **JWT** - Stateless authentication
 - **bcryptjs** - Password hashing
 - **Helmet.js** - Security headers
 - **express-rate-limit** - Rate limiting
 - **speakeasy** - MFA/TOTP
-- **passport-jwt** - JWT strategy
 
 **Communication & Voice:**
 - **Asterisk/FreePBX** - VoIP server
-- **ARI Client** (ari-client) - Asterisk REST Interface
+- **ARI Client** - Asterisk REST Interface
 - **Twilio** - SIP trunk provider
 - **WebSocket (ws)** - Real-time communication
 - **Socket.io** - Real-time bidirectional communication
-- **prism-media** - Audio processing
 
 **AI & Machine Learning:**
-- **OpenAI API** (openai 4.26.0) - GPT-4 integration
+- **OpenAI API** - GPT-4 integration
 - **OpenAI Realtime API** - Real-time voice interaction
 - **OpenAI Whisper** - Speech-to-text transcription
-- **LangChain** (@langchain/core, @langchain/openai, @langchain/community) - AI orchestration
-- **Natural** - NLP utilities
+- **LangChain** - AI orchestration
 
 **Cloud Infrastructure (AWS):**
 - **ECS** - Container orchestration
@@ -105,7 +89,6 @@ src/
 - **Secrets Manager** - Secret management
 - **SNS** - Emergency notifications
 - **Route53** - DNS management
-- **VPC** - Network isolation
 
 **Job Scheduling:**
 - **Agenda** - Job scheduling (MongoDB-backed)
@@ -116,17 +99,13 @@ src/
 - **Sinon** - Spies, stubs, mocks
 - **MongoDB Memory Server** - In-memory MongoDB for tests
 
-**GraphQL (Optional):**
-- **GraphQL Yoga** - GraphQL server
-- **Pothos** - GraphQL schema builder
-
-**Assessment:** ✅ Modern, well-supported stack with all dependencies up to date
+**Assessment:** ✅ Modern, well-supported stack (⚠️ Mongoose needs update)
 
 ---
 
 ## 2. Architectural Patterns
 
-### 2.1 Layered Architecture (3-Tier)
+### 2.1 Layered Architecture
 
 The backend follows a classic **3-tier architecture**:
 
@@ -134,35 +113,21 @@ The backend follows a classic **3-tier architecture**:
 ┌─────────────────────────────────────┐
 │         Routes Layer                 │
 │  (Route definitions, middleware)      │
-│  - Express route handlers            │
-│  - Request validation                │
-│  - Authentication/Authorization      │
 └──────────────┬──────────────────────┘
                │
 ┌──────────────▼──────────────────────┐
 │      Controllers Layer               │
 │  (Request/response handling)         │
-│  - Extract request data              │
-│  - Call services                     │
-│  - Format responses                  │
-│  - Error handling (catchAsync)      │
 └──────────────┬──────────────────────┘
                │
 ┌──────────────▼──────────────────────┐
 │        Services Layer                │
 │  (Business logic, external APIs)    │
-│  - Business rules                   │
-│  - Data transformation              │
-│  - External API calls               │
-│  - Service orchestration            │
 └──────────────┬──────────────────────┘
                │
 ┌──────────────▼──────────────────────┐
 │         Models Layer                 │
 │  (Database schemas, Mongoose)        │
-│  - Data models                      │
-│  - Schema validation                │
-│  - Database queries                 │
 └─────────────────────────────────────┘
 ```
 
@@ -175,14 +140,13 @@ router.post('/login', validate(authValidation.login), authController.login);
 const login = catchAsync(async (req, res) => {
   const { email, password } = req.body;
   const loginData = await authService.loginCaregiverWithEmailAndPassword(email, password);
-  res.status(httpStatus.OK).json(loginData);
+  // ... response handling
 });
 
 // Service: services/auth.service.js
 const loginCaregiverWithEmailAndPassword = async (email, password) => {
-  const caregiver = await caregiverService.getLoginCaregiverData(email);
+  const login = await caregiverService.getLoginCaregiverData(email);
   // ... business logic
-  return { caregiver, tokens };
 };
 ```
 
@@ -196,27 +160,32 @@ const loginCaregiverWithEmailAndPassword = async (email, password) => {
 - Error conversion middleware
 - Error handler middleware with environment-specific responses
 
-**Error Flow:**
-1. Route handler throws error (or `ApiError`)
-2. `catchAsync` wrapper catches async errors
-3. `errorConverter` middleware converts to `ApiError`
-4. `errorHandler` middleware formats and sends response
-
-**Key Components:**
-- `utils/ApiError.js` - Custom error class
-- `utils/catchAsync.js` - Async error wrapper
-- `middlewares/error.js` - Error conversion and handling
-
-**Error Response Format:**
 ```javascript
-{
-  code: 400,
-  message: "Error message",
-  stack: "..." // Only in development/test
+// utils/ApiError.js
+class ApiError extends Error {
+  constructor(statusCode, message, isOperational = true, stack = '') {
+    // ...
+  }
 }
+
+// utils/catchAsync.js
+const catchAsync = (fn) => (req, res, next) => {
+  return Promise.resolve(fn(req, res, next)).catch((err) => {
+    // Convert to ApiError and pass to error middleware
+  });
+};
+
+// middlewares/error.js
+const errorConverter = (err, req, res, next) => {
+  // Convert to ApiError
+};
+
+const errorHandler = (err, req, res, next) => {
+  // Format and send error response
+};
 ```
 
-**Assessment:** ✅ Robust, consistent error handling with proper error propagation
+**Assessment:** ✅ Robust, consistent error handling
 
 ### 2.3 Validation Pattern
 
@@ -224,9 +193,7 @@ const loginCaregiverWithEmailAndPassword = async (email, password) => {
 - Validation schemas in `validations/` directory
 - Reusable `validate` middleware
 - Validates `params`, `query`, and `body`
-- Environment-specific validation rules
 
-**Example:**
 ```javascript
 // validations/auth.validation.js
 const login = {
@@ -240,7 +207,7 @@ const login = {
 router.post('/login', validate(authValidation.login), authController.login);
 ```
 
-**Assessment:** ✅ Consistent validation pattern with good coverage
+**Assessment:** ✅ Consistent validation pattern
 
 ### 2.4 Service Layer Pattern
 
@@ -248,56 +215,20 @@ router.post('/login', validate(authValidation.login), authController.login);
 - Business logic isolated in services
 - Services can depend on other services
 - Models accessed through services (not directly from controllers)
-- Mixed patterns: some services exported via `services/index.js`, others required directly
+- Some services exported via `services/index.js`, others required directly
 
-**Service Export Patterns:**
-
-**Pattern 1: Index Export (Preferred)**
+**Example:**
 ```javascript
 // services/index.js
 module.exports.alertService = require('./alert.service');
 module.exports.authService = require('./auth.service');
+// ...
 
-// Usage
-const { authService } = require('../services');
+// controllers/auth.controller.js
+const { authService, caregiverService } = require('../services');
 ```
 
-**Pattern 2: Direct Require**
-```javascript
-// Direct require
-const caregiverService = require('./caregiver.service');
-```
-
-**Pattern 3: Singleton Export**
-```javascript
-// services/openai.realtime.service.js
-let openAIRealtimeServiceInstance = null;
-function getOpenAIServiceInstance() {
-  if (!openAIRealtimeServiceInstance) {
-    openAIRealtimeServiceInstance = new OpenAIRealtimeService();
-  }
-  return openAIRealtimeServiceInstance;
-}
-module.exports = getOpenAIServiceInstance();
-```
-
-**Assessment:** ✅ Good pattern (⚠️ Inconsistent - should standardize on index exports)
-
-### 2.5 Dependency Injection Pattern
-
-**Current Approach:**
-- **No formal DI container** - Uses Node.js `require()` for dependencies
-- Services instantiated via `require()` at module load time
-- Singleton pattern used for stateful services (ARI client, OpenAI service, Port Manager)
-- Some services export classes, others export instances
-
-**Singleton Services:**
-- `openai.realtime.service.js` - Singleton instance
-- `ari.client.js` - Singleton instance
-- `port.manager.service.js` - Singleton instance
-- `emergencyProcessor.service.js` - Singleton instance
-
-**Assessment:** ✅ Simple and effective for Node.js (⚠️ Consider DI container for complex scenarios)
+**Assessment:** ✅ Good pattern (⚠️ Inconsistent - some direct requires)
 
 ---
 
@@ -327,41 +258,18 @@ mongoose: {
 - Retry logic with exponential backoff (5 retries)
 - Graceful shutdown handling
 - Connection pooling (maxPoolSize: 10)
-- Connection state monitoring
-- Automatic reconnection on disconnect
 
-**Assessment:** ✅ Good connection management with proper retry logic
+**Assessment:** ✅ Good connection management
 
 ### 3.2 Model Architecture
 
-**Mongoose Models (15+ models):**
-- `Alert` - Alert notifications
-- `AuditLog` - HIPAA audit logs
-- `BreachLog` - Security breach logs
-- `Call` - Call records
-- `Caregiver` - Caregiver accounts
-- `Conversation` - Conversation threads
-- `EmergencyPhrase` - Emergency detection phrases
-- `Invoice` - Billing invoices
-- `LineItem` - Invoice line items
-- `MedicalAnalysis` - Medical analysis results
-- `MedicalBaseline` - Patient baselines
-- `Message` - Conversation messages
-- `Org` - Organizations
-- `Patient` - Patient records
-- `PaymentMethod` - Payment methods
-- `Report` - Reports
-- `Schedule` - Wellness check schedules
-- `Token` - JWT tokens
-
-**Model Features:**
+**Mongoose Models:**
+- 15+ models (Patient, Caregiver, Org, Schedule, Call, Conversation, etc.)
 - Mongoose plugins: `mongoose-delete` (soft deletes), custom `toJSON`, `paginate`
 - Schema validation with `validator` library
 - Virtual fields and relationships
-- Timestamps enabled (`timestamps: true`)
-- Indexes on frequently queried fields
 
-**Example Model Structure:**
+**Example Model:**
 ```javascript
 const patientSchema = mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -381,52 +289,20 @@ patientSchema.plugin(toJSON);
 patientSchema.plugin(paginate);
 ```
 
-**Assessment:** ✅ Well-structured models with good validation and relationships
+**Assessment:** ✅ Well-structured models with good validation
 
-### 3.3 Database Transactions
+### 3.3 Database Concerns
 
-**Current State:**
-- ⚠️ **No MongoDB transactions identified** in codebase
-- Operations are performed independently
-- No atomic multi-document operations
-
-**Recommendations:**
-- Consider using MongoDB transactions for:
-  - Payment processing (invoice creation + payment method charging)
-  - Multi-step operations (e.g., patient creation + caregiver assignment)
-  - Billing operations (cost calculation + invoice creation)
-
-**Example Transaction Pattern:**
-```javascript
-const session = await mongoose.startSession();
-session.startTransaction();
-try {
-  await Invoice.create([invoiceData], { session });
-  await PaymentMethod.updateOne({ _id }, { $inc: { balance: -amount } }, { session });
-  await session.commitTransaction();
-} catch (error) {
-  await session.abortTransaction();
-  throw error;
-} finally {
-  session.endSession();
-}
-```
-
-**Assessment:** ⚠️ Missing transaction support - consider adding for critical operations
-
-### 3.4 Database Indexing
-
-**Current Indexes:**
-- Unique indexes on email fields
-- Indexes on foreign key references (org, caregivers, etc.)
+**Issues:**
+- ⚠️ **Mongoose 5.7.7 is outdated** (current is 8.x)
+  - Missing newer features and performance improvements
+  - Potential security vulnerabilities
+  - Migration path available but requires testing
 
 **Recommendations:**
-- Review query patterns and add indexes for:
-  - Frequently queried fields (patient name, caregiver email)
-  - Date range queries (audit logs, conversations)
-  - Compound queries (org + date range, patient + conversation)
-
-**Assessment:** ⚠️ Basic indexing - review and optimize based on query patterns
+- Upgrade Mongoose to latest stable version (8.x)
+- Test thoroughly after upgrade (breaking changes possible)
+- Consider migration to Mongoose 7.x first (intermediate step)
 
 ---
 
@@ -451,15 +327,13 @@ try {
 - Backup codes (8-character codes)
 - MFA encryption key stored in AWS Secrets Manager
 - MFA enrollment and verification endpoints
-- Required for administrators
 
 **Role-Based Access Control (RBAC):**
 - Roles: `superAdmin`, `orgAdmin`, `staff`, `unverified`, `invited`
 - Role-based permissions via `accesscontrol` library
 - Minimum necessary access principle (HIPAA)
-- Ownership checks for resource access
 
-**Assessment:** ✅ Strong authentication and authorization with comprehensive MFA
+**Assessment:** ✅ Strong authentication and authorization
 
 ### 4.2 HIPAA Compliance Features
 
@@ -492,7 +366,6 @@ try {
    - ✅ Automated breach detection service
    - ✅ Alert system for suspicious activity
    - ✅ Breach log model
-   - ✅ Account locking on suspicious activity
 
 6. **MFA:**
    - ✅ TOTP-based MFA
@@ -513,7 +386,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", "wss:", "https://app.myphonefriend.com"],
+      connectSrc: ["'self'", "wss:", "https://app.biancawellness.com"],
     }
   }
 }));
@@ -527,13 +400,11 @@ app.use(helmet({
 **Rate Limiting:**
 - Auth endpoints rate limited in production
 - Configurable limits
-- IP-based rate limiting
 
 **CORS:**
 - Whitelist-based CORS
 - Development mode allows localhost
 - Production restricts to specific domains
-- Credentials support enabled
 
 **Assessment:** ✅ Comprehensive security middleware
 
@@ -543,96 +414,57 @@ app.use(helmet({
 
 ### 5.1 Service Organization
 
-**Core Services (30+ services):**
-
-**Authentication & Security:**
+**Core Services (25+ services):**
 - `auth.service.js` - Authentication logic
-- `mfa.service.js` - Multi-factor authentication
-- `breachDetection.service.js` - Security monitoring
-- `token.service.js` - Token management
-
-**User Management:**
 - `caregiver.service.js` - Caregiver management
 - `patient.service.js` - Patient management
 - `org.service.js` - Organization management
-
-**Communication:**
-- `conversation.service.js` - Conversation handling
 - `email.service.js` - Email sending (AWS SES)
-- `sns.service.js` - AWS SNS notifications
-- `twilioCall.service.js` - Twilio integration
-
-**AI & Analysis:**
-- `openai.realtime.service.js` - AI real-time interaction (4,049 lines)
-- `openai.sentiment.service.js` - Sentiment analysis
-- `ai/medicalAnalysisScheduler.service.js` - Medical analysis scheduling
-- `ai/medicalPatternAnalyzer.service.js` - Medical pattern detection
-- `ai/psychiatricMarkerAnalyzer.service.js` - Psychiatric markers
-- `ai/cognitiveDeclineDetector.service.js` - Cognitive decline detection
-- `ai/speechPatternAnalyzer.service.js` - Speech pattern analysis
-- `ai/repetitionMemoryAnalyzer.service.js` - Repetition analysis
-- `ai/vocabularyAnalyzer.service.js` - Vocabulary analysis
-- `ai/psychiatricPatternDetector.service.js` - Psychiatric patterns
-- `ai/baselineManager.service.js` - Baseline management
-
-**Voice & Audio:**
-- `ari.client.js` - Asterisk integration (2,447 lines)
+- `schedule.service.js` - Scheduling logic
+- `call.service.js` - Call management
+- `conversation.service.js` - Conversation handling
+- `payment.service.js` - Payment processing
+- `mfa.service.js` - Multi-factor authentication
+- `breachDetection.service.js` - Security monitoring
+- `emergencyProcessor.service.js` - Emergency detection
+- `openai.realtime.service.js` - AI real-time interaction
+- `ari.client.js` - Asterisk integration
 - `rtp.listener.service.js` - RTP audio handling
 - `rtp.sender.service.js` - RTP audio sending
-- `port.manager.service.js` - Port management
-- `audio.diagnostic.service.js` - Audio diagnostics
-
-**Emergency & Alerts:**
-- `emergencyProcessor.service.js` - Emergency detection
-- `emergencyPhrase.service.js` - Emergency phrase management
-- `localizedEmergencyDetector.service.js` - Localized detection
-- `alert.service.js` - Alert management
-
-**Billing & Payments:**
-- `payment.service.js` - Payment processing
-- `paymentMethod.service.js` - Payment method management
-
-**Scheduling:**
-- `schedule.service.js` - Scheduling logic
-
-**Storage:**
 - `s3.service.js` - AWS S3 file storage
+- `sns.service.js` - AWS SNS notifications
+- And more...
 
-**Assessment:** ✅ Well-organized service layer with clear domain separation
+**Assessment:** ✅ Well-organized service layer
 
 ### 5.2 Service Complexity
 
 **High Complexity Services:**
 
-1. **`openai.realtime.service.js`** (4,049 lines) - **HIGHEST PRIORITY**
+1. **`openai.realtime.service.js`** (4000+ lines)
    - Real-time WebSocket communication
    - Complex state machine for conversation flow
    - Audio processing and buffering
    - Message accumulation and saving
-   - Event handling for OpenAI WebSocket events
-   - **Recommendation:** Split into smaller modules (see REFACTORING_PLAN.md)
+   - **Recommendation:** Consider splitting into smaller modules:
+     - `openai.realtime.connection.js` - WebSocket management
+     - `openai.realtime.state.js` - State machine
+     - `openai.realtime.audio.js` - Audio processing
+     - `openai.realtime.messages.js` - Message handling
 
-2. **`ari.client.js`** (2,447 lines) - **HIGH PRIORITY**
+2. **`ari.client.js`** (400+ lines)
    - Circuit breaker pattern
    - Connection management
    - Event handling
-   - Channel management
-   - RTP handling
    - **Assessment:** ✅ Well-structured despite complexity
 
-3. **`conversation.service.js`** (1,155 lines) - **MEDIUM PRIORITY**
-   - Conversation CRUD operations
-   - Message management
-   - Summary generation
-   - Context window management
-   - **Recommendation:** Consider splitting into smaller modules
+3. **`emergencyProcessor.service.js`**
+   - Multi-step emergency detection pipeline
+   - Localized detection
+   - Alert deduplication
+   - **Assessment:** ✅ Good separation of concerns
 
-4. **`channel.tracker.js`** (922 lines) - **MEDIUM PRIORITY**
-   - Channel tracking logic
-   - Call data management
-   - **Recommendation:** Consider splitting
-
-**Assessment:** ✅ Most services are well-sized (⚠️ Large services need refactoring)
+**Assessment:** ✅ Most services are well-sized (⚠️ `openai.realtime.service.js` needs refactoring)
 
 ### 5.3 Service Dependencies
 
@@ -641,7 +473,7 @@ app.use(helmet({
 - Models accessed through services (not directly from controllers)
 - Some circular dependencies possible (needs review)
 
-**Example Dependencies:**
+**Example:**
 ```javascript
 // services/auth.service.js
 const caregiverService = require('./caregiver.service');
@@ -679,10 +511,6 @@ routes/v1/
 ├── report.route.js       # Reports
 ├── stripe.route.js       # Stripe webhooks
 ├── twilioCall.route.js   # Twilio webhooks
-├── openai.route.js       # OpenAI endpoints
-├── sso.route.js          # SSO
-├── paymentMethod.route.js # Payment methods
-├── docs.route.js         # API documentation (dev only)
 └── test.route.js         # Test endpoints (dev only)
 ```
 
@@ -695,7 +523,6 @@ routes/v1/
 **Future Considerations:**
 - No versioning strategy documented
 - Consider versioning strategy for future breaking changes
-- Plan for `/v2/` when needed
 
 **Assessment:** ✅ Good start (⚠️ Consider versioning strategy)
 
@@ -703,7 +530,7 @@ routes/v1/
 
 **Swagger/OpenAPI:**
 - `swagger-jsdoc` and `swagger-ui-express` installed
-- Documentation route available in development (`/v1/docs`)
+- Documentation route available in development
 - **Recommendation:** Expand API documentation coverage
 
 **Assessment:** ⚠️ Basic documentation (needs expansion)
@@ -715,7 +542,7 @@ routes/v1/
 ### 7.1 Configuration Architecture
 
 **Centralized Config:**
-- `config/config.js` - Main configuration (398 lines)
+- `config/config.js` - Main configuration (380+ lines)
 - Environment variable validation with Joi
 - AWS Secrets Manager integration for production
 - Environment-specific overrides
@@ -743,16 +570,14 @@ routes/v1/
 
 **Production:**
 - AWS Secrets Manager integration
-- Secrets loaded at startup via `config.loadSecrets()`
+- Secrets loaded at startup
 - Environment variables as fallback
-- Secure key rotation support
 
 **Development:**
 - `.env` file support
 - Local secrets for testing
-- Ethereal email for development
 
-**Assessment:** ✅ Good secrets management with proper production security
+**Assessment:** ✅ Good secrets management
 
 ---
 
@@ -765,14 +590,13 @@ routes/v1/
 - Environment-specific log levels
 - Structured logging
 - File and console transports
-- PHI redaction in logs
 
 **Morgan HTTP Logging:**
 - Request/response logging
 - Success and error handlers
 - Environment-specific formatting
 
-**Assessment:** ✅ Good logging infrastructure with PHI protection
+**Assessment:** ✅ Good logging infrastructure
 
 ### 8.2 Error Handling
 
@@ -791,7 +615,7 @@ routes/v1/
 }
 ```
 
-**Assessment:** ✅ Consistent error handling with proper error propagation
+**Assessment:** ✅ Consistent error handling
 
 ---
 
@@ -875,7 +699,6 @@ tests/
 - AWS infrastructure defined in Terraform
 - ECS, VPC, Route53, S3, etc.
 - Environment-specific configurations
-- Backup system with Lambda functions
 
 **Assessment:** ✅ Good IaC practices
 
@@ -899,7 +722,6 @@ tests/
 - State machine for conversation flow
 - Audio processing and buffering
 - Message accumulation and saving
-- Reconnection logic
 
 **Socket.io:**
 - Real-time bidirectional communication
@@ -914,7 +736,6 @@ tests/
 - Circuit breaker pattern for reliability
 - Connection retry logic
 - Event handling
-- Channel management
 
 **RTP Audio:**
 - RTP listener service
@@ -934,8 +755,6 @@ tests/
 - MongoDB-backed job queue
 - Scheduled tasks (billing, analysis, etc.)
 - Configurable in `config/agenda.js`
-- Daily billing cycles
-- Medical analysis scheduling
 
 **Assessment:** ✅ Good job scheduling solution
 
@@ -957,14 +776,13 @@ tests/
 
 ### 13.2 Caching
 
-- ⚠️ **No caching layer identified**
+- **No caching layer identified**
 - **Recommendation:** Consider Redis for:
   - Session storage
   - Rate limiting
   - Frequently accessed data
-  - API response caching
 
-**Assessment:** ⚠️ Missing caching layer - significant performance opportunity
+**Assessment:** ⚠️ Missing caching layer
 
 ### 13.3 API Performance
 
@@ -1002,7 +820,6 @@ tests/
 **Code Documentation:**
 - JSDoc comments in some files
 - README files in key directories
-- Architectural documentation
 - **Recommendation:** Expand inline documentation
 
 **API Documentation:**
@@ -1017,72 +834,65 @@ tests/
 
 ### 15.1 High Priority
 
-1. **Refactor Large Services**
-   - Split `openai.realtime.service.js` (4,049 lines)
+1. **Upgrade Mongoose**
+   - Current: 5.7.7
+   - Target: 8.x (latest stable)
+   - Impact: Security, performance, features
+   - Effort: Medium (requires testing)
+
+2. **Refactor Large Services**
+   - Split `openai.realtime.service.js` (4000+ lines)
    - Break into smaller, focused modules
    - Impact: Maintainability, testability
-   - Effort: High (5-7 days)
-   - See: `REFACTORING_PLAN.md`
+   - Effort: High
 
-2. **Add Caching Layer**
+3. **Add Caching Layer**
    - Implement Redis for session storage
    - Cache frequently accessed data
    - Impact: Performance, scalability
-   - Effort: Medium (3-5 days)
-
-3. **Add Database Transactions**
-   - Implement MongoDB transactions for critical operations
-   - Payment processing, multi-step operations
-   - Impact: Data consistency, reliability
-   - Effort: Medium (2-3 days)
+   - Effort: Medium
 
 4. **Expand API Documentation**
    - Complete Swagger/OpenAPI documentation
    - Document all endpoints
    - Impact: Developer experience, onboarding
-   - Effort: Medium (3-5 days)
+   - Effort: Medium
 
 ### 15.2 Medium Priority
 
 5. **Standardize Service Exports**
    - Use consistent pattern (index.js vs. direct requires)
    - Impact: Code consistency
-   - Effort: Low (1-2 days)
+   - Effort: Low
 
 6. **Review Database Indexes**
    - Analyze query patterns
    - Add missing indexes
    - Impact: Performance
-   - Effort: Low-Medium (2-3 days)
+   - Effort: Low-Medium
 
 7. **Expand Rate Limiting**
    - Add rate limiting to more endpoints
    - Impact: Security, abuse prevention
-   - Effort: Low (1-2 days)
+   - Effort: Low
 
-8. **Refactor ARI Client**
-   - Split `ari.client.js` (2,447 lines)
-   - Extract circuit breaker, resource manager
-   - Impact: Maintainability
-   - Effort: Medium (3-4 days)
+8. **Consider TypeScript Migration**
+   - Gradual migration path available
+   - Impact: Type safety, developer experience
+   - Effort: High (long-term)
 
 ### 15.3 Low Priority
 
 9. **Split Configuration File**
    - Break `config.js` into smaller modules
    - Impact: Maintainability
-   - Effort: Low (1-2 days)
+   - Effort: Low
 
 10. **API Versioning Strategy**
     - Document versioning approach
     - Plan for future breaking changes
     - Impact: Future-proofing
-    - Effort: Low (1 day)
-
-11. **Consider TypeScript Migration**
-    - Gradual migration path available
-    - Impact: Type safety, developer experience
-    - Effort: High (long-term)
+    - Effort: Low
 
 ---
 
@@ -1090,7 +900,7 @@ tests/
 
 The backend architecture is **well-designed and production-ready** with strong security, HIPAA compliance, and good separation of concerns. The main areas for improvement are:
 
-1. **Technical Debt:** Large service files need refactoring
+1. **Technical Debt:** Outdated Mongoose version, large service files
 2. **Performance:** Missing caching layer, potential index optimization
 3. **Documentation:** API documentation needs expansion
 4. **Code Quality:** Some inconsistencies in patterns
@@ -1101,20 +911,19 @@ The backend architecture is **well-designed and production-ready** with strong s
 
 ## Appendix: Key Metrics
 
-- **Total JavaScript Files:** 188 files
-- **Total Services:** 30+ services
-- **Total Models:** 15+ models
-- **Total Controllers:** 20+ controllers
+- **Total Services:** 25+
+- **Total Models:** 15+
+- **Total Controllers:** 20+
 - **Total Routes:** 20+ route files
 - **Test Coverage:** Comprehensive (unit + integration)
 - **HIPAA Compliance:** 95% complete
 - **Security Score:** High (MFA, audit logging, encryption)
 - **Code Quality:** Good (with noted improvements)
-- **Largest File:** `openai.realtime.service.js` (4,049 lines)
 
 ---
 
 **Review Completed:** January 2025  
-**Next Review Recommended:** Q2 2025  
-**Reviewer:** AI Architectural Analysis
+**Next Review Recommended:** Q2 2025
+
+
 

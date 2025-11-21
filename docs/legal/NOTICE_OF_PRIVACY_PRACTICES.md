@@ -1,5 +1,5 @@
 # Notice of Privacy Practices
-## MyPhoneFriend Healthcare Communication Services
+## Bianca Technologies Inc. Healthcare Communication Services
 
 **Effective Date**: October 15, 2025  
 **Last Revised**: October 15, 2025
@@ -66,8 +66,8 @@ When it comes to your health information, you have certain rights. This section 
 - Account information and preferences
 
 **How to request**:
-- Email: privacy@myphonefriend.com
-- Mail: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+- Email: privacy@biancawellness.com
+- Mail: Bianca Technologies Inc. Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 - Phone: +1-604-562-4263
 
 **Our response**:
@@ -160,8 +160,8 @@ When it comes to your health information, you have certain rights. This section 
 **You can ask for a paper copy of this notice at any time**, even if you have agreed to receive the notice electronically.
 
 **How to get a copy**:
-- Download from our website: www.myphonefriend.com/privacy-practices
-- Email us at privacy@myphonefriend.com
+- Download from our website: www.biancawellness.com/privacy-practices
+- Email us at privacy@biancawellness.com
 - Call +1-604-562-4263
 - We'll mail you a copy
 
@@ -183,8 +183,8 @@ When it comes to your health information, you have certain rights. This section 
 **You can file a complaint if you believe your privacy rights have been violated.**
 
 **File with us**:
-- Email: privacy@myphonefriend.com
-- Mail: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+- Email: privacy@biancawellness.com
+- Mail: Bianca Technologies Inc. Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 - Phone: +1-604-562-4263
 
 **File with the U.S. Department of Health and Human Services (HHS)**:
@@ -384,7 +384,7 @@ We are allowed or required to share your information in other ways – usually i
 
 ### What We Do
 
-MyPhoneFriend provides AI-powered communication services to help caregivers monitor and communicate with patients (elderly individuals, healthcare facility residents, etc.). Our services include:
+Bianca Technologies Inc. provides AI-powered communication services to help caregivers monitor and communicate with patients (elderly individuals, healthcare facility residents, etc.). Our services include:
 
 1. **Voice Calls**: Phone calls between patients and AI assistant or human caregivers
 2. **Conversation Recording**: Call recordings for quality and safety
@@ -470,7 +470,7 @@ All business associates are required to protect your information under signed Bu
 - Account information
 
 **How to Request**:
-1. Submit written request to privacy@myphonefriend.com
+1. Submit written request to privacy@biancawellness.com
 2. Specify what information you want (date range, type, etc.)
 3. Specify format (electronic preferred, paper if requested)
 
@@ -872,7 +872,7 @@ We maintain comprehensive audit logs of all system access. For each disclosure, 
 
 **You'll receive this notice**:
 - At first use of our service
-- Posted on our website: www.myphonefriend.com/privacy-practices
+- Posted on our website: www.biancawellness.com/privacy-practices
 - Available in app: Settings → Legal → Privacy Practices
 - Paper copy upon request at any time
 
@@ -899,9 +899,9 @@ We maintain comprehensive audit logs of all system access. For each disclosure, 
 ### For Questions About This Notice
 
 **Privacy Officer**:
-- Email: privacy@myphonefriend.com
+- Email: privacy@biancawellness.com
 - Phone: +1-604-562-4263
-- Mail: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+- Mail: Bianca Technologies Inc. Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 
 **Hours**: Monday-Friday, 9 AM - 5 PM PST
 
@@ -918,7 +918,7 @@ We maintain comprehensive audit logs of all system access. For each disclosure, 
 - Copy of this notice
 
 **Contact**:
-- Same as above: privacy@myphonefriend.com
+- Same as above: privacy@biancawellness.com
 
 **Response Time**: 30-60 days (depending on request type)
 
@@ -927,7 +927,7 @@ We maintain comprehensive audit logs of all system access. For each disclosure, 
 ### To File a Complaint
 
 **File with Us**:
-- Email: privacy@myphonefriend.com
+- Email: privacy@biancawellness.com
 - Mail: Address above
 - Phone: +1-604-562-4263
 
@@ -956,17 +956,17 @@ We maintain comprehensive audit logs of all system access. For each disclosure, 
 
 If you have questions about this Notice of Privacy Practices or want to exercise any of your rights, please contact our Privacy Officer:
 
-**Email**: privacy@myphonefriend.com  
+**Email**: privacy@biancawellness.com  
 **Phone**: +1-604-562-4263  
-**Mail**: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+**Mail**: Bianca Technologies Inc. Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 
 ---
 
 ## Language Assistance
 
-**English**: If you need help understanding this notice, please contact us at privacy@myphonefriend.com
+**English**: If you need help understanding this notice, please contact us at privacy@biancawellness.com
 
-**Español**: Si necesita ayuda para comprender este aviso, comuníquese con nosotros al privacy@myphonefriend.com
+**Español**: Si necesita ayuda para comprender este aviso, comuníquese con nosotros al privacy@biancawellness.com
 
 **Other Languages**: Language assistance available upon request
 
@@ -977,7 +977,7 @@ If you have questions about this Notice of Privacy Practices or want to exercise
 
 ---
 
-© 2025 MyPhoneFriend. All rights reserved.
+© 2025 Bianca Technologies Inc.. All rights reserved.
 
 This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.520)
 

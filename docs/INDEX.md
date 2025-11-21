@@ -8,11 +8,13 @@ This directory contains all the technical documentation for the Bianca App Backe
 - **[EMERGENCY_SYSTEM.md](./EMERGENCY_SYSTEM.md)** - Overview of the emergency detection system
 - **[LOCALIZED_EMERGENCY_DETECTION.md](./LOCALIZED_EMERGENCY_DETECTION.md)** - Multi-language emergency phrase detection
 - **[EMERGENCY_INTEGRATION_GUIDE.md](./EMERGENCY_INTEGRATION_GUIDE.md)** - How to integrate emergency features
-- **[SNS_SETUP_GUIDE.md](./SNS_SETUP_GUIDE.md)** - AWS SNS setup for emergency notifications
+- **Note:** Emergency notifications now use Twilio for SMS (see [Twilio Configuration](./technical/TWILIO_CONFIGURATION.md))
 
 ### 📞 Communication & Workflows
 - **[CALL_WORKFLOW_README.md](./CALL_WORKFLOW_README.md)** - Call handling and workflow documentation
 - **[WORKFLOWS.md](./WORKFLOWS.md)** - General workflow documentation
+- **[PHONE_VERIFICATION_STRATEGY.md](./PHONE_VERIFICATION_STRATEGY.md)** - Phone verification implementation
+- **[VERIFICATION_UX_ANALYSIS.md](./VERIFICATION_UX_ANALYSIS.md)** - Email and phone verification UX analysis
 
 ### 🧠 AI & Analysis
 - **[SENTIMENT_ANALYSIS_API.md](./SENTIMENT_ANALYSIS_API.md)** - Sentiment analysis API documentation
@@ -27,8 +29,35 @@ This directory contains all the technical documentation for the Bianca App Backe
 - **[MEDICAL_TEST_SUITE.md](./MEDICAL_TEST_SUITE.md)** - Medical testing suite documentation
 - **[testing-strategy.md](./testing-strategy.md)** - Overall testing strategy
 
+### 🚀 Deployment & Operations
+- **[DEPLOYMENT.md](./deployment/DEPLOYMENT.md)** - Deployment procedures
+- **[DEPLOYMENT_IMPROVEMENTS.md](./deployment/DEPLOYMENT_IMPROVEMENTS.md)** - Deployment improvements
+- **[DEPLOYMENT_OPTIMIZATIONS.md](./deployment/DEPLOYMENT_OPTIMIZATIONS.md)** - Deployment optimizations
+- **[RECREATE_PRODUCTION_INSTANCE.md](./deployment/RECREATE_PRODUCTION_INSTANCE.md)** - Production instance recreation
+- **[GITHUB_OIDC_SETUP.md](./deployment/GITHUB_OIDC_SETUP.md)** - GitHub OIDC setup
+- **[WORDPRESS_VOLUME_MIGRATION_PLAN.md](./deployment/WORDPRESS_VOLUME_MIGRATION_PLAN.md)** - WordPress volume migration
+
+### 📋 Planning & Refactoring
+- **[REFACTORING_PLAN.md](./planning/REFACTORING_PLAN.md)** - Backend refactoring plan
+- **[REFACTOR_PRIORITIES.md](./planning/REFACTOR_PRIORITIES.md)** - Refactoring priorities
+- **[REMAINING_WORK.md](./planning/REMAINING_WORK.md)** - Remaining work from architectural review
+- **[REMAINING_TASKS.md](./planning/REMAINING_TASKS.md)** - General remaining tasks
+- **[NEXT_STEPS.md](./planning/NEXT_STEPS.md)** - Next steps for development
+- **[BRANCH_SUMMARY.md](./planning/BRANCH_SUMMARY.md)** - Branch summaries
+- **[TEST_FAILURE_ANALYSIS.md](./planning/TEST_FAILURE_ANALYSIS.md)** - Test failure analysis
+
+### 🔧 Technical Documentation
+- **[Technical Index](./technical/INDEX.md)** - Complete technical documentation index
+- **[Twilio Configuration](./technical/TWILIO_CONFIGURATION.md)** - Twilio setup for voice and SMS
+- **[SSO Setup](./technical/SSO_SETUP.md)** - Single Sign-On configuration
+
 ### 📖 General
 - **[README.md](./README.md)** - General documentation overview
+- **[RELEASE_NOTES.md](./RELEASE_NOTES.md)** - Release notes and changelog
+- **[DOCUMENTATION_ORGANIZATION_SUMMARY.md](./DOCUMENTATION_ORGANIZATION_SUMMARY.md)** - Documentation organization summary
+
+### 🏗️ Architecture
+- **[Architectural Review 2025](./technical/ARCHITECTURAL_REVIEW_2025.md)** - Comprehensive architectural analysis
 
 ## 🚀 Quick Start
 

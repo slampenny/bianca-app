@@ -1,6 +1,6 @@
 # WordPress Infrastructure - Standalone Terraform Workspace
 
-This is a **standalone Terraform workspace** for the WordPress site at `myphonefriend.com`. It is completely independent from the main app infrastructure.
+This is a **standalone Terraform workspace** for the WordPress site at `biancawellness.com`. It is completely independent from the main app infrastructure.
 
 ## ✅ Why This Exists
 
@@ -58,7 +58,7 @@ WordPress runs independently. You can:
 ## 📝 Variables
 
 Default values are set in `main.tf`. Override if needed:
-- `wp_domain` - Default: "myphonefriend.com"
+- `wp_domain` - Default: "biancawellness.com"
 - `wordpress_instance_type` - Default: "t3.micro"
 - `subnet_public_a_id` / `subnet_public_b_id` - Auto-discovered if not set
 

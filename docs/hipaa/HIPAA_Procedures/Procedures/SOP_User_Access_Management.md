@@ -64,7 +64,7 @@ This procedure applies to:
 cd bianca-app-backend
 
 # Create new user (via API or database)
-curl -X POST https://api.myphonefriend.com/v1/caregivers \
+curl -X POST https://api.biancawellness.com/v1/caregivers \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -132,7 +132,7 @@ curl -X POST https://api.myphonefriend.com/v1/caregivers \
 **Step 3: Implementation**
 ```bash
 # Update user role
-curl -X PATCH https://api.myphonefriend.com/v1/caregivers/USER_ID \
+curl -X PATCH https://api.biancawellness.com/v1/caregivers/USER_ID \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -210,7 +210,7 @@ curl -X PATCH https://api.myphonefriend.com/v1/caregivers/USER_ID \
 ```bash
 # Use emergency superAdmin account
 # Credentials stored in AWS Secrets Manager
-# Access: "emergency-admin@myphonefriend.com"
+# Access: "emergency-admin@biancawellness.com"
 
 # All actions automatically:
 # - Logged with complianceFlags.highRiskAction = true
@@ -246,7 +246,7 @@ curl -X PATCH https://api.myphonefriend.com/v1/caregivers/USER_ID \
 
 ```bash
 # Step 1: Disable account
-curl -X PATCH https://api.myphonefriend.com/v1/caregivers/USER_ID \
+curl -X PATCH https://api.biancawellness.com/v1/caregivers/USER_ID \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -588,7 +588,7 @@ db.audit_logs.find({
 - Emergency access needs
 
 ### Contact:
-- **Email**: security@myphonefriend.com
+- **Email**: security@biancawellness.com
 - **Phone**: [Security Officer phone]
 - **After Hours**: [On-call number]
 
@@ -619,7 +619,7 @@ db.audit_logs.find({
 
 ---
 
-**For Questions**: Contact HIPAA Security Officer at security@myphonefriend.com
+**For Questions**: Contact HIPAA Security Officer at security@biancawellness.com
 
 
 

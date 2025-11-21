@@ -106,7 +106,7 @@ Located in `Training/` folder:
 7. Monitor technical safeguards
 8. Update procedures as needed
 
-**Contact**: [security-officer@myphonefriend.com]
+**Contact**: [security-officer@biancawellness.com]
 
 ---
 
@@ -139,8 +139,8 @@ Located in `Training/` folder:
 ## 🚨 EMERGENCY CONTACTS
 
 ### Security Incidents:
-- **Primary**: Security Officer - [security@myphonefriend.com]
-- **Escalation**: CTO - [cto@myphonefriend.com]
+- **Primary**: Security Officer - [security@biancawellness.com]
+- **Escalation**: CTO - [cto@biancawellness.com]
 - **After Hours**: [Emergency contact number]
 
 ### Data Breach:

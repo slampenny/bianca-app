@@ -23,8 +23,8 @@ This guide will help you set up Google and Microsoft SSO authentication for your
    - Choose "Web application"
    - Add authorized redirect URIs:
      - For development: `http://localhost:19006`
-     - For staging: `https://staging.app.myphonefriend.com`
-     - For production: `https://app.myphonefriend.com`
+     - For staging: `https://staging.app.biancawellness.com`
+     - For production: `https://app.biancawellness.com`
      - For mobile: `https://auth.expo.io/@negascout/bianca`
 5. Copy the Client ID
 
@@ -47,7 +47,7 @@ EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id-here
 4. Fill in the details:
    - Name: "Bianca App"
    - Supported account types: "Accounts in any organizational directory and personal Microsoft accounts"
-   - Redirect URI: Platform "Web", URI: `https://app.myphonefriend.com`
+   - Redirect URI: Platform "Web", URI: `https://app.biancawellness.com`
 5. After creation, note down:
    - Application (client) ID
    - Directory (tenant) ID
@@ -103,7 +103,7 @@ The backend SSO endpoints are already configured. Make sure your backend has:
 Test the SSO endpoint directly:
 
 ```bash
-curl -X POST https://api.myphonefriend.com/v1/sso/login \
+curl -X POST https://api.biancawellness.com/v1/sso/login \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "google",
@@ -134,7 +134,7 @@ curl -X POST https://api.myphonefriend.com/v1/sso/login \
 
 1. **"Invalid redirect URI" error**:
    - Check that redirect URIs in OAuth providers match your app configuration
-   - For web apps: Use the actual domain (e.g., `https://app.myphonefriend.com`)
+   - For web apps: Use the actual domain (e.g., `https://app.biancawellness.com`)
    - For mobile: Use the format: `https://auth.expo.io/@username/app-slug`
 
 2. **"Client ID not found" error**:

@@ -5,6 +5,18 @@ const logger = require('../config/logger');
 const { Caregiver } = require('../models');
 const ApiError = require('../utils/ApiError');
 const httpStatus = require('http-status');
+const i18n = require('i18n');
+
+// Configure i18n for SMS service (same config as email service)
+i18n.configure({
+  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
+  directory: `${__dirname}/../locales`,
+  objectNotation: true,
+  defaultLocale: 'en',
+  logWarnFn(msg) {
+    // do nothing
+  },
+});
 
 /**
  * SMS Verification Service
@@ -49,12 +61,16 @@ class SMSVerificationService {
       const code = this.generateVerificationCode();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Find caregiver (select hidden fields for rate limiting check)
+      // Find caregiver (select hidden fields for rate limiting check and preferredLanguage)
+      // Note: phone and isPhoneVerified are included by default, we just need to ensure preferredLanguage is selected
       const caregiver = await Caregiver.findById(caregiverId)
-        .select('+phoneVerificationAttempts +phoneVerificationCodeExpires');
+        .select('+phoneVerificationAttempts +phoneVerificationCodeExpires phone isPhoneVerified preferredLanguage');
       if (!caregiver) {
         throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
       }
+      
+      // Get caregiver's preferred language for SMS message
+      const locale = caregiver.preferredLanguage || 'en';
 
       // Check if phone is already verified
       if (caregiver.isPhoneVerified) {
@@ -82,8 +98,21 @@ class SMSVerificationService {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid phone number format');
       }
 
-      // Create SMS message
-      const message = `Your Bianca verification code is: ${code}. This code expires in 10 minutes.`;
+      // Create localized SMS message
+      const previousLocale = i18n.getLocale();
+      i18n.setLocale(locale);
+      
+      let message;
+      if (i18n.__) {
+        const template = i18n.__('smsVerification.message');
+        message = template.replace('%s', code);
+      } else {
+        // Fallback to English if i18n not available
+        message = `Your Bianca verification code is: ${code}. This code expires in 10 minutes.`;
+      }
+      
+      // Restore previous locale
+      i18n.setLocale(previousLocale);
 
       // Send SMS via Twilio
       const response = await this.twilioSmsService.sendSMS(formattedPhone, message, {
@@ -91,7 +120,7 @@ class SMSVerificationService {
         caregiverId: caregiverId
       });
 
-      logger.info(`[SMS Verification] Code sent to ${formattedPhone}, MessageSid: ${response.messageSid}`);
+      logger.info(`[SMS Verification] Code sent to ${formattedPhone} (locale: ${locale}), MessageSid: ${response.messageSid}`);
 
       // Store verification code in database
       // Use select to include fields that are normally excluded
