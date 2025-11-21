@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react"
 import { View, StyleSheet, Platform } from "react-native"
 import { useNavigation } from "@react-navigation/native"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { Screen, Text, Button, TextField } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { spacing } from "app/theme"
@@ -13,7 +13,8 @@ import {
   useVerifyPhoneCodeMutation,
   useResendPhoneVerificationCodeMutation,
 } from "app/services/api/authApi"
-import { getCurrentUser } from "app/store/authSlice"
+import { getCurrentUser, setCurrentUser } from "app/store/authSlice"
+import { useGetCaregiverQuery } from "app/services/api/caregiverApi"
 import { logger } from "../utils/logger"
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
@@ -96,6 +97,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 
 export const VerifyPhoneScreen = () => {
   const navigation = useNavigation()
+  const dispatch = useDispatch()
   const { colors, isLoading: themeLoading } = useTheme()
   const currentUser = useSelector(getCurrentUser)
   const [code, setCode] = useState("")
@@ -108,6 +110,12 @@ export const VerifyPhoneScreen = () => {
   const [sendCode, { isLoading: isSending }] = useSendPhoneVerificationCodeMutation()
   const [verifyCode, { isLoading: isVerifying }] = useVerifyPhoneCodeMutation()
   const [resendCode, { isLoading: isResending }] = useResendPhoneVerificationCodeMutation()
+  
+  // Refetch current user after verification to update isPhoneVerified status
+  const { data: updatedUser, refetch: refetchUser } = useGetCaregiverQuery(
+    { id: currentUser?.id || '' },
+    { skip: !currentUser?.id }
+  )
 
   // Mask phone number for display
   const maskPhone = (phone: string) => {
@@ -198,6 +206,20 @@ export const VerifyPhoneScreen = () => {
       setErrorMessage("")
       setSuccessMessage("")
       const result = await verifyCode({ code }).unwrap()
+      
+      // Refetch the current user to get updated isPhoneVerified status
+      if (currentUser?.id) {
+        try {
+          const { data: updatedUser } = await refetchUser()
+          if (updatedUser) {
+            // Update Redux with the updated user object
+            dispatch(setCurrentUser(updatedUser))
+          }
+        } catch (refetchError) {
+          logger.warn("Failed to refetch user after phone verification:", refetchError)
+          // Continue anyway - the backend is updated, just Redux might be stale
+        }
+      }
       
       // Success - navigate to success screen or back
       if (navigationRef.isReady()) {
