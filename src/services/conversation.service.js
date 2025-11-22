@@ -463,6 +463,15 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     await Conversation.findByIdAndUpdate(conversationId, updateData);
 
     logger.info(`[Finalize] Successfully finalized conversation ${conversationId} with ${messages.length} messages${sentimentAnalysis && sentimentAnalysis.success ? ' and sentiment analysis' : ''}`);
+    
+    // Trigger medical and fraud/abuse analysis after call completion (async, don't wait)
+    if (conversation.patientId) {
+      const patientId = conversation.patientId._id || conversation.patientId;
+      triggerAnalysisAfterCall(patientId).catch(err => {
+        logger.error(`[Finalize] Error triggering analysis after call for patient ${patientId}: ${err.message}`);
+      });
+    }
+    
     return {
       summary,
       sentimentAnalysis: sentimentAnalysis && sentimentAnalysis.success ? sentimentAnalysis.data : null
@@ -1149,6 +1158,113 @@ const calculateVariance = (values) => {
   const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / values.length;
   
   return variance;
+};
+
+/**
+ * Trigger medical and fraud/abuse analysis after a call completes
+ * This runs asynchronously and doesn't block call finalization
+ * @param {string} patientId - Patient ID
+ */
+const triggerAnalysisAfterCall = async (patientId) => {
+  try {
+    logger.info(`[Analysis Trigger] Triggering analysis after call for patient ${patientId}`);
+    
+    // Trigger medical analysis
+    try {
+      const MedicalPatternAnalyzer = require('./ai/medicalPatternAnalyzer.service');
+      const analyzer = new MedicalPatternAnalyzer();
+      
+      // Get all conversations for the patient
+      const conversations = await getConversationsByPatient(patientId);
+      
+      if (conversations.length > 0) {
+        // Get baseline analysis (previous result)
+        const baselineResults = await getMedicalAnalysisResults(patientId, 1);
+        const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
+        
+        // Perform medical pattern analysis
+        const analysisResult = await analyzer.analyzeMonth(conversations, baseline);
+        
+        // Store analysis result
+        const resultToStore = {
+          ...analysisResult,
+          trigger: 'automatic_after_call',
+          batchId: `auto-${Date.now()}`,
+          processingTime: 0
+        };
+        
+        await storeMedicalAnalysisResult(patientId, resultToStore);
+        
+        logger.info(`[Analysis Trigger] Medical analysis completed for patient ${patientId}`, {
+          conversationCount: conversations.length,
+          confidence: analysisResult.confidence
+        });
+      } else {
+        logger.info(`[Analysis Trigger] No conversations found for patient ${patientId}, skipping medical analysis`);
+      }
+    } catch (medicalErr) {
+      logger.error(`[Analysis Trigger] Error in medical analysis for patient ${patientId}: ${medicalErr.message}`);
+    }
+    
+    // Trigger fraud/abuse analysis
+    try {
+      const FraudAbuseAnalyzer = require('./ai/fraudAbuseAnalyzer.service');
+      const analyzer = new FraudAbuseAnalyzer();
+      
+      // Get all conversations for the patient
+      const conversations = await getConversationsByPatient(patientId);
+      
+      if (conversations.length > 0) {
+        // Get baseline analysis (previous result)
+        const FraudAbuseAnalysis = require('../models/fraudAbuseAnalysis.model');
+        const baselineResults = await FraudAbuseAnalysis.find({ patientId })
+          .sort({ analysisDate: -1 })
+          .limit(1);
+        const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
+        
+        // Perform fraud/abuse analysis
+        const analysisResult = await analyzer.analyzeConversations(conversations, baseline);
+        
+        // Store analysis result
+        const resultToStore = {
+          patientId,
+          analysisDate: new Date(),
+          timeRange: 'custom',
+          startDate: conversations.length > 0 ? conversations[conversations.length - 1].createdAt : new Date(),
+          endDate: conversations.length > 0 ? conversations[0].createdAt : new Date(),
+          conversationCount: conversations.length,
+          messageCount: analysisResult.messageCount,
+          totalWords: analysisResult.totalWords,
+          financialRisk: analysisResult.financialRisk,
+          abuseRisk: analysisResult.abuseRisk,
+          relationshipRisk: analysisResult.relationshipRisk,
+          overallRiskScore: analysisResult.overallRiskScore,
+          changeFromBaseline: analysisResult.changeFromBaseline,
+          confidence: analysisResult.confidence,
+          warnings: analysisResult.warnings,
+          recommendations: analysisResult.recommendations,
+          processingTime: 0,
+          version: '1.0'
+        };
+        
+        await FraudAbuseAnalysis.create(resultToStore);
+        
+        logger.info(`[Analysis Trigger] Fraud/abuse analysis completed for patient ${patientId}`, {
+          conversationCount: conversations.length,
+          confidence: analysisResult.confidence,
+          overallRiskScore: analysisResult.overallRiskScore
+        });
+      } else {
+        logger.info(`[Analysis Trigger] No conversations found for patient ${patientId}, skipping fraud/abuse analysis`);
+      }
+    } catch (fraudErr) {
+      logger.error(`[Analysis Trigger] Error in fraud/abuse analysis for patient ${patientId}: ${fraudErr.message}`);
+    }
+    
+    logger.info(`[Analysis Trigger] Completed analysis triggering for patient ${patientId}`);
+  } catch (error) {
+    logger.error(`[Analysis Trigger] Error triggering analysis after call for patient ${patientId}: ${error.message}`, error);
+  }
 };
 
 module.exports = {
