@@ -1,13 +1,14 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { View, StyleSheet } from "react-native"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { Button } from "app/components/Button"
 import { Text } from "app/components/Text"
-import { getCurrentUser } from "../store/authSlice"
+import { getCurrentUser, setCurrentUser } from "../store/authSlice"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { Caregiver } from "../services/api/api.types"
 import { navigationRef } from "../navigators/navigationUtilities"
+import { useGetCaregiverQuery } from "../services/api/caregiverApi"
 
 interface PhoneVerificationBannerProps {
   onDismiss?: () => void
@@ -16,18 +17,40 @@ interface PhoneVerificationBannerProps {
 export const PhoneVerificationBanner: React.FC<PhoneVerificationBannerProps> = ({
   onDismiss
 }) => {
+  const dispatch = useDispatch()
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
   const { colors } = useTheme()
 
+  // Refetch user data to ensure we have the latest isPhoneVerified status
+  // This prevents showing the banner when the phone is already verified (stale Redux state)
+  const { data: freshUserData, refetch } = useGetCaregiverQuery(
+    { id: currentUser?.id || '' },
+    { skip: !currentUser?.id, refetchOnMountOrArgChange: true }
+  )
+
+  // Update Redux with fresh user data if it's different
+  useEffect(() => {
+    if (freshUserData && currentUser?.id === freshUserData.id) {
+      // Only update if isPhoneVerified status changed
+      if (freshUserData.isPhoneVerified !== currentUser.isPhoneVerified) {
+        dispatch(setCurrentUser(freshUserData))
+      }
+    }
+  }, [freshUserData, currentUser, dispatch])
+
+  // Use fresh data if available, otherwise fall back to Redux state
+  const userToCheck = freshUserData || currentUser
+
   // Debug logging (only in development)
-  if (process.env.NODE_ENV === 'development' && currentUser) {
+  if (process.env.NODE_ENV === 'development' && userToCheck) {
     console.log('[PhoneVerificationBanner] Debug:', {
-      hasUser: !!currentUser,
-      hasPhone: !!currentUser.phone,
-      phone: currentUser.phone ? `${currentUser.phone.substring(0, 3)}***` : 'none',
-      isPhoneVerified: currentUser.isPhoneVerified,
-      isPhoneVerifiedType: typeof currentUser.isPhoneVerified,
-      shouldShow: !currentUser.isPhoneVerified && !!currentUser.phone && currentUser.phone.trim() !== ''
+      hasUser: !!userToCheck,
+      hasPhone: !!userToCheck.phone,
+      phone: userToCheck.phone ? `${userToCheck.phone.substring(0, 3)}***` : 'none',
+      isPhoneVerified: userToCheck.isPhoneVerified,
+      isPhoneVerifiedType: typeof userToCheck.isPhoneVerified,
+      usingFreshData: !!freshUserData,
+      shouldShow: !userToCheck.isPhoneVerified && !!userToCheck.phone && userToCheck.phone.trim() !== ''
     })
   }
 
@@ -35,19 +58,21 @@ export const PhoneVerificationBanner: React.FC<PhoneVerificationBannerProps> = (
   // 1. User exists
   // 2. User has a phone number (not empty string)
   // 3. User is NOT phone verified (explicitly check for false/undefined, not just truthy)
-  if (!currentUser) {
+  // Use fresh data if available to avoid stale Redux state
+  if (!userToCheck) {
     return null
   }
   
   // Check if user has a phone number
-  if (!currentUser.phone || typeof currentUser.phone !== 'string' || currentUser.phone.trim() === '') {
+  if (!userToCheck.phone || typeof userToCheck.phone !== 'string' || userToCheck.phone.trim() === '') {
     return null
   }
   
   // Check if phone is verified - explicitly check for true (not just truthy)
   // isPhoneVerified should be false or undefined for unverified users
   // The DTO defaults it to false, but we check explicitly for true to be safe
-  if (currentUser.isPhoneVerified === true) {
+  // Use fresh data to ensure we don't show banner for already-verified phones
+  if (userToCheck.isPhoneVerified === true) {
     return null
   }
 
