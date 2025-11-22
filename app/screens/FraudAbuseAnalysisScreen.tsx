@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react"
+import React, { useState } from "react"
 import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
@@ -13,7 +13,6 @@ import { Text } from "../components"
 import { 
   useGetFraudAbuseAnalysisQuery,
   useGetFraudAbuseAnalysisResultsQuery,
-  useTriggerFraudAbuseAnalysisMutation,
 } from "../services/api/fraudAbuseAnalysisApi"
 import { 
   FraudAbuseAnalysisResult, 
@@ -59,10 +58,12 @@ export function FraudAbuseAnalysisScreen() {
     }
   )
 
-  const [triggerAnalysis, { isLoading: isTriggering, error: triggerError }] = useTriggerFraudAbuseAnalysisMutation()
-
   const latestAnalysis = analysisResponse?.data?.analysis as FraudAbuseAnalysisResult | undefined
   const recommendations = analysisResponse?.data?.recommendations || []
+  
+  // Minimum data points needed for reliable analysis (based on baselineManager minDataPoints: 5)
+  const MIN_DATA_POINTS_FOR_RELIABLE_ANALYSIS = 5
+  const hasInsufficientData = latestAnalysis && (latestAnalysis.conversationCount || 0) < MIN_DATA_POINTS_FOR_RELIABLE_ANALYSIS
 
   React.useEffect(() => {
     if (analysisError) {
@@ -78,36 +79,6 @@ export function FraudAbuseAnalysisScreen() {
       // Silently ignore 404 errors - they're expected when no analysis exists
     }
   }, [analysisError, showError])
-
-  React.useEffect(() => {
-    if (triggerError) {
-      console.error('Error triggering fraud/abuse analysis:', triggerError)
-      let errorMessage = translate('fraudAbuseAnalysis.triggerFailed')
-      if ('data' in triggerError && triggerError.data) {
-        errorMessage = (triggerError.data as any)?.message || errorMessage
-      }
-      showError(errorMessage)
-    }
-  }, [triggerError, showError])
-
-  const handleTriggerAnalysis = useCallback(async () => {
-    if (!patientId) return
-    
-    try {
-      logger.debug('Triggering fraud/abuse analysis for patient:', patientId)
-      const result = await triggerAnalysis({ patientId }).unwrap()
-      logger.debug('Trigger analysis result:', result)
-      
-      if (result.success) {
-        showSuccess(translate('fraudAbuseAnalysis.triggerSuccess'))
-        refetchAnalysis()
-      } else {
-        showError(result.message || translate('fraudAbuseAnalysis.triggerFailed'))
-      }
-    } catch (error) {
-      console.error('Trigger analysis failed:', error)
-    }
-  }, [patientId, triggerAnalysis, refetchAnalysis, showSuccess, showError])
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections)
@@ -168,30 +139,18 @@ export function FraudAbuseAnalysisScreen() {
         </Text>
       </View>
 
-      <View style={styles.actions}>
-        <Pressable 
-          style={[
-            styles.actionButton, 
-            styles.triggerButton,
-            isTriggering && styles.buttonDisabled
-          ]} 
-          onPress={handleTriggerAnalysis}
-          disabled={isTriggering}
-        >
-          {isTriggering ? (
-            <ActivityIndicator size="small" color={colors.palette.neutral100} />
-          ) : (
-            <Ionicons 
-              name="shield-checkmark" 
-              size={20} 
-              color={colors.palette.neutral100} 
-            />
-          )}
-          <Text style={styles.actionButtonText}>
-            {isTriggering ? translate('fraudAbuseAnalysis.triggering') : translate('fraudAbuseAnalysis.triggerAnalysis')}
+      {/* Insufficient Data Warning */}
+      {hasInsufficientData && (
+        <View style={[styles.disclaimerContainer, { backgroundColor: colors.palette.biancaWarning + '20', borderColor: colors.palette.biancaWarning }]}>
+          <Ionicons name="information-circle" size={20} color={colors.palette.biancaWarning} />
+          <Text style={[styles.disclaimerText, { color: colors.palette.biancaWarning }]}>
+            {translate("fraudAbuseAnalysis.insufficientDataWarning", { 
+              current: latestAnalysis?.conversationCount || 0, 
+              minimum: MIN_DATA_POINTS_FOR_RELIABLE_ANALYSIS 
+            })}
           </Text>
-        </Pressable>
-      </View>
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -202,7 +161,7 @@ export function FraudAbuseAnalysisScreen() {
         <View style={styles.emptyContainer}>
           <Ionicons name="shield" size={48} color={colors.palette.neutral600} />
           <Text style={styles.emptyText}>{translate("fraudAbuseAnalysis.noResultsAvailable")}</Text>
-          <Text style={styles.emptySubtext}>{translate("fraudAbuseAnalysis.triggerToGetStarted")}</Text>
+          <Text style={styles.emptySubtext}>{translate("fraudAbuseAnalysis.analysisWillAppearAfterCalls")}</Text>
         </View>
       ) : (
         <ScrollView style={styles.resultsContainer} showsVerticalScrollIndicator={false}>

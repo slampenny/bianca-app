@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react"
+import React, { useState } from "react"
 import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
@@ -13,7 +13,6 @@ import { Text } from "../components"
 import { 
   useGetMedicalAnalysisResultsQuery,
   useGetMedicalAnalysisTrendQuery,
-  useTriggerMedicalAnalysisMutation,
 } from "../services/api/medicalAnalysisApi"
 import { 
   MedicalAnalysisResult, 
@@ -81,10 +80,12 @@ export function MedicalAnalysisScreen() {
     }
   )
 
-  const [triggerAnalysis, { isLoading: isTriggering, error: triggerError }] = useTriggerMedicalAnalysisMutation()
-
   const analysisResults = analysisData?.results || []
   const latestAnalysis = analysisResults[0] as MedicalAnalysisResult | undefined
+  
+  // Minimum data points needed for reliable analysis (based on baselineManager minDataPoints: 5)
+  const MIN_DATA_POINTS_FOR_RELIABLE_ANALYSIS = 5
+  const hasInsufficientData = latestAnalysis && (latestAnalysis.conversationCount || 0) < MIN_DATA_POINTS_FOR_RELIABLE_ANALYSIS
 
   // Handle errors
   React.useEffect(() => {
@@ -97,37 +98,6 @@ export function MedicalAnalysisScreen() {
       showError(errorMessage)
     }
   }, [analysisError, showError])
-
-  React.useEffect(() => {
-    if (triggerError) {
-      console.error('Error triggering medical analysis:', triggerError)
-      let errorMessage = translate('medicalAnalysis.triggerFailed')
-      if ('data' in triggerError && triggerError.data) {
-        errorMessage = (triggerError.data as any)?.message || errorMessage
-      }
-      showError(errorMessage)
-    }
-  }, [triggerError, showError])
-
-  const handleTriggerAnalysis = useCallback(async () => {
-    if (!patientId) return
-    
-    try {
-      logger.debug('Triggering medical analysis for patient:', patientId)
-      const result = await triggerAnalysis({ patientId }).unwrap()
-      logger.debug('Trigger analysis result:', result)
-      
-      if (result.success) {
-        showSuccess(translate('medicalAnalysis.triggerSuccess'))
-        // Immediately refetch since analysis is now synchronous
-        refetchResults()
-      } else {
-        showError(result.message || translate('medicalAnalysis.triggerFailed'))
-      }
-    } catch (error) {
-      console.error('Trigger analysis failed:', error)
-    }
-  }, [patientId, triggerAnalysis, refetchResults, showSuccess, showError])
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections)
@@ -287,31 +257,18 @@ export function MedicalAnalysisScreen() {
         </Text>
       </View>
 
-      {/* Trigger Button */}
-      <View style={styles.actions}>
-        <Pressable 
-          style={[
-            styles.actionButton, 
-            styles.triggerButton,
-            isTriggering && styles.buttonDisabled
-          ]} 
-          onPress={handleTriggerAnalysis}
-          disabled={isTriggering}
-        >
-          {isTriggering ? (
-            <ActivityIndicator size="small" color={colors.palette.neutral100} />
-          ) : (
-            <Ionicons 
-              name="play-circle" 
-              size={20} 
-              color={colors.palette.neutral100} 
-            />
-          )}
-          <Text style={styles.actionButtonText}>
-            {isTriggering ? translate('medicalAnalysis.triggering') : translate('medicalAnalysis.triggerAnalysis')}
+      {/* Insufficient Data Warning */}
+      {hasInsufficientData && (
+        <View style={[styles.disclaimerContainer, { backgroundColor: colors.palette.biancaWarning + '20', borderColor: colors.palette.biancaWarning }]}>
+          <Ionicons name="information-circle" size={20} color={colors.palette.biancaWarning} />
+          <Text style={[styles.disclaimerText, { color: colors.palette.biancaWarning }]}>
+            {translate("medicalAnalysis.insufficientDataWarning", { 
+              current: latestAnalysis?.conversationCount || 0, 
+              minimum: MIN_DATA_POINTS_FOR_RELIABLE_ANALYSIS 
+            })}
           </Text>
-        </Pressable>
-      </View>
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -322,7 +279,7 @@ export function MedicalAnalysisScreen() {
         <View style={styles.emptyContainer}>
           <Ionicons name="analytics" size={48} color={colors.palette.neutral600} />
           <Text style={styles.emptyText}>{translate("medicalAnalysis.noResultsAvailable")}</Text>
-          <Text style={styles.emptySubtext}>{translate("medicalAnalysis.triggerToGetStarted")}</Text>
+          <Text style={styles.emptySubtext}>{translate("medicalAnalysis.analysisWillAppearAfterCalls")}</Text>
         </View>
       ) : (
         <ScrollView style={styles.resultsContainer} showsVerticalScrollIndicator={false}>
