@@ -143,7 +143,7 @@ const removeCaregiver = async (orgId, caregiverId) => {
   return org;
 };
 
-const sendInvite = async (orgId, name, email, phone) => {
+const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
   const org = await Org.findById(orgId);
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
