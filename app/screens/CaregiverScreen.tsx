@@ -486,6 +486,7 @@ function CaregiverScreen() {
           <Button
             text={caregiver && caregiver.id ? translate("caregiverScreen.save") : translate("caregiverScreen.invite")}
             onPress={handleSave}
+            accessibilityHint={caregiver && caregiver.id ? "Saves changes to this caregiver" : "Sends an invitation email to this caregiver"}
             disabled={!email || !phone || !!emailError || !!phoneError || isUpdating || isInviting}
             testID="caregiver-save-button"
             preset="primary"
@@ -502,6 +503,7 @@ function CaregiverScreen() {
               onPress={handleDelete}
               disabled={isDeleting}
               testID="delete-caregiver-button"
+              accessibilityHint={confirmDelete ? "Permanently deletes this caregiver. This action cannot be undone." : "Tap once to confirm deletion, tap again to permanently delete this caregiver"}
               preset="danger"
               style={[
                 styles.button,

@@ -144,6 +144,7 @@ export function HomeScreen() {
               onPress={() => handleCallNow(item)}
               testID={`call-now-${item.name}`}
               accessibilityLabel={`Call ${item.name}`}
+              accessibilityHint="Initiates a phone call to this patient"
               style={styles.callButton}
               textStyle={styles.callButtonText}
               LeftAccessory={(props) => (
@@ -159,7 +160,8 @@ export function HomeScreen() {
               text="" // Empty text for icon-only button
               onPress={() => handlePatientPress(item)}
               testID={`edit-patient-button-${item.name}`}
-              accessibilityLabel={`edit-patient-button-${item.name}`}
+              accessibilityLabel={`Edit ${item.name}`}
+              accessibilityHint="Opens patient details for editing"
               style={styles.editButton}
               textStyle={styles.editButtonText}
               LeftAccessory={(props) => (

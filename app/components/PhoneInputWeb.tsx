@@ -212,7 +212,9 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
             autoComplete="tel"
             testID={testID}
             {...testingProps(testID)}
-            accessibilityLabel={accessibilityLabel}
+            accessibilityLabel={accessibilityLabel || label || (labelTx ? translate(labelTx, labelTxOptions) : undefined) || "Phone number"}
+            accessibilityState={{ disabled: !isEditable }}
+            accessibilityHint={error || validationError || helper}
           />
         </View>
         

@@ -43,7 +43,9 @@ export function FontScaleSelector({ testID }: { testID?: string }) {
           onPress={handleDecrease}
           disabled={fontScale <= 0.8}
           testID="font-scale-decrease"
+          accessibilityRole="button"
           accessibilityLabel={translate("profileScreen.decreaseFontSize") || "Decrease font size"}
+          accessibilityState={{ disabled: fontScale <= 0.8 }}
         >
           <Text style={[styles.buttonText, { color: colors.palette.neutral100 }]}>−</Text>
         </Pressable>
@@ -63,7 +65,9 @@ export function FontScaleSelector({ testID }: { testID?: string }) {
           onPress={handleIncrease}
           disabled={fontScale >= 2.0}
           testID="font-scale-increase"
+          accessibilityRole="button"
           accessibilityLabel={translate("profileScreen.increaseFontSize") || "Increase font size"}
+          accessibilityState={{ disabled: fontScale >= 2.0 }}
         >
           <Text style={[styles.buttonText, { color: colors.palette.neutral100 }]}>+</Text>
         </Pressable>

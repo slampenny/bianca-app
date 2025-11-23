@@ -11,6 +11,7 @@ import {
 import { spacing, typography } from "../theme"
 import { useTheme } from "../theme/ThemeContext"
 import { useKeyboardFocus } from "../hooks/useKeyboardFocus"
+import { translate } from "../i18n"
 import { Text, TextProps } from "./Text"
 
 /**
@@ -103,6 +104,16 @@ export interface ButtonProps extends PressableProps {
   loading?: boolean
 
   testID?: string
+  /**
+   * Accessibility label for screen readers. Should be user-friendly and descriptive.
+   * If not provided, will use the button text (from `text` or `tx` prop).
+   */
+  accessibilityLabel?: string
+  /**
+   * Accessibility hint for screen readers. Provides additional context about what the button does.
+   * Use for complex interactions or when the action isn't obvious from the label alone.
+   */
+  accessibilityHint?: string
 }
 
 /**
@@ -139,6 +150,8 @@ export function Button(props: ButtonProps) {
     loading = false,
     disabledStyle: $disabledViewStyleOverride,
     testID,
+    accessibilityLabel,
+    accessibilityHint,
     ...rest
   } = props
 
@@ -146,6 +159,15 @@ export function Button(props: ButtonProps) {
   
   // Button is disabled if explicitly disabled OR loading
   const isDisabled = disabled || loading
+  
+  // Generate accessibility label from text if not provided
+  const getAccessibilityLabel = () => {
+    if (accessibilityLabel) return accessibilityLabel
+    if (text) return text
+    if (tx) return translate(tx, txOptions)
+    if (children && typeof children === 'string') return children
+    return undefined
+  }
   
   // Create presets dynamically based on current theme colors
   const $viewPresets = getViewPresets(colors)
@@ -193,7 +215,9 @@ export function Button(props: ButtonProps) {
     <Pressable
       style={$viewStyle}
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled }}
+      accessibilityLabel={getAccessibilityLabel()}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      accessibilityHint={loading ? "Button is loading, please wait" : accessibilityHint}
       {...rest}
       disabled={isDisabled}
       testID={testID}

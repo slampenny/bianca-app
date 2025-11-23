@@ -310,8 +310,9 @@ export function AlertScreen() {
             }}
             style={styles.tabButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={translate("alertScreen.allAlerts")}
+            accessibilityRole="tab"
+            accessibilityLabel={translate("alertScreen.allAlerts") || "All alerts"}
+            accessibilityState={{ selected: !showUnread }}
           >
             <View style={styles.tabButtonContent}>
               <Text style={styles.tabText}>
@@ -329,6 +330,8 @@ export function AlertScreen() {
               onPress={handleMarkAllAsRead}
               style={styles.refreshButton}
               testID="mark-all-checkbox"
+              accessibilityLabel={translate("alertScreen.markAllAsRead") || "Mark all alerts as read"}
+              accessibilityHint="Marks all unread alerts as read"
             />
           </View>
         )}

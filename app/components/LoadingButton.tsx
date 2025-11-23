@@ -3,6 +3,7 @@ import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } 
 import { colors } from "app/theme/colors"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
+import { useKeyboardFocus } from "../hooks/useKeyboardFocus"
 
 interface LoadingButtonProps {
   onPress: () => void | Promise<void>
@@ -67,6 +68,12 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
     return getDisplayText()
   }
 
+  // Generate accessibility label from text if not provided
+  const getAccessibilityLabel = () => {
+    if (accessibilityLabel) return accessibilityLabel
+    return getDisplayText()
+  }
+
   return (
     <Pressable
       style={[
@@ -78,7 +85,10 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
       onPress={handlePress}
       disabled={isDisabled}
       testID={testID}
-      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      accessibilityLabel={getAccessibilityLabel()}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      accessibilityHint={loading ? "Button is loading, please wait" : undefined}
     >
       {loading ? (
         <>

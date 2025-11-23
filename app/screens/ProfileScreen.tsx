@@ -402,7 +402,11 @@ function ProfileScreen() {
               onPress={() => navigation.navigate("MFASetup" as never)}
               preset="default"
               testID="mfa-setup-button"
-              accessibilityLabel="mfa-setup-button"
+              accessibilityLabel={mfaStatus?.mfaEnabled 
+                ? (translate("mfa.manageMFA") || "Manage Multi-Factor Authentication")
+                : (translate("mfa.enableMFA") || "Enable Multi-Factor Authentication")
+              }
+              accessibilityHint="Opens multi-factor authentication setup screen"
               style={styles.mfaButton}
             />
 
@@ -412,7 +416,8 @@ function ProfileScreen() {
               preset="primary"
               disabled={!email || !phone || !!emailError || !!phoneError}
               testID="profile-update-button"
-              accessibilityLabel="profile-update-button"
+              accessibilityLabel={translate("profileScreen.updateProfile") || "Update profile"}
+              accessibilityHint="Saves your profile changes"
               style={styles.updateButton}
             />
 

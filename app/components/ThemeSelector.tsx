@@ -50,6 +50,9 @@ export function ThemeSelector({ testID }: { testID?: string }) {
           keyboardFocusStyle, // Add keyboard focus styles (web only)
         ]} 
         onPress={() => setModalVisible(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`${translate("profileScreen.theme")}: ${translate(`themes.${currentTheme}.name`)}`}
+        accessibilityHint="Opens theme selection dialog"
       >
         <Text style={[dynamicStyles.selectorText, { color: colors.palette.biancaHeader || colors.text }]}>{translate(`themes.${currentTheme}.name`)}</Text>
         <View style={styles.currentThemeSwatchContainer}>
@@ -90,6 +93,10 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                     keyboardFocusStyle, // Add keyboard focus styles (web only)
                   ]}
                   onPress={() => handleThemeChange(key as ThemeType)}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate(`themes.${key}.name`)}
+                  accessibilityState={{ selected: currentTheme === key }}
+                  accessibilityHint={translate(`themes.${key}.description`)}
                 >
                   <View style={styles.themeHeader}>
                     <Text style={[

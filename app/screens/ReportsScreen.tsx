@@ -91,6 +91,9 @@ export function ReportsScreen() {
           style={styles.patientPicker}
           onPress={() => setShowPatientPicker(true)}
           testID="patient-picker-button"
+          accessibilityRole="button"
+          accessibilityLabel={selectedPatient ? `Selected patient: ${selectedPatient.name}` : translate("reportsScreen.choosePatient") || "Choose patient"}
+          accessibilityHint="Opens patient selection dialog"
         >
           <Text style={styles.patientPickerText}>
             {selectedPatient ? selectedPatient.name : translate("reportsScreen.choosePatient")}
@@ -112,6 +115,7 @@ export function ReportsScreen() {
             onPress={handleSentimentPress}
             disabled={!selectedPatient}
             testID="sentiment-reports-button"
+            accessibilityHint="Opens sentiment analysis report for the selected patient"
           >
             <View style={styles.buttonContent}>
               <Ionicons 
@@ -157,6 +161,7 @@ export function ReportsScreen() {
             onPress={handleFraudAbusePress}
             disabled={!selectedPatient}
             testID="fraud-abuse-reports-button"
+            accessibilityHint="Opens fraud and abuse analysis report for the selected patient"
           >
             <View style={styles.buttonContent}>
               <Ionicons 

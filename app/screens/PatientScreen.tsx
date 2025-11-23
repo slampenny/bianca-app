@@ -464,6 +464,9 @@ function PatientScreen() {
               style={styles.languagePicker}
               onPress={() => setShowLanguagePicker(true)}
               testID="language-picker-button"
+              accessibilityRole="button"
+              accessibilityLabel={`Preferred language: ${getLanguageByCode(preferredLanguage).label}`}
+              accessibilityHint="Opens language selection dialog"
             >
               <Text style={styles.languagePickerText}>
                 {getLanguageByCode(preferredLanguage).label} ({getLanguageByCode(preferredLanguage).nativeName})
@@ -476,6 +479,7 @@ function PatientScreen() {
           <Button
             text={patient && patient.id ? translate("patientScreen.updatePatient") : translate("patientScreen.createPatient")}
             onPress={handleSave}
+            accessibilityHint={patient && patient.id ? "Saves changes to this patient" : "Creates a new patient"}
             disabled={
               !canCreateOrEditPatient ||
               !name ||
@@ -499,6 +503,7 @@ function PatientScreen() {
                 onPress={handleManageSchedules}
                 disabled={isLoading}
                 testID="manage-schedules-button"
+                accessibilityHint="Opens screen to manage patient schedules"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
@@ -509,7 +514,8 @@ function PatientScreen() {
                 onPress={handleManageConversations}
                 disabled={isLoading}
                 testID="manage-conversations-button"
-                accessibilityLabel="manage-conversations-button"
+                accessibilityLabel={translate("patientScreen.manageConversations") || "Manage conversations"}
+                accessibilityHint="Opens screen to view and manage patient conversations"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
@@ -523,6 +529,7 @@ function PatientScreen() {
                 })}
                 disabled={isLoading}
                 testID="view-sentiment-analysis-button"
+                accessibilityHint="Opens sentiment analysis report for this patient"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
@@ -545,6 +552,7 @@ function PatientScreen() {
                 onPress={handleDelete}
                 disabled={isLoading}
                 testID="delete-patient-button"
+                accessibilityHint={confirmDelete ? "Permanently deletes this patient. This action cannot be undone." : "Tap once to confirm deletion, tap again to permanently delete this patient"}
                 preset="danger"
                 style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
                 textStyle={styles.buttonText}

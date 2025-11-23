@@ -42,6 +42,11 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
   RightAccessory?: ComponentType<TextFieldAccessoryProps>
   LeftAccessory?: ComponentType<TextFieldAccessoryProps>
   testID?: string
+  /**
+   * Accessibility label for screen readers. Should be user-friendly and descriptive.
+   * If not provided, will use the label (from `label` or `labelTx` prop).
+   */
+  accessibilityLabel?: string
 }
 
 export const TextField = forwardRef(function TextField(props: TextFieldProps, ref: Ref<TextInput>) {
@@ -64,6 +69,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     containerStyle: $containerStyleOverride,
     inputWrapperStyle: $inputWrapperStyleOverride,
     testID,
+    accessibilityLabel,
     ...TextInputProps
   } = props
 
@@ -77,6 +83,14 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   const placeholderContent = placeholderTx
     ? translate(placeholderTx, placeholderTxOptions)
     : placeholder
+  
+  // Generate accessibility label from label if not provided
+  const getAccessibilityLabel = () => {
+    if (accessibilityLabel) return accessibilityLabel
+    if (label) return label
+    if (labelTx) return translate(labelTx, labelTxOptions)
+    return undefined
+  }
 
   const $containerStyles: StyleProp<ViewStyle> = [
     $containerStyleOverride,
@@ -179,6 +193,9 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
           style={$inputStyles}
           testID={testID}
           {...testingProps(testID)}
+          accessibilityLabel={getAccessibilityLabel()}
+          accessibilityState={{ disabled }}
+          accessibilityHint={status === "error" && helper ? helper : undefined}
         />
 
         {!!RightAccessory && (
