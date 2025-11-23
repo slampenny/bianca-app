@@ -1,5 +1,5 @@
 import React, { ErrorInfo } from "react"
-import { ScrollView, TextStyle, View, ViewStyle } from "react-native"
+import { ScrollView, TextStyle, View, ViewStyle, Platform } from "react-native"
 import { Button, Icon, Screen, Text } from "../../components"
 import { colors, spacing } from "../../theme"
 
@@ -68,19 +68,29 @@ const $errorSection: ViewStyle = {
   backgroundColor: colors.separator,
   marginVertical: spacing.md,
   borderRadius: 6,
+  width: '100%',
+  maxWidth: '100%',
 }
 
 const $errorSectionContentContainer: ViewStyle = {
   padding: spacing.md,
+  width: '100%',
+  maxWidth: '100%',
 }
 
 const $errorContent: TextStyle = {
   color: colors.error,
+  wordBreak: 'break-word' as any,
+  overflowWrap: 'break-word' as any,
 }
 
 const $errorBacktrace: TextStyle = {
   marginTop: spacing.md,
   color: colors.textDim,
+  wordBreak: 'break-word' as any,
+  overflowWrap: 'break-word' as any,
+  fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  fontSize: Platform.OS === 'web' ? 12 : undefined,
 }
 
 const $resetButton: ViewStyle = {

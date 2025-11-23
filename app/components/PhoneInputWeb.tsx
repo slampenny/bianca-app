@@ -1,5 +1,5 @@
 import React, { useState, forwardRef, useRef, useEffect } from 'react'
-import { View, StyleSheet, TextInput } from 'react-native'
+import { View, StyleSheet, TextInput, Platform } from 'react-native'
 import { colors, spacing, typography } from 'app/theme'
 import { useTheme } from 'app/theme/ThemeContext'
 import { translate } from 'app/i18n'

@@ -233,12 +233,20 @@ test.describe('Login Modal Error Display', () => {
     await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
     
     // WHEN: I attempt to login with invalid credentials
-    const emailInput = page.locator('[aria-label="email-input"]')
-    const passwordInput = page.locator('[aria-label="password-input"]')
-    const loginButton = page.locator('[aria-label="login-button"]')
+    // Use data-testid instead of aria-label
+    const emailInput = page.locator('input[data-testid="email-input"]')
+    const passwordInput = page.locator('input[data-testid="password-input"]')
     
     await emailInput.fill('invalid@example.org')
     await passwordInput.fill('wrongpassword')
+    
+    // Find login button with fallback
+    let loginButton = page.getByTestId('login-button')
+    let loginButtonCount = await loginButton.count().catch(() => 0)
+    if (loginButtonCount === 0) {
+      loginButton = page.locator('[data-testid="login-button"]').first()
+    }
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
     await loginButton.click()
     
     await page.waitForTimeout(3000)

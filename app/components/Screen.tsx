@@ -89,8 +89,6 @@ interface AutoScreenProps extends Omit<ScrollScreenProps, "preset"> {
 
 export type ScreenProps = ScrollScreenProps | FixedScreenProps | AutoScreenProps
 
-const isIos = Platform.OS === "ios"
-
 type ScreenPreset = "fixed" | "scroll" | "auto"
 
 /**
@@ -247,6 +245,9 @@ export function Screen(props: ScreenProps) {
   } = props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
+  
+  // Check Platform at runtime to avoid module load errors
+  const isIos = typeof Platform !== 'undefined' && Platform.OS === "ios"
 
   return (
     <View style={[$containerStyle, { backgroundColor }, $containerInsets]} testID={testID} accessibilityLabel={accessibilityLabel}>

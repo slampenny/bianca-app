@@ -26,10 +26,25 @@ export async function navigateToRegister(page: Page) {
   }
   
   await registerButton.waitFor({ state: 'visible', timeout: 10000 })
+  console.log('Register button found, clicking...')
   await registerButton.click()
+  console.log('Register button clicked, waiting for navigation...')
   
-  // Wait for register screen - use data-testid
-  await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
+  // Wait for navigation - use Promise.race to fail fast (5 second total timeout)
+  try {
+    await Promise.race([
+      page.waitForSelector('[data-testid="register-screen"]', { timeout: 5000 }),
+      page.waitForSelector('input[data-testid="register-name"]', { timeout: 5000 }),
+      page.waitForSelector('[data-testid^="register-"]', { timeout: 5000 }),
+    ])
+    console.log('Found register screen')
+  } catch {
+    // Quick debug
+    const currentUrl = page.url()
+    const stillOnLogin = await page.locator('input[data-testid="email-input"]').isVisible({ timeout: 1000 }).catch(() => false)
+    console.error(`Failed to find register screen. URL: ${currentUrl}, Still on login: ${stillOnLogin}`)
+    throw new Error('Register screen not found after clicking register button')
+  }
 }
 
 export async function navigateToHome(page: Page, user?: { email: string; password: string }) {

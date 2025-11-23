@@ -11,10 +11,18 @@
 [warning] Require cycle: app/components/LoginForm.tsx -> app/contexts/AuthModalContext.tsx -> app/components/LoginForm.tsx
 
 Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
-[log] Running application "main" with appParams:
- {rootTag: #root, hydrate: false} 
-Development-level warnings: ON.
-Performance optimizations: OFF.
+[pageerror] Page Error: Platform is not defined
+ReferenceError: Platform is not defined
+    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228874:17
+    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
+    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
+    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
+    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228655:23
+    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
+    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
+    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
+    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:117530:24
+    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
 [log] [DEBUG] Saved language from storage: null
 [log] [DEBUG] System locale detected: en-US
 [log] [DEBUG] System locale is English, using it
@@ -37,10 +45,18 @@ Performance optimizations: OFF.
 [warning] Require cycle: app/components/LoginForm.tsx -> app/contexts/AuthModalContext.tsx -> app/components/LoginForm.tsx
 
 Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
-[log] Running application "main" with appParams:
- {rootTag: #root, hydrate: false} 
-Development-level warnings: ON.
-Performance optimizations: OFF.
+[pageerror] Page Error: Platform is not defined
+ReferenceError: Platform is not defined
+    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228874:17
+    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
+    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
+    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
+    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228655:23
+    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
+    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
+    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
+    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:117530:24
+    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
 [log] [DEBUG] Saved language from storage: null
 [log] [DEBUG] System locale detected: en-US
 [log] [DEBUG] System locale is English, using it
@@ -49,7 +65,3 @@ Performance optimizations: OFF.
 [log] [DEBUG] System locale detected: en-US
 [log] [DEBUG] System locale is English, using it
 [log] [DEBUG] Final i18n.locale set to: en-US
-[warning] props.pointerEvents is deprecated. Use style.pointerEvents
-[log] [SSO Buttons] Dark mode: undefined Background color: #FFFFFF
-[log] [DEBUG] useLanguage: Language change detected, updating to: en-US
-[log] [DEBUG] useLanguage: Language change detected, updating to: en-US

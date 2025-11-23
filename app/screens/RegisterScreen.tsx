@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
-import { StyleSheet, View, Pressable, Platform, Dimensions } from "react-native"
+import { StyleSheet, View, Pressable, ScrollView } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
-import { Button, Text, TextField, PhoneInputWeb } from "app/components"
+import { Button, Text, TextField, PhoneInputWeb, Screen } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
@@ -11,11 +11,22 @@ import { logger } from "../utils/logger"
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
-  const scrollRef = useRef(null)
+  const scrollRef = useRef<ScrollView>(null)
   const { colors, isLoading: themeLoading } = useTheme()
 
+  // Don't return null - render a loading state instead to prevent navigation issues
   if (themeLoading) {
-    return null
+    return (
+      <Screen 
+        testID="register-screen"
+        accessibilityLabel="Register"
+        style={{ backgroundColor: colors.palette?.biancaBackground || '#FFFFFF', flex: 1 }}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Loading...</Text>
+        </View>
+      </Screen>
+    )
   }
 
   const styles = createStyles(colors)
@@ -189,24 +200,17 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
     setShouldRegister(true) // Trigger the useEffect hook
   }
 
-  // Pure HTML approach for React Native Web
   return (
-    <div
-      data-testid="register-form"
-      style={{
-        position: "absolute",
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: colors.palette.biancaBackground,
-        overflowY: "scroll",
-        msOverflowStyle: "scrollbar",
-        WebkitOverflowScrolling: "touch",
-      }}
-      ref={scrollRef}
+    <Screen 
+      testID="register-screen"
+      accessibilityLabel="Register"
+      style={{ backgroundColor: colors.palette.biancaBackground, flex: 1 }}
     >
-      <div style={{ padding: "20px" }}>
+      <ScrollView 
+        ref={scrollRef}
+        contentContainerStyle={{ padding: 20 }}
+        testID="register-form"
+      >
         {/* Error message block MOVED FROM HERE */}
 
         <View style={styles.buttonContainer}>
@@ -401,9 +405,9 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
 
         {/* Add extra space at the bottom to ensure scrollability */}
-        <div style={{ height: "100px" }}></div>
-      </div>
-    </div>
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </Screen>
   )
 }
 
