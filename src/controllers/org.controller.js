@@ -59,7 +59,9 @@ const setRole = catchAsync(async (req, res) => {
 const sendInvite = catchAsync(async (req, res) => {
   const { orgId } = req.params;
   const { name, email, phone } = req.body;
-  const caregiver = await orgService.sendInvite(orgId, name, email, phone);
+  // Get inviterId from the authenticated user (req.caregiver)
+  const inviterId = req.caregiver?.id || null;
+  const caregiver = await orgService.sendInvite(orgId, name, email, phone, inviterId);
   res.status(httpStatus.OK).send(caregiver);
 });
 
