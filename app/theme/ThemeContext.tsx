@@ -3,14 +3,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { colors as healthcareColors } from "./colors"
 import { colors as colorblindColors } from "./colors.colorblind"
 import { colors as darkColors } from "./colors.dark"
+import { colors as highContrastColors } from "./colors.highcontrast"
 import { logger } from "../utils/logger"
 
-export type ThemeType = "healthcare" | "colorblind" | "dark"
+export type ThemeType = "healthcare" | "colorblind" | "dark" | "highcontrast"
 
 export interface Theme {
   name: string
   description: string
-  colors: typeof healthcareColors | typeof colorblindColors | typeof darkColors
+  colors: typeof healthcareColors | typeof colorblindColors | typeof darkColors | typeof highContrastColors
   accessibility: {
     wcagLevel: "AA" | "AAA"
     colorblindFriendly: boolean
@@ -56,6 +57,18 @@ export const themes: Record<ThemeType, Theme> = {
       darkMode: true,
       description: "Dark theme with bright colors for comfortable viewing in low-light conditions"
     }
+  },
+  highcontrast: {
+    name: "High Contrast",
+    description: "Maximum contrast theme for vision impairment (WCAG AAA)",
+    colors: highContrastColors,
+    accessibility: {
+      wcagLevel: "AAA",
+      colorblindFriendly: true,
+      highContrast: true,
+      darkMode: false,
+      description: "Maximum contrast (7:1+) with pure black and white for users with vision impairment"
+    }
   }
 }
 
@@ -64,14 +77,17 @@ export const defaultTheme: ThemeType = "healthcare"
 interface ThemeContextType {
   currentTheme: ThemeType
   setTheme: (theme: ThemeType) => void
-  colors: typeof healthcareColors | typeof colorblindColors
+  colors: typeof healthcareColors | typeof colorblindColors | typeof darkColors | typeof highContrastColors
   themeInfo: Theme
   isLoading: boolean
+  fontScale: number
+  setFontScale: (scale: number) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 const THEME_STORAGE_KEY = "@myphonefriend_theme"
+const FONT_SCALE_STORAGE_KEY = "@myphonefriend_font_scale"
 
 interface ThemeProviderProps {
   children: ReactNode
@@ -79,12 +95,14 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [currentTheme, setCurrentTheme] = useState<ThemeType>(defaultTheme)
+  const [fontScale, setFontScaleState] = useState<number>(1.0)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load theme from storage on mount
+  // Load theme and font scale from storage on mount
   useEffect(() => {
-    const loadTheme = async () => {
+    const loadPreferences = async () => {
       try {
+        // Load theme
         const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY)
         if (savedTheme && savedTheme in themes) {
           setCurrentTheme(savedTheme as ThemeType)
@@ -93,14 +111,23 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           const prefersColorblind = detectColorblindPreference()
           setCurrentTheme(prefersColorblind ? "colorblind" : "healthcare")
         }
+        
+        // Load font scale
+        const savedFontScale = await AsyncStorage.getItem(FONT_SCALE_STORAGE_KEY)
+        if (savedFontScale) {
+          const scale = parseFloat(savedFontScale)
+          if (!isNaN(scale) && scale >= 0.8 && scale <= 2.0) {
+            setFontScaleState(scale)
+          }
+        }
       } catch (error) {
-        logger.warn("Failed to load theme:", error)
+        logger.warn("Failed to load preferences:", error)
         setCurrentTheme(defaultTheme)
       } finally {
         setIsLoading(false)
       }
     }
-    loadTheme()
+    loadPreferences()
   }, [])
 
   // Save theme to storage when it changes
@@ -114,6 +141,19 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }
 
+  // Save font scale to storage when it changes
+  const setFontScale = async (scale: number) => {
+    try {
+      // Clamp between 0.8 and 2.0
+      const clampedScale = Math.max(0.8, Math.min(2.0, scale))
+      await AsyncStorage.setItem(FONT_SCALE_STORAGE_KEY, clampedScale.toString())
+      setFontScaleState(clampedScale)
+    } catch (error) {
+      logger.warn("Failed to save font scale:", error)
+      setFontScaleState(scale) // Still update locally even if storage fails
+    }
+  }
+
   const currentThemeData = themes[currentTheme]
 
   const contextValue: ThemeContextType = {
@@ -122,6 +162,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     colors: currentThemeData.colors,
     themeInfo: currentThemeData,
     isLoading,
+    fontScale,
+    setFontScale,
   }
 
   // Always render children with theme context, even during loading
@@ -144,6 +186,10 @@ export function useTheme() {
       colors: defaultThemeData.colors,
       themeInfo: defaultThemeData,
       isLoading: true,
+      fontScale: 1.0,
+      setFontScale: () => {
+        logger.warn("setFontScale called outside ThemeProvider")
+      },
     }
   }
   return context

@@ -6,9 +6,9 @@ export class AuthWorkflow {
 
   // GIVEN steps - Setup conditions
   async givenIAmOnTheLoginScreen() {
-    // Navigate to the app and wait for login screen
-    await this.page.goto('http://localhost:8081/')
-    await this.page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
+    // Navigate to the app and wait for login screen (baseURL is configured in playwright.config.ts)
+    await this.page.goto('/')
+    await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 5000 })
   }
 
   async givenIHaveValidCredentials() {
@@ -33,9 +33,9 @@ export class AuthWorkflow {
   }
 
   async givenIAmOnTheRegisterScreen() {
-    // Use aria-label for React Native Web
-    await this.page.locator('[aria-label="register-link"]').click()
-    await this.page.waitForSelector('[aria-label="register-name"]', { timeout: 10000 })
+    // Use data-testid for React Native Web
+    await this.page.getByTestId('register-button').click()
+    await this.page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
   }
 
   async givenIHaveRegistrationData() {
@@ -51,28 +51,35 @@ export class AuthWorkflow {
 
   // WHEN steps - Actions
   async whenIEnterCredentials(email: string, password: string) {
-    await this.page.fill('[aria-label="email-input"]', email)
-    await this.page.fill('[aria-label="password-input"]', password)
+    await this.page.fill('input[data-testid="email-input"]', email)
+    await this.page.fill('input[data-testid="password-input"]', password)
   }
 
   async whenIClickLoginButton() {
-    await this.page.click('[aria-label="login-button"]')
+    await this.page.click('[data-testid="login-button"]')
   }
 
   async whenIClickRegisterButton() {
-    await this.page.locator('[aria-label="register-submit"]').click()
+    let submitButton = this.page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = this.page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
   }
 
   async whenIFillRegistrationForm(data: any) {
-    await this.page.locator('[aria-label="register-name"]').fill(data.name)
-    await this.page.locator('[aria-label="register-email"]').fill(data.email)
-    await this.page.locator('[aria-label="register-password"]').fill(data.password)
-    await this.page.locator('[aria-label="register-confirm-password"]').fill(data.confirmPassword)
-    await this.page.locator('[aria-label="register-phone"]').fill(data.phone)
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="register-name"]').fill(data.name)
+    await this.page.locator('input[data-testid="register-email"]').fill(data.email)
+    await this.page.locator('input[data-testid="register-password"]').fill(data.password)
+    await this.page.locator('input[data-testid="register-confirm-password"]').fill(data.confirmPassword)
+    await this.page.locator('input[data-testid="register-phone"]').fill(data.phone)
     if (data.organizationName) {
       // Switch to organization account type first
-      await this.page.locator('[aria-label="register-organization-toggle"]').click()
-      await this.page.locator('[aria-label="register-org-name"]').fill(data.organizationName)
+      await this.page.getByTestId('register-organization-toggle').click()
+      await this.page.locator('input[data-testid="register-org-name"]').fill(data.organizationName)
     }
   }
 
@@ -95,7 +102,7 @@ export class AuthWorkflow {
       this.page.getByText(/Failed to log in/i),
       this.page.getByText(/Invalid email or password/i),
       this.page.getByText(/Please check your email and password/i),
-      this.page.locator('[aria-label="login-error"], [data-testid="login-error"]'),
+      this.page.locator('[data-testid="login-error"]'),
       this.page.locator('.error, [class*="error"]'),
     ]
     
@@ -120,7 +127,7 @@ export class AuthWorkflow {
     await this.page.waitForTimeout(3000)
     
     // Check if we're on MFA verification screen (user might have MFA enabled)
-    const mfaScreen = await this.page.locator('[aria-label="mfa-token-input"], [data-testid="mfa-verification-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
+    const mfaScreen = await this.page.locator('[data-testid="mfa-verification-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
     if (mfaScreen) {
       // User has MFA enabled - we need to complete MFA verification
       // For now, we'll use a backup code if available, or skip this test
@@ -129,8 +136,13 @@ export class AuthWorkflow {
       
       // Try to find backup codes or use a mock token
       // Note: This will likely fail with invalid token, but we'll handle that
-      const mfaTokenInput = this.page.locator('[aria-label="mfa-token-input"]')
-      const verifyButton = this.page.locator('[aria-label="mfa-verify-button"]')
+      // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+      const mfaTokenInput = this.page.locator('input[data-testid="mfa-token-input"]')
+      let verifyButton = this.page.getByTestId('mfa-verify-button')
+      let buttonCount = await verifyButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        verifyButton = this.page.locator('[data-testid="mfa-verify-button"]').first()
+      }
       
       // Try with a 6-digit code (might work in test mode, or will show error)
       await mfaTokenInput.fill('123456')
@@ -140,7 +152,7 @@ export class AuthWorkflow {
       await this.page.waitForTimeout(2000)
       
       // Check if we're now on home screen (token was accepted) or still on MFA screen (token rejected)
-      const isHomeNow = await this.page.locator('[aria-label="home-header"]').isVisible({ timeout: 3000 }).catch(() => false)
+      const isHomeNow = await this.page.locator('[data-testid="home-header"]').isVisible({ timeout: 3000 }).catch(() => false)
       const isAddPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 3000 }).catch(() => false)
       
       if (isHomeNow || isAddPatient) {
@@ -157,19 +169,19 @@ export class AuthWorkflow {
     await this.page.waitForTimeout(2000)
     
     // Check multiple indicators that we're on the home screen
-    const homeHeader = await this.page.locator('[aria-label="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
+    const homeHeader = await this.page.locator('[data-testid="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
     const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 5000 }).catch(() => false)
-    const homeScreen = await this.page.locator('[aria-label="home-screen"]').isVisible({ timeout: 5000 }).catch(() => false)
-    const profileButton = await this.page.locator('[aria-label="profile-button"]').isVisible({ timeout: 5000 }).catch(() => false)
+    const homeScreen = await this.page.locator('[data-testid="home-screen"]').isVisible({ timeout: 5000 }).catch(() => false)
+    const profileButton = await this.page.getByTestId('profile-button').isVisible({ timeout: 5000 }).catch(() => false)
     
     // If we're not on login screen and we can see profile button or home elements, we're on home
-    const loginScreen = await this.page.locator('[aria-label="login-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
+    const loginScreen = await this.page.locator('[data-testid="login-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
     
     expect(homeHeader || addPatient || homeScreen || (profileButton && !loginScreen)).toBe(true)
   }
 
   async thenIShouldSeeWelcomeMessage() {
-    await expect(this.page.locator('[aria-label="home-header"]')).toContainText('Welcome')
+    await expect(this.page.locator('[data-testid="home-header"]')).toContainText('Welcome')
   }
 
   async thenIShouldSeeRegistrationSuccess() {
@@ -191,6 +203,6 @@ export class AuthWorkflow {
   }
 
   async thenIShouldRemainOnLoginScreen() {
-    await expect(this.page.locator('[aria-label="login-button"]')).toBeVisible()
+    await expect(this.page.getByTestId('login-button')).toBeVisible()
   }
 }

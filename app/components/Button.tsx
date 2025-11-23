@@ -10,6 +10,7 @@ import {
 } from "react-native"
 import { spacing, typography } from "../theme"
 import { useTheme } from "../theme/ThemeContext"
+import { useKeyboardFocus } from "../hooks/useKeyboardFocus"
 import { Text, TextProps } from "./Text"
 
 /**
@@ -119,7 +120,8 @@ export interface ButtonProps extends PressableProps {
  * />
  */
 export function Button(props: ButtonProps) {
-  const { colors } = useTheme()
+  const { colors, fontScale } = useTheme()
+  const keyboardFocusStyle = useKeyboardFocus()
   
   const {
     tx,
@@ -147,9 +149,9 @@ export function Button(props: ButtonProps) {
   
   // Create presets dynamically based on current theme colors
   const $viewPresets = getViewPresets(colors)
-  const $textPresets = getTextPresets(colors)
+  const $textPresets = getTextPresets(colors, fontScale)
   const $pressedViewPresets = getPressedViewPresets(colors)
-  const $pressedTextPresets = getPressedTextPresets(colors)
+  const $pressedTextPresets = getPressedTextPresets(colors, fontScale)
   
   /**
    * @param {PressableStateCallbackType} root0 - The root object containing the pressed state.
@@ -162,6 +164,7 @@ export function Button(props: ButtonProps) {
       $viewStyleOverride,
       !!pressed && [$pressedViewPresets[preset], $pressedViewStyleOverride],
       !!isDisabled && $disabledViewStyleOverride,
+      keyboardFocusStyle, // Add keyboard focus styles (web only)
     ]
   }
   /**
@@ -194,6 +197,7 @@ export function Button(props: ButtonProps) {
       {...rest}
       disabled={isDisabled}
       testID={testID}
+      // Note: Pressable automatically maps testID to data-testid on web, no need for testingProps
     >
       {(state) => (
         <>
@@ -314,25 +318,31 @@ function getViewPresets(colors: any): Record<PresetNames, StyleProp<ViewStyle>> 
   }
 }
 
-function getTextPresets(colors: any): Record<PresetNames, StyleProp<TextStyle>> {
+function getTextPresets(colors: any, fontScale: number): Record<PresetNames, StyleProp<TextStyle>> {
+  const scaledBaseTextStyle = {
+    ...$baseTextStyle,
+    fontSize: 16 * fontScale,
+    lineHeight: 20 * fontScale,
+  }
+  
   return {
     // Default preset uses border, so text should be theme-aware
-    default: [$baseTextStyle, { color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 }],
+    default: [scaledBaseTextStyle, { color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 }],
     // CRITICAL: filled preset uses neutral300 background
     // In dark mode: neutral300 = #262626 (dark gray), so use light text
     // In light mode: neutral300 = #F0F0F0 (light gray), so use dark text
     // Use theme's text color which automatically adjusts for light/dark mode
-    filled: [$baseTextStyle, { 
+    filled: [scaledBaseTextStyle, { 
       color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 
     }],
     // Reversed uses dark background (neutral800), so always use light text
-    reversed: [$baseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    reversed: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
     // Colored presets always use white/light text for contrast
-    primary: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
-    success: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
-    danger: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
-    warning: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
-    medical: [$baseTextStyle, { color: colors.palette?.neutral900 || "#FFFFFF" }],
+    primary: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    success: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    danger: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    warning: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    medical: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
   }
 }
 
@@ -349,7 +359,12 @@ function getPressedViewPresets(colors: any): Record<PresetNames, StyleProp<ViewS
   }
 }
 
-function getPressedTextPresets(colors: any): Record<PresetNames, StyleProp<TextStyle>> {
+function getPressedTextPresets(colors: any, fontScale: number): Record<PresetNames, StyleProp<TextStyle>> {
+  const scaledBaseTextStyle = {
+    ...$baseTextStyle,
+    fontSize: 16 * fontScale,
+    lineHeight: 20 * fontScale,
+  }
   return {
     default: { opacity: 0.9 },
     filled: { opacity: 0.9 },

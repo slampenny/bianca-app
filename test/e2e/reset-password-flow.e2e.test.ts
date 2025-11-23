@@ -139,24 +139,27 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
           name: 'Test User',
           email: testEmail,
           password: testPassword,
-          phone: '+1234567890',
+          phone: '+1-234-567-8900', // Use properly formatted phone number
         },
       })
       
       if (registerResponse.ok()) {
         console.log('✅ User created successfully')
+        // Wait a bit for user to be fully created
+        await page.waitForTimeout(2000)
       } else if (registerResponse.status() === 409) {
         console.log('ℹ️ User already exists, continuing...')
       } else {
         const errorText = await registerResponse.text()
         console.log(`⚠️ Registration returned ${registerResponse.status()}: ${errorText}`)
+        // If registration failed, try to continue anyway - user might exist from previous test
+        await page.waitForTimeout(1000)
       }
     } catch (error) {
       console.log(`⚠️ Registration error (may be OK): ${error.message}`)
+      // Continue anyway - user might exist from previous test
+      await page.waitForTimeout(1000)
     }
-    
-    // Wait a bit for user to be fully created
-    await page.waitForTimeout(1000)
     
     // Step 2: Generate reset password token via test route (more reliable for testing)
     console.log(`🔑 Generating reset password token for ${testEmail}...`)
@@ -247,20 +250,18 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     
     // Check for reset password form indicators (should be present)
     const resetForm = page.getByText('Reset Password', { exact: false })
-      .or(page.getByLabel('new-password-input'))
+      .or(page.locator('input[data-testid="new-password-input"]'))
       .or(page.locator('[data-testid="new-password-input"]'))
       .or(page.getByText('New Password', { exact: false }))
     
     const isResetFormVisible = await resetForm.first().isVisible({ timeout: 5000 }).catch(() => false)
     expect(isResetFormVisible).toBe(true)
     
-    // Step 9: Fill in new password and confirm
-    const newPasswordInput = page.getByLabel('new-password-input')
-      .or(page.getByTestId('new-password-input'))
+    // Step 9: Fill in new password and confirm - use data-testid for TextField inputs
+    const newPasswordInput = page.locator('input[data-testid="new-password-input"]').first()
       .or(page.locator('input[type="password"]').first())
     
-    const confirmPasswordInput = page.getByLabel('confirm-password-input')
-      .or(page.getByTestId('confirm-password-input'))
+    const confirmPasswordInput = page.locator('input[data-testid="confirm-password-input"]').first()
       .or(page.locator('input[type="password"]').nth(1))
     
     await newPasswordInput.waitFor({ state: 'visible', timeout: 10000 })
@@ -269,12 +270,19 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     await confirmPasswordInput.waitFor({ state: 'visible', timeout: 10000 })
     await confirmPasswordInput.fill(newPassword)
     
-    // Step 10: Submit reset password form
-    const resetButton = page.getByText('Reset Password', { exact: false })
-      .or(page.getByLabel('reset-password-submit'))
-      .or(page.locator('[data-testid="reset-password-submit"]'))
-      .or(page.locator('button[type="submit"]'))
+    // Step 10: Submit reset password form - use data-testid for Button
+    let resetButton = page.getByTestId('reset-password-submit')
+    let buttonCount = await resetButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      resetButton = page.locator('[data-testid="reset-password-submit"]').first()
+      buttonCount = await resetButton.count().catch(() => 0)
+    }
+    if (buttonCount === 0) {
+      // Fallback: find by text
+      resetButton = page.getByText('Reset Password', { exact: false }).first()
+    }
     
+    await resetButton.waitFor({ state: 'visible', timeout: 5000 })
     await resetButton.click()
     
     // Wait for password reset to complete
@@ -285,7 +293,7 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
       page.getByText('Password Reset Successful', { exact: false }),
       page.getByText('password has been updated', { exact: false }),
       page.getByText('Redirecting to login', { exact: false }),
-      page.locator('[aria-label="email-input"]'), // Login screen
+      page.locator('input[data-testid="email-input"]'), // Login screen
     ]
     
     let foundSuccess = false

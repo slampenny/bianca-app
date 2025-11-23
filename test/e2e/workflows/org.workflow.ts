@@ -6,10 +6,11 @@ export class OrgWorkflow {
 
   // GIVEN steps - Setup conditions
   async givenIAmAnOrgAdmin() {
-    // Login as playwright test user (orgAdmin role) who has org management permissions - use aria-label
-    await this.page.locator('[aria-label="email-input"]').fill('playwright@example.org')
-    await this.page.locator('[aria-label="password-input"]').fill('Password1')
-    await this.page.locator('[aria-label="login-button"]').click()
+    // Login as playwright test user (orgAdmin role) who has org management permissions - use data-testid
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="email-input"]').fill('playwright@example.org')
+    await this.page.locator('input[data-testid="password-input"]').fill('Password1')
+    await this.page.getByTestId('login-button').click()
     
     // Wait for home screen
     await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
@@ -29,7 +30,7 @@ export class OrgWorkflow {
 
   async givenIHaveExistingPatients() {
     // Verify patients exist in the system - try to navigate to home if not already there
-    const homeTab = this.page.locator('[data-testid="tab-home"], [aria-label*="home"], [aria-label*="Home"]').first()
+    const homeTab = this.page.locator('[data-testid="tab-home"]').first()
     const homeTabExists = await homeTab.count() > 0
     if (homeTabExists) {
       await homeTab.click({ timeout: 5000 }).catch(() => {
@@ -138,7 +139,7 @@ export class OrgWorkflow {
 
   async whenIAssignCaregiverToPatient(caregiverName: string, patientName: string) {
     // Navigate to patient and assign caregiver
-    const homeTab = this.page.locator('[data-testid="tab-home"], [aria-label*="home"], [aria-label*="Home"]').first()
+    const homeTab = this.page.locator('[data-testid="tab-home"]').first()
     const homeTabExists = await homeTab.count() > 0
     if (homeTabExists) {
       await homeTab.click({ timeout: 5000 }).catch(() => {

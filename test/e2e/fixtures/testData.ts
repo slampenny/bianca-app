@@ -57,9 +57,12 @@ export const TEST_PATIENTS = {
 // Helper function to generate unique test data
 export function generateUniqueTestData(prefix: string = 'test') {
   const timestamp = Date.now();
+  // Generate a valid phone number in E.164 format (+1XXXXXXXXXX)
+  const last4 = timestamp.toString().slice(-4);
+  const phoneDigits = `604555${last4}`; // 10 digits
   return {
     email: `${prefix}-${timestamp}@example.org`,
-    phone: `123456${timestamp.toString().slice(-4)}`,
+    phone: `+1-${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`, // Format as +1-604-555-XXXX
     name: `${prefix} User ${timestamp}`,
   };
 }

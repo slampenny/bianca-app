@@ -20,7 +20,7 @@ const palette = {
   primary200: "#E0E7FF",      // Light indigo
   primary300: "#C7D2FE",      // Medium light indigo
   primary400: "#A5B4FC",      // Medium indigo
-  primary500: "#6366F1",      // Primary indigo - modern, distinct, accessible
+  primary500: "#4F46E5",      // Darker indigo for better contrast with white text (was #6366F1)
   primary600: "#4F46E5",      // Darker indigo
   primary700: "#4338CA",      // Dark indigo
   primary800: "#3730A3",      // Very dark indigo
@@ -42,7 +42,7 @@ const palette = {
   success200: "#DCFCE7",      // Light teal-green
   success300: "#BBF7D0",      // Medium light teal-green
   success400: "#86EFAC",      // Medium teal-green
-  success500: "#22C55E",      // Primary teal-green - distinct and accessible
+  success500: "#16A34A",      // Darker green for better contrast with white text (was #22C55E)
   success600: "#16A34A",      // Dark teal-green
   success700: "#15803D",      // Darker teal-green
   success800: "#166534",      // Very dark teal-green
@@ -53,7 +53,7 @@ const palette = {
   warning200: "#FDE68A",      // Light amber
   warning300: "#FCD34D",      // Medium light amber
   warning400: "#FBBF24",      // Medium amber
-  warning500: "#F59E0B",      // Primary amber - modern, distinct, accessible
+  warning500: "#D97706",      // Darker amber for better contrast with white text (was #F59E0B)
   warning600: "#D97706",      // Dark amber
   warning700: "#B45309",      // Darker amber
   warning800: "#92400E",      // Very dark amber
@@ -64,7 +64,7 @@ const palette = {
   error200: "#FECACA",        // Light rose
   error300: "#FCA5A5",        // Medium light rose
   error400: "#F87171",        // Medium rose
-  error500: "#EF4444",        // Primary rose - modern, distinct, high contrast
+  error500: "#DC2626",        // Darker red for better contrast with white text (was #EF4444)
   error600: "#DC2626",        // Dark rose
   error700: "#B91C1C",        // Darker rose
   error800: "#991B1B",        // Very dark rose
@@ -86,7 +86,7 @@ const palette = {
   medical200: "#CCFBF1",      // Light teal
   medical300: "#99F6E4",      // Medium light teal
   medical400: "#5EEAD4",      // Medium teal
-  medical500: "#14B8A6",      // Primary teal - modern, distinct medical color
+  medical500: "#0D9488",     // Darker teal for better contrast with white text (was #14B8A6)
   medical600: "#0D9488",      // Dark teal
   medical700: "#0F766E",      // Darker teal
   medical800: "#115E59",      // Very dark teal
@@ -114,7 +114,7 @@ const colors = {
   
   // Text colors - high contrast
   text: palette.neutral900,           // Dark text on light backgrounds
-  textDim: palette.neutral600,       // Dimmed text
+  textDim: palette.neutral700,       // Darker for better contrast (was neutral600)
   textInverse: palette.neutral100,   // Light text on dark backgrounds
   
   // Background colors
@@ -138,10 +138,10 @@ const colors = {
   biancaButtonUnselected: palette.neutral400,
   biancaHeader: palette.neutral800,
   biancaBorder: palette.neutral400,
-  biancaError: palette.error500,
-  biancaErrorBackground: "rgba(239, 68, 68, 0.1)",
-  biancaSuccess: palette.success500,
-  biancaSuccessBackground: "rgba(34, 197, 94, 0.1)",
+  biancaError: palette.error600,        // Darker red for better contrast
+  biancaErrorBackground: palette.error100, // Solid light red background - meets WCAG AA
+  biancaSuccess: palette.success600,    // Darker green for better contrast
+  biancaSuccessBackground: palette.success100, // Solid light green background - meets WCAG AA
   biancaWarning: palette.warning500,
   biancaExplanation: palette.neutral600,
 } as const

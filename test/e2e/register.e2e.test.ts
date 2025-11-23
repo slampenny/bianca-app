@@ -10,77 +10,132 @@ test.describe("Register Screen", () => {
   })
 
   test("can fill in all fields", async ({ page }) => {
-    // Use aria-label for React Native Web
-    await page.locator('[aria-label="register-name"]').fill("Jordan Lapp")
-    await page.locator('[aria-label="register-email"]').fill("jordan@example.org")
-    await page.locator('[aria-label="register-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-confirm-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-phone"]').fill("1234567890")
+    // Use data-testid for React Native Web (TextField needs input[data-testid="..."] pattern)
+    await page.locator('input[data-testid="register-name"]').fill("Jordan Lapp")
+    await page.locator('input[data-testid="register-email"]').fill("jordan@example.org")
+    await page.locator('input[data-testid="register-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-phone"]').fill("1234567890")
   })
 
   test("shows error if name is empty", async ({ page }) => {
-    await page.locator('[aria-label="register-email"]').fill("jordan@example.org")
-    await page.locator('[aria-label="register-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-confirm-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-phone"]').fill("1234567890")
-    await page.locator('[aria-label="register-submit"]').click()
+    await page.locator('input[data-testid="register-email"]').fill("jordan@example.org")
+    await page.locator('input[data-testid="register-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-phone"]').fill("1234567890")
+    
+    // Find submit button - try getByTestId first, fallback to locator
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
 
     await expect(page.getByText(/name cannot be empty/i)).toBeVisible()
   })
 
   test("shows error for invalid email", async ({ page }) => {
-    await page.locator('[aria-label="register-name"]').fill("Jordan Lapp")
-    await page.locator('[aria-label="register-email"]').fill("bad-email")
-    await page.locator('[aria-label="register-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-confirm-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-phone"]').fill("1234567890")
-    await page.locator('[aria-label="register-submit"]').click()
+    await page.locator('input[data-testid="register-name"]').fill("Jordan Lapp")
+    await page.locator('input[data-testid="register-email"]').fill("bad-email")
+    await page.locator('input[data-testid="register-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-phone"]').fill("1234567890")
+    
+    // Find submit button - try getByTestId first, fallback to locator
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
 
     await expect(page.getByText(/valid email/i)).toBeVisible()
   })
 
   test("shows error for weak password", async ({ page }) => {
-    await page.locator('[aria-label="register-name"]').fill("Jordan Lapp")
-    await page.locator('[aria-label="register-email"]').fill("jordan@example.org")
-    await page.locator('[aria-label="register-password"]').fill("weak")
-    await page.locator('[aria-label="register-confirm-password"]').fill("weak")
-    await page.locator('[aria-label="register-phone"]').fill("1234567890")
-    await page.locator('[aria-label="register-submit"]').click()
+    await page.locator('input[data-testid="register-name"]').fill("Jordan Lapp")
+    await page.locator('input[data-testid="register-email"]').fill("jordan@example.org")
+    await page.locator('input[data-testid="register-password"]').fill("weak")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("weak")
+    await page.locator('input[data-testid="register-phone"]').fill("1234567890")
+    
+    // Find submit button - try getByTestId first, fallback to locator
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
 
     await expect(page.getByText(/password must contain/i)).toBeVisible()
   })
 
   test("shows error when confirm password doesn't match", async ({ page }) => {
-    await page.locator('[aria-label="register-name"]').fill("Jordan Lapp")
-    await page.locator('[aria-label="register-email"]').fill("jordan@example.org")
-    await page.locator('[aria-label="register-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-confirm-password"]').fill("Mismatch123!")
-    await page.locator('[aria-label="register-phone"]').fill("1234567890")
-    await page.locator('[aria-label="register-submit"]').click()
+    await page.locator('input[data-testid="register-name"]').fill("Jordan Lapp")
+    await page.locator('input[data-testid="register-email"]').fill("jordan@example.org")
+    await page.locator('input[data-testid="register-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("Mismatch123!")
+    await page.locator('input[data-testid="register-phone"]').fill("1234567890")
+    
+    // Find submit button - try getByTestId first, fallback to locator
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
 
     await expect(page.getByText(/passwords do not match/i)).toBeVisible()
   })
 
   test("shows error for short phone number", async ({ page }) => {
-    await page.locator('[aria-label="register-name"]').fill("Jordan Lapp")
-    await page.locator('[aria-label="register-email"]').fill("jordan@example.org")
-    await page.locator('[aria-label="register-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-confirm-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-phone"]').fill("123")
-    await page.locator('[aria-label="register-submit"]').click()
+    await page.locator('input[data-testid="register-name"]').fill("Jordan Lapp")
+    await page.locator('input[data-testid="register-email"]').fill("jordan@example.org")
+    await page.locator('input[data-testid="register-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-phone"]').fill("123")
+    
+    // Find submit button - try getByTestId first, fallback to locator
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
 
     await expect(page.getByText(/phone number.*10 digits/i)).toBeVisible()
   })
 
   test("shows error if org name is missing when accountType is organization", async ({ page }) => {
-    await page.locator('[aria-label="register-organization-toggle"]').click()
+    // Find organization toggle button
+    let orgToggle = page.getByTestId('register-organization-toggle')
+    let toggleCount = await orgToggle.count().catch(() => 0)
+    if (toggleCount === 0) {
+      orgToggle = page.locator('[data-testid="register-organization-toggle"]').first()
+    }
+    await orgToggle.waitFor({ state: 'visible', timeout: 5000 })
+    await orgToggle.click()
 
-    await page.locator('[aria-label="register-name"]').fill("Org Rep")
-    await page.locator('[aria-label="register-email"]').fill("org@example.org")
-    await page.locator('[aria-label="register-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-confirm-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-phone"]').fill("1234567890")
-    await page.locator('[aria-label="register-submit"]').click()
+    await page.locator('input[data-testid="register-name"]').fill("Org Rep")
+    await page.locator('input[data-testid="register-email"]').fill("org@example.org")
+    await page.locator('input[data-testid="register-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-phone"]').fill("1234567890")
+    
+    // Find submit button - try getByTestId first, fallback to locator
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
 
     await expect(page.getByText(/organization name cannot be empty/i)).toBeVisible()
   })
@@ -89,16 +144,28 @@ test.describe("Register Screen", () => {
     const registrationData = generateRegistrationData();
     
     // Ensure we're registering as an individual (not organization)
-    await page.locator('[aria-label="register-individual-toggle"]').click();
+    let individualToggle = page.getByTestId('register-individual-toggle')
+    let toggleCount = await individualToggle.count().catch(() => 0)
+    if (toggleCount === 0) {
+      individualToggle = page.locator('[data-testid="register-individual-toggle"]').first()
+    }
+    await individualToggle.waitFor({ state: 'visible', timeout: 5000 })
+    await individualToggle.click()
     
-    await page.locator('[aria-label="register-name"]').fill(registrationData.name)
-    await page.locator('[aria-label="register-email"]').fill(registrationData.email)
-    await page.locator('[aria-label="register-password"]').fill(registrationData.password)
-    await page.locator('[aria-label="register-confirm-password"]').fill(registrationData.confirmPassword)
-    await page.locator('[aria-label="register-phone"]').fill(registrationData.phone)
+    await page.locator('input[data-testid="register-name"]').fill(registrationData.name)
+    await page.locator('input[data-testid="register-email"]').fill(registrationData.email)
+    await page.locator('input[data-testid="register-password"]').fill(registrationData.password)
+    await page.locator('input[data-testid="register-confirm-password"]').fill(registrationData.confirmPassword)
+    await page.locator('input[data-testid="register-phone"]').fill(registrationData.phone)
 
     // Click register button and wait for API call
-    await page.locator('[aria-label="register-submit"]').click()
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
     
     // Wait for API call to complete and navigation to start
     await page.waitForTimeout(2000)
@@ -118,7 +185,8 @@ test.describe("Register Screen", () => {
     
     // After registration, user should be navigated to EmailVerificationRequired screen
     // Wait for navigation by checking for the email input field (most reliable indicator)
-    const emailInput = page.locator('[data-testid="email-input"], [aria-label="email-input"]').first()
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    const emailInput = page.locator('input[data-testid="email-input"]').first()
     const resendButton = page.locator('[data-testid="resend-verification-button"]').first()
     const backToLoginButton = page.locator('[data-testid="back-to-login-button"]').first()
     
@@ -166,7 +234,7 @@ test.describe("Register Screen", () => {
       
       if (!found) {
         // Check if we're still on register screen
-        const registerNameField = page.locator('[aria-label="register-name"]')
+        const registerNameField = page.locator('input[data-testid="register-name"]')
         const stillOnRegister = await registerNameField.isVisible({ timeout: 2000 }).catch(() => false)
         
         if (stillOnRegister) {
@@ -198,19 +266,31 @@ test.describe("Register Screen", () => {
     const registrationData = generateRegistrationData();
     
     // Register as an organization
-    await page.locator('[aria-label="register-organization-toggle"]').click();
+    let orgToggle = page.getByTestId('register-organization-toggle')
+    let toggleCount = await orgToggle.count().catch(() => 0)
+    if (toggleCount === 0) {
+      orgToggle = page.locator('[data-testid="register-organization-toggle"]').first()
+    }
+    await orgToggle.waitFor({ state: 'visible', timeout: 5000 })
+    await orgToggle.click()
     
     // Fill organization name first (now at the top)
-    await page.locator('[aria-label="register-org-name"]').fill("Test Organization")
+    await page.locator('input[data-testid="register-org-name"]').fill("Test Organization")
     
-    await page.locator('[aria-label="register-name"]').fill(registrationData.name)
-    await page.locator('[aria-label="register-email"]').fill(registrationData.email)
-    await page.locator('[aria-label="register-password"]').fill(registrationData.password)
-    await page.locator('[aria-label="register-confirm-password"]').fill(registrationData.confirmPassword)
-    await page.locator('[aria-label="register-phone"]').fill(registrationData.phone)
+    await page.locator('input[data-testid="register-name"]').fill(registrationData.name)
+    await page.locator('input[data-testid="register-email"]').fill(registrationData.email)
+    await page.locator('input[data-testid="register-password"]').fill(registrationData.password)
+    await page.locator('input[data-testid="register-confirm-password"]').fill(registrationData.confirmPassword)
+    await page.locator('input[data-testid="register-phone"]').fill(registrationData.phone)
 
     // Click register button and wait for API call
-    await page.locator('[aria-label="register-submit"]').click()
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
     
     // Wait for API call to complete and navigation to start
     await page.waitForTimeout(2000)
@@ -230,7 +310,8 @@ test.describe("Register Screen", () => {
     
     // After registration, user should be navigated to EmailVerificationRequired screen
     // Wait for navigation by checking for the email input field (most reliable indicator)
-    const emailInput = page.locator('[data-testid="email-input"], [aria-label="email-input"]').first()
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    const emailInput = page.locator('input[data-testid="email-input"]').first()
     const resendButton = page.locator('[data-testid="resend-verification-button"]').first()
     const backToLoginButton = page.locator('[data-testid="back-to-login-button"]').first()
     
@@ -278,7 +359,7 @@ test.describe("Register Screen", () => {
       
       if (!found) {
         // Check if we're still on register screen
-        const registerNameField = page.locator('[aria-label="register-name"]')
+        const registerNameField = page.locator('input[data-testid="register-name"]')
         const stillOnRegister = await registerNameField.isVisible({ timeout: 2000 }).catch(() => false)
         
         if (stillOnRegister) {
@@ -307,19 +388,46 @@ test.describe("Register Screen", () => {
   })
 
   test("shows error message on backend failure", async ({ page }) => {
-    await page.locator('[aria-label="register-name"]').fill("API Failure")
-    await page.locator('[aria-label="register-email"]').fill("fail@example")
-    await page.locator('[aria-label="register-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-confirm-password"]').fill("StrongPass!1")
-    await page.locator('[aria-label="register-phone"]').fill("1234567890")
+    await page.locator('input[data-testid="register-name"]').fill("API Failure")
+    await page.locator('input[data-testid="register-email"]').fill("fail@example")
+    await page.locator('input[data-testid="register-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-confirm-password"]').fill("StrongPass!1")
+    await page.locator('input[data-testid="register-phone"]').fill("1234567890")
 
     // Stub failure path or hit known failing email
-    await page.locator('[aria-label="register-submit"]').click()
+    let submitButton = page.getByTestId('register-submit')
+    let buttonCount = await submitButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      submitButton = page.locator('[data-testid="register-submit"]').first()
+    }
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.click()
     await expect(page.getByText(/Please enter a valid email address/i)).toBeVisible()
   })
 
   test("navigates back when goBack is pressed", async ({ page }) => {
-    await page.locator('[aria-label="register-go-back"]').click()
-    await isLoginScreen(page)
+    // Wait for register screen to load first
+    await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
+    await page.waitForTimeout(1000) // Give it time to render
+    
+    // Find go back button - try multiple methods
+    let goBackButton = page.getByTestId('register-go-back')
+    let buttonCount = await goBackButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      goBackButton = page.locator('[data-testid="register-go-back"]').first()
+      buttonCount = await goBackButton.count().catch(() => 0)
+    }
+    if (buttonCount === 0) {
+      // Fallback: find by text
+      goBackButton = page.getByText(/go back|back/i).first()
+    }
+    await goBackButton.waitFor({ state: 'visible', timeout: 10000 })
+    await goBackButton.click()
+    
+    // Wait for navigation to login screen - check for email input (most reliable indicator)
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+    // Verify we're on login screen (email input is sufficient proof)
+    const emailInput = page.locator('input[data-testid="email-input"]')
+    await expect(emailInput).toBeVisible({ timeout: 5000 })
   })
 })

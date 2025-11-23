@@ -86,7 +86,7 @@ test.describe('Email Verification Flow - End to End with Ethereal', () => {
       page.getByText('Email Verified', { exact: false }),
       page.getByText('verified', { exact: false }),
       page.getByTestId('email-verified-screen'),
-      page.getByLabel('email-verified-screen')
+      page.locator('[data-testid="email-verified-screen"]')
     ]
     
     let foundSuccess = false

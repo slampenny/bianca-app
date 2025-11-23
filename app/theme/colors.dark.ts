@@ -18,7 +18,7 @@ const palette = {
   primary200: "#312E81",      // Dark indigo
   primary300: "#3730A3",      // Medium dark indigo
   primary400: "#4338CA",      // Medium indigo
-  primary500: "#6366F1",      // Primary indigo - bright but balanced
+  primary500: "#818CF8",      // Lighter indigo for better contrast with dark text (was #6366F1)
   primary600: "#818CF8",      // Light indigo
   primary700: "#A5B4FC",      // Lighter indigo
   primary800: "#C7D2FE",      // Very light indigo
@@ -140,10 +140,10 @@ const colors = {
   biancaButtonUnselected: palette.neutral400, // Medium gray
   biancaHeader: palette.neutral900,       // Light text
   biancaBorder: palette.neutral400,      // Visible borders
-  biancaError: palette.error500,         // Modern rose
-  biancaErrorBackground: "rgba(239, 68, 68, 0.15)", // Subtle error background
-  biancaSuccess: palette.success500,     // Modern emerald
-  biancaSuccessBackground: "rgba(16, 185, 129, 0.15)", // Subtle success background
+  biancaError: palette.error400,        // Lighter red for dark theme (better contrast on dark bg)
+  biancaErrorBackground: palette.error900, // Dark red background for dark theme - meets WCAG AA
+  biancaSuccess: palette.success400,    // Lighter green for dark theme
+  biancaSuccessBackground: palette.success900, // Dark green background for dark theme - meets WCAG AA
   biancaWarning: palette.warning500,    // Modern amber
   biancaExplanation: palette.neutral700, // Medium gray for explanations
 } as const

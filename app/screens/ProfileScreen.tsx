@@ -15,6 +15,7 @@ import AvatarPicker from "../components/AvatarPicker"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LanguageSelector } from "app/components/LanguageSelector"
 import { ThemeSelector } from "app/components/ThemeSelector"
+import { FontScaleSelector } from "app/components/FontScaleSelector"
 import { useLanguage } from "app/hooks/useLanguage"
 import { translate } from "app/i18n"
 import i18n from "i18n-js"
@@ -32,12 +33,15 @@ import telemetry from "../services/telemetry/telemetry.service"
 import { useTheme } from "app/theme/ThemeContext"
 import { navigationRef } from "app/navigators/navigationUtilities"
 import { Button } from "app/components"
+import { useFontScale } from "app/hooks/useFontScale"
+import { testingProps } from "../utils/testingProps"
 
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const dispatch = useDispatch()
   const { toast, showInfo, hideToast } = useToast()
-  const { colors, isLoading: themeLoading } = useTheme()
+  const { colors, isLoading: themeLoading, fontScale } = useTheme()
+  const { scale } = useFontScale()
   
   // Use language hook to trigger re-renders on language change
   useLanguage()
@@ -240,12 +244,18 @@ function ProfileScreen() {
     return <LoadingScreen />
   }
 
-  const styles = createStyles(colors)
+  const styles = createStyles(colors, fontScale)
 
   return (
     <>
       <TouchableWithoutFeedback>
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} accessibilityLabel="profile-screen">
+        <ScrollView 
+          style={styles.container} 
+          contentContainerStyle={styles.contentContainer} 
+          testID="profile-screen"
+          {...testingProps("profile-screen")}
+          accessibilityLabel="Profile"
+        >
           {(updateError || uploadError) && (
             <Text style={styles.error}>
               {updateError && "data" in updateError
@@ -349,6 +359,7 @@ function ProfileScreen() {
 
             <LanguageSelector testID="language-selector" />
             <ThemeSelector testID="theme-selector" />
+            <FontScaleSelector testID="font-scale-selector" />
 
             {/* Telemetry Opt-in Toggle */}
             <View style={styles.telemetryContainer}>
@@ -405,8 +416,16 @@ function ProfileScreen() {
               style={styles.updateButton}
             />
 
-            <Pressable style={styles.logoutButton} onPress={handleLogout} testID="profile-logout-button" accessibilityLabel="profile-logout-button" accessible={true}>
-              <Text style={styles.buttonText}>{translate("profileScreen.logout")}</Text>
+            <Pressable 
+              style={styles.logoutButton} 
+              onPress={handleLogout} 
+              testID="profile-logout-button"
+              {...testingProps("profile-logout-button")}
+              accessibilityLabel={translate("profileScreen.logout") || "Logout"}
+              accessibilityRole="button"
+              accessible={true}
+            >
+              <Text style={styles.buttonText} testID="profile-logout-button-text">{translate("profileScreen.logout")}</Text>
             </Pressable>
 
             {/* Legal Links */}
@@ -425,7 +444,7 @@ function ProfileScreen() {
   )
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
   updateButton: {
     marginBottom: 15,
   },
@@ -434,7 +453,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   error: { color: colors.palette.biancaError, marginBottom: 10, textAlign: "center" },
   fieldError: {
     color: colors.palette.biancaError,
-    fontSize: 14,
+    fontSize: 14 * fontScale,
     marginBottom: 10,
     textAlign: "center",
   },
@@ -451,7 +470,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   formTitle: {
     color: colors.palette.biancaHeader,
-    fontSize: 20,
+    fontSize: 20 * fontScale,
     fontWeight: "600",
     marginBottom: 20,
     textAlign: "center",
@@ -482,12 +501,12 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   verificationText: {
     color: colors.palette.biancaSuccess || colors.palette.success500 || "#10b981",
-    fontSize: 14,
+    fontSize: 14 * fontScale,
     fontWeight: "500",
   },
   verificationWarning: {
     color: colors.palette.biancaWarning || colors.palette.warning500 || "#f59e0b",
-    fontSize: 14,
+    fontSize: 14 * fontScale,
     fontWeight: "500",
     marginRight: 8,
   },
@@ -508,17 +527,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginRight: 15,
   },
   telemetryLabel: {
-    fontSize: 16,
+    fontSize: 16 * fontScale,
     fontWeight: "600",
     color: colors.text,
     marginBottom: 4,
   },
   telemetryDescription: {
-    fontSize: 14,
+    fontSize: 14 * fontScale,
     color: colors.palette.neutral600,
-    lineHeight: 20,
+    lineHeight: 20 * fontScale,
   },
-  success: { color: colors.palette.biancaSuccess, fontSize: 16, marginBottom: 10, textAlign: "center" },
+  success: { color: colors.palette.biancaSuccess, fontSize: 16 * fontScale, marginBottom: 10, textAlign: "center" },
   unverifiedBanner: {
     backgroundColor: colors.palette.warning500 || colors.palette.biancaWarning,
     borderRadius: 8,
@@ -527,16 +546,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   unverifiedTitle: {
     color: colors.palette.neutral100,
-    fontSize: 18,
+    fontSize: 18 * fontScale,
     fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
   },
   unverifiedText: {
     color: colors.palette.neutral100,
-    fontSize: 14,
+    fontSize: 14 * fontScale,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 20 * fontScale,
   },
   legalLinks: {
     marginTop: 20,

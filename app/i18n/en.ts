@@ -901,6 +901,11 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     phoneVerified: "Phone Verified",
     phoneNotVerified: "Phone Not Verified",
     verifyPhone: "Verify Phone",
+    fontSize: "Font Size",
+    fontSizeDescription: "Adjust text size for better readability. Changes apply immediately.",
+    decreaseFontSize: "Decrease font size",
+    increaseFontSize: "Increase font size",
+    fontSizeHint: "Adjust font size from 80% to 200%",
   },
   reportsScreen: {
     selectPatient: "Select Patient:",
@@ -950,6 +955,10 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     dark: {
       name: "Dark Mode",
       description: "Dark theme optimized for low-light environments",
+    },
+    highcontrast: {
+      name: "High Contrast",
+      description: "Maximum contrast theme for vision impairment (WCAG AAA)",
     },
     accessibility: {
       wcagLevel: "WCAG Level",

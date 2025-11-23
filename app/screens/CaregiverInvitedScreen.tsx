@@ -14,7 +14,14 @@ interface CaregiverInvitedScreenProps {
 export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
   const { colors, isLoading: themeLoading } = useTheme()
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
-  const { caregiver } = route.params
+  
+  // Handle missing route params gracefully
+  const caregiver = route?.params?.caregiver || { id: '', name: 'Unknown', email: 'unknown@example.com' }
+  
+  // Log for debugging
+  if (__DEV__) {
+    console.log('CaregiverInvitedScreen rendered with params:', route?.params)
+  }
 
   if (themeLoading) {
     return null

@@ -6,10 +6,11 @@ export class PatientDetailedWorkflow {
 
   // GIVEN steps - Setup conditions
   async givenIAmLoggedInAsStaffWithPatients() {
-    // Login as staff user who has patients assigned - use aria-label
-    await this.page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await this.page.locator('[aria-label="password-input"]').fill('Password1')
-    await this.page.locator('[aria-label="login-button"]').click()
+    // Login as staff user who has patients assigned - use data-testid
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await this.page.locator('input[data-testid="password-input"]').fill('Password1')
+    await this.page.getByTestId('login-button').click()
     
     // Wait for home screen with patients
     await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
@@ -62,8 +63,8 @@ export class PatientDetailedWorkflow {
           await this.page.waitForTimeout(2000)
           return true
         } catch (error) {
-          // Try alternative: click by aria-label
-          const patientByLabel = this.page.locator('[aria-label^="patient-card-"]').first()
+          // Try alternative: click by data-testid
+          const patientByLabel = this.page.locator('[data-testid^="patient-card-"]').first()
           const labelCount = await patientByLabel.count().catch(() => 0)
           if (labelCount > 0) {
             await patientByLabel.scrollIntoViewIfNeeded().catch(() => {})

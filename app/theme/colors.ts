@@ -108,10 +108,10 @@ const palette = {
   biancaHeader: "#171717",               // Modern dark text
   biancaButtonSelected: "#6366F1",       // Modern indigo primary
   biancaButtonUnselected: "#E5E5E5",     // Modern warm gray
-  biancaError: "#EF4444",                // Modern rose error
-  biancaErrorBackground: "rgba(239, 68, 68, 0.1)", // Modern error background
-  biancaSuccess: "#10B981",              // Modern emerald success
-  biancaSuccessBackground: "rgba(16, 185, 129, 0.1)", // Modern success background
+  biancaError: "#DC2626",                // Darker red for better contrast (was #EF4444)
+  biancaErrorBackground: "#FEE2E2",      // Solid light red background (was rgba) - meets WCAG AA
+  biancaSuccess: "#059669",              // Darker green for better contrast (was #10B981)
+  biancaSuccessBackground: "#D1FAE5",   // Solid light green background (was rgba) - meets WCAG AA
   biancaExplanation: "#737373",          // Modern warm gray
   biancaBorder: "#E5E5E5",              // Modern warm gray border
 
@@ -141,7 +141,7 @@ export const colors = {
   /**
    * Secondary text information.
    */
-  textDim: palette.neutral600,
+  textDim: palette.neutral700,  // Darker for better contrast (was neutral600)
   
   /**
    * The default color of the screen background.

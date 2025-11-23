@@ -16,9 +16,9 @@ export class PaymentHelpers {
    * Wait for payment methods to load
    */
   async waitForPaymentMethodsToLoad(): Promise<void> {
-    // Wait for either existing methods or loading/error state
+    // Wait for either existing methods or loading/error state - use data-testid
     await this.page.waitForSelector(
-      '[aria-label="existing-payment-methods"], [aria-label="payment-methods-loading"], [aria-label="payment-methods-error"]',
+      '[data-testid="existing-payment-methods"], [data-testid="payment-methods-loading"], [data-testid="payment-methods-error"]',
       { timeout: 10000 }
     )
   }
@@ -27,7 +27,7 @@ export class PaymentHelpers {
    * Get count of existing payment methods
    */
   async getPaymentMethodCount(): Promise<number> {
-    const cards = this.page.locator('[aria-label^="payment-method-card-"]')
+    const cards = this.page.locator('[data-testid^="payment-method-card-"]')
     return await cards.count()
   }
 
@@ -35,7 +35,7 @@ export class PaymentHelpers {
    * Get payment method by index
    */
   async getPaymentMethodByIndex(index: number) {
-    const cards = this.page.locator('[aria-label^="payment-method-card-"]')
+    const cards = this.page.locator('[data-testid^="payment-method-card-"]')
     return cards.nth(index)
   }
 
@@ -43,14 +43,14 @@ export class PaymentHelpers {
    * Get payment method by ID
    */
   async getPaymentMethodById(id: string) {
-    return this.page.getByLabel(`payment-method-card-${id}`)
+    return this.page.getByTestId(`payment-method-card-${id}`)
   }
 
   /**
    * Check if payment method is default
    */
   async isPaymentMethodDefault(paymentMethodId: string): Promise<boolean> {
-    const defaultBadge = this.page.getByLabel(`default-badge-${paymentMethodId}`)
+    const defaultBadge = this.page.getByTestId(`default-badge-${paymentMethodId}`)
     return await defaultBadge.count() > 0
   }
 
@@ -102,7 +102,7 @@ export class PaymentHelpers {
    * Get payment method text content
    */
   async getPaymentMethodText(paymentMethodId: string): Promise<string> {
-    const textElement = this.page.getByLabel(`payment-method-text-${paymentMethodId}`)
+    const textElement = this.page.getByTestId(`payment-method-text-${paymentMethodId}`)
     return await textElement.textContent() || ''
   }
 
@@ -110,7 +110,7 @@ export class PaymentHelpers {
    * Get payment method subtext content
    */
   async getPaymentMethodSubtext(paymentMethodId: string): Promise<string> {
-    const subtextElement = this.page.getByLabel(`payment-method-subtext-${paymentMethodId}`)
+    const subtextElement = this.page.getByTestId(`payment-method-subtext-${paymentMethodId}`)
     const count = await subtextElement.count()
     if (count > 0) {
       return await subtextElement.textContent() || ''
@@ -122,28 +122,28 @@ export class PaymentHelpers {
    * Check if add payment form is visible
    */
   async isAddPaymentFormVisible(): Promise<boolean> {
-    return await this.page.getByLabel('add-payment-form').isVisible()
+    return await this.page.getByTestId('add-payment-form').isVisible()
   }
 
   /**
    * Check if payment methods are loading
    */
   async isLoading(): Promise<boolean> {
-    return await this.page.getByLabel('payment-methods-loading').isVisible().catch(() => false)
+    return await this.page.getByTestId('payment-methods-loading').isVisible().catch(() => false)
   }
 
   /**
    * Check if there's a payment methods error
    */
   async hasError(): Promise<boolean> {
-    return await this.page.getByLabel('payment-methods-error').isVisible().catch(() => false)
+    return await this.page.getByTestId('payment-methods-error').isVisible().catch(() => false)
   }
 
   /**
    * Get error message text
    */
   async getErrorMessage(): Promise<string> {
-    const errorElement = this.page.getByLabel('payment-methods-error')
+    const errorElement = this.page.getByTestId('payment-methods-error')
     return await errorElement.textContent() || ''
   }
 
@@ -151,7 +151,7 @@ export class PaymentHelpers {
    * Get success/error message from payment actions
    */
   async getPaymentMessage(): Promise<string> {
-    const messageElement = this.page.getByLabel('payment-message')
+    const messageElement = this.page.getByTestId('payment-message')
     const count = await messageElement.count()
     if (count > 0) {
       return await messageElement.textContent() || ''

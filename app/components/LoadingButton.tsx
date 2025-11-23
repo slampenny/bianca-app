@@ -36,6 +36,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
   accessibilityLabel,
 }) => {
   const isDisabled = disabled || loading
+  const keyboardFocusStyle = useKeyboardFocus()
 
   const handlePress = async () => {
     logger.debug('LoadingButton pressed', { title, tx, loading, disabled, isDisabled, testID })
@@ -71,12 +72,13 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
       style={[
         styles.button,
         isDisabled && styles.buttonDisabled,
+        keyboardFocusStyle, // Add keyboard focus styles (web only)
         style,
       ]}
       onPress={handlePress}
       disabled={isDisabled}
       testID={testID}
-      accessibilityLabel={accessibilityLabel || testID}
+      accessibilityLabel={accessibilityLabel}
     >
       {loading ? (
         <>

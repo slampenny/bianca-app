@@ -21,6 +21,7 @@ import { colors, spacing } from "../theme"
 import { iconRegistry, IconTypes } from "./Icon"
 import { Text, TextProps } from "./Text"
 import { useTheme } from "../theme/ThemeContext"
+import { useKeyboardFocus } from "../hooks/useKeyboardFocus"
 
 type Variants = "checkbox" | "switch" | "radio"
 
@@ -192,6 +193,7 @@ export function Toggle(props: ToggleProps) {
   const { checkboxIcon } = props as CheckboxToggleProps
 
   const disabled = editable === false || status === "disabled" || props.disabled
+  const keyboardFocusStyle = useKeyboardFocus()
 
   // Use Pressable instead of TouchableOpacity for better React Native Web compatibility
   const Wrapper = useMemo(
@@ -200,7 +202,10 @@ export function Toggle(props: ToggleProps) {
   )
   const ToggleInput = useMemo(() => ToggleInputs[variant] || (() => null), [variant])
 
-  const $containerStyles = [$containerStyleOverride]
+  const $containerStyles = [
+    !disabled && keyboardFocusStyle, // Add keyboard focus styles (web only, only when not disabled)
+    $containerStyleOverride,
+  ]
   const $inputWrapperStyles = [$inputWrapper, $inputWrapperStyleOverride]
   const $helperStyles = [
     $helper,
@@ -262,10 +267,11 @@ export function Toggle(props: ToggleProps) {
     <Wrapper
       accessibilityRole={variant}
       accessibilityState={{ checked: value, disabled }}
-      accessibilityLabel={accessibilityLabel || testID}
+      accessibilityLabel={accessibilityLabel}
       onPress={handlePress}
       style={$containerStyles}
       testID={testID}
+      // Note: Pressable automatically maps testID to data-testid on web
       {...webProps}
       {...WrapperProps}
     >

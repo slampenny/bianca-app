@@ -289,7 +289,7 @@ export const VerifyPhoneScreen = () => {
               style={styles.codeInputField}
               containerStyle={styles.codeInput}
               testID="phone-verification-code-input"
-              accessibilityLabel="Enter 6-digit verification code"
+              accessibilityLabel={translate("phoneVerificationScreen.invalidCode") || "Enter 6-digit verification code"}
             />
 
             <View style={styles.buttonContainer}>
@@ -300,7 +300,7 @@ export const VerifyPhoneScreen = () => {
                 disabled={!code || code.length !== 6 || isVerifying}
                 loading={isVerifying}
                 testID="verify-phone-code-button"
-              accessibilityLabel="Verify phone code button"
+                accessibilityLabel={translate("phoneVerificationScreen.verifyButton") || "Verify phone"}
               />
             </View>
 
@@ -320,7 +320,7 @@ export const VerifyPhoneScreen = () => {
                   disabled={isResending}
                   loading={isResending}
                   testID="resend-phone-code-button"
-                  accessibilityLabel="Resend phone verification code button"
+                  accessibilityLabel={translate("phoneVerificationScreen.resendButton") || "Resend code"}
                 />
               )}
             </View>
@@ -336,7 +336,7 @@ export const VerifyPhoneScreen = () => {
               disabled={isSending}
               loading={isSending}
               testID="send-phone-code-button"
-              accessibilityLabel="Send phone verification code button"
+              accessibilityLabel={translate("phoneVerificationScreen.sendCodeButton") || "Send verification code"}
             />
           </View>
         )}

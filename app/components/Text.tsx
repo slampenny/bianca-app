@@ -55,16 +55,16 @@ export interface TextProps extends RNTextProps {
 export function Text(props: TextProps) {
   const { weight, size, tx, txOptions, text, children, style: $styleOverride, ...rest } = props
 
-  const { colors } = useTheme()
+  const { colors, fontScale } = useTheme()
   const i18nText = tx && translate(tx, txOptions)
   const content = i18nText || text || children
 
   const preset: Presets = props.preset ?? "default"
   const $styles: StyleProp<TextStyle> = [
     $rtlStyle,
-    getPresetStyle(preset, colors),
+    getPresetStyle(preset, colors, fontScale),
     weight && $fontWeightStyles[weight],
-    size && $sizeStyles[size],
+    size && getSizeStyle(size, fontScale),
     $styleOverride,
   ]
 
@@ -75,14 +75,14 @@ export function Text(props: TextProps) {
   )
 }
 
-const getPresetStyle = (preset: Presets, colors: any): StyleProp<TextStyle> => {
+const getPresetStyle = (preset: Presets, colors: any, fontScale: number): StyleProp<TextStyle> => {
   // Use text color that's properly theme-aware
   // In dark mode: colors.text = neutral800 (#CCCCCC - light gray)
   // In light mode: colors.text = neutral800 (#1E293B - dark gray)
   const textColor = colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800
   
   const baseStyle: StyleProp<TextStyle> = [
-    $sizeStyles.sm,
+    getSizeStyle("sm", fontScale),
     $fontWeightStyles.normal,
     { color: textColor },
   ]
@@ -90,13 +90,21 @@ const getPresetStyle = (preset: Presets, colors: any): StyleProp<TextStyle> => {
   const presets = {
     default: baseStyle,
     bold: [baseStyle, $fontWeightStyles.bold] as StyleProp<TextStyle>,
-    heading: [baseStyle, $sizeStyles.xxl, $fontWeightStyles.bold] as StyleProp<TextStyle>,
-    subheading: [baseStyle, $sizeStyles.lg, $fontWeightStyles.medium] as StyleProp<TextStyle>,
+    heading: [baseStyle, getSizeStyle("xxl", fontScale), $fontWeightStyles.bold] as StyleProp<TextStyle>,
+    subheading: [baseStyle, getSizeStyle("lg", fontScale), $fontWeightStyles.medium] as StyleProp<TextStyle>,
     formLabel: [baseStyle, $fontWeightStyles.medium] as StyleProp<TextStyle>,
-    formHelper: [baseStyle, $sizeStyles.sm, $fontWeightStyles.normal] as StyleProp<TextStyle>,
+    formHelper: [baseStyle, getSizeStyle("sm", fontScale), $fontWeightStyles.normal] as StyleProp<TextStyle>,
   }
 
   return presets[preset]
+}
+
+const getSizeStyle = (size: Sizes, fontScale: number): TextStyle => {
+  const baseStyle = $sizeStyles[size]
+  return {
+    fontSize: baseStyle.fontSize * fontScale,
+    lineHeight: baseStyle.lineHeight * fontScale,
+  }
 }
 
 const $sizeStyles = {

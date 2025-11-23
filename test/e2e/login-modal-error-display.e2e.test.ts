@@ -76,8 +76,9 @@ test.describe('Login Modal Error Display', () => {
     
     // WHEN: I navigate to a screen that makes API calls
     // This should trigger 401 and show the login modal
-    await page.waitForSelector('[aria-label*="edit-patient-button-"]', { timeout: 15000 })
-    await page.locator('[aria-label*="edit-patient-button-"]').first().click()
+    // Note: edit-patient-button uses data-testid, but we'll use a more generic selector
+    await page.waitForSelector('[data-testid*="edit-patient-button"]', { timeout: 15000 })
+    await page.locator('[data-testid*="edit-patient-button"]').first().click()
     
     // Wait for patient screen to load and make API call
     await page.waitForTimeout(2000)
@@ -97,9 +98,10 @@ test.describe('Login Modal Error Display', () => {
     
     // Modal appeared! Now test the error display
     // WHEN: I attempt to login with email/password for the SSO-only account
-    const emailInput = page.locator('[aria-label="email-input"]')
-    const passwordInput = page.locator('[aria-label="password-input"]')
-    const loginButton = page.locator('[aria-label="login-button"]')
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    const emailInput = page.locator('input[data-testid="email-input"]')
+    const passwordInput = page.locator('input[data-testid="password-input"]')
+    const loginButton = page.getByTestId('login-button')
     
     await emailInput.waitFor({ state: 'visible', timeout: 5000 })
     await emailInput.fill('sso-unlinked@example.org')
@@ -160,13 +162,14 @@ test.describe('Login Modal Error Display', () => {
     })
     
     // GIVEN: I am on the login screen (not modal)
-    await page.goto('http://localhost:8081/')
-    await page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
+    await page.goto('/')
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
     
     // WHEN: I attempt to login with email/password for the SSO-only account
-    const emailInput = page.locator('[aria-label="email-input"]')
-    const passwordInput = page.locator('[aria-label="password-input"]')
-    const loginButton = page.locator('[aria-label="login-button"]')
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    const emailInput = page.locator('input[data-testid="email-input"]')
+    const passwordInput = page.locator('input[data-testid="password-input"]')
+    const loginButton = page.getByTestId('login-button')
     
     await emailInput.fill('sso-unlinked@example.org')
     await passwordInput.fill('SomePassword123')
@@ -226,8 +229,8 @@ test.describe('Login Modal Error Display', () => {
     })
     
     // GIVEN: I am on the login screen
-    await page.goto('http://localhost:8081/')
-    await page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
+    await page.goto('/')
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
     
     // WHEN: I attempt to login with invalid credentials
     const emailInput = page.locator('[aria-label="email-input"]')
@@ -243,7 +246,7 @@ test.describe('Login Modal Error Display', () => {
     // THEN: Error should be visible
     const toast = page.locator('[data-testid="auth-modal-toast"], [data-testid="toast"], [data-testid="login-toast"]')
     const errorText = page.locator('text=/incorrect|invalid|password/i')
-    const errorContainer = page.locator('[data-testid="login-error-container"], [aria-label="login-error"]')
+    const errorContainer = page.locator('[data-testid="login-error-container"]')
     
     const toastVisible = await toast.isVisible().catch(() => false)
     const errorTextVisible = await errorText.isVisible().catch(() => false)

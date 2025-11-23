@@ -8,6 +8,7 @@ import { clearCaregivers } from "../store/caregiverSlice"
 import { clearPatients } from "../store/patientSlice"
 import { Button, Screen, Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
+import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
 
 export const LogoutScreen = () => {
@@ -54,7 +55,7 @@ export const LogoutScreen = () => {
         style={styles.logoutButton}
         textStyle={styles.logoutButtonText}
         testID="logout-button"
-        accessibilityLabel="logout-button"
+        accessibilityLabel={translate("logoutScreen.logoutButton") || "Log out"}
       />
     </Screen>
   )

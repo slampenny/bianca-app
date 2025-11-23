@@ -45,14 +45,14 @@ export class LogoutWorkflow {
     })
     
     // Navigate to login
-    await this.page.goto('http://localhost:8082/')
-    await this.page.waitForSelector('[aria-label="email-input"]', { timeout: 10000 })
+    await this.page.goto('/')
+    await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
     
-    // Login
+    // Login - use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
     console.log(`\n🔐 Logging in with ${email} / ${password}`)
-    await this.page.fill('[aria-label="email-input"]', email)
-    await this.page.fill('[aria-label="password-input"]', password)
-    await this.page.click('[aria-label="login-button"]')
+    await this.page.fill('input[data-testid="email-input"]', email)
+    await this.page.fill('input[data-testid="password-input"]', password)
+    await this.page.getByTestId('login-button').click()
     
     // Wait for response
     console.log('⏳ Waiting for login response...')
@@ -64,19 +64,19 @@ export class LogoutWorkflow {
 
   async givenIAmOnTheProfileScreen() {
     // Click the profile button in the header
-    const profileButton = this.page.locator('[aria-label="profile-button"]')
+    const profileButton = this.page.getByTestId('profile-button')
     await expect(profileButton).toBeVisible({ timeout: 5000 })
     await profileButton.click()
     
     // Wait for profile screen to load
     await this.page.waitForTimeout(2000)
-    await expect(this.page.locator('[aria-label="profile-screen"]')).toBeVisible({ timeout: 5000 })
+    await expect(this.page.locator('[data-testid="profile-screen"]')).toBeVisible({ timeout: 5000 })
   }
 
   // WHEN steps - Actions
   
   async whenIClickTheLogoutButton() {
-    const logoutButton = this.page.locator('[aria-label="profile-logout-button"]')
+    const logoutButton = this.page.getByTestId('profile-logout-button')
     await expect(logoutButton).toBeVisible({ timeout: 5000 })
     console.log('Found logout button, clicking...')
     await logoutButton.click()
@@ -88,18 +88,18 @@ export class LogoutWorkflow {
   async whenIConfirmLogout() {
     // Wait for logout confirmation screen
     await this.page.waitForTimeout(1000)
-    const confirmButton = this.page.locator('[aria-label="logout-button"]')
+    const confirmButton = this.page.getByTestId('logout-button')
     await expect(confirmButton).toBeVisible({ timeout: 5000 })
     await confirmButton.click()
   }
 
   async whenIClickLogoutMultipleTimes() {
-    const logoutButton = this.page.locator('[aria-label="profile-logout-button"]')
+    const logoutButton = this.page.getByTestId('profile-logout-button')
     await logoutButton.waitFor({ state: 'visible', timeout: 5000 })
     await logoutButton.click()
     
     // Wait for logout confirmation screen to appear
-    const confirmButton = this.page.locator('[aria-label="logout-button"]')
+    const confirmButton = this.page.getByTestId('logout-button')
     await confirmButton.waitFor({ state: 'visible', timeout: 10000 })
     await this.page.waitForTimeout(500) // Small delay to ensure button is ready
     
@@ -125,7 +125,7 @@ export class LogoutWorkflow {
   // THEN steps - Assertions
   
   async thenIShouldSeeTheLogoutConfirmationScreen() {
-    await expect(this.page.locator('[aria-label="logout-screen"]')).toBeVisible({ timeout: 5000 })
+    await expect(this.page.locator('[data-testid="logout-screen"]')).toBeVisible({ timeout: 5000 })
   }
 
   async thenIShouldBeLoggedOut() {
@@ -135,8 +135,9 @@ export class LogoutWorkflow {
     try {
       // Check if we're on the login screen immediately
       // Try to find login screen elements - this will throw if page is closed
-      const loginScreen = this.page.locator('[aria-label="login-screen"]')
-      const emailInput = this.page.locator('[aria-label="email-input"]')
+      const loginScreen = this.page.locator('[data-testid="login-screen"]')
+      // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+      const emailInput = this.page.locator('input[data-testid="email-input"]')
       
       // Wait for either login screen or email input (both indicate we're on login)
       await Promise.race([
@@ -173,7 +174,7 @@ export class LogoutWorkflow {
       try {
         await this.page.goto('/')
         await this.page.waitForTimeout(2000)
-        await expect(this.page.locator('[aria-label="email-input"]')).toBeVisible({ timeout: 10000 })
+        await expect(this.page.locator('input[data-testid="email-input"]')).toBeVisible({ timeout: 10000 })
       } catch (recoveryError) {
         const recoveryMessage = recoveryError instanceof Error ? recoveryError.message : String(recoveryError)
         // If recovery also fails due to page closure, that's still valid
@@ -189,7 +190,8 @@ export class LogoutWorkflow {
   }
 
   async thenIShouldSeeTheLoginScreen() {
-    await expect(this.page.locator('[aria-label="email-input"]')).toBeVisible({ timeout: 5000 })
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await expect(this.page.locator('input[data-testid="email-input"]')).toBeVisible({ timeout: 5000 })
   }
 
   async thenIShouldNotBeAbleToAccessProtectedScreens() {
@@ -205,8 +207,9 @@ export class LogoutWorkflow {
     
     // Should be on login screen, not home screen
     // Check for login form elements instead of login-screen
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
     const isOnLogin = await Promise.race([
-      this.page.locator('[aria-label="email-input"]').isVisible(),
+      this.page.locator('input[data-testid="email-input"]').isVisible(),
       new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000))
     ]).catch(() => false)
     const isOnHome = await Promise.race([

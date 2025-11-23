@@ -4,17 +4,32 @@ import { TEST_USERS } from "../fixtures/testData"
 
 export async function navigateToRegister(page: Page) {
   await page.goto("/")
-  // Wait for login screen to load - use aria-label for React Native Web
-  await page.waitForSelector('[aria-label="email-input"]', { timeout: 30000 })
+  // Wait for login screen to load - use data-testid for React Native Web
+  await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
   await page.waitForTimeout(1000) // Small delay to ensure form is ready
   
-  // Click register button - use aria-label
-  const registerButton = page.locator('[aria-label="register-link"], [aria-label="register-button"]')
-  await registerButton.waitFor({ state: 'visible', timeout: 15000 })
+  // Click register button - use data-testid (LoginForm uses "register-button" testID)
+  // Button component should map testID to data-testid automatically
+  // Try getByTestId first, fallback to locator
+  let registerButton = page.getByTestId('register-button')
+  let buttonCount = await registerButton.count().catch(() => 0)
+  
+  if (buttonCount === 0) {
+    // Fallback: try locator
+    registerButton = page.locator('[data-testid="register-button"]').first()
+    buttonCount = await registerButton.count().catch(() => 0)
+  }
+  
+  if (buttonCount === 0) {
+    // Last resort: find by text
+    registerButton = page.getByText(/register|create account/i).first()
+  }
+  
+  await registerButton.waitFor({ state: 'visible', timeout: 10000 })
   await registerButton.click()
   
-  // Wait for register screen - use aria-label
-  await page.waitForSelector('[aria-label="register-name"]', { timeout: 15000 })
+  // Wait for register screen - use data-testid
+  await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
 }
 
 export async function navigateToHome(page: Page, user?: { email: string; password: string }) {
@@ -25,7 +40,13 @@ export async function navigateToHome(page: Page, user?: { email: string; passwor
 }
 
 export async function isLoginScreen(page: Page) {
-  await expect(page.locator('[aria-label="login-button"]')).toBeVisible()
+  // Wait for login screen to load - check for email input first (more reliable)
+  await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+  await page.waitForTimeout(500) // Give it a moment to render
+  
+  // Then verify login button is visible - Button should map testID to data-testid automatically
+  const loginButton = page.getByTestId('login-button')
+  await expect(loginButton).toBeVisible({ timeout: 5000 })
 }
 
 export async function isHomeScreen(page: Page) {
@@ -75,7 +96,7 @@ export async function navigateToSchedules(page: Page) {
   await isHomeScreen(page)
   
   // Find a patient card to navigate to patient screen
-  const patientCard = page.locator('[data-testid^="patient-card-"], [aria-label^="patient-card-"], [data-testid^="edit-patient-button-"]')
+  const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
   const patientCardCount = await patientCard.count()
   
   if (patientCardCount === 0) {
@@ -100,7 +121,7 @@ export async function navigateToSchedules(page: Page) {
   
   // Now look for the "Manage Schedules" button on the patient screen
   // This button only appears for existing patients (not new patient mode)
-  const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
+  const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"]')
   const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
   
   if (buttonCount === 0) {
@@ -118,7 +139,7 @@ export async function navigateToSchedules(page: Page) {
   await page.waitForTimeout(1000)
   
   // Verify we're on the schedule screen
-  const scheduleScreen = page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"], [aria-label*="schedule-screen"]')
+  const scheduleScreen = page.locator('[data-testid="schedules-screen"]')
   await expect(scheduleScreen).toBeVisible({ timeout: 10000 })
   console.log("Successfully navigated to Schedules via Patient screen")
 }
@@ -126,14 +147,14 @@ export async function navigateToSchedules(page: Page) {
 export async function isSchedulesScreen(page: Page) {
   console.log("Checking if on Schedules Screen...")
   // Use accessibilityLabel for React Native Web
-  await expect(page.locator('[data-testid="schedules-screen"], [aria-label="schedules-screen"]')).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('[data-testid="schedules-screen"]')).toBeVisible({ timeout: 10000 })
   console.log("Confirmed on Schedules Screen.")
 }
 
 export async function navigateToOrgTab(page: Page) {
   console.log("Navigating to Organization tab...")
   // Use flexible selector - try both testID and aria-label
-  const orgTab = page.locator('[data-testid="tab-org"], [aria-label="Organization tab"]').first()
+  const orgTab = page.locator('[data-testid="tab-org"]').first()
   await orgTab.waitFor({ timeout: 10000, state: 'visible' })
   await orgTab.click()
   await page.waitForTimeout(1000) // Wait for tab to activate
@@ -144,7 +165,7 @@ export async function navigateToOrgScreen(page: Page) {
   console.log("Navigating to Organization screen...")
   await navigateToOrgTab(page)
   // Wait for org screen to load
-  await page.waitForSelector('[data-testid="org-screen"], [aria-label="org-screen"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="org-screen"]', { timeout: 10000 })
   await page.waitForTimeout(1000) // Wait for screen to fully render
   console.log("Successfully navigated to Organization screen")
 }
@@ -176,10 +197,10 @@ export async function navigateToPaymentMethods(page: Page) {
   
   // Verify we're on payment methods - check for Stripe container or payment methods elements
   // The container might not have a testID, so check for Stripe elements or payment form
-  const stripeContainer = page.locator('[aria-label="stripe-web-payment-container"], [data-testid="payment-methods-container"]')
+  const stripeContainer = page.locator('[data-testid="payment-methods-container"]')
   await stripeContainer.waitFor({ timeout: 10000, state: 'visible' }).catch(async () => {
     // Fallback: check for payment form or existing methods
-    await page.waitForSelector('[aria-label="add-payment-form"], [aria-label="existing-payment-methods"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="add-payment-form"], [data-testid="existing-payment-methods"]', { timeout: 10000 })
   })
   console.log("Successfully navigated to Payment Methods")
 }
@@ -199,11 +220,11 @@ export async function isPaymentScreen(page: Page) {
 export async function navigateToTab(page: Page, tabName: 'home' | 'org' | 'alert' | 'reports' | 'payment') {
   console.log(`Navigating to ${tabName} tab...`)
   const tabSelectors = {
-    home: '[data-testid="tab-home"], [aria-label="Home tab"]',
-    org: '[data-testid="tab-org"], [aria-label="Organization tab"]',
-    alert: '[data-testid="tab-alert"], [aria-label="Alerts tab"]',
-    reports: '[data-testid="tab-reports"], [aria-label="Reports tab"]',
-    payment: '[data-testid="tab-payment"], [aria-label="Payment tab"]'
+    home: '[data-testid="tab-home"]',
+    org: '[data-testid="tab-org"]',
+    alert: '[data-testid="tab-alert"]',
+    reports: '[data-testid="tab-reports"]',
+    payment: '[data-testid="tab-payment"]'
   }
   
   const tab = page.locator(tabSelectors[tabName]).first()
@@ -221,7 +242,7 @@ export async function navigateToHomeTab(page: Page) {
 export async function navigateToAlertTab(page: Page) {
   await navigateToTab(page, 'alert')
   // Wait for alert screen to load
-  await page.waitForSelector('[data-testid="alert-screen"], [aria-label="alert-screen"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="alert-screen"]', { timeout: 10000 })
   await page.waitForTimeout(1000)
   console.log("Successfully navigated to Alerts screen")
 }
@@ -229,7 +250,7 @@ export async function navigateToAlertTab(page: Page) {
 export async function navigateToReportsTab(page: Page) {
   await navigateToTab(page, 'reports')
   // Wait for reports screen to load
-  await page.waitForSelector('[data-testid="reports-screen"], [aria-label="reports-screen"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="reports-screen"]', { timeout: 10000 })
   await page.waitForTimeout(1000)
   console.log("Successfully navigated to Reports screen")
 }

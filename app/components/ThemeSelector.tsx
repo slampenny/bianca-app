@@ -5,9 +5,13 @@ import { useTheme } from "app/theme/ThemeContext"
 import { themes, ThemeType } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { useLanguage } from "app/hooks/useLanguage"
+import { useFontScale } from "app/hooks/useFontScale"
+import { useKeyboardFocus } from "app/hooks/useKeyboardFocus"
 
 export function ThemeSelector({ testID }: { testID?: string }) {
   const { currentTheme, setTheme, themeInfo, colors, isLoading } = useTheme()
+  const { scale } = useFontScale()
+  const keyboardFocusStyle = useKeyboardFocus()
   const [modalVisible, setModalVisible] = useState(false)
   
   // Use language hook to trigger re-renders on language change
@@ -17,6 +21,17 @@ export function ThemeSelector({ testID }: { testID?: string }) {
     return null
   }
 
+  // Create dynamic styles with font scaling
+  const dynamicStyles = {
+    label: { fontSize: scale(16), fontWeight: "600" as const, marginBottom: 8 },
+    selectorText: { fontSize: scale(16) },
+    modalTitle: { fontSize: scale(20), fontWeight: "600" as const, marginBottom: 16, textAlign: "center" as const },
+    themeName: { fontSize: scale(16), fontWeight: "600" as const },
+    themeDescription: { fontSize: scale(14), marginBottom: 8 },
+    accessibilityText: { fontSize: scale(12), fontStyle: "italic" as const },
+    closeButtonText: { fontSize: scale(16), fontWeight: "600" as const, textAlign: "center" as const },
+  }
+
   const handleThemeChange = (theme: ThemeType) => {
     setTheme(theme)
     setModalVisible(false)
@@ -24,15 +39,19 @@ export function ThemeSelector({ testID }: { testID?: string }) {
 
   return (
     <View style={styles.container} testID={testID}>
-      <Text style={[styles.label, { color: colors.palette.biancaHeader || colors.text }]}>{translate("profileScreen.theme")}</Text>
+      <Text style={[dynamicStyles.label, { color: colors.palette.biancaHeader || colors.text }]}>{translate("profileScreen.theme")}</Text>
       <Pressable 
-        style={[styles.selectorButton, { 
-          borderColor: colors.palette.neutral300, 
-          backgroundColor: colors.palette.neutral100 
-        }]} 
+        style={[
+          styles.selectorButton, 
+          { 
+            borderColor: colors.palette.neutral300, 
+            backgroundColor: colors.palette.neutral100 
+          },
+          keyboardFocusStyle, // Add keyboard focus styles (web only)
+        ]} 
         onPress={() => setModalVisible(true)}
       >
-        <Text style={[styles.selectorText, { color: colors.palette.biancaHeader || colors.text }]}>{translate(`themes.${currentTheme}.name`)}</Text>
+        <Text style={[dynamicStyles.selectorText, { color: colors.palette.biancaHeader || colors.text }]}>{translate(`themes.${currentTheme}.name`)}</Text>
         <View style={styles.currentThemeSwatchContainer}>
           <View style={[styles.colorSwatch, { backgroundColor: colors.palette.primary500 }]} testID="colorSwatch-primary" accessibilityLabel="colorSwatch-primary" />
           <View style={[styles.colorSwatch, { backgroundColor: colors.palette.success500 }]} testID="colorSwatch-success" accessibilityLabel="colorSwatch-success" />
@@ -42,6 +61,9 @@ export function ThemeSelector({ testID }: { testID?: string }) {
           )}
           {currentTheme === 'dark' && (
             <View style={[styles.colorSwatch, { backgroundColor: colors.palette.warning500 }]} testID="colorSwatch-warning" accessibilityLabel="colorSwatch-warning" />
+          )}
+          {currentTheme === 'highcontrast' && (
+            <View style={[styles.colorSwatch, { backgroundColor: colors.palette.primary500 }]} testID="colorSwatch-primary" accessibilityLabel="colorSwatch-primary" />
           )}
         </View>
       </Pressable>
@@ -54,7 +76,7 @@ export function ThemeSelector({ testID }: { testID?: string }) {
       >
         <View style={[styles.modalOverlay, { backgroundColor: colors.palette.overlay50 || "rgba(0, 0, 0, 0.5)" }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.palette.neutral100 }]}>
-            <Text key={currentLanguage} style={[styles.modalTitle, { color: colors.palette.biancaHeader || colors.text }]}>{translate("profileScreen.selectTheme")}</Text>
+            <Text key={currentLanguage} style={[dynamicStyles.modalTitle, { color: colors.palette.biancaHeader || colors.text }]}>{translate("profileScreen.selectTheme")}</Text>
             <ScrollView>
               {Object.entries(themes).map(([key, theme]) => (
                 <Pressable
@@ -65,12 +87,13 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                       borderColor: colors.palette.neutral300,
                       backgroundColor: currentTheme === key ? colors.palette.primary500 : colors.palette.neutral100,
                     },
+                    keyboardFocusStyle, // Add keyboard focus styles (web only)
                   ]}
                   onPress={() => handleThemeChange(key as ThemeType)}
                 >
                   <View style={styles.themeHeader}>
                     <Text style={[
-                      styles.themeName, 
+                      dynamicStyles.themeName, 
                       { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.biancaHeader || colors.text) }
                     ]}>
                       {translate(`themes.${key}.name`)}
@@ -85,24 +108,27 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                       {key === 'dark' && (
                         <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.warning500 }]} testID="colorSwatch-warning" accessibilityLabel="colorSwatch-warning" />
                       )}
+                      {key === 'highcontrast' && (
+                        <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.primary500 }]} testID="colorSwatch-primary" accessibilityLabel="colorSwatch-primary" />
+                      )}
                     </View>
                   </View>
                   <Text style={[
-                    styles.themeDescription,
+                    dynamicStyles.themeDescription,
                     { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.biancaHeader || colors.text) }
                   ]}>
                     {translate(`themes.${key}.description`)}
                   </Text>
                   <View style={styles.accessibilityInfo}>
                     <Text style={[
-                      styles.accessibilityText,
+                      dynamicStyles.accessibilityText,
                       { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                     ]}>
                       {translate("themes.accessibility.wcagLevel")}: {theme.accessibility.wcagLevel}
                     </Text>
                     {theme.accessibility.colorblindFriendly && (
                       <Text style={[
-                        styles.accessibilityText,
+                        dynamicStyles.accessibilityText,
                         { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                       ]}>
                         {translate("themes.accessibility.colorblindFriendly")}
@@ -110,7 +136,7 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                     )}
                     {theme.accessibility.highContrast && (
                       <Text style={[
-                        styles.accessibilityText,
+                        dynamicStyles.accessibilityText,
                         { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                       ]}>
                         {translate("themes.accessibility.highContrast")}
@@ -118,7 +144,7 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                     )}
                     {theme.accessibility.darkMode && (
                       <Text style={[
-                        styles.accessibilityText,
+                        dynamicStyles.accessibilityText,
                         { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.neutral600 || colors.textDim || colors.text) }
                       ]}>
                         {translate("themes.accessibility.darkMode")}
@@ -129,10 +155,14 @@ export function ThemeSelector({ testID }: { testID?: string }) {
               ))}
             </ScrollView>
             <Pressable 
-              style={[styles.closeButton, { backgroundColor: colors.palette.primary500 }]} 
+              style={[
+                styles.closeButton, 
+                { backgroundColor: colors.palette.primary500 },
+                keyboardFocusStyle, // Add keyboard focus styles (web only)
+              ]} 
               onPress={() => setModalVisible(false)}
             >
-              <Text style={[styles.closeButtonText, { color: colors.palette.neutral100 }]}>{translate("common.close")}</Text>
+              <Text style={[dynamicStyles.closeButtonText, { color: colors.palette.neutral100 }]}>{translate("common.close")}</Text>
             </Pressable>
           </View>
         </View>
@@ -145,11 +175,6 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
   selectorButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -157,10 +182,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-  },
-  selectorText: {
-    fontSize: 16,
-    // Color will be set via inline style using theme colors
   },
   currentThemeSwatchContainer: {
     flexDirection: "row",
@@ -183,12 +204,6 @@ const styles = StyleSheet.create({
     width: "90%",
     maxHeight: "80%",
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 16,
-    textAlign: "center",
-  },
   themeOption: {
     padding: 16,
     borderRadius: 8,
@@ -201,35 +216,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  themeName: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
   themeSwatches: {
     flexDirection: "row",
     gap: 4,
-  },
-  themeDescription: {
-    fontSize: 14,
-    marginBottom: 8,
   },
   accessibilityInfo: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
-  accessibilityText: {
-    fontSize: 12,
-    fontStyle: "italic",
-  },
   closeButton: {
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
   },
 })

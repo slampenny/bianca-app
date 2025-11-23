@@ -431,6 +431,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
 
         <View style={styles.form}>
           <TextField
+            testID="new-password-input"
+            accessibilityLabel={translate("confirmResetScreen.newPasswordLabel") || "New password"}
             value={newPassword}
             onChangeText={(text) => {
               setNewPassword(text)
@@ -445,6 +447,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
           />
 
           <TextField
+            testID="confirm-password-input"
+            accessibilityLabel={translate("confirmResetScreen.confirmPasswordLabel") || "Confirm password"}
             value={confirmPassword}
             onChangeText={(text) => {
               setConfirmPassword(text)
@@ -459,6 +463,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
           />
 
           <Button
+            testID="reset-password-submit"
+            accessibilityLabel="Reset password"
             text="Reset Password"
             onPress={handleConfirmReset}
             disabled={isLoading || !newPassword || !confirmPassword}

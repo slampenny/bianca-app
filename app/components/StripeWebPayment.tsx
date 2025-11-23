@@ -49,7 +49,8 @@ const PaymentForm: React.FC<{
 }> = ({ orgId, onPaymentMethodAdded, onError }) => {
   const stripe = useStripe()
   const elements = useElements()
-  const { colors: themeColors } = useTheme()
+  const { colors: themeColors, fontScale } = useTheme()
+  const { scale } = useFontScale()
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
@@ -238,7 +239,7 @@ const PaymentForm: React.FC<{
   const cardElementOptions = {
     style: {
       base: {
-        fontSize: '16px',
+        fontSize: `${scale(16)}px`,
         color: themeColors.text || themeColors.palette.neutral800 || '#424770',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         '::placeholder': {
@@ -252,7 +253,7 @@ const PaymentForm: React.FC<{
     },
   }
 
-  const dynamicStyles = createDynamicStyles(themeColors)
+  const dynamicStyles = createDynamicStyles(themeColors, fontScale)
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.palette.biancaBackground }]} accessibilityLabel="stripe-web-payment-container">
@@ -440,41 +441,41 @@ const StripeWebPayment: React.FC<StripeWebPaymentProps> = ({
   )
 }
 
-const createDynamicStyles = (colors: any) => StyleSheet.create({
+const createDynamicStyles = (colors: any, fontScale: number) => StyleSheet.create({
   title: {
-    fontSize: 24,
+    fontSize: 24 * fontScale,
     fontWeight: 'bold',
     marginBottom: spacing.lg,
     color: colors.text || colors.palette.neutral800,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 18 * fontScale,
     fontWeight: '600',
     marginBottom: spacing.md,
     color: colors.text || colors.palette.neutral800,
   },
   paymentMethodText: {
-    fontSize: 16,
+    fontSize: 16 * fontScale,
     fontWeight: '600',
     color: colors.text || colors.palette.neutral800,
     marginBottom: spacing.xs,
   },
   paymentMethodSubText: {
-    fontSize: 14,
+    fontSize: 14 * fontScale,
     color: colors.textDim || colors.palette.neutral600,
   },
   loadingText: {
     color: colors.textDim || colors.palette.neutral600,
-    fontSize: 14,
+    fontSize: 14 * fontScale,
   },
   errorText: {
     color: colors.palette.angry500,
-    fontSize: 14,
+    fontSize: 14 * fontScale,
   },
   message: {
     marginTop: spacing.md,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 14 * fontScale,
   },
   successMessage: {
     color: colors.palette.accent500,
@@ -529,7 +530,7 @@ const styles = StyleSheet.create({
   },
   defaultBadgeText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 12, // Badge text - keep small, doesn't need scaling
     fontWeight: '600',
   },
   actionButton: {
@@ -539,7 +540,7 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   actionButtonText: {
-    fontSize: 12,
+    fontSize: 12, // Button text uses Text component which scales
     fontWeight: '600',
   },
   formContainer: {

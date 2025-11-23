@@ -344,7 +344,7 @@ export const LoginForm: FC<LoginFormProps> = ({
       
       <TextField
         testID="email-input"
-        accessibilityLabel="email-input"
+        accessibilityLabel="Email address"
         value={authEmail}
         onChangeText={(value) => dispatch(setAuthEmail(value))}
         placeholderTx="loginScreen.emailFieldLabel"
@@ -362,7 +362,7 @@ export const LoginForm: FC<LoginFormProps> = ({
       />
       <TextField
         testID="password-input"
-        accessibilityLabel="password-input"
+        accessibilityLabel="Password"
         ref={authPasswordInput}
         value={authPassword}
         onChangeText={setAuthPassword}
@@ -401,7 +401,7 @@ export const LoginForm: FC<LoginFormProps> = ({
       
       <Button
         testID="login-button"
-        accessibilityLabel="login-button"
+        accessibilityLabel="Log in"
         tx="loginScreen.signIn"
         onPress={handleLoginPress}
         preset="primary"
@@ -422,7 +422,7 @@ export const LoginForm: FC<LoginFormProps> = ({
       {showRegisterButton && onRegisterPress && (
         <Button
           testID="register-button"
-          accessibilityLabel="register-link"
+          accessibilityLabel="Create account"
           tx="loginScreen.register"
           onPress={onRegisterPress}
           style={styles.registerButton}

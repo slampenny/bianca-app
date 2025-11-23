@@ -11,7 +11,7 @@ test.describe('Phone Verification Flow', () => {
 
   test('complete phone verification workflow', async ({ page }) => {
     // Step 1: Login as an existing user
-    await page.goto('http://localhost:8081')
+    await page.goto('/')
     
     try {
       await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
@@ -27,10 +27,31 @@ test.describe('Phone Verification Flow', () => {
     }
 
     // Step 2: Navigate to Profile screen via profile button in header
-    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"]').first()
+    // Wait for home screen to be fully loaded first
+    await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    await page.waitForTimeout(1000) // Give time for UI to render
+    
+    // Find profile button - try getByTestId first, fallback to locator
+    let profileButton = page.getByTestId('profile-button')
+    let buttonCount = await profileButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      profileButton = page.locator('[data-testid="profile-button"]').first()
+      buttonCount = await profileButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Wait a bit more and try again
+      await page.waitForTimeout(2000)
+      profileButton = page.getByTestId('profile-button')
+      buttonCount = await profileButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        profileButton = page.locator('[data-testid="profile-button"]').first()
+      }
+    }
+    
     await profileButton.waitFor({ timeout: 10000, state: 'visible' })
     await profileButton.click()
-    await page.waitForSelector('[data-testid="profile-screen"], [aria-label="profile-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
     await page.waitForTimeout(2000) // Give React time to render
 
     // Step 3: Check if phone verification is needed
@@ -58,11 +79,10 @@ test.describe('Phone Verification Flow', () => {
       return
     }
 
-    // Step 4: Click "Verify Phone" button (using accessibility label for React Native Web)
+    // Step 4: Click "Verify Phone" button - use data-testid
     // Try banner button first (more likely to be visible), then profile verify button
-    const bannerButton = page.locator('[data-testid="phone-verification-banner-button"]').first()
-    const profileVerifyButton = page.locator('[data-testid="verify-phone-button"]').first()
-    const anyVerifyButton = page.locator('[aria-label="Verify phone button"]').first()
+    const bannerButton = page.getByTestId('phone-verification-banner-button')
+    const profileVerifyButton = page.getByTestId('verify-phone-button')
     
     // Wait for any verify button to be visible (banner or profile)
     let verifyPhoneButton = null
@@ -74,9 +94,10 @@ test.describe('Phone Verification Flow', () => {
         await profileVerifyButton.waitFor({ timeout: 5000, state: 'visible' })
         verifyPhoneButton = profileVerifyButton
       } catch {
-        // Fallback: try any button with the aria-label
-        await anyVerifyButton.waitFor({ timeout: 5000, state: 'visible' })
-        verifyPhoneButton = anyVerifyButton
+        // Fallback: try locator
+        const fallbackButton = page.locator('[data-testid="verify-phone-button"]').first()
+        await fallbackButton.waitFor({ timeout: 5000, state: 'visible' })
+        verifyPhoneButton = fallbackButton
       }
     }
     
@@ -95,9 +116,9 @@ test.describe('Phone Verification Flow', () => {
       console.log(`Current URL: ${currentUrl}`)
     }
     
-    // Check what's visible on the screen
-    const sendCodeButton = page.locator('[aria-label="Send phone verification code button"], [data-testid="send-phone-code-button"]')
-    const codeInput = page.locator('[aria-label="Enter 6-digit verification code"], [data-testid="phone-verification-code-input"]')
+    // Check what's visible on the screen - use data-testid
+    const sendCodeButton = page.getByTestId('send-phone-code-button')
+    const codeInput = page.locator('input[data-testid="phone-verification-code-input"]').first()
     
     // Check if send code button is visible (code not sent yet)
     const sendCodeVisible = await sendCodeButton.isVisible({ timeout: 2000 }).catch(() => false)
@@ -166,8 +187,12 @@ test.describe('Phone Verification Flow', () => {
     // Note: This will fail verification, but tests the UI flow
     await codeInput.fill('123456')
 
-    // Step 9: Click verify button (using accessibility label)
-    const verifyButton = page.locator('[aria-label="Verify phone code button"], [data-testid="verify-phone-code-button"]').first()
+    // Step 9: Click verify button - use data-testid
+    let verifyButton = page.getByTestId('verify-phone-code-button')
+    let verifyButtonCount = await verifyButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      verifyButton = page.locator('[data-testid="verify-phone-code-button"]').first()
+    }
     await verifyButton.waitFor({ timeout: 10000, state: 'visible' })
     await verifyButton.click()
 
@@ -183,7 +208,7 @@ test.describe('Phone Verification Flow', () => {
     
     if (hasVerifySuccess) {
       // Success - navigate back to profile to verify status
-      const profileButtonAgain = page.locator('[data-testid="profile-button"], [aria-label="profile-button"]').first()
+      const profileButtonAgain = page.getByTestId('profile-button')
       if (await profileButtonAgain.isVisible().catch(() => false)) {
         await profileButtonAgain.click()
         await page.waitForTimeout(2000)
@@ -223,14 +248,18 @@ test.describe('Phone Verification Flow', () => {
     }
 
     // Navigate to profile via profile button
-    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"]').first()
+    const profileButton = page.getByTestId('profile-button')
     await profileButton.waitFor({ timeout: 10000, state: 'visible' })
     await profileButton.click()
-    await page.waitForSelector('[data-testid="profile-screen"], [aria-label="profile-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
     await page.waitForTimeout(2000)
 
-    // Click verify phone button if visible (using accessibility label)
-    const verifyPhoneButton = page.locator('[aria-label="Verify phone button"], [data-testid="verify-phone-button"]').first()
+    // Click verify phone button if visible - use data-testid
+    let verifyPhoneButton = page.getByTestId('verify-phone-button')
+    let buttonCount = await verifyPhoneButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      verifyPhoneButton = page.locator('[data-testid="verify-phone-button"]').first()
+    }
     const isVisible = await verifyPhoneButton.isVisible().catch(() => false)
     
     if (!isVisible) {
@@ -243,8 +272,8 @@ test.describe('Phone Verification Flow', () => {
     // Wait for VerifyPhoneScreen to load and handle code sending
     await page.waitForTimeout(2000)
     
-    // Check if we need to send code first
-    const sendCodeButton = page.locator('[aria-label="Send phone verification code button"], [data-testid="send-phone-code-button"]')
+    // Check if we need to send code first - use data-testid
+    const sendCodeButton = page.getByTestId('send-phone-code-button')
     const sendCodeVisible = await sendCodeButton.isVisible({ timeout: 3000 }).catch(() => false)
     
     if (sendCodeVisible) {
@@ -280,20 +309,28 @@ test.describe('Phone Verification Flow', () => {
       return // Don't check for input if there's an error
     }
 
-    // Check for code input (using accessibility label)
-    const codeInput = page.locator('[aria-label="Enter 6-digit verification code"], [data-testid="phone-verification-code-input"]').first()
+    // Check for code input - use data-testid (TextField needs input[data-testid="..."] pattern)
+    const codeInput = page.locator('input[data-testid="phone-verification-code-input"]').first()
     const codeInputVisible = await codeInput.isVisible({ timeout: 10000 }).catch(() => false)
     
     if (codeInputVisible) {
       await expect(codeInput).toBeVisible()
       await expect(codeInput).toBeEditable()
 
-      // Check for verify button (using accessibility label)
-      const verifyButton = page.locator('[aria-label="Verify phone code button"], [data-testid="verify-phone-code-button"]').first()
+      // Check for verify button - use data-testid
+      let verifyButton = page.getByTestId('verify-phone-code-button')
+      let buttonCount = await verifyButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        verifyButton = page.locator('[data-testid="verify-phone-code-button"]').first()
+      }
       await expect(verifyButton).toBeVisible()
 
-      // Check for resend button (using accessibility label, might be disabled initially)
-      const resendButton = page.locator('[aria-label="Resend phone verification code button"], [data-testid="resend-phone-code-button"]').first()
+      // Check for resend button - use data-testid (might be disabled initially)
+      let resendButton = page.getByTestId('resend-phone-code-button')
+      let resendCount = await resendButton.count().catch(() => 0)
+      if (resendCount === 0) {
+        resendButton = page.locator('[data-testid="resend-phone-code-button"]').first()
+      }
       // Resend button might not be visible if cooldown is active
       const resendVisible = await resendButton.isVisible().catch(() => false)
       if (resendVisible) {
@@ -302,8 +339,8 @@ test.describe('Phone Verification Flow', () => {
 
       console.log('✅ Phone verification screen displays correctly')
     } else {
-      // Check if send code button is visible instead
-      const sendCodeButton = page.locator('[aria-label="Send phone verification code button"], [data-testid="send-phone-code-button"]').first()
+      // Check if send code button is visible instead - use data-testid
+      const sendCodeButton = page.getByTestId('send-phone-code-button')
       const sendCodeVisible = await sendCodeButton.isVisible({ timeout: 2000 }).catch(() => false)
       
       if (sendCodeVisible) {
@@ -350,8 +387,8 @@ test.describe('Phone Verification Flow', () => {
     // Wait for VerifyPhoneScreen to load and handle code sending
     await page.waitForTimeout(2000)
     
-    // Check if we need to send code first
-    const sendCodeButton = page.locator('[aria-label="Send phone verification code button"], [data-testid="send-phone-code-button"]')
+    // Check if we need to send code first - use data-testid
+    const sendCodeButton = page.getByTestId('send-phone-code-button')
     const sendCodeVisible = await sendCodeButton.isVisible({ timeout: 3000 }).catch(() => false)
     
     if (sendCodeVisible) {
@@ -404,11 +441,15 @@ test.describe('Phone Verification Flow', () => {
     
     await page.waitForTimeout(1000) // Additional wait
 
-    // Enter invalid code (using accessibility label)
+    // Enter invalid code
     await codeInput.fill('000000')
 
-    // Click verify (using accessibility label)
-    const verifyButton = page.locator('[aria-label="Verify phone code button"], [data-testid="verify-phone-code-button"]').first()
+    // Click verify - use data-testid
+    let verifyButton = page.getByTestId('verify-phone-code-button')
+    let buttonCount = await verifyButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      verifyButton = page.locator('[data-testid="verify-phone-code-button"]').first()
+    }
     await verifyButton.click()
 
     // Wait for error message
@@ -444,10 +485,10 @@ test.describe('Phone Verification Flow', () => {
     }
 
     // Navigate to profile via profile button
-    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"]').first()
+    const profileButton = page.getByTestId('profile-button')
     await profileButton.waitFor({ timeout: 10000, state: 'visible' })
     await profileButton.click()
-    await page.waitForSelector('[data-testid="profile-screen"], [aria-label="profile-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
     await page.waitForTimeout(2000)
 
     // Check for phone verification status (either verified or not verified)

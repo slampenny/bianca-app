@@ -24,22 +24,22 @@ test.describe("Alert Mark All Read Test", () => {
     await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
     
     // Wait for home screen to be ready
-    await expect(page.getByLabel('home-header')).toBeVisible()
+    await expect(page.getByTestId('home-header')).toBeVisible()
   })
 
   test("should show 11 unread alerts, then 0 after marking all as read, but 11 total on All Alerts tab", async ({ page }) => {
     console.log('=== ALERT MARK ALL READ TEST ===')
     
     // GIVEN: I'm on the home screen
-    await expect(page.getByLabel('home-header')).toBeVisible()
+    await expect(page.getByTestId('home-header')).toBeVisible()
     
     // Navigate to alert screen
-    const alertTab = page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab')).or(page.getByLabel('Alerts tab'))
+    const alertTab = page.getByTestId('tab-alert')
     await alertTab.click()
     await page.waitForTimeout(2000)
     
     // Verify we're on the alert screen
-    await expect(page.getByTestId('alert-screen').or(page.getByLabel('alert-screen'))).toBeVisible()
+    await expect(page.getByTestId('alert-screen')).toBeVisible()
     
     // Check initial unread count - we're on "Unread Alerts" tab by default
     const unreadAlertsInitial = page.locator('[data-testid="alert-item"]')

@@ -19,19 +19,19 @@ export class MFAWorkflow {
     })
     
     // Navigate to the app - same pattern as auth workflow
-    await this.page.goto('http://localhost:8081/')
+    await this.page.goto('/')
     
     // Wait for either login screen or home screen (exactly like auth workflow)
     try {
       // Try login screen first
-      await this.page.waitForSelector('[aria-label="email-input"]', { timeout: 15000 })
+      await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 15000 })
       // We're on login screen - proceed with login
       await loginUserViaUI(this.page, 'fake@example.org', 'Password1')
       // Wait for home screen
-      await this.page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 15000 })
+      await this.page.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
     } catch (loginError) {
       // Might already be on home screen - verify
-      const isHomeScreen = await this.page.locator('[data-testid="home-header"], [aria-label="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
+      const isHomeScreen = await this.page.locator('[data-testid="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
       if (!isHomeScreen) {
         // Neither screen found - this is a bug, get diagnostic info
         const bodyText = await this.page.textContent('body').catch(() => 'empty')
@@ -45,18 +45,69 @@ export class MFAWorkflow {
 
   async givenIAmOnTheProfileScreen() {
     // Navigate to profile screen
-    await this.page.locator('[data-testid="profile-button"], [aria-label*="profile"]').first().click()
-    await this.page.waitForSelector('[data-testid="profile-screen"], [aria-label*="profile-screen"]', { timeout: 10000 })
+    // Wait for home screen to be fully loaded first
+    await this.page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    await this.page.waitForTimeout(1000) // Give time for UI to render
+    
+    // Find profile button - try getByTestId first, fallback to locator
+    let profileButton = this.page.getByTestId('profile-button')
+    let buttonCount = await profileButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      profileButton = this.page.locator('[data-testid="profile-button"]').first()
+      buttonCount = await profileButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Wait a bit more and try again
+      await this.page.waitForTimeout(2000)
+      profileButton = this.page.getByTestId('profile-button')
+      buttonCount = await profileButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        profileButton = this.page.locator('[data-testid="profile-button"]').first()
+      }
+    }
+    
+    await profileButton.waitFor({ state: 'visible', timeout: 10000 })
+    await profileButton.click()
+    await this.page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
   }
 
   async givenIAmOnTheMFASetupScreen() {
     // Navigate to MFA setup screen
     await this.givenIAmOnTheProfileScreen()
-    await this.page.locator('[data-testid="mfa-setup-button"], [aria-label="mfa-setup-button"]').click()
-    // Wait for the MFA setup screen specifically (not the button)
-    await this.page.waitForSelector('[data-testid="mfa-setup-screen"], [aria-label="mfa-setup-screen"]', { timeout: 10000 })
-    // Wait a moment for navigation to complete
+    
+    // Wait for profile screen to fully render
+    await this.page.waitForTimeout(2000)
+    
+    // Find MFA button - try getByTestId first, fallback to locator
+    let mfaButton = this.page.getByTestId('mfa-setup-button')
+    let buttonCount = await mfaButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      mfaButton = this.page.locator('[data-testid="mfa-setup-button"]').first()
+      buttonCount = await mfaButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Wait a bit more and try again
+      await this.page.waitForTimeout(2000)
+      mfaButton = this.page.getByTestId('mfa-setup-button')
+      buttonCount = await mfaButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        mfaButton = this.page.locator('[data-testid="mfa-setup-button"]').first()
+      }
+    }
+    
+    // Scroll into view if needed
+    await mfaButton.scrollIntoViewIfNeeded().catch(() => {})
     await this.page.waitForTimeout(500)
+    
+    await mfaButton.waitFor({ state: 'visible', timeout: 15000 })
+    await mfaButton.click()
+    
+    // Wait for the MFA setup screen specifically (not the button)
+    await this.page.waitForSelector('[data-testid="mfa-setup-screen"]', { timeout: 15000 })
+    // Wait a moment for navigation to complete
+    await this.page.waitForTimeout(1000)
   }
 
   async givenMFAIsEnabled() {
@@ -80,14 +131,37 @@ export class MFAWorkflow {
 
   async givenIAmOnTheMFAVerificationScreen() {
     // This would typically be reached via login flow
-    await this.page.waitForSelector('[data-testid="mfa-verification-screen"], [aria-label*="mfa-verification"], [aria-label="mfa-token-input"]', { timeout: 10000 })
+    await this.page.waitForSelector('[data-testid="mfa-verification-screen"]', { timeout: 10000 })
   }
 
   // WHEN steps - Actions
   async whenIEnableMFA() {
-    // Click enable MFA button
-    const enableButton = this.page.locator('[data-testid="mfa-enable-button"], [aria-label="mfa-enable-button"]')
-    await enableButton.waitFor({ state: 'visible', timeout: 10000 })
+    // Wait for MFA setup screen to fully render
+    await this.page.waitForTimeout(2000)
+    
+    // Find enable MFA button - try getByTestId first, fallback to locator
+    let enableButton = this.page.getByTestId('mfa-enable-button')
+    let buttonCount = await enableButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      enableButton = this.page.locator('[data-testid="mfa-enable-button"]').first()
+      buttonCount = await enableButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Wait a bit more and try again
+      await this.page.waitForTimeout(2000)
+      enableButton = this.page.getByTestId('mfa-enable-button')
+      buttonCount = await enableButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        enableButton = this.page.locator('[data-testid="mfa-enable-button"]').first()
+      }
+    }
+    
+    // Scroll into view if needed
+    await enableButton.scrollIntoViewIfNeeded().catch(() => {})
+    await this.page.waitForTimeout(500)
+    
+    await enableButton.waitFor({ state: 'visible', timeout: 15000 })
     
     // Capture console errors and network requests to diagnose issues
     const errors: string[] = []
@@ -156,10 +230,13 @@ export class MFAWorkflow {
     // Wait for the verification step to appear (token input field)
     // This indicates the API call succeeded and we're on the verify step
     try {
-      await this.page.waitForSelector('[data-testid="mfa-verify-token-input"], [aria-label="mfa-verify-token-input"]', { timeout: 20000 })
+      // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+      await this.page.waitForSelector('input[data-testid="mfa-verify-token-input"]', { timeout: 20000 })
+      // Wait a bit more for the cancel button to render
+      await this.page.waitForTimeout(1000)
     } catch (error) {
       // Check if we're still on the status step (API call might have failed silently)
-      const stillOnStatus = await this.page.locator('[aria-label="mfa-enable-button"]').isVisible().catch(() => false)
+      const stillOnStatus = await this.page.getByTestId('mfa-enable-button').isVisible().catch(() => false)
       if (stillOnStatus) {
         const consoleErrors = errors.length > 0 ? `\nConsole errors: ${errors.join('; ')}` : ''
         const netErrors = networkErrors.length > 0 ? `\nNetwork errors: ${networkErrors.join('; ')}` : ''
@@ -181,40 +258,69 @@ export class MFAWorkflow {
   }
 
   async whenIVerifyAndEnableMFA(token: string) {
+    // Wait for verify step to fully render
+    await this.page.waitForTimeout(2000)
+    
     // Enter verification token
-    await this.page.locator('[data-testid="mfa-verify-token-input"], [aria-label="mfa-verify-token-input"]').fill(token)
-    // Click verify and enable button
-    await this.page.locator('[data-testid="mfa-verify-enable-button"], [aria-label="mfa-verify-enable-button"]').click()
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="mfa-verify-token-input"]').fill(token)
+    
+    // Find verify and enable button - try getByTestId first, fallback to locator
+    let verifyButton = this.page.getByTestId('mfa-verify-enable-button')
+    let buttonCount = await verifyButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      verifyButton = this.page.locator('[data-testid="mfa-verify-enable-button"]').first()
+      buttonCount = await verifyButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Wait a bit more and try again
+      await this.page.waitForTimeout(2000)
+      verifyButton = this.page.getByTestId('mfa-verify-enable-button')
+      buttonCount = await verifyButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        verifyButton = this.page.locator('[data-testid="mfa-verify-enable-button"]').first()
+      }
+    }
+    
+    // Scroll into view if needed
+    await verifyButton.scrollIntoViewIfNeeded().catch(() => {})
+    await this.page.waitForTimeout(500)
+    
+    await verifyButton.waitFor({ state: 'visible', timeout: 15000 })
+    await verifyButton.click()
     // Wait for success or error
     await this.page.waitForTimeout(2000)
   }
 
   async whenIEnterMFAToken(token: string) {
     // Enter MFA token on verification screen
-    await this.page.locator('[data-testid="mfa-token-input"], [aria-label="mfa-token-input"]').fill(token)
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="mfa-token-input"]').fill(token)
   }
 
   async whenIClickVerifyMFA() {
     // Click verify button on verification screen
-    await this.page.locator('[data-testid="mfa-verify-button"], [aria-label="mfa-verify-button"]').click()
+    await this.page.getByTestId('mfa-verify-button').click()
     await this.page.waitForTimeout(2000)
   }
 
   async whenIUseBackupCode(backupCode: string) {
     // Enter backup code (8 characters)
-    await this.page.locator('[data-testid="mfa-token-input"], [aria-label="mfa-token-input"]').fill(backupCode)
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="mfa-token-input"]').fill(backupCode)
     // Click use backup code button
-    await this.page.locator('[data-testid="mfa-backup-code-button"], [aria-label="mfa-backup-code-button"]').click()
+    await this.page.getByTestId('mfa-backup-code-button').click()
     await this.page.waitForTimeout(2000)
   }
 
   async whenIDisableMFA(token: string) {
     // Navigate to disable step
-    await this.page.locator('[data-testid="mfa-disable-button"], [aria-label="mfa-disable-button"]').click()
-    // Enter token
-    await this.page.locator('[data-testid="mfa-disable-token-input"], [aria-label="mfa-disable-token-input"]').fill(token)
+    await this.page.getByTestId('mfa-disable-button').click()
+    // Enter token - use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="mfa-disable-token-input"]').fill(token)
     // Click disable confirm button
-    await this.page.locator('[data-testid="mfa-disable-confirm-button"], [aria-label="mfa-disable-confirm-button"]').click()
+    await this.page.getByTestId('mfa-disable-confirm-button').click()
     // Handle confirmation dialog if present
     await this.page.waitForTimeout(2000)
     // If there's a confirmation dialog, accept it
@@ -227,11 +333,11 @@ export class MFAWorkflow {
 
   async whenIRegenerateBackupCodes(token: string) {
     // Click regenerate backup codes button
-    await this.page.locator('[data-testid="mfa-regenerate-backup-codes-button"], [aria-label*="regenerate"]').click()
-    // Enter token
-    await this.page.locator('[data-testid="mfa-regenerate-token-input"], [aria-label*="regenerate"]').fill(token)
+    await this.page.getByTestId('mfa-regenerate-backup-codes-button').click()
+    // Enter token - use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="mfa-regenerate-token-input"]').fill(token)
     // Click regenerate confirm button
-    await this.page.locator('[data-testid="mfa-regenerate-confirm-button"], [aria-label*="regenerate"]').click()
+    await this.page.getByTestId('mfa-regenerate-confirm-button').click()
     // Handle confirmation dialog if present
     await this.page.waitForTimeout(2000)
     const confirmButton = this.page.locator('button:has-text("Regenerate"), button:has-text("Confirm")')
@@ -242,9 +348,32 @@ export class MFAWorkflow {
   }
 
   async whenIClickCancelOnMFASetup() {
-    // Click cancel button
-    const cancelButton = this.page.locator('[data-testid="mfa-cancel-setup-button"], [aria-label*="cancel"]')
-    await cancelButton.waitFor({ state: 'visible', timeout: 10000 })
+    // Wait for MFA setup screen to fully render
+    await this.page.waitForTimeout(2000)
+    
+    // Find cancel button - try getByTestId first, fallback to locator
+    let cancelButton = this.page.getByTestId('mfa-cancel-setup-button')
+    let buttonCount = await cancelButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      cancelButton = this.page.locator('[data-testid="mfa-cancel-setup-button"]').first()
+      buttonCount = await cancelButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Wait a bit more and try again
+      await this.page.waitForTimeout(2000)
+      cancelButton = this.page.getByTestId('mfa-cancel-setup-button')
+      buttonCount = await cancelButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        cancelButton = this.page.locator('[data-testid="mfa-cancel-setup-button"]').first()
+      }
+    }
+    
+    // Scroll into view if needed
+    await cancelButton.scrollIntoViewIfNeeded().catch(() => {})
+    await this.page.waitForTimeout(500)
+    
+    await cancelButton.waitFor({ state: 'visible', timeout: 15000 })
     await cancelButton.click()
     // Wait for navigation back to profile
     await this.page.waitForTimeout(1000)
@@ -252,7 +381,7 @@ export class MFAWorkflow {
 
   async whenILogout() {
     // First, try to navigate to home screen to ensure we're in the main app
-    const homeHeader = this.page.locator('[data-testid="home-header"], [aria-label="home-header"]')
+    const homeHeader = this.page.locator('[data-testid="home-header"]')
     const isOnHome = await homeHeader.isVisible().catch(() => false)
     
     if (!isOnHome) {
@@ -282,17 +411,17 @@ export class MFAWorkflow {
     }
     
     // Check if we're already on profile screen
-    const isOnProfile = await this.page.locator('[data-testid="profile-screen"], [aria-label="profile-screen"]').isVisible().catch(() => false)
+    const isOnProfile = await this.page.locator('[data-testid="profile-screen"]').isVisible().catch(() => false)
     
     if (!isOnProfile) {
       // Navigate to profile - try multiple ways
-      const profileButton = this.page.locator('[data-testid="profile-button"], [aria-label="profile-button"]')
+      const profileButton = this.page.getByTestId('profile-button')
       const isProfileButtonVisible = await profileButton.isVisible({ timeout: 3000 }).catch(() => false)
       
       if (isProfileButtonVisible) {
         await profileButton.click()
         // Wait for profile screen to load
-        await this.page.waitForSelector('[data-testid="profile-screen"], [aria-label="profile-screen"]', { timeout: 10000 }).catch(() => {})
+        await this.page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 }).catch(() => {})
         await this.page.waitForTimeout(1000)
       } else {
         // Try navigating back first
@@ -300,17 +429,17 @@ export class MFAWorkflow {
         await this.page.waitForTimeout(1000)
         
         // Try profile button again
-        const profileBtn = this.page.locator('[data-testid="profile-button"], [aria-label="profile-button"]')
+        const profileBtn = this.page.getByTestId('profile-button')
         if (await profileBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
           await profileBtn.click()
-          await this.page.waitForSelector('[data-testid="profile-screen"], [aria-label="profile-screen"]', { timeout: 10000 }).catch(() => {})
+          await this.page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 }).catch(() => {})
           await this.page.waitForTimeout(1000)
         }
       }
     }
     
     // Click logout button - try with a longer timeout and multiple attempts
-    const logoutButton = this.page.locator('[data-testid="profile-logout-button"], [aria-label="profile-logout-button"]')
+    const logoutButton = this.page.getByTestId('profile-logout-button')
     
     // Wait for logout button with retries
     let logoutVisible = false
@@ -319,7 +448,7 @@ export class MFAWorkflow {
       if (logoutVisible) break
       
       // If not visible, try navigating to profile again
-      const profileBtn = this.page.locator('[data-testid="profile-button"], [aria-label="profile-button"]')
+      const profileBtn = this.page.getByTestId('profile-button')
       if (await profileBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await profileBtn.click()
         await this.page.waitForTimeout(1000)
@@ -334,7 +463,8 @@ export class MFAWorkflow {
       await this.page.waitForTimeout(1000)
       
       // Check if we're on login screen
-      const isOnLogin = await this.page.locator('[data-testid="email-input"], [aria-label="email-input"]').isVisible({ timeout: 3000 }).catch(() => false)
+      // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+      const isOnLogin = await this.page.locator('input[data-testid="email-input"]').isVisible({ timeout: 3000 }).catch(() => false)
       if (isOnLogin) {
         return // Already on login screen
       }
@@ -351,23 +481,24 @@ export class MFAWorkflow {
     }
     
     // Wait for login screen
-    await this.page.waitForSelector('[aria-label="email-input"], [data-testid="email-input"]', { timeout: 10000 })
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
   }
 
   async whenIClickCancelOnMFAVerification() {
     // Click cancel button on verification screen
-    await this.page.locator('[data-testid="mfa-cancel-button"], [aria-label*="cancel"]').click()
+    await this.page.getByTestId('mfa-cancel-button').click()
   }
 
   // THEN steps - Assertions
   async thenIShouldSeeMFASetupScreen() {
     // Wait for MFA setup screen to be visible - this is the main assertion
-    const setupScreen = this.page.locator('[data-testid="mfa-setup-screen"], [aria-label="mfa-setup-screen"]')
+    const setupScreen = this.page.locator('[data-testid="mfa-setup-screen"]')
     await expect(setupScreen).toBeVisible({ timeout: 10000 })
     
     // Verify we're not still on the profile screen by checking the profile button is not visible
     // (or that the MFA setup screen is actually rendered)
-    const profileButton = this.page.locator('[aria-label="mfa-setup-button"]')
+    const profileButton = this.page.getByTestId('mfa-setup-button')
     const profileButtonVisible = await profileButton.isVisible().catch(() => false)
     
     // If profile button is still visible, navigation might not have completed
@@ -412,14 +543,15 @@ export class MFAWorkflow {
     await expect(verificationTitle.first()).toBeVisible({ timeout: 10000 })
     
     // Check for token input
-    const tokenInput = this.page.locator('[data-testid="mfa-token-input"], [aria-label="mfa-token-input"]')
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    const tokenInput = this.page.locator('input[data-testid="mfa-token-input"]')
     await expect(tokenInput).toBeVisible()
   }
 
   async thenIShouldSeeMFAError() {
     // Check for error message
     const errorSelectors = [
-      this.page.locator('[data-testid="mfa-error"], [aria-label="mfa-error"]'),
+      this.page.locator('[data-testid="mfa-error"]'),
       this.page.locator('text=/invalid.*code|verification.*failed/i'),
     ]
     
@@ -464,7 +596,7 @@ export class MFAWorkflow {
 
   async thenIShouldBeOnHomeScreen() {
     // Check for home screen indicators
-    const homeHeader = this.page.locator('[data-testid="home-header"], [aria-label="home-header"]')
+    const homeHeader = this.page.locator('[data-testid="home-header"]')
     const addPatient = this.page.getByText("Add Patient", { exact: true })
     
     const headerVisible = await homeHeader.isVisible().catch(() => false)
@@ -475,7 +607,7 @@ export class MFAWorkflow {
 
   async thenIShouldBeOnProfileScreen() {
     // Check for profile screen indicators - use more specific selector
-    const profileScreen = this.page.locator('[data-testid="profile-screen"], [aria-label="profile-screen"]')
+    const profileScreen = this.page.locator('[data-testid="profile-screen"]')
     // Wait for the screen to be visible (might need to wait for navigation)
     await this.page.waitForTimeout(1000)
     

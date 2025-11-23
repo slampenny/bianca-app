@@ -212,7 +212,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.buttonContainer}>
           <Button
             testID="register-individual-toggle"
-            accessibilityLabel="register-individual-toggle"
+            accessibilityLabel={translate("registerScreen.individualButton") || "Individual"}
             tx="registerScreen.individualButton" // Make sure these tx keys exist in your i18n files
             onPress={() => setAccountType("individual")}
             style={accountType === "individual" ? styles.selectedButton : styles.button}
@@ -220,7 +220,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           />
           <Button
             testID="register-organization-toggle"
-            accessibilityLabel="register-organization-toggle"
+            accessibilityLabel={translate("registerScreen.organizationButton") || "Organization"}
             tx="registerScreen.organizationButton" // Make sure these tx keys exist in your i18n files
             onPress={() => setAccountType("organization")}
             style={accountType === "organization" ? styles.selectedButton : styles.button}
@@ -237,11 +237,11 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         {/* Form Fields */}
         {accountType === "organization" && (
           <View style={styles.fieldContainer}>
-            <TextField
-              testID="register-org-name"
-              accessibilityLabel="register-org-name"
-              placeholderTx="registerScreen.organizationNameFieldPlaceholder"
-              labelTx="registerScreen.organizationNameFieldLabel"
+          <TextField
+            testID="register-org-name"
+            accessibilityLabel={translate("registerScreen.organizationNameFieldLabel") || "Organization name"}
+            placeholderTx="registerScreen.organizationNameFieldPlaceholder"
+            labelTx="registerScreen.organizationNameFieldLabel"
               value={organizationName}
               onChangeText={(text) => {
                 setOrganizationName(text)
@@ -256,7 +256,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-name"
-            accessibilityLabel="register-name"
+            accessibilityLabel={translate("registerScreen.nameFieldLabel") || "Name"}
             placeholderTx="registerScreen.nameFieldPlaceholder"
             labelTx="registerScreen.nameFieldLabel"
             value={name}
@@ -276,7 +276,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-email"
-            accessibilityLabel="register-email"
+            accessibilityLabel={translate("registerScreen.emailFieldLabel") || "Email"}
             placeholderTx="registerScreen.emailFieldPlaceholder"
             labelTx="registerScreen.emailFieldLabel"
             value={email}
@@ -296,7 +296,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <PhoneInputWeb
             testID="register-phone"
-            accessibilityLabel="register-phone"
+            accessibilityLabel={translate("registerScreen.phoneFieldLabel") || "Phone"}
             placeholderTx="registerScreen.phoneFieldPlaceholder"
             labelTx="registerScreen.phoneFieldLabel"
             value={phone}
@@ -315,7 +315,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-password"
-            accessibilityLabel="register-password"
+            accessibilityLabel={translate("registerScreen.passwordFieldLabel") || "Password"}
             placeholderTx="registerScreen.passwordFieldPlaceholder"
             labelTx="registerScreen.passwordFieldLabel"
             secureTextEntry
@@ -333,7 +333,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         <View style={styles.fieldContainer}>
           <TextField
             testID="register-confirm-password"
-            accessibilityLabel="register-confirm-password"
+            accessibilityLabel={translate("registerScreen.confirmPasswordFieldLabel") || "Confirm password"}
             placeholderTx="registerScreen.confirmPasswordFieldPlaceholder"
             labelTx="registerScreen.confirmPasswordFieldLabel"
             secureTextEntry
@@ -365,7 +365,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         {/* Submit Button */}
         <Button
           testID="register-submit"
-          accessibilityLabel="register-submit"
+          accessibilityLabel={translate("registerScreen.title") || "Register"}
           onPress={handleRegister}
           disabled={isLoading}
           loading={isLoading}
@@ -391,7 +391,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         {/* Go Back Link */}
         <Button 
           testID="register-go-back"
-          accessibilityLabel="register-go-back"
+          accessibilityLabel={translate("registerScreen.goBack") || "Go back"}
           style={styles.linkButton} 
           onPress={() => navigation.goBack()}
           preset="default"

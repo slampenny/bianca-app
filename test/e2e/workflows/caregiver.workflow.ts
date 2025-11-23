@@ -6,10 +6,11 @@ export class CaregiverWorkflow {
 
   // GIVEN steps - Setup conditions
   async givenIAmAnOrgAdminWithCaregiverAccess() {
-    // Login as playwright test user (orgAdmin role) who can manage caregivers - use aria-label
-    await this.page.locator('[aria-label="email-input"]').fill('playwright@example.org')
-    await this.page.locator('[aria-label="password-input"]').fill('Password1')
-    await this.page.locator('[aria-label="login-button"]').click()
+    // Login as playwright test user (orgAdmin role) who can manage caregivers - use data-testid
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    await this.page.locator('input[data-testid="email-input"]').fill('playwright@example.org')
+    await this.page.locator('input[data-testid="password-input"]').fill('Password1')
+    await this.page.getByTestId('login-button').click()
     
     // Wait for home screen and navigate to org
     await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
@@ -59,9 +60,9 @@ export class CaregiverWorkflow {
           }
           return false
         },
-        // Method 2: Try by aria-label
+        // Method 2: Try by data-testid
         async () => {
-          const caregiverButton = this.page.locator('[aria-label*="caregiver" i], [aria-label*="view" i]').first()
+          const caregiverButton = this.page.locator('[data-testid*="caregiver" i], [data-testid*="view" i]').first()
           const buttonCount = await caregiverButton.count().catch(() => 0)
           if (buttonCount > 0) {
             await caregiverButton.scrollIntoViewIfNeeded().catch(() => {})

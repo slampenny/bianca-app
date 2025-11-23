@@ -10,21 +10,21 @@ test('PatientScreen should load without crashing', async ({ page }) => {
   await page.goto('/')
   await page.waitForLoadState('networkidle')
   
-  // Try to login
-  const emailInput = page.locator('[data-testid="email-input"]')
+  // Try to login - use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+  const emailInput = page.locator('input[data-testid="email-input"]')
   if (await emailInput.count() > 0) {
     await emailInput.fill('fake@example.org')
-    await page.fill('[data-testid="password-input"]', 'Password1')
-    await page.click('[data-testid="login-button"]')
-    await page.waitForSelector('[aria-label="Home tab"], [data-testid="tab-home"]', { timeout: 15000 }).catch(() => {})
+    await page.fill('input[data-testid="password-input"]', 'Password1')
+    await page.getByTestId('login-button').click()
+    await page.waitForSelector('[data-testid="tab-home"]', { timeout: 15000 }).catch(() => {})
   }
   
   // Wait for home screen to load after login
-  await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 15000 })
+  await page.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
   await page.waitForTimeout(2000)
   
   // Navigate to home tab (might already be there, but ensure we're on it)
-  const homeTab = page.locator('[aria-label="Home tab"], [data-testid="tab-home"]').first()
+  const homeTab = page.locator('[data-testid="tab-home"]').first()
   const homeTabVisible = await homeTab.isVisible({ timeout: 5000 }).catch(() => false)
   if (homeTabVisible) {
     await homeTab.click()
@@ -32,11 +32,11 @@ test('PatientScreen should load without crashing', async ({ page }) => {
   }
   
   // Wait for home screen to fully load
-  await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
   await page.waitForTimeout(2000)
   
   // Click add patient button to navigate to PatientScreen
-  const addPatientButton = page.locator('[data-testid="add-patient-button"], [aria-label="add-patient-button"]').first()
+  const addPatientButton = page.getByTestId('add-patient-button')
   await addPatientButton.waitFor({ state: 'visible', timeout: 10000 })
   
   // Wait for button to be enabled (it might be disabled initially)
@@ -65,7 +65,7 @@ test('PatientScreen should load without crashing', async ({ page }) => {
   }
   
   // Verify we're on the PatientScreen
-  const patientScreen = page.locator('[data-testid="patient-screen"], [aria-label="patient-screen"]').first()
+  const patientScreen = page.locator('[data-testid="patient-screen"]').first()
   await patientScreen.waitFor({ state: 'visible', timeout: 15000 })
   await page.waitForTimeout(1000)
   

@@ -4,17 +4,26 @@ export { expect }
 import { asyncStorageMockScript } from './asyncStorageMock'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
-  // Use aria-label for React Native Web
-  if (await page.locator('[aria-label="register-name"]').count() === 0) {
-    await page.locator('[aria-label="register-link"]').click()
-    await page.waitForSelector('[aria-label="register-name"]', { timeout: 10000 })
+  // Use data-testid for React Native Web
+  if (await page.locator('input[data-testid="register-name"]').count() === 0) {
+    await page.getByTestId('register-button').click()
+    await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
   }
-  await page.locator('[aria-label="register-name"]').fill(name)
-  await page.locator('[aria-label="register-email"]').fill(email)
-  await page.locator('[aria-label="register-password"]').fill(password)
-  await page.locator('[aria-label="register-confirm-password"]').fill(password)
-  await page.locator('[aria-label="register-phone"]').fill(phone)
-  await page.locator('[aria-label="register-submit"]').click()
+  // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+  await page.locator('input[data-testid="register-name"]').fill(name)
+  await page.locator('input[data-testid="register-email"]').fill(email)
+  await page.locator('input[data-testid="register-password"]').fill(password)
+  await page.locator('input[data-testid="register-confirm-password"]').fill(password)
+  await page.locator('input[data-testid="register-phone"]').fill(phone)
+  
+  // Find submit button - try getByTestId first, fallback to locator
+  let submitButton = page.getByTestId('register-submit')
+  let buttonCount = await submitButton.count().catch(() => 0)
+  if (buttonCount === 0) {
+    submitButton = page.locator('[data-testid="register-submit"]').first()
+  }
+  await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+  await submitButton.click()
   // Wait for navigation after registration - check for email verification screen or home screen
   await page.waitForTimeout(2000) // Give time for navigation
   
@@ -32,7 +41,7 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
     ])
   } catch {
     // If none found, check if we're on login screen (registration may have failed)
-    await page.waitForSelector('[aria-label="email-input"]', { timeout: 5000 }).catch(() => {
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 5000 }).catch(() => {
       // If we can't find anything, that's okay - the test will handle it
     })
   }
@@ -77,38 +86,49 @@ export async function reliableClick(page: Page, locator: any, options: { timeout
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
   console.log(`Attempting to login with email: ${email}`)
   
-  // Wait for login form to be visible - try multiple selectors with longer timeout
-  // This is the same pattern used in auth.workflow.ts
-  try {
-    await page.waitForSelector('[aria-label="email-input"]', { timeout: 30000 })
-  } catch {
-    // Fallback: try data-testid
-    await page.waitForSelector('[data-testid="email-input"]', { timeout: 30000 })
-  }
+  // Wait for login form to be visible - use data-testid for inputs
+  await page.waitForSelector('input[data-testid="email-input"]', { timeout: 5000 })
   
-  await page.waitForTimeout(1000) // Small delay to ensure form is ready
+  await page.waitForTimeout(500) // Small delay to ensure form is ready
   
-  // Fill in login form - try testID first, then accessibilityLabel
-  const emailInput = page.getByTestId('email-input').or(page.getByLabel('email-input'))
-  const passwordInput = page.getByTestId('password-input').or(page.getByLabel('password-input'))
+  // Fill in login form - use locator for input elements (getByTestId doesn't work for inputs in React Native Web)
+  const emailInput = page.locator('input[data-testid="email-input"]')
+  const passwordInput = page.locator('input[data-testid="password-input"]')
   
   // Wait for inputs to be visible and enabled
-  await expect(emailInput).toBeVisible({ timeout: 15000 })
-  await expect(passwordInput).toBeVisible({ timeout: 15000 })
+  await expect(emailInput).toBeVisible({ timeout: 5000 })
+  await expect(passwordInput).toBeVisible({ timeout: 5000 })
   
-  await emailInput.fill(email, { timeout: 10000 })
-  await passwordInput.fill(password, { timeout: 10000 })
+  await emailInput.fill(email, { timeout: 5000 })
+  await passwordInput.fill(password, { timeout: 5000 })
   
-  const loginButton = page.getByTestId('login-button').or(page.getByLabel('login-button'))
-  await expect(loginButton).toBeVisible({ timeout: 15000 });
+  // Find login button - try getByTestId first, fallback to locator
+  let loginButton = page.getByTestId('login-button')
+  let buttonCount = await loginButton.count().catch(() => 0)
+  if (buttonCount === 0) {
+    loginButton = page.locator('[data-testid="login-button"]').first()
+    buttonCount = await loginButton.count().catch(() => 0)
+  }
+  
+  if (buttonCount === 0) {
+    // Wait a bit more for the page to fully render
+    await page.waitForTimeout(1000)
+    loginButton = page.getByTestId('login-button')
+    buttonCount = await loginButton.count().catch(() => 0)
+    if (buttonCount === 0) {
+      loginButton = page.locator('[data-testid="login-button"]').first()
+    }
+  }
+  
+  await expect(loginButton).toBeVisible({ timeout: 10000 });
   
   // Click login button with retry logic for intercepted clicks
   try {
-    await loginButton.click({ timeout: 10000, force: false })
+    await loginButton.click({ timeout: 5000, force: false })
   } catch (error) {
     // If click is intercepted, try force click
     if (error.message?.includes('intercept') || error.message?.includes('not clickable')) {
-      await loginButton.click({ timeout: 10000, force: true })
+      await loginButton.click({ timeout: 5000, force: true })
     } else {
       throw error
     }
@@ -116,7 +136,7 @@ export async function loginUserViaUI(page: Page, email: string, password: string
   
   // Wait for either success or error with longer timeout
   try {
-    await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 20000 })
+      await page.waitForSelector('[data-testid="home-header"]', { timeout: 20000 })
     console.log('Login successful - home header found')
   } catch (error) {
     console.log('Login failed - checking for error messages')
@@ -336,33 +356,42 @@ export async function getVisibleAlertMessages(page: Page): Promise<string[]> {
 
 export async function ensureUserRegisteredAndLoggedInViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
   // Navigate to login page first
-  await page.goto('http://localhost:8081/')
+  await page.goto('/')
   await page.waitForTimeout(1000)
   
   // Try to login using aria-label (React Native Web compatibility)
-  await page.fill('[aria-label="email-input"]', email)
-  await page.fill('[aria-label="password-input"]', password)
-  await page.click('[aria-label="login-button"]')
+  await page.fill('input[data-testid="email-input"]', email)
+  await page.fill('input[data-testid="password-input"]', password)
+  await page.click('[data-testid="login-button"]')
   
   // Wait for either home screen or login error
   try {
-    await page.waitForSelector('[aria-label="home-header"]', { timeout: 5000 })
+      await page.waitForSelector('[data-testid="home-header"]', { timeout: 5000 })
     // Login successful
     return
   } catch {
     // Login failed, check for error and register
     if (await page.getByText(/Failed to log in/i).isVisible()) {
       // Go to register screen
-      if (await page.locator('[aria-label="register-name"]').count() === 0) {
-        await page.click('[aria-label="register-link"]')
+      if (await page.locator('input[data-testid="register-name"]').count() === 0) {
+        await page.getByTestId('register-button').click()
       }
-      await page.fill('[aria-label="register-name"]', name)
-      await page.fill('[aria-label="register-email"]', email)
-      await page.fill('[aria-label="register-password"]', password)
-      await page.fill('[aria-label="register-confirm-password"]', password)
-      await page.fill('[aria-label="register-phone"]', phone)
-      await page.click('[aria-label="register-submit"]')
-      await page.waitForSelector('[aria-label="home-header"]', { timeout: 10000 })
+      // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+      await page.fill('input[data-testid="register-name"]', name)
+      await page.fill('input[data-testid="register-email"]', email)
+      await page.fill('input[data-testid="register-password"]', password)
+      await page.fill('input[data-testid="register-confirm-password"]', password)
+      await page.fill('input[data-testid="register-phone"]', phone)
+      
+      // Find submit button - try getByTestId first, fallback to locator
+      let submitButton = page.getByTestId('register-submit')
+      let buttonCount = await submitButton.count().catch(() => 0)
+      if (buttonCount === 0) {
+        submitButton = page.locator('[data-testid="register-submit"]').first()
+      }
+      await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+      await submitButton.click()
+      await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
     } else {
       throw new Error('Login failed for unknown reason')
     }
@@ -379,22 +408,22 @@ export async function logoutViaUI(page: Page): Promise<void> {
     // Navigate directly to profile screen (more reliable than clicking button)
     // Profile is in HomeStack, not OrgStack
     console.log('Navigating to profile screen...')
-    await page.goto('http://localhost:8081/MainTabs/Home/Profile')
+    await page.goto('/MainTabs/Home/Profile')
     await page.waitForTimeout(1000)
     
     // Wait for profile screen to load
-    await page.waitForSelector('[aria-label="profile-logout-button"]', { timeout: 5000 })
+    await page.waitForSelector('[data-testid="profile-logout-button"]', { timeout: 5000 })
     console.log('Found logout button on profile screen')
     
     // On profile screen, click the logout button (which navigates to logout screen)
-    await page.click('[aria-label="profile-logout-button"]')
+    await page.click('[data-testid="profile-logout-button"]')
     
     // Wait for logout screen to load
-    await page.waitForSelector('[aria-label="logout-button"]', { timeout: 5000 })
+    await page.waitForSelector('[data-testid="logout-button"]', { timeout: 5000 })
     console.log('Found confirm logout button')
     
     // On logout screen, click the logout button (which actually performs logout)
-    await page.click('[aria-label="logout-button"]')
+    await page.click('[data-testid="logout-button"]')
     
   } catch (error) {
     console.log('Logout failed, navigating to login screen as fallback:', error.message)
@@ -404,7 +433,7 @@ export async function logoutViaUI(page: Page): Promise<void> {
   
   // Wait for login screen to appear
   try {
-    await page.waitForSelector('[aria-label="email-input"]', { timeout: 5000 })
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 5000 })
     console.log('Successfully reached login screen')
   } catch (error) {
     console.log('Failed to reach login screen, but continuing...')
@@ -512,13 +541,13 @@ export const test = base.extend<{}>({
       // Reload to ensure clean state
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
       
-      // Wait for login screen - use aria-label for React Native Web
+      // Wait for login screen - use data-testid for React Native Web
       try {
-        await page.waitForSelector('[aria-label="email-input"]', { timeout: 30000 })
+        await page.waitForSelector('input[data-testid="email-input"]', { timeout: 5000 })
         console.log('Successfully loaded login screen')
       } catch (error) {
         // Try alternative selectors
-        await page.waitForSelector('input[type="email"], [aria-label="email-input"], [aria-label="login-form"]', { timeout: 10000 }).catch(() => {
+        await page.waitForSelector('input[type="email"], input[data-testid="email-input"], [data-testid="login-form"]', { timeout: 5000 }).catch(() => {
           console.error('Failed to find login screen elements')
           throw error
         })

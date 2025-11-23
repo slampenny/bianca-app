@@ -236,8 +236,9 @@ export function Card(props: CardProps) {
       style={$containerStyle}
       activeOpacity={0.8}
       accessibilityRole={isPressable ? "button" : undefined}
-      accessibilityLabel={accessibilityLabel || testID}
+      accessibilityLabel={accessibilityLabel}
       testID={testID}
+      // Note: TouchableOpacity/Pressable automatically maps testID to data-testid on web
       {...WrapperProps}
     >
       {LeftComponent}

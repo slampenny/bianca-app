@@ -250,6 +250,7 @@ export function Screen(props: ScreenProps) {
 
   return (
     <View style={[$containerStyle, { backgroundColor }, $containerInsets]} testID={testID} accessibilityLabel={accessibilityLabel}>
+      {/* Note: View automatically maps testID to data-testid on web */}
       <StatusBar style={statusBarStyle} {...StatusBarProps} />
 
       <KeyboardAvoidingView

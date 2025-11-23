@@ -24,7 +24,7 @@ async function navigateToSchedulesViaPatient(page: any): Promise<void> {
   
   // Step 2: Wait for patient screen to load
   // Check for patient screen container first (most reliable)
-  const patientScreen = page.locator('[data-testid="patient-screen"], [aria-label="patient-screen"]')
+  const patientScreen = page.locator('[data-testid="patient-screen"]')
   await patientScreen.waitFor({ timeout: 10000, state: 'visible' })
   
   // Step 3: Wait for patient data to load and form to populate
@@ -94,8 +94,8 @@ test.describe("Schedule Workflow", () => {
     await navigateToSchedulesViaPatient(page)
     
     // Should be on schedules screen
-    await expect(page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')).toBeVisible({ timeout: 10000 })
-    await expect(page.locator('[data-testid="schedules-header"], [aria-label*="schedules-header"]')).toContainText('Schedule', { timeout: 10000 })
+    await expect(page.locator('[data-testid="schedules-screen"]')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('[data-testid="schedules-header"]')).toContainText('Schedule', { timeout: 10000 })
   })
 
   test("can view existing schedules", async ({ page }) => {
@@ -120,7 +120,7 @@ test.describe("Schedule Workflow", () => {
     
     // The schedule screen should show the ScheduleComponent - it's always available for editing/creating
     // The Save button should be visible
-    const saveButton = page.locator('button:has-text("Save"), [data-testid*="save"], [aria-label*="save"]')
+    const saveButton = page.locator('button:has-text("Save"), [data-testid*="save"]')
     const saveButtonCount = await saveButton.count()
     if (saveButtonCount === 0) {
       throw new Error('BUG: Save schedule button not found - schedule save functionality should always be available!')

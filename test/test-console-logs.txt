@@ -1,0 +1,55 @@
+[info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[log] [DEBUG] Initializing language...
+[log] [DEBUG] Initializing language...
+[log] [DEBUG] Config loading - Environment check: {__DEV__: true, NODE_ENV: development, PLAYWRIGHT_TEST: undefined, JEST_WORKER_ID: undefined, expo_environment: undefined}
+[log] [DEBUG] Using DEV config (localhost detected)
+[log] [DEBUG] Final API_URL: http://localhost:3000/v1
+[warning] "shadow*" style props are deprecated. Use "boxShadow".
+[log] 🔵 ConfirmResetScreen module loaded - v2.1 - Build: 2025-11-15-08:30
+[log] [DEBUG] OAuth Redirect URI: http://localhost:8081
+[log] [DEBUG] OAuth Client IDs: {google: configured, microsoft: configured, tenant: common}
+[warning] Require cycle: app/components/LoginForm.tsx -> app/contexts/AuthModalContext.tsx -> app/components/LoginForm.tsx
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[log] Running application "main" with appParams:
+ {rootTag: #root, hydrate: false} 
+Development-level warnings: ON.
+Performance optimizations: OFF.
+[log] [DEBUG] Saved language from storage: null
+[log] [DEBUG] System locale detected: en-US
+[log] [DEBUG] System locale is English, using it
+[log] [DEBUG] Final i18n.locale set to: en-US
+[log] [DEBUG] Saved language from storage: null
+[log] [DEBUG] System locale detected: en-US
+[log] [DEBUG] System locale is English, using it
+[log] [DEBUG] Final i18n.locale set to: en-US
+[requestfailed] Request Failed: GET https://js.stripe.com/clover/stripe.js - net::ERR_ABORTED
+[info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[log] [DEBUG] Initializing language...
+[log] [DEBUG] Initializing language...
+[log] [DEBUG] Config loading - Environment check: {__DEV__: true, NODE_ENV: development, PLAYWRIGHT_TEST: undefined, JEST_WORKER_ID: undefined, expo_environment: undefined}
+[log] [DEBUG] Using DEV config (localhost detected)
+[log] [DEBUG] Final API_URL: http://localhost:3000/v1
+[warning] "shadow*" style props are deprecated. Use "boxShadow".
+[log] 🔵 ConfirmResetScreen module loaded - v2.1 - Build: 2025-11-15-08:30
+[log] [DEBUG] OAuth Redirect URI: http://localhost:8081
+[log] [DEBUG] OAuth Client IDs: {google: configured, microsoft: configured, tenant: common}
+[warning] Require cycle: app/components/LoginForm.tsx -> app/contexts/AuthModalContext.tsx -> app/components/LoginForm.tsx
+
+Require cycles are allowed, but can result in uninitialized values. Consider refactoring to remove the need for a cycle.
+[log] Running application "main" with appParams:
+ {rootTag: #root, hydrate: false} 
+Development-level warnings: ON.
+Performance optimizations: OFF.
+[log] [DEBUG] Saved language from storage: null
+[log] [DEBUG] System locale detected: en-US
+[log] [DEBUG] System locale is English, using it
+[log] [DEBUG] Final i18n.locale set to: en-US
+[log] [DEBUG] Saved language from storage: null
+[log] [DEBUG] System locale detected: en-US
+[log] [DEBUG] System locale is English, using it
+[log] [DEBUG] Final i18n.locale set to: en-US
+[warning] props.pointerEvents is deprecated. Use style.pointerEvents
+[log] [SSO Buttons] Dark mode: undefined Background color: #FFFFFF
+[log] [DEBUG] useLanguage: Language change detected, updating to: en-US
+[log] [DEBUG] useLanguage: Language change detected, updating to: en-US

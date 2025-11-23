@@ -11,6 +11,9 @@ import {
 import { isRTL, translate } from "../i18n"
 import { colors, spacing, typography } from "../theme"
 import { useTheme } from "../theme/ThemeContext"
+import { useFontScale } from "../hooks/useFontScale"
+import { useKeyboardFocus } from "../hooks/useKeyboardFocus"
+import { testingProps } from "../utils/testingProps"
 import { Text, TextProps } from "./Text"
 
 export interface TextFieldAccessoryProps {
@@ -65,6 +68,8 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   } = props
 
   const { colors: themeColors } = useTheme()
+  const { scale, scaleWithLineHeight } = useFontScale()
+  const keyboardFocusStyle = useKeyboardFocus()
   const input = useRef<TextInput>(null)
   // IMPORTANT: Only "disabled" status disables the input, NOT "error" status
   // Error status is purely visual (red border) and should never make inputs uneditable
@@ -84,7 +89,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   ]
 
   const $labelStyles = [
-    { ...$labelStyle, color: themeColors.palette.biancaHeader },
+    { ...$labelStyle, fontSize: scale(16), color: themeColors.palette.biancaHeader },
     LabelTextProps?.style,
   ]
 
@@ -103,12 +108,15 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     TextInputProps.multiline && { minHeight: 112 },
     LeftAccessory && { paddingStart: 0 },
     RightAccessory && { paddingEnd: 0 },
+    keyboardFocusStyle, // Add keyboard focus styles (web only)
     $inputWrapperStyleOverride,
   ]
 
   const $inputStyles: StyleProp<TextStyle> = [
     {
       ...$inputStyle,
+      fontSize: scale(16),
+      lineHeight: scale(20),
       // CRITICAL: Use theme-aware text color with fallbacks
       // In dark mode: text = neutral800 (#CCCCCC - light gray)
       // In light mode: text = neutral800 (#1E293B - dark gray)
@@ -129,6 +137,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   const $helperStyles = [
     {
       ...$helperStyle,
+      fontSize: scale(14),
       color: themeColors.textDim,
     },
     status === "error" && { color: themeColors.error || colors.error },
@@ -169,6 +178,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
           editable={!disabled}
           style={$inputStyles}
           testID={testID}
+          {...testingProps(testID)}
         />
 
         {!!RightAccessory && (

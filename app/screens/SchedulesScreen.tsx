@@ -41,7 +41,7 @@ export const SchedulesScreen = () => {
   const [deleteSchedule, { isLoading: isDeleting, isError: isDeletingError }] =
     useDeleteScheduleMutation()
   const [createAlert] = useCreateAlertMutation()
-  const { colors, isLoading: themeLoading, currentTheme } = useTheme()
+  const { colors, isLoading: themeLoading, currentTheme, fontScale } = useTheme()
   
   // Track if we've already checked for missing schedule to avoid duplicate alerts
   const hasCheckedForAlert = useRef(false)
@@ -217,7 +217,7 @@ export const SchedulesScreen = () => {
     return <LoadingScreen />
   }
 
-  const styles = createStyles(colors)
+  const styles = createStyles(colors, fontScale)
 
   if (isUpdating || isCreating || isDeleting) {
     return <LoadingScreen /> // use the LoadingScreen component
@@ -319,7 +319,7 @@ export const SchedulesScreen = () => {
   )
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, fontScale: number) => StyleSheet.create({
   button: {
     marginTop: spacing.md,
     marginBottom: spacing.md,
@@ -328,7 +328,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   cardHeading: {
     // Use theme-aware text color with fallbacks
     color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
-    fontSize: 18,
+    fontSize: 18 * fontScale,
     fontWeight: "600",
   },
   container: {
@@ -353,9 +353,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   emptyStateText: {
     // Use theme-aware text color with fallbacks
     color: colors.textDim || colors.palette?.neutral600 || colors.palette?.neutral700 || "#666666",
-    fontSize: 18,
+    fontSize: 18 * fontScale,
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 24 * fontScale,
     paddingHorizontal: spacing.md,
   },
   header: {
@@ -365,7 +365,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   headerTitle: {
     // Use theme-aware text color with fallbacks
     color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
-    fontSize: 28,
+    fontSize: 28 * fontScale,
     fontWeight: "bold",
     textAlign: "center",
   },
@@ -396,7 +396,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   selectorLabel: {
     // Use theme-aware text color with fallbacks
     color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
-    fontSize: 18,
+    fontSize: 18 * fontScale,
     marginBottom: 8,
   },
 

@@ -16,7 +16,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
 
   test('complete invite caregiver workflow works end-to-end with real email', async ({ page, context }) => {
     // Step 1: Admin user logs in (using real backend, no mocks)
-    await page.goto('http://localhost:8081')
+    await page.goto('/')
     
     // Try login first - if it fails due to email verification, handle it
     try {
@@ -125,7 +125,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     // Navigate to signup page with invite token (this is what the email link points to)
     const inviteLink = `http://localhost:8081/signup?token=${inviteToken}`
     await invitePage.goto(inviteLink)
-    await invitePage.waitForSelector('[data-testid="signup-screen"], [aria-label="signup-screen"]', { timeout: 10000 })
+    await invitePage.waitForSelector('[data-testid="signup-screen"]', { timeout: 10000 })
 
     // Step 10: Fill in the signup form
     // Note: The form requires name, email, phone, and password (token validation happens on backend)
@@ -133,11 +133,12 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     await invitePage.waitForTimeout(1000) // Give form time to render
     
     // Fill name, email, phone (these should match what was sent in the invite)
-    const nameField = invitePage.getByTestId('register-name').or(invitePage.getByLabel('signup-name-input'))
-    const emailField = invitePage.getByTestId('register-email').or(invitePage.getByLabel('signup-email-input'))
-    const phoneField = invitePage.getByTestId('register-phone').or(invitePage.getByLabel('signup-phone-input'))
-    const passwordField = invitePage.getByTestId('register-password').or(invitePage.getByLabel('signup-password-input'))
-    const confirmPasswordField = invitePage.getByTestId('register-confirm-password').or(invitePage.getByLabel('signup-confirm-password-input'))
+    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
+    const nameField = invitePage.locator('input[data-testid="register-name"]')
+    const emailField = invitePage.locator('input[data-testid="register-email"]')
+    const phoneField = invitePage.locator('input[data-testid="register-phone"]')
+    const passwordField = invitePage.locator('input[data-testid="register-password"]')
+    const confirmPasswordField = invitePage.locator('input[data-testid="register-confirm-password"]')
     
     // Wait for all fields to be visible
     await Promise.all([
@@ -193,12 +194,12 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     await confirmPasswordField.fill(invitePassword)
 
     // Step 11: Submit the signup form
-    const submitButton = invitePage.getByTestId('signup-submit-button').or(invitePage.getByLabel('signup-submit-button'))
+    const submitButton = invitePage.getByTestId('signup-submit-button')
     await submitButton.waitFor({ timeout: 10000, state: 'visible' })
     await submitButton.click()
 
     // Step 12: Verify user is logged in and redirected to home
-    await invitePage.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 15000 })
+    await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
     await expect(invitePage.getByLabel('home-header').or(invitePage.getByTestId('home-header'))).toBeVisible()
 
     console.log('✅ End-to-end invite caregiver workflow completed successfully!')

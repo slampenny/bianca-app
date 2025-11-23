@@ -599,7 +599,7 @@ export function PaymentInfoScreen() {
 
   // *** 1. Get the current user in the main component ***
   const currentUser = useSelector(getCurrentUser)
-  const { colors, isLoading: themeLoading } = useTheme()
+  const { colors, isLoading: themeLoading, fontScale } = useTheme()
 
   if (themeLoading) {
     return null
@@ -650,7 +650,7 @@ export function PaymentInfoScreen() {
           screenOptions={{
             tabBarActiveTintColor: colors.palette.biancaButtonSelected,
             tabBarInactiveTintColor: colors.palette.neutral600,
-            tabBarLabelStyle: { fontSize: 16, fontWeight: "600" },
+            tabBarLabelStyle: { fontSize: 16 * fontScale, fontWeight: "600" },
             tabBarStyle: { backgroundColor: colors.palette.neutral100 },
             tabBarIndicatorStyle: { backgroundColor: colors.palette.biancaButtonSelected },
           }}

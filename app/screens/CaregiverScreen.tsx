@@ -316,13 +316,56 @@ function CaregiverScreen() {
           
           // Clear caregiver state and navigate to success screen
           dispatch(clearCaregiver())
-          navigation.navigate("CaregiverInvited", {
-            caregiver: {
-              id: invitedCaregiver.id || "",
-              name: invitedCaregiver.name,
-              email: invitedCaregiver.email,
-            }
+          
+          // Log navigation attempt for debugging
+          logger.debug('Attempting navigation to CaregiverInvited screen', {
+            caregiverId: invitedCaregiver.id,
+            caregiverName: invitedCaregiver.name,
+            caregiverEmail: invitedCaregiver.email
           })
+          
+          try {
+            // Use CommonActions to ensure navigation works
+            const { CommonActions } = require('@react-navigation/native')
+            navigation.dispatch(
+              CommonActions.navigate({
+                name: "CaregiverInvited",
+                params: {
+                  caregiver: {
+                    id: invitedCaregiver.id || "",
+                    name: invitedCaregiver.name,
+                    email: invitedCaregiver.email,
+                  }
+                }
+              })
+            )
+            logger.debug('Navigation to CaregiverInvited called successfully via CommonActions')
+          } catch (navError) {
+            logger.error('Navigation to CaregiverInvited failed:', navError)
+            // Fallback: try direct navigation
+            try {
+              navigation.navigate("CaregiverInvited" as never, {
+                caregiver: {
+                  id: invitedCaregiver.id || "",
+                  name: invitedCaregiver.name,
+                  email: invitedCaregiver.email,
+                }
+              } as never)
+              logger.debug('Fallback navigation to CaregiverInvited called')
+            } catch (fallbackError) {
+              logger.error('Fallback navigation also failed:', fallbackError)
+              // Final fallback: show success message on current screen
+              setSuccessMessage(`Invitation sent to ${invitedCaregiver.name} at ${invitedCaregiver.email}`)
+              // Clear timeout
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current)
+              }
+              timeoutRef.current = setTimeout(() => {
+                setSuccessMessage("")
+                timeoutRef.current = null
+              }, 5000)
+            }
+          }
         } else {
           console.error('No currentOrg available')
           setErrorMessage("Error: No organization found.")
