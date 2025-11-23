@@ -15,7 +15,9 @@ async function seedCaregivers(org) {
   playwrightTestUser.org = org._id;
   
   // Insert caregivers
-  const caregivers = await insertCaregiversAndAddToOrg(org, [admin, caregiverOne, playwrightTestUser]);
+  // Ensure admin has isPhoneVerified set to true
+  const adminWithVerifiedPhone = { ...admin, isPhoneVerified: true };
+  const caregivers = await insertCaregiversAndAddToOrg(org, [adminWithVerifiedPhone, caregiverOne, playwrightTestUser]);
   console.log(`Seeded ${caregivers.length} caregivers`);
   
   // Create super admin

@@ -37,3 +37,4 @@ echo "  cd /opt/bianca-wordpress"
 echo "  docker-compose restart wordpress"
 
 
+

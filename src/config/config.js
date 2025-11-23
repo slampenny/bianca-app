@@ -36,6 +36,8 @@ const envVarsSchema = Joi.object({
   // --- Email Variables ---
   // Primary 'from' address for all emails
   EMAIL_FROM: Joi.string().email().description('Default "from" email address for all outgoing emails'),
+  // Admin email for security alerts (breach notifications)
+  ADMIN_EMAIL: Joi.string().email().description('Admin email address for security breach notifications'),
   // SES specific
   AWS_SES_REGION: Joi.string().description('AWS Region for SES (e.g., us-east-1)'),
   

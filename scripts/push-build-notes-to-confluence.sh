@@ -328,9 +328,11 @@ create_page() {
     local content="$2"
     local parent_id="${3:-}"
     
-    local json_payload
+    # Use temporary file for large content to avoid "Argument list too long" error
+    local temp_json=$(mktemp)
+    
     if [ -z "$parent_id" ]; then
-        json_payload=$(jq -n \
+        jq -n \
             --arg title "$title" \
             --arg content "$content" \
             --arg space "$SPACE_KEY" \
@@ -344,9 +346,9 @@ create_page() {
                         representation: "storage"
                     }
                 }
-            }')
+            }' > "$temp_json"
     else
-        json_payload=$(jq -n \
+        jq -n \
             --arg title "$title" \
             --arg content "$content" \
             --arg space "$SPACE_KEY" \
@@ -362,15 +364,17 @@ create_page() {
                         representation: "storage"
                     }
                 }
-            }')
+            }' > "$temp_json"
     fi
     
     RESPONSE=$(curl -s -w "\n%{http_code}" \
         -X POST \
         -u "$CONFLUENCE_EMAIL:$CONFLUENCE_API_TOKEN" \
         -H "Content-Type: application/json" \
-        -d "$json_payload" \
+        -d "@$temp_json" \
         "$CONFLUENCE_URL/wiki/rest/api/content" 2>&1)
+    
+    rm -f "$temp_json"
     
     HTTP_CODE=$(echo "$RESPONSE" | tail -1)
     BODY=$(echo "$RESPONSE" | sed '$d')
@@ -401,7 +405,10 @@ update_page() {
     
     local new_version=$((version + 1))
     
-    json_payload=$(jq -n \
+    # Use temporary file for large content to avoid "Argument list too long" error
+    local temp_json=$(mktemp)
+    
+    jq -n \
         --arg title "$title" \
         --arg content "$content" \
         --arg version "$new_version" \
@@ -415,14 +422,16 @@ update_page() {
                     representation: "storage"
                 }
             }
-        }')
+        }' > "$temp_json"
     
     RESPONSE=$(curl -s -w "\n%{http_code}" \
         -X PUT \
         -u "$CONFLUENCE_EMAIL:$CONFLUENCE_API_TOKEN" \
         -H "Content-Type: application/json" \
-        -d "$json_payload" \
+        -d "@$temp_json" \
         "$CONFLUENCE_URL/wiki/rest/api/content/$page_id" 2>&1)
+    
+    rm -f "$temp_json"
     
     HTTP_CODE=$(echo "$RESPONSE" | tail -1)
     BODY=$(echo "$RESPONSE" | sed '$d')

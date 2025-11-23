@@ -11,6 +11,7 @@
 
 const logger = require('../config/logger');
 const { AuditLog, BreachLog, Caregiver } = require('../models');
+const emailService = require('./email.service');
 
 // Detection thresholds
 const DETECTION_RULES = {
@@ -348,31 +349,96 @@ class BreachDetectionService {
    */
   async notifySecurityTeam(breach) {
     try {
-      // TODO: Integrate with SNS or email service
       logger.warn(`[BREACH] 🚨 SECURITY ALERT 🚨`);
       logger.warn(`[BREACH] Type: ${breach.type}`);
       logger.warn(`[BREACH] Severity: ${breach.severity}`);
       logger.warn(`[BREACH] Details: ${breach.details}`);
       logger.warn(`[BREACH] Breach ID: ${breach._id}`);
 
-      // If AWS SNS is configured, send notification
-      if (process.env.SECURITY_ALERT_TOPIC_ARN) {
-        const { SNS } = require('@aws-sdk/client-sns');
-        const sns = new SNS({ region: process.env.AWS_REGION || 'us-east-2' });
+      // Send email notification to admin
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@biancatechnologies.com';
+      if (adminEmail) {
+        try {
+          const subject = `🚨 HIPAA Breach Alert: ${breach.type}`;
+          const text = `
+HIPAA Security Breach Detected
 
-      await sns.publish({
-          TopicArn: process.env.SECURITY_ALERT_TOPIC_ARN,
-          Subject: `🚨 HIPAA Breach Alert: ${breach.type}`,
-          Message: JSON.stringify({
-            severity: breach.severity,
-            type: breach.type,
-            details: breach.details,
-            breachId: breach._id.toString(),
-            userId: breach.userId?.toString(),
-            timestamp: breach.detectedAt.toISOString(),
-            actionRequired: 'Investigate immediately'
-          }, null, 2)
-        });
+Breach Type: ${breach.type}
+Severity: ${breach.severity}
+Detected At: ${breach.detectedAt.toISOString()}
+Breach ID: ${breach._id}
+
+Details:
+${breach.details}
+
+${breach.userId ? `User ID: ${breach.userId}` : ''}
+${breach.ipAddress ? `IP Address: ${breach.ipAddress}` : ''}
+${breach.affectedCount > 0 ? `Affected Records: ${breach.affectedCount}` : ''}
+
+Notification Deadline: ${breach.notificationDeadline ? breach.notificationDeadline.toISOString() : 'Not set'}
+(HIPAA requires notification within 60 days of discovery)
+
+ACTION REQUIRED: Investigate immediately per SOP_Breach_Response.md
+
+This is an automated alert from the breach detection system.
+          `.trim();
+
+          const html = `
+<h2>🚨 HIPAA Security Breach Detected</h2>
+
+<p><strong>Breach Type:</strong> ${breach.type}<br>
+<strong>Severity:</strong> ${breach.severity}<br>
+<strong>Detected At:</strong> ${breach.detectedAt.toISOString()}<br>
+<strong>Breach ID:</strong> ${breach._id}</p>
+
+<p><strong>Details:</strong><br>
+${breach.details}</p>
+
+${breach.userId ? `<p><strong>User ID:</strong> ${breach.userId}</p>` : ''}
+${breach.ipAddress ? `<p><strong>IP Address:</strong> ${breach.ipAddress}</p>` : ''}
+${breach.affectedCount > 0 ? `<p><strong>Affected Records:</strong> ${breach.affectedCount}</p>` : ''}
+
+<p><strong>Notification Deadline:</strong> ${breach.notificationDeadline ? breach.notificationDeadline.toISOString() : 'Not set'}<br>
+<em>(HIPAA requires notification within 60 days of discovery)</em></p>
+
+<p><strong style="color: red;">ACTION REQUIRED:</strong> Investigate immediately per SOP_Breach_Response.md</p>
+
+<p><em>This is an automated alert from the breach detection system.</em></p>
+          `.trim();
+
+          await emailService.sendEmail(adminEmail, subject, text, html);
+          logger.info(`[BREACH] Email notification sent to ${adminEmail}`);
+        } catch (emailError) {
+          logger.error('[BREACH] Failed to send email notification:', emailError);
+          // Don't throw - continue with SNS notification if available
+        }
+      }
+
+      // Optional: If AWS SNS is configured, send notification
+      // Note: SNS may not be enabled/configured - this is optional
+      if (process.env.SECURITY_ALERT_TOPIC_ARN) {
+        try {
+          const { SNS } = require('@aws-sdk/client-sns');
+          const sns = new SNS({ region: process.env.AWS_REGION || 'us-east-2' });
+
+          await sns.publish({
+            TopicArn: process.env.SECURITY_ALERT_TOPIC_ARN,
+            Subject: `🚨 HIPAA Breach Alert: ${breach.type}`,
+            Message: JSON.stringify({
+              severity: breach.severity,
+              type: breach.type,
+              details: breach.details,
+              breachId: breach._id.toString(),
+              userId: breach.userId?.toString(),
+              timestamp: breach.detectedAt.toISOString(),
+              actionRequired: 'Investigate immediately'
+            }, null, 2)
+          });
+          logger.info(`[BREACH] SNS notification sent to ${process.env.SECURITY_ALERT_TOPIC_ARN}`);
+        } catch (snsError) {
+          // SNS is optional - log error but don't fail the whole notification
+          logger.warn('[BREACH] SNS notification failed (this is optional):', snsError.message);
+        }
       }
     } catch (error) {
       logger.error('[BREACH] Failed to notify security team:', error);

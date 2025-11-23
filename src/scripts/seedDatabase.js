@@ -62,7 +62,7 @@ async function seedDatabase() {
 
     // Create a third patient for fraud/abuse testing
     const patient3 = new Patient({
-      name: 'Vulnerable Victim',
+      name: 'Margaret Thompson',
       email: 'vulnerable@example.org',
       phone: '1234567892',
       caregivers: [caregiverOneRecord.id],

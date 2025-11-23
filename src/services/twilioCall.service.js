@@ -180,12 +180,6 @@ class TwilioCallService {
 
       // For human answer, connect to Asterisk SIP endpoint
       
-      // Add initial message so user knows Twilio is working
-      twiml.say({
-        voice: 'alice',
-        language: 'en-US'
-      }, "Hello, connecting you to Bianca");
-      
       // Determine SIP endpoint based on environment
       let sipHost, sipPort;
       if (config.env === 'staging') {

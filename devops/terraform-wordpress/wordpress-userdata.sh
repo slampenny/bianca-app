@@ -331,6 +331,140 @@ chmod +x /usr/local/bin/wordpress-backup.sh
 # Schedule daily backups at 2 AM
 (crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/wordpress-backup.sh >> /var/log/wordpress-backup.log 2>&1") | crontab -
 
+# Create health check and auto-restart script for application-level recovery
+# This monitors nginx/WordPress containers and restarts them if they're not responding
+cat > /usr/local/bin/wordpress-health-check.sh <<HEALTHCHECKEOF
+#!/bin/bash
+# Health check script for WordPress containers
+# Restarts containers if they're not responding (application-level recovery)
+
+WORDPRESS_DIR="/opt/bianca-wordpress"
+LOG_FILE="/var/log/wordpress-health-check.log"
+
+# Function to log with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Check if nginx is responding on port 80
+check_nginx() {
+    if ! curl -f -s -m 5 http://localhost:80 >/dev/null 2>&1; then
+        log "❌ Nginx not responding on port 80"
+        return 1
+    fi
+    return 0
+}
+
+# Check if WordPress container is running
+check_wordpress_container() {
+    if ! docker ps | grep -q "bianca-wordpress\$"; then
+        log "❌ WordPress container not running"
+        return 1
+    fi
+    return 0
+}
+
+# Check if nginx container is running
+check_nginx_container() {
+    if ! docker ps | grep -q "bianca-wordpress-nginx\$"; then
+        log "❌ Nginx container not running"
+        return 1
+    fi
+    return 0
+}
+
+# Check if database container is running
+check_db_container() {
+    if ! docker ps | grep -q "bianca-wordpress-db\$"; then
+        log "❌ Database container not running"
+        return 1
+    fi
+    return 0
+}
+
+# Check if WordPress can reach the database
+check_db_connectivity() {
+    if ! docker exec bianca-wordpress ping -c 2 wordpress-db >/dev/null 2>&1; then
+        log "❌ WordPress cannot reach database (DNS resolution failed)"
+        return 1
+    fi
+    return 0
+}
+
+# Restart WordPress services
+restart_services() {
+    log "🔄 Restarting WordPress services..."
+    cd "$WORDPRESS_DIR" || return 1
+    # Restart all containers to ensure network is properly initialized
+    docker-compose restart || docker-compose up -d
+    sleep 15
+    log "✅ Services restarted"
+}
+
+# Main health check
+log "🔍 Starting WordPress health check..."
+
+NGINX_OK=true
+CONTAINERS_OK=true
+
+# Check containers first
+if ! check_db_container; then
+    log "⚠️  Database container issue detected"
+    CONTAINERS_OK=false
+fi
+
+if ! check_wordpress_container; then
+    log "⚠️  WordPress container issue detected"
+    CONTAINERS_OK=false
+fi
+
+if ! check_nginx_container; then
+    log "⚠️  Nginx container issue detected"
+    CONTAINERS_OK=false
+fi
+
+# Check database connectivity (critical for WordPress)
+if ! check_db_connectivity; then
+    log "⚠️  Database connectivity issue detected"
+    CONTAINERS_OK=false
+fi
+
+# Check nginx response
+if ! check_nginx; then
+    log "⚠️  Nginx not responding to HTTP requests"
+    NGINX_OK=false
+fi
+
+# If any issues detected, restart services
+if [ "$CONTAINERS_OK" = false ] || [ "$NGINX_OK" = false ]; then
+    log "⚠️  Health check failed - restarting services"
+    restart_services
+    
+    # Wait and verify
+    sleep 15
+    if check_nginx && check_nginx_container && check_wordpress_container && check_db_container; then
+        log "✅ Health check passed after restart"
+    else
+        log "❌ Health check still failing after restart - manual intervention may be needed"
+        # Send alert via CloudWatch (if configured)
+        aws cloudwatch put-metric-data \
+            --namespace WordPress/Health \
+            --metric-name HealthCheckFailed \
+            --value 1 \
+            --unit Count \
+            --region $${AWS_REGION:-us-east-2} 2>/dev/null || true
+    fi
+else
+    log "✅ All health checks passed"
+fi
+HEALTHCHECKEOF
+
+chmod +x /usr/local/bin/wordpress-health-check.sh
+
+# Schedule health check every 2 minutes
+(crontab -l 2>/dev/null; echo "*/2 * * * * /usr/local/bin/wordpress-health-check.sh") | crontab -
+echo "✅ Health check script installed and scheduled (runs every 2 minutes)"
+
 INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
 echo "=========================================="
