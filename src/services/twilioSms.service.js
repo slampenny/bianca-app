@@ -235,7 +235,18 @@ class TwilioSMSService {
       logger.info('[Twilio SMS] Connectivity test passed: Twilio client can access account.');
       return true;
     } catch (error) {
-      logger.error(`[Twilio SMS] Connectivity test failed: ${error.message}`, error);
+      // Handle authentication errors gracefully (common on localhost/development)
+      const isAuthError = error.code === 20003 || error.status === 401;
+      
+      if (isAuthError) {
+        // Log as warning for auth errors (expected on localhost without credentials)
+        logger.warn(`[Twilio SMS] Connectivity test skipped: Authentication failed (credentials not available). SMS functionality will be disabled.`);
+        logger.debug(`[Twilio SMS] Auth error details: ${error.message}`);
+      } else {
+        // Log as error for unexpected failures
+        logger.error(`[Twilio SMS] Connectivity test failed: ${error.message}`, error);
+      }
+      
       return false;
     }
   }

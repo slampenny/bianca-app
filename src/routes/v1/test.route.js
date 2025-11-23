@@ -555,4 +555,86 @@ router.post('/seed', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/reset-mfa:
+ *   post:
+ *     summary: Reset MFA for a user (test only)
+ *     description: Disables MFA for a specific user by email (development/test only)
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 description: Email of the user to reset MFA for
+ *     responses:
+ *       "200":
+ *         description: MFA reset successfully
+ *       "404":
+ *         description: User not found
+ *       "500":
+ *         description: Error resetting MFA
+ */
+router.post('/reset-mfa', async (req, res) => {
+  try {
+    // Only allow in development/test environments
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'MFA reset is not allowed in production' });
+    }
+
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const { Caregiver } = require('../../models');
+    const mfaService = require('../../services/mfa.service');
+    
+    // Find the user by email
+    const caregiver = await Caregiver.findOne({ email });
+    if (!caregiver) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if MFA is enabled
+    if (!caregiver.mfaEnabled) {
+      return res.json({
+        success: true,
+        message: 'MFA is already disabled for this user'
+      });
+    }
+
+    // Disable MFA (using a bypass token for test purposes)
+    // In test mode, we'll directly update the database
+    caregiver.mfaEnabled = false;
+    caregiver.mfaSecret = undefined;
+    caregiver.mfaBackupCodes = [];
+    await caregiver.save();
+
+    logger.info(`MFA reset for user: ${email}`);
+    
+    res.json({
+      success: true,
+      message: 'MFA reset successfully',
+      data: {
+        email: caregiver.email,
+        mfaEnabled: false
+      }
+    });
+  } catch (error) {
+    logger.error('Error resetting MFA:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

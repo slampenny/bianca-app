@@ -42,6 +42,7 @@ const admin = {
   phone: '+16045624263',
   role: 'orgAdmin',
   patients: [],
+  isPhoneVerified: true, // Admin user's phone is verified
 };
 
 const superAdmin = {
