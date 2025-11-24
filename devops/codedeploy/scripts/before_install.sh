@@ -18,11 +18,11 @@ if echo "$INSTANCE_NAME" | grep -qi "production"; then
   CONTAINER_PREFIX="production"
   IMAGE_TAG="production"
   NODE_ENV="production"
-  API_BASE_URL="https://api.myphonefriend.com"
-  WEBSOCKET_URL="wss://api.myphonefriend.com"
-  FRONTEND_URL="https://myphonefriend.com"
-  SERVER_NAME_FRONTEND="myphonefriend.com"
-  SERVER_NAME_API="api.myphonefriend.com"
+  API_BASE_URL="https://api.biancawellness.com"
+  WEBSOCKET_URL="wss://api.biancawellness.com"
+  FRONTEND_URL="https://app.biancawellness.com"
+  SERVER_NAME_FRONTEND="app.biancawellness.com"
+  SERVER_NAME_API="api.biancawellness.com"
   YARN_COMMAND="yarn start"
   CLOUDWATCH_LOG_PREFIX="/bianca/production"
 else
@@ -32,11 +32,11 @@ else
   CONTAINER_PREFIX="staging"
   IMAGE_TAG="staging"
   NODE_ENV="staging"
-  API_BASE_URL="https://staging-api.myphonefriend.com"
-  WEBSOCKET_URL="wss://staging-api.myphonefriend.com"
-  FRONTEND_URL="https://staging.myphonefriend.com"
-  SERVER_NAME_FRONTEND="staging.myphonefriend.com"
-  SERVER_NAME_API="staging-api.myphonefriend.com"
+  API_BASE_URL="https://staging-api.biancawellness.com"
+  WEBSOCKET_URL="wss://staging-api.biancawellness.com"
+  FRONTEND_URL="https://staging.biancawellness.com"
+  SERVER_NAME_FRONTEND="staging.biancawellness.com"
+  SERVER_NAME_API="staging-api.biancawellness.com"
   YARN_COMMAND="yarn dev:staging"
   CLOUDWATCH_LOG_PREFIX="/bianca/staging"
 fi
@@ -198,7 +198,7 @@ services:
       - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=$PUBLIC_IP
       - AWS_SES_REGION=$AWS_REGION
-      - EMAIL_FROM=no-reply@myphonefriend.com
+      - EMAIL_FROM=no-reply@biancawellness.com
       - TWILIO_PHONENUMBER=+19285758645
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef

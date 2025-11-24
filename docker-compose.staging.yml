@@ -10,16 +10,16 @@ services:
       - AWS_REGION=us-east-2
       - AWS_SECRET_ID=MySecretsManagerSecret
       # Base URLs for staging
-      - API_BASE_URL=https://staging-api.myphonefriend.com
-      - FRONTEND_URL=https://staging.myphonefriend.com
-      - WEBSOCKET_URL=wss://staging-api.myphonefriend.com
+      - API_BASE_URL=https://staging-api.biancawellness.com
+      - FRONTEND_URL=https://staging.biancawellness.com
+      - WEBSOCKET_URL=wss://staging-api.biancawellness.com
       # MongoDB for staging (using containerized version)
       - MONGODB_URL=mongodb://localhost:27017/bianca-service
       # Redis for caching (zero cost - runs on same instance)
       - REDIS_URL=redis://localhost:6379
       - CACHE_TYPE=redis
       # Email configuration
-      - EMAIL_FROM=no-reply@myphonefriend.com
+      - EMAIL_FROM=no-reply@biancawellness.com
       # Enable EC2 metadata service for IAM role credentials
       - AWS_EC2_METADATA_DISABLED=false
     # Don't mount ~/.aws - use EC2 instance IAM role via metadata service

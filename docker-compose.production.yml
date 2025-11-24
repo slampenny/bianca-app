@@ -7,16 +7,16 @@ services:
       - AWS_REGION=us-east-2
       - AWS_SECRET_ID=MySecretsManagerSecret
       # Base URLs for production
-      - API_BASE_URL=https://api.myphonefriend.com
-      - FRONTEND_URL=https://app.myphonefriend.com
-      - WEBSOCKET_URL=wss://api.myphonefriend.com
+      - API_BASE_URL=https://api.biancawellness.com
+      - FRONTEND_URL=https://app.biancawellness.com
+      - WEBSOCKET_URL=wss://api.biancawellness.com
       # MongoDB for production (using containerized version)
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       # Redis for caching (zero cost - runs on same instance, can switch to ElastiCache later)
       - REDIS_URL=redis://redis:6379
       - CACHE_TYPE=redis
       # Email configuration
-      - EMAIL_FROM=no-reply@myphonefriend.com
+      - EMAIL_FROM=no-reply@biancawellness.com
       # Asterisk configuration (will be loaded from AWS Secrets Manager)
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_ENABLED=true
