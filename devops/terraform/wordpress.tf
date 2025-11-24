@@ -16,27 +16,27 @@
 ################################################################################
 
 variable "wp_domain" {
-  description = "Domain name for WordPress site"
+  description = "Domain name for WordPress site (should match primary_domain from main.tf)"
   type        = string
-  default     = "myphonefriend.com"
+  default     = "biancawellness.com"
 }
 
 variable "create_wordpress" {
   description = "Whether to create WordPress resources. Default false to avoid accidental deployment."
   type        = bool
-  default     = false  # Set to true explicitly when deploying WordPress
+  default     = false # Set to true explicitly when deploying WordPress
 }
 
 variable "wordpress_instance_type" {
   description = "EC2 instance type for WordPress"
   type        = string
-  default     = "t3.micro"  # Free tier eligible, sufficient for WordPress
+  default     = "t3.micro" # Free tier eligible, sufficient for WordPress
 }
 
 variable "wordpress_key_pair_name" {
   description = "SSH key pair name for WordPress instance"
   type        = string
-  default     = ""  # Will use same as staging/production if not set
+  default     = "" # Will use same as staging/production if not set
 }
 
 ################################################################################
@@ -48,7 +48,7 @@ resource "aws_security_group" "wordpress_alb" {
   count       = var.create_wordpress ? 1 : 0
   name        = "bianca-wordpress-alb-sg"
   description = "Security group for WordPress ALB"
-  vpc_id      = aws_subnet.public_a.vpc_id  # Use same VPC as subnets
+  vpc_id      = aws_subnet.public_a.vpc_id # Use same VPC as subnets
 
   # HTTP from internet
   ingress {
@@ -89,7 +89,7 @@ resource "aws_security_group" "wordpress" {
   count       = var.create_wordpress ? 1 : 0
   name        = "bianca-wordpress-sg"
   description = "Security group for WordPress instance"
-  vpc_id      = aws_subnet.public_a.vpc_id  # Use same VPC as subnets
+  vpc_id      = aws_subnet.public_a.vpc_id # Use same VPC as subnets
 
   # Allow traffic only from ALB
   ingress {
@@ -105,7 +105,7 @@ resource "aws_security_group" "wordpress" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # TODO: Restrict to your IP
+    cidr_blocks = ["0.0.0.0/0"] # TODO: Restrict to your IP
     description = "SSH"
   }
 
@@ -248,10 +248,10 @@ resource "aws_lb" "wordpress" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.wordpress_alb[0].id]
-  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]  # Need at least 2 subnets in different AZs
+  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id] # Need at least 2 subnets in different AZs
 
   enable_deletion_protection = false
-  enable_http2              = true
+  enable_http2               = true
   idle_timeout               = 60
 
   depends_on = [
@@ -271,7 +271,7 @@ resource "aws_lb_target_group" "wordpress" {
   name     = "bianca-wordpress-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = aws_subnet.public_a.vpc_id  # Use same VPC as subnets
+  vpc_id   = aws_subnet.public_a.vpc_id # Use same VPC as subnets
 
   health_check {
     enabled             = true
@@ -334,6 +334,55 @@ resource "aws_lb_listener" "wordpress_https" {
   }
 }
 
+# Redirect rules for WordPress - redirect old domain to new domain
+# Redirect myphonefriend.com → biancawellness.com
+resource "aws_lb_listener_rule" "wordpress_root_redirect" {
+  count        = var.create_wordpress ? 1 : 0
+  listener_arn = aws_lb_listener.wordpress_https[0].arn
+  priority     = 50
+
+  action {
+    type = "redirect"
+
+    redirect {
+      host        = var.primary_domain
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    host_header {
+      values = [var.legacy_domain]
+    }
+  }
+}
+
+# Redirect www.myphonefriend.com → www.biancawellness.com
+resource "aws_lb_listener_rule" "wordpress_www_redirect" {
+  count        = var.create_wordpress ? 1 : 0
+  listener_arn = aws_lb_listener.wordpress_https[0].arn
+  priority     = 51
+
+  action {
+    type = "redirect"
+
+    redirect {
+      host        = "www.${var.primary_domain}"
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    host_header {
+      values = ["www.${var.legacy_domain}"]
+    }
+  }
+}
+
 ################################################################################
 # WORDPRESS EC2 INSTANCE
 ################################################################################
@@ -346,19 +395,19 @@ resource "aws_instance" "wordpress" {
   instance_type          = var.wordpress_instance_type
   key_name               = var.wordpress_key_pair_name != "" ? var.wordpress_key_pair_name : var.asterisk_key_pair_name
   vpc_security_group_ids = [aws_security_group.wordpress[0].id]
-  subnet_id              = aws_subnet.public_a.id  # Use public_a subnet
+  subnet_id              = aws_subnet.public_a.id # Use public_a subnet
   iam_instance_profile   = aws_iam_instance_profile.wordpress_profile[0].name
 
   user_data = base64encode(templatefile("${path.module}/wordpress-userdata.sh", {
-    wp_domain         = var.wp_domain
-    s3_backup_bucket  = aws_s3_bucket.wordpress_media[0].id
-    aws_region        = var.aws_region
-    cert_arn          = var.create_wordpress ? aws_acm_certificate_validation.wordpress_cert[0].certificate_arn : ""
+    wp_domain        = var.wp_domain
+    s3_backup_bucket = aws_s3_bucket.wordpress_media[0].id
+    aws_region       = var.aws_region
+    cert_arn         = var.create_wordpress ? aws_acm_certificate_validation.wordpress_cert[0].certificate_arn : ""
   }))
 
   root_block_device {
     volume_type = "gp3"
-    volume_size = 8  # Small root volume for t3.micro
+    volume_size = 8 # Small root volume for t3.micro
     encrypted   = true
   }
 
@@ -487,8 +536,8 @@ data "aws_route53_zone" "wordpress_domain" {
 # Note: ACM certs can't be used directly by nginx on EC2, but we'll use Route53 validation
 # and still use Let's Encrypt for the actual nginx configuration
 resource "aws_acm_certificate" "wordpress_cert" {
-  count            = var.create_wordpress ? 1 : 0
-  domain_name      = var.wp_domain
+  count             = var.create_wordpress ? 1 : 0
+  domain_name       = var.wp_domain
   validation_method = "DNS"
 
   subject_alternative_names = [
@@ -515,12 +564,12 @@ resource "aws_acm_certificate" "wordpress_cert" {
 locals {
   # Map domain names to their Route53 zone IDs
   domain_zone_map = var.create_wordpress ? {
-    "myphonefriend.com"              = data.aws_route53_zone.wordpress_domain[0].zone_id
-    "www.myphonefriend.com"          = data.aws_route53_zone.wordpress_domain[0].zone_id
-    "biancatechnologies.com"         = data.aws_route53_zone.biancatechnologies.zone_id
-    "www.biancatechnologies.com"     = data.aws_route53_zone.biancatechnologies.zone_id
-    "biancawellness.com"             = data.aws_route53_zone.biancawellness.zone_id
-    "www.biancawellness.com"         = data.aws_route53_zone.biancawellness.zone_id
+    "myphonefriend.com"          = data.aws_route53_zone.wordpress_domain[0].zone_id
+    "www.myphonefriend.com"      = data.aws_route53_zone.wordpress_domain[0].zone_id
+    "biancatechnologies.com"     = data.aws_route53_zone.biancatechnologies.zone_id
+    "www.biancatechnologies.com" = data.aws_route53_zone.biancatechnologies.zone_id
+    "biancawellness.com"         = data.aws_route53_zone.biancawellness.zone_id
+    "www.biancawellness.com"     = data.aws_route53_zone.biancawellness.zone_id
   } : {}
 }
 
@@ -572,11 +621,11 @@ data "aws_acm_certificate" "wordpress_cert_existing" {
 # Route53 A Record for root domain (myphonefriend.com - WordPress)
 # Uses instance public IP (auto-assigned since EIP limit reached)
 resource "aws_route53_record" "wordpress_root" {
-  count          = var.create_wordpress ? 1 : 0
-  zone_id        = data.aws_route53_zone.wordpress_domain[count.index].zone_id
-  name           = var.wp_domain  # Just "myphonefriend.com" - NO subdomains touched
-  type           = "A"
-  allow_overwrite = true  # Allow Terraform to manage existing records
+  count           = var.create_wordpress ? 1 : 0
+  zone_id         = data.aws_route53_zone.wordpress_domain[count.index].zone_id
+  name            = var.wp_domain # Just "myphonefriend.com" - NO subdomains touched
+  type            = "A"
+  allow_overwrite = true # Allow Terraform to manage existing records
 
   alias {
     name                   = aws_lb.wordpress[0].dns_name
@@ -592,11 +641,11 @@ resource "aws_route53_record" "wordpress_root" {
 
 # Create www subdomain record (only if it doesn't exist)
 resource "aws_route53_record" "wordpress_www" {
-  count          = var.create_wordpress ? 1 : 0
-  zone_id        = data.aws_route53_zone.wordpress_domain[count.index].zone_id
-  name           = "www.${var.wp_domain}"  # Only www subdomain - other subdomains untouched
-  type           = "A"
-  allow_overwrite = true  # Allow Terraform to manage existing records
+  count           = var.create_wordpress ? 1 : 0
+  zone_id         = data.aws_route53_zone.wordpress_domain[count.index].zone_id
+  name            = "www.${var.wp_domain}" # Only www subdomain - other subdomains untouched
+  type            = "A"
+  allow_overwrite = true # Allow Terraform to manage existing records
 
   alias {
     name                   = aws_lb.wordpress[0].dns_name
@@ -634,7 +683,7 @@ output "wordpress_url" {
 }
 
 output "wordpress_ssh_command" {
-  value = var.create_wordpress ? "ssh -i ~/.ssh/${var.wordpress_key_pair_name != "" ? var.wordpress_key_pair_name : var.asterisk_key_pair_name}.pem ec2-user@${aws_instance.wordpress[0].public_ip}" : null
+  value       = var.create_wordpress ? "ssh -i ~/.ssh/${var.wordpress_key_pair_name != "" ? var.wordpress_key_pair_name : var.asterisk_key_pair_name}.pem ec2-user@${aws_instance.wordpress[0].public_ip}" : null
   description = "SSH command to connect to WordPress instance"
 }
 

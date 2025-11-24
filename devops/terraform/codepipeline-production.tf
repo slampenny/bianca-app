@@ -39,8 +39,8 @@ resource "aws_codebuild_project" "production_build" {
 
   logs_config {
     cloudwatch_logs {
-      status      = "ENABLED"
-      group_name  = "/aws/codebuild/bianca-production-build"
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-production-build"
     }
   }
 
@@ -261,7 +261,7 @@ resource "aws_codepipeline" "production" {
         ConnectionArn        = var.github_app_connection_arn
         FullRepositoryId     = "${var.github_owner}/${var.github_repo}"
         BranchName           = "main"
-        OutputArtifactFormat  = "CODE_ZIP"
+        OutputArtifactFormat = "CODE_ZIP"
       }
     }
     action {
@@ -275,7 +275,7 @@ resource "aws_codepipeline" "production" {
         ConnectionArn        = var.github_app_connection_arn
         FullRepositoryId     = "slampenny/bianca-app-frontend"
         BranchName           = "main"
-        OutputArtifactFormat  = "CODE_ZIP"
+        OutputArtifactFormat = "CODE_ZIP"
       }
       run_order = 1
     }

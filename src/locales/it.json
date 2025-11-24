@@ -1,15 +1,15 @@
 {
 	"sendResetPasswordEmail": {
 		"subject": "My Phone Friend - Richiesta di reimpostazione password",
-		"text": "Caro caregiver,\n\nAbbiamo ricevuto una richiesta per reimpostare la password del tuo account My Phone Friend.\n\nPer reimpostare la password, clicca sul link qui sotto:\n\n%s\n\nQuesto link di reimpostazione scadrà tra 1 ora per motivi di sicurezza.\n\nSe non hai richiesto una reimpostazione della password, ignora questa email. Il tuo account rimane sicuro.\n\nCordiali saluti,\nIl team My Phone Friend\n\n---\nMy Phone Friend - Comunicazione sanitaria sicura\nQuesta email è stata inviata da un dominio verificato: myphonefriend.com"
+		"text": "Caro caregiver,\n\nAbbiamo ricevuto una richiesta per reimpostare la password del tuo account My Phone Friend.\n\nPer reimpostare la password, clicca sul link qui sotto:\n\n%s\n\nQuesto link di reimpostazione scadrà tra 1 ora per motivi di sicurezza.\n\nSe non hai richiesto una reimpostazione della password, ignora questa email. Il tuo account rimane sicuro.\n\nCordiali saluti,\nIl team My Phone Friend\n\n---\nMy Phone Friend - Comunicazione sanitaria sicura\nQuesta email è stata inviata da un dominio verificato: biancawellness.com"
 	},
 	"sendVerificationEmail": {
 		"subject": "My Phone Friend - Verifica il tuo indirizzo email",
-		"text": "Caro caregiver,\n\nGrazie per aver creato il tuo account My Phone Friend! Per completare la registrazione e garantire la sicurezza dell'account, verifica il tuo indirizzo email.\n\nClicca sul link qui sotto per verificare la tua email:\n\n%s\n\nQuesto link di verifica scadrà tra 24 ore per motivi di sicurezza.\n\nSe non hai creato un account My Phone Friend, ignora questa email.\n\nBenvenuto nella comunicazione sanitaria sicura!\n\nCordiali saluti,\nIl team My Phone Friend\n\n---\nMy Phone Friend - Comunicazione sanitaria sicura\nQuesta email è stata inviata da un dominio verificato: myphonefriend.com"
+		"text": "Caro caregiver,\n\nGrazie per aver creato il tuo account My Phone Friend! Per completare la registrazione e garantire la sicurezza dell'account, verifica il tuo indirizzo email.\n\nClicca sul link qui sotto per verificare la tua email:\n\n%s\n\nQuesto link di verifica scadrà tra 24 ore per motivi di sicurezza.\n\nSe non hai creato un account My Phone Friend, ignora questa email.\n\nBenvenuto nella comunicazione sanitaria sicura!\n\nCordiali saluti,\nIl team My Phone Friend\n\n---\nMy Phone Friend - Comunicazione sanitaria sicura\nQuesta email è stata inviata da un dominio verificato: biancawellness.com"
 	},
 	"inviteEmail": {
 		"subject": "Benvenuto su My Phone Friend - Invito a partecipare",
-		"text": "Caro caregiver,\n\nSei stato invitato a partecipare a My Phone Friend, una piattaforma sicura per la comunicazione sanitaria.\n\nPer accettare il tuo invito e configurare il tuo account, clicca sul link qui sotto:\n\n%s\n\nQuesto invito scadrà tra 7 giorni per motivi di sicurezza.\n\nSe non ti aspettavi questo invito, ignora questa email.\n\nCordiali saluti,\nIl team My Phone Friend\n\n---\nMy Phone Friend - Comunicazione sanitaria sicura\nQuesta email è stata inviata da un dominio verificato: myphonefriend.com"
+		"text": "Caro caregiver,\n\nSei stato invitato a partecipare a My Phone Friend, una piattaforma sicura per la comunicazione sanitaria.\n\nPer accettare il tuo invito e configurare il tuo account, clicca sul link qui sotto:\n\n%s\n\nQuesto invito scadrà tra 7 giorni per motivi di sicurezza.\n\nSe non ti aspettavi questo invito, ignora questa email.\n\nCordiali saluti,\nIl team My Phone Friend\n\n---\nMy Phone Friend - Comunicazione sanitaria sicura\nQuesta email è stata inviata da un dominio verificato: biancawellness.com"
 	},
 	"emailVerifiedPage": {
 		"title": "Email verificata!",

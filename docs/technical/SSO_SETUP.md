@@ -23,7 +23,7 @@ This guide will help you set up Google and Microsoft SSO authentication for your
    - Choose "Web application"
    - Add authorized redirect URIs:
      - For development: `http://localhost:19006`
-     - For staging: `https://staging.app.biancawellness.com`
+     - For staging: `https://staging.biancawellness.com`
      - For production: `https://app.biancawellness.com`
      - For mobile: `https://auth.expo.io/@negascout/bianca`
 5. Copy the Client ID

@@ -1,15 +1,15 @@
 {
 	"sendResetPasswordEmail": {
 		"subject": "My Phone Friend - Password Reset Request",
-		"text": "Dear caregiver,\n\nWe received a request to reset your My Phone Friend account password.\n\nTo reset your password, please click the link below:\n\n%s\n\nThis reset link will expire in 1 hour for security purposes.\n\nIf you did not request a password reset, please ignore this email. Your account remains secure.\n\nBest regards,\nThe My Phone Friend Team\n\n---\nMy Phone Friend - Secure Healthcare Communication\nThis email was sent from a verified domain: myphonefriend.com"
+		"text": "Dear caregiver,\n\nWe received a request to reset your My Phone Friend account password.\n\nTo reset your password, please click the link below:\n\n%s\n\nThis reset link will expire in 1 hour for security purposes.\n\nIf you did not request a password reset, please ignore this email. Your account remains secure.\n\nBest regards,\nThe My Phone Friend Team\n\n---\nMy Phone Friend - Secure Healthcare Communication\nThis email was sent from a verified domain: biancawellness.com"
 	},
 	"sendVerificationEmail": {
 		"subject": "My Phone Friend - Please Verify Your Email Address",
-		"text": "Dear caregiver,\n\nThank you for creating your My Phone Friend account! To complete your registration and ensure account security, please verify your email address.\n\nClick the link below to verify your email:\n\n%s\n\nThis verification link will expire in 24 hours for security purposes.\n\nIf you did not create a My Phone Friend account, please ignore this email.\n\nWelcome to secure healthcare communication!\n\nBest regards,\nThe My Phone Friend Team\n\n---\nMy Phone Friend - Secure Healthcare Communication\nThis email was sent from a verified domain: myphonefriend.com"
+		"text": "Dear caregiver,\n\nThank you for creating your My Phone Friend account! To complete your registration and ensure account security, please verify your email address.\n\nClick the link below to verify your email:\n\n%s\n\nThis verification link will expire in 24 hours for security purposes.\n\nIf you did not create a My Phone Friend account, please ignore this email.\n\nWelcome to secure healthcare communication!\n\nBest regards,\nThe My Phone Friend Team\n\n---\nMy Phone Friend - Secure Healthcare Communication\nThis email was sent from a verified domain: biancawellness.com"
 	},
 	"inviteEmail": {
 		"subject": "Welcome to My Phone Friend - Invitation to Join",
-		"text": "Dear caregiver,\n\nYou have been invited to join My Phone Friend, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n%s\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe My Phone Friend Team\n\n---\nMy Phone Friend - Secure Healthcare Communication\nThis email was sent from a verified domain: myphonefriend.com"
+		"text": "Dear caregiver,\n\nYou have been invited to join My Phone Friend, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n%s\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe My Phone Friend Team\n\n---\nMy Phone Friend - Secure Healthcare Communication\nThis email was sent from a verified domain: biancawellness.com"
 	},
 	"emailVerifiedPage": {
 		"title": "Email Verified!",

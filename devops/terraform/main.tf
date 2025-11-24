@@ -1,6 +1,6 @@
 provider "aws" {
   region = var.aws_region
-  
+
   # Only use profile if explicitly set (for local development)
   # In CI/CD (GitHub Actions), use environment variables instead
   profile = var.aws_profile != "" ? var.aws_profile : null
@@ -227,7 +227,7 @@ variable "github_branch" {
   type        = string
   default     = "main"
 }
-  
+
 variable "github_app_connection_arn" {
   description = "ARN of the AWS CodeStar connection to GitHub."
   type        = string
@@ -260,6 +260,19 @@ variable "bianca_client_static_ips" {
   default     = ["3.141.235.83/32"]
 }
 
+# --- Domain Configuration (Single Source of Truth) ---
+variable "primary_domain" {
+  description = "Primary domain name for the application (e.g., biancawellness.com). This is the single source of truth for all domain references."
+  type        = string
+  default     = "biancawellness.com"
+}
+
+variable "legacy_domain" {
+  description = "Legacy domain to redirect from (e.g., myphonefriend.com)"
+  type        = string
+  default     = "myphonefriend.com"
+}
+
 ################################################################################
 # DATA SOURCES
 ################################################################################
@@ -269,20 +282,26 @@ variable "bianca_client_static_ips" {
 #   name = var.secrets_manager_secret_name
 # }
 
-data "aws_route53_zone" "myphonefriend" {
-  name         = "myphonefriend.com."
+# Primary domain Route53 zone (single source of truth)
+data "aws_route53_zone" "primary" {
+  name         = "${var.primary_domain}."
   private_zone = false
 }
 
-# Route53 zone for biancawellness.com
-# Note: Domain must be registered in Route 53 first via AWS Console
-# After registration, Route 53 will automatically create a hosted zone
+# Legacy domain zone (for redirects and transition)
+data "aws_route53_zone" "legacy" {
+  name         = "${var.legacy_domain}."
+  private_zone = false
+}
+
+# Route53 zone for biancawellness.com (alias for primary)
 data "aws_route53_zone" "biancawellness" {
   name         = "biancawellness.com."
   private_zone = false
 }
 
-data "aws_acm_certificate" "app_cert" {
+# Legacy certificate (for transition period)
+data "aws_acm_certificate" "app_cert_legacy" {
   domain      = "*.myphonefriend.com"
   statuses    = ["ISSUED"]
   most_recent = true
@@ -352,7 +371,7 @@ resource "aws_route_table" "public" {
 
 # Create the first public subnet in the first available Availability Zone
 resource "aws_subnet" "public_a" {
-  vpc_id                  = aws_vpc.main.id
+  vpc_id = aws_vpc.main.id
   # IMPORTANT: Adjust this CIDR block if it conflicts with existing subnets in your VPC
   cidr_block              = "172.31.100.0/24"
   availability_zone       = data.aws_availability_zones.available.names[0]
@@ -365,7 +384,7 @@ resource "aws_subnet" "public_a" {
 
 # Create the second public subnet in the second available Availability Zone
 resource "aws_subnet" "public_b" {
-  vpc_id                  = aws_vpc.main.id
+  vpc_id = aws_vpc.main.id
   # IMPORTANT: Adjust this CIDR block if it conflicts with existing subnets in your VPC
   cidr_block              = "172.31.101.0/24"
   availability_zone       = data.aws_availability_zones.available.names[1]
@@ -394,9 +413,9 @@ resource "aws_route_table_association" "public_b" {
 # Private subnet for Fargate applications
 resource "aws_subnet" "private_a" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "172.31.110.0/24"  # Adjust to avoid conflicts
+  cidr_block        = "172.31.110.0/24" # Adjust to avoid conflicts
   availability_zone = data.aws_availability_zones.available.names[0]
-  
+
   tags = {
     Name = "bianca-private-a"
   }
@@ -404,9 +423,9 @@ resource "aws_subnet" "private_a" {
 
 resource "aws_subnet" "private_b" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "172.31.111.0/24"  # Adjust to avoid conflicts
+  cidr_block        = "172.31.111.0/24" # Adjust to avoid conflicts
   availability_zone = data.aws_availability_zones.available.names[1]
-  
+
   tags = {
     Name = "bianca-private-b"
   }
@@ -420,9 +439,9 @@ resource "aws_eip" "nat_gateway" {
 
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat_gateway.id
-  subnet_id     = aws_subnet.public_a.id  # NAT goes in public subnet
-  
-  tags = { Name = "bianca-nat-gateway" }
+  subnet_id     = aws_subnet.public_a.id # NAT goes in public subnet
+
+  tags       = { Name = "bianca-nat-gateway" }
   depends_on = [aws_internet_gateway.gw]
 }
 
@@ -460,10 +479,10 @@ resource "aws_route_table_association" "private_b" {
 ################################################################################
 
 resource "aws_service_discovery_private_dns_namespace" "internal" {
-  name        = "myphonefriend.internal"
+  name        = "${replace(var.primary_domain, ".", "-")}.internal"
   description = "Private DNS namespace for internal services"
   vpc         = aws_vpc.main.id
-  tags        = { Name = "myphonefriend-internal-namespace" }
+  tags        = { Name = "${replace(var.primary_domain, ".", "-")}-internal-namespace" }
 }
 
 resource "aws_service_discovery_service" "asterisk_sd_service" {
@@ -530,7 +549,7 @@ resource "aws_security_group" "vpc_endpoints_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   tags = { Name = "vpc-endpoints-sg" }
 }
 
@@ -541,7 +560,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
   subnet_ids          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
   security_group_ids  = [aws_security_group.vpc_endpoints_sg.id]
   private_dns_enabled = true
-  
+
   tags = { Name = "ecr-api-endpoint" }
 }
 
@@ -552,7 +571,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   subnet_ids          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
   security_group_ids  = [aws_security_group.vpc_endpoints_sg.id]
   private_dns_enabled = true
-  
+
   tags = { Name = "ecr-dkr-endpoint" }
 }
 
@@ -561,7 +580,7 @@ resource "aws_vpc_endpoint" "s3" {
   service_name      = "com.amazonaws.${var.aws_region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.private.id]
-  
+
   tags = { Name = "s3-endpoint" }
 }
 
@@ -607,7 +626,7 @@ resource "aws_security_group" "alb_sg" {
     protocol        = "tcp"
     security_groups = [aws_security_group.bianca_app_sg.id]
   }
-  
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -633,7 +652,7 @@ resource "aws_security_group" "bianca_app_sg" {
     from_port   = var.container_port
     to_port     = var.container_port
     protocol    = "tcp"
-    cidr_blocks = ["172.31.0.0/16"]  # VPC CIDR - ALB is in the VPC
+    cidr_blocks = ["172.31.0.0/16"] # VPC CIDR - ALB is in the VPC
   }
 
   # RTP from Asterisk (private subnet CIDR)
@@ -642,7 +661,7 @@ resource "aws_security_group" "bianca_app_sg" {
     from_port   = var.app_rtp_port_start
     to_port     = var.app_rtp_port_end
     protocol    = "udp"
-    cidr_blocks = ["172.31.100.0/24"]  # Asterisk's private subnet CIDR
+    cidr_blocks = ["172.31.100.0/24"] # Asterisk's private subnet CIDR
   }
 
   # Egress rules
@@ -736,9 +755,9 @@ resource "aws_security_group" "asterisk_ec2_sg" {
 
   # DEBUG: Allow all TCP from private subnets
   ingress {
-    from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
+    from_port = 0
+    to_port   = 65535
+    protocol  = "tcp"
     cidr_blocks = [
       "172.31.110.0/24",
       "172.31.111.0/24"
@@ -772,7 +791,7 @@ resource "aws_security_group" "mongodb_sg" {
   }
 
   # No egress rules needed - MongoDB only communicates with app and EFS
-  
+
   tags = { Name = "mongodb-sg" }
 }
 
@@ -954,19 +973,19 @@ resource "aws_iam_role_policy_attachment" "asterisk_cloudwatch" {
 #   provisioner "local-exec" {
 #     command = <<-EOT
 #       echo "Waiting for Asterisk to be ready..."
-      
+
 #       # Wait for user data script to complete (Docker install + Asterisk startup)
 #       echo "Waiting for user data script to complete..."
 #       sleep 180
-      
+
 #       # Test Asterisk ARI connectivity
 #       echo "Testing Asterisk ARI connectivity..."
 #       max_attempts=30
 #       attempt=1
-      
+
 #       while [ $attempt -le $max_attempts ]; do
 #         echo "Attempt $attempt/$max_attempts: Testing connection to ${aws_eip.asterisk_eip.public_ip}:${var.asterisk_ari_http_port}"
-        
+
 #         # Use curl with proper error handling
 #         if curl -f -s --connect-timeout 10 --max-time 30 "http://${aws_eip.asterisk_eip.public_ip}:${var.asterisk_ari_http_port}/ari/asterisk/info" > /dev/null 2>&1; then
 #           echo "✅ Asterisk ARI is ready!"
@@ -977,7 +996,7 @@ resource "aws_iam_role_policy_attachment" "asterisk_cloudwatch" {
 #           attempt=$((attempt + 1))
 #         fi
 #       done
-      
+
 #       if [ $attempt -gt $max_attempts ]; then
 #         echo "❌ Asterisk failed to become ready after $max_attempts attempts"
 #         echo "This may indicate:"
@@ -1007,7 +1026,7 @@ resource "aws_efs_access_point" "mongo_ap" {
     gid = 999
   }
   root_directory {
-    path = "/mongodb_v7_clean"  # NEW PATH to avoid old data
+    path = "/mongodb_v7_clean" # NEW PATH to avoid old data
     creation_info {
       owner_uid   = 999
       owner_gid   = 999
@@ -1180,7 +1199,7 @@ resource "aws_ecs_task_definition" "mongodb_task" {
       startPeriod = 60
     }
   }])
-  
+
   tags = { Name = "mongodb-service" }
 }
 
@@ -1380,14 +1399,14 @@ resource "aws_ecr_repository" "app_repo" {
   name                 = var.repository_name
   image_tag_mutability = "MUTABLE"
   image_scanning_configuration { scan_on_push = true }
-  tags                 = { Name = var.repository_name }
+  tags = { Name = var.repository_name }
 }
 
 resource "aws_ecr_repository" "asterisk_repo" {
   name                 = var.asterisk_ecr_repo_name
   image_tag_mutability = "MUTABLE"
   image_scanning_configuration { scan_on_push = true }
-  tags                 = { Name = var.asterisk_ecr_repo_name }
+  tags = { Name = var.asterisk_ecr_repo_name }
 }
 
 resource "aws_ecr_repository" "frontend_repo" {
@@ -1448,9 +1467,9 @@ resource "aws_iam_role_policy" "asterisk_ecr_pull" {
 ################################################################################
 
 resource "aws_iam_role" "ecs_execution_role" {
-  name               = var.ecs_execution_role_name
+  name = var.ecs_execution_role_name
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17",
+    Version = "2012-10-17",
     Statement = [{
       Action    = "sts:AssumeRole",
       Effect    = "Allow",
@@ -1487,9 +1506,9 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy_attachment"
 # }
 
 resource "aws_iam_role" "ecs_task_role" {
-  name               = var.ecs_task_role_name
+  name = var.ecs_task_role_name
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17",
+    Version = "2012-10-17",
     Statement = [{
       Action    = "sts:AssumeRole",
       Effect    = "Allow",
@@ -1503,7 +1522,7 @@ resource "aws_iam_policy" "ecs_task_exec_policy" {
   name        = "ECSTaskExecPolicy"
   description = "Allows ECS Exec functionality"
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
       Action = [
@@ -1546,7 +1565,7 @@ resource "aws_iam_policy" "ecs_task_ses_policy" {
   name        = "ECSTaskSESPolicy"
   description = "Allows ECS tasks to send email via SES"
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
       Action = [
@@ -1723,9 +1742,9 @@ resource "aws_iam_role_policy_attachment" "codebuild_s3_artifact_attach" {
 }
 
 resource "aws_iam_role" "codepipeline_role" {
-  name               = var.codepipeline_role_name
+  name = var.codepipeline_role_name
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17",
+    Version = "2012-10-17",
     Statement = [{
       Action    = "sts:AssumeRole",
       Effect    = "Allow",
@@ -1739,7 +1758,7 @@ resource "aws_iam_role" "codepipeline_role" {
 resource "aws_iam_policy" "codepipeline_base_policy" {
   name        = "CodePipelineBasePermissions"
   description = "Base permissions for CodePipeline"
-  
+
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -1902,7 +1921,7 @@ resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
 # COST MINIMIZATION: API subdomain - STOPPED (points to stopped ALB)
 # To restart: uncomment this section and run terraform apply
 # resource "aws_route53_record" "api_subdomain" {
-#   zone_id = data.aws_route53_zone.myphonefriend.zone_id
+#   zone_id = data.aws_route53_zone.legacy.zone_id
 #   name    = "api.myphonefriend.com"
 #   type    = "A"
 #   alias {
@@ -1915,7 +1934,7 @@ resource "aws_iam_role_policy_attachment" "codepipeline_temp_ecs_full_attach" {
 # COST MINIMIZATION: App subdomain - STOPPED (points to stopped ALB)
 # To restart: uncomment this section and run terraform apply
 # resource "aws_route53_record" "app_subdomain" {
-#   zone_id = data.aws_route53_zone.myphonefriend.zone_id
+#   zone_id = data.aws_route53_zone.legacy.zone_id
 #   name    = "app.myphonefriend.com"
 #   type    = "A"
 #   alias {
@@ -1946,7 +1965,7 @@ resource "aws_ses_domain_identity" "ses_domain" {
 }
 
 resource "aws_route53_record" "ses_verification_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "_amazonses.${aws_ses_domain_identity.ses_domain.domain}"
   type    = "TXT"
   ttl     = 600
@@ -1967,7 +1986,7 @@ resource "aws_ses_domain_dkim" "ses_dkim" {
 
 resource "aws_route53_record" "ses_dkim_records" {
   count   = 3
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.ses_domain.domain}"
   type    = "CNAME"
   ttl     = 600
@@ -1980,7 +1999,7 @@ resource "aws_route53_record" "ses_dkim_records" {
 
 # SPF Record - Authorize SES to send emails for this domain
 resource "aws_route53_record" "ses_spf_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = aws_ses_domain_identity.ses_domain.domain
   type    = "TXT"
   ttl     = 600
@@ -1989,7 +2008,7 @@ resource "aws_route53_record" "ses_spf_record" {
 
 # DMARC Record - Email authentication policy (relaxed for better deliverability)
 resource "aws_route53_record" "ses_dmarc_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "_dmarc.${aws_ses_domain_identity.ses_domain.domain}"
   type    = "TXT"
   ttl     = 600
@@ -2005,6 +2024,154 @@ resource "aws_route53_record" "ses_dmarc_record" {
 # and helps with authentication troubleshooting.
 resource "aws_ses_email_identity" "support_email" {
   email = "support@myphonefriend.com"
+}
+
+################################################################################
+# PRIMARY DOMAIN (biancawellness.com) - ACM CERTIFICATES
+################################################################################
+
+# ACM Certificate for primary domain (API, App, Staging subdomains)
+resource "aws_acm_certificate" "primary_domain_cert" {
+  domain_name       = "api.${var.primary_domain}"
+  validation_method = "DNS"
+
+  subject_alternative_names = [
+    "app.${var.primary_domain}",
+    "staging.${var.primary_domain}",
+    "staging-api.${var.primary_domain}",
+    "sip.${var.primary_domain}",
+    "staging-sip.${var.primary_domain}",
+  ]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name        = "primary-domain-ssl"
+    Environment = var.environment
+    Project     = "bianca"
+    Domain      = var.primary_domain
+  }
+}
+
+# Route53 validation records for primary domain certificate
+resource "aws_route53_record" "primary_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.primary_domain_cert.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  records = [each.value.record]
+  ttl     = 60
+
+  allow_overwrite = true
+}
+
+# Certificate validation (waits for DNS validation)
+resource "aws_acm_certificate_validation" "primary_domain_cert" {
+  certificate_arn = aws_acm_certificate.primary_domain_cert.arn
+  validation_record_fqdns = [
+    for record in aws_route53_record.primary_cert_validation : record.fqdn
+  ]
+
+  timeouts {
+    create = "5m"
+  }
+}
+
+################################################################################
+# PRIMARY DOMAIN (biancawellness.com) - SES DOMAIN VERIFICATION
+################################################################################
+
+# SES Domain Identity for primary domain
+resource "aws_ses_domain_identity" "primary_domain" {
+  domain = var.primary_domain
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# SES Domain Verification Record
+resource "aws_route53_record" "primary_ses_verification" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "_amazonses.${aws_ses_domain_identity.primary_domain.domain}"
+  type    = "TXT"
+  ttl     = 600
+  records = [aws_ses_domain_identity.primary_domain.verification_token]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# SES DKIM for primary domain
+resource "aws_ses_domain_dkim" "primary_domain_dkim" {
+  domain = aws_ses_domain_identity.primary_domain.domain
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# DKIM CNAME records for primary domain
+resource "aws_route53_record" "primary_ses_dkim_records" {
+  count   = 3
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "${element(aws_ses_domain_dkim.primary_domain_dkim.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.primary_domain.domain}"
+  type    = "CNAME"
+  ttl     = 600
+  records = ["${element(aws_ses_domain_dkim.primary_domain_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# SPF Record for primary domain
+resource "aws_route53_record" "primary_ses_spf_record" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = aws_ses_domain_identity.primary_domain.domain
+  type    = "TXT"
+  ttl     = 600
+  records = ["v=spf1 include:amazonses.com ~all"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# DMARC Record for primary domain
+resource "aws_route53_record" "primary_ses_dmarc_record" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "_dmarc.${aws_ses_domain_identity.primary_domain.domain}"
+  type    = "TXT"
+  ttl     = 600
+  records = ["v=DMARC1; p=none; rua=mailto:dmarc-reports@${aws_ses_domain_identity.primary_domain.domain}; ruf=mailto:dmarc-reports@${aws_ses_domain_identity.primary_domain.domain}"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Email identities for primary domain
+resource "aws_ses_email_identity" "primary_support_email" {
+  email = "support@${var.primary_domain}"
+}
+
+resource "aws_ses_email_identity" "primary_privacy_email" {
+  email = "privacy@${var.primary_domain}"
+}
+
+resource "aws_ses_email_identity" "primary_legal_email" {
+  email = "legal@${var.primary_domain}"
 }
 
 ################################################################################
@@ -2116,12 +2283,12 @@ resource "aws_s3_bucket_policy" "ses_email_storage_policy" {
 
 # Lambda function for email forwarding
 resource "aws_lambda_function" "email_forwarder" {
-  filename         = "email-forwarder.zip"
-  function_name    = "myphonefriend-email-forwarder"
-  role            = aws_iam_role.lambda_email_forwarding_role.arn
-  handler         = "index.handler"
-  runtime         = "nodejs20.x"
-  timeout         = 60
+  filename      = "email-forwarder.zip"
+  function_name = "myphonefriend-email-forwarder"
+  role          = aws_iam_role.lambda_email_forwarding_role.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 60
 
   environment {
     variables = {
@@ -2229,9 +2396,9 @@ resource "aws_ses_receipt_rule" "privacy_email" {
   enabled       = true
 
   s3_action {
-    bucket_name = aws_s3_bucket.ses_email_storage.bucket
+    bucket_name       = aws_s3_bucket.ses_email_storage.bucket
     object_key_prefix = "privacy/"
-    position = 1
+    position          = 1
   }
 
   lambda_action {
@@ -2249,9 +2416,9 @@ resource "aws_ses_receipt_rule" "support_email" {
   enabled       = true
 
   s3_action {
-    bucket_name = aws_s3_bucket.ses_email_storage.bucket
+    bucket_name       = aws_s3_bucket.ses_email_storage.bucket
     object_key_prefix = "support/"
-    position = 1
+    position          = 1
   }
 
   lambda_action {
@@ -2269,9 +2436,9 @@ resource "aws_ses_receipt_rule" "legal_email" {
   enabled       = true
 
   s3_action {
-    bucket_name = aws_s3_bucket.ses_email_storage.bucket
+    bucket_name       = aws_s3_bucket.ses_email_storage.bucket
     object_key_prefix = "legal/"
-    position = 1
+    position          = 1
   }
 
   lambda_action {
@@ -2284,7 +2451,7 @@ resource "aws_ses_receipt_rule" "legal_email" {
 
 # MX record to direct emails to SES
 resource "aws_route53_record" "ses_mx_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "myphonefriend.com"
   type    = "MX"
   ttl     = 600
@@ -2315,7 +2482,7 @@ output "forwarded_email_addresses" {
   description = "Email addresses that will be forwarded to jordanglapp@gmail.com"
   value = [
     "privacy@myphonefriend.com",
-    "support@myphonefriend.com", 
+    "support@myphonefriend.com",
     "legal@myphonefriend.com"
   ]
 }
@@ -2355,7 +2522,7 @@ output "private_subnet_cidrs" {
 
 output "network_architecture" {
   description = "Network architecture summary"
-  value = "Hybrid: Asterisk in public subnet with EIP for Twilio, App in private subnet. RTP uses private IPs within VPC."
+  value       = "Hybrid: Asterisk in public subnet with EIP for Twilio, App in private subnet. RTP uses private IPs within VPC."
 }
 
 output "nat_gateway_ip" {
@@ -2401,7 +2568,7 @@ output "mongodb_service_discovery_dns" {
 
 output "deployment_architecture" {
   description = "Deployment architecture summary"
-  value = "MongoDB runs as separate ECS service. App deployments no longer affect MongoDB. Zero-downtime deployments enabled."
+  value       = "MongoDB runs as separate ECS service. App deployments no longer affect MongoDB. Zero-downtime deployments enabled."
 }
 
 output "frontend_ecr_repo_url" {
@@ -2419,10 +2586,10 @@ output "artifact_bucket_name" {
 }
 
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "bianca-terraform-state"
+  bucket        = "bianca-terraform-state"
   force_destroy = true
   tags = {
-    Name = "bianca-terraform-state"
+    Name    = "bianca-terraform-state"
     Purpose = "Terraform remote state storage"
   }
 }
@@ -2452,7 +2619,7 @@ resource "aws_iam_policy" "ecs_task_sns_sms_policy" {
         Action = [
           "sns:Publish"
         ]
-        Resource = "*"  # Allow publishing to any phone number
+        Resource = "*" # Allow publishing to any phone number
       }
     ]
   })

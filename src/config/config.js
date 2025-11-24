@@ -44,11 +44,14 @@ const envVarsSchema = Joi.object({
   // SNS specific for emergency notifications
   EMERGENCY_SNS_TOPIC_ARN: Joi.string().description('SNS Topic ARN for emergency notifications'),
   
-  // Base URL configuration (should be set by Terraform)
-  API_BASE_URL: Joi.string().uri().description('Base API URL (e.g., https://api.myphonefriend.com)'),
+  // Domain configuration (single source of truth)
+  PRIMARY_DOMAIN: Joi.string().description('Primary domain name (e.g., biancawellness.com). Used to construct URLs if not explicitly set.'),
+  
+  // Base URL configuration (should be set by Terraform, or constructed from PRIMARY_DOMAIN)
+  API_BASE_URL: Joi.string().uri().description('Base API URL (e.g., https://api.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
   BASE_URL: Joi.string().uri().description('Base URL (alternative to API_BASE_URL)'),
-  FRONTEND_URL: Joi.string().uri().description('Frontend URL for email links (e.g., https://app.myphonefriend.com)'),
-  WEBSOCKET_URL: Joi.string().uri().description('WebSocket URL (e.g., wss://api.myphonefriend.com)'),
+  FRONTEND_URL: Joi.string().uri().description('Frontend URL for email links (e.g., https://app.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
+  WEBSOCKET_URL: Joi.string().uri().description('WebSocket URL (e.g., wss://api.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
   
   // Generic SMTP (can be used for Ethereal if manually configured, or other SMTP services)
   SMTP_HOST: Joi.string().description('SMTP host'),
@@ -94,7 +97,6 @@ const envVarsSchema = Joi.object({
   OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
   OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
   OPENAI_MODEL: Joi.string().default('gpt-4o'),
-  WEBSOCKET_URL: Joi.string().default('wss://api.myphonefriend.com'), // URL your WebSocket server listens on
   
   // Cache configuration (optional - defaults to in-memory)
   CACHE_TYPE: Joi.string().valid('memory', 'redis').default('memory'),
@@ -114,10 +116,20 @@ if (error) {
   throw new Error(`Config validation error: ${error.message}`);
 }
 
+// Helper function to construct URLs from primary domain
+const getUrlFromDomain = (subdomain, domain, protocol = 'https') => {
+  if (!domain) return null;
+  return `${protocol}://${subdomain ? `${subdomain}.` : ''}${domain}`;
+};
+
+// Get primary domain (single source of truth)
+const primaryDomain = envVars.PRIMARY_DOMAIN || 'biancawellness.com';
+
 // Build a baseline configuration object based on environment variables
 // Base configuration (not domain-specific)
 const baselineConfig = {
   env: envVars.NODE_ENV,
+  primaryDomain: primaryDomain,  // Expose primary domain in config,
   port: envVars.PORT,
   aws: {
     accessKeyId: envVars.AWS_SECRET_ID,
@@ -128,9 +140,9 @@ const baselineConfig = {
     },
   },
   authEnabled: true,
-  baseUrl: envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`,
-  apiUrl: (envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`) + '/v1',
-  frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? 'https://staging.myphonefriend.com' : 'https://app.myphonefriend.com')),
+  baseUrl: envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : getUrlFromDomain('api', primaryDomain)),
+  apiUrl: (envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : getUrlFromDomain('api', primaryDomain))) + '/v1',
+  frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging', primaryDomain) : getUrlFromDomain('app', primaryDomain))),
   billing: { 
     ratePerMinute: 0.1,
     minimumBillableDuration: 30,
@@ -174,12 +186,13 @@ const baselineConfig = {
 
 // Set production-specific overrides (Restored and updated)
 if (envVars.NODE_ENV === 'production') {
-  // Use environment variables set by Terraform
-  const apiBaseUrl = envVars.API_BASE_URL || envVars.BASE_URL || 'https://api.myphonefriend.com';
+  // Use environment variables set by Terraform, or construct from PRIMARY_DOMAIN
+  const apiBaseUrl = envVars.API_BASE_URL || envVars.BASE_URL || getUrlFromDomain('api', primaryDomain);
+  const internalDomain = primaryDomain.replace('.', '-');  // biancawellness.com -> biancawellness-com
   
   baselineConfig.baseUrl = apiBaseUrl;
   baselineConfig.apiUrl = `${apiBaseUrl}/v1`;
-  baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb.myphonefriend.internal:27017/bianca-app';
+  baselineConfig.mongoose.url = envVars.MONGODB_URL || `mongodb://mongodb.${internalDomain}.internal:27017/bianca-app`;
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = apiBaseUrl;
 
@@ -190,20 +203,20 @@ if (envVars.NODE_ENV === 'production') {
   // Ensure baseUrl is also correct for production if used elsewhere
   // Ensure Asterisk ARI URL points to the internal service discovery name in production
   baselineConfig.asterisk.enabled = true; // Always enable Asterisk
-  baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.myphonefriend.internal`;
+  baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.${internalDomain}.internal`;
   baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
-  baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || `bianca-app.myphonefriend.internal`;
-  baselineConfig.asterisk.rtpAsteriskHost = envVars.RTP_ASTERISK_HOST || `asterisk.myphonefriend.internal`;
+  baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || `bianca-app.${internalDomain}.internal`;
+  baselineConfig.asterisk.rtpAsteriskHost = envVars.RTP_ASTERISK_HOST || `asterisk.${internalDomain}.internal`;
 }
 
 // Set staging-specific overrides
 if (envVars.NODE_ENV === 'staging') {
-  // Use environment variables from docker-compose
-  const apiBaseUrl = envVars.API_BASE_URL || 'https://staging-api.myphonefriend.com';
+  // Use environment variables from docker-compose, or construct from PRIMARY_DOMAIN
+  const apiBaseUrl = envVars.API_BASE_URL || getUrlFromDomain('staging-api', primaryDomain);
   
   baselineConfig.baseUrl = apiBaseUrl;
   baselineConfig.apiUrl = `${apiBaseUrl}/v1`;
-  baselineConfig.frontendUrl = envVars.FRONTEND_URL || 'https://staging.myphonefriend.com';
+  baselineConfig.frontendUrl = envVars.FRONTEND_URL || getUrlFromDomain('staging', primaryDomain);
   baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb:27017/bianca-service';
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = apiBaseUrl;

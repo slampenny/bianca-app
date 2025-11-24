@@ -4,7 +4,7 @@
 # SNS Topic for cost alerts
 resource "aws_sns_topic" "staging_cost_alerts" {
   name = "bianca-staging-cost-alerts"
-  
+
   tags = {
     Environment = "staging"
     Purpose     = "Cost monitoring alerts"
@@ -42,7 +42,7 @@ resource "aws_cloudwatch_metric_alarm" "staging_low_network" {
   namespace           = "AWS/EC2"
   period              = "300"
   statistic           = "Sum"
-  threshold           = "1000000"  # 1MB in 5 minutes
+  threshold           = "1000000" # 1MB in 5 minutes
   alarm_description   = "This metric monitors staging instance network activity"
   alarm_actions       = [aws_sns_topic.staging_cost_alerts.arn]
 

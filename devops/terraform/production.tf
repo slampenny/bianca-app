@@ -8,7 +8,7 @@
 
 # Production VPC (separate from staging)
 resource "aws_vpc" "production" {
-  cidr_block           = "10.2.0.0/16"  # Different from staging (10.1.0.0/16)
+  cidr_block           = "10.2.0.0/16" # Different from staging (10.1.0.0/16)
   enable_dns_hostnames = true
   enable_dns_support   = true
 
@@ -211,9 +211,9 @@ resource "aws_iam_instance_profile" "production_profile" {
 # Production EBS Volume for MongoDB data persistence
 resource "aws_ebs_volume" "production_mongodb" {
   availability_zone = aws_subnet.production_public.availability_zone
-  size              = 20  # 20GB same as staging for cost optimization
+  size              = 20 # 20GB same as staging for cost optimization
   type              = "gp3"
-  
+
   tags = {
     Name        = "bianca-production-mongodb-data"
     Environment = "production"
@@ -225,11 +225,11 @@ resource "aws_ebs_volume" "production_mongodb" {
 resource "aws_launch_template" "production" {
   name_prefix   = "bianca-production-"
   image_id      = data.aws_ami.amazon_linux_2.id
-  instance_type = "t3.small"  # Same as staging for cost optimization
+  instance_type = "t3.small" # Same as staging for cost optimization
   key_name      = var.asterisk_key_pair_name
 
   vpc_security_group_ids = [aws_security_group.production.id]
-  
+
   iam_instance_profile {
     name = aws_iam_instance_profile.production_profile.name
   }
@@ -237,7 +237,7 @@ resource "aws_launch_template" "production" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size = 50  # Increased from 20GB to 50GB to prevent disk space issues
+      volume_size = 50 # Increased from 20GB to 50GB to prevent disk space issues
       volume_type = "gp3"
     }
   }
@@ -439,13 +439,13 @@ resource "aws_lb_listener" "production_http_redirect" {
   }
 }
 
-# HTTPS listener
+# HTTPS listener - supports both domains via SNI
 resource "aws_lb_listener" "production_https" {
   load_balancer_arn = aws_lb.production.arn
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
-  certificate_arn   = data.aws_acm_certificate.app_cert.arn
+  certificate_arn   = data.aws_acm_certificate.app_cert_legacy.arn # Legacy cert as default
 
   default_action {
     type             = "forward"
@@ -453,7 +453,60 @@ resource "aws_lb_listener" "production_https" {
   }
 }
 
-# HTTPS listener rule for API - route ALL api.myphonefriend.com traffic to API
+# Add primary domain certificate to production listener (SNI - supports multiple certs)
+resource "aws_lb_listener_certificate" "production_https_primary" {
+  listener_arn    = aws_lb_listener.production_https.arn
+  certificate_arn = aws_acm_certificate_validation.primary_domain_cert.certificate_arn
+}
+
+# Redirect rules - higher priority (lower number) so redirects happen first
+# Redirect api.myphonefriend.com → api.biancawellness.com
+resource "aws_lb_listener_rule" "production_api_redirect" {
+  listener_arn = aws_lb_listener.production_https.arn
+  priority     = 50
+
+  action {
+    type = "redirect"
+
+    redirect {
+      host        = "api.${var.primary_domain}"
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    host_header {
+      values = ["api.${var.legacy_domain}"]
+    }
+  }
+}
+
+# Redirect app.myphonefriend.com → app.biancawellness.com
+resource "aws_lb_listener_rule" "production_app_redirect" {
+  listener_arn = aws_lb_listener.production_https.arn
+  priority     = 51
+
+  action {
+    type = "redirect"
+
+    redirect {
+      host        = "app.${var.primary_domain}"
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    host_header {
+      values = ["app.${var.legacy_domain}"]
+    }
+  }
+}
+
+# HTTPS listener rule for API - route api.biancawellness.com traffic to API
 resource "aws_lb_listener_rule" "production_api_https_rule" {
   listener_arn = aws_lb_listener.production_https.arn
   priority     = 100
@@ -465,14 +518,15 @@ resource "aws_lb_listener_rule" "production_api_https_rule" {
 
   condition {
     host_header {
-      values = ["api.myphonefriend.com"]
+      values = ["api.${var.primary_domain}"] # Only new domain now
     }
   }
 }
 
 # Production Route53 Records
+# Legacy domain records (myphonefriend.com)
 resource "aws_route53_record" "production_api" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "api.myphonefriend.com"
   type    = "CNAME"
   ttl     = 300
@@ -480,7 +534,7 @@ resource "aws_route53_record" "production_api" {
 }
 
 resource "aws_route53_record" "production_app" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "app.myphonefriend.com"
   type    = "CNAME"
   ttl     = 300
@@ -490,14 +544,44 @@ resource "aws_route53_record" "production_app" {
 # SIP DNS record - automatically updates when EIP changes
 # Note: This may conflict with main.tf - if so, remove the one in main.tf
 resource "aws_route53_record" "production_sip" {
-  zone_id        = data.aws_route53_zone.myphonefriend.zone_id
-  name           = "sip.myphonefriend.com"
-  type           = "A"
-  ttl            = 300
-  records        = [aws_eip.production.public_ip]
-  allow_overwrite = true  # Allow overwriting existing record
-  
+  zone_id         = data.aws_route53_zone.legacy.zone_id
+  name            = "sip.myphonefriend.com"
+  type            = "A"
+  ttl             = 300
+  records         = [aws_eip.production.public_ip]
+  allow_overwrite = true # Allow overwriting existing record
+
   # Allow this to be managed here instead of main.tf
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Primary domain records (biancawellness.com) - Parallel setup
+resource "aws_route53_record" "production_api_primary" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "api.${var.primary_domain}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [aws_lb.production.dns_name]
+}
+
+resource "aws_route53_record" "production_app_primary" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "app.${var.primary_domain}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [aws_lb.production.dns_name]
+}
+
+resource "aws_route53_record" "production_sip_primary" {
+  zone_id         = data.aws_route53_zone.primary.zone_id
+  name            = "sip.${var.primary_domain}"
+  type            = "A"
+  ttl             = 300
+  records         = [aws_eip.production.public_ip]
+  allow_overwrite = true
+
   lifecycle {
     create_before_destroy = true
   }
@@ -506,7 +590,7 @@ resource "aws_route53_record" "production_sip" {
 # Production CloudWatch Log Groups for HIPAA Compliance (7-year retention)
 resource "aws_cloudwatch_log_group" "production_app_logs" {
   name              = "/bianca/production/app"
-  retention_in_days = 2557  # 7 years for HIPAA compliance (§164.316(b)(2)(i)) - closest valid value
+  retention_in_days = 2557 # 7 years for HIPAA compliance (§164.316(b)(2)(i)) - closest valid value
 
   tags = {
     Name        = "bianca-production-app-logs"
@@ -517,7 +601,7 @@ resource "aws_cloudwatch_log_group" "production_app_logs" {
 
 resource "aws_cloudwatch_log_group" "production_mongodb_logs" {
   name              = "/bianca/production/mongodb"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-production-mongodb-logs"
@@ -528,7 +612,7 @@ resource "aws_cloudwatch_log_group" "production_mongodb_logs" {
 
 resource "aws_cloudwatch_log_group" "production_asterisk_logs" {
   name              = "/bianca/production/asterisk"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-production-asterisk-logs"
@@ -539,7 +623,7 @@ resource "aws_cloudwatch_log_group" "production_asterisk_logs" {
 
 resource "aws_cloudwatch_log_group" "production_nginx_logs" {
   name              = "/bianca/production/nginx"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-production-nginx-logs"
@@ -550,7 +634,7 @@ resource "aws_cloudwatch_log_group" "production_nginx_logs" {
 
 resource "aws_cloudwatch_log_group" "production_frontend_logs" {
   name              = "/bianca/production/frontend"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-production-frontend-logs"
