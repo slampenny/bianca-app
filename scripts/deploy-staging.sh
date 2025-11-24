@@ -251,9 +251,9 @@ fi
 if [ "$STATUS" = "success" ]; then
     echo -e "${GREEN}✅ Deployment successful!${NC}"
     echo ""
-    echo -e "${GREEN}🌐 Staging API: https://staging-api.myphonefriend.com${NC}"
-    echo -e "${GREEN}🌐 Staging Frontend: https://staging.myphonefriend.com${NC}"
-    echo -e "${GREEN}📊 PostHog Analytics: https://staging-analytics.myphonefriend.com${NC}"
+    echo -e "${GREEN}🌐 Staging API: https://staging-api.biancawellness.com${NC}"
+    echo -e "${GREEN}🌐 Staging Frontend: https://staging.biancawellness.com${NC}"
+    echo -e "${GREEN}📊 PostHog Analytics: https://staging-analytics.biancawellness.com${NC}"
     if [ -n "$RUN_URL" ]; then
         echo -e "${BLUE}📋 Workflow logs: $RUN_URL${NC}"
     fi

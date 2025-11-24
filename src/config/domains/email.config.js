@@ -4,7 +4,7 @@
 
 const buildEmailConfig = (envVars) => ({
   email: {
-    from: envVars.EMAIL_FROM || 'no-reply@myphonefriend.com',
+    from: envVars.EMAIL_FROM || 'no-reply@biancawellness.com',
     ses: {
       region: envVars.AWS_SES_REGION || envVars.AWS_REGION || 'us-east-2',
     },

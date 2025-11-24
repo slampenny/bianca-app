@@ -1216,9 +1216,9 @@ resource "aws_ecs_task_definition" "app_task" {
         # UPDATED: Use service discovery DNS name instead of localhost
         { name = "MONGODB_URL", value = "mongodb://mongodb.myphonefriend.internal:${var.mongodb_port}/${var.service_name}" },
         { name = "NODE_ENV", value = "production" },
-        { name = "API_BASE_URL", value = "https://api.myphonefriend.com" },
-        { name = "WEBSOCKET_URL", value = "wss://api.myphonefriend.com" },
-        { name = "FRONTEND_URL", value = "https://app.myphonefriend.com" },
+        { name = "API_BASE_URL", value = "https://api.biancawellness.com" },
+        { name = "WEBSOCKET_URL", value = "wss://api.biancawellness.com" },
+        { name = "FRONTEND_URL", value = "https://app.biancawellness.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
         # Internal communication uses private IP for both ARI and RTP
@@ -1230,7 +1230,7 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "ASTERISK_PUBLIC_IP", value = aws_eip.asterisk_eip.public_ip },
         
         { name = "AWS_SES_REGION", value = var.aws_region },
-        { name = "EMAIL_FROM", value = "no-reply@myphonefriend.com" },
+        { name = "EMAIL_FROM", value = "no-reply@biancawellness.com" },
         { name = "TWILIO_PHONENUMBER", value = "+19786256514" },  # Replace with your actual Twilio number
         { name = "TWILIO_ACCOUNTSID", value = "TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED" },  # Replace with your actual Twilio SID
         { name = "STRIPE_PUBLISHABLE_KEY", value = "pk_live_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef" },  # Production Stripe publishable key
