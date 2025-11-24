@@ -78,7 +78,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", "wss:", "https://app.myphonefriend.com", "https://api.myphonefriend.com"]
+      connectSrc: ["'self'", "wss:", "https://app.biancawellness.com", "https://api.biancawellness.com"]
     }
   }
 }));

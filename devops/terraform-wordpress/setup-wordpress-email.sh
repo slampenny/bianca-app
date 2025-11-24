@@ -72,7 +72,7 @@ function configure_ses_smtp($phpmailer) {
     $phpmailer->Password = $password;
     
     // Set default from address
-    $phpmailer->From = defined('SES_FROM_EMAIL') ? SES_FROM_EMAIL : 'noreply@myphonefriend.com';
+    $phpmailer->From = defined('SES_FROM_EMAIL') ? SES_FROM_EMAIL : 'noreply@biancawellness.com';
     $phpmailer->FromName = defined('SES_FROM_NAME') ? SES_FROM_NAME : 'My Phone Friend';
     
     // Optional: Enable debugging (disable in production)
@@ -138,7 +138,7 @@ echo "3. Test email sending:"
 echo "   sudo docker exec $CONTAINER_NAME wp mail test your-email@example.com --allow-root"
 echo ""
 echo "4. Or test via WordPress admin:"
-echo "   - Go to: https://myphonefriend.com/wp-admin"
+echo "   - Go to: https://biancawellness.com/wp-admin"
 echo "   - Navigate to: WP Mail SMTP → Tools → Email Test"
 echo ""
 
