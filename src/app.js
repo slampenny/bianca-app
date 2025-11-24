@@ -119,6 +119,20 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
+      // New primary domain
+      'https://app.biancawellness.com',
+      'http://app.biancawellness.com',
+      'https://www.biancawellness.com',
+      'http://www.biancawellness.com',
+      'https://biancawellness.com',
+      'http://biancawellness.com',
+      'https://staging.biancawellness.com',
+      'http://staging.biancawellness.com',
+      'https://staging-api.biancawellness.com',
+      'http://staging-api.biancawellness.com',
+      'https://api.biancawellness.com',
+      'http://api.biancawellness.com',
+      // Legacy domain (for redirects)
       'https://app.myphonefriend.com',
       'http://app.myphonefriend.com',
       'https://www.myphonefriend.com',
@@ -131,6 +145,7 @@ const corsOptions = {
       'http://staging-api.myphonefriend.com',
       'https://api.myphonefriend.com',
       'http://api.myphonefriend.com',
+      // Local development
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:8080',
@@ -196,7 +211,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts
-      connectSrc: ["'self'", "wss:", "https://app.myphonefriend.com", "https://api.myphonefriend.com"], // Allow WebSocket connections and API calls
+      connectSrc: ["'self'", "wss:", "https://app.biancawellness.com", "https://api.biancawellness.com", "https://staging.biancawellness.com", "https://staging-api.biancawellness.com", "https://app.myphonefriend.com", "https://api.myphonefriend.com"], // Allow WebSocket connections and API calls
     }
   }
 }));
