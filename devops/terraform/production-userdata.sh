@@ -165,14 +165,14 @@ services:
       - AWS_SECRET_ID=MySecretsManagerSecret
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - NODE_ENV=production
-      - API_BASE_URL=https://api.myphonefriend.com
-      - WEBSOCKET_URL=wss://api.myphonefriend.com
-      - FRONTEND_URL=https://app.myphonefriend.com
+      - API_BASE_URL=https://api.biancawellness.com
+      - WEBSOCKET_URL=wss://api.biancawellness.com
+      - FRONTEND_URL=https://app.biancawellness.com
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=$${PUBLIC_IP}
       - AWS_SES_REGION=us-east-2
-      - EMAIL_FROM=no-reply@myphonefriend.com
+      - EMAIL_FROM=no-reply@biancawellness.com
       - TWILIO_PHONENUMBER=+19786256514
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
       - STRIPE_PUBLISHABLE_KEY=pk_live_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
@@ -228,7 +228,7 @@ EOF
 cat > nginx.conf <<'EOF'
 server {
     listen 80;
-    server_name app.myphonefriend.com;
+    server_name app.biancawellness.com;
     
     location / {
         proxy_pass http://frontend:80;
@@ -242,7 +242,7 @@ server {
 
 server {
     listen 80;
-    server_name api.myphonefriend.com;
+    server_name api.biancawellness.com;
     
     location / {
         proxy_pass http://app:3000;
