@@ -5,6 +5,11 @@
  *
  * https://reactnative.dev/docs/security#storing-sensitive-info
  */
+
+// Primary domain (single source of truth)
+const PRIMARY_DOMAIN = "biancawellness.com";
+
 export default {
-  API_URL: "https://api.myphonefriend.com/v1",
+  PRIMARY_DOMAIN,
+  API_URL: `https://api.${PRIMARY_DOMAIN}/v1`,
 }

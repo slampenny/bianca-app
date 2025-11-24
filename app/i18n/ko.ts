@@ -695,7 +695,7 @@ const ko: Translations = {
 - 계정 정보 및 기본 설정
 
 **요청 방법**:
-- 이메일: privacy@myphonefriend.com
+- 이메일: privacy@biancawellness.com
 - 전화: +1-604-562-4263
 
 **우리의 응답**: 30일 이내
@@ -742,7 +742,7 @@ const ko: Translations = {
 ## 불만 제기
 
 **우리에게 제기**:
-- 이메일: privacy@myphonefriend.com
+- 이메일: privacy@biancawellness.com
 - 전화: +1-604-562-4263
 
 **HHS에 제기**:
@@ -844,7 +844,7 @@ const ko: Translations = {
 # 연락처 정보
 
 **개인정보 보호 책임자**:
-- 이메일: privacy@myphonefriend.com
+- 이메일: privacy@biancawellness.com
 - 전화: +1-604-562-4263
 - 우편: MyPhoneFriend 개인정보 보호 사무소, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 
@@ -855,7 +855,7 @@ const ko: Translations = {
 # 불만 제기
 
 **우리에게**:
-- 이메일: privacy@myphonefriend.com
+- 이메일: privacy@biancawellness.com
 - 전화: +1-604-562-4263
 
 **연방 정부 (HHS)에**:
@@ -874,9 +874,9 @@ const ko: Translations = {
 
 ## 언어 지원
 
-**영어**: 이 공지를 이해하는 데 도움이 필요한 경우 privacy@myphonefriend.com으로 문의하세요
+**영어**: 이 공지를 이해하는 데 도움이 필요한 경우 privacy@biancawellness.com으로 문의하세요
 
-**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
+**Español**: Si necesita ayuda, comuníquese con privacy@biancawellness.com`,
   },
   mfa: {
     setupTitle: "다중 인증",

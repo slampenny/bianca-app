@@ -38,7 +38,7 @@ echo "🌐 Deploying to Vercel..."
 vercel --prod
 
 echo "🎉 Deployment completed!"
-echo "📱 Your web app should be available at: https://app.myphonefriend.com"
+echo "📱 Your web app should be available at: https://app.biancawellness.com"
 echo "📋 Don't forget to:"
 echo "   1. Configure your custom domain in Vercel dashboard"
 echo "   2. Update DNS records to point to Vercel"

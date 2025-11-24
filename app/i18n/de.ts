@@ -698,7 +698,7 @@ Was Sie anfordern können:
 - Kontoinformationen und Einstellungen
 
 **So fordern Sie an**:
-- E-Mail: privacy@myphonefriend.com
+- E-Mail: privacy@biancawellness.com
 - Telefon: +1-604-562-4263
 
 **Unsere Antwort**: Innerhalb von 30 Tagen
@@ -745,7 +745,7 @@ Schließt aus: Offenlegungen für Behandlung, Zahlung und Betrieb (es sei denn, 
 ## Beschwerde einreichen
 
 **Bei uns einreichen**:
-- E-Mail: privacy@myphonefriend.com
+- E-Mail: privacy@biancawellness.com
 - Telefon: +1-604-562-4263
 
 **Bei HHS einreichen**:
@@ -847,7 +847,7 @@ Alle Geschäftspartner unterzeichnen Geschäftspartnervereinbarungen und müssen
 # KONTAKTINFORMATIONEN
 
 **Datenschutzbeauftragter**:
-- E-Mail: privacy@myphonefriend.com
+- E-Mail: privacy@biancawellness.com
 - Telefon: +1-604-562-4263
 - Post: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 
@@ -858,7 +858,7 @@ Alle Geschäftspartner unterzeichnen Geschäftspartnervereinbarungen und müssen
 # BESCHWERDE EINREICHEN
 
 **Bei uns**:
-- E-Mail: privacy@myphonefriend.com
+- E-Mail: privacy@biancawellness.com
 - Telefon: +1-604-562-4263
 
 **Bei der Bundesregierung (HHS)**:
@@ -877,9 +877,9 @@ Dieser Hinweis zu Datenschutzpraktiken entspricht der HIPAA-Datenschutzregel (45
 
 ## Sprachunterstützung
 
-**Englisch**: Wenn Sie Hilfe beim Verstehen dieses Hinweises benötigen, kontaktieren Sie privacy@myphonefriend.com
+**Englisch**: Wenn Sie Hilfe beim Verstehen dieses Hinweises benötigen, kontaktieren Sie privacy@biancawellness.com
 
-**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
+**Español**: Si necesita ayuda, comuníquese con privacy@biancawellness.com`,
   },
   mfa: {
     setupTitle: "Multi-Faktor-Authentifizierung",

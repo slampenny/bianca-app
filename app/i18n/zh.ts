@@ -580,7 +580,7 @@ const zh: Translations = {
 - 账户信息和偏好设置
 
 **如何请求**：
-- 电子邮件：privacy@myphonefriend.com
+- 电子邮件：privacy@biancawellness.com
 - 电话：+1-604-562-4263
 
 **我们的回复**：30天内
@@ -627,7 +627,7 @@ const zh: Translations = {
 ## 提出投诉
 
 **向我们提出**：
-- 电子邮件：privacy@myphonefriend.com
+- 电子邮件：privacy@biancawellness.com
 - 电话：+1-604-562-4263
 
 **向HHS提出**：
@@ -729,7 +729,7 @@ const zh: Translations = {
 # 联系信息
 
 **隐私官**：
-- 电子邮件：privacy@myphonefriend.com
+- 电子邮件：privacy@biancawellness.com
 - 电话：+1-604-562-4263
 - 邮件：MyPhoneFriend隐私办公室，2955 Elbow Place，Port Coquitlam，BC V3B 7T3
 
@@ -740,7 +740,7 @@ const zh: Translations = {
 # 提出投诉
 
 **向我们提出**：
-- 电子邮件：privacy@myphonefriend.com
+- 电子邮件：privacy@biancawellness.com
 - 电话：+1-604-562-4263
 
 **向联邦政府（HHS）提出**：
@@ -759,9 +759,9 @@ const zh: Translations = {
 
 ## 语言协助
 
-**英语**：如果您需要帮助理解本通知，请联系privacy@myphonefriend.com
+**英语**：如果您需要帮助理解本通知，请联系privacy@biancawellness.com
 
-**Español**：Si necesita ayuda，comuníquese con privacy@myphonefriend.com`,
+**Español**：Si necesita ayuda，comuníquese con privacy@biancawellness.com`,
   },
   mfa: {
     setupTitle: "多因素身份验证",

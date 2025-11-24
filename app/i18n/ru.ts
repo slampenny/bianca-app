@@ -592,7 +592,7 @@ const ru: Translations = {
 - Информация об учетной записи и настройки
 
 **Как запросить**:
-- Email: privacy@myphonefriend.com
+- Email: privacy@biancawellness.com
 - Телефон: +1-604-562-4263
 
 **Наш ответ**: В течение 30 дней
@@ -639,7 +639,7 @@ const ru: Translations = {
 ## Подать жалобу
 
 **Подать нам**:
-- Email: privacy@myphonefriend.com
+- Email: privacy@biancawellness.com
 - Телефон: +1-604-562-4263
 
 **Подать в HHS**:
@@ -741,7 +741,7 @@ const ru: Translations = {
 # КОНТАКТНАЯ ИНФОРМАЦИЯ
 
 **Ответственный за конфиденциальность**:
-- Email: privacy@myphonefriend.com
+- Email: privacy@biancawellness.com
 - Телефон: +1-604-562-4263
 - Почта: Офис конфиденциальности MyPhoneFriend, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 
@@ -752,7 +752,7 @@ const ru: Translations = {
 # ПОДАТЬ ЖАЛОБУ
 
 **Нам**:
-- Email: privacy@myphonefriend.com
+- Email: privacy@biancawellness.com
 - Телефон: +1-604-562-4263
 
 **Федеральному правительству (HHS)**:
@@ -771,9 +771,9 @@ const ru: Translations = {
 
 ## Языковая помощь
 
-**Английский**: Если вам нужна помощь в понимании этого уведомления, свяжитесь с privacy@myphonefriend.com
+**Английский**: Если вам нужна помощь в понимании этого уведомления, свяжитесь с privacy@biancawellness.com
 
-**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
+**Español**: Si necesita ayuda, comuníquese con privacy@biancawellness.com`,
   },
   mfa: {
     setupTitle: "Многофакторная аутентификация",

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { View, StyleSheet, Animated } from 'react-native'
+import { View, StyleSheet, Animated, Platform } from 'react-native'
 import { Text } from 'app/components/Text'
 import { useTheme } from 'app/theme/ThemeContext'
 import { spacing } from 'app/theme'
@@ -33,8 +33,12 @@ const Toast: React.FC<ToastProps> = ({
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: 8,
-      zIndex: 9999, // Very high z-index to ensure it appears above modal
+      zIndex: 99999, // Very high z-index to ensure it appears above all UI elements
       elevation: 9999, // Android elevation
+      // Ensure it's above all other elements
+      ...(Platform.OS === 'web' && {
+        position: 'fixed' as any, // Use fixed positioning on web for better layering
+      }),
     },
     message: {
       color: colors.palette.neutral100,

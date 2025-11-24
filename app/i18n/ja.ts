@@ -592,7 +592,7 @@ const ja: Translations = {
 - アカウント情報と設定
 
 **要求方法**：
-- メール: privacy@myphonefriend.com
+- メール: privacy@biancawellness.com
 - 電話: +1-604-562-4263
 
 **私たちの回答**: 30日以内
@@ -639,7 +639,7 @@ const ja: Translations = {
 ## 苦情を申し立てる
 
 **私たちに申し立てる**：
-- メール: privacy@myphonefriend.com
+- メール: privacy@biancawellness.com
 - 電話: +1-604-562-4263
 
 **HHSに申し立てる**：
@@ -741,7 +741,7 @@ const ja: Translations = {
 # 連絡先情報
 
 **プライバシー責任者**：
-- メール: privacy@myphonefriend.com
+- メール: privacy@biancawellness.com
 - 電話: +1-604-562-4263
 - 郵送: MyPhoneFriendプライバシーオフィス、2955 Elbow Place、Port Coquitlam、BC V3B 7T3
 
@@ -752,7 +752,7 @@ const ja: Translations = {
 # 苦情を申し立てる
 
 **私たちに**：
-- メール: privacy@myphonefriend.com
+- メール: privacy@biancawellness.com
 - 電話: +1-604-562-4263
 
 **連邦政府（HHS）に**：
@@ -771,9 +771,9 @@ const ja: Translations = {
 
 ## 言語支援
 
-**英語**: この通知を理解するのに助けが必要な場合は、privacy@myphonefriend.comにお問い合わせください
+**英語**: この通知を理解するのに助けが必要な場合は、privacy@biancawellness.comにお問い合わせください
 
-**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
+**Español**: Si necesita ayuda, comuníquese con privacy@biancawellness.com`,
   },
   mfa: {
     setupTitle: "多要素認証",

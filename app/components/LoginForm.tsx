@@ -452,6 +452,7 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     padding: compact ? 16 : 16, // Reduced from 20
     paddingTop: compact ? 16 : 12, // Reduced top padding
     width: "100%",
+    overflow: 'visible', // Allow toast to render above other elements
   },
   brandingContainer: {
     alignItems: "center",

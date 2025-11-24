@@ -715,7 +715,7 @@ const ar: Translations = {
 - معلومات الحساب والتفضيلات
 
 **كيفية الطلب**:
-- البريد الإلكتروني: privacy@myphonefriend.com
+- البريد الإلكتروني: privacy@biancawellness.com
 - الهاتف: +1-604-562-4263
 
 **ردنا**: خلال 30 يومًا
@@ -762,7 +762,7 @@ const ar: Translations = {
 ## تقديم شكوى
 
 **تقديم معنا**:
-- البريد الإلكتروني: privacy@myphonefriend.com
+- البريد الإلكتروني: privacy@biancawellness.com
 - الهاتف: +1-604-562-4263
 
 **تقديم مع HHS**:
@@ -864,7 +864,7 @@ const ar: Translations = {
 # معلومات الاتصال
 
 **مسؤول الخصوصية**:
-- البريد الإلكتروني: privacy@myphonefriend.com
+- البريد الإلكتروني: privacy@biancawellness.com
 - الهاتف: +1-604-562-4263
 - البريد: مكتب خصوصية MyPhoneFriend، 2955 Elbow Place، Port Coquitlam، BC V3B 7T3
 
@@ -875,7 +875,7 @@ const ar: Translations = {
 # تقديم شكوى
 
 **معنا**:
-- البريد الإلكتروني: privacy@myphonefriend.com
+- البريد الإلكتروني: privacy@biancawellness.com
 - الهاتف: +1-604-562-4263
 
 **مع الحكومة الفيدرالية (HHS)**:
@@ -894,9 +894,9 @@ const ar: Translations = {
 
 ## المساعدة اللغوية
 
-**الإنجليزية**: إذا كنت بحاجة إلى مساعدة في فهم هذا الإشعار، اتصل بـ privacy@myphonefriend.com
+**الإنجليزية**: إذا كنت بحاجة إلى مساعدة في فهم هذا الإشعار، اتصل بـ privacy@biancawellness.com
 
-**Español**: Si necesita ayuda, comuníquese con privacy@myphonefriend.com`,
+**Español**: Si necesita ayuda, comuníquese con privacy@biancawellness.com`,
   },
   mfa: {
     setupTitle: "المصادقة متعددة العوامل",
