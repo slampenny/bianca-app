@@ -1,7 +1,5 @@
 # --- Data sources for shared resources ---
-data "aws_route53_zone" "myphonefriend" {
-  name = "myphonefriend.com."
-}
+# Note: Route53 zone data source removed - DNS records are managed in main terraform workspace
 
 data "aws_ecs_cluster" "main" {
   cluster_name = "bianca-cluster"
