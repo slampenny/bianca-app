@@ -41,7 +41,7 @@ echo ""
 echo "✅ WordPress SMTP credentials updated!"
 echo ""
 echo "To test email:"
-echo "1. Go to: https://myphonefriend.com/wp-admin"
+echo "1. Go to: https://biancawellness.com/wp-admin"
 echo "2. Navigate to: WP Mail SMTP → Tools → Email Test"
 echo "3. Send a test email"
 EOF

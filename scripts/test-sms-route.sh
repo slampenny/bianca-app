@@ -2,14 +2,14 @@
 # Script to test the SMS route on staging
 # Requires authentication token
 
-STAGING_API="https://staging-api.myphonefriend.com"
+STAGING_API="https://staging-api.biancawellness.com"
 ENDPOINT="/v1/test/send-sms-patient-0"
 
 if [ -z "$1" ]; then
   echo "Usage: $0 <auth-token>"
   echo ""
   echo "To get an auth token:"
-  echo "1. Login to staging frontend: https://staging.myphonefriend.com"
+  echo "1. Login to staging frontend: https://staging.biancawellness.com"
   echo "2. Open browser dev tools → Application → Local Storage"
   echo "3. Find 'auth' key and copy the access token"
   echo "4. Or use: curl -X POST $STAGING_API/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"your-email\",\"password\":\"your-password\"}'"

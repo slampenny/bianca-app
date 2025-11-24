@@ -22,7 +22,7 @@ fi
 
 # Get AWS region (default to us-east-2)
 AWS_REGION=${AWS_REGION:-us-east-2}
-DOMAIN="myphonefriend.com"
+DOMAIN="biancawellness.com"
 
 echo "Checking SES configuration for domain: $DOMAIN"
 echo "Region: $AWS_REGION"

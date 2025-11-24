@@ -10,7 +10,7 @@ exports.handler = async (event) => {
     try {
         // Parse RECIPIENT_MAP from environment variable
         const recipientMap = JSON.parse(process.env.RECIPIENT_MAP || '{}');
-        const fromDomain = process.env.FROM_DOMAIN || 'myphonefriend.com';
+        const fromDomain = process.env.FROM_DOMAIN || 'biancawellness.com';
         
         // Handle S3 events (SES stores emails in S3 first)
         if (event.Records && event.Records[0] && event.Records[0].s3) {
