@@ -39,7 +39,7 @@ resource "aws_codebuild_project" "staging_build" {
 
   logs_config {
     cloudwatch_logs {
-      status = "ENABLED"
+      status     = "ENABLED"
       group_name = "/aws/codebuild/bianca-staging-build"
     }
   }

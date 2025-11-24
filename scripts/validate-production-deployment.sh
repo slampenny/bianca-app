@@ -16,7 +16,7 @@ fi
 echo "✅ Production instance found: $PRODUCTION_IP"
 
 # Check DNS
-DNS_IP=$(dig +short sip.myphonefriend.com)
+DNS_IP=$(dig +short sip.biancawellness.com)
 if [ "$DNS_IP" = "$PRODUCTION_IP" ]; then
     echo "✅ DNS correctly points to production IP"
 else

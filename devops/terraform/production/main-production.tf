@@ -1077,7 +1077,7 @@ resource "aws_lb_listener" "https_listener" {
   load_balancer_arn = aws_lb.app_lb.arn
   port              = 443
   protocol          = "HTTPS"
-  certificate_arn   = data.aws_acm_certificate.app_cert.arn
+  certificate_arn   = data.aws_acm_certificate.app_cert_legacy.arn
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06"
   default_action {
     type             = "forward"
@@ -1857,7 +1857,7 @@ resource "aws_codepipeline" "bianca_pipeline" {
 ################################################################################
 
 resource "aws_route53_record" "api_subdomain" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = "api.myphonefriend.com"
   type    = "A"
   alias {
@@ -1868,7 +1868,7 @@ resource "aws_route53_record" "api_subdomain" {
 }
 
 resource "aws_route53_record" "app_subdomain" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = "app.myphonefriend.com"
   type    = "A"
   alias {
@@ -1880,7 +1880,7 @@ resource "aws_route53_record" "app_subdomain" {
 
 # KEPT: Direct EIP mapping for SIP (Twilio needs direct access)
 resource "aws_route53_record" "sip_subdomain" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = "sip.myphonefriend.com"
   type    = "A"
   ttl     = 300
@@ -1900,7 +1900,7 @@ resource "aws_ses_domain_identity" "ses_domain" {
 }
 
 resource "aws_route53_record" "ses_verification_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = "_amazonses.${aws_ses_domain_identity.ses_domain.domain}"
   type    = "TXT"
   ttl     = 600
@@ -1921,7 +1921,7 @@ resource "aws_ses_domain_dkim" "ses_dkim" {
 
 resource "aws_route53_record" "ses_dkim_records" {
   count   = 3
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = "${element(aws_ses_domain_dkim.ses_dkim.dkim_tokens, count.index)}._domainkey.${aws_ses_domain_identity.ses_domain.domain}"
   type    = "CNAME"
   ttl     = 600
@@ -1934,7 +1934,7 @@ resource "aws_route53_record" "ses_dkim_records" {
 
 # SPF Record - Authorize SES to send emails for this domain
 resource "aws_route53_record" "ses_spf_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = aws_ses_domain_identity.ses_domain.domain
   type    = "TXT"
   ttl     = 600
@@ -1943,7 +1943,7 @@ resource "aws_route53_record" "ses_spf_record" {
 
 # DMARC Record - Email authentication policy (relaxed for better deliverability)
 resource "aws_route53_record" "ses_dmarc_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = "_dmarc.${aws_ses_domain_identity.ses_domain.domain}"
   type    = "TXT"
   ttl     = 600
@@ -2260,7 +2260,7 @@ resource "aws_ses_receipt_rule" "legal_email" {
 
 # MX record to direct emails to SES
 resource "aws_route53_record" "ses_mx_record" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.primary.zone_id
   name    = "myphonefriend.com"
   type    = "MX"
   ttl     = 600

@@ -181,14 +181,16 @@ class TwilioCallService {
       // For human answer, connect to Asterisk SIP endpoint
       
       // Determine SIP endpoint based on environment
+      // Use config.primaryDomain to construct SIP host (single source of truth)
       let sipHost, sipPort;
+      const primaryDomain = config.primaryDomain || 'biancawellness.com';
       if (config.env === 'staging') {
         // Staging: Use staging SIP endpoint
-        sipHost = 'staging-sip.myphonefriend.com';
+        sipHost = `staging-sip.${primaryDomain}`;
         sipPort = 5061;
       } else {
         // Production: Use direct Asterisk SIP
-        sipHost = 'sip.myphonefriend.com';
+        sipHost = `sip.${primaryDomain}`;
         sipPort = config.asterisk.externalPort || 5061;
       }
       

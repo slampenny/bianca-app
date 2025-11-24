@@ -26,7 +26,7 @@ resource "aws_lambda_function" "staging_scheduler" {
 data "archive_file" "staging_scheduler" {
   type        = "zip"
   output_path = "staging-scheduler.zip"
-  
+
   source {
     content  = <<EOF
 import boto3

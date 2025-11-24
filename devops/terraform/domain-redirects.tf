@@ -25,10 +25,10 @@ data "aws_lb" "wordpress" {
 # Root domain A record (ALIAS) pointing to WordPress ALB
 # This makes biancatechnologies.com resolve to the same site as myphonefriend.com
 resource "aws_route53_record" "biancatechnologies_root" {
-  zone_id        = data.aws_route53_zone.biancatechnologies.zone_id
-  name           = "biancatechnologies.com"
-  type           = "A"
-  allow_overwrite = true  # Allow overwriting existing A record
+  zone_id         = data.aws_route53_zone.biancatechnologies.zone_id
+  name            = "biancatechnologies.com"
+  type            = "A"
+  allow_overwrite = true # Allow overwriting existing A record
 
   alias {
     name                   = data.aws_lb.wordpress.dns_name
@@ -43,10 +43,10 @@ resource "aws_route53_record" "biancatechnologies_root" {
 
 # www subdomain A record (ALIAS) pointing to WordPress ALB
 resource "aws_route53_record" "biancatechnologies_www" {
-  zone_id        = data.aws_route53_zone.biancatechnologies.zone_id
-  name           = "www.biancatechnologies.com"
-  type           = "A"
-  allow_overwrite = true  # Allow overwriting existing A record
+  zone_id         = data.aws_route53_zone.biancatechnologies.zone_id
+  name            = "www.biancatechnologies.com"
+  type            = "A"
+  allow_overwrite = true # Allow overwriting existing A record
 
   alias {
     name                   = data.aws_lb.wordpress.dns_name

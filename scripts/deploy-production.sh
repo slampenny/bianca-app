@@ -487,7 +487,7 @@ fi
 echo "🎉 Production deployment complete!"
 echo "🌐 Production API: https://api.myphonefriend.com"
 echo "🌐 Production Frontend: https://app.myphonefriend.com"
-echo "🔗 SIP Endpoint: sip.myphonefriend.com"
+echo "🔗 SIP Endpoint: sip.biancawellness.com"
 echo ""
 echo "💡 Usage:"
 echo "   ./scripts/deploy-production.sh                    # Normal deployment (preserves MongoDB)"

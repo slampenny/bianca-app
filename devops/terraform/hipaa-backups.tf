@@ -377,24 +377,24 @@ resource "aws_iam_role_policy" "backup_lambda_policy" {
 resource "aws_lambda_function" "mongodb_backup" {
   filename         = "${path.module}/lambda-backup.zip" # We'll create this
   function_name    = "${var.environment}-mongodb-backup"
-  role            = aws_iam_role.backup_lambda_role.arn
-  handler         = "index.handler"
+  role             = aws_iam_role.backup_lambda_role.arn
+  handler          = "index.handler"
   source_code_hash = fileexists("${path.module}/lambda-backup.zip") ? filebase64sha256("${path.module}/lambda-backup.zip") : null
-  runtime         = "nodejs18.x"
-  timeout         = 900 # 15 minutes (enough for large database dumps)
-  memory_size     = 1024 # 1GB RAM
+  runtime          = "nodejs18.x"
+  timeout          = 900  # 15 minutes (enough for large database dumps)
+  memory_size      = 1024 # 1GB RAM
 
   environment {
     variables = {
       MONGODB_URL_SECRET_NAME = "${var.environment}/mongodb-url" # Secrets Manager secret name
-      S3_BUCKET              = aws_s3_bucket.hipaa_backups.id
-      KMS_KEY_ID             = aws_kms_key.backup_encryption.id
-      SNS_TOPIC_ARN          = aws_sns_topic.backup_notifications.arn
-      ENVIRONMENT            = var.environment
-      RETENTION_DAYS_DAILY   = "90"
-      RETENTION_DAYS_WEEKLY  = "365"
-      RETENTION_DAYS_MONTHLY = "1095"
-      RETENTION_DAYS_ANNUAL  = "2555" # 7 years
+      S3_BUCKET               = aws_s3_bucket.hipaa_backups.id
+      KMS_KEY_ID              = aws_kms_key.backup_encryption.id
+      SNS_TOPIC_ARN           = aws_sns_topic.backup_notifications.arn
+      ENVIRONMENT             = var.environment
+      RETENTION_DAYS_DAILY    = "90"
+      RETENTION_DAYS_WEEKLY   = "365"
+      RETENTION_DAYS_MONTHLY  = "1095"
+      RETENTION_DAYS_ANNUAL   = "2555" # 7 years
     }
   }
 
@@ -533,12 +533,12 @@ resource "aws_lambda_permission" "allow_eventbridge_monthly" {
 resource "aws_lambda_function" "backup_verification" {
   filename         = "${path.module}/lambda-verify-backup.zip"
   function_name    = "${var.environment}-backup-verification"
-  role            = aws_iam_role.backup_lambda_role.arn
-  handler         = "verify.handler"
+  role             = aws_iam_role.backup_lambda_role.arn
+  handler          = "verify.handler"
   source_code_hash = fileexists("${path.module}/lambda-verify-backup.zip") ? filebase64sha256("${path.module}/lambda-verify-backup.zip") : null
-  runtime         = "nodejs18.x"
-  timeout         = 900
-  memory_size     = 2048 # More memory for restore testing
+  runtime          = "nodejs18.x"
+  timeout          = 900
+  memory_size      = 2048 # More memory for restore testing
 
   environment {
     variables = {
@@ -665,20 +665,20 @@ resource "aws_cloudwatch_metric_alarm" "backup_missing" {
 resource "aws_lambda_function" "mongodb_restore" {
   filename         = "${path.module}/lambda-restore.zip"
   function_name    = "${var.environment}-mongodb-restore"
-  role            = aws_iam_role.backup_lambda_role.arn
-  handler         = "restore.handler"
+  role             = aws_iam_role.backup_lambda_role.arn
+  handler          = "restore.handler"
   source_code_hash = fileexists("${path.module}/lambda-restore.zip") ? filebase64sha256("${path.module}/lambda-restore.zip") : null
-  runtime         = "nodejs18.x"
-  timeout         = 900
-  memory_size     = 2048
+  runtime          = "nodejs18.x"
+  timeout          = 900
+  memory_size      = 2048
 
   environment {
     variables = {
-      S3_BUCKET              = aws_s3_bucket.hipaa_backups.id
-      KMS_KEY_ID             = aws_kms_key.backup_encryption.id
+      S3_BUCKET               = aws_s3_bucket.hipaa_backups.id
+      KMS_KEY_ID              = aws_kms_key.backup_encryption.id
       MONGODB_URL_SECRET_NAME = "${var.environment}/mongodb-url"
-      SNS_TOPIC_ARN          = aws_sns_topic.backup_notifications.arn
-      ENVIRONMENT            = var.environment
+      SNS_TOPIC_ARN           = aws_sns_topic.backup_notifications.arn
+      ENVIRONMENT             = var.environment
     }
   }
 
@@ -723,9 +723,9 @@ resource "aws_cloudwatch_dashboard" "backup_monitoring" {
       {
         type = "log"
         properties = {
-          query   = "SOURCE '/aws/lambda/${aws_lambda_function.mongodb_backup.function_name}' | fields @timestamp, @message | filter @message like /SUCCESS/ or @message like /ERROR/ | sort @timestamp desc | limit 20"
-          region  = var.aws_region
-          title   = "Recent Backup Logs"
+          query  = "SOURCE '/aws/lambda/${aws_lambda_function.mongodb_backup.function_name}' | fields @timestamp, @message | filter @message like /SUCCESS/ or @message like /ERROR/ | sort @timestamp desc | limit 20"
+          region = var.aws_region
+          title  = "Recent Backup Logs"
         }
       }
     ]

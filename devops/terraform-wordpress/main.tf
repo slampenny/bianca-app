@@ -36,9 +36,9 @@ variable "environment" {
 }
 
 variable "wp_domain" {
-  description = "Domain name for WordPress site"
+  description = "Domain name for WordPress site (primary domain - single source of truth)"
   type        = string
-  default     = "myphonefriend.com"
+  default     = "biancawellness.com"
 }
 
 variable "wordpress_instance_type" {
@@ -596,8 +596,8 @@ resource "aws_acm_certificate" "wordpress_cert" {
     "www.${var.wp_domain}",
     "biancatechnologies.com",
     "www.biancatechnologies.com",
-    "biancawellness.com",
-    "www.biancawellness.com"
+    "myphonefriend.com",  # Legacy domain for redirects
+    "www.myphonefriend.com"  # Legacy domain for redirects
   ]
 
   lifecycle {

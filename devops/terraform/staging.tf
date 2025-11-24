@@ -8,7 +8,7 @@
 
 # Staging VPC (separate from production)
 resource "aws_vpc" "staging" {
-  cidr_block           = "10.1.0.0/16"  # Different from production
+  cidr_block           = "10.1.0.0/16" # Different from production
   enable_dns_hostnames = true
   enable_dns_support   = true
 
@@ -85,10 +85,10 @@ resource "aws_security_group" "staging" {
 
   # Allow all internal
   ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    self        = true
+    from_port = 0
+    to_port   = 0
+    protocol  = "-1"
+    self      = true
   }
 
   # HTTP/HTTPS
@@ -143,7 +143,7 @@ resource "aws_security_group" "staging" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Restrict to your IP in production
+    cidr_blocks = ["0.0.0.0/0"] # Restrict to your IP in production
   }
 
   egress {
@@ -214,24 +214,24 @@ resource "aws_iam_role_policy" "staging_instance_policy" {
           "ecr:BatchGetImage",
           "ecr:DescribeRepositories",
           "ecr:ListImages",
-          
+
           # Secrets Manager
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret",
-          
+
           # CloudWatch Logs (HIPAA-compliant 7-year retention)
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
-          
+
           # SES permissions
           "ses:GetSendQuota",
           "ses:SendEmail",
           "ses:SendRawEmail",
           "ses:GetSendStatistics",
-          
+
           # SNS permissions for emergency notifications
           "sns:Publish"
         ]
@@ -255,7 +255,7 @@ resource "aws_launch_template" "staging" {
   key_name      = var.asterisk_key_pair_name
 
   vpc_security_group_ids = [aws_security_group.staging.id]
-  
+
   iam_instance_profile {
     name = aws_iam_instance_profile.staging_profile.name
   }
@@ -263,7 +263,7 @@ resource "aws_launch_template" "staging" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size = 50  # Increased from 20GB to 50GB to prevent disk space issues
+      volume_size = 50 # Increased from 20GB to 50GB to prevent disk space issues
       volume_type = "gp3"
     }
   }
@@ -299,8 +299,8 @@ resource "aws_instance" "staging" {
   instance_market_options {
     market_type = "spot"
     spot_options {
-      max_price                      = "0.015"  # ~70% of on-demand, much more stable
-      spot_instance_type            = "one-time"
+      max_price                      = "0.015" # ~70% of on-demand, much more stable
+      spot_instance_type             = "one-time"
       instance_interruption_behavior = "terminate"
     }
   }
@@ -322,9 +322,9 @@ resource "aws_instance" "staging" {
 # EBS Volume for MongoDB data persistence
 resource "aws_ebs_volume" "staging_mongodb" {
   availability_zone = aws_subnet.staging_public.availability_zone
-  size              = 20  # 20GB should be plenty for staging
+  size              = 20 # 20GB should be plenty for staging
   type              = "gp3"
-  
+
   tags = {
     Name        = "bianca-staging-mongodb-data"
     Environment = "staging"
@@ -334,7 +334,7 @@ resource "aws_ebs_volume" "staging_mongodb" {
 
 # Attach EBS volume to staging instance
 resource "aws_volume_attachment" "staging_mongodb" {
-  device_name = "/dev/sdf"  # Use /dev/sdf for data volume
+  device_name = "/dev/sdf" # Use /dev/sdf for data volume
   volume_id   = aws_ebs_volume.staging_mongodb.id
   instance_id = aws_instance.staging.id
 }
@@ -462,8 +462,9 @@ resource "random_string" "staging_suffix" {
 }
 
 # Route 53 for staging
+# Legacy domain records (myphonefriend.com)
 resource "aws_route53_record" "staging_api" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "staging-api.myphonefriend.com"
   type    = "A"
 
@@ -475,7 +476,7 @@ resource "aws_route53_record" "staging_api" {
 }
 
 resource "aws_route53_record" "staging_sip" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "staging-sip.myphonefriend.com"
   type    = "A"
   ttl     = 60
@@ -484,7 +485,7 @@ resource "aws_route53_record" "staging_sip" {
 
 # Route 53 for staging frontend
 resource "aws_route53_record" "staging_frontend" {
-  zone_id = data.aws_route53_zone.myphonefriend.zone_id
+  zone_id = data.aws_route53_zone.legacy.zone_id
   name    = "staging.myphonefriend.com"
   type    = "A"
 
@@ -495,19 +496,52 @@ resource "aws_route53_record" "staging_frontend" {
   }
 }
 
-# ACM Certificate for staging (uses the same wildcard cert as production)
+# Primary domain records (biancawellness.com) - Parallel setup
+resource "aws_route53_record" "staging_api_primary" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "staging-api.${var.primary_domain}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.staging.dns_name
+    zone_id                = aws_lb.staging.zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "staging_sip_primary" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "staging-sip.${var.primary_domain}"
+  type    = "A"
+  ttl     = 60
+  records = [aws_instance.staging.public_ip]
+}
+
+resource "aws_route53_record" "staging_frontend_primary" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "staging.${var.primary_domain}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.staging.dns_name
+    zone_id                = aws_lb.staging.zone_id
+    evaluate_target_health = false
+  }
+}
+
+# ACM Certificate for staging (legacy domain)
 data "aws_acm_certificate" "staging_cert" {
   domain      = "*.myphonefriend.com"
   statuses    = ["ISSUED"]
   most_recent = true
 }
 
-# HTTPS Listener for staging
+# HTTPS Listener for staging - supports both domains via SNI
 resource "aws_lb_listener" "staging_https" {
   load_balancer_arn = aws_lb.staging.arn
   port              = "443"
   protocol          = "HTTPS"
-  certificate_arn   = data.aws_acm_certificate.staging_cert.arn
+  certificate_arn   = data.aws_acm_certificate.staging_cert.arn # Legacy cert as default
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06"
 
   default_action {
@@ -516,7 +550,60 @@ resource "aws_lb_listener" "staging_https" {
   }
 }
 
-# HTTPS Listener Rule for API traffic
+# Add primary domain certificate to staging listener (SNI - supports multiple certs)
+resource "aws_lb_listener_certificate" "staging_https_primary" {
+  listener_arn    = aws_lb_listener.staging_https.arn
+  certificate_arn = aws_acm_certificate_validation.primary_domain_cert.certificate_arn
+}
+
+# Redirect rules - higher priority (lower number) so redirects happen first
+# Redirect staging-api.myphonefriend.com → staging-api.biancawellness.com
+resource "aws_lb_listener_rule" "staging_api_redirect" {
+  listener_arn = aws_lb_listener.staging_https.arn
+  priority     = 50
+
+  action {
+    type = "redirect"
+
+    redirect {
+      host        = "staging-api.${var.primary_domain}"
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    host_header {
+      values = ["staging-api.${var.legacy_domain}"]
+    }
+  }
+}
+
+# Redirect staging.myphonefriend.com → staging.biancawellness.com
+resource "aws_lb_listener_rule" "staging_frontend_redirect" {
+  listener_arn = aws_lb_listener.staging_https.arn
+  priority     = 51
+
+  action {
+    type = "redirect"
+
+    redirect {
+      host        = "staging.${var.primary_domain}"
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    host_header {
+      values = ["staging.${var.legacy_domain}"]
+    }
+  }
+}
+
+# HTTPS Listener Rule for API traffic - updated to use host header instead of path
 resource "aws_lb_listener_rule" "staging_api_https_rule" {
   listener_arn = aws_lb_listener.staging_https.arn
   priority     = 100
@@ -527,8 +614,8 @@ resource "aws_lb_listener_rule" "staging_api_https_rule" {
   }
 
   condition {
-    path_pattern {
-      values = ["/api/*", "/health", "/admin/*"]
+    host_header {
+      values = ["staging-api.${var.primary_domain}"]
     }
   }
 }
@@ -608,7 +695,7 @@ resource "aws_lambda_function" "staging_auto_stop" {
 data "archive_file" "staging_auto_stop" {
   type        = "zip"
   output_path = "staging-auto-stop.zip"
-  
+
   source {
     content  = <<EOF
 import boto3
@@ -668,37 +755,37 @@ resource "aws_lambda_permission" "staging_auto_stop" {
 ################################################################################
 
 output "staging_instance_ip" {
-  value = aws_instance.staging.public_ip
+  value       = aws_instance.staging.public_ip
   description = "Staging instance public IP"
 }
 
 output "staging_api_url" {
-  value = "https://staging-api.myphonefriend.com"
+  value       = "https://staging-api.myphonefriend.com"
   description = "Staging API URL"
 }
 
 output "staging_sip_url" {
-  value = "staging-sip.myphonefriend.com"
+  value       = "staging-sip.myphonefriend.com"
   description = "Staging SIP URL for Twilio"
 }
 
 output "staging_ssh_command" {
-  value = "ssh -i ~/.ssh/${var.asterisk_key_pair_name}.pem ec2-user@${aws_instance.staging.public_ip}"
+  value       = "ssh -i ~/.ssh/${var.asterisk_key_pair_name}.pem ec2-user@${aws_instance.staging.public_ip}"
   description = "SSH command to connect to staging"
 }
 
 output "staging_monthly_cost" {
-  value = "Estimated: $20-30/month (with auto-stop enabled)"
+  value       = "Estimated: $20-30/month (with auto-stop enabled)"
   description = "Staging environment cost estimate"
 }
 
 output "staging_frontend_url" {
-  value = "https://staging.myphonefriend.com"
+  value       = "https://staging.myphonefriend.com"
   description = "Staging frontend URL"
 }
 
 output "staging_frontend_s3_bucket" {
-  value = aws_s3_bucket.staging_frontend.bucket
+  value       = aws_s3_bucket.staging_frontend.bucket
   description = "Staging frontend S3 bucket name"
 }
 
@@ -709,7 +796,7 @@ output "staging_frontend_s3_bucket" {
 # Staging application logs (Docker containers)
 resource "aws_cloudwatch_log_group" "staging_app_logs" {
   name              = "/bianca/staging/app"
-  retention_in_days = 2557  # 7 years for HIPAA compliance (§164.316(b)(2)(i)) - closest valid value
+  retention_in_days = 2557 # 7 years for HIPAA compliance (§164.316(b)(2)(i)) - closest valid value
 
   tags = {
     Name        = "bianca-staging-app-logs"
@@ -720,7 +807,7 @@ resource "aws_cloudwatch_log_group" "staging_app_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_mongodb_logs" {
   name              = "/bianca/staging/mongodb"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-mongodb-logs"
@@ -731,7 +818,7 @@ resource "aws_cloudwatch_log_group" "staging_mongodb_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_asterisk_logs" {
   name              = "/bianca/staging/asterisk"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-asterisk-logs"
@@ -742,7 +829,7 @@ resource "aws_cloudwatch_log_group" "staging_asterisk_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_nginx_logs" {
   name              = "/bianca/staging/nginx"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-nginx-logs"
@@ -753,7 +840,7 @@ resource "aws_cloudwatch_log_group" "staging_nginx_logs" {
 
 resource "aws_cloudwatch_log_group" "staging_frontend_logs" {
   name              = "/bianca/staging/frontend"
-  retention_in_days = 2557  # 7 years for HIPAA compliance
+  retention_in_days = 2557 # 7 years for HIPAA compliance
 
   tags = {
     Name        = "bianca-staging-frontend-logs"
@@ -781,7 +868,7 @@ resource "aws_sns_topic" "ses_bounce_complaint_notifications" {
 resource "aws_sns_topic_subscription" "ses_bounce_complaint_email" {
   topic_arn = aws_sns_topic.ses_bounce_complaint_notifications.arn
   protocol  = "email"
-  endpoint  = "jlapp@biancatechnologies.com"  # Change this to your monitoring email
+  endpoint  = "jlapp@biancatechnologies.com" # Change this to your monitoring email
 
   # Note: AWS will send a confirmation email that must be clicked
 }

@@ -180,7 +180,7 @@ resource "aws_route53_record" "corp_dkim" {
   records = ["${element(aws_ses_domain_dkim.corp.dkim_tokens, count.index)}.dkim.amazonses.com"]
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy       = true
     create_before_destroy = true
   }
 }
