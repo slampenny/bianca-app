@@ -473,7 +473,7 @@ echo "Waiting 30 seconds for deployment to complete..."
 sleep 30
 
 echo "Testing production API..."
-curl -f https://api.myphonefriend.com/health && echo "✅ Production environment is healthy!" || echo "❌ Production environment health check failed"
+curl -f https://api.biancawellness.com/health && echo "✅ Production environment is healthy!" || echo "❌ Production environment health check failed"
 
 # Run post-deployment validation
 echo ""
@@ -485,8 +485,8 @@ else
 fi
 
 echo "🎉 Production deployment complete!"
-echo "🌐 Production API: https://api.myphonefriend.com"
-echo "🌐 Production Frontend: https://app.myphonefriend.com"
+echo "🌐 Production API: https://api.biancawellness.com"
+echo "🌐 Production Frontend: https://app.biancawellness.com"
 echo "🔗 SIP Endpoint: sip.biancawellness.com"
 echo ""
 echo "💡 Usage:"
