@@ -67,6 +67,13 @@ router.post('/initiate', validate(twilioCallValidation.initiate), twilioCallCont
  *       "403":
  *         description: Twilio validation failed.
  */
+// Handle both GET and POST for Twilio webhooks
+router.get(
+  '/start-call/:patientId',
+  express.urlencoded({ extended: false }),
+  bypassTwilioAuthMiddleware,
+  twilioCallController.handleStartCall
+);
 router.post(
   '/start-call/:patientId',
   express.urlencoded({ extended: false }),
@@ -96,6 +103,13 @@ router.post(
  *       "403":
  *         description: Twilio validation failed.
  */
+// Handle both GET and POST for Twilio webhooks
+router.get(
+  '/call-status', 
+  express.urlencoded({ extended: false }), 
+  bypassTwilioAuthMiddleware, 
+  twilioCallController.handleCallStatus
+);
 router.post(
   '/call-status', 
   express.urlencoded({ extended: false }), 
@@ -115,6 +129,7 @@ router.post(
  *         description: TwiML for SIP test
  */
 router.get('/test-sip', (req, res) => {
+  const config = require('../../config/config');
   const VoiceResponse = require('twilio').twiml.VoiceResponse;
   const twiml = new VoiceResponse();
 
@@ -122,14 +137,15 @@ router.get('/test-sip', (req, res) => {
   const testPatientId = req.query.testPatientId || 'direct-sip-test';
   const testTwilioSid = req.query.testTwilioSid || `TEST_SIP_${Date.now()}`;
 
-  // Use environment-appropriate SIP endpoint
+  // Use environment-appropriate SIP endpoint from config
+  const primaryDomain = config.primaryDomain || 'biancawellness.com';
   let sipHost, sipPort;
   if (config.env === 'staging') {
-    sipHost = 'staging-sip.myphonefriend.com';
+    sipHost = `staging-sip.${primaryDomain}`;
     sipPort = '5061';
   } else {
     // Production: Use direct Asterisk SIP
-    sipHost = 'sip.myphonefriend.com';
+    sipHost = `sip.${primaryDomain}`;
     sipPort = '5061';
   }
 
