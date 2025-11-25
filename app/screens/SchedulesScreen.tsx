@@ -46,6 +46,10 @@ export const SchedulesScreen = () => {
   // Track if we've already checked for missing schedule to avoid duplicate alerts
   const hasCheckedForAlert = useRef(false)
   
+  // Track if schedule has been modified to enable/disable save button
+  const [hasChanges, setHasChanges] = useState(false)
+  const initialScheduleRef = useRef<Schedule | null>(null)
+  
   // Check if user exits without creating a schedule and create alert if needed
   // Only for new patient creations, not updates
   // useFocusEffect works for both stack navigation and tab navigation
@@ -174,11 +178,21 @@ export const SchedulesScreen = () => {
   }, [colors, currentTheme])
 
   const handleSave = async () => {
+    // Don't save if there are no changes
+    if (!hasChanges && selectedSchedule?.id) {
+      return
+    }
+    
     if (selectedSchedule && selectedSchedule.id) {
       await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule })
+      // Reset changes after successful save
+      setHasChanges(false)
+      initialScheduleRef.current = JSON.parse(JSON.stringify(selectedSchedule))
     } else {
       if (selectedPatient && selectedPatient.id && selectedSchedule) {
         await createNewSchedule({ patientId: selectedPatient.id, data: selectedSchedule })
+        // Reset changes after successful create
+        setHasChanges(false)
       }
     }
   }
@@ -210,7 +224,28 @@ export const SchedulesScreen = () => {
 
   const handleScheduleChange = (newSchedule: Schedule) => {
     dispatch(setSchedule(newSchedule))
+    
+    // Check if schedule has changed from initial state
+    if (initialScheduleRef.current) {
+      const hasChanged = JSON.stringify(newSchedule) !== JSON.stringify(initialScheduleRef.current)
+      setHasChanges(hasChanged)
+    } else {
+      // If no initial schedule, any schedule is considered a change
+      setHasChanges(!!newSchedule)
+    }
   }
+  
+  // Initialize tracking when schedule changes
+  useEffect(() => {
+    if (selectedSchedule) {
+      // Deep clone the schedule for comparison
+      initialScheduleRef.current = JSON.parse(JSON.stringify(selectedSchedule))
+      setHasChanges(false)
+    } else {
+      initialScheduleRef.current = null
+      setHasChanges(false)
+    }
+  }, [selectedSchedule?.id]) // Only reset when schedule ID changes, not on every update
 
 
   if (themeLoading) {
@@ -304,6 +339,7 @@ export const SchedulesScreen = () => {
         preset="primary"
         testID="schedule-save-button"
         accessibilityLabel="schedule-save-button"
+        disabled={!hasChanges && !!selectedSchedule?.id}
       />
       {schedules && schedules.length > 0 && selectedSchedule && selectedSchedule.id && (
         <Button
