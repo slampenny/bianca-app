@@ -241,7 +241,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
                 marginLeft: 8,
                 // Force dark text color for visibility on light gray background in dark mode
                 color: isDarkMode ? '#171717' : '#171717' // Dark text (#171717) for maximum contrast
-              }}>{translate("ssoButtons.google")}</Text>
+              }}>{translate("ssoButtons.continueWithGoogle")}</Text>
             </>
           )}
         </Pressable>
@@ -258,7 +258,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
           ) : (
             <>
               <Text style={styles.microsoftIcon}>M</Text>
-              <Text style={styles.microsoftButtonText}>{translate("ssoButtons.microsoft")}</Text>
+              <Text style={styles.microsoftButtonText}>{translate("ssoButtons.continueWithMicrosoft")}</Text>
             </>
           )}
         </Pressable>

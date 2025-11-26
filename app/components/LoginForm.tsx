@@ -337,7 +337,7 @@ export const LoginForm: FC<LoginFormProps> = ({
               })}
             />
           </View>
-          <Text style={styles.appName}>Bianca</Text>
+          <Text style={styles.appName}>{translate("loginScreen.appName") || "Bianca"}</Text>
           <Text style={styles.appTagline}>{translate("loginScreen.tagline") || "Wellness Check Communication"}</Text>
         </View>
       )}

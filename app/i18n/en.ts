@@ -42,6 +42,7 @@ const en = {
     passwordFieldPlaceholder: "Super secret password here",
     forgotPassword: "Forgot Password?",
     hint: "Hint: you can use any email address and your favorite password :)",
+    appName: "Bianca",
     tagline: "Wellness Check Communication",
   },
   logoutScreen: {
@@ -154,6 +155,8 @@ const en = {
     orContinueWith: "Or continue with",
     google: "Google",
     microsoft: "Microsoft",
+    continueWithGoogle: "Continue with Google",
+    continueWithMicrosoft: "Continue with Microsoft",
     companySSO: "Company SSO",
     ssoNotAvailable: "SSO Not Available",
     signInFailed: "Sign In Failed",

@@ -21,6 +21,7 @@ import {
 import { HomeStackParamList } from "../navigators/navigationTypes"
 import { getPatient } from "../store/patientSlice"
 import { logger } from "../utils/logger"
+import { formatDate as formatDateLocalized } from "../utils/formatDate"
 
 type FraudAbuseAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "FraudAbuseAnalysis">
 
@@ -181,7 +182,7 @@ export function FraudAbuseAnalysisScreen() {
               </View>
             </View>
             <Text style={styles.overviewDate}>
-              {new Date(latestAnalysis.analysisDate).toLocaleDateString()}
+              {formatDateLocalized(latestAnalysis.analysisDate)}
             </Text>
             <View style={styles.overviewStats}>
               <View style={styles.statItem}>

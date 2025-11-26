@@ -22,6 +22,7 @@ import { useTheme } from "app/theme/ThemeContext"
 import { Text, Card, ListItem, Button, Icon } from "app/components"
 import StripePayment from "app/components/StripePayment"
 import { logger } from "../utils/logger"
+import { formatDate as formatDateLocalized } from "../utils/formatDate"
 
 // --- Define the required roles ---
 const AUTHORIZED_ROLES = ["orgAdmin", "superAdmin"]
@@ -49,13 +50,8 @@ const formatCurrency = (amount: number) => {
   }).format(amount)
 }
 
-const formatDate = (dateString: string, options?: Intl.DateTimeFormatOptions) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    ...options,
-  })
+const formatDate = (dateString: string, dateFormat?: string) => {
+  return formatDateLocalized(dateString, dateFormat)
 }
 
 // ================================================
@@ -228,21 +224,11 @@ function ExpandableInvoice({ invoice }: { invoice: any }) {
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{translate("paymentScreen.issueDate")}</Text>
-            <Text style={styles.detailValue}>{formatDate(invoice.issueDate, { 
-              weekday: 'short', 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })}</Text>
+            <Text style={styles.detailValue}>{formatDate(invoice.issueDate, "EEE, MMM dd, yyyy")}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{translate("paymentScreen.dueDate")}</Text>
-            <Text style={styles.detailValue}>{formatDate(invoice.dueDate, { 
-              weekday: 'short', 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })}</Text>
+            <Text style={styles.detailValue}>{formatDate(invoice.dueDate, "EEE, MMM dd, yyyy")}</Text>
           </View>
           {invoice.notes && (
             <View style={styles.detailRow}>

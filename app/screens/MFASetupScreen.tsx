@@ -565,18 +565,23 @@ const createStyles = (colors: ThemeColors) =>
     secretContainer: {
       width: "100%",
       padding: 15,
-      backgroundColor: colors.palette.neutral100,
+      backgroundColor: colors.palette.neutral200 || colors.palette.neutral100,
       borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.palette.neutral300 || colors.border,
     },
     secretLabel: {
       fontSize: 14,
-      color: colors.textDim,
+      color: colors.textDim || colors.text,
       marginBottom: 8,
     },
     secretValue: {
       fontSize: 16,
       fontFamily: "monospace",
-      color: colors.text,
+      color: colors.text || colors.palette.neutral900,
+      backgroundColor: colors.palette.neutral300 || colors.palette.neutral200,
+      padding: 8,
+      borderRadius: 4,
     },
     backupCodesContainer: {
       marginBottom: 20,
@@ -604,12 +609,14 @@ const createStyles = (colors: ThemeColors) =>
     backupCode: {
       fontSize: 14,
       fontFamily: "monospace",
-      color: colors.text,
-      backgroundColor: colors.background,
+      color: colors.text || colors.palette.neutral900,
+      backgroundColor: colors.palette.neutral300 || colors.palette.neutral200,
       padding: 8,
       borderRadius: 4,
       minWidth: 80,
       textAlign: "center",
+      borderWidth: 1,
+      borderColor: colors.palette.neutral400 || colors.palette.neutral300 || colors.border,
     },
     enableButton: {
       marginTop: 10,

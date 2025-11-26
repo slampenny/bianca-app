@@ -21,6 +21,7 @@ import {
 import { HomeStackParamList } from "../navigators/navigationTypes"
 import { getPatient } from "../store/patientSlice"
 import { logger } from "../utils/logger"
+import { formatDate as formatDateLocalized } from "../utils/formatDate"
 
 type MedicalAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "MedicalAnalysis">
 
@@ -235,8 +236,11 @@ export function MedicalAnalysisScreen() {
 
   // Helper to get health level for inverted scores (for display purposes)
   // When we invert a risk score, we need to invert the risk level logic too
+  // Health percentage: 100% = excellent (good), 0% = poor (bad)
+  // Thresholds: >= 70% = good (green), >= 40% = fair (yellow), < 40% = poor (red)
   const getHealthLevel = (invertedScore: number) => {
-    // Inverted: high risk (70+) becomes low health (30-), low risk (0-30) becomes high health (70+)
+    // 100% health (invertedScore = 100) → good ✓
+    // 0% health (invertedScore = 0) → poor ✓
     if (invertedScore >= 70) return { level: translate('medicalAnalysis.good'), color: colors.palette.biancaSuccess }
     if (invertedScore >= 40) return { level: translate('medicalAnalysis.fair'), color: colors.palette.biancaWarning }
     return { level: translate('medicalAnalysis.poor'), color: colors.palette.biancaError }
@@ -300,7 +304,7 @@ export function MedicalAnalysisScreen() {
               </View>
             </View>
             <Text style={styles.overviewDate}>
-              {new Date(latestAnalysis.analysisDate).toLocaleDateString()}
+              {formatDateLocalized(latestAnalysis.analysisDate)}
             </Text>
             <View style={styles.overviewStats}>
               <View style={styles.statItem}>

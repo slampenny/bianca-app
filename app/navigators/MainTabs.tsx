@@ -171,7 +171,7 @@ function ReportsStack() {
 
 export default function MainTabNavigator() {
   const unreadAlertCount = useSelector(selectUnreadAlertCount) // Get unread alert count
-  const { colors } = useTheme()
+  const { colors, fontScale } = useTheme()
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
 
   return (
@@ -185,6 +185,10 @@ export default function MainTabNavigator() {
           backgroundColor: colors.palette.neutral100,
           borderTopColor: (colors.palette as any).biancaBorder || colors.palette.neutral300,
           borderTopWidth: 1,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12 * fontScale,
+          fontWeight: "500",
         },
         tabBarShowLabel: true, // Show labels
         tabBarIcon: ({ focused, color, size }) => {
