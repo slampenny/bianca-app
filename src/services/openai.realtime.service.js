@@ -1784,7 +1784,10 @@ class OpenAIRealtimeService {
             logger.error(`[Emergency Detection] Failed to create alert: ${alertResult.error}`);
           }
         } else {
-          logger.debug(`[Emergency Detection] No emergency detected for ${callId}: ${emergencyResult.reason}`);
+          // Log at info level for better visibility when debugging
+          logger.info(`[Emergency Detection] No emergency detected for ${callId}: ${emergencyResult.reason}`);
+          logger.info(`[Emergency Detection] Transcript: "${message.transcript}"`);
+          logger.info(`[Emergency Detection] Processing details:`, emergencyResult.processing);
         }
       } catch (error) {
         logger.error(`[Emergency Detection] Error processing emergency detection for ${callId}:`, error);

@@ -90,11 +90,13 @@ class EmergencyProcessor {
         falsePositiveResult = filterFalsePositives(text, emergencyResult);
         
         // If not a basic false positive, check context window for narrative vs present-tense
+        // NOTE: We err on the side of sending alerts - only filter if VERY confident it's narrative
         if (!falsePositiveResult.isFalsePositive && config.enableContextAwareFiltering !== false) {
           const narrativeClassification = contextWindow.classifyNarrativeVsPresent(patientId, text);
           
-          // If high confidence that it's narrative (past story), mark as false positive
-          if (narrativeClassification.isNarrative && narrativeClassification.confidence > 0.6) {
+          // Only filter if VERY high confidence (>0.85) that it's narrative (past story)
+          // This ensures we send alerts even for ambiguous cases
+          if (narrativeClassification.isNarrative && narrativeClassification.confidence > 0.85) {
             falsePositiveResult = {
               isFalsePositive: true,
               reason: `Narrative context detected: ${narrativeClassification.reason}`

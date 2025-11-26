@@ -11,6 +11,7 @@ const EMERGENCY_PATTERNS = [
   // CRITICAL SEVERITY (0-1 minute response needed)
   
   // Medical Emergencies - CRITICAL
+  // Match "heart attack" anywhere in text, including "having a heart attack", "I'm having a heart attack", etc.
   { pattern: /\b(heart\s+attack|heartattack)\b/i, phrase: 'heart attack', severity: 'CRITICAL', category: 'Medical' },
   { pattern: /\b(myocardial\s+infarction|mi)\b/i, phrase: 'myocardial infarction', severity: 'CRITICAL', category: 'Medical' },
   { pattern: /\b(can'?t\s+breathe|cannot\s+breathe|can't\s+breath|cannot\s+breath)\b/i, phrase: "can't breathe", severity: 'CRITICAL', category: 'Medical' },
@@ -202,18 +203,21 @@ function filterFalsePositives(text, emergencyMatch) {
   }
 
   // Additional context checks
+  // NOTE: These patterns are conservative - we err on the side of sending alerts
+  // Only filter if we're very confident it's not a current emergency
   const contextChecks = [
-    // Check if emergency phrase appears in a question
-    { pattern: /^\s*what\s+if\s+.*(heart\s+attack|stroke|can'?t\s+breathe)/i, reason: 'hypothetical question' },
+    // Check if emergency phrase appears in a hypothetical question (very specific)
+    { pattern: /^\s*what\s+if\s+(i|you|someone)\s+(had|have|got|get)\s+(a\s+)?(heart\s+attack|stroke)/i, reason: 'hypothetical question' },
     
-    // Check for educational context
-    { pattern: /(symptoms\s+of|signs\s+of).*(heart\s+attack|stroke|emergency)/i, reason: 'educational context' },
+    // Check for educational context (very specific - must have "symptoms of" or "signs of" before)
+    { pattern: /(what\s+are\s+)?(the\s+)?(symptoms\s+of|signs\s+of|what\s+is\s+a)\s+(heart\s+attack|stroke|emergency)/i, reason: 'educational context' },
     
-    // Check for past tense
-    { pattern: /(had|suffered|experienced).*(heart\s+attack|stroke|emergency)/i, reason: 'past tense' },
+    // Check for past tense (must have clear past tense verb BEFORE the emergency phrase)
+    // Don't match if there's "I'm" or "I am" or "having" before it (present tense)
+    { pattern: /(?:^|\W)(?:i\s+)?(had|suffered|experienced|got|was\s+diagnosed\s+with)\s+(a\s+)?(heart\s+attack|stroke|emergency)\b/i, reason: 'past tense' },
     
-    // Check for third person
-    { pattern: /(my\s+(dad|mom|friend|family)).*(had|has|suffered).*(heart\s+attack|stroke|emergency)/i, reason: 'third person reference' }
+    // Check for third person (very specific - must be clearly about someone else)
+    { pattern: /(?:^|\W)(?:my\s+)?(dad|mom|father|mother|friend|neighbor|brother|sister|uncle|aunt|they|he|she)\s+(had|has|suffered|experienced|got)\s+(a\s+)?(heart\s+attack|stroke|emergency)\b/i, reason: 'third person reference' }
   ];
 
   for (const { pattern, reason } of contextChecks) {
