@@ -913,13 +913,13 @@ class OpenAIRealtimeService {
         input_audio_format: 'g711_ulaw',
         output_audio_format: 'g711_ulaw',
 
-        // CRITICAL: Add turn detection to prevent interruptions
-        // Optimized for noisy environments (Phase 1: OpenAI VAD Tuning)
+        // CRITICAL: Add turn detection - optimized for faster response and natural interruptions
+        // Reduced delays for more conversational feel
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.6,              // Increased from 0.5 - more selective (ignores quiet background)
-          prefix_padding_ms: 300,      // Keep at 300ms to capture speech start
-          silence_duration_ms: 1000    // Optimized for noisy environments - wait longer to confirm speech end
+          threshold: 0.6,              // More selective (ignores quiet background)
+          prefix_padding_ms: 200,      // Reduced from 300ms - faster speech start detection
+          silence_duration_ms: 500     // Reduced from 1000ms - faster response after user stops speaking
         },
 
         // Add input transcription for debugging
@@ -1775,6 +1775,26 @@ class OpenAIRealtimeService {
 
           if (alertResult.success) {
             logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert._id}`);
+            
+            // Update session instructions to inform AI that caregiver has been alerted
+            // ONLY do this when we've actually sent an alert successfully
+            try {
+              const emergencyInstruction = `\n\nCRITICAL: An emergency alert has been AUTOMATICALLY sent to the patient's caregiver via text message. In your next response, you MUST inform them: "I've already sent an alert to your caregiver. They'll be notified right away. Please call emergency services right away if you need immediate medical help." Do NOT offer to call emergency services yourself - you cannot make calls. Use "emergency services" (not "911") as it works in all countries. ONLY say this because the system has confirmed an alert was sent.`;
+              
+              const updatedInstructions = (conn.initialPrompt || '') + emergencyInstruction;
+              
+              await this.sendJsonMessage(callId, {
+                type: 'session.update',
+                session: {
+                  instructions: updatedInstructions
+                }
+              });
+              
+              logger.info(`[Emergency Detection] Updated session instructions for ${callId} to include emergency alert notification`);
+            } catch (updateError) {
+              logger.error(`[Emergency Detection] Failed to update session instructions: ${updateError.message}`);
+              // Don't fail the alert creation if instruction update fails
+            }
             
             // For CRITICAL emergencies, log warning for potential intervention
             if (emergencyResult.alertData.severity === 'CRITICAL') {
