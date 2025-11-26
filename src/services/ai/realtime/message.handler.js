@@ -41,13 +41,13 @@ class MessageHandler {
         input_audio_format: 'g711_ulaw',
         output_audio_format: 'g711_ulaw',
 
-        // CRITICAL: Add turn detection to prevent interruptions
-        // Optimized for noisy environments (Phase 1: OpenAI VAD Tuning)
+        // CRITICAL: Add turn detection - optimized for faster response and natural interruptions
+        // Reduced delays for more conversational feel
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.6,              // Increased from 0.5 - more selective (ignores quiet background)
-          prefix_padding_ms: 300,      // Keep at 300ms to capture speech start
-          silence_duration_ms: 1000    // Optimized for noisy environments - wait longer to confirm speech end
+          threshold: 0.6,              // More selective (ignores quiet background)
+          prefix_padding_ms: 200,      // Reduced from 300ms - faster speech start detection
+          silence_duration_ms: 500     // Reduced from 1000ms - faster response after user stops speaking
         },
 
         // Add input transcription for debugging
