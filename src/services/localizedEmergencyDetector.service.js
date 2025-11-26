@@ -104,19 +104,31 @@ class LocalizedEmergencyDetector {
       let highestSeverityMatch = null;
       const severityOrder = { 'CRITICAL': 3, 'HIGH': 2, 'MEDIUM': 1 };
 
+      // Log the text being analyzed for debugging
+      if (normalizedText.toLowerCase().includes('heart') || normalizedText.toLowerCase().includes('attack')) {
+        logger.info(`[Emergency Detection] Analyzing text for heart attack: "${normalizedText}"`);
+      }
+
       for (const phraseDoc of phrases) {
         try {
           const pattern = this.getCompiledPattern(phraseDoc);
-          if (pattern && pattern.test(normalizedText)) {
-            // If no match yet or this match has higher severity
-            if (!highestSeverityMatch || 
-                severityOrder[phraseDoc.severity] > severityOrder[highestSeverityMatch.severity]) {
-              highestSeverityMatch = {
-                phrase: phraseDoc.phrase,
-                severity: phraseDoc.severity,
-                category: phraseDoc.category,
-                phraseId: phraseDoc._id
-              };
+          if (pattern) {
+            const matches = pattern.test(normalizedText);
+            if (matches) {
+              // Log when heart attack pattern is tested
+              if (phraseDoc.phrase === 'heart attack') {
+                logger.info(`[Emergency Detection] Heart attack pattern matched! Pattern: ${phraseDoc.pattern}, Text: "${normalizedText}"`);
+              }
+              // If no match yet or this match has higher severity
+              if (!highestSeverityMatch || 
+                  severityOrder[phraseDoc.severity] > severityOrder[highestSeverityMatch.severity]) {
+                highestSeverityMatch = {
+                  phrase: phraseDoc.phrase,
+                  severity: phraseDoc.severity,
+                  category: phraseDoc.category,
+                  phraseId: phraseDoc._id
+                };
+              }
             }
           }
         } catch (error) {
