@@ -57,6 +57,11 @@ export const paymentApi = createApi({
           startDate: string;
           endDate: string;
         };
+        stripeUsage?: {
+          totalUsage: number;
+          currentPeriodStart: string;
+          currentPeriodEnd: string;
+        };
       },
       { orgId: string; days?: number }
     >({

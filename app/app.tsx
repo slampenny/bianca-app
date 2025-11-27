@@ -36,7 +36,6 @@ import { ViewStyle } from "react-native"
 import useRefreshToken from "./effects/useRefreshToken"
 import { useLanguage } from "./hooks/useLanguage"
 import { AuthModalProvider } from "./contexts/AuthModalContext"
-import telemetry from "./services/telemetry/telemetry.service"
 import { useSelector } from "react-redux"
 import { getCurrentUser } from "./store/authSlice"
 
@@ -71,14 +70,6 @@ function InnerApp() {
   // Set up language change listener to trigger app-wide re-renders
   // This must be inside the Redux Provider
   useLanguage()
-  
-  // Initialize telemetry with user ID
-  const currentUser = useSelector(getCurrentUser)
-  React.useEffect(() => {
-    if (currentUser?.id) {
-      telemetry.setUserId(currentUser.id)
-    }
-  }, [currentUser?.id])
   
   return null
 }

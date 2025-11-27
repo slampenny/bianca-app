@@ -5,11 +5,13 @@ import * as storage from "../utils/storage"
 import { notifyLanguageChange } from "../hooks/languageNotifications"
 import { logger } from "../utils/logger"
 
-// if English isn't your default language, move Translations to the appropriate language file.
-import en, { Translations } from "./en"
+// Type-only import to avoid loading the large en.ts file synchronously
+import type { Translations } from "./en"
 
-// Lazy load other languages to improve initial app load time
+// Lazy load ALL languages (including English) to improve initial app load time
+// This prevents the 40KB+ en.ts file from blocking app startup
 const languageModules = {
+  en: () => import("./en"),
   ar: () => import("./ar"),
   ko: () => import("./ko"),
   fr: () => import("./fr"),
@@ -24,12 +26,8 @@ const languageModules = {
 
 i18n.fallbacks = true
 
-// to use regional locales use { "en-US": enUS } etc
-// Start with only English loaded for faster initial load
-i18n.translations = { 
-  en, 
-  "en-US": en, 
-}
+// Start with empty translations - they'll be loaded asynchronously
+i18n.translations = {}
 
 const fallbackLocale = "en-US"
 const LANGUAGE_STORAGE_KEY = "user_selected_language"
@@ -55,6 +53,14 @@ const loadLanguage = async (locale: string): Promise<void> => {
 // Function to initialize language with user preference or system default
 export const initializeLanguage = async () => {
   logger.debug("Initializing language...")
+  
+  // CRITICAL: Load English first as it's the fallback language
+  // This must happen before any other language operations
+  await loadLanguage("en")
+  if (i18n.translations.en) {
+    // Also set en-US to use English translations
+    i18n.translations["en-US"] = i18n.translations.en
+  }
   
   // First, set a default to prevent undefined errors
   i18n.locale = "en"
@@ -160,15 +166,12 @@ export const changeLanguage = async (languageCode: string) => {
 const systemLocale = Localization.getLocales()[0]
 const systemLocaleTag = systemLocale?.languageTag ?? "en-US"
 
-// Set a default locale immediately (only English is loaded initially)
-if (systemLocaleTag === "en" || systemLocaleTag === "en-US") {
-  i18n.locale = systemLocaleTag
-} else {
-  // For non-English locales, default to English and load the actual locale asynchronously
-  i18n.locale = fallbackLocale
-}
+// Set a default locale immediately (translations will be loaded asynchronously)
+// This prevents blocking, but translations may not be available until initializeLanguage completes
+i18n.locale = systemLocaleTag === "en" || systemLocaleTag === "en-US" ? systemLocaleTag : fallbackLocale
 
 // Initialize language with user preference (async)
+// This will load English translations immediately, then load user's preferred language if different
 initializeLanguage()
 
 // handle RTL languages for initial load
