@@ -12,6 +12,7 @@ import {
 } from "react-native"
 import { Text, TextField } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
+import { store } from "../store/store"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
 import { LoadingButton, Button, PhoneInputWeb } from "app/components"
@@ -26,6 +27,7 @@ import {
   useUpdateCaregiverMutation,
   useUploadAvatarMutation,
   useDeleteCaregiverMutation,
+  caregiverApi,
 } from "../services/api/caregiverApi"
 import { useSendInviteMutation } from "../services/api/orgApi"
 import { useGetUnassignedPatientsQuery, useAssignUnassignedPatientsMutation } from "../services/api/patientApi"
@@ -313,6 +315,11 @@ function CaregiverScreen() {
             }).unwrap()
           
           logger.debug('Invite successful:', invitedCaregiver)
+          
+          // Invalidate caregiver list cache so the new invite appears immediately
+          store.dispatch(
+            caregiverApi.util.invalidateTags([{ type: "Caregiver", id: "LIST" }])
+          )
           
           // Clear caregiver state and navigate to success screen
           dispatch(clearCaregiver())

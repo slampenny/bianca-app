@@ -5,6 +5,7 @@ import baseQueryWithReauth from "./baseQueryWithAuth"
 export const caregiverApi = createApi({
   reducerPath: "caregiverApi",
   baseQuery: baseQueryWithReauth(),
+  tagTypes: ["Caregiver"],
   endpoints: (builder) => ({
     getAllCaregivers: builder.query<
       CaregiverPages,
@@ -22,9 +23,17 @@ export const caregiverApi = createApi({
         method: "GET",
         params,
       }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.results.map(({ id }) => ({ type: "Caregiver" as const, id })),
+              { type: "Caregiver" as const, id: "LIST" },
+            ]
+          : [{ type: "Caregiver" as const, id: "LIST" }],
     }),
     getCaregiver: builder.query<Caregiver, { id: string }>({
       query: ({ id }) => `/caregivers/${id}`,
+      providesTags: (result, error, { id }) => [{ type: "Caregiver" as const, id }],
     }),
     updateCaregiver: builder.mutation<Caregiver, { id: string; caregiver: Partial<Caregiver> }>({
       query: ({ id, caregiver }) => {
@@ -57,6 +66,10 @@ export const caregiverApi = createApi({
           body: filteredData,
         }
       },
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Caregiver", id },
+        { type: "Caregiver", id: "LIST" },
+      ],
     }),
     uploadAvatar: builder.mutation<Caregiver, { id: string; avatar: Blob | File }>({
       query: ({ id, avatar }) => {
@@ -79,6 +92,10 @@ export const caregiverApi = createApi({
         url: `/caregivers/${id}`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Caregiver", id },
+        { type: "Caregiver", id: "LIST" },
+      ],
     }),
     getPatientForCaregiver: builder.query<Patient, { patientId: string; caregiverId: string }>({
       query: ({ patientId, caregiverId }) => ({
