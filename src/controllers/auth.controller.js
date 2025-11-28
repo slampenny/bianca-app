@@ -33,7 +33,11 @@ const register = catchAsync(async (req, res, next) => {
     const locale = caregiver.preferredLanguage || 'en';
     await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
   } catch (emailError) {
-    console.error('Failed to send verification email during registration:', emailError);
+    logger.error('Failed to send verification email during registration', {
+      error: emailError.message,
+      stack: emailError.stack,
+      email: caregiver.email
+    });
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Registration successful but verification email failed. Please contact support.');
   }
   
@@ -129,7 +133,11 @@ const login = catchAsync(async (req, res, next) => {
         const locale = caregiver.preferredLanguage || 'en';
         await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
       } catch (emailError) {
-        console.error('Failed to resend verification email:', emailError);
+        logger.error('Failed to resend verification email', {
+          error: emailError.message,
+          stack: emailError.stack,
+          email: caregiver.email
+        });
       }
       
       throw new ApiError(httpStatus.FORBIDDEN, 'Please verify your email before logging in. A verification email has been sent.');
@@ -378,7 +386,11 @@ const resendVerificationEmail = catchAsync(async (req, res) => {
     await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
     res.status(httpStatus.OK).send({ message: 'Verification email sent successfully' });
   } catch (emailError) {
-    console.error('Failed to resend verification email:', emailError);
+    logger.error('Failed to resend verification email', {
+      error: emailError.message,
+      stack: emailError.stack,
+      email: req.caregiver?.email
+    });
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to send verification email');
   }
 });

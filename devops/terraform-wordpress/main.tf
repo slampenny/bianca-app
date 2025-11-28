@@ -44,7 +44,7 @@ variable "wp_domain" {
 variable "wordpress_instance_type" {
   description = "EC2 instance type for WordPress"
   type        = string
-  default     = "t3.micro"
+  default     = "t3.small"  # Upgraded from t3.micro for better reliability
 }
 
 variable "wordpress_key_pair_name" {
@@ -107,6 +107,11 @@ data "aws_route53_zone" "biancatechnologies" {
 
 data "aws_route53_zone" "biancawellness" {
   name         = "biancawellness.com."
+  private_zone = false
+}
+
+data "aws_route53_zone" "myphonefriend" {
+  name         = "myphonefriend.com."
   private_zone = false
 }
 
@@ -481,7 +486,7 @@ resource "aws_instance" "wordpress" {
   subnet_id              = var.subnet_public_a_id
   iam_instance_profile   = aws_iam_instance_profile.wordpress_profile.name
 
-  user_data = base64encode(templatefile("${path.module}/wordpress-userdata.sh", {
+  user_data_base64 = base64encode(templatefile("${path.module}/wordpress-userdata-compact.sh", {
     wp_domain         = var.wp_domain
     s3_backup_bucket  = aws_s3_bucket.wordpress_media.id
     aws_region        = var.aws_region
@@ -615,8 +620,8 @@ resource "aws_acm_certificate" "wordpress_cert" {
 # Map domain names to their Route53 zone IDs for certificate validation
 locals {
   domain_zone_map = {
-    "myphonefriend.com"              = data.aws_route53_zone.wordpress_domain.zone_id
-    "www.myphonefriend.com"          = data.aws_route53_zone.wordpress_domain.zone_id
+    "myphonefriend.com"              = data.aws_route53_zone.myphonefriend.zone_id
+    "www.myphonefriend.com"          = data.aws_route53_zone.myphonefriend.zone_id
     "biancatechnologies.com"         = data.aws_route53_zone.biancatechnologies.zone_id
     "www.biancatechnologies.com"     = data.aws_route53_zone.biancatechnologies.zone_id
     "biancawellness.com"             = data.aws_route53_zone.biancawellness.zone_id

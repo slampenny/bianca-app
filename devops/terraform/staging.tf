@@ -247,7 +247,7 @@ resource "aws_iam_instance_profile" "staging_profile" {
   role = aws_iam_role.staging_instance_role.name
 }
 
-# Staging EC2 Instance (Spot for cost savings)
+# Staging EC2 Instance (On-demand for reliability, same as production)
 resource "aws_launch_template" "staging" {
   name_prefix   = "bianca-staging-"
   image_id      = data.aws_ami.amazon_linux_2.id
@@ -295,14 +295,16 @@ resource "aws_instance" "staging" {
 
   subnet_id = aws_subnet.staging_public.id
 
-  # Spot instance configuration - increased bid for better availability
-  instance_market_options {
-    market_type = "spot"
-    spot_options {
-      max_price                      = "0.015" # ~70% of on-demand, much more stable
-      spot_instance_type             = "one-time"
-      instance_interruption_behavior = "terminate"
-    }
+  # NO SPOT INSTANCE FOR STAGING - Use on-demand for reliability (same as production)
+  # REMOVED spot configuration - staging should be reliable for testing
+
+  # Enable detailed monitoring for auto-recovery
+  monitoring = true
+
+  # Enable auto-recovery if instance fails health checks
+  # This will automatically restart the instance if it becomes impaired
+  maintenance_options {
+    auto_recovery = "default"
   }
 
   tags = {
@@ -311,9 +313,9 @@ resource "aws_instance" "staging" {
     AutoStop    = "true"
   }
 
-  # Note: Spot instances with one-time requests cannot be stopped
+  # On-demand instances can be stopped and restarted to apply user_data changes
   # To apply user_data changes: terraform taint aws_instance.staging && terraform apply
-  # This will terminate and recreate the instance (data persists on EBS volume)
+  # Or manually: stop instance, update user_data, start instance
   lifecycle {
     ignore_changes = [user_data]
   }

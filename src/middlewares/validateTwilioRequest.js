@@ -33,16 +33,12 @@ const validateTwilioRequest = (req, res, next) => {
   const params = req.body || {};
 
   // --- DETAILED LOGGING BEFORE VALIDATION ---
-  console.log('\n--- Validating Request ---');
-  console.log(
-    `AuthToken Status: ${
-      config.twilio.authToken && config.twilio.authToken.length > 10 ? 'LOADED' : 'MISSING or Invalid Length'
-    }`
-  );
-  console.log('Received Signature:', twilioSignature);
-  console.log('Validation URL Used:', validationUrl); // Log URL being used for the check
-  console.log('Validation Params:', JSON.stringify(params, null, 2));
-  console.log('--------------------------');
+  logger.debug('Validating Twilio request', {
+    authTokenStatus: config.twilio.authToken && config.twilio.authToken.length > 10 ? 'LOADED' : 'MISSING or Invalid Length',
+    receivedSignature: twilioSignature,
+    validationUrl,
+    validationParams: params
+  });
   // --- END DETAILED LOGGING ---
 
   const isValid = twilio.validateRequestWithBody(
@@ -53,8 +49,10 @@ const validateTwilioRequest = (req, res, next) => {
   );
 
   // --- LOG VALIDATION RESULT ---
-  console.log('isValid Result:', isValid);
-  console.log('--- Validation Attempt End ---\n');
+  logger.debug('Twilio validation result', {
+    isValid,
+    validationUrl
+  });
   // --- END RESULT LOG ---
 
   if (!isValid) {
