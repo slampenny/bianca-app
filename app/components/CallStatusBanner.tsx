@@ -173,10 +173,18 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   }
 
   const handleEndCall = async () => {
-    if (status !== 'in-progress') return
+    if (status !== 'in-progress') {
+      logger.warn('End call button clicked but status is not in-progress', { status, conversationId })
+      return
+    }
+    
+    logger.info('🛑 End call button clicked, calling API...', { 
+      conversationId,
+      status,
+      timestamp: new Date().toISOString()
+    })
     
     try {
-      logger.info('End call button clicked, calling API...', { conversationId })
       const result = await endCall({
         conversationId,
         data: {
@@ -185,7 +193,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         }
       }).unwrap()
       
-      logger.info('End call API success:', result)
+      logger.info('✅ End call API success:', result)
       
       // Update local state
       setStatus('completed')
@@ -196,16 +204,44 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         conversationId,
         status: 'completed'
       }))
+      
+      // Clear any previous errors
+      setError(null)
     } catch (err: any) {
-      const errorMessage = err?.data?.message || err?.message || 'Failed to end call'
-      setError(errorMessage)
-      logger.error('End call error:', {
+      // Extract error message from various possible error structures
+      let errorMessage = 'Failed to end call'
+      
+      if (err?.data) {
+        if (typeof err.data === 'string') {
+          errorMessage = err.data
+        } else if (err.data?.message) {
+          errorMessage = err.data.message
+        } else if (err.data?.error) {
+          errorMessage = err.data.error
+        }
+      } else if (err?.message) {
+        errorMessage = err.message
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      }
+      
+      logger.error('❌ End call error:', {
         error: err,
+        errorString: String(err),
+        errorType: typeof err,
         data: err?.data,
         status: err?.status,
+        statusCode: err?.statusCode,
+        response: err?.response,
         message: errorMessage,
-        conversationId
+        conversationId,
+        fullError: JSON.stringify(err, Object.getOwnPropertyNames(err))
       })
+      
+      setError(errorMessage)
+      
+      // Also log to console for debugging
+      console.error('End call failed:', err)
     }
   }
 
