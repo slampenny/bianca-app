@@ -176,7 +176,8 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     if (status !== 'in-progress') return
     
     try {
-      await endCall({
+      logger.info('End call button clicked, calling API...', { conversationId })
+      const result = await endCall({
         conversationId,
         data: {
           outcome: 'answered',
@@ -184,7 +185,10 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         }
       }).unwrap()
       
-      setCallStatus('completed')
+      logger.info('End call API success:', result)
+      
+      // Update local state
+      setStatus('completed')
       onStatusChange?.('completed')
       
       // Update Redux store
@@ -193,8 +197,15 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         status: 'completed'
       }))
     } catch (err: any) {
-      setError('Failed to end call')
-      logger.error('End call error:', err)
+      const errorMessage = err?.data?.message || err?.message || 'Failed to end call'
+      setError(errorMessage)
+      logger.error('End call error:', {
+        error: err,
+        data: err?.data,
+        status: err?.status,
+        message: errorMessage,
+        conversationId
+      })
     }
   }
 
