@@ -93,7 +93,20 @@ export const LoginForm: FC<LoginFormProps> = ({
   }, [])
 
   const handleLoginPress = async () => {
-    if (validationError) return
+    // Show validation error if email is invalid
+    if (validationError) {
+      // Convert validation error to user-friendly message
+      let userFriendlyError = validationError
+      if (validationError === "can't be blank") {
+        userFriendlyError = "Please enter your email address"
+      } else if (validationError === "must be at least 6 characters") {
+        userFriendlyError = "Email address is too short"
+      } else if (validationError === "must be a valid email address") {
+        userFriendlyError = "Please enter a valid email address"
+      }
+      setErrorMessage(userFriendlyError)
+      return
+    }
     setIsLoading(true)
     setErrorMessage("") // Clear previous errors
     try {
