@@ -2927,6 +2927,21 @@ class OpenAIRealtimeService {
 
     if (conn.webSocket) {
       const ws = conn.webSocket;
+      
+      // Cancel any active AI response before closing
+      if (ws.readyState === WebSocket.OPEN && conn._aiIsSpeaking) {
+        try {
+          logger.info(`[OpenAI Realtime] Canceling active AI response before disconnect for ${callId}`);
+          await this.sendJsonMessage(callId, { type: 'response.cancel' });
+          conn._aiIsSpeaking = false;
+          // Give a brief moment for the cancel to be processed
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (err) {
+          logger.warn(`[OpenAI Realtime] Error canceling response before disconnect: ${err.message}`);
+          // Continue with disconnect even if cancel fails
+        }
+      }
+      
       ws.removeAllListeners();
 
       try {

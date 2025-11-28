@@ -80,6 +80,14 @@ if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
   echo "   Deployment will continue - health endpoint should be available shortly"
 fi
 
+# Disable maintenance mode once deployment is validated
+if [ -f "/opt/bianca-deployment/devops/maintenance/disable-maintenance.sh" ]; then
+    echo "   Disabling maintenance mode..."
+    bash /opt/bianca-deployment/devops/maintenance/disable-maintenance.sh || {
+        echo "   ⚠️  Could not disable maintenance mode, but deployment is complete"
+    }
+fi
+
 echo "✅ ValidateService completed - containers are running"
 exit 0
 

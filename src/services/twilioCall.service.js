@@ -403,13 +403,39 @@ class TwilioCallService {
           throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Twilio credentials not configured');
         }
         twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
+        logger.info('[Twilio Service] Twilio client initialized for hangup');
       }
 
+      logger.info(`[Twilio Service] Attempting to hang up call ${callSid}`);
+      
+      // First, check the current call status
+      try {
+        const currentCall = await twilioClient.calls(callSid).fetch();
+        logger.info(`[Twilio Service] Current call status for ${callSid}: ${currentCall.status}`);
+        
+        // If call is already completed or ended, no need to update
+        if (currentCall.status === 'completed' || currentCall.status === 'busy' || currentCall.status === 'no-answer' || currentCall.status === 'failed' || currentCall.status === 'canceled') {
+          logger.info(`[Twilio Service] Call ${callSid} is already in terminal state: ${currentCall.status}. Skipping hangup.`);
+          return currentCall;
+        }
+      } catch (fetchErr) {
+        logger.warn(`[Twilio Service] Could not fetch call status for ${callSid}: ${fetchErr.message}. Proceeding with hangup anyway.`);
+      }
+      
       // Update the call status to 'completed' which will hang up the call
-      await twilioClient.calls(callSid).update({ status: 'completed' });
-      logger.info(`[Twilio Service] Successfully hung up Twilio call ${callSid}`);
+      const updatedCall = await twilioClient.calls(callSid).update({ status: 'completed' });
+      logger.info(`[Twilio Service] Successfully hung up Twilio call ${callSid}. New call status: ${updatedCall.status}`);
+      
+      return updatedCall;
     } catch (err) {
       logger.error(`[Twilio Service] Error hanging up call ${callSid}: ${err.message}`);
+      logger.error(`[Twilio Service] Twilio hangup error details:`, {
+        callSid,
+        errorCode: err.code,
+        errorMessage: err.message,
+        errorStatus: err.status,
+        stack: err.stack
+      });
       throw err;
     }
   }

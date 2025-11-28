@@ -6,6 +6,14 @@ set +e
 
 echo "🧹 BeforeInstall: Setting up docker-compose.yml and nginx.conf..."
 
+# Enable maintenance mode at the start of deployment
+if [ -f "/opt/bianca-deployment/devops/maintenance/enable-maintenance.sh" ]; then
+    echo "   Enabling maintenance mode..."
+    bash /opt/bianca-deployment/devops/maintenance/enable-maintenance.sh || {
+        echo "   ⚠️  Could not enable maintenance mode, continuing anyway..."
+    }
+fi
+
 # Detect environment from instance Name tag
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 AWS_REGION="us-east-2"
@@ -249,6 +257,8 @@ services:
         awslogs-create-group: "true"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/maintenance-mode.flag:/opt/maintenance-mode.flag:ro
+      - /opt/maintenance.html:/opt/maintenance.html:ro
     depends_on:
       - app
       - frontend
@@ -263,14 +273,26 @@ networks:
     driver: bridge
 EOF
 
-# Create nginx config
+# Create nginx config with maintenance mode support
 echo "   Creating nginx.conf..."
 cat > nginx.conf <<EOF
+# Frontend server
 server {
     listen 80;
     server_name $SERVER_NAME_FRONTEND;
     
+    # Serve maintenance page
+    location = /maintenance.html {
+        root /opt;
+        add_header Content-Type text/html;
+    }
+    
     location / {
+        # Check if maintenance flag exists and return 503 with maintenance page
+        if (-f /opt/maintenance-mode.flag) {
+            return 503 /maintenance.html;
+        }
+        
         proxy_pass http://frontend:80;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -278,13 +300,27 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
     }
+    
+    error_page 503 /maintenance.html;
 }
 
+# API server
 server {
     listen 80;
     server_name $SERVER_NAME_API;
     
+    # Serve maintenance page
+    location = /maintenance.html {
+        root /opt;
+        add_header Content-Type text/html;
+    }
+    
     location / {
+        # Check if maintenance flag exists and return 503 with maintenance page
+        if (-f /opt/maintenance-mode.flag) {
+            return 503 /maintenance.html;
+        }
+        
         proxy_pass http://app:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -295,6 +331,8 @@ server {
         proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
         proxy_cache_bypass \$http_upgrade;
     }
+    
+    error_page 503 /maintenance.html;
 }
 EOF
 
