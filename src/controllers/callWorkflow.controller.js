@@ -249,6 +249,15 @@ const updateCallStatus = catchAsync(async (req, res) => {
 const endCall = catchAsync(async (req, res) => {
   const { conversationId } = req.params;
   const { outcome, notes } = req.body;
+  
+  logger.info(`[CallWorkflow] endCall endpoint called`, {
+    conversationId,
+    outcome,
+    notes,
+    body: req.body,
+    user: req.caregiver?.id,
+    timestamp: new Date().toISOString()
+  });
 
   const conversation = await conversationService.getConversationById(conversationId);
   if (!conversation) {
@@ -257,8 +266,8 @@ const endCall = catchAsync(async (req, res) => {
 
   // Actually terminate the call by finding the connection and disconnecting everything
   try {
-    const { getOpenAIRealtimeServiceInstance } = require('../services/openai.realtime.service');
-    const openAIService = getOpenAIRealtimeServiceInstance();
+    const { getOpenAIServiceInstance } = require('../services/openai.realtime.service');
+    const openAIService = getOpenAIServiceInstance();
     
     // Find the connection by conversationId (same approach as getCallStatus)
     let connectionFound = false;
