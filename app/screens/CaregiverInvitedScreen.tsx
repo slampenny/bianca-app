@@ -4,6 +4,8 @@ import { useNavigation, NavigationProp, RouteProp } from "@react-navigation/nati
 import { Screen, LoadingButton, Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
+import { store } from "app/store/store"
+import { caregiverApi } from "app/services/api/caregiverApi"
 
 type CaregiverInvitedScreenRouteProp = RouteProp<OrgStackParamList, "CaregiverInvited">
 
@@ -30,6 +32,10 @@ export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
   const styles = createStyles(colors)
 
   const handleContinue = () => {
+    // Force invalidate caregiver cache before navigating to ensure fresh data
+    store.dispatch(
+      caregiverApi.util.invalidateTags([{ type: "Caregiver", id: "LIST" }])
+    )
     // Navigate back to the caregivers list
     navigation.navigate("Caregivers")
   }

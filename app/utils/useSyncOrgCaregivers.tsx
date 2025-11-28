@@ -1,5 +1,7 @@
 import { useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
+import { useFocusEffect } from "@react-navigation/native"
+import { useCallback } from "react"
 import { getCurrentUser } from "app/store/authSlice"
 import {
   clearCaregivers,
@@ -21,10 +23,16 @@ export function useSyncOrgCaregivers() {
 
   // Query caregivers for this org
   // Skip if user doesn't have permission or no org ID
+  // Refetch on mount to ensure we have fresh data when navigating to this screen
   logger.debug("orgId:", orgId, "canReadAllCaregivers:", canReadAllCaregivers)
-  const { data: caregiversData } = useGetAllCaregiversQuery(
+  const { data: caregiversData, refetch } = useGetAllCaregiversQuery(
     { org: orgId },
-    { skip: !orgId || !canReadAllCaregivers }
+    { 
+      skip: !orgId || !canReadAllCaregivers,
+      refetchOnMountOrArgChange: true, // Always refetch when component mounts or args change
+      // Force refetch even if we have cached data - ensures we get the latest list after invites
+      refetchOnFocus: true, // Refetch when window regains focus
+    }
   )
 
   // When data arrives, store it in the slice
@@ -33,4 +41,21 @@ export function useSyncOrgCaregivers() {
       dispatch(setCaregivers(caregiversData.results))
     }
   }, [caregiversData, dispatch])
+
+  // Aggressively refetch when screen comes into focus (e.g., after navigating from invite screen)
+  // This ensures the list is always fresh when navigating to this screen
+  useFocusEffect(
+    useCallback(() => {
+      if (orgId && canReadAllCaregivers && refetch) {
+        logger.debug("CaregiversScreen focused - immediately refetching caregivers")
+        // Refetch immediately when screen comes into focus
+        refetch().catch((error) => {
+          logger.error("Failed to refetch caregivers on focus:", error)
+        })
+      }
+    }, [orgId, canReadAllCaregivers, refetch])
+  )
+
+  // Return refetch function so components can manually trigger refetch if needed
+  return { refetch }
 }

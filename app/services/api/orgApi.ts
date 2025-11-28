@@ -114,7 +114,10 @@ export const orgApi = createApi({
           body: { name, email, phone },
         }
       },
-      invalidatesTags: ["Caregiver"],
+      invalidatesTags: [
+        { type: "Caregiver", id: "LIST" },
+        { type: "Caregiver" }, // Also invalidate all caregiver tags
+      ],
     }),
     verifyInvite: builder.mutation<void, { orgId: string; token: string }>({
       query: ({ orgId, token }) => {
