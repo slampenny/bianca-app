@@ -55,6 +55,14 @@ const orgSchema = mongoose.Schema(
       type: String,
       trim: true,
     },
+    stripeSubscriptionId: {
+      type: String,
+      trim: true,
+    },
+    stripeSubscriptionItemId: {
+      type: String,
+      trim: true,
+    },
     paymentMethods: [
       {
         type: mongoose.Schema.Types.ObjectId,

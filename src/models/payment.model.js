@@ -33,6 +33,17 @@ const lineItemSchema = mongoose.Schema(
     unitPrice: {
       type: Number,
     },
+    // Stripe sync fields
+    stripeInvoiceItemId: {
+      type: String,
+    },
+    stripeSynced: {
+      type: Boolean,
+      default: false,
+    },
+    stripeSyncedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
@@ -79,6 +90,17 @@ const invoiceSchema = mongoose.Schema(
     },
     stripeInvoiceId: {
       type: String,
+    },
+    stripeSubscriptionId: {
+      type: String,
+    },
+    // Sync status with Stripe
+    stripeSynced: {
+      type: Boolean,
+      default: false,
+    },
+    stripeSyncedAt: {
+      type: Date,
     },
     paidAt: {
       type: Date,
