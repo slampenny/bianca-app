@@ -292,5 +292,150 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log(`   Email subject: ${email.subject}`)
     console.log(`   Token matches: ${emailToken === linkToken}`)
   })
+
+  test('invited caregiver appears immediately on caregivers screen without refresh', async ({ page }) => {
+    // Generate a unique email for this specific test run
+    const uniqueInviteEmail = `invite-caregiver-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`
+    console.log(`Using unique invite email: ${uniqueInviteEmail}`)
+    
+    // Step 1: Admin logs in
+    await page.goto('http://localhost:8081')
+    await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
+
+    // Step 2: Navigate to Organization screen
+    const orgTab = page.locator('[data-testid="tab-org"], [aria-label="Organization tab"]').first()
+    await orgTab.waitFor({ timeout: 10000, state: 'visible' })
+    await orgTab.click()
+    await page.waitForSelector('[data-testid="org-screen"]', { timeout: 10000 })
+
+    // Step 3: Get initial caregiver count (if any)
+    const viewCaregiversButton = page.locator('[data-testid="view-caregivers-button"]').first()
+    const hasViewButton = await viewCaregiversButton.count() > 0
+    
+    let initialCaregiverCount = 0
+    if (hasViewButton) {
+      await viewCaregiversButton.click()
+      await page.waitForSelector('[data-testid="caregivers-screen"]', { timeout: 10000 })
+      await page.waitForTimeout(1000) // Give list time to render
+      initialCaregiverCount = await page.locator('[data-testid="caregiver-card"]').count()
+      console.log(`Initial caregiver count: ${initialCaregiverCount}`)
+      
+      // Navigate back to org screen
+      await page.goBack()
+      await page.waitForSelector('[data-testid="org-screen"]', { timeout: 10000 })
+      await page.waitForTimeout(1000)
+    }
+
+    // Step 4: Click "Invite Caregiver" button
+    const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
+    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.click()
+    
+    await page.waitForSelector('[data-testid="caregiver-screen"]', { timeout: 15000 })
+    await page.waitForTimeout(2000)
+
+    // Step 5: Fill in caregiver details
+    const nameInput = page.locator('[data-testid="caregiver-name-input"]').first()
+    await nameInput.waitFor({ timeout: 10000, state: 'visible' })
+    await nameInput.fill(testData.name)
+    
+    const emailInput = page.locator('[data-testid="caregiver-email-input"]').first()
+    await emailInput.waitFor({ timeout: 10000, state: 'visible' })
+    await emailInput.fill(uniqueInviteEmail)
+    
+    const phoneInput = page.locator('[data-testid="caregiver-phone-input"]').first()
+    await phoneInput.waitFor({ timeout: 10000, state: 'visible' })
+    // Phone validation expects +1XXXXXXXXXX or XXXXXXXXXX (no dashes)
+    // testData.phone has format +1-604-555-XXXX, so we need to remove dashes
+    const phoneWithoutDashes = testData.phone.replace(/-/g, '')
+    await phoneInput.fill(phoneWithoutDashes)
+    
+    // Wait a bit for validation to complete
+    await page.waitForTimeout(500)
+
+    // Step 6: Send the invite - wait for button to be enabled
+    const saveButton = page.locator('[data-testid="caregiver-save-button"]').first()
+    await saveButton.waitFor({ timeout: 10000, state: 'visible' })
+    // Wait for button to be enabled (not disabled)
+    await page.waitForFunction(
+      () => {
+        const button = document.querySelector('[data-testid="caregiver-save-button"]') as HTMLButtonElement
+        return button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
+      },
+      { timeout: 10000 }
+    )
+    await saveButton.click()
+
+    // Step 7: Verify we're on the success screen
+    await page.waitForSelector('[data-testid="caregiver-invited-screen"]', { timeout: 10000 })
+    await expect(page.getByText('Invitation Sent!', { exact: false })).toBeVisible()
+    
+    console.log('✅ Invite sent successfully')
+
+    // Step 8: Click "Continue" button on success screen - this should navigate to Caregivers screen
+    // The CaregiverInvitedScreen has a Continue button that navigates to Caregivers
+    // Try multiple ways to find the Continue button
+    const continueButton = page.getByText('Continue', { exact: false })
+      .or(page.locator('button:has-text("Continue")'))
+      .or(page.locator('[aria-label*="Continue" i]'))
+      .first()
+    
+    const continueButtonCount = await continueButton.count()
+    
+    if (continueButtonCount > 0) {
+      await continueButton.waitFor({ timeout: 10000, state: 'visible' })
+      await continueButton.click()
+      console.log('✅ Clicked Continue button to navigate to Caregivers screen')
+    } else {
+      // Fallback: navigate manually if Continue button not found
+      console.log('⚠️ Continue button not found, navigating manually to caregivers screen')
+      await page.goBack()
+      await page.waitForSelector('[data-testid="org-screen"]', { timeout: 10000 })
+      await page.waitForTimeout(1000)
+      
+      if (hasViewButton) {
+        await viewCaregiversButton.waitFor({ timeout: 10000, state: 'visible' })
+        await viewCaregiversButton.click()
+      } else {
+        throw new Error('View Caregivers button not found - cannot verify caregiver appears')
+      }
+    }
+
+    // Step 9: Wait for caregivers screen and verify the new caregiver appears
+    await page.waitForSelector('[data-testid="caregivers-screen"]', { timeout: 10000 })
+    await page.waitForTimeout(2000) // Give time for cache invalidation and refetch
+
+    // Step 10: Verify the newly invited caregiver appears in the list
+    // Check that caregiver count increased
+    const finalCaregiverCount = await page.locator('[data-testid="caregiver-card"]').count()
+    console.log(`Final caregiver count: ${finalCaregiverCount}`)
+    expect(finalCaregiverCount).toBeGreaterThan(initialCaregiverCount)
+
+    // Step 11: Find the newly invited caregiver by name or email and verify it has "Invited" badge
+    const caregiverCards = page.locator('[data-testid="caregiver-card"]')
+    const caregiverCount = await caregiverCards.count()
+    
+    let foundInvitedCaregiver = false
+    for (let i = 0; i < caregiverCount; i++) {
+      const card = caregiverCards.nth(i)
+      const cardText = await card.textContent()
+      
+      // Check if this card contains the invited caregiver's name or email
+      if (cardText && (cardText.includes(testData.name) || cardText.includes(uniqueInviteEmail))) {
+        // Verify it shows "Invited" badge
+        const invitedBadge = card.locator('text=/Invited/i')
+        const hasInvitedBadge = await invitedBadge.count() > 0
+        
+        if (hasInvitedBadge) {
+          foundInvitedCaregiver = true
+          console.log(`✅ Found invited caregiver "${testData.name}" (${uniqueInviteEmail}) with "Invited" badge`)
+          break
+        }
+      }
+    }
+
+    expect(foundInvitedCaregiver).toBe(true)
+    console.log('✅ Invited caregiver appears immediately on caregivers screen without manual refresh!')
+  })
 })
 

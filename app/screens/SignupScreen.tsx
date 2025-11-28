@@ -38,6 +38,9 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
   // Extract token from URL on web (React Navigation might not parse query params automatically)
   useEffect(() => {
+    let subscription: { remove: () => void } | null = null
+    let isMounted = true
+
     const extractTokenFromUrl = async () => {
       // If we already have a token from route params, use it
       if (token) {
@@ -45,70 +48,115 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       }
 
       try {
-        // On web: Check window.location for query parameters
+        // On web: Check window.location for query parameters (fast, synchronous)
         if (typeof window !== 'undefined' && window.location) {
           const urlParams = new URLSearchParams(window.location.search)
           const urlToken = urlParams.get('token')
-          if (urlToken) {
+          if (urlToken && isMounted) {
             setToken(urlToken)
             navigation.setParams({ token: urlToken } as any)
             return
           }
         }
 
-        // On mobile: Check Linking for deep link URL
-        const initialUrl = await Linking.getInitialURL()
-        if (initialUrl) {
-          try {
-            const urlObj = new URL(initialUrl)
-            const urlToken = urlObj.searchParams.get('token')
-            if (urlToken) {
-              setToken(urlToken)
-              navigation.setParams({ token: urlToken } as any)
-              return
-            }
-          } catch (e) {
-            // URL parsing failed, try regex as fallback
-            const tokenMatch = initialUrl.match(/[?&]token=([^&]+)/)
-            if (tokenMatch && tokenMatch[1]) {
-              const decodedToken = decodeURIComponent(tokenMatch[1])
-              setToken(decodedToken)
-              navigation.setParams({ token: decodedToken } as any)
-              return
+        // On mobile: Check Linking for deep link URL with timeout
+        // Use Promise.race to add a timeout so it doesn't hang
+        try {
+          const initialUrlPromise = Linking.getInitialURL()
+          const timeoutPromise = new Promise<string | null>((resolve) => {
+            setTimeout(() => resolve(null), 2000) // 2 second timeout
+          })
+          
+          const initialUrl = await Promise.race([initialUrlPromise, timeoutPromise])
+          
+          if (initialUrl && isMounted) {
+            try {
+              const urlObj = new URL(initialUrl)
+              const urlToken = urlObj.searchParams.get('token')
+              if (urlToken) {
+                setToken(urlToken)
+                navigation.setParams({ token: urlToken } as any)
+                return
+              }
+            } catch (e) {
+              // URL parsing failed, try regex as fallback
+              const tokenMatch = initialUrl.match(/[?&]token=([^&]+)/)
+              if (tokenMatch && tokenMatch[1] && isMounted) {
+                const decodedToken = decodeURIComponent(tokenMatch[1])
+                setToken(decodedToken)
+                navigation.setParams({ token: decodedToken } as any)
+                return
+              }
             }
           }
+        } catch (e) {
+          logger.debug('Linking.getInitialURL() failed or timed out:', e)
+          // Continue to set up event listener as fallback
         }
 
-        // Also listen for URL changes (in case link is opened while app is running)
-        const subscription = Linking.addEventListener('url', (event) => {
-          try {
-            const urlObj = new URL(event.url)
-            const urlToken = urlObj.searchParams.get('token')
-            if (urlToken && !token) {
-              setToken(urlToken)
-              navigation.setParams({ token: urlToken } as any)
+        // Set up listener for URL changes (in case link is opened while app is running)
+        // This is set up outside the async flow so it's always available
+        if (isMounted) {
+          subscription = Linking.addEventListener('url', (event) => {
+            if (!isMounted) return
+            
+            try {
+              const urlObj = new URL(event.url)
+              const urlToken = urlObj.searchParams.get('token')
+              if (urlToken) {
+                setToken(urlToken)
+                navigation.setParams({ token: urlToken } as any)
+              }
+            } catch (e) {
+              // Try regex fallback
+              const tokenMatch = event.url.match(/[?&]token=([^&]+)/)
+              if (tokenMatch && tokenMatch[1]) {
+                const decodedToken = decodeURIComponent(tokenMatch[1])
+                setToken(decodedToken)
+                navigation.setParams({ token: decodedToken } as any)
+              }
             }
-          } catch (e) {
-            // Try regex fallback
-            const tokenMatch = event.url.match(/[?&]token=([^&]+)/)
-            if (tokenMatch && tokenMatch[1] && !token) {
-              const decodedToken = decodeURIComponent(tokenMatch[1])
-              setToken(decodedToken)
-              navigation.setParams({ token: decodedToken } as any)
-            }
-          }
-        })
-
-        return () => subscription.remove()
+          })
+        }
       } catch (e) {
         logger.error('Error extracting token from URL:', e)
-        return null
+        // Still set up the event listener as fallback
+        if (isMounted) {
+          subscription = Linking.addEventListener('url', (event) => {
+            if (!isMounted) return
+            try {
+              const urlObj = new URL(event.url)
+              const urlToken = urlObj.searchParams.get('token')
+              if (urlToken) {
+                setToken(urlToken)
+                navigation.setParams({ token: urlToken } as any)
+              }
+            } catch (e) {
+              const tokenMatch = event.url.match(/[?&]token=([^&]+)/)
+              if (tokenMatch && tokenMatch[1]) {
+                const decodedToken = decodeURIComponent(tokenMatch[1])
+                setToken(decodedToken)
+                navigation.setParams({ token: decodedToken } as any)
+              }
+            }
+          })
+        }
       }
     }
 
     // If no token in route params, try to extract from URL
     if (!token) {
-      extractTokenFromUrl()
+      extractTokenFromUrl().catch((error) => {
+        logger.error('Failed to extract token from URL:', error)
+      })
+    }
+
+    // Cleanup function - properly placed in useEffect return
+    return () => {
+      isMounted = false
+      if (subscription) {
+        subscription.remove()
+      }
     }
   }, [token, navigation])
 
@@ -223,11 +271,8 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
     }
   }
 
-  if (themeLoading) {
-    return null
-  }
-
-  const styles = createStyles(colors)
+  // Don't block rendering while theme loads - use default colors if needed
+  const styles = createStyles(colors || { palette: { biancaBackground: '#ffffff', biancaHeader: '#000000', biancaError: '#ff0000', neutral100: '#ffffff', neutral600: '#666666', biancaButtonSelected: '#007AFF', biancaBorder: '#e0e0e0', neutral900: '#000000' } })
 
   return (
     <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
