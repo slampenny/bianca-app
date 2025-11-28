@@ -1,20 +1,20 @@
 {
 	"sendResetPasswordEmail": {
-		"subject": "My Phone Friend - Solicitação de redefinição de senha",
-		"text": "Caro cuidador,\n\nRecebemos uma solicitação para redefinir a senha da sua conta My Phone Friend.\n\nPara redefinir sua senha, clique no link abaixo:\n\n%s\n\nEste link de redefinição expirará em 1 hora por motivos de segurança.\n\nSe você não solicitou uma redefinição de senha, ignore este e-mail. Sua conta permanece segura.\n\nAtenciosamente,\nA equipe My Phone Friend\n\n---\nMy Phone Friend - Comunicação de saúde segura\nEste e-mail foi enviado de um domínio verificado: biancawellness.com"
+		"subject": "Bianca Wellness - Solicitação de redefinição de senha",
+		"text": "Caro cuidador,\n\nRecebemos uma solicitação para redefinir a senha da sua conta Bianca Wellness.\n\nPara redefinir sua senha, clique no link abaixo:\n\n%s\n\nEste link de redefinição expirará em 1 hora por motivos de segurança.\n\nSe você não solicitou uma redefinição de senha, ignore este e-mail. Sua conta permanece segura.\n\nAtenciosamente,\nA equipe Bianca Wellness\n\n---\nBianca Wellness - Comunicação de saúde segura\nEste e-mail foi enviado de um domínio verificado: biancawellness.com"
 	},
 	"sendVerificationEmail": {
-		"subject": "My Phone Friend - Por favor, verifique seu endereço de e-mail",
-		"text": "Caro cuidador,\n\nObrigado por criar sua conta My Phone Friend! Para concluir seu registro e garantir a segurança da conta, verifique seu endereço de e-mail.\n\nClique no link abaixo para verificar seu e-mail:\n\n%s\n\nEste link de verificação expirará em 24 horas por motivos de segurança.\n\nSe você não criou uma conta My Phone Friend, ignore este e-mail.\n\nBem-vindo à comunicação de saúde segura!\n\nAtenciosamente,\nA equipe My Phone Friend\n\n---\nMy Phone Friend - Comunicação de saúde segura\nEste e-mail foi enviado de um domínio verificado: biancawellness.com"
+		"subject": "Bianca Wellness - Por favor, verifique seu endereço de e-mail",
+		"text": "Caro cuidador,\n\nObrigado por criar sua conta Bianca Wellness! Para concluir seu registro e garantir a segurança da conta, verifique seu endereço de e-mail.\n\nClique no link abaixo para verificar seu e-mail:\n\n%s\n\nEste link de verificação expirará em 24 horas por motivos de segurança.\n\nSe você não criou uma conta Bianca Wellness, ignore este e-mail.\n\nBem-vindo à comunicação de saúde segura!\n\nAtenciosamente,\nA equipe Bianca Wellness\n\n---\nBianca Wellness - Comunicação de saúde segura\nEste e-mail foi enviado de um domínio verificado: biancawellness.com"
 	},
 	"inviteEmail": {
-		"subject": "Bem-vindo ao My Phone Friend - Convite para participar",
-		"text": "Caro cuidador,\n\nVocê foi convidado a participar do My Phone Friend, uma plataforma segura para comunicação de saúde.\n\nPara aceitar seu convite e configurar sua conta, clique no link abaixo:\n\n%s\n\nEste convite expirará em 7 dias por motivos de segurança.\n\nSe você não esperava este convite, ignore este e-mail.\n\nAtenciosamente,\nA equipe My Phone Friend\n\n---\nMy Phone Friend - Comunicação de saúde segura\nEste e-mail foi enviado de um domínio verificado: biancawellness.com"
+		"subject": "Bem-vindo ao Bianca Wellness - Convite para participar",
+		"text": "Caro cuidador,\n\nVocê foi convidado a participar do Bianca Wellness, uma plataforma segura para comunicação de saúde.\n\nPara aceitar seu convite e configurar sua conta, clique no link abaixo:\n\n%s\n\nEste convite expirará em 7 dias por motivos de segurança.\n\nSe você não esperava este convite, ignore este e-mail.\n\nAtenciosamente,\nA equipe Bianca Wellness\n\n---\nBianca Wellness - Comunicação de saúde segura\nEste e-mail foi enviado de um domínio verificado: biancawellness.com"
 	},
 	"emailVerifiedPage": {
 		"title": "E-mail verificado!",
 		"titleAlreadyVerified": "Já verificado",
-		"message": "Sua conta My Phone Friend foi verificada com sucesso.",
+		"message": "Sua conta Bianca Wellness foi verificada com sucesso.",
 		"messageAlreadyVerified": "Seu e-mail já está verificado. Você pode prosseguir para o login.",
 		"redirecting": "Redirecionando para o aplicativo...",
 		"continueButton": "Continuar para o aplicativo"

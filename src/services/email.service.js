@@ -349,7 +349,7 @@ const sendInviteEmail = async (to, inviteLink, locale = 'en', caregiverName = nu
   const previousLocale = i18n.getLocale();
   i18n.setLocale(locale);
   
-  const subject = i18n.__ ? i18n.__('inviteEmail.subject') : 'Welcome to My Phone Friend - Invitation to Join';
+  const subject = i18n.__ ? i18n.__('inviteEmail.subject') : 'Welcome to Bianca Wellness - Invitation to Join';
   
   // Create personalized greeting
   const greeting = caregiverName ? `Dear ${caregiverName},` : 'Dear caregiver,';
@@ -362,16 +362,16 @@ const sendInviteEmail = async (to, inviteLink, locale = 'en', caregiverName = nu
     // Replace "Dear caregiver," with personalized greeting
     text = text.replace(/Dear caregiver,?/i, greeting);
   } else {
-    text = `${greeting}\n\nYou have been invited to join My Phone Friend, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n${inviteLink}\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe My Phone Friend Team`;
+    text = `${greeting}\n\nYou have been invited to join Bianca Wellness, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n${inviteLink}\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe Bianca Wellness Team`;
   }
   
   // Create HTML version for better deliverability
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
       <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #2c3e50; margin-top: 0;">You're Invited to My Phone Friend!</h2>
+        <h2 style="color: #2c3e50; margin-top: 0;">You're Invited to Bianca Wellness!</h2>
         <p style="color: #555; line-height: 1.6;">${greeting}</p>
-        <p style="color: #555; line-height: 1.6;">You have been invited to join My Phone Friend, a secure platform for healthcare communication.</p>
+        <p style="color: #555; line-height: 1.6;">You have been invited to join Bianca Wellness, a secure platform for healthcare communication.</p>
         <p style="color: #555; line-height: 1.6;">To accept your invitation and set up your account, please click the button below:</p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${inviteLink}" style="background-color: #27ae60; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Accept Invitation</a>
@@ -379,9 +379,9 @@ const sendInviteEmail = async (to, inviteLink, locale = 'en', caregiverName = nu
         <p style="color: #777; font-size: 14px;">This invitation will expire in 7 days for security purposes.</p>
         <p style="color: #777; font-size: 14px;">If you did not expect this invitation, please ignore this email.</p>
         <p style="color: #555; line-height: 1.6; margin-top: 30px;">Welcome to secure healthcare communication!</p>
-        <p style="color: #555; line-height: 1.6;">Best regards,<br>The My Phone Friend Team</p>
+        <p style="color: #555; line-height: 1.6;">Best regards,<br>The Bianca Wellness Team</p>
         <hr style="border: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">Bianca Wellness - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
       </div>
     </div>
   `;
@@ -406,7 +406,7 @@ const sendResetPasswordEmail = async (to, token, locale = 'en') => {
   const previousLocale = i18n.getLocale();
   i18n.setLocale(locale);
   
-  const subject = i18n.__ ? i18n.__('sendResetPasswordEmail.subject') : 'My Phone Friend - Password Reset Request';
+  const subject = i18n.__ ? i18n.__('sendResetPasswordEmail.subject') : 'Bianca Wellness - Password Reset Request';
   const resetLink = `${config.frontendUrl}/reset-password?token=${token}`;
   
   let text;
@@ -415,7 +415,7 @@ const sendResetPasswordEmail = async (to, token, locale = 'en') => {
     const template = i18n.__('sendResetPasswordEmail.text');
     text = template.replace('%s', resetLink);
   } else {
-    text = `Dear caregiver,\n\nWe received a request to reset your My Phone Friend account password.\n\nTo reset your password, please click the link below:\n\n${resetLink}\n\nThis reset link will expire in 1 hour for security purposes.\n\nIf you did not request a password reset, please ignore this email. Your account remains secure.\n\nBest regards,\nThe My Phone Friend Team`;
+    text = `Dear caregiver,\n\nWe received a request to reset your Bianca Wellness account password.\n\nTo reset your password, please click the link below:\n\n${resetLink}\n\nThis reset link will expire in 1 hour for security purposes.\n\nIf you did not request a password reset, please ignore this email. Your account remains secure.\n\nBest regards,\nThe Bianca Wellness Team`;
   }
   
   // Create HTML version for better deliverability
@@ -424,16 +424,16 @@ const sendResetPasswordEmail = async (to, token, locale = 'en') => {
       <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <h2 style="color: #2c3e50; margin-top: 0;">Password Reset Request</h2>
         <p style="color: #555; line-height: 1.6;">Dear caregiver,</p>
-        <p style="color: #555; line-height: 1.6;">We received a request to reset your My Phone Friend account password.</p>
+        <p style="color: #555; line-height: 1.6;">We received a request to reset your Bianca Wellness account password.</p>
         <p style="color: #555; line-height: 1.6;">To reset your password, please click the button below:</p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${resetLink}" style="background-color: #e74c3c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Reset Password</a>
         </div>
         <p style="color: #777; font-size: 14px;">This reset link will expire in 1 hour for security purposes.</p>
         <p style="color: #777; font-size: 14px;">If you did not request a password reset, please ignore this email. Your account remains secure.</p>
-        <p style="color: #555; line-height: 1.6; margin-top: 30px;">Best regards,<br>The My Phone Friend Team</p>
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">Best regards,<br>The Bianca Wellness Team</p>
         <hr style="border: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">Bianca Wellness - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
       </div>
     </div>
   `;
@@ -459,7 +459,7 @@ const sendVerificationEmail = async (to, token, caregiverName = null, locale = '
   const previousLocale = i18n.getLocale();
   i18n.setLocale(locale);
   
-  const subject = i18n.__ ? i18n.__('sendVerificationEmail.subject') : 'My Phone Friend - Please Verify Your Email Address';
+  const subject = i18n.__ ? i18n.__('sendVerificationEmail.subject') : 'Bianca Wellness - Please Verify Your Email Address';
   
   // Always use frontend URL - frontend will handle routing to backend
   // This ensures the verification page appears in the frontend app
@@ -478,25 +478,25 @@ const sendVerificationEmail = async (to, token, caregiverName = null, locale = '
       text = text.replace(/Dear caregiver,?/i, greeting);
     }
   } else {
-    text = `${greeting}\n\nThank you for creating your My Phone Friend account! To complete your registration and ensure account security, please verify your email address.\n\nClick the link below to verify your email:\n\n${verificationLink}\n\nThis verification link will expire in 24 hours for security purposes.\n\nIf you did not create a My Phone Friend account, please ignore this email.\n\nWelcome to secure healthcare communication!\n\nBest regards,\nThe My Phone Friend Team`;
+    text = `${greeting}\n\nThank you for creating your Bianca Wellness account! To complete your registration and ensure account security, please verify your email address.\n\nClick the link below to verify your email:\n\n${verificationLink}\n\nThis verification link will expire in 24 hours for security purposes.\n\nIf you did not create a Bianca Wellness account, please ignore this email.\n\nWelcome to secure healthcare communication!\n\nBest regards,\nThe Bianca Wellness Team`;
   }
   
   // Create HTML version for better deliverability
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
       <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #2c3e50; margin-top: 0;">Welcome to My Phone Friend!</h2>
+        <h2 style="color: #2c3e50; margin-top: 0;">Welcome to Bianca Wellness!</h2>
         <p style="color: #555; line-height: 1.6;">${greeting}</p>
-        <p style="color: #555; line-height: 1.6;">Thank you for creating your My Phone Friend account! To complete your registration and ensure account security, please verify your email address.</p>
+        <p style="color: #555; line-height: 1.6;">Thank you for creating your Bianca Wellness account! To complete your registration and ensure account security, please verify your email address.</p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${verificationLink}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Verify Your Email</a>
         </div>
         <p style="color: #777; font-size: 14px;">This verification link will expire in 24 hours for security purposes.</p>
-        <p style="color: #777; font-size: 14px;">If you did not create a My Phone Friend account, please ignore this email.</p>
+        <p style="color: #777; font-size: 14px;">If you did not create a Bianca Wellness account, please ignore this email.</p>
         <p style="color: #555; line-height: 1.6; margin-top: 30px;">Welcome to secure healthcare communication!</p>
-        <p style="color: #555; line-height: 1.6;">Best regards,<br>The My Phone Friend Team</p>
+        <p style="color: #555; line-height: 1.6;">Best regards,<br>The Bianca Wellness Team</p>
         <hr style="border: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #999; font-size: 12px; text-align: center;">My Phone Friend - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">Bianca Wellness - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
       </div>
     </div>
   `;

@@ -1,20 +1,20 @@
 {
 	"sendResetPasswordEmail": {
-		"subject": "My Phone Friend - 비밀번호 재설정 요청",
-		"text": "보호자님께,\n\nMy Phone Friend 계정 비밀번호 재설정 요청을 받았습니다.\n\n비밀번호를 재설정하려면 아래 링크를 클릭하세요:\n\n%s\n\n이 재설정 링크는 보안상의 이유로 1시간 후 만료됩니다.\n\n비밀번호 재설정을 요청하지 않으셨다면 이 이메일을 무시하세요. 계정은 안전합니다.\n\n감사합니다,\nMy Phone Friend 팀\n\n---\nMy Phone Friend - 안전한 의료 커뮤니케이션\n이 이메일은 확인된 도메인에서 전송되었습니다: biancawellness.com"
+		"subject": "Bianca Wellness - 비밀번호 재설정 요청",
+		"text": "보호자님께,\n\nBianca Wellness 계정 비밀번호 재설정 요청을 받았습니다.\n\n비밀번호를 재설정하려면 아래 링크를 클릭하세요:\n\n%s\n\n이 재설정 링크는 보안상의 이유로 1시간 후 만료됩니다.\n\n비밀번호 재설정을 요청하지 않으셨다면 이 이메일을 무시하세요. 계정은 안전합니다.\n\n감사합니다,\nBianca Wellness 팀\n\n---\nBianca Wellness - 안전한 의료 커뮤니케이션\n이 이메일은 확인된 도메인에서 전송되었습니다: biancawellness.com"
 	},
 	"sendVerificationEmail": {
-		"subject": "My Phone Friend - 이메일 주소를 확인해주세요",
-		"text": "보호자님께,\n\nMy Phone Friend 계정을 만들어 주셔서 감사합니다! 등록을 완료하고 계정 보안을 보장하려면 이메일 주소를 확인해주세요.\n\n아래 링크를 클릭하여 이메일을 확인하세요:\n\n%s\n\n이 확인 링크는 보안상의 이유로 24시간 후 만료됩니다.\n\nMy Phone Friend 계정을 만들지 않으셨다면 이 이메일을 무시하세요.\n\n안전한 의료 커뮤니케이션에 오신 것을 환영합니다!\n\n감사합니다,\nMy Phone Friend 팀\n\n---\nMy Phone Friend - 안전한 의료 커뮤니케이션\n이 이메일은 확인된 도메인에서 전송되었습니다: biancawellness.com"
+		"subject": "Bianca Wellness - 이메일 주소를 확인해주세요",
+		"text": "보호자님께,\n\nBianca Wellness 계정을 만들어 주셔서 감사합니다! 등록을 완료하고 계정 보안을 보장하려면 이메일 주소를 확인해주세요.\n\n아래 링크를 클릭하여 이메일을 확인하세요:\n\n%s\n\n이 확인 링크는 보안상의 이유로 24시간 후 만료됩니다.\n\nBianca Wellness 계정을 만들지 않으셨다면 이 이메일을 무시하세요.\n\n안전한 의료 커뮤니케이션에 오신 것을 환영합니다!\n\n감사합니다,\nBianca Wellness 팀\n\n---\nBianca Wellness - 안전한 의료 커뮤니케이션\n이 이메일은 확인된 도메인에서 전송되었습니다: biancawellness.com"
 	},
 	"inviteEmail": {
-		"subject": "My Phone Friend에 오신 것을 환영합니다 - 참여 초대",
-		"text": "보호자님께,\n\nMy Phone Friend에 참여하도록 초대되었습니다. My Phone Friend는 안전한 의료 커뮤니케이션 플랫폼입니다.\n\n초대를 수락하고 계정을 설정하려면 아래 링크를 클릭하세요:\n\n%s\n\n이 초대는 보안상의 이유로 7일 후 만료됩니다.\n\n이 초대를 기대하지 않으셨다면 이 이메일을 무시하세요.\n\n감사합니다,\nMy Phone Friend 팀\n\n---\nMy Phone Friend - 안전한 의료 커뮤니케이션\n이 이메일은 확인된 도메인에서 전송되었습니다: biancawellness.com"
+		"subject": "Bianca Wellness에 오신 것을 환영합니다 - 참여 초대",
+		"text": "보호자님께,\n\nBianca Wellness에 참여하도록 초대되었습니다. Bianca Wellness는 안전한 의료 커뮤니케이션 플랫폼입니다.\n\n초대를 수락하고 계정을 설정하려면 아래 링크를 클릭하세요:\n\n%s\n\n이 초대는 보안상의 이유로 7일 후 만료됩니다.\n\n이 초대를 기대하지 않으셨다면 이 이메일을 무시하세요.\n\n감사합니다,\nBianca Wellness 팀\n\n---\nBianca Wellness - 안전한 의료 커뮤니케이션\n이 이메일은 확인된 도메인에서 전송되었습니다: biancawellness.com"
 	},
 	"emailVerifiedPage": {
 		"title": "이메일 확인됨!",
 		"titleAlreadyVerified": "이미 확인됨",
-		"message": "My Phone Friend 계정이 성공적으로 확인되었습니다.",
+		"message": "Bianca Wellness 계정이 성공적으로 확인되었습니다.",
 		"messageAlreadyVerified": "이메일이 이미 확인되었습니다. 로그인을 진행할 수 있습니다.",
 		"redirecting": "앱으로 리디렉션 중...",
 		"continueButton": "앱으로 계속"

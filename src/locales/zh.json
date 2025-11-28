@@ -1,20 +1,20 @@
 {
 	"sendResetPasswordEmail": {
-		"subject": "My Phone Friend - 密码重置请求",
-		"text": "亲爱的护理人员，\n\n我们收到了重置您的 My Phone Friend 账户密码的请求。\n\n要重置您的密码，请点击下面的链接：\n\n%s\n\n此重置链接将在1小时后出于安全原因过期。\n\n如果您没有请求重置密码，请忽略此电子邮件。您的账户仍然安全。\n\n此致，\nMy Phone Friend 团队\n\n---\nMy Phone Friend - 安全医疗通信\n此电子邮件从已验证的域名发送：biancawellness.com"
+		"subject": "Bianca Wellness - 密码重置请求",
+		"text": "亲爱的护理人员，\n\n我们收到了重置您的 Bianca Wellness 账户密码的请求。\n\n要重置您的密码，请点击下面的链接：\n\n%s\n\n此重置链接将在1小时后出于安全原因过期。\n\n如果您没有请求重置密码，请忽略此电子邮件。您的账户仍然安全。\n\n此致，\nBianca Wellness 团队\n\n---\nBianca Wellness - 安全医疗通信\n此电子邮件从已验证的域名发送：biancawellness.com"
 	},
 	"sendVerificationEmail": {
-		"subject": "My Phone Friend - 请验证您的电子邮件地址",
-		"text": "亲爱的护理人员，\n\n感谢您创建 My Phone Friend 账户！要完成注册并确保账户安全，请验证您的电子邮件地址。\n\n点击下面的链接以验证您的电子邮件：\n\n%s\n\n此验证链接将在24小时后出于安全原因过期。\n\n如果您没有创建 My Phone Friend 账户，请忽略此电子邮件。\n\n欢迎使用安全医疗通信！\n\n此致，\nMy Phone Friend 团队\n\n---\nMy Phone Friend - 安全医疗通信\n此电子邮件从已验证的域名发送：biancawellness.com"
+		"subject": "Bianca Wellness - 请验证您的电子邮件地址",
+		"text": "亲爱的护理人员，\n\n感谢您创建 Bianca Wellness 账户！要完成注册并确保账户安全，请验证您的电子邮件地址。\n\n点击下面的链接以验证您的电子邮件：\n\n%s\n\n此验证链接将在24小时后出于安全原因过期。\n\n如果您没有创建 Bianca Wellness 账户，请忽略此电子邮件。\n\n欢迎使用安全医疗通信！\n\n此致，\nBianca Wellness 团队\n\n---\nBianca Wellness - 安全医疗通信\n此电子邮件从已验证的域名发送：biancawellness.com"
 	},
 	"inviteEmail": {
-		"subject": "欢迎加入 My Phone Friend - 邀请加入",
-		"text": "亲爱的护理人员，\n\n您已被邀请加入 My Phone Friend，一个安全的医疗通信平台。\n\n要接受您的邀请并设置您的账户，请点击下面的链接：\n\n%s\n\n此邀请将在7天后出于安全原因过期。\n\n如果您没有期待此邀请，请忽略此电子邮件。\n\n此致，\nMy Phone Friend 团队\n\n---\nMy Phone Friend - 安全医疗通信\n此电子邮件从已验证的域名发送：biancawellness.com"
+		"subject": "欢迎加入 Bianca Wellness - 邀请加入",
+		"text": "亲爱的护理人员，\n\n您已被邀请加入 Bianca Wellness，一个安全的医疗通信平台。\n\n要接受您的邀请并设置您的账户，请点击下面的链接：\n\n%s\n\n此邀请将在7天后出于安全原因过期。\n\n如果您没有期待此邀请，请忽略此电子邮件。\n\n此致，\nBianca Wellness 团队\n\n---\nBianca Wellness - 安全医疗通信\n此电子邮件从已验证的域名发送：biancawellness.com"
 	},
 	"emailVerifiedPage": {
 		"title": "电子邮件已验证！",
 		"titleAlreadyVerified": "已验证",
-		"message": "您的 My Phone Friend 账户已成功验证。",
+		"message": "您的 Bianca Wellness 账户已成功验证。",
 		"messageAlreadyVerified": "您的电子邮件已验证。您可以继续登录。",
 		"redirecting": "正在重定向到应用程序...",
 		"continueButton": "继续到应用程序"
