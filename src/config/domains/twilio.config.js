@@ -2,16 +2,23 @@
  * Twilio Configuration
  */
 
-const buildTwilioConfig = (envVars) => ({
-  twilio: {
-    phone: envVars.TWILIO_PHONENUMBER,
-    apiUrl: envVars.PUBLIC_TUNNEL_URL || envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`,
-    accountSid: envVars.TWILIO_ACCOUNTSID,
-    authToken: envVars.TWILIO_AUTHTOKEN,
-    playbackUrl: 'https://default-playback-url.com',
-    websocketUrl: envVars.WEBSOCKET_URL,
-  },
-});
+const buildTwilioConfig = (envVars) => {
+  // Enable call recording in staging, disable in production
+  // staging = record all calls, production = no recording
+  const shouldRecord = envVars.NODE_ENV === 'staging' || envVars.NODE_ENV === 'development';
+  
+  return {
+    twilio: {
+      phone: envVars.TWILIO_PHONENUMBER,
+      apiUrl: envVars.PUBLIC_TUNNEL_URL || envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`,
+      accountSid: envVars.TWILIO_ACCOUNTSID,
+      authToken: envVars.TWILIO_AUTHTOKEN,
+      playbackUrl: 'https://default-playback-url.com',
+      websocketUrl: envVars.WEBSOCKET_URL,
+      recordCalls: shouldRecord, // true for staging/dev, false for production
+    },
+  };
+};
 
 const validateTwilioEnvVars = (envVars) => {
   const schema = Joi.object({

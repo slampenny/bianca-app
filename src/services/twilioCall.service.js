@@ -72,21 +72,31 @@ class TwilioCallService {
       }
 
       // Create call with Twilio
+      // Only record calls in staging/dev, not in production
+      const callOptions = {
+        url: initialTwiMLUrl,
+        to: patient.phone,
+        from: config.twilio.phone,
+        statusCallback: statusCallbackUrl,
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+        statusCallbackMethod: 'POST',
+        answerOnBridge: true,
+        machineDetection: 'DetectMessageEnd', // Detect answering machines
+        machineDetectionTimeout: 10, // Wait 10 seconds for detection
+        timeout: 30 // Ring for 30 seconds before giving up
+      };
+      
+      // Only add record option if enabled in config (staging/dev only)
+      if (config.twilio.recordCalls) {
+        callOptions.record = true;
+        logger.info(`[Twilio Service] Call recording enabled for ${config.env} environment`);
+      } else {
+        logger.info(`[Twilio Service] Call recording disabled for ${config.env} environment`);
+      }
+      
       let call;
       try {
-        call = await twilioClient.calls.create({
-          url: initialTwiMLUrl,
-          to: patient.phone,
-          from: config.twilio.phone,
-          statusCallback: statusCallbackUrl,
-          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-          statusCallbackMethod: 'POST',
-          record: true,
-          answerOnBridge: true,
-          machineDetection: 'DetectMessageEnd', // Detect answering machines
-          machineDetectionTimeout: 10, // Wait 10 seconds for detection
-          timeout: 30 // Ring for 30 seconds before giving up
-        });
+        call = await twilioClient.calls.create(callOptions);
       } catch (twilioError) {
         // Log full Twilio error details
         logger.error(`[Twilio Service] Twilio API error: ${twilioError.message}`);
@@ -199,15 +209,22 @@ class TwilioCallService {
 
       // Connect to Asterisk SIP endpoint with patientId as a parameter
       // CRITICAL FIX: Remove answerOnBridge to prevent initial audio cutoff
-      const dial = twiml.dial({
+      const dialOptions = {
         callerId: config.twilio.phone, // Use configured Twilio number
-        record: 'record-from-answer',
         timeLimit: 1800, // Example: 30 mins
         timeout: 20, // Example: Ring Asterisk for 20 secs
         // answerOnBridge: true, // REMOVED: This was causing initial audio cutoff
         // Note: mediaStream is not supported in Twilio's TwiML Dial verb
         // Media streams are configured via Twilio's Media Streams API, not TwiML
-      });
+      };
+      
+      // Only add record option if enabled in config (staging/dev only)
+      if (config.twilio.recordCalls) {
+        dialOptions.record = 'record-from-answer';
+        logger.info(`[Twilio Service] TwiML recording enabled for ${config.env} environment`);
+      }
+      
+      const dial = twiml.dial(dialOptions);
       
       // Add the SIP endpoint
       dial.sip(sipUri);
