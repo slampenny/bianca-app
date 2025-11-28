@@ -358,7 +358,7 @@ check_nginx() {
 # Check if WordPress responds within reasonable time (detect gateway timeouts)
 check_wordpress_response() {
     # Use a 10 second timeout - if it takes longer, WordPress is likely hung
-    RESPONSE_TIME=$(curl -o /dev/null -s -w "%{time_total}" -m 10 http://localhost:80 2>&1)
+    RESPONSE_TIME=$(curl -o /dev/null -s -w "%%{time_total}" -m 10 http://localhost:80 2>&1)
     EXIT_CODE=$?
     
     if [ $EXIT_CODE -ne 0 ]; then
@@ -368,7 +368,7 @@ check_wordpress_response() {
     
     # Check if response time is too slow (would cause gateway timeout)
     if (( $(echo "$RESPONSE_TIME > 8" | bc -l 2>/dev/null || echo "0") )); then
-        log "⚠️  WordPress responding but very slow (${RESPONSE_TIME}s) - may cause gateway timeouts"
+        log "⚠️  WordPress responding but very slow ($${RESPONSE_TIME}s) - may cause gateway timeouts"
         return 1
     fi
     

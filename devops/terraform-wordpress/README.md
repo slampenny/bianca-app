@@ -34,7 +34,7 @@ terraform apply
 ## 🏗️ Resources Managed
 
 - Application Load Balancer (ALB)
-- EC2 Instance (t3.micro)
+- EC2 Instance (t3.small)
 - EBS Volumes (data + database)
 - Route53 DNS Records
 - ACM SSL Certificate
@@ -59,7 +59,7 @@ WordPress runs independently. You can:
 
 Default values are set in `main.tf`. Override if needed:
 - `wp_domain` - Default: "biancawellness.com"
-- `wordpress_instance_type` - Default: "t3.micro"
+- `wordpress_instance_type` - Default: "t3.small"
 - `subnet_public_a_id` / `subnet_public_b_id` - Auto-discovered if not set
 
 ## ⚠️ Important

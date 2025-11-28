@@ -3,6 +3,7 @@ const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const paymentValidation = require('../../validations/payment.validation');
 const paymentController = require('../../controllers/payment.controller'); // Changed to match your controller name
+const logger = require('../../config/logger');
 
 const router = express.Router();
 
@@ -87,7 +88,9 @@ router
   .route('/patients/:patientId/invoices')
   .post(
     (req, res, next) => {
-      console.log('Received POST to /patients/:patientId/invoices');
+      logger.debug('Received POST to /patients/:patientId/invoices', {
+        patientId: req.params.patientId
+      });
       next();
     },
     auth('createAny:invoice'),

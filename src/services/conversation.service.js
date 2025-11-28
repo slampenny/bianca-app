@@ -600,8 +600,13 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
     // Return raw conversation data for DTO transformation
     const dataPoints = conversations; // Return raw conversations, let DTO handle transformation
 
-    console.log(`[SentimentTrend] Sample raw conversation:`, dataPoints[0]);
-    console.log(`[SentimentTrend] Sample sentiment:`, dataPoints[0]?.analyzedData?.sentiment);
+    logger.debug('SentimentTrend sample data', {
+      sampleConversation: dataPoints[0] ? {
+        id: dataPoints[0]._id,
+        date: dataPoints[0].date
+      } : null,
+      sampleSentiment: dataPoints[0]?.analyzedData?.sentiment
+    });
 
     // Calculate summary statistics
     const sentimentScores = conversations
@@ -623,19 +628,28 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
     let trendDirection = 'stable';
     let confidence = 0;
     
-    console.log(`[SentimentTrend] Processing ${dataPoints.length} data points for patient ${patientId}`);
+    logger.debug('SentimentTrend processing', {
+      patientId,
+      dataPointCount: dataPoints.length
+    });
     
     if (dataPoints.length >= 3) {
       // Sort data points by date (oldest first) for proper trend calculation
       const sortedDataPoints = dataPoints.sort((a, b) => new Date(a.date) - new Date(b.date));
       const sentimentScores = sortedDataPoints.map(point => point.sentiment?.sentimentScore || 0);
       
-      console.log(`[SentimentTrend] Sorted sentiment scores:`, sentimentScores);
+      logger.debug('SentimentTrend sorted scores', {
+        patientId,
+        sentimentScores
+      });
       
       // Use linear regression to calculate trend
       trendDirection = calculateLinearTrend(sentimentScores);
       
-      console.log(`[SentimentTrend] Calculated trend direction:`, trendDirection);
+      logger.debug('SentimentTrend calculated direction', {
+        patientId,
+        trendDirection
+      });
       
       // Calculate confidence based on data quality and quantity
       const scoreVariance = calculateVariance(sentimentScores);
@@ -649,12 +663,20 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
       const lastScore = sortedDataPoints[sortedDataPoints.length - 1].sentiment?.sentimentScore || 0;
       const difference = lastScore - firstScore;
       
-      console.log(`[SentimentTrend] 2-point comparison: first=${firstScore}, last=${lastScore}, difference=${difference}`);
+      logger.debug('SentimentTrend 2-point comparison', {
+        patientId,
+        firstScore,
+        lastScore,
+        difference
+      });
       
       if (difference > 0.05) trendDirection = 'improving';
       else if (difference < -0.05) trendDirection = 'declining';
       
-      console.log(`[SentimentTrend] 2-point trend direction:`, trendDirection);
+      logger.debug('SentimentTrend 2-point direction', {
+        patientId,
+        trendDirection
+      });
       
       confidence = Math.min(0.6, dataPoints.length / 5); // Lower confidence for small datasets
     } else {

@@ -385,6 +385,94 @@ router.post('/generate-reset-password-link', async (req, res) => {
 
 /**
  * @swagger
+ * /test/generate-invite-link:
+ *   post:
+ *     summary: Generate invite link for testing
+ *     description: Returns the invite link that would be sent in an email (for E2E testing). Requires an existing invited caregiver.
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       "200":
+ *         description: Invite link information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 details:
+ *                   type: object
+ *                   properties:
+ *                     inviteLink:
+ *                       type: object
+ *                       properties:
+ *                         frontend:
+ *                           type: string
+ *                           description: Frontend invite URL
+ *                     token:
+ *                       type: string
+ *                       description: Invite token
+ *       "404":
+ *         description: Caregiver not found or not in invited state
+ */
+router.post('/generate-invite-link', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    if (!tokenService || !caregiverService) {
+      return res.status(503).json({ error: 'Required services not available' });
+    }
+
+    // Find caregiver by email
+    const caregiver = await caregiverService.getCaregiverByEmail(email);
+    if (!caregiver) {
+      return res.status(404).json({ error: 'Caregiver not found' });
+    }
+
+    // Check if caregiver is in invited state
+    if (caregiver.role !== 'invited') {
+      return res.status(400).json({ 
+        error: 'Caregiver is not in invited state',
+        currentRole: caregiver.role 
+      });
+    }
+
+    // Generate invite token
+    const inviteToken = await tokenService.generateInviteToken(caregiver);
+    
+    // Build the invite link (same format as email service)
+    const frontendLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
+    
+    res.json({
+      details: {
+        inviteLink: {
+          frontend: frontendLink,
+        },
+        token: inviteToken,
+      },
+    });
+  } catch (err) {
+    logger.error('Error generating invite link for test:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
  * /test/send-sms-patient-0:
  *   post:
  *     summary: Send test SMS to patient 0 phone number

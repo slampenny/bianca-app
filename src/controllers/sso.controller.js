@@ -4,6 +4,7 @@ const Caregiver = require('../models/caregiver.model');
 const Org = require('../models/org.model');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
+const logger = require('../config/logger');
 const { tokenService, orgService, emailService } = require('../services');
 const { tokenTypes } = require('../config/tokens');
 const { CaregiverDTO, OrgDTO } = require('../dtos');
@@ -11,18 +12,25 @@ const { CaregiverDTO, OrgDTO } = require('../dtos');
 const login = async (req, res) => {
   try {
     const { provider, email, name, id: providerId, picture } = req.body;
-    console.log('SSO login attempt:', { provider, email, name, id: providerId });
+    logger.info('SSO login attempt', { provider, email, name, id: providerId });
+
+    // Validate required fields
+    if (!provider || !email || !name || !providerId) {
+      logger.error('SSO login missing required fields', { provider, email, name, id: providerId });
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Missing required SSO fields: provider, email, name, and id are required');
+    }
 
     // Check if caregiver exists with this email
     let caregiver = await Caregiver.findOne({ email });
-    console.log('Caregiver found:', !!caregiver);
+    logger.debug('SSO login caregiver lookup', { email, found: !!caregiver });
 
     let orgForDTO = null;
     
     if (!caregiver) {
-      console.log('Creating new org and caregiver...');
-      // Create new user through the proper registration workflow
-      const org = await orgService.createOrg(
+      logger.info('SSO login creating new org and caregiver', { email, name, provider });
+      try {
+        // Create new user through the proper registration workflow
+        const org = await orgService.createOrg(
         {
           email: email,
           name: `${name}'s Organization`,
@@ -39,11 +47,27 @@ const login = async (req, res) => {
           isEmailVerified: true, // SSO users are pre-verified
           role: 'unverified', // SSO users start as unverified until they complete profile
         }
-      );
+        );
 
-      caregiver = org.caregivers[0];
-      // Use the org we just created
-      orgForDTO = org;
+        caregiver = org.caregivers[0];
+        // Use the org we just created
+        orgForDTO = org;
+        logger.info('SSO login successfully created new org and caregiver', { 
+          orgId: org._id, 
+          caregiverId: caregiver._id 
+        });
+      } catch (createError) {
+        logger.error('SSO login failed to create org and caregiver', {
+          error: createError.message,
+          stack: createError.stack,
+          email,
+          provider
+        });
+        throw new ApiError(
+          httpStatus.INTERNAL_SERVER_ERROR,
+          `Failed to create organization and caregiver: ${createError.message}`
+        );
+      }
       
       // Send verification email automatically after registration (even though SSO users are pre-verified)
       // Temporarily disabled to fix crash
@@ -84,29 +108,67 @@ const login = async (req, res) => {
     }
 
     // Generate JWT tokens with correct structure
-    const accessToken = jwt.sign(
-      {
-        type: tokenTypes.ACCESS,
-        sub: caregiver._id,
-        iat: Math.floor(Date.now() / 1000)
-      },
-      config.jwt.secret,
-      { expiresIn: '1h' }
-    );
+    let accessToken, refreshToken;
+    try {
+      accessToken = jwt.sign(
+        {
+          type: tokenTypes.ACCESS,
+          sub: caregiver._id,
+          iat: Math.floor(Date.now() / 1000)
+        },
+        config.jwt.secret,
+        { expiresIn: '1h' }
+      );
 
-    const refreshToken = jwt.sign(
-      {
-        type: tokenTypes.REFRESH,
-        sub: caregiver._id,
-        iat: Math.floor(Date.now() / 1000)
-      },
-      config.jwt.secret,
-      { expiresIn: '7d' }
-    );
+      refreshToken = jwt.sign(
+        {
+          type: tokenTypes.REFRESH,
+          sub: caregiver._id,
+          iat: Math.floor(Date.now() / 1000)
+        },
+        config.jwt.secret,
+        { expiresIn: '7d' }
+      );
+    } catch (jwtError) {
+      logger.error('SSO login failed to generate JWT tokens', {
+        error: jwtError.message,
+        stack: jwtError.stack,
+        caregiverId: caregiver._id
+      });
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        `Failed to generate authentication tokens: ${jwtError.message}`
+      );
+    }
 
     // Calculate expiration dates
     const accessExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
     const refreshExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
+    // Generate DTOs
+    let userDTO, orgDTO;
+    try {
+      userDTO = CaregiverDTO(caregiver);
+      orgDTO = orgForDTO ? OrgDTO(orgForDTO) : null;
+    } catch (dtoError) {
+      logger.error('SSO login failed to generate DTOs', {
+        error: dtoError.message,
+        stack: dtoError.stack,
+        caregiverId: caregiver._id,
+        orgId: orgForDTO?._id
+      });
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        `Failed to generate response data: ${dtoError.message}`
+      );
+    }
+
+    logger.info('SSO login successful', {
+      provider,
+      email,
+      caregiverId: caregiver._id,
+      orgId: orgForDTO?._id
+    });
 
     res.json({
       success: true,
@@ -121,13 +183,36 @@ const login = async (req, res) => {
           expires: refreshExpires,
         },
       },
-      user: CaregiverDTO(caregiver),
-      org: orgForDTO ? OrgDTO(orgForDTO) : null
+      user: userDTO,
+      org: orgDTO
     });
 
   } catch (error) {
-    console.error('SSO login error:', error);
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Internal server error');
+    // If it's already an ApiError, re-throw it
+    if (error instanceof ApiError) {
+      logger.error('SSO login error (ApiError)', {
+        statusCode: error.statusCode,
+        message: error.message,
+        provider: req.body?.provider,
+        email: req.body?.email
+      });
+      throw error;
+    }
+    
+    // Log the full error for debugging
+    logger.error('SSO login error (unexpected)', {
+      error: error.message,
+      stack: error.stack,
+      provider: req.body?.provider,
+      email: req.body?.email,
+      errorName: error.name,
+      errorType: error.constructor?.name
+    });
+    
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      `SSO login failed: ${error.message || 'Unknown error'}`
+    );
   }
 };
 
@@ -177,11 +262,18 @@ const verify = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('SSO verify error:', error);
+    logger.error('SSO verify error', {
+      error: error.message,
+      stack: error.stack,
+      provider: req.body?.provider
+    });
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Internal server error');
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      `SSO verification failed: ${error.message || 'Unknown error'}`
+    );
   }
 };
 
