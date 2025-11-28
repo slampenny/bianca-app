@@ -6,6 +6,7 @@ const catchAsync = require('../utils/catchAsync');
 const { caregiverService } = require('../services');
 const config = require('../config/config');
 const { CaregiverDTO } = require('../dtos');
+const logger = require('../config/logger');
 
 const getCaregivers = catchAsync(async (req, res) => {
   // Start with query filters for name and role from req.query
@@ -19,10 +20,29 @@ const getCaregivers = catchAsync(async (req, res) => {
     filter._id = req.caregiver._id;
   } else {
     // Otherwise, return caregivers in the same organization.
-    filter.org = req.caregiver.org;
+    // Ensure org is converted to ObjectId if it's a string
+    const orgId = req.caregiver.org;
+    filter.org = orgId;
+    
+    // Debug logging to help diagnose issues
+    logger.debug('getCaregivers query:', {
+      requesterRole: req.caregiver.role,
+      requesterId: req.caregiver.id,
+      orgId: orgId,
+      orgIdType: typeof orgId,
+      filter: filter,
+      queryParams: req.query
+    });
   }
 
   const result = await caregiverService.queryCaregivers(filter, options);
+  
+  // Debug logging for results
+  logger.debug('getCaregivers result:', {
+    totalResults: result.totalResults,
+    resultsCount: result.results?.length || 0,
+    roles: result.results?.map(c => ({ id: c.id, name: c.name, role: c.role, email: c.email })) || []
+  });
 
   res.send(result);
 });
