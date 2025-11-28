@@ -341,22 +341,28 @@ const sendEmail = async (to, subject, text, html) => {
  * @param {string} to
  * @param {string} inviteLink
  * @param {string} [locale='en'] - User's preferred language
+ * @param {string} [caregiverName] - Name of the caregiver being invited
  * @returns {Promise}
  */
-const sendInviteEmail = async (to, inviteLink, locale = 'en') => {
+const sendInviteEmail = async (to, inviteLink, locale = 'en', caregiverName = null) => {
   // Set locale for this email
   const previousLocale = i18n.getLocale();
   i18n.setLocale(locale);
   
   const subject = i18n.__ ? i18n.__('inviteEmail.subject') : 'Welcome to My Phone Friend - Invitation to Join';
   
+  // Create personalized greeting
+  const greeting = caregiverName ? `Dear ${caregiverName},` : 'Dear caregiver,';
+  
   let text;
   if (i18n.__) {
     // Get the template and replace %s with the invite link
     const template = i18n.__('inviteEmail.text');
     text = template.replace('%s', inviteLink);
+    // Replace "Dear caregiver," with personalized greeting
+    text = text.replace(/Dear caregiver,?/i, greeting);
   } else {
-    text = `Dear caregiver,\n\nYou have been invited to join My Phone Friend, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n${inviteLink}\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe My Phone Friend Team`;
+    text = `${greeting}\n\nYou have been invited to join My Phone Friend, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n${inviteLink}\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe My Phone Friend Team`;
   }
   
   // Create HTML version for better deliverability
@@ -364,7 +370,7 @@ const sendInviteEmail = async (to, inviteLink, locale = 'en') => {
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
       <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <h2 style="color: #2c3e50; margin-top: 0;">You're Invited to My Phone Friend!</h2>
-        <p style="color: #555; line-height: 1.6;">Dear caregiver,</p>
+        <p style="color: #555; line-height: 1.6;">${greeting}</p>
         <p style="color: #555; line-height: 1.6;">You have been invited to join My Phone Friend, a secure platform for healthcare communication.</p>
         <p style="color: #555; line-height: 1.6;">To accept your invitation and set up your account, please click the button below:</p>
         <div style="text-align: center; margin: 30px 0;">
@@ -385,7 +391,7 @@ const sendInviteEmail = async (to, inviteLink, locale = 'en') => {
   // Restore previous locale
   i18n.setLocale(previousLocale);
   
-  logger.info(`Invite email successfully queued for ${to} (locale: ${locale})`);
+  logger.info(`Invite email successfully queued for ${to} (locale: ${locale}, name: ${caregiverName || 'not provided'})`);
 };
 
 /**

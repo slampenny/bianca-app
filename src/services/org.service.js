@@ -153,6 +153,7 @@ const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
   let caregiver = await Caregiver.findOne({ email });
 
   if (!caregiver) {
+    // Create new invited caregiver
     caregiver = new Caregiver({
       org: orgId,
       name,
@@ -180,27 +181,40 @@ const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
       caregiversCount: org.caregivers.length,
       caregiverIds: org.caregivers.map(c => c.toString())
     });
-
-    // Generate invite token and send email
-    const inviteToken = await tokenService.generateInviteToken(caregiver);
-    const inviteLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
-    // Get inviter's preferred language for the invite email
-    // If inviter is not found, default to English
-    let locale = 'en';
-    if (inviterId) {
-      const inviter = await Caregiver.findById(inviterId).select('preferredLanguage');
-      if (inviter?.preferredLanguage) {
-        locale = inviter.preferredLanguage;
-      }
-    }
+  } else if (caregiver.role === 'invited' && caregiver.org?.toString() === orgId.toString()) {
+    // Resend invite for existing invited caregiver in the same org
+    logger.info('Resending invite to existing invited caregiver:', {
+      caregiverId: caregiver.id,
+      caregiverEmail: caregiver.email,
+      caregiverName: caregiver.name,
+      orgId: orgId
+    });
     
-    await emailService.sendInviteEmail(email, inviteLink, locale);
-
-    return { caregiver, inviteToken };
+    // Update name and phone in case they've changed
+    caregiver.name = name;
+    caregiver.phone = phone;
+    await caregiver.save();
+  } else {
+    // Caregiver exists but is not in invited state or belongs to different org
+    throw new ApiError(httpStatus.CONFLICT, 'Caregiver already exists');
   }
 
-  // Option 1: Throw error if caregiver already exists.
-  throw new ApiError(httpStatus.CONFLICT, 'Caregiver already invited');
+  // Generate invite token and send email (for both new and resend cases)
+  const inviteToken = await tokenService.generateInviteToken(caregiver);
+  const inviteLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
+  // Get inviter's preferred language for the invite email
+  // If inviter is not found, default to English
+  let locale = 'en';
+  if (inviterId) {
+    const inviter = await Caregiver.findById(inviterId).select('preferredLanguage');
+    if (inviter?.preferredLanguage) {
+      locale = inviter.preferredLanguage;
+    }
+  }
+  
+    await emailService.sendInviteEmail(email, inviteLink, locale, caregiver.name);
+
+  return { caregiver, inviteToken };
 };
 
 const verifyInvite = async (token, caregiverBody = {}) => {
