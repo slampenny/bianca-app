@@ -5,6 +5,7 @@ const emailService = require('./email.service');
 const tokenService = require('./token.service');
 const { tokenTypes } = require('../config/tokens');
 const ApiError = require('../utils/ApiError');
+const logger = require('../config/logger');
 
 /**
  * Create a org and a caregiver
@@ -161,8 +162,24 @@ const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
     });
 
     await caregiver.save();
+    logger.info('Invited caregiver created:', {
+      caregiverId: caregiver.id,
+      caregiverEmail: caregiver.email,
+      caregiverName: caregiver.name,
+      caregiverRole: caregiver.role,
+      caregiverOrg: caregiver.org,
+      orgId: orgId,
+      orgIdType: typeof orgId,
+      caregiverOrgType: typeof caregiver.org
+    });
+    
     org.caregivers.push(caregiver);
     await org.save();
+    logger.info('Caregiver added to org.caregivers array:', {
+      orgId: org.id,
+      caregiversCount: org.caregivers.length,
+      caregiverIds: org.caregivers.map(c => c.toString())
+    });
 
     // Generate invite token and send email
     const inviteToken = await tokenService.generateInviteToken(caregiver);
