@@ -45,6 +45,38 @@ const register = catchAsync(async (req, res, next) => {
   });
 });
 
+const getInviteInfo = catchAsync(async (req, res) => {
+  const { token } = req.query;
+  const { tokenTypes } = require('../config/tokens');
+  
+  if (!token) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Token is required');
+  }
+  
+  try {
+    const inviteTokenDoc = await tokenService.verifyToken(token, tokenTypes.INVITE);
+    
+    // Get the existing invited caregiver (created when invite was sent)
+    const invitedCaregiver = await caregiverService.getCaregiverById(inviteTokenDoc.caregiver);
+    if (!invitedCaregiver) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Invited caregiver not found');
+    }
+    
+    // Return only the info needed to prefill the form (name, email, phone)
+    // Don't return sensitive info like password
+    res.status(httpStatus.OK).send({
+      name: invitedCaregiver.name,
+      email: invitedCaregiver.email,
+      phone: invitedCaregiver.phone,
+    });
+  } catch (error) {
+    if (error.message === 'Invalid or expired invite token' || error.message === 'Token not found') {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid or expired invite token');
+    }
+    throw error;
+  }
+});
+
 const registerWithInvite = catchAsync(async (req, res) => {
   const { token, password, name, email, phone } = req.body;
   const { tokenTypes } = require('../config/tokens');
@@ -394,7 +426,7 @@ const generateVerificationPage = (req, isError, options = {}) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title} - My Phone Friend</title>
+      <title>${title} - Bianca Wellness</title>
       <style>
         * {
           margin: 0;
@@ -649,6 +681,7 @@ const verifyEmail = async (req, res, next) => {
 
 module.exports = {
   register,
+  getInviteInfo,
   registerWithInvite,
   login,
   logout,
