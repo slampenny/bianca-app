@@ -368,6 +368,7 @@ const fr: Translations = {
   caregiversScreen: {
     invited: "Invité",
     edit: "Modifier",
+    resendInvite: "Renvoyer l'invitation",
     noCaregiversFound: "Aucun aidant trouvé",
     notAuthorized: "Non autorisé",
     noPermissionToView: "Vous n'avez pas la permission de voir les aidants. Veuillez contacter votre administrateur.",

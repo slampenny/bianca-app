@@ -261,6 +261,7 @@ const es: Translations = {
   caregiversScreen: {
     invited: "Invitado",
     edit: "Editar",
+    resendInvite: "Reenviar Invitación",
     noCaregiversFound: "No se encontraron cuidadores",
     notAuthorized: "No autorizado",
     noPermissionToView: "No tienes permiso para ver cuidadores",

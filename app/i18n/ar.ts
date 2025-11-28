@@ -352,6 +352,7 @@ const ar: Translations = {
   caregiversScreen: {
     invited: "مدعو",
     edit: "تحرير",
+    resendInvite: "إعادة إرسال الدعوة",
     noCaregiversFound: "لم يتم العثور على مقدمي رعاية",
     notAuthorized: "غير مخول",
     noPermissionToView: "ليس لديك إذن لعرض مقدمي الرعاية. يرجى الاتصال بمديرك.",

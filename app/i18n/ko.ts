@@ -352,6 +352,7 @@ const ko: Translations = {
   caregiversScreen: {
     invited: "초대됨",
     edit: "편집",
+    resendInvite: "초대 다시 보내기",
     noCaregiversFound: "간병인을 찾을 수 없습니다",
     notAuthorized: "승인되지 않음",
     noPermissionToView: "간병인을 볼 권한이 없습니다. 관리자에게 문의하세요.",
@@ -762,6 +763,7 @@ const ko: Translations = {
   caregiversScreen: {
     invited: "초대됨",
     edit: "편집",
+    resendInvite: "초대 다시 보내기",
     noCaregiversFound: "간병인을 찾을 수 없습니다",
     notAuthorized: "권한 없음",
     noPermissionToView: "간병인을 볼 권한이 없습니다",

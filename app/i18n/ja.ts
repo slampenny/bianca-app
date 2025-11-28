@@ -394,6 +394,7 @@ const ja: Translations = {
   caregiversScreen: {
     invited: "招待済み",
     edit: "編集",
+    resendInvite: "招待を再送信",
     noCaregiversFound: "介護者が見つかりません",
     notAuthorized: "認証されていません",
     noPermissionToView: "介護者を表示する権限がありません",

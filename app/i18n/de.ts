@@ -467,6 +467,7 @@ const de: Translations = {
   caregiversScreen: {
     invited: "Eingeladen",
     edit: "Bearbeiten",
+    resendInvite: "Einladung erneut senden",
     noCaregiversFound: "Keine Betreuer gefunden",
     notAuthorized: "Nicht autorisiert",
     noPermissionToView: "Du hast keine Berechtigung, Betreuer anzuzeigen",

@@ -306,6 +306,7 @@ const en = {
   caregiversScreen: {
     invited: "Invited",
     edit: "Edit",
+    resendInvite: "Resend Invite",
     noCaregiversFound: "No caregivers found",
     notAuthorized: "Not Authorized",
     noPermissionToView: "You don't have permission to view caregivers. Please contact your administrator.",
@@ -941,6 +942,7 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
   caregiversScreen: {
     invited: "Invited",
     edit: "Edit",
+    resendInvite: "Resend Invite",
     noCaregiversFound: "No caregivers found",
     notAuthorized: "Not Authorized",
     noPermissionToView: "You don't have permission to view caregivers",

@@ -394,6 +394,7 @@ const zh: Translations = {
   caregiversScreen: {
     invited: "已邀请",
     edit: "编辑",
+    resendInvite: "重新发送邀请",
     noCaregiversFound: "未找到护理人员",
     notAuthorized: "未授权",
     noPermissionToView: "你没有权限查看护理人员",

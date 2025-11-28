@@ -394,6 +394,7 @@ const ru: Translations = {
   caregiversScreen: {
     invited: "Приглашен",
     edit: "Редактировать",
+    resendInvite: "Повторно отправить приглашение",
     noCaregiversFound: "Сиделки не найдены",
     notAuthorized: "Не авторизован",
     noPermissionToView: "У вас нет разрешения на просмотр сиделок",

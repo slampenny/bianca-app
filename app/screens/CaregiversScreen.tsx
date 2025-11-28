@@ -11,13 +11,20 @@ import { useSyncOrgCaregivers } from "app/utils/useSyncOrgCaregivers"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
+import { useSendInviteMutation } from "app/services/api/orgApi"
+import { getOrg } from "app/store/orgSlice"
+import { store } from "app/store/store"
+import { caregiverApi } from "app/services/api/caregiverApi"
 
 export function CaregiversScreen() {
   const dispatch = useDispatch()
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
   const caregivers = useSelector(getCaregivers)
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
+  const currentOrg = useSelector(getOrg)
   const { colors, isLoading: themeLoading } = useTheme()
+  const [sendInvite, { isLoading: isResendingInvite }] = useSendInviteMutation()
+  const [resendingCaregiverId, setResendingCaregiverId] = useState<string | null>(null)
 
   useSyncOrgCaregivers()
 
@@ -53,6 +60,74 @@ export function CaregiversScreen() {
     navigation.navigate("Caregiver")
   }
 
+  const handleResendInvite = async (caregiver: Caregiver) => {
+    if (!currentOrg?.id || !caregiver.email || !caregiver.name || !caregiver.phone) {
+      logger.error("Cannot resend invite: missing required information", {
+        orgId: currentOrg?.id,
+        caregiverEmail: caregiver.email,
+        caregiverName: caregiver.name,
+        caregiverPhone: caregiver.phone
+      })
+      return
+    }
+
+    setResendingCaregiverId(caregiver.id)
+    try {
+      const result = await sendInvite({
+        orgId: currentOrg.id,
+        name: caregiver.name,
+        email: caregiver.email,
+        phone: caregiver.phone,
+      }).unwrap()
+
+      logger.debug("Invite resent successfully", { caregiverId: caregiver.id, email: caregiver.email })
+      
+      // Invalidate caregiver list cache to ensure UI is up to date
+      store.dispatch(
+        caregiverApi.util.invalidateTags([{ type: "Caregiver", id: "LIST" }])
+      )
+
+      // Navigate to the "invite sent" screen, just like the initial invite
+      const invitedCaregiver = result.caregiver || caregiver
+      try {
+        const { CommonActions } = require('@react-navigation/native')
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: "CaregiverInvited",
+            params: {
+              caregiver: {
+                id: invitedCaregiver.id || caregiver.id,
+                name: invitedCaregiver.name || caregiver.name,
+                email: invitedCaregiver.email || caregiver.email,
+              }
+            }
+          })
+        )
+        logger.debug('Navigation to CaregiverInvited called successfully via CommonActions (resend)')
+      } catch (navError) {
+        logger.error('Navigation to CaregiverInvited failed (resend):', navError)
+        // Fallback: try direct navigation
+        try {
+          navigation.navigate("CaregiverInvited" as never, {
+            caregiver: {
+              id: invitedCaregiver.id || caregiver.id,
+              name: invitedCaregiver.name || caregiver.name,
+              email: invitedCaregiver.email || caregiver.email,
+            }
+          } as never)
+          logger.debug('Fallback navigation to CaregiverInvited called (resend)')
+        } catch (fallbackError) {
+          logger.error('Fallback navigation also failed (resend):', fallbackError)
+        }
+      }
+    } catch (error) {
+      logger.error("Failed to resend invite:", error)
+      // TODO: Show error message to user
+    } finally {
+      setResendingCaregiverId(null)
+    }
+  }
+
   const renderCaregiver = ({ item }: { item: Caregiver }) => {
     const isInvited = (item.role as string) === "invited"
     
@@ -80,17 +155,37 @@ export function CaregiversScreen() {
             )}
           </View>
         </View>
-        <Button
-          text={translate("caregiversScreen.edit")}
-          onPress={() => handleCaregiverPress(item)}
-          preset={isInvited ? "default" : "primary"}
-          style={[
-            styles.editButton,
-            isInvited && styles.invitedEditButton
-          ]}
-          textStyle={styles.editButtonText}
-          testID="edit-caregiver-button"
-        />
+        <View style={styles.buttonContainer}>
+          {isInvited && (
+            <Button
+              text={translate("caregiversScreen.resendInvite")}
+              onPress={() => handleResendInvite(item)}
+              preset="default"
+              style={[
+                styles.resendButton,
+                resendingCaregiverId === item.id && styles.resendButtonLoading
+              ]}
+              textStyle={styles.resendButtonText}
+              disabled={isResendingInvite && resendingCaregiverId === item.id}
+              testID="resend-invite-button"
+              accessibilityLabel={`${translate("caregiversScreen.resendInvite")} ${item.name}`}
+              accessibilityHint={isResendingInvite && resendingCaregiverId === item.id 
+                ? "Sending invitation email, please wait"
+                : `Resends the invitation email to ${item.name} at ${item.email}`}
+            />
+          )}
+          <Button
+            text={translate("caregiversScreen.edit")}
+            onPress={() => handleCaregiverPress(item)}
+            preset={isInvited ? "default" : "primary"}
+            style={[
+              styles.editButton,
+              isInvited && styles.invitedEditButton
+            ]}
+            textStyle={styles.editButtonText}
+            testID="edit-caregiver-button"
+          />
+        </View>
       </View>
     )
   }
@@ -166,10 +261,26 @@ const createStyles = (colors: any) => StyleSheet.create({
   caregiverInfo: { alignItems: "center", flexDirection: "row" },
   caregiverName: { color: colors.palette.biancaHeader, flexShrink: 1, fontSize: 16 },
   // Container removed - Screen component handles background
+  buttonContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   editButton: {
     minHeight: 40,
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  resendButton: {
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginRight: 8,
+  },
+  resendButtonLoading: {
+    opacity: 0.6,
+  },
+  resendButtonText: {
+    fontSize: 14,
   },
   editButtonText: { 
     fontSize: 16,
