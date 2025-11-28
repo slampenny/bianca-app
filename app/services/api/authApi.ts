@@ -17,9 +17,18 @@ export const authApi = createApi({
         body: data,
       }),
     }),
+    getInviteInfo: builder.query<
+      { name: string; email: string; phone: string },
+      { token: string }
+    >({
+      query: ({ token }) => ({
+        url: `/auth/invite-info?token=${encodeURIComponent(token)}`,
+        method: "GET",
+      }),
+    }),
     registerWithInvite: builder.mutation<
       { caregiver: Caregiver; tokens: any },
-      { token: string; password: string }
+      { token: string; password: string; name: string; email: string; phone: string }
     >({
       query: (data) => ({
         url: "/auth/registerWithInvite",
@@ -137,6 +146,7 @@ export const authApi = createApi({
 
 export const {
   useRegisterMutation,
+  useGetInviteInfoQuery,
   useRegisterWithInviteMutation,
   useLoginMutation,
   useLogoutMutation,

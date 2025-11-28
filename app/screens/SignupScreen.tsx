@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet, Linking } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
-import { useRegisterWithInviteMutation } from "../services/api/authApi"
+import { useRegisterWithInviteMutation, useGetInviteInfoQuery } from "../services/api/authApi"
 import { useDispatch } from "react-redux"
 import { setInviteToken } from "app/store/authSlice"
 import { Button, Text, TextField, Screen, Header, PhoneInputWeb } from "app/components"
@@ -22,6 +22,12 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
 
   const [registerWithInvite, { isLoading }] = useRegisterWithInviteMutation()
   const [token, setToken] = useState<string | undefined>(routeToken)
+
+  // Fetch invite info to prefill form
+  const { data: inviteInfo, isLoading: isLoadingInviteInfo, error: inviteInfoError } = useGetInviteInfoQuery(
+    { token: token || "" },
+    { skip: !token }
+  )
 
   // Form state - name, email, phone will be prefilled from invite
   const [name, setName] = useState("")
@@ -160,6 +166,25 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
     }
   }, [token, navigation])
 
+  // Prefill form when invite info is loaded
+  useEffect(() => {
+    if (inviteInfo) {
+      setName(inviteInfo.name || "")
+      setEmail(inviteInfo.email || "")
+      setPhone(inviteInfo.phone || "")
+      logger.debug("Prefilled form from invite info:", inviteInfo)
+    }
+  }, [inviteInfo])
+
+  // Handle invite info errors
+  useEffect(() => {
+    if (inviteInfoError && token) {
+      const errorMessage = (inviteInfoError as any)?.data?.message || (inviteInfoError as any)?.message || "Invalid or expired invite token"
+      setGeneralError(errorMessage)
+      logger.error("Failed to load invite info:", inviteInfoError)
+    }
+  }, [inviteInfoError, token])
+
   // Check if we have an invite token and persist it
   useEffect(() => {
     if (token) {
@@ -274,6 +299,16 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
   // Don't block rendering while theme loads - use default colors if needed
   const styles = createStyles(colors || { palette: { biancaBackground: '#ffffff', biancaHeader: '#000000', biancaError: '#ff0000', neutral100: '#ffffff', neutral600: '#666666', biancaButtonSelected: '#007AFF', biancaBorder: '#e0e0e0', neutral900: '#000000' } })
 
+  // Show loading state while fetching invite info
+  if (isLoadingInviteInfo && token) {
+    return (
+      <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
+        <Header titleTx="signupScreen.title" />
+        <Text style={styles.infoText}>Loading invitation details...</Text>
+      </Screen>
+    )
+  }
+
   return (
     <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
       <Header titleTx="signupScreen.title" />
@@ -292,6 +327,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
+        editable={!isLoadingInviteInfo}
       />
 
       <TextField
@@ -316,7 +352,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         onChangeText={setPhone}
         labelTx="signupScreen.phoneLabel"
         placeholderTx="signupScreen.phonePlaceholder"
-        editable={false}
+        editable={!isLoadingInviteInfo}
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
