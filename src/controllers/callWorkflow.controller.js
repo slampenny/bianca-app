@@ -274,22 +274,15 @@ const endCall = catchAsync(async (req, res) => {
     }
     
     if (callIdToDisconnect) {
-      // Disconnect OpenAI WebSocket
+      // Step 1: Cancel OpenAI response and disconnect OpenAI WebSocket
+      // This ensures any active AI responses are canceled and the WebSocket is closed cleanly
+      // Note: channelTracker.cleanupCall will also try to disconnect OpenAI, but that's fine - disconnect is idempotent
       await openAIService.disconnect(callIdToDisconnect);
       logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket for callId ${callIdToDisconnect}`);
       
-      // Hang up the Twilio call if we have a callSid
-      if (conversation.callSid) {
-        try {
-          await twilioCallService.hangupCall(conversation.callSid);
-          logger.info(`[CallWorkflow] Hung up Twilio call ${conversation.callSid}`);
-        } catch (err) {
-          logger.warn(`[CallWorkflow] Error hanging up Twilio call: ${err.message}`);
-          // Continue with other cleanup even if Twilio hangup fails
-        }
-      }
-      
-      // Also trigger Asterisk channel cleanup if we have the asteriskChannelId
+      // Step 2: Cleanup Asterisk channels (RTP listeners, RTP sender, ports, etc.)
+      // This should happen before hanging up Twilio to ensure all resources are released
+      // channelTracker.cleanupCall will also disconnect OpenAI again (idempotent) and update the conversation
       if (conversation.asteriskChannelId) {
         try {
           const { channelTracker } = require('../services');
@@ -297,7 +290,25 @@ const endCall = catchAsync(async (req, res) => {
           logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${conversation.asteriskChannelId}`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel: ${err.message}`);
+          // Continue with Twilio hangup even if Asterisk cleanup fails
         }
+      }
+      
+      // Step 3: Hang up the Twilio call (this terminates the actual phone call)
+      // This should be last because it's the final step that ends the call
+      // After this, Twilio will send webhooks indicating the call has ended
+      if (conversation.callSid) {
+        try {
+          logger.info(`[CallWorkflow] Attempting to hang up Twilio call ${conversation.callSid}`);
+          await twilioCallService.hangupCall(conversation.callSid);
+          logger.info(`[CallWorkflow] Successfully hung up Twilio call ${conversation.callSid}`);
+        } catch (err) {
+          logger.error(`[CallWorkflow] FAILED to hang up Twilio call ${conversation.callSid}: ${err.message}`);
+          logger.error(`[CallWorkflow] Twilio hangup error stack: ${err.stack}`);
+          // Continue with conversation update even if Twilio hangup fails, but log as error
+        }
+      } else {
+        logger.warn(`[CallWorkflow] No callSid found in conversation ${conversationId} - cannot hang up Twilio call`);
       }
     } else {
       logger.warn(`[CallWorkflow] No active connection found for conversation ${conversationId}`);
@@ -315,6 +326,27 @@ const endCall = catchAsync(async (req, res) => {
           logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket using asteriskChannelId fallback: ${conversation.asteriskChannelId}`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Fallback disconnect by asteriskChannelId failed: ${err.message}`);
+        }
+      }
+      
+      // Even if connection not found, still try to hangup Twilio and cleanup Asterisk
+      if (conversation.asteriskChannelId) {
+        try {
+          const { channelTracker } = require('../services');
+          await channelTracker.cleanupCall(conversation.asteriskChannelId, 'Call ended by agent');
+          logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${conversation.asteriskChannelId} (fallback)`);
+        } catch (err) {
+          logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel (fallback): ${err.message}`);
+        }
+      }
+      
+      if (conversation.callSid) {
+        try {
+          await twilioCallService.hangupCall(conversation.callSid);
+          logger.info(`[CallWorkflow] Hung up Twilio call ${conversation.callSid} (fallback)`);
+        } catch (err) {
+          logger.error(`[CallWorkflow] Error hanging up Twilio call (fallback): ${err.message}`);
+          // Don't swallow the error - log it as error so we can see it
         }
       }
     }
