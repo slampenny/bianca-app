@@ -49,6 +49,20 @@ export const caregiverSlice = createSlice({
         state.caregiver = payload.caregiver
       }
     })
+    // Set current caregiver from register response
+    builder.addMatcher(authApi.endpoints.register.matchFulfilled, (state, { payload }) => {
+      logger.debug("[caregiverSlice] authApi.register.matchFulfilled, payload:", payload)
+      if (payload.caregiver) {
+        state.caregiver = payload.caregiver
+      }
+    })
+    // Set current caregiver from registerWithInvite response
+    builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
+      logger.debug("[caregiverSlice] authApi.registerWithInvite.matchFulfilled, payload:", payload)
+      if (payload.caregiver) {
+        state.caregiver = payload.caregiver
+      }
+    })
     // Auto-clear caregivers on logout
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
       state.caregiver = null
