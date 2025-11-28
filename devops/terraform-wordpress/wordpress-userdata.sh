@@ -355,6 +355,26 @@ check_nginx() {
     return 0
 }
 
+# Check if WordPress responds within reasonable time (detect gateway timeouts)
+check_wordpress_response() {
+    # Use a 10 second timeout - if it takes longer, WordPress is likely hung
+    RESPONSE_TIME=$(curl -o /dev/null -s -w "%{time_total}" -m 10 http://localhost:80 2>&1)
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -ne 0 ]; then
+        log "❌ WordPress not responding or timed out"
+        return 1
+    fi
+    
+    # Check if response time is too slow (would cause gateway timeout)
+    if (( $(echo "$RESPONSE_TIME > 8" | bc -l 2>/dev/null || echo "0") )); then
+        log "⚠️  WordPress responding but very slow (${RESPONSE_TIME}s) - may cause gateway timeouts"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Check if WordPress container is running
 check_wordpress_container() {
     if ! docker ps | grep -q "bianca-wordpress\$"; then
@@ -405,6 +425,7 @@ restart_services() {
 log "🔍 Starting WordPress health check..."
 
 NGINX_OK=true
+WORDPRESS_RESPONSE_OK=true
 CONTAINERS_OK=true
 
 # Check containers first
@@ -435,14 +456,20 @@ if ! check_nginx; then
     NGINX_OK=false
 fi
 
+# Check WordPress response time (detect gateway timeouts)
+if ! check_wordpress_response; then
+    log "⚠️  WordPress response timeout or too slow (gateway timeout risk)"
+    WORDPRESS_RESPONSE_OK=false
+fi
+
 # If any issues detected, restart services
-if [ "$CONTAINERS_OK" = false ] || [ "$NGINX_OK" = false ]; then
+if [ "$CONTAINERS_OK" = false ] || [ "$NGINX_OK" = false ] || [ "$WORDPRESS_RESPONSE_OK" = false ]; then
     log "⚠️  Health check failed - restarting services"
     restart_services
     
     # Wait and verify
     sleep 15
-    if check_nginx && check_nginx_container && check_wordpress_container && check_db_container; then
+    if check_nginx && check_wordpress_response && check_nginx_container && check_wordpress_container && check_db_container; then
         log "✅ Health check passed after restart"
     else
         log "❌ Health check still failing after restart - manual intervention may be needed"

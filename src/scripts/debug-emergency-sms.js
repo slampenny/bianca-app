@@ -194,4 +194,3 @@ mongoose.connect(config.mongoose.url, config.mongoose.options)
     console.error('Failed to connect to MongoDB:', error);
     process.exit(1);
   });
-

@@ -3,6 +3,9 @@ const stripeController = require('../../controllers/stripe.controller');
 
 const router = express.Router();
 
+// Middleware to handle raw body for webhook signature verification
+const rawBodyMiddleware = express.raw({ type: 'application/json' });
+
 /**
  * @swagger
  * tags:
@@ -43,6 +46,29 @@ const router = express.Router();
  *                   description: Error message
  */
 router.get('/publishable-key', stripeController.getPublishableKey);
+
+/**
+ * @swagger
+ * /stripe/webhook:
+ *   post:
+ *     summary: Stripe webhook endpoint
+ *     description: Handles Stripe webhook events for billing and subscriptions
+ *     tags: [Stripe]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       "200":
+ *         description: Webhook processed successfully
+ *       "400":
+ *         description: Invalid webhook signature
+ *       "500":
+ *         description: Webhook processing failed
+ */
+router.post('/webhook', rawBodyMiddleware, stripeController.handleWebhook);
 
 module.exports = router;
 

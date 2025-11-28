@@ -143,72 +143,10 @@ const listInvoicesByPatient = async (patientId, filters = {}) => {
 };
 
 const getUnbilledCostsByOrg = async (orgId, days = 7) => {
-  // Get organization info
-  const org = await Org.findById(orgId);
-  if (!org) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
-  }
-
-  // Get all patients for this organization
-  const patients = await Patient.find({ org: orgId });
-  
-  // Calculate date range
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-  
-  // Get unbilled conversations from the specified period
-  const unbilledConversations = await Conversation.find({
-    patientId: { $in: patients.map(p => p._id) },
-    lineItemId: null, // Not yet billed
-    endTime: { $gte: startDate }, // From the specified period
-    cost: { $gt: 0 } // Has a cost
-  }).populate('patientId');
-  
-  // Group conversations by patient
-  const patientCosts = {};
-  let totalUnbilledCost = 0;
-  
-  for (const conversation of unbilledConversations) {
-    const patientId = conversation.patientId._id.toString();
-    const patientName = conversation.patientId.name;
-    
-    if (!patientCosts[patientId]) {
-      patientCosts[patientId] = {
-        patientId,
-        patientName,
-        conversationCount: 0,
-        totalCost: 0,
-        conversations: []
-      };
-    }
-    
-    patientCosts[patientId].conversationCount++;
-    patientCosts[patientId].totalCost += conversation.cost;
-    patientCosts[patientId].conversations.push({
-      conversationId: conversation._id,
-      startTime: conversation.startTime,
-      duration: conversation.duration,
-      cost: conversation.cost,
-      status: conversation.status
-    });
-    
-    totalUnbilledCost += conversation.cost;
-  }
-  
-  // Convert to array and sort by total cost (highest first)
-  const patientCostsArray = Object.values(patientCosts).sort((a, b) => b.totalCost - a.totalCost);
-  
-  return {
-    orgId: org._id,
-    orgName: org.name,
-    totalUnbilledCost,
-    patientCosts: patientCostsArray,
-    period: {
-      days,
-      startDate,
-      endDate: new Date()
-    }
-  };
+  // Use the new Stripe billing service which includes Stripe usage data
+  // This maintains backward compatibility while adding Stripe integration
+  const stripeBillingService = require('./stripeBilling.service');
+  return await stripeBillingService.getUnbilledCosts(orgId, days);
 };
 
 module.exports = {

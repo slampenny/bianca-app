@@ -106,3 +106,8 @@ mongoose.connect(config.mongoose.url, config.mongoose.options)
     process.exit(1);
   });
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> fix/conversationa-ai

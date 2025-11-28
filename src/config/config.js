@@ -86,6 +86,7 @@ const envVarsSchema = Joi.object({
   }),
   STRIPE_SECRET_KEY: Joi.string().optional(),
   STRIPE_PUBLISHABLE_KEY: Joi.string().optional(),
+  STRIPE_WEBHOOK_SECRET: Joi.string().optional(),
   MFA_ENCRYPTION_KEY: Joi.string().when('NODE_ENV', {
     is: Joi.string().valid('staging', 'production'),
     then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
@@ -228,6 +229,7 @@ baselineConfig.loadSecrets = async () => {
   // Skip in development and test, but load for staging and production
   if (baselineConfig.env === 'development' || baselineConfig.env === 'test') {
     logger.info('Skipping AWS Secrets Manager in development/test environment.');
+    logger.info('Using Stripe keys from .env file for localhost/dev.');
     return baselineConfig;
   }
 
@@ -253,16 +255,17 @@ baselineConfig.loadSecrets = async () => {
 
     const secrets = JSON.parse(data.SecretString);
     logger.info(`Successfully loaded secrets from AWS Secrets Manager.`);
+    logger.info('Using Stripe keys from AWS Secrets Manager for staging/production.');
 
     // Update process.env first - important if other modules read directly from process.env
-    // Be cautious about overriding existing env vars if not intended
+    // In staging/production, AWS secrets should override .env values
     for (const key in secrets) {
-        if (!(key in process.env)) { // Optional: only set if not already set by system env
-            process.env[key] = secrets[key];
-        }
+        // Override process.env with AWS secrets for staging/production
+        // This ensures AWS secrets take precedence over .env values
+        process.env[key] = secrets[key];
     }
 
-    // Apply secrets using domain modules
+    // Apply secrets using domain modules (this will override config with AWS secrets)
     applyAllSecrets(baselineConfig, secrets);
     
     // MFA Encryption Key (special case - sets process.env)
