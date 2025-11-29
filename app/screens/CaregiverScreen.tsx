@@ -388,13 +388,16 @@ function CaregiverScreen() {
           }, 5000)
         }
       } catch (error: unknown) {
-        console.error('Invite error:', error)
-        console.error('Invite error details:', {
+        logger.error('Invite error:', error)
+        logger.error('Invite error details:', {
           message: error?.message,
           data: error?.data,
           status: error?.status,
           originalStatus: error?.originalStatus
         })
+        
+        // Reset RTK Query error state to prevent duplicate error display
+        sendInvite.reset()
         
         if (error?.data?.message === "Caregiver already invited") {
           setErrorMessage("This email is already invited.")
@@ -431,7 +434,8 @@ function CaregiverScreen() {
     <TouchableWithoutFeedback onPress={handleCancelDelete}>
       <View style={styles.container} testID="caregiver-screen">
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {(updateError || deleteError || inviteError) && (
+        {/* Only show RTK Query errors if we don't have a manual errorMessage set (to avoid duplicates) */}
+        {(updateError || deleteError || (inviteError && !errorMessage)) && (
           <Text style={styles.error}>
             {updateError && "data" in updateError
               ? `Error: ${(updateError.data as { message: string }).message}`
