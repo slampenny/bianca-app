@@ -14,8 +14,7 @@ try {
   caregiverService = require('../../services/caregiver.service');
   etherealEmailRetriever = require('../../services/etherealEmailRetriever.service');
   orgService = require('../../services/org.service');
-  const emailServiceModule = require('../../services/email.service');
-  emailService = emailServiceModule.getEmailServiceInstance ? emailServiceModule.getEmailServiceInstance() : emailServiceModule;
+  emailService = require('../../services/email.service');
 } catch (err) {
   logger.error('Error loading services for test routes:', err);
 }
