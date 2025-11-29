@@ -1,6 +1,6 @@
-import React, { useEffect } from "react"
+import React, { useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
-import { useNavigation } from "@react-navigation/native"
+import { useNavigation, useFocusEffect } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "app/store/authSlice"
 import { Screen, Text } from "app/components"
@@ -58,6 +58,7 @@ export const EmailVerifiedScreen = () => {
   const navigation = useNavigation()
   const isLoggedIn = useSelector(isAuthenticated)
   const { colors, isLoading: themeLoading } = useTheme()
+  const hasNavigated = useRef(false)
 
   if (themeLoading) {
     return (
@@ -70,31 +71,46 @@ export const EmailVerifiedScreen = () => {
   const styles = createStyles(colors)
 
   useEffect(() => {
-    // If user logs out while on this screen, immediately navigate away
-    if (!isLoggedIn) {
-      // User logged out - navigate to login immediately
-      if (navigationRef.isReady()) {
-        navigationRef.navigate("Login")
-      } else {
-        navigation.navigate("Login" as never)
-      }
+    // Prevent multiple navigations
+    if (hasNavigated.current) {
       return
     }
 
-    // Show success message briefly, then navigate to home
-    // Since they verified, we know it's them - redirect to home screen
+    // If user logs out while on this screen, immediately navigate away
+    if (!isLoggedIn) {
+      // User logged out - replace with login to remove this screen from stack
+      hasNavigated.current = true
+      navigation.replace("Login" as never)
+      return
+    }
+
+    // Show success message briefly, then replace with home screen
+    // Use replace() instead of navigate() to remove this screen from the stack
     const timer = setTimeout(() => {
-      // Always redirect to home - if not logged in, AppNavigator will handle showing login
-      if (navigationRef.isReady()) {
-        navigationRef.navigate("MainTabs")
-      } else {
-        // Fallback: navigate to home via navigation
-        navigation.navigate("MainTabs" as never)
+      if (hasNavigated.current) {
+        return
       }
+      hasNavigated.current = true
+      // Replace this screen with MainTabs to remove it from the stack
+      navigation.replace("MainTabs" as never)
     }, 2000)
 
     return () => clearTimeout(timer)
   }, [navigation, isLoggedIn])
+
+  // Also handle focus effect to ensure we navigate away if we come back to this screen
+  useFocusEffect(
+    React.useCallback(() => {
+      // If we're logged in and somehow back on this screen, navigate away immediately
+      if (isLoggedIn && !hasNavigated.current) {
+        hasNavigated.current = true
+        navigation.replace("MainTabs" as never)
+      } else if (!isLoggedIn && !hasNavigated.current) {
+        hasNavigated.current = true
+        navigation.replace("Login" as never)
+      }
+    }, [isLoggedIn, navigation])
+  )
 
   return (
     <Screen 

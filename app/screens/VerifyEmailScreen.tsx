@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react"
 import { View, StyleSheet, Linking } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
-import { useSelector } from "react-redux"
-import { isAuthenticated } from "app/store/authSlice"
+import { useSelector, useDispatch } from "react-redux"
+import { isAuthenticated, setAuthTokens, setCurrentUser, setAuthEmail } from "app/store/authSlice"
+import { setCaregiver } from "app/store/caregiverSlice"
+import { setOrg } from "app/store/orgSlice"
 import { Screen, Text, Button } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { spacing } from "app/theme"
@@ -58,6 +60,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 export const VerifyEmailScreen = () => {
   const navigation = useNavigation()
   const route = useRoute()
+  const dispatch = useDispatch()
   const { colors, isLoading: themeLoading } = useTheme()
   const isLoggedIn = useSelector(isAuthenticated)
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying")
@@ -150,9 +153,24 @@ export const VerifyEmailScreen = () => {
         const result = await verifyEmail({ token }).unwrap()
         
         if (result.success) {
-          // Verification successful - navigate to EmailVerifiedScreen which shows success message
-          // and then redirects to home (not login) since we know it's them
-          navigation.navigate("EmailVerified" as never)
+          // If we got tokens back, automatically log the user in
+          if (result.tokens && result.caregiver) {
+            // Set tokens and user data for auto-login
+            dispatch(setAuthTokens(result.tokens))
+            dispatch(setCurrentUser(result.caregiver))
+            dispatch(setAuthEmail(result.caregiver.email))
+            dispatch(setCaregiver(result.caregiver))
+            
+            if (result.org) {
+              dispatch(setOrg(result.org))
+            }
+            
+            // Navigate to EmailVerifiedScreen which will replace itself with MainTabs
+            navigation.navigate("EmailVerified" as never)
+          } else {
+            // No tokens (HTML response) - just navigate to EmailVerifiedScreen
+            navigation.navigate("EmailVerified" as never)
+          }
         } else {
           // Verification failed - backend returns HTML, try to extract error message
           setStatus("error")

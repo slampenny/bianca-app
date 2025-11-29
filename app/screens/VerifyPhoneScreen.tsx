@@ -14,6 +14,7 @@ import {
   useResendPhoneVerificationCodeMutation,
 } from "app/services/api/authApi"
 import { getCurrentUser, setCurrentUser } from "app/store/authSlice"
+import { setCaregiver } from "app/store/caregiverSlice"
 import { useGetCaregiverQuery } from "app/services/api/caregiverApi"
 import { logger } from "../utils/logger"
 
@@ -212,8 +213,10 @@ export const VerifyPhoneScreen = () => {
         try {
           const { data: updatedUser } = await refetchUser()
           if (updatedUser) {
-            // Update Redux with the updated user object
+            // Update both authSlice and caregiverSlice with the updated user object
+            // ProfileScreen uses caregiverSlice, so we need to update both
             dispatch(setCurrentUser(updatedUser))
+            dispatch(setCaregiver(updatedUser))
           }
         } catch (refetchError) {
           logger.warn("Failed to refetch user after phone verification:", refetchError)
