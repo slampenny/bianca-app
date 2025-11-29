@@ -36,7 +36,7 @@ const auditLogSchema = mongoose.Schema(
     userRole: {
       type: String,
       required: true,
-      enum: ['superAdmin', 'orgAdmin', 'staff', 'invited', 'unverified', 'system'],
+      enum: ['superAdmin', 'orgAdmin', 'staff', 'invited', 'system'],
     },
     userEmail: {
       type: String, // Hashed in pre-save hook

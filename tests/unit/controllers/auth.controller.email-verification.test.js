@@ -67,15 +67,15 @@ describe('Auth Controller - Email Verification', () => {
   });
 
   describe('resendVerificationEmail', () => {
-    test('should resend verification email for unverified user', async () => {
-      // Create an unverified caregiver
+    test('should resend verification email for user with unverified email', async () => {
+      // Create a caregiver with unverified email
       const caregiver = new Caregiver({
         name: 'Test User',
         email: 'test@example.com',
         password: 'Password123',
         phone: '+16045624263',
         isEmailVerified: false,
-        role: 'unverified',
+        role: 'orgAdmin',
       });
       await caregiver.save();
 
@@ -163,7 +163,7 @@ describe('Auth Controller - Email Verification', () => {
         password: 'Password123',
         phone: '+16045624263',
         isEmailVerified: false,
-        role: 'unverified',
+        role: 'orgAdmin',
       });
       await caregiver.save();
 

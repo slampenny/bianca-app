@@ -186,20 +186,11 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
     updateBody.phone = normalizedPhone;
   }
   
-  // If this is an invited user completing their profile with a phone number, promote them to staff
-  if (caregiver.role === 'invited' && updateBody.phone) {
-    // Set phone first before changing role (to avoid validation issues)
-    caregiver.phone = updateBody.phone;
-    
-    // Also set password before changing role if it's provided (required when becoming staff)
-    if (updateBody.password) {
-      caregiver.password = updateBody.password;
-      delete updateBody.password; // Remove from updateBody to avoid duplicate assignment
-    }
-    
-    delete updateBody.phone; // Remove from updateBody to avoid duplicate assignment
-    
-    // Invited user - promote to staff
+  // If this is an invited user completing registration (setting password), promote them to staff
+  // Role change happens on registration completion, not on phone verification
+  if (caregiver.role === 'invited' && updateBody.password) {
+    // Invited user completing registration - promote to staff
+    // Phone and verification status are separate concerns
     updateBody.role = 'staff';
   }
   

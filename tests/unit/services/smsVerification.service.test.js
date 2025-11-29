@@ -363,13 +363,13 @@ describe('SMS Verification Service', () => {
     });
 
     test('should throw error if phone not set', async () => {
-      // Create caregiver without phone (role unverified doesn't require phone)
+      // Create caregiver without phone (role invited doesn't require phone)
       const caregiver = new Caregiver({
         name: 'Test User',
         email: 'test@example.com',
         password: 'Password123',
         isPhoneVerified: false,
-        role: 'unverified', // unverified role doesn't require phone
+        role: 'invited', // invited role doesn't require phone
       });
       await caregiver.save();
 
@@ -388,8 +388,8 @@ describe('SMS Verification Service', () => {
       expect(smsVerificationService.isVerificationRequired('admin')).toBe(true);
     });
 
-    test('should return false for unverified role', () => {
-      expect(smsVerificationService.isVerificationRequired('unverified')).toBe(false);
+    test('should return false for invited role', () => {
+      expect(smsVerificationService.isVerificationRequired('invited')).toBe(false);
     });
 
     test('should return false for invited role', () => {
