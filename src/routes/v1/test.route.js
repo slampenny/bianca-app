@@ -5,7 +5,7 @@ const logger = require('../../config/logger');
 const config = require('../../config/config');
 
 // Import services safely
-let ariClient, openAIService, channelTracker, tokenService, caregiverService, etherealEmailRetriever;
+let ariClient, openAIService, channelTracker, tokenService, caregiverService, etherealEmailRetriever, orgService;
 try {
   ariClient = require('../../services/ari.client');
   openAIService = require('../../services/openai.realtime.service');
@@ -13,6 +13,7 @@ try {
   tokenService = require('../../services/token.service');
   caregiverService = require('../../services/caregiver.service');
   etherealEmailRetriever = require('../../services/etherealEmailRetriever.service');
+  orgService = require('../../services/org.service');
 } catch (err) {
   logger.error('Error loading services for test routes:', err);
 }
@@ -468,6 +469,101 @@ router.post('/generate-invite-link', async (req, res) => {
   } catch (err) {
     logger.error('Error generating invite link for test:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /test/send-invite-email:
+ *   post:
+ *     summary: Send test invite email
+ *     description: Sends an actual invite email to the specified email address. Creates or updates a caregiver and sends the invite email.
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - orgId
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               name:
+ *                 type: string
+ *                 description: Caregiver name (default: "Test Caregiver")
+ *               phone:
+ *                 type: string
+ *                 description: Caregiver phone (default: "+15555555555")
+ *               orgId:
+ *                 type: string
+ *                 description: Organization ID to invite to
+ *     responses:
+ *       "200":
+ *         description: Invite email sent successfully
+ *       "400":
+ *         description: Invalid request
+ *       "404":
+ *         description: Organization not found
+ *       "500":
+ *         description: Failed to send invite email
+ */
+router.post('/send-invite-email', async (req, res) => {
+  try {
+    const { email, name = 'Test Caregiver', phone = '+15555555555', orgId } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    if (!orgService) {
+      return res.status(503).json({ error: 'Organization service not available' });
+    }
+
+    // If orgId not provided, find the first org
+    let targetOrgId = orgId;
+    if (!targetOrgId) {
+      const Org = require('../../models/org.model');
+      const firstOrg = await Org.findOne();
+      if (!firstOrg) {
+        return res.status(404).json({ error: 'No organizations found. Please provide orgId or create an organization first.' });
+      }
+      targetOrgId = firstOrg._id.toString();
+      logger.info('Auto-selected first org for test invite', { orgId: targetOrgId });
+    }
+
+    logger.info('Test invite email request', { email, name, phone, orgId: targetOrgId });
+
+    // Send invite using the org service (this will create/update caregiver and send email)
+    const result = await orgService.sendInvite(targetOrgId, name, email, phone);
+    
+    logger.info('Test invite email sent successfully', { 
+      email, 
+      caregiverId: result.caregiver?._id,
+      inviteToken: result.inviteToken ? 'generated' : 'none'
+    });
+
+    res.json({
+      success: true,
+      message: 'Invite email sent successfully',
+      caregiver: {
+        id: result.caregiver._id,
+        email: result.caregiver.email,
+        name: result.caregiver.name,
+        role: result.caregiver.role
+      },
+      inviteToken: result.inviteToken
+    });
+  } catch (err) {
+    logger.error('Error sending test invite email:', err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message,
+      details: err.stack
+    });
   }
 });
 
