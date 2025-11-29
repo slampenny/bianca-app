@@ -513,14 +513,14 @@ router.post('/generate-invite-link', async (req, res) => {
  */
 router.post('/send-invite-email', async (req, res) => {
   try {
-    const { email, name = 'Test Caregiver', phone = '+15555555555', orgId } = req.body;
+    const { email, name = 'Test Caregiver', phone = '+15555555555', orgId, forceResend = false } = req.body;
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    if (!orgService) {
-      return res.status(503).json({ error: 'Organization service not available' });
+    if (!orgService || !emailService || !tokenService) {
+      return res.status(503).json({ error: 'Required services not available' });
     }
 
     // If orgId not provided, find the first org
@@ -535,7 +535,47 @@ router.post('/send-invite-email', async (req, res) => {
       logger.info('Auto-selected first org for test invite', { orgId: targetOrgId });
     }
 
-    logger.info('Test invite email request', { email, name, phone, orgId: targetOrgId });
+    logger.info('Test invite email request', { email, name, phone, orgId: targetOrgId, forceResend });
+
+    // Check if caregiver already exists
+    const Caregiver = require('../../models/caregiver.model');
+    const existingCaregiver = await Caregiver.findOne({ email });
+    
+    // If forceResend is true and caregiver exists, resend invite email directly
+    if (forceResend && existingCaregiver) {
+      logger.info('Force resending invite email to existing caregiver', {
+        email,
+        caregiverId: existingCaregiver._id,
+        currentRole: existingCaregiver.role
+      });
+      
+      // Generate invite token and send email directly
+      const inviteToken = await tokenService.generateInviteToken(existingCaregiver);
+      const inviteLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
+      
+      // Get inviter's preferred language (default to English for test)
+      const locale = 'en';
+      
+      await emailService.sendInviteEmail(email, inviteLink, locale, existingCaregiver.name || name);
+      
+      logger.info('Force resend invite email sent successfully', { 
+        email, 
+        caregiverId: existingCaregiver._id,
+        inviteToken: inviteToken ? 'generated' : 'none'
+      });
+
+      return res.json({
+        success: true,
+        message: 'Invite email sent successfully (force resend)',
+        caregiver: {
+          id: existingCaregiver._id,
+          email: existingCaregiver.email,
+          name: existingCaregiver.name,
+          role: existingCaregiver.role
+        },
+        inviteToken: inviteToken
+      });
+    }
 
     // Send invite using the org service (this will create/update caregiver and send email)
     const result = await orgService.sendInvite(targetOrgId, name, email, phone);
