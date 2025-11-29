@@ -37,7 +37,7 @@ describe('Auth Service - Email Verification', () => {
         password: 'Password123',
         phone: '+16045624263',
         isEmailVerified: false,
-        role: 'unverified',
+        role: 'orgAdmin',
       });
       await caregiver.save();
 

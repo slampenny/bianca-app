@@ -2,7 +2,6 @@ const { AccessControl } = require('accesscontrol');
 
 const allRoles = {
   invited: ['readOwn:caregiver', 'updateOwn:caregiver'],
-  unverified: ['readOwn:caregiver', 'updateOwn:caregiver'],
   staff: [
     'readOwn:caregiver',
     'updateOwn:caregiver',

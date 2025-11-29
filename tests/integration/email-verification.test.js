@@ -53,7 +53,7 @@ describe('Email verification workflow', () => {
       expect(res.body.message).toContain('check your email to verify');
       expect(res.body.caregiver.email).toBe(newCaregiver.email);
       expect(res.body.caregiver.isEmailVerified).toBe(false);
-      expect(res.body.caregiver.role).toBe('unverified');
+      expect(res.body.caregiver.role).toBe('orgAdmin');
 
       // Should not return tokens
       expect(res.body).not.toHaveProperty('tokens');
@@ -62,7 +62,7 @@ describe('Email verification workflow', () => {
       const caregiver = await Caregiver.findOne({ email: newCaregiver.email });
       expect(caregiver).toBeTruthy();
       expect(caregiver.isEmailVerified).toBe(false);
-      expect(caregiver.role).toBe('unverified');
+      expect(caregiver.role).toBe('orgAdmin');
 
       // Verify verification token was created
       const verificationToken = await Token.findOne({ 
@@ -122,7 +122,7 @@ describe('Email verification workflow', () => {
     });
 
     test('should block login for unverified email and send verification email', async () => {
-      // Ensure caregiver is unverified
+      // Ensure caregiver email is unverified
       await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
 
       const res = await request(app)
@@ -150,7 +150,7 @@ describe('Email verification workflow', () => {
       const originalSendVerificationEmail = emailService.sendVerificationEmail;
       emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
 
-      // Ensure caregiver is unverified
+      // Ensure caregiver email is unverified
       await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
 
       const res = await request(app)
@@ -183,8 +183,8 @@ describe('Email verification workflow', () => {
       await insertCaregivers([caregiverOne]);
     });
 
-    test('should resend verification email for unverified user', async () => {
-      // Ensure caregiver is unverified
+    test('should resend verification email for user with unverified email', async () => {
+      // Ensure caregiver email is unverified
       await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
 
       const res = await request(app)
@@ -238,7 +238,7 @@ describe('Email verification workflow', () => {
       const originalSendVerificationEmail = emailService.sendVerificationEmail;
       emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
 
-      // Ensure caregiver is unverified
+      // Ensure caregiver email is unverified
       await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
 
       await request(app)

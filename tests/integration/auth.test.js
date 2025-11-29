@@ -72,7 +72,7 @@ describe('Auth routes', () => {
         name: caregiverOne.name,
         email: caregiverOne.email,
         phone: caregiverOne.phone,
-        role: 'unverified',
+        role: 'orgAdmin',
         org: expect.anything(),
         patients: [],
         isEmailVerified: false,
@@ -83,7 +83,7 @@ describe('Auth routes', () => {
       expect(dbCaregiver).toMatchObject({
         name: caregiverOne.name,
         email: caregiverOne.email,
-        role: 'unverified', // Registration creates unverified users
+        role: 'orgAdmin', // Registration creates orgAdmin users
         isEmailVerified: false,
       });
 

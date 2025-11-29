@@ -184,18 +184,18 @@ describe('caregiverService', () => {
       });
     });
 
-    describe('SSO Users (Unverified)', () => {
-      it('should promote SSO user to orgAdmin when completing profile', async () => {
-        // Create an SSO user (unverified)
+    describe('SSO Users', () => {
+      it('should update org phone when orgAdmin adds phone', async () => {
+        // Create an SSO user (orgAdmin)
         const ssoCaregiver = await Caregiver.create({
           org: org.id,
           name: 'SSO User',
           email: 'sso@example.com',
-          role: 'unverified',
+          role: 'orgAdmin',
           ssoProvider: 'google',
           ssoProviderId: 'google123',
           isEmailVerified: true,
-          // No phone initially - unverified users don't require phone
+          // No phone initially - will be added
         });
 
         // Complete profile by adding phone
@@ -207,7 +207,7 @@ describe('caregiverService', () => {
         expect(updatedCaregiver.phone).toBe('+16045624263');
       });
 
-      it('should update org phone when SSO user becomes orgAdmin', async () => {
+      it('should update org phone when SSO orgAdmin adds phone', async () => {
         // Create org without phone
         const orgWithoutPhone = await Org.create({
           name: 'Test Org',
@@ -215,18 +215,18 @@ describe('caregiverService', () => {
           caregivers: [],
         });
 
-        // Create an SSO user
+        // Create an SSO user (orgAdmin)
         const ssoCaregiver = await Caregiver.create({
           org: orgWithoutPhone.id,
           name: 'SSO User',
           email: 'sso@example.com',
-          role: 'unverified',
+          role: 'orgAdmin',
           ssoProvider: 'google',
           ssoProviderId: 'google123',
-          // No phone initially - unverified users don't require phone
+          // No phone initially - will be added
         });
 
-        // Complete profile
+        // Add phone
         const updateBody = { phone: '+16045624263' };
         
         const updatedCaregiver = await caregiverService.updateCaregiverById(ssoCaregiver.id, updateBody);
@@ -249,18 +249,18 @@ describe('caregiverService', () => {
           caregivers: [],
         });
 
-        // Create an SSO user
+        // Create an SSO user (orgAdmin)
         const ssoCaregiver = await Caregiver.create({
           org: orgWithPhone.id,
           name: 'SSO User',
           email: 'sso@example.com',
-          role: 'unverified',
+          role: 'orgAdmin',
           ssoProvider: 'google',
           ssoProviderId: 'google123',
-          // No phone initially - unverified users don't require phone
+          // No phone initially - will be added
         });
 
-        // Complete profile
+        // Add phone
         const updateBody = { phone: '+16045624263' };
         
         const updatedCaregiver = await caregiverService.updateCaregiverById(ssoCaregiver.id, updateBody);
@@ -273,23 +273,23 @@ describe('caregiverService', () => {
       });
     });
 
-    describe('Unverified Users Without SSO', () => {
-      it('should promote unverified user without SSO to staff', async () => {
-        // Create an unverified user without SSO (edge case)
-        const unverifiedCaregiver = await Caregiver.create({
+    describe('Invited Users', () => {
+      it('should promote invited user to staff when phone is added', async () => {
+        // Create an invited user
+        const invitedCaregiver = await Caregiver.create({
           org: org.id,
-          name: 'Unverified User',
-          email: 'unverified@example.com',
-          role: 'unverified',
+          name: 'Invited User',
+          email: 'invited@example.com',
+          role: 'invited',
           password: 'Password123', // Required for non-SSO users
           // No ssoProvider
-          // No phone initially - unverified users don't require phone
+          // No phone initially - invited users don't require phone
         });
 
-        // Complete profile
+        // Complete profile by adding phone
         const updateBody = { phone: '+16045624263' };
         
-        const updatedCaregiver = await caregiverService.updateCaregiverById(unverifiedCaregiver.id, updateBody);
+        const updatedCaregiver = await caregiverService.updateCaregiverById(invitedCaregiver.id, updateBody);
         
         expect(updatedCaregiver.role).toBe('staff');
         expect(updatedCaregiver.phone).toBe('+16045624263');
@@ -395,10 +395,10 @@ describe('caregiverService', () => {
           org: org.id,
           name: 'SSO User',
           email: 'sso@example.com',
-          role: 'unverified',
+          role: 'orgAdmin',
           ssoProvider: 'microsoft', // Different provider
           ssoProviderId: 'microsoft123',
-          // No phone initially - unverified users don't require phone
+          // No phone initially - will be added
         });
 
         const updateBody = { phone: '+16045624263' };
