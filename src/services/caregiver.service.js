@@ -213,8 +213,31 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
         await org.save();
       }
     } else {
-      // Unverified user without SSO (shouldn't happen in normal flow, but handle gracefully)
-      updateBody.role = 'staff';
+      // Unverified user without SSO - check if they created the org (first caregiver)
+      // If they're the first caregiver in the org, they should be orgAdmin
+      const org = await Org.findById(caregiver.org);
+      if (org && org.caregivers && org.caregivers.length > 0) {
+        // Check if this caregiver is the first one in the org
+        const firstCaregiverId = org.caregivers[0].toString();
+        const currentCaregiverId = caregiver.id.toString();
+        
+        if (firstCaregiverId === currentCaregiverId) {
+          // This is the first caregiver (org creator) - promote to orgAdmin
+          updateBody.role = 'orgAdmin';
+          
+          // Also update the organization's phone number if it's not set
+          if (!org.phone) {
+            org.phone = caregiver.phone;
+            await org.save();
+          }
+        } else {
+          // Not the first caregiver - promote to staff
+          updateBody.role = 'staff';
+        }
+      } else {
+        // No org or no caregivers - default to staff (shouldn't happen)
+        updateBody.role = 'staff';
+      }
     }
   }
   
