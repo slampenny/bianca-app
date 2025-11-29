@@ -154,12 +154,14 @@ const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
 
   if (!caregiver) {
     // Create new invited caregiver
+    // Email is considered verified since they received the invite email
     caregiver = new Caregiver({
       org: orgId,
       name,
       email,
       phone,
       role: 'invited',
+      isEmailVerified: true, // Invite email proves email ownership
     });
 
     await caregiver.save();
