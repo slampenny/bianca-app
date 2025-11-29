@@ -520,8 +520,8 @@ router.post('/send-invite-email', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Ensure emailService is available (require it here if not already loaded)
-    const emailServiceInstance = emailService || require('../../services/email.service');
+    // Require emailService directly in the route handler
+    const emailServiceInstance = require('../../services/email.service');
     
     if (!orgService || !emailServiceInstance || !tokenService) {
       return res.status(503).json({ error: 'Required services not available' });
