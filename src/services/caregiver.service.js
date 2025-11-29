@@ -186,8 +186,8 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
     updateBody.phone = normalizedPhone;
   }
   
-  // If this is an unverified or invited user completing their profile with a phone number, promote them appropriately
-  if ((caregiver.role === 'unverified' || caregiver.role === 'invited') && updateBody.phone) {
+  // If this is an invited user completing their profile with a phone number, promote them to staff
+  if (caregiver.role === 'invited' && updateBody.phone) {
     // Set phone first before changing role (to avoid validation issues)
     caregiver.phone = updateBody.phone;
     
@@ -199,45 +199,16 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
     
     delete updateBody.phone; // Remove from updateBody to avoid duplicate assignment
     
-    if (caregiver.role === 'invited') {
-      // Invited user - promote to staff
-      updateBody.role = 'staff';
-    } else if (caregiver.ssoProvider) {
-      // SSO user who created their own org - promote to orgAdmin
-      updateBody.role = 'orgAdmin';
-      
-      // Also update the organization's phone number if it's not set
-      const org = await Org.findById(caregiver.org);
-      if (org && !org.phone) {
-        org.phone = caregiver.phone;
-        await org.save();
-      }
-    } else {
-      // Unverified user without SSO - check if they created the org (first caregiver)
-      // If they're the first caregiver in the org, they should be orgAdmin
-      const org = await Org.findById(caregiver.org);
-      if (org && org.caregivers && org.caregivers.length > 0) {
-        // Check if this caregiver is the first one in the org
-        const firstCaregiverId = org.caregivers[0].toString();
-        const currentCaregiverId = caregiver.id.toString();
-        
-        if (firstCaregiverId === currentCaregiverId) {
-          // This is the first caregiver (org creator) - promote to orgAdmin
-          updateBody.role = 'orgAdmin';
-          
-          // Also update the organization's phone number if it's not set
-          if (!org.phone) {
-            org.phone = caregiver.phone;
-            await org.save();
-          }
-        } else {
-          // Not the first caregiver - promote to staff
-          updateBody.role = 'staff';
-        }
-      } else {
-        // No org or no caregivers - default to staff (shouldn't happen)
-        updateBody.role = 'staff';
-      }
+    // Invited user - promote to staff
+    updateBody.role = 'staff';
+  }
+  
+  // If orgAdmin or staff is updating their phone, also update the organization's phone if it's not set
+  if ((caregiver.role === 'orgAdmin' || caregiver.role === 'superAdmin') && updateBody.phone) {
+    const org = await Org.findById(caregiver.org);
+    if (org && !org.phone) {
+      org.phone = updateBody.phone;
+      await org.save();
     }
   }
   
