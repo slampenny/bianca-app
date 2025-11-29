@@ -5,7 +5,7 @@ const logger = require('../../config/logger');
 const config = require('../../config/config');
 
 // Import services safely
-let ariClient, openAIService, channelTracker, tokenService, caregiverService, etherealEmailRetriever, orgService;
+let ariClient, openAIService, channelTracker, tokenService, caregiverService, etherealEmailRetriever, orgService, emailService;
 try {
   ariClient = require('../../services/ari.client');
   openAIService = require('../../services/openai.realtime.service');
@@ -14,6 +14,7 @@ try {
   caregiverService = require('../../services/caregiver.service');
   etherealEmailRetriever = require('../../services/etherealEmailRetriever.service');
   orgService = require('../../services/org.service');
+  emailService = require('../../services/email.service');
 } catch (err) {
   logger.error('Error loading services for test routes:', err);
 }
