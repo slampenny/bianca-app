@@ -141,8 +141,8 @@ const baselineConfig = {
     },
   },
   authEnabled: true,
-  baseUrl: envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : getUrlFromDomain('api', primaryDomain)),
-  apiUrl: (envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : getUrlFromDomain('api', primaryDomain))) + '/v1',
+  baseUrl: envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain))),
+  apiUrl: (envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain)))) + '/v1',
   frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging', primaryDomain) : getUrlFromDomain('app', primaryDomain))),
   billing: { 
     ratePerMinute: 0.1,
@@ -217,6 +217,7 @@ if (envVars.NODE_ENV === 'staging') {
   
   baselineConfig.baseUrl = apiBaseUrl;
   baselineConfig.apiUrl = `${apiBaseUrl}/v1`;
+  // On staging, frontend is at staging.biancawellness.com, API is at staging-api.biancawellness.com
   baselineConfig.frontendUrl = envVars.FRONTEND_URL || getUrlFromDomain('staging', primaryDomain);
   baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb:27017/bianca-service';
   baselineConfig.email.smtp.secure = true;
