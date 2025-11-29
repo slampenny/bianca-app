@@ -48,8 +48,9 @@ function ProfileScreen() {
   const currentUser = useSelector(getCaregiver)
   const inviteToken = useSelector(getInviteToken)
   
-  // Check if user is unverified and needs to complete profile
-  const isUnverified = currentUser?.role === 'unverified'
+  // Check if user needs to complete profile (email or phone not verified)
+  // Profile is incomplete if email or phone is not verified
+  const isUnverified = !currentUser?.isEmailVerified || !currentUser?.isPhoneVerified
 
   // Mutations for editing profile
   const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
