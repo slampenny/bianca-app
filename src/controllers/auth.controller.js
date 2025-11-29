@@ -652,23 +652,45 @@ const generateVerificationPage = (req, isError, options = {}) => {
 };
 
 const verifyEmail = async (req, res, next) => {
-  // Always set Content-Type to HTML before any response
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  // Check if client wants JSON response (API call from frontend)
+  const wantsJson = req.headers.accept?.includes('application/json') || req.query.format === 'json';
   
   // Validate token parameter (manual validation to avoid error middleware)
   const token = req.query.token || req.body.token;
   if (!token) {
+    if (wantsJson) {
+      return res.status(httpStatus.BAD_REQUEST).json({
+        success: false,
+        error: 'Verification token is required'
+      });
+    }
     const errorHtml = generateVerificationPage(req, true, {
       errorMessage: 'Verification token is required',
       isExpired: false
     });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(httpStatus.BAD_REQUEST).send(errorHtml);
   }
   
   try {
     const result = await authService.verifyEmail(token);
     
-    // Generate localized and themed HTML page
+    // If JSON is requested, return tokens and user data for auto-login
+    if (wantsJson) {
+      const { CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
+      return res.status(httpStatus.OK).json({
+        success: true,
+        message: result.message,
+        alreadyVerified: result.alreadyVerified,
+        caregiver: CaregiverDTO(result.caregiver),
+        tokens: result.tokens,
+        org: result.org ? OrgDTO(result.org) : null,
+        patients: result.patients ? result.patients.map(p => PatientDTO(p)) : []
+      });
+    }
+    
+    // Otherwise, return HTML page
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     const html = generateVerificationPage(req, false, {
       isAlreadyVerified: result.alreadyVerified,
       message: result.message
@@ -676,12 +698,19 @@ const verifyEmail = async (req, res, next) => {
   
     res.status(httpStatus.OK).send(html);
   } catch (error) {
-    // If verification failed, return a user-friendly error page
-    // Don't pass to error middleware - we want to send HTML, not JSON
+    // If verification failed
+    if (wantsJson) {
+      return res.status(httpStatus.UNAUTHORIZED).json({
+        success: false,
+        error: error.message || 'Email verification failed'
+      });
+    }
+    
+    // Return HTML error page
     const errorMessage = error.message || 'Email verification failed';
     const isExpired = error.message && (error.message.includes('expired') || error.message.includes('Invalid') || error.message.includes('Token not found'));
     
-    // Generate localized and themed error HTML page
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     const errorHtml = generateVerificationPage(req, true, {
       errorMessage,
       isExpired

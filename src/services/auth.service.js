@@ -103,10 +103,21 @@ const verifyEmail = async (verifyEmailToken) => {
     
     // Check if already verified
     if (caregiver.isEmailVerified) {
+      // Still return tokens for auto-login if already verified
+      const tokens = await tokenService.generateAuthTokens(caregiver);
+      const { orgService } = require('./org.service');
+      const { Patient } = require('../models');
+      const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
+      const patients = await Patient.find({ caregivers: caregiver.id });
+      
       return {
         success: true,
         alreadyVerified: true,
-        message: 'Your email is already verified. You can proceed to login.'
+        message: 'Your email is already verified. You can proceed to login.',
+        caregiver,
+        tokens,
+        org,
+        patients
       };
     }
     
@@ -116,10 +127,23 @@ const verifyEmail = async (verifyEmailToken) => {
     // Mark email as verified
     await caregiverService.updateCaregiverById(caregiver.id, { isEmailVerified: true });
     
+    // Generate auth tokens for automatic login after verification
+    const tokens = await tokenService.generateAuthTokens(caregiver);
+    
+    // Fetch org and patients for the response
+    const { orgService } = require('./org.service');
+    const { Patient } = require('../models');
+    const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
+    const patients = await Patient.find({ caregivers: caregiver.id });
+    
     return {
       success: true,
       alreadyVerified: false,
-      message: 'Email verified successfully'
+      message: 'Email verified successfully',
+      caregiver,
+      tokens,
+      org,
+      patients
     };
   } catch (error) {
     // If it's an ApiError, check if it's a token verification error
