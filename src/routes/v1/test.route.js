@@ -520,7 +520,10 @@ router.post('/send-invite-email', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    if (!orgService || !emailService || !tokenService) {
+    // Ensure emailService is available (require it here if not already loaded)
+    const emailServiceInstance = emailService || require('../../services/email.service');
+    
+    if (!orgService || !emailServiceInstance || !tokenService) {
       return res.status(503).json({ error: 'Required services not available' });
     }
 
@@ -557,7 +560,7 @@ router.post('/send-invite-email', async (req, res) => {
       // Get inviter's preferred language (default to English for test)
       const locale = 'en';
       
-      await emailService.sendInviteEmail(email, inviteLink, locale, existingCaregiver.name || name);
+      await emailServiceInstance.sendInviteEmail(email, inviteLink, locale, existingCaregiver.name || name);
       
       logger.info('Force resend invite email sent successfully', { 
         email, 
