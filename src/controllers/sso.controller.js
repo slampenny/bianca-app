@@ -45,7 +45,7 @@ const login = async (req, res) => {
           ssoProviderId: providerId,
           avatar: picture,
           isEmailVerified: true, // SSO users are pre-verified
-          role: 'unverified', // SSO users start as unverified until they complete profile
+          role: 'orgAdmin', // User creating the org should be orgAdmin from the start
         }
         );
 

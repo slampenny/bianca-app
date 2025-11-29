@@ -21,7 +21,7 @@ const register = catchAsync(async (req, res, next) => {
       name: req.body.name,
       phone: req.body.phone,
       password: req.body.password,
-      role: 'unverified', // Explicitly set unverified role
+      role: 'orgAdmin', // User creating the org should be orgAdmin from the start
     }
   );
 

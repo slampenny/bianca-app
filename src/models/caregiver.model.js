@@ -34,7 +34,8 @@ const caregiverSchema = mongoose.Schema(
     phone: {
       type: String,
       required: function required() {
-        return this.role !== 'unverified';
+        // Phone is required for orgAdmin and staff, but not for invited users
+        return this.role === 'orgAdmin' || this.role === 'staff' || this.role === 'superAdmin';
       },
       trim: true,
       validate(value) {
