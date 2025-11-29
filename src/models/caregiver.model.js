@@ -35,7 +35,17 @@ const caregiverSchema = mongoose.Schema(
       type: String,
       required: function required() {
         // Phone is required for orgAdmin and staff, but not for invited users
-        return this.role === 'orgAdmin' || this.role === 'staff' || this.role === 'superAdmin';
+        // Also allow phone to be optional during initial setup (before phone verification)
+        // This allows email verification to work even if phone isn't set yet
+        if (this.role === 'invited') {
+          return false;
+        }
+        if (this.role === 'orgAdmin' || this.role === 'staff' || this.role === 'superAdmin') {
+          // Phone is required once phone verification is complete
+          // This allows users to complete email verification before setting phone
+          return this.isPhoneVerified === true;
+        }
+        return false;
       },
       trim: true,
       validate(value) {
