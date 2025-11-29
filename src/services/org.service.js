@@ -212,7 +212,26 @@ const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
     }
   }
   
+  // Send invite email with error handling
+  try {
     await emailService.sendInviteEmail(email, inviteLink, locale, caregiver.name);
+    logger.info('Invite email sent successfully', {
+      email,
+      caregiverId: caregiver.id,
+      locale
+    });
+  } catch (emailError) {
+    logger.error('Failed to send invite email', {
+      error: emailError.message,
+      stack: emailError.stack,
+      email,
+      caregiverId: caregiver.id,
+      locale,
+      inviteLink
+    });
+    // Don't throw - allow the invite to be created even if email fails
+    // The caregiver can still use the invite link if they have it
+  }
 
   return { caregiver, inviteToken };
 };
