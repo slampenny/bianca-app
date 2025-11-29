@@ -210,6 +210,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         ref={scrollRef}
         contentContainerStyle={{ padding: 20 }}
         testID="register-form"
+        showsVerticalScrollIndicator={true}
       >
         {/* Error message block MOVED FROM HERE */}
 
