@@ -49,9 +49,14 @@ if ! command -v aws &> /dev/null; then
 fi
 
 # Get instance metadata
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+INSTANCE_ID=$$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+PRIVATE_IP=$$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+# Use EIP if provided (from Terraform), otherwise fall back to instance metadata
+%{ if eip_address != "" ~}
+PUBLIC_IP="${eip_address}"
+%{ else ~}
+PUBLIC_IP=$$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+%{ endif ~}
 
 echo "Instance: $${INSTANCE_ID}"
 echo "Private IP: $${PRIVATE_IP}"
