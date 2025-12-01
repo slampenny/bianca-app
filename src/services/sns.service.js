@@ -65,32 +65,44 @@ class SNSService {
    */
   async sendEmergencyAlert(alertData, caregivers = []) {
     try {
+      logger.info(`[SNS Service] sendEmergencyAlert called for patient ${alertData?.patientId}, severity: ${alertData?.severity}`);
+      logger.info(`[SNS Service] enableSNSPushNotifications: ${emergencyConfig.enableSNSPushNotifications}, caregivers count: ${caregivers?.length || 0}`);
+      
       if (!emergencyConfig.enableSNSPushNotifications) {
+        logger.warn('[SNS Service] Emergency notifications disabled in config');
         return { success: false, reason: 'Emergency notifications disabled in config' };
       }
 
       if (!twilioSmsService) {
+        logger.error('[SNS Service] Twilio SMS service not available');
         return { success: false, reason: 'Twilio SMS service not available' };
       }
 
       // Try to initialize Twilio if not already initialized (lazy init)
       if (!twilioSmsService.isInitialized) {
+        logger.info('[SNS Service] Twilio SMS not initialized, attempting to reinitialize...');
         twilioSmsService.reinitialize();
         if (!twilioSmsService.isInitialized) {
+          logger.error('[SNS Service] Twilio SMS service failed to initialize');
           return { success: false, reason: 'Twilio SMS service not initialized' };
         }
+        logger.info('[SNS Service] Twilio SMS service initialized successfully');
       }
 
       if (!caregivers || caregivers.length === 0) {
-        logger.warn('No caregivers provided for emergency alert');
+        logger.warn('[SNS Service] No caregivers provided for emergency alert');
         return { success: false, reason: 'No caregivers to notify' };
       }
 
       // Get unique phone numbers from caregivers using Twilio service
       const phoneNumbers = twilioSmsService.extractPhoneNumbers(caregivers);
+      logger.info(`[SNS Service] Extracted ${phoneNumbers.length} valid phone number(s) from ${caregivers.length} caregiver(s)`);
       
       if (phoneNumbers.length === 0) {
-        logger.warn('No valid phone numbers found in caregiver list');
+        logger.warn('[SNS Service] No valid phone numbers found in caregiver list');
+        caregivers.forEach((cg, idx) => {
+          logger.warn(`[SNS Service] Caregiver ${idx + 1}: phone="${cg.phone || 'MISSING'}"`);
+        });
         return { success: false, reason: 'No valid phone numbers' };
       }
 
@@ -130,7 +142,16 @@ class SNSService {
       const successful = results.filter(result => result.status === 'fulfilled').length;
       const failed = results.filter(result => result.status === 'rejected').length;
 
-      logger.info(`Emergency alert sent via Twilio: ${successful} successful, ${failed} failed`);
+      logger.info(`[SNS Service] Emergency alert sent via Twilio: ${successful} successful, ${failed} failed`);
+      
+      // Log detailed results for debugging
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          logger.info(`[SNS Service] SMS sent successfully to ${twilioSmsService.maskPhoneNumber(phoneNumbers[index])}, SID: ${result.value.messageSid}`);
+        } else {
+          logger.error(`[SNS Service] SMS failed to ${twilioSmsService.maskPhoneNumber(phoneNumbers[index])}: ${result.reason?.message || result.reason}`);
+        }
+      });
 
       return {
         success: successful > 0,
