@@ -1755,23 +1755,35 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
 
     // EMERGENCY DETECTION: Real-time analysis of user transcript
+    logger.debug(`[Emergency Detection] Checking transcript - patientId: ${conn.patientId}, transcript length: ${message.transcript?.trim().length || 0}`);
+    
     if (conn.patientId && message.transcript && message.transcript.trim().length > 10) {
       try {
+        logger.info(`[Emergency Detection] Processing utterance for emergency detection: "${message.transcript.substring(0, 100)}..."`);
         const emergencyResult = await emergencyProcessor.processUtterance(
           conn.patientId,
           message.transcript,
           Date.now()
         );
 
+        logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}, reason: ${emergencyResult.reason}`);
+
         if (emergencyResult.shouldAlert) {
           logger.warn(`[Emergency Detection] EMERGENCY DETECTED for patient ${conn.patientId}: ${emergencyResult.reason}`);
+          logger.warn(`[Emergency Detection] Alert data:`, emergencyResult.alertData);
           
           // Create alert and notify caregivers
+          logger.info(`[Emergency Detection] Calling createAlert for patient ${conn.patientId}`);
           const alertResult = await emergencyProcessor.createAlert(
             conn.patientId,
             emergencyResult.alertData,
             message.transcript
           );
+
+          logger.info(`[Emergency Detection] createAlert result - success: ${alertResult.success}, error: ${alertResult.error || 'none'}`);
+          if (alertResult.notificationResult) {
+            logger.info(`[Emergency Detection] Notification result:`, alertResult.notificationResult);
+          }
 
           if (alertResult.success) {
             logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert._id}`);
@@ -1802,16 +1814,23 @@ class OpenAIRealtimeService {
             }
           } else {
             logger.error(`[Emergency Detection] Failed to create alert: ${alertResult.error}`);
+            logger.error(`[Emergency Detection] Alert result details:`, alertResult);
           }
         } else {
-          // Log at info level for better visibility when debugging
-          logger.info(`[Emergency Detection] No emergency detected for ${callId}: ${emergencyResult.reason}`);
-          logger.info(`[Emergency Detection] Transcript: "${message.transcript}"`);
-          logger.info(`[Emergency Detection] Processing details:`, emergencyResult.processing);
+          logger.debug(`[Emergency Detection] Emergency detected but shouldAlert=false. Reason: ${emergencyResult.reason}`);
+          logger.debug(`[Emergency Detection] Processing details:`, emergencyResult.processing);
         }
       } catch (error) {
         logger.error(`[Emergency Detection] Error processing emergency detection for ${callId}:`, error);
+        logger.error(`[Emergency Detection] Error stack:`, error.stack);
         // Don't let emergency detection errors break the conversation
+      }
+    } else {
+      if (!conn.patientId) {
+        logger.debug(`[Emergency Detection] Skipping - no patientId in connection for ${callId}`);
+      }
+      if (!message.transcript || message.transcript.trim().length <= 10) {
+        logger.debug(`[Emergency Detection] Skipping - transcript too short (${message.transcript?.trim().length || 0} chars) for ${callId}`);
       }
     }
 
