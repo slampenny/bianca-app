@@ -652,12 +652,16 @@ const generateVerificationPage = (req, isError, options = {}) => {
 };
 
 const verifyEmail = async (req, res, next) => {
+  logger.info(`[Auth Controller] verifyEmail called - method: ${req.method}, wantsJson: ${req.headers.accept?.includes('application/json') || req.query.format === 'json'}`);
+  logger.info(`[Auth Controller] Token present: ${!!(req.query.token || req.body.token)}, token length: ${(req.query.token || req.body.token)?.length || 0}`);
+  
   // Check if client wants JSON response (API call from frontend)
   const wantsJson = req.headers.accept?.includes('application/json') || req.query.format === 'json';
   
   // Validate token parameter (manual validation to avoid error middleware)
   const token = req.query.token || req.body.token;
   if (!token) {
+    logger.warn(`[Auth Controller] Verification token missing`);
     if (wantsJson) {
       return res.status(httpStatus.BAD_REQUEST).json({
         success: false,
@@ -673,7 +677,9 @@ const verifyEmail = async (req, res, next) => {
   }
   
   try {
+    logger.info(`[Auth Controller] Calling authService.verifyEmail with token`);
     const result = await authService.verifyEmail(token);
+    logger.info(`[Auth Controller] Email verification successful - alreadyVerified: ${result.alreadyVerified}`);
     
     // If JSON is requested, return tokens and user data for auto-login
     if (wantsJson) {
@@ -698,6 +704,13 @@ const verifyEmail = async (req, res, next) => {
   
     res.status(httpStatus.OK).send(html);
   } catch (error) {
+    logger.error(`[Auth Controller] Email verification failed:`, {
+      message: error.message,
+      stack: error.stack,
+      tokenLength: token?.length || 0,
+      wantsJson
+    });
+    
     // If verification failed
     if (wantsJson) {
       return res.status(httpStatus.UNAUTHORIZED).json({
@@ -709,6 +722,8 @@ const verifyEmail = async (req, res, next) => {
     // Return HTML error page
     const errorMessage = error.message || 'Email verification failed';
     const isExpired = error.message && (error.message.includes('expired') || error.message.includes('Invalid') || error.message.includes('Token not found'));
+    
+    logger.info(`[Auth Controller] Returning HTML error page - isExpired: ${isExpired}, errorMessage: ${errorMessage}`);
     
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     const errorHtml = generateVerificationPage(req, true, {

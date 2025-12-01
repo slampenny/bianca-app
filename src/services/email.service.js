@@ -464,6 +464,7 @@ const sendVerificationEmail = async (to, token, caregiverName = null, locale = '
   // Always use frontend URL - frontend will handle routing to backend
   // This ensures the verification page appears in the frontend app
   const verificationLink = `${config.frontendUrl}/auth/verify-email?token=${token}`;
+  logger.info(`[Email Service] Generated verification link - frontendUrl: ${config.frontendUrl}, link: ${verificationLink.substring(0, 100)}...`);
   
   // Use caregiver name if provided, otherwise use generic greeting
   const greeting = caregiverName ? `Dear ${caregiverName},` : 'Dear caregiver,';
@@ -501,12 +502,24 @@ const sendVerificationEmail = async (to, token, caregiverName = null, locale = '
     </div>
   `;
   
-  await sendEmail(to, subject, text, html);
+  try {
+    await sendEmail(to, subject, text, html);
+    logger.info(`[Email Service] Verification email successfully queued for ${to} (locale: ${locale})`);
+    logger.info(`[Email Service] Verification link: ${verificationLink}`);
+  } catch (error) {
+    logger.error(`[Email Service] Failed to send verification email to ${to}:`, error);
+    logger.error(`[Email Service] Error details:`, {
+      message: error.message,
+      stack: error.stack,
+      to,
+      locale,
+      verificationLink
+    });
+    throw error; // Re-throw to let caller handle
+  }
   
   // Restore previous locale
   i18n.setLocale(previousLocale);
-  
-  logger.info(`Verification email successfully queued for ${to} (locale: ${locale})`);
 };
 
 /**
