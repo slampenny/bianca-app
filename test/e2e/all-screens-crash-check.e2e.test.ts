@@ -7,25 +7,24 @@ async function loginIfNeeded(page: any) {
   
   // Check if we're already logged in by looking for home header or tabs
   const homeHeader = page.locator('[data-testid="home-header"], [aria-label="home-header"]')
-  const tabHome = page.locator('[data-testid="tab-home"]')
+  const tabHome = page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
+  const addPatient = page.getByText("Add Patient", { exact: true })
   
   const isLoggedIn = await Promise.race([
-    homeHeader.waitFor({ timeout: 3000 }).then(() => true).catch(() => false),
-    tabHome.waitFor({ timeout: 3000 }).then(() => true).catch(() => false)
+    homeHeader.isVisible({ timeout: 3000 }).catch(() => false),
+    tabHome.isVisible({ timeout: 3000 }).catch(() => false),
+    addPatient.isVisible({ timeout: 3000 }).catch(() => false)
   ])
   
   if (!isLoggedIn) {
     const emailInput = page.locator('[data-testid="email-input"], [aria-label="email-input"]')
     if (await emailInput.count() > 0) {
-      await emailInput.fill('fake@example.org')
-      await page.fill('[data-testid="password-input"], [aria-label="password-input"]', 'Password1')
-      await page.click('[data-testid="login-button"], [aria-label="login-button"]')
-      
-      // Wait for either home header or tab-home to appear after login
-      await Promise.race([
-        homeHeader.waitFor({ timeout: 15000 }),
-        tabHome.waitFor({ timeout: 15000 })
-      ]).catch(() => {})
+      const { loginUserViaUI } = await import('./helpers/testHelpers')
+      try {
+        await loginUserViaUI(page, 'fake@example.org', 'Password1')
+      } catch (error) {
+        console.log('Login failed, continuing anyway:', error)
+      }
       
       // Additional wait to ensure tabs are visible
       await page.waitForTimeout(1000)

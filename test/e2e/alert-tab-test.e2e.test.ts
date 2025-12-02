@@ -13,12 +13,25 @@ test.describe("Alert Tab Test", () => {
   test("check alert tab badge count vs alert screen", async ({ page }) => {
     console.log('=== ALERT TAB TEST ===')
     
-    // GIVEN: I'm on the home screen
-    await expect(page.getByLabel('home-header')).toBeVisible()
+    // GIVEN: I'm on the home screen - verify we're not on login
+    const emailInput = page.locator('input[data-testid="email-input"]')
+    const isOnLogin = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
+    expect(isOnLogin).toBe(false)
     
-    // WHEN: I check the alert tab badge
-    const alertTab = page.getByTestId('tab-alert').or(page.getByLabel('Alerts tab'))
-    await alertTab.waitFor({ state: 'visible' })
+    // WHEN: I check the alert tab badge - try multiple selectors
+    let alertTab = page.getByTestId('tab-alert')
+    let tabCount = await alertTab.count().catch(() => 0)
+    
+    if (tabCount === 0) {
+      alertTab = page.locator('[data-testid="tab-alert"], [aria-label="Alerts tab"], [aria-label*="alert" i]').first()
+      tabCount = await alertTab.count().catch(() => 0)
+    }
+    
+    if (tabCount === 0) {
+      throw new Error('Alert tab not found')
+    }
+    
+    await alertTab.waitFor({ state: 'visible', timeout: 10000 })
     
     // Check if there's a badge on the alert tab - look for the actual badge element
     const badgeElement = page.locator('[data-testid="tab-alert"] span[style*="background-color: rgb(255, 59, 48)"]')

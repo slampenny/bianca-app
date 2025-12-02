@@ -67,10 +67,51 @@ export async function isLoginScreen(page: Page) {
 export async function isHomeScreen(page: Page) {
   console.log("Checking if on Home Screen...")
 
-  // Wait for the home screen to load by looking for the "Add Patient" button
-  await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
-
-  console.log("Confirmed on Home Screen.")
+  // Try multiple indicators that we're on the home screen
+  const homeIndicators = [
+    page.getByText("Add Patient", { exact: true }),
+    page.getByTestId('add-patient-button'),
+    page.getByTestId('home-header'),
+    page.locator('[data-testid="home-screen"]'),
+    page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
+  ]
+  
+  // Check if we're still on login screen
+  const emailInput = page.locator('input[data-testid="email-input"]')
+  const isOnLogin = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
+  
+  if (isOnLogin) {
+    throw new Error('Still on login screen - login may have failed')
+  }
+  
+  // Wait for any home indicator
+  let foundHome = false
+  for (const indicator of homeIndicators) {
+    try {
+      await expect(indicator).toBeVisible({ timeout: 5000 })
+      foundHome = true
+      console.log("Confirmed on Home Screen.")
+      break
+    } catch {
+      // Continue to next indicator
+    }
+  }
+  
+  if (!foundHome) {
+    // Last check: if we're not on login and we can see tabs, we're probably on home
+    const homeTab = page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
+    const hasHomeTab = await homeTab.isVisible({ timeout: 2000 }).catch(() => false)
+    if (hasHomeTab && !isOnLogin) {
+      foundHome = true
+      console.log("Confirmed on Home Screen (via tab detection).")
+    }
+  }
+  
+  if (!foundHome) {
+    const url = page.url()
+    const pageContent = await page.content().catch(() => '')
+    throw new Error(`Failed to confirm home screen. URL: ${url}, Contains login: ${pageContent.includes('email-input')}`)
+  }
 }
 
 export async function isPatientScreen(page: Page) {

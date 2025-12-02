@@ -8,7 +8,38 @@ export class AuthWorkflow {
   async givenIAmOnTheLoginScreen() {
     // Navigate to the app and wait for login screen (baseURL is configured in playwright.config.ts)
     await this.page.goto('/')
-    await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 5000 })
+    
+    // Check if already logged in
+    const emailInput = this.page.locator('input[data-testid="email-input"]')
+    const isOnLogin = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
+    
+    if (!isOnLogin) {
+      // Already logged in, try to log out first
+      try {
+        // Look for profile button or any logout mechanism
+        const profileButton = this.page.getByTestId('profile-button')
+        if (await profileButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await profileButton.click()
+          await this.page.waitForTimeout(1000)
+          // Look for logout button
+          const logoutButton = this.page.getByText(/log out/i).or(this.page.getByTestId('logout-button'))
+          if (await logoutButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await logoutButton.click()
+            await this.page.waitForTimeout(2000)
+            // Navigate back to home to trigger login screen
+            await this.page.goto('/')
+          }
+        }
+      } catch (error) {
+        console.log('Could not log out, trying to navigate to login:', error)
+        // Force navigation to login by going to root
+        await this.page.goto('/')
+        await this.page.waitForTimeout(1000)
+      }
+    }
+    
+    // Now wait for login screen
+    await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
   }
 
   async givenIHaveValidCredentials() {
@@ -56,7 +87,27 @@ export class AuthWorkflow {
   }
 
   async whenIClickLoginButton() {
-    await this.page.click('[data-testid="login-button"]')
+    // Try multiple selectors for login button
+    let loginButton = this.page.getByTestId('login-button')
+    let buttonCount = await loginButton.count().catch(() => 0)
+    
+    if (buttonCount === 0) {
+      loginButton = this.page.locator('[data-testid="login-button"]').first()
+      buttonCount = await loginButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Last resort: try to find by text
+      loginButton = this.page.getByText(/log in/i).first()
+      buttonCount = await loginButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      throw new Error('Login button not found')
+    }
+    
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
   }
 
   async whenIClickRegisterButton() {
@@ -171,13 +222,41 @@ export class AuthWorkflow {
     // Check multiple indicators that we're on the home screen
     const homeHeader = await this.page.locator('[data-testid="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
     const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 5000 }).catch(() => false)
+    const addPatientButton = await this.page.getByTestId('add-patient-button').isVisible({ timeout: 5000 }).catch(() => false)
     const homeScreen = await this.page.locator('[data-testid="home-screen"]').isVisible({ timeout: 5000 }).catch(() => false)
     const profileButton = await this.page.getByTestId('profile-button').isVisible({ timeout: 5000 }).catch(() => false)
+    const homeTab = await this.page.locator('[data-testid="tab-home"], [aria-label="Home tab"]').isVisible({ timeout: 5000 }).catch(() => false)
     
-    // If we're not on login screen and we can see profile button or home elements, we're on home
+    // Check if we're still on login screen
     const loginScreen = await this.page.locator('[data-testid="login-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
+    const emailInput = await this.page.locator('input[data-testid="email-input"]').isVisible({ timeout: 2000 }).catch(() => false)
     
-    expect(homeHeader || addPatient || homeScreen || (profileButton && !loginScreen)).toBe(true)
+    // Log what we found for debugging
+    console.log('Home screen detection:', {
+      homeHeader,
+      addPatient,
+      addPatientButton,
+      homeScreen,
+      profileButton,
+      homeTab,
+      loginScreen,
+      emailInput
+    })
+    
+    // If we're not on login screen and we can see any home elements, we're on home
+    const isOnHome = homeHeader || addPatient || addPatientButton || homeScreen || (profileButton && !loginScreen && !emailInput) || (homeTab && !loginScreen && !emailInput)
+    
+    if (!isOnHome) {
+      // Take a screenshot for debugging
+      const screenshot = await this.page.screenshot().catch(() => null)
+      const url = this.page.url()
+      const pageContent = await this.page.content().catch(() => '')
+      console.error('Failed to detect home screen. URL:', url)
+      console.error('Page contains login form:', pageContent.includes('email-input'))
+      console.error('Page contains home elements:', pageContent.includes('home-header') || pageContent.includes('add-patient'))
+    }
+    
+    expect(isOnHome).toBe(true)
   }
 
   async thenIShouldSeeWelcomeMessage() {

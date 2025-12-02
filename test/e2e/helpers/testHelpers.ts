@@ -136,36 +136,118 @@ export async function loginUserViaUI(page: Page, email: string, password: string
   
   // Wait for either success or error with longer timeout
   try {
-      await page.waitForSelector('[data-testid="home-header"]', { timeout: 20000 })
-    console.log('Login successful - home header found')
+    // Wait for home screen indicators - try multiple possible selectors
+    const homeIndicators = [
+      '[data-testid="home-header"]',
+      '[data-testid="tab-home"]',
+      '[data-testid="add-patient-button"]',
+      '[aria-label="Home tab"]',
+      'text=Add Patient'
+    ]
+    
+    let foundHome = false
+    for (const selector of homeIndicators) {
+      try {
+        await page.waitForSelector(selector, { timeout: 5000 })
+        foundHome = true
+        console.log(`Login successful - found home indicator: ${selector}`)
+        break
+      } catch (e) {
+        // Continue to next selector
+      }
+    }
+    
+    if (!foundHome) {
+      // Try waiting a bit more and check again
+      await page.waitForTimeout(2000)
+      for (const selector of homeIndicators) {
+        try {
+          if (await page.locator(selector).isVisible({ timeout: 2000 })) {
+            foundHome = true
+            console.log(`Login successful - found home indicator after wait: ${selector}`)
+            break
+          }
+        } catch (e) {
+          // Continue
+        }
+      }
+    }
+    
+    if (!foundHome) {
+      throw new Error('Home screen not found')
+    }
   } catch (error) {
     console.log('Login failed - checking for error messages')
     
-    // Check for login error messages
+    // Wait a moment for error messages to appear
+    await page.waitForTimeout(1000)
+    
+    // Check for login error messages - including backend errors
     const errorMessages = [
       'Failed to log in',
       'Invalid credentials',
       'User not found',
-      'Incorrect password'
+      'Incorrect password',
+      'Invalid caregiver ID format',
+      'Please verify your email',
+      'Account is locked',
+      'Incorrect email or password'
     ]
     
     for (const errorMsg of errorMessages) {
       try {
-        const errorElement = page.getByText(errorMsg, { exact: false })
-        if (await errorElement.isVisible({ timeout: 1000 })) {
-          console.log(`Login error found: ${errorMsg}`)
-          throw new Error(`Login failed: ${errorMsg}`)
+        // Try multiple ways to find error text
+        const errorSelectors = [
+          page.getByText(errorMsg, { exact: false }),
+          page.locator(`text=${errorMsg}`),
+          page.locator(`*:has-text("${errorMsg}")`)
+        ]
+        
+        for (const errorElement of errorSelectors) {
+          try {
+            if (await errorElement.isVisible({ timeout: 1000 })) {
+              console.log(`Login error found: ${errorMsg}`)
+              throw new Error(`Login failed: ${errorMsg}`)
+            }
+          } catch (e) {
+            if (e.message.includes('Login failed:')) {
+              throw e
+            }
+            // Continue checking
+          }
         }
       } catch (e) {
+        if (e.message.includes('Login failed:')) {
+          throw e
+        }
         // Continue checking other error messages
+      }
+    }
+    
+    // Check page content for error messages
+    const pageContent = await page.content()
+    const pageText = await page.textContent('body').catch(() => '')
+    
+    for (const errorMsg of errorMessages) {
+      if (pageContent.includes(errorMsg) || pageText.includes(errorMsg)) {
+        console.log(`Login error found in page content: ${errorMsg}`)
+        throw new Error(`Login failed: ${errorMsg}`)
       }
     }
     
     // If no specific error found, check current page content
     const currentUrl = page.url()
-    const pageContent = await page.content()
     console.log(`Current URL: ${currentUrl}`)
     console.log(`Page contains login form: ${pageContent.includes('email-input')}`)
+    
+    // Check console logs for errors
+    const consoleLogs = await page.evaluate(() => {
+      return window.console._logs || []
+    }).catch(() => [])
+    
+    if (consoleLogs.length > 0) {
+      console.log('Console logs:', consoleLogs.slice(-5))
+    }
     
     throw new Error('Login failed - no home header found and no specific error message detected')
   }
