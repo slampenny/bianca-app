@@ -20,18 +20,25 @@ const extractCaregiverId = (caregiver) => {
     throw new Error('Caregiver is required');
   }
   
-  // If it's already a string, return it
+  let id;
+  
+  // If it's already a string, validate it's a valid ObjectId
   if (typeof caregiver === 'string') {
+    if (!mongoose.Types.ObjectId.isValid(caregiver)) {
+      logger.error('[Token Service] Invalid ObjectId string:', caregiver);
+      throw new Error('Invalid caregiver ID format: not a valid ObjectId string');
+    }
     return caregiver;
   }
   
-  // If it's a Mongoose ObjectId, convert to string
-  if (mongoose.Types.ObjectId.isValid(caregiver)) {
+  // If it's a Mongoose ObjectId directly, convert to string
+  if (caregiver instanceof mongoose.Types.ObjectId || 
+      (caregiver.constructor && caregiver.constructor.name === 'ObjectId')) {
     return caregiver.toString();
   }
   
   // Try to get ID from object (handles both .id and ._id)
-  const id = caregiver.id || caregiver._id;
+  id = caregiver.id || caregiver._id;
   
   if (!id) {
     logger.error('[Token Service] Cannot extract caregiver ID from:', {
@@ -43,8 +50,22 @@ const extractCaregiverId = (caregiver) => {
     throw new Error('Caregiver ID not found in caregiver object');
   }
   
-  // Convert to string if it's an ObjectId
-  return id.toString ? id.toString() : String(id);
+  // Convert to string
+  const idString = id.toString ? id.toString() : String(id);
+  
+  // Validate it's a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(idString)) {
+    logger.error('[Token Service] Extracted ID is not a valid ObjectId:', {
+      idString,
+      idType: typeof id,
+      caregiverType: typeof caregiver,
+      hasId: !!caregiver.id,
+      has_id: !!caregiver._id
+    });
+    throw new Error(`Invalid caregiver ID format: "${idString}" is not a valid ObjectId`);
+  }
+  
+  return idString;
 };
 
 /**

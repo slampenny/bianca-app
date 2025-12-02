@@ -3,7 +3,7 @@ const catchAsync = require('../utils/catchAsync');
 const config = require('../config/config');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
-const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService } = require('../services');
+const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService, privacyService } = require('../services');
 const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
 const { auditAuthFailure } = require('../middlewares/auditLog');
 const { AuditLog, Token } = require('../models');
@@ -27,16 +27,49 @@ const register = catchAsync(async (req, res, next) => {
 
   const caregiver = org.caregivers[0];
   
+  // Record PIPEDA consent for data collection (required for Canadian users)
+  try {
+    await privacyService.createConsentRecord({
+      consentType: 'collection',
+      purpose: 'Account creation and service delivery',
+      method: 'explicit',
+      explicitConsent: {
+        provided: true,
+        providedVia: 'registration',
+        ipAddress: req.ip || req.connection?.remoteAddress,
+        userAgent: req.get('user-agent')
+      },
+      informationTypes: ['name', 'email', 'phone'],
+      collectionNoticeProvided: true,
+      collectionNoticeVersion: '1.0'
+    }, caregiver.id, 'Caregiver');
+    logger.info(`[Auth Controller] PIPEDA consent recorded for caregiver ${caregiver.id}`);
+  } catch (consentError) {
+    logger.error('Failed to record consent during registration', {
+      error: consentError.message,
+      caregiverId: caregiver.id
+    });
+    // Don't fail registration if consent recording fails - log and continue
+  }
+  
   // Send verification email automatically after registration
   try {
     const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
     const locale = caregiver.preferredLanguage || 'en';
     await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
   } catch (emailError) {
-    logger.error('Failed to send verification email during registration', {
+    // Log detailed error information for debugging
+    logger.error('[Registration] Failed to send verification email during registration', {
       error: emailError.message,
+      errorName: emailError.name,
+      errorCode: emailError.code,
       stack: emailError.stack,
-      email: caregiver.email
+      email: caregiver.email,
+      caregiverId: caregiver.id,
+      awsErrorCode: emailError.name, // AWS SDK errors have a 'name' property
+      awsRequestId: emailError.$metadata?.requestId, // AWS SDK v3 request ID
+      awsStatusCode: emailError.$metadata?.httpStatusCode, // AWS SDK v3 status code
+      fullError: JSON.stringify(emailError, Object.getOwnPropertyNames(emailError)) // Include all error properties
     });
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Registration successful but verification email failed. Please contact support.');
   }
@@ -107,6 +140,31 @@ const registerWithInvite = catchAsync(async (req, res) => {
   // Delete the invite token since it's been used
   await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.INVITE });
   
+  // Record PIPEDA consent for data collection (required for Canadian users)
+  try {
+    await privacyService.createConsentRecord({
+      consentType: 'collection',
+      purpose: 'Account creation and service delivery',
+      method: 'explicit',
+      explicitConsent: {
+        provided: true,
+        providedVia: 'registration',
+        ipAddress: req.ip || req.connection?.remoteAddress,
+        userAgent: req.get('user-agent')
+      },
+      informationTypes: ['name', 'email', 'phone'],
+      collectionNoticeProvided: true,
+      collectionNoticeVersion: '1.0'
+    }, caregiver.id, 'Caregiver');
+    logger.info(`[Auth Controller] PIPEDA consent recorded for caregiver ${caregiver.id}`);
+  } catch (consentError) {
+    logger.error('Failed to record consent during registration', {
+      error: consentError.message,
+      caregiverId: caregiver.id
+    });
+    // Don't fail registration if consent recording fails - log and continue
+  }
+  
   const caregiverDTO = CaregiverDTO(caregiver);
   const tokens = await tokenService.generateAuthTokens(caregiver);
   res.status(httpStatus.CREATED).send({ caregiver: caregiverDTO, tokens });
@@ -148,8 +206,10 @@ const login = catchAsync(async (req, res, next) => {
       // If MFA is enabled but no token provided, return requireMFA flag
       if (!mfaToken) {
         // Generate a temporary token for MFA verification
+        // Use _id for Mongoose documents, fallback to id
+        const caregiverId = caregiver._id || caregiver.id;
         const tempToken = await tokenService.generateToken(
-          caregiver.id,
+          caregiverId,
           require('moment')().add(5, 'minutes'),
           'MFA_TEMP'
         );
@@ -161,8 +221,9 @@ const login = catchAsync(async (req, res, next) => {
         });
       }
       
-      // Verify MFA token
-      const mfaValid = await mfaService.verifyMFAToken(caregiver.id, mfaToken);
+      // Verify MFA token - use _id for Mongoose documents, fallback to id
+      const caregiverId = caregiver._id || caregiver.id;
+      const mfaValid = await mfaService.verifyMFAToken(caregiverId, mfaToken);
       if (!mfaValid) {
         // Log failed MFA attempt
         await auditAuthFailure(
@@ -176,15 +237,17 @@ const login = catchAsync(async (req, res, next) => {
     }
     
     // Step 3: Reset failed login attempts on successful login
+    // Use _id for Mongoose documents, fallback to id
+    const caregiverId = caregiver._id || caregiver.id;
     if (caregiver.failedLoginAttempts > 0) {
-      await caregiverService.updateCaregiverById(caregiver.id, {
+      await caregiverService.updateCaregiverById(caregiverId, {
         failedLoginAttempts: 0,
         lastFailedLogin: null
       });
     }
 
     // Step 4: Create session and audit log
-    const alerts = await alertService.getAlerts(caregiver.id);
+    const alerts = await alertService.getAlerts(caregiverId);
     const alertDTOs = alerts.map((alert) => AlertDTO(alert));
     const patientDTOs = patients.map((patient) => PatientDTO(patient));
     const caregiverDTO = CaregiverDTO(caregiver);
@@ -215,11 +278,11 @@ const login = catchAsync(async (req, res, next) => {
     // Create audit log for successful login
     await AuditLog.create({
       timestamp: new Date(),
-      userId: caregiver.id,
+      userId: caregiverId,
       userRole: caregiver.role,
       action: 'LOGIN',
       resource: 'session',
-      resourceId: caregiver.id,
+      resourceId: caregiverId,
       outcome: 'SUCCESS',
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('user-agent'),
