@@ -1,10 +1,10 @@
 {
-  "name": "myphonefriend-backend",
+  "name": "bianca-app-backend",
   "version": "1.0.0",
-  "description": "MyPhoneFriend Backend API - Secure healthcare communication platform for caregivers and wellness monitoring. Provides REST API, real-time voice calls, AI-powered transcription, and HIPAA-compliant patient care coordination.",
+  "description": "Bianca Wellness Backend API - Secure healthcare communication platform for caregivers and wellness monitoring. Provides REST API, real-time voice calls, AI-powered transcription, and HIPAA-compliant patient care coordination.",
   "private": true,
   "main": "src/index.js",
-  "repository": "https://github.com/jordanlapp/myphonefriend-backend.git",
+  "repository": "https://github.com/jordanlapp/bianca-app-backend.git",
   "author": "Jordan Lapp <jordanglapp@gmail.com>",
   "license": "UNLICENSED",
   "keywords": [
@@ -165,5 +165,6 @@
     "prettier": "^2.0.5",
     "sinon": "^17.0.1",
     "supertest": "^6.3.4"
-  }
+  },
+  "packageManager": "yarn@4.12.0+sha512.f45ab632439a67f8bc759bf32ead036a1f413287b9042726b7cc4818b7b49e14e9423ba49b18f9e06ea4941c1ad062385b1d8760a8d5091a1a31e5f6219afca8"
 }

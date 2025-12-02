@@ -78,9 +78,16 @@ const insertCaregiversAndAddToOrg = async (org, caregivers) => {
 
 const insertCaregivertoOrgAndReturnToken = async (org, caregiverChoice) => {
   const [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverChoice]);
-  const authTokens = await tokenService.generateAuthTokens(caregiver);
+  // Fetch the full document to ensure it has all Mongoose document properties
+  const caregiverDoc = await Caregiver.findById(caregiver._id);
+  if (!caregiverDoc) {
+    throw new Error(`Caregiver not found with ID: ${caregiver._id}`);
+  }
+  // Use the _id directly as a string to avoid any extraction issues
+  const caregiverIdString = caregiverDoc._id.toString();
+  const authTokens = await tokenService.generateAuthTokens(caregiverIdString);
 
-  return { caregiver, accessToken: authTokens.access.token };
+  return { caregiver: caregiverDoc, accessToken: authTokens.access.token };
 };
 
 const insertCaregivertoOrgAndReturnTokenByRole = async (org, role = 'staff') => {

@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
   net-tools \
   awscli \
   ffmpeg \
+  gosu \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get clean
 
@@ -31,17 +32,28 @@ RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-de
 # Set environment variable for MongoMemoryServer
 ENV MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod
 
+# Enable Corepack to use the Yarn version specified in package.json
+RUN corepack enable
+
 # Dependencies stage - this layer will be cached unless package.json changes
 FROM base AS dependencies
-COPY --chown=node:node package.json yarn.lock ./
+COPY --chown=node:node package.json yarn.lock .yarnrc.yml ./
+# Create .yarn directory structure with proper permissions for Yarn 4
+RUN mkdir -p .yarn/cache .yarn/releases && chown -R node:node .yarn
 USER node
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --pure-lockfile --frozen-lockfile
+# Yarn 4 - don't use cache mount during build (causes permission issues)
+# The cache will be in the layer anyway, and we'll use named volume at runtime
+RUN yarn install --immutable
 
 # Build stage - copy source and build if needed
 FROM dependencies AS build
+# Reset to root user so entrypoint can fix permissions on volumes
+USER root
 # Copy static config files (rarely change)
-COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json docker-compose*.yml ./
+COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json docker-compose*.yml docker-entrypoint.sh ./
+# Ensure entrypoint script is executable
+RUN chmod +x docker-entrypoint.sh
+# Entrypoint will switch to node user after fixing permissions
 
 # Copy source code
 COPY --chown=node:node src/ ./src/
