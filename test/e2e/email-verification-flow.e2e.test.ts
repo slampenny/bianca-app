@@ -63,7 +63,19 @@ test.describe('Email Verification Flow - End to End with Ethereal', () => {
     console.log('✅ Verification link constructed:', verificationLink)
     
     // Step 5: Navigate to verification link (no mocks - use real backend)
-    await page.goto(verificationLink)
+    // Ensure frontend is ready and handle connection errors
+    try {
+      await page.goto(verificationLink, { waitUntil: 'networkidle', timeout: 30000 })
+    } catch (error) {
+      // If connection refused, wait a bit and retry
+      if (error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('net::ERR')) {
+        console.log('Frontend not ready, waiting 5 seconds and retrying...')
+        await page.waitForTimeout(5000)
+        await page.goto(verificationLink, { waitUntil: 'networkidle', timeout: 30000 })
+      } else {
+        throw error
+      }
+    }
     
     // Verify we're on the frontend (localhost:8081)
     expect(page.url()).toContain('localhost:8081')

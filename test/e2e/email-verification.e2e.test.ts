@@ -40,6 +40,10 @@ test.describe('Email Verification Flow', () => {
   })
 
   test('verification link opens in frontend and extracts token', async ({ page, context }) => {
+    // Ensure frontend is ready first
+    await page.goto('http://localhost:8081')
+    await page.waitForLoadState('networkidle')
+    
     // Create a test token
     const testToken = 'test-verification-token-12345'
     const verificationUrl = `http://localhost:8081/auth/verify-email?token=${testToken}`
@@ -53,8 +57,19 @@ test.describe('Email Verification Flow', () => {
       })
     })
 
-    // Navigate to verification URL
-    await page.goto(verificationUrl)
+    // Navigate to verification URL with retry logic
+    try {
+      await page.goto(verificationUrl, { waitUntil: 'networkidle', timeout: 30000 })
+    } catch (error) {
+      // If connection refused, wait a bit and retry
+      if (error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('net::ERR')) {
+        console.log('Frontend not ready, waiting 5 seconds and retrying...')
+        await page.waitForTimeout(5000)
+        await page.goto(verificationUrl, { waitUntil: 'networkidle', timeout: 30000 })
+      } else {
+        throw error
+      }
+    }
 
     // Verify we're on the frontend (localhost:8081)
     expect(page.url()).toContain('localhost:8081')
@@ -69,6 +84,10 @@ test.describe('Email Verification Flow', () => {
   })
 
   test('VerifyEmailScreen extracts token from URL and calls backend', async ({ page }) => {
+    // Ensure frontend is ready first
+    await page.goto('http://localhost:8081')
+    await page.waitForLoadState('networkidle')
+    
     const testToken = 'test-token-12345'
     
     // Track if backend API was called
@@ -76,9 +95,10 @@ test.describe('Email Verification Flow', () => {
     let calledToken = ''
 
     // Mock backend verification endpoint
-    await page.route(`**/v1/auth/verify-email?token=${testToken}`, async (route) => {
+    await page.route(`**/v1/auth/verify-email*`, async (route) => {
       backendApiCalled = true
-      calledToken = new URL(route.request().url()).searchParams.get('token') || ''
+      const url = new URL(route.request().url())
+      calledToken = url.searchParams.get('token') || ''
       
       route.fulfill({
         status: 200,
@@ -87,8 +107,19 @@ test.describe('Email Verification Flow', () => {
       })
     })
 
-    // Navigate to verification URL
-    await page.goto(`http://localhost:8081/auth/verify-email?token=${testToken}`)
+    // Navigate to verification URL with retry logic
+    try {
+      await page.goto(`http://localhost:8081/auth/verify-email?token=${testToken}`, { waitUntil: 'networkidle', timeout: 30000 })
+    } catch (error) {
+      // If connection refused, wait a bit and retry
+      if (error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('net::ERR')) {
+        console.log('Frontend not ready, waiting 5 seconds and retrying...')
+        await page.waitForTimeout(5000)
+        await page.goto(`http://localhost:8081/auth/verify-email?token=${testToken}`, { waitUntil: 'networkidle', timeout: 30000 })
+      } else {
+        throw error
+      }
+    }
 
     // Wait a bit for the screen to process
     await page.waitForTimeout(2000)
