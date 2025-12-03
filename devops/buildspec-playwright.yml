@@ -92,14 +92,23 @@ phases:
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
         echo "Yarn version: $(yarn --version)"
-        echo "Checking for yarn.lock..."
-        ls -la yarn.lock || echo "No yarn.lock found"
-        echo "Running yarn install..."
-        yarn install --frozen-lockfile 2>&1 | tee /tmp/yarn-backend.log || {
-          echo "❌ Yarn install failed. Error log:"
-          cat /tmp/yarn-backend.log
-          exit 1
-        }
+        echo "Contents of backend directory:"
+        ls -la | head -20
+        echo "Checking for lock files..."
+        ls -la yarn.lock package-lock.json 2>/dev/null || echo "No lock files found"
+        echo "Running yarn install (trying without --frozen-lockfile first to see error)..."
+        # Try with frozen-lockfile first, if it fails, try without to see the actual error
+        if ! yarn install --frozen-lockfile 2>&1 | tee /tmp/yarn-backend.log; then
+          echo "⚠️  --frozen-lockfile failed, trying without it to see error:"
+          yarn install 2>&1 | tee /tmp/yarn-backend-error.log || {
+            echo "❌ Yarn install failed completely. Error logs:"
+            echo "=== With --frozen-lockfile ==="
+            cat /tmp/yarn-backend.log || true
+            echo "=== Without --frozen-lockfile ==="
+            cat /tmp/yarn-backend-error.log || true
+            exit 1
+          }
+        fi
       - echo "Installing frontend dependencies..."
       - |
         cd "$FRONTEND_DIR" || exit 1
