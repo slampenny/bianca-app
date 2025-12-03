@@ -13,13 +13,17 @@ phases:
       - echo "Setting up Yarn 4 via corepack..."
       - |
         # Enable corepack for Yarn 4 support (must be done first)
-        if ! command -v corepack &> /dev/null; then
-          npm install -g corepack
-        fi
-        corepack enable
-        corepack prepare yarn@stable --activate
+        # CodeBuild standard:7.0 should have Node 18+ which includes corepack
+        corepack enable || (npm install -g corepack && corepack enable)
+        # Use the exact Yarn version from backend package.json (4.12.0)
+        corepack prepare yarn@4.12.0 --activate
         yarn --version
         echo "✅ Yarn version: $(yarn --version)"
+        # Verify it's Yarn 4
+        if ! yarn --version | grep -q "^4\."; then
+          echo "❌ ERROR: Yarn 4 not activated. Current version: $(yarn --version)"
+          exit 1
+        fi
       - echo "Installing MongoDB via Docker..."
       - |
         # Start MongoDB using Docker (better isolation than installing directly)
