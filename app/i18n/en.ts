@@ -899,6 +899,7 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     completeProfileTitle: "Complete Your Profile",
     completeProfileMessage: "Please complete your profile by adding a phone number before continuing.",
     completeProfileMessageUnverified: "Please add your phone number to complete your profile and access all features.",
+    verifyPhoneBannerMessage: "Please verify your phone number to receive emergency alerts and important notifications. You can continue using the app with an unverified phone number.",
     errorUploadingAvatar: "Error uploading avatar",
     emailVerified: "Email Verified",
     emailNotVerified: "Email Not Verified",

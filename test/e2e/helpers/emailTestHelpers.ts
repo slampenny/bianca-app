@@ -1,8 +1,15 @@
 import { Page, BrowserContext } from '@playwright/test'
+import { getEmailFromEthereal } from './backendHelpers'
 
 /**
  * Email testing helpers for invite workflow tests
- * These helpers simulate email interactions in a test environment
+ * 
+ * @deprecated This helper class mocks email services. Use real backend with Ethereal instead.
+ * See getEmailFromEthereal() in backendHelpers.ts for the correct approach.
+ * 
+ * Email should go through real backend:
+ * - In tests: Backend uses Ethereal mail (not mocked)
+ * - On staging: Backend uses SES (not mocked)
  */
 
 export interface EmailMessage {
@@ -12,15 +19,28 @@ export interface EmailMessage {
   body: string
   htmlBody?: string
   links: string[]
+  tokens?: {
+    invite?: string
+    verification?: string
+  }
 }
 
 export class EmailTestHelper {
   private emails: EmailMessage[] = []
 
   /**
-   * Mock email sending - captures emails instead of actually sending them
+   * @deprecated Do not mock email services. Use real backend with Ethereal instead.
+   * This method is kept for backward compatibility but should not be used in new tests.
+   * 
+   * Instead, use:
+   * ```typescript
+   * const email = await getEmailFromEthereal(page, emailAddress, true, 30000)
+   * const inviteToken = email.tokens.invite
+   * ```
    */
   async mockEmailService(page: Page) {
+    console.warn('⚠️ EmailTestHelper.mockEmailService is deprecated. Use real backend with Ethereal instead.')
+    console.warn('   Use: getEmailFromEthereal(page, emailAddress, true, 30000)')
     await page.route('**/v1/orgs/*/sendInvite', async (route) => {
       const request = route.request()
       const postData = request.postDataJSON()
@@ -35,7 +55,8 @@ export class EmailTestHelper {
         subject: 'You\'re invited to join Bianca App',
         body: `You've been invited to join Test Organization. Click the link below to complete your registration.`,
         htmlBody: this.generateInviteEmailHTML(inviteToken, postData.email),
-        links: [this.generateInviteLink(inviteToken)]
+        links: [this.generateInviteLink(inviteToken)],
+        tokens: { invite: inviteToken }
       }
       
       this.emails.push(email)
@@ -150,16 +171,34 @@ export class EmailTestHelper {
 }
 
 /**
- * Helper function to set up email testing for invite workflow
+ * @deprecated Do not mock email services. Use real backend with Ethereal instead.
+ * 
+ * Instead of setupEmailTesting, use:
+ * ```typescript
+ * // Send invite via real backend
+ * await page.getByTestId('invite-caregiver-button').click()
+ * // ... fill form and send invite ...
+ * 
+ * // Retrieve email from Ethereal
+ * const email = await getEmailFromEthereal(page, inviteeEmail, true, 30000)
+ * const inviteToken = email.tokens.invite
+ * ```
  */
 export async function setupEmailTesting(page: Page): Promise<EmailTestHelper> {
+  console.warn('⚠️ setupEmailTesting is deprecated. Use real backend with Ethereal instead.')
   const emailHelper = new EmailTestHelper()
   await emailHelper.mockEmailService(page)
   return emailHelper
 }
 
 /**
- * Helper function to simulate the complete invite workflow
+ * @deprecated Do not mock email services. Use real backend with Ethereal instead.
+ * 
+ * Instead, use real backend workflow:
+ * 1. Admin sends invite via real backend (sends email via Ethereal)
+ * 2. Retrieve email from Ethereal using getEmailFromEthereal()
+ * 3. Extract invite token from email
+ * 4. Navigate to invite link
  */
 export async function simulateInviteWorkflow(
   adminPage: Page,
@@ -168,6 +207,7 @@ export async function simulateInviteWorkflow(
   inviteeName: string,
   inviteePhone: string
 ): Promise<{ adminPage: Page; inviteePage: Page; emailHelper: EmailTestHelper }> {
+  console.warn('⚠️ simulateInviteWorkflow is deprecated. Use real backend with Ethereal instead.')
   // Set up email testing
   const emailHelper = await setupEmailTesting(adminPage)
 

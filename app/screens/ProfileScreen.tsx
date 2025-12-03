@@ -48,9 +48,12 @@ function ProfileScreen() {
   const currentUser = useSelector(getCaregiver)
   const inviteToken = useSelector(getInviteToken)
   
-  // Check if user needs to complete profile (email or phone not verified)
-  // Profile is incomplete if email or phone is not verified
-  const isUnverified = !currentUser?.isEmailVerified || !currentUser?.isPhoneVerified
+  // Check if user needs to complete profile
+  // Profile is incomplete if email is not verified OR phone is missing (not just unverified)
+  // Users can continue with unverified phone, but need verified email and a phone number present
+  const hasMissingPhone = !currentUser?.phone || (typeof currentUser.phone === 'string' && currentUser.phone.trim() === '')
+  const isUnverified = !currentUser?.isEmailVerified || hasMissingPhone
+  const hasUnverifiedPhone = currentUser?.phone && typeof currentUser.phone === 'string' && currentUser.phone.trim() !== '' && !currentUser?.isPhoneVerified
 
   // Mutations for editing profile
   const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
@@ -123,7 +126,8 @@ function ProfileScreen() {
     }
   }
 
-  // Prevent navigation away from profile screen for unverified users (except logout)
+  // Only prevent navigation if email is not verified or phone is missing
+  // Users can continue with unverified phone number
   useEffect(() => {
     if (isUnverified) {
       const unsubscribe = navigation.addListener('beforeRemove', (e) => {
@@ -141,7 +145,7 @@ function ProfileScreen() {
 
       return unsubscribe
     }
-  }, [navigation, isUnverified])
+  }, [navigation, isUnverified, showInfo])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -254,11 +258,22 @@ function ProfileScreen() {
 
           {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
-          {isUnverified && (
+          {/* Show banner for missing phone or unverified phone */}
+          {hasMissingPhone && (
             <View style={styles.unverifiedBanner}>
               <Text style={styles.unverifiedTitle}>{translate("profileScreen.completeProfileTitle")}</Text>
               <Text style={styles.unverifiedText}>
                 {translate("profileScreen.completeProfileMessageUnverified")}
+              </Text>
+            </View>
+          )}
+          
+          {/* Show different banner for unverified phone (phone exists but not verified) */}
+          {hasUnverifiedPhone && (
+            <View style={styles.unverifiedBanner}>
+              <Text style={styles.unverifiedTitle}>{translate("profileScreen.completeProfileTitle")}</Text>
+              <Text style={styles.unverifiedText}>
+                {translate("profileScreen.verifyPhoneBannerMessage")}
               </Text>
             </View>
           )}

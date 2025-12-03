@@ -35,9 +35,11 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   }, [isLoggedIn])
 
   // Redirect users with incomplete profiles to profile screen
-  // Profile is incomplete if email or phone is not verified
+  // Profile is incomplete if email is not verified OR phone is missing
+  // Users can continue with unverified phone number
   useEffect(() => {
-    if (isLoggedIn && currentUser && (!currentUser.isEmailVerified || !currentUser.isPhoneVerified)) {
+    const hasMissingPhone = !currentUser?.phone || (typeof currentUser.phone === 'string' && currentUser.phone.trim() === '')
+    if (isLoggedIn && currentUser && (!currentUser.isEmailVerified || hasMissingPhone)) {
       // Navigate to profile screen to complete setup
       if (navigationRef.isReady()) {
         navigationRef.navigate('Profile')

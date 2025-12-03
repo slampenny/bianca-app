@@ -44,20 +44,38 @@ test.describe('Email Verification Flow', () => {
     await page.goto('http://localhost:8081')
     await page.waitForLoadState('networkidle')
     
-    // Create a test token
-    const testToken = 'test-verification-token-12345'
-    const verificationUrl = `http://localhost:8081/auth/verify-email?token=${testToken}`
+    // Get a real verification token from the backend
+    // First, send a verification email to get a real token
+    const testEmail = `verify-test-${Date.now()}@example.com`
+    let verificationToken = ''
+    
+    try {
+      const response = await page.evaluate(async (email) => {
+        const res = await fetch('http://localhost:3000/v1/test/send-verification-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        })
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+        }
+        return await res.json()
+      }, testEmail)
+      
+      const verificationLink = response?.details?.verificationLinks?.frontend || ''
+      if (verificationLink) {
+        const url = new URL(verificationLink)
+        verificationToken = url.searchParams.get('token') || ''
+      }
+    } catch (error) {
+      test.skip(true, `Could not get real verification token: ${error.message}`)
+      return
+    }
+    
+    expect(verificationToken).toBeTruthy()
+    const verificationUrl = `http://localhost:8081/auth/verify-email?token=${verificationToken}`
 
-    // Mock the backend verification endpoint
-    await page.route(`**/v1/auth/verify-email*`, async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<html><body><h1>Email Verified!</h1></body></html>'
-      })
-    })
-
-    // Navigate to verification URL with retry logic
+    // Navigate to verification URL with retry logic (using REAL backend, no mocks)
     try {
       await page.goto(verificationUrl, { waitUntil: 'networkidle', timeout: 30000 })
     } catch (error) {
@@ -80,7 +98,7 @@ test.describe('Email Verification Flow', () => {
     const url = page.url()
     expect(url).toContain('localhost:8081')
 
-    console.log('✅ Verification link opens correctly in frontend')
+    console.log('✅ Verification link opens correctly in frontend with real backend')
   })
 
   test('VerifyEmailScreen extracts token from URL and calls backend', async ({ page }) => {
@@ -88,34 +106,52 @@ test.describe('Email Verification Flow', () => {
     await page.goto('http://localhost:8081')
     await page.waitForLoadState('networkidle')
     
-    const testToken = 'test-token-12345'
+    // Get a real verification token from the backend
+    const testEmail = `verify-extract-${Date.now()}@example.com`
+    let verificationToken = ''
     
-    // Track if backend API was called
-    let backendApiCalled = false
-    let calledToken = ''
-
-    // Mock backend verification endpoint
-    await page.route(`**/v1/auth/verify-email*`, async (route) => {
-      backendApiCalled = true
-      const url = new URL(route.request().url())
-      calledToken = url.searchParams.get('token') || ''
+    try {
+      const response = await page.evaluate(async (email) => {
+        const res = await fetch('http://localhost:3000/v1/test/send-verification-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        })
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+        }
+        return await res.json()
+      }, testEmail)
       
-      route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<html><body><h1>Email Verified Successfully!</h1></body></html>'
-      })
+      const verificationLink = response?.details?.verificationLinks?.frontend || ''
+      if (verificationLink) {
+        const url = new URL(verificationLink)
+        verificationToken = url.searchParams.get('token') || ''
+      }
+    } catch (error) {
+      test.skip(true, `Could not get real verification token: ${error.message}`)
+      return
+    }
+    
+    expect(verificationToken).toBeTruthy()
+
+    // Track network requests to verify backend is called (but don't mock it)
+    const apiCalls: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/v1/auth/verify-email')) {
+        apiCalls.push(request.url())
+      }
     })
 
-    // Navigate to verification URL with retry logic
+    // Navigate to verification URL with retry logic (using REAL backend, no mocks)
     try {
-      await page.goto(`http://localhost:8081/auth/verify-email?token=${testToken}`, { waitUntil: 'networkidle', timeout: 30000 })
+      await page.goto(`http://localhost:8081/auth/verify-email?token=${verificationToken}`, { waitUntil: 'networkidle', timeout: 30000 })
     } catch (error) {
       // If connection refused, wait a bit and retry
       if (error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('net::ERR')) {
         console.log('Frontend not ready, waiting 5 seconds and retrying...')
         await page.waitForTimeout(5000)
-        await page.goto(`http://localhost:8081/auth/verify-email?token=${testToken}`, { waitUntil: 'networkidle', timeout: 30000 })
+        await page.goto(`http://localhost:8081/auth/verify-email?token=${verificationToken}`, { waitUntil: 'networkidle', timeout: 30000 })
       } else {
         throw error
       }
@@ -124,11 +160,14 @@ test.describe('Email Verification Flow', () => {
     // Wait a bit for the screen to process
     await page.waitForTimeout(2000)
 
-    // Verify backend API was called with correct token
-    expect(backendApiCalled).toBe(true)
-    expect(calledToken).toBe(testToken)
+    // Verify backend API was called with correct token (real backend call, not mocked)
+    expect(apiCalls.length).toBeGreaterThan(0)
+    const calledUrl = apiCalls[0]
+    const url = new URL(calledUrl)
+    const calledToken = url.searchParams.get('token')
+    expect(calledToken).toBe(verificationToken)
 
-    console.log('✅ VerifyEmailScreen correctly extracts token and calls backend')
+    console.log('✅ VerifyEmailScreen correctly extracts token and calls real backend')
   })
 
   test('verification flow works end-to-end', async ({ page }) => {
@@ -202,16 +241,7 @@ test.describe('Email Verification Flow', () => {
     const token = url.searchParams.get('token')
     expect(token).toBeTruthy()
 
-    // Mock successful verification
-    await page.route(`**/v1/auth/verify-email?token=${token}`, async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<html><body><h1>Email Verified!</h1></body></html>'
-      })
-    })
-
-    // Navigate to verification link
+    // Navigate to verification link (using REAL backend, no mocks)
     await page.goto(verificationLink)
 
     // Verify we're on the frontend

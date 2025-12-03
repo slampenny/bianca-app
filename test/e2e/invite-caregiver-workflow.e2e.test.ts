@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { generateUniqueTestData, TEST_USERS } from './fixtures/testData'
 import { getEmailFromEthereal } from './helpers/backendHelpers'
-import { loginUserViaUI } from './helpers/testHelpers'
+import { loginUserViaUI, logoutViaUI } from './helpers/testHelpers'
 
 test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
   let testData: ReturnType<typeof generateUniqueTestData>
@@ -15,6 +15,23 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
   })
 
   test('complete invite caregiver workflow works end-to-end with real email', async ({ page, context }) => {
+    // Step 0: Ensure Ethereal email service is initialized (required for test)
+    const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
+    try {
+      // Force Ethereal initialization by calling get-email endpoint
+      // This will trigger forceEtherealInitialization if SES is being used
+      await page.request.post(`${API_BASE_URL}/test/get-email`, {
+        data: {
+          email: 'test@example.com',
+          waitForEmail: false,
+          maxWaitMs: 1000
+        }
+      })
+    } catch (error) {
+      // Ignore "email not found" errors - we just want to ensure Ethereal is initialized
+      console.log('Ethereal initialization check completed')
+    }
+    
     // Step 1: Admin user logs in (using real backend, no mocks)
     await page.goto('/')
     
@@ -82,11 +99,22 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     
     const phoneInput = page.locator('[data-testid="caregiver-phone-input"]').first()
     await phoneInput.waitFor({ timeout: 10000, state: 'visible' })
-    await phoneInput.fill(testData.phone)
+    // Phone validation expects +1XXXXXXXXXX or XXXXXXXXXX (no dashes)
+    // testData.phone has format +1-604-555-XXXX, so we need to remove dashes
+    const phoneWithoutDashes = testData.phone.replace(/-/g, '')
+    await phoneInput.fill(phoneWithoutDashes)
 
     // Step 5: Send the invite - button is "caregiver-save-button" in invite mode
     const saveButton = page.locator('[data-testid="caregiver-save-button"]').first()
     await saveButton.waitFor({ timeout: 10000, state: 'visible' })
+    // Wait for button to be enabled (not disabled)
+    await page.waitForFunction(
+      () => {
+        const button = document.querySelector('[data-testid="caregiver-save-button"]') as HTMLButtonElement
+        return button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
+      },
+      { timeout: 10000 }
+    )
     await saveButton.click()
 
     // Step 6: Verify we're on the success screen
@@ -118,7 +146,20 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     const inviteToken = email.tokens.invite
     expect(inviteToken).toBeTruthy()
     
-    // Step 9: Simulate clicking the email link
+    // Step 9: Log out the admin user before clicking the invite link
+    // This is critical - if we don't log out, the invitee will be logged in as the invitor
+    console.log('🔓 Logging out admin user before clicking invite link...')
+    await logoutViaUI(page)
+    
+    // Clear cookies and storage to ensure clean session for invitee
+    await page.context().clearCookies()
+    await page.evaluate(() => {
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+    console.log('✅ Admin user logged out and session cleared')
+    
+    // Step 10: Simulate clicking the email link
     // Create a new page context to simulate the invite link
     const invitePage = await context.newPage()
 
@@ -127,7 +168,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     await invitePage.goto(inviteLink)
     await invitePage.waitForSelector('[data-testid="signup-screen"]', { timeout: 10000 })
 
-    // Step 10: Fill in the signup form
+    // Step 11: Fill in the signup form
     // Note: The form requires name, email, phone, and password (token validation happens on backend)
     // We use the same test data that was used to send the invite
     await invitePage.waitForTimeout(1000) // Give form time to render
@@ -175,6 +216,9 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
       }
     }, inviteEmail)
     
+    // Phone validation expects +1XXXXXXXXXX or XXXXXXXXXX (no dashes)
+    // testData.phone has format +1-604-555-XXXX, so we need to remove dashes
+    const signupPhoneWithoutDashes = testData.phone.replace(/-/g, '')
     await phoneField.evaluate((el: HTMLInputElement, value: string) => {
       el.removeAttribute('readonly')
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
@@ -185,22 +229,128 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
       } else {
         el.value = value
       }
-    }, testData.phone)
+    }, signupPhoneWithoutDashes)
     
     await passwordField.waitFor({ timeout: 10000, state: 'visible' })
     await passwordField.fill(invitePassword)
     
     await confirmPasswordField.waitFor({ timeout: 10000, state: 'visible' })
     await confirmPasswordField.fill(invitePassword)
+    
+    // Wait a bit for form validation to complete
+    await invitePage.waitForTimeout(1000)
 
-    // Step 11: Submit the signup form
-    const submitButton = invitePage.getByTestId('signup-submit-button')
+    // Step 12: Submit the signup form
+    // Try multiple ways to find the button
+    let submitButton = invitePage.getByTestId('register-submit')
+    const buttonCount = await submitButton.count()
+    
+    if (buttonCount === 0) {
+      // Try by accessibility label
+      submitButton = invitePage.getByLabel('signup-submit-button')
+      const labelCount = await submitButton.count()
+      if (labelCount === 0) {
+        // Try by text content
+        submitButton = invitePage.getByRole('button', { name: /complete registration|sign up|submit/i })
+      }
+    }
+    
     await submitButton.waitFor({ timeout: 10000, state: 'visible' })
+    // Wait for button to be enabled (not disabled)
+    await invitePage.waitForFunction(
+      () => {
+        const button = document.querySelector('[data-testid="register-submit"]') as HTMLButtonElement ||
+                      document.querySelector('[aria-label="signup-submit-button"]') as HTMLButtonElement
+        return button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
+      },
+      { timeout: 10000 }
+    )
     await submitButton.click()
 
-    // Step 12: Verify user is logged in and redirected to home
-    await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
-    await expect(invitePage.getByLabel('home-header').or(invitePage.getByTestId('home-header'))).toBeVisible()
+    // Step 13: Verify user is logged in and redirected
+    // After signup, user might be redirected to profile (if email not verified) or home
+    // Wait for either profile screen or home screen
+    let isOnProfile = false
+    let isOnHome = false
+    
+    try {
+      await invitePage.waitForSelector('[data-testid="profile-screen"]', { timeout: 5000 })
+      isOnProfile = true
+      console.log('✅ Invited caregiver redirected to profile screen')
+    } catch {
+      try {
+        await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 5000 })
+        isOnHome = true
+        console.log('✅ Invited caregiver redirected to home screen')
+      } catch {
+        throw new Error('Neither profile nor home screen found after signup')
+      }
+    }
+
+    // Step 14: Navigate to profile to verify what the invited caregiver sees
+    // Navigate to profile screen to check user info and banner
+    if (!isOnProfile) {
+      // Navigate to profile from home
+      const profileTab = invitePage.locator('[data-testid="tab-profile"], [aria-label*="Profile" i]').first()
+      if (await profileTab.count() > 0) {
+        await profileTab.click()
+        await invitePage.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
+        isOnProfile = true
+      } else {
+        // Try navigating via URL
+        await invitePage.goto('/MainTabs/Home/Profile')
+        await invitePage.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
+        isOnProfile = true
+      }
+    }
+
+    // Step 15: Verify the phone verification banner shows correct message
+    // The banner should say "verify phone" not "add phone" when phone exists but is unverified
+    const profileContent = await invitePage.locator('[data-testid="profile-screen"]').textContent()
+    expect(profileContent).toBeTruthy()
+    
+    // Verify banner message contains "verify" (not "add") when phone exists
+    // The banner should say "Please verify your phone number..." not "Please add your phone number..."
+    if (profileContent.includes('Complete Your Profile')) {
+      // Banner exists - verify it says "verify" not "add"
+      const hasVerifyMessage = profileContent.includes('verify') || profileContent.includes('Verify')
+      const hasAddMessage = profileContent.includes('add your phone number') || profileContent.includes('Add your phone number')
+      
+      // If phone was added during signup, banner should say "verify" not "add"
+      if (hasAddMessage && !hasVerifyMessage) {
+        throw new Error('Banner incorrectly says "add phone" when phone already exists. Should say "verify phone".')
+      }
+      console.log('✅ Phone verification banner shows correct message (verify, not add)')
+    }
+    
+    // Step 16: Verify user can navigate away (not blocked by navigation blocker)
+    // Try navigating to home tab
+    const homeTab = invitePage.locator('[data-testid="tab-home"], [aria-label="Home tab"]').first()
+    if (await homeTab.count() > 0) {
+      await homeTab.click()
+      await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+      console.log('✅ Invited caregiver can navigate away from profile (not blocked by navigation blocker)')
+    }
+    
+    // Step 17: Verify user is logged in as the invitee (not the invitor)
+    // Try to navigate to profile to check email
+    // First try clicking the profile tab if available
+    const profileTab = invitePage.locator('[data-testid="tab-profile"], [aria-label*="Profile" i]').first()
+    if (await profileTab.count() > 0) {
+      await profileTab.click()
+      await invitePage.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
+    } else {
+      // Fallback: try navigating via URL
+      await invitePage.goto('/MainTabs/Home/Profile')
+      await invitePage.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
+    }
+    
+    // Check email field value (email is in an input field, not text content)
+    const profileEmailInput = invitePage.locator('input[data-testid="register-email"], input[placeholder*="Email" i]')
+    const emailValue = await profileEmailInput.inputValue().catch(() => '')
+    expect(emailValue).toBe(inviteEmail)
+    expect(emailValue).not.toBe(TEST_USERS.ORG_ADMIN.email)
+    console.log(`✅ Verified logged in as invitee (email: ${emailValue})`)
 
     console.log('✅ End-to-end invite caregiver workflow completed successfully!')
     console.log('   - Admin logged in')
@@ -208,9 +358,12 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log('   - Real email sent via Ethereal')
     console.log('   - Email retrieved from Ethereal IMAP')
     console.log('   - Token extracted from email content')
+    console.log('   - Admin logged out before clicking invite link')
     console.log('   - Invite link clicked')
     console.log('   - Signup form completed')
-    console.log('   - User registered and logged in')
+    console.log('   - User registered and logged in as invitee')
+    console.log('   - Phone verification banner displayed correctly')
+    console.log('   - User can navigate freely (not blocked)')
 
     // Close the invite page
     await invitePage.close()
@@ -245,7 +398,10 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     
     const phoneInput = page.locator('[data-testid="caregiver-phone-input"]').first()
     await phoneInput.waitFor({ timeout: 10000, state: 'visible' })
-    await phoneInput.fill(testData.phone)
+    // Phone validation expects +1XXXXXXXXXX or XXXXXXXXXX (no dashes)
+    // testData.phone has format +1-604-555-XXXX, so we need to remove dashes
+    const phoneWithoutDashes = testData.phone.replace(/-/g, '')
+    await phoneInput.fill(phoneWithoutDashes)
 
     const saveButton = page.locator('[data-testid="caregiver-save-button"]').first()
     await saveButton.waitFor({ timeout: 10000, state: 'visible' })

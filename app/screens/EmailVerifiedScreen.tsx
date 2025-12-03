@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
-import { useNavigation, useFocusEffect } from "@react-navigation/native"
+import { useFocusEffect } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "app/store/authSlice"
 import { Screen, Text } from "app/components"
@@ -80,23 +80,28 @@ export const EmailVerifiedScreen = () => {
     if (!isLoggedIn) {
       // User logged out - replace with login to remove this screen from stack
       hasNavigated.current = true
-      navigation.replace("Login" as never)
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("Login" as never)
+      }
       return
     }
 
-    // Show success message briefly, then replace with home screen
-    // Use replace() instead of navigate() to remove this screen from the stack
+    // Show success message briefly, then navigate to MainTabs
+    // Use navigationRef to navigate globally across stacks
     const timer = setTimeout(() => {
       if (hasNavigated.current) {
         return
       }
       hasNavigated.current = true
-      // Replace this screen with MainTabs to remove it from the stack
-      navigation.replace("MainTabs" as never)
+      // Use navigationRef to navigate globally to MainTabs
+      // This works regardless of which stack we're in
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("MainTabs" as never)
+      }
     }, 2000)
 
     return () => clearTimeout(timer)
-  }, [navigation, isLoggedIn])
+  }, [isLoggedIn])
 
   // Also handle focus effect to ensure we navigate away if we come back to this screen
   useFocusEffect(
@@ -104,12 +109,16 @@ export const EmailVerifiedScreen = () => {
       // If we're logged in and somehow back on this screen, navigate away immediately
       if (isLoggedIn && !hasNavigated.current) {
         hasNavigated.current = true
-        navigation.replace("MainTabs" as never)
+        if (navigationRef.isReady()) {
+          navigationRef.navigate("MainTabs" as never)
+        }
       } else if (!isLoggedIn && !hasNavigated.current) {
         hasNavigated.current = true
-        navigation.replace("Login" as never)
+        if (navigationRef.isReady()) {
+          navigationRef.navigate("Login" as never)
+        }
       }
-    }, [isLoggedIn, navigation])
+    }, [isLoggedIn])
   )
 
   return (

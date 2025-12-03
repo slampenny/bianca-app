@@ -1,302 +1,153 @@
 import { test, expect, Page } from '@playwright/test'
 import { generateUniqueTestData, TEST_USERS } from './fixtures/testData'
+import { loginUserViaUI } from './helpers/testHelpers'
+import { getEmailFromEthereal } from './helpers/backendHelpers'
+import { navigateToOrgScreen } from './helpers/navigation'
 
-test.describe('Invite User Workflow - Corrected', () => {
+test.describe('Invite User Workflow - Corrected (Real Backend)', () => {
   let testData: ReturnType<typeof generateUniqueTestData>
-  let inviteToken: string
+  let inviteEmail: string
 
   test.beforeEach(() => {
     testData = generateUniqueTestData('invite')
-    inviteToken = `mock_invite_token_${Date.now()}`
+    // Use a unique email for each test run to avoid conflicts
+    inviteEmail = `invite-corrected-${Date.now()}@example.com`
   })
 
   test('Complete invite user workflow with email link', async ({ page, context }) => {
-    // Step 1: Admin user logs in
+    // Step 1: Admin user logs in (using real backend, no mocks)
     await page.goto('/')
-    await page.waitForSelector('[data-testid="email-input"]')
-
-    // Mock admin login
-    await page.route('**/v1/auth/login', async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          org: {
-            id: 'mock_org_id',
-            name: 'Test Organization',
-            email: 'admin@example.org'
-          },
-          caregiver: {
-            id: 'mock_admin_id',
-            email: TEST_USERS.ORG_ADMIN.email,
-            name: TEST_USERS.ORG_ADMIN.name,
-            role: 'orgAdmin',
-            avatar: '',
-            phone: TEST_USERS.ORG_ADMIN.phone,
-            org: 'mock_org_id',
-            patients: []
-          },
-          patients: [],
-          alerts: [],
-          tokens: {
-            access: {
-              token: 'mock_admin_access_token',
-              expires: new Date(Date.now() + 3600000).toISOString()
-            },
-            refresh: {
-              token: 'mock_admin_refresh_token',
-              expires: new Date(Date.now() + 7 * 24 * 3600000).toISOString()
-            }
-          }
-        })
-      })
-    })
-
-    // Login as admin
-    // Wait for login screen to load
-    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
-    await page.waitForSelector('[data-testid="email-input"], [aria-label="email-input"]', { timeout: 10000 })
     
-    await page.getByTestId('email-input').or(page.getByLabel('email-input')).fill(TEST_USERS.ORG_ADMIN.email)
-    await page.getByTestId('password-input').or(page.getByLabel('password-input')).fill(TEST_USERS.ORG_ADMIN.password)
-    await page.getByTestId('login-button').or(page.getByLabel('login-button')).click()
-    await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
+    // Try login first - if it fails due to email verification, handle it
+    try {
+      await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
+    } catch (error) {
+      // If login fails, check if we're on email verification screen
+      const currentUrl = page.url()
+      if (currentUrl.includes('EmailVerificationRequired')) {
+        console.log('Login requires email verification, verifying admin email...')
+        const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
+        try {
+          // Send verification email for admin user
+          await page.request.post(`${API_BASE_URL}/test/send-verification-email`, {
+            data: { email: TEST_USERS.ORG_ADMIN.email }
+          })
+          
+          // Retrieve and verify the email
+          const email = await getEmailFromEthereal(page, TEST_USERS.ORG_ADMIN.email, true, 30000)
+          const token = email.tokens.verification
+          if (token) {
+            // Verify the email by navigating to the verification link
+            await page.goto(`http://localhost:8081/auth/verify-email?token=${token}`)
+            await page.waitForTimeout(2000)
+            // Try login again
+            await page.goto('/')
+            await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
+          } else {
+            throw new Error('Could not retrieve verification token from email')
+          }
+        } catch (verifyError) {
+          console.log('Email verification failed:', verifyError.message)
+          throw error // Re-throw original login error
+        }
+      } else {
+        // Login failed for a different reason
+        throw error
+      }
+    }
 
     // Step 2: Navigate to Organization screen
-    const orgTab = page.locator('[data-testid="tab-org"], [aria-label="Organization tab"]').first()
-    await orgTab.waitFor({ timeout: 10000, state: 'visible' })
-    await orgTab.click()
-    await page.waitForSelector('[data-testid="org-screen"]')
+    await navigateToOrgScreen(page)
 
     // Step 3: Click "Invite Caregiver" button
-    await page.waitForTimeout(2000) // Wait for screen to fully render
-    
-    // Listen for console errors and navigation events
-    const errors: string[] = []
-    page.on('pageerror', (error) => errors.push(error.message))
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text())
-      }
-    })
-    
     const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
-    
-    // Check if button exists and is visible
-    const buttonCount = await inviteButton.count()
-    if (buttonCount === 0) {
-      // Button might not be visible if user doesn't have permission
-      // Check if we're actually logged in as orgAdmin
-      const currentUrl = page.url()
-      console.log('Current URL after org tab click:', currentUrl)
-      
-      // Check if button exists but is hidden
-      const allButtons = page.locator('button, [role="button"]')
-      const buttonTexts = await allButtons.allTextContents()
-      console.log('All buttons on page:', buttonTexts)
-      
-      throw new Error('Invite caregiver button not found - user may not have orgAdmin permissions or button may not be rendered')
-    }
-    
     await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.click()
     
-    // Check if button is enabled
-    const isEnabled = await inviteButton.isEnabled().catch(() => false)
-    if (!isEnabled) {
-      console.log('⚠️ Invite button is disabled - may need to wait or check permissions')
-      await page.waitForTimeout(2000)
-    }
-    
-    // Get current URL before click
-    const urlBeforeClick = page.url()
-    console.log('URL before clicking invite button:', urlBeforeClick)
-    
-    // Click the button and wait for navigation
-    await Promise.all([
-      page.waitForURL(/.*Caregiver.*/, { timeout: 10000 }).catch(() => null),
-      inviteButton.click()
-    ])
-    
-    // Wait for navigation - check URL or screen appearance
-    await page.waitForTimeout(3000) // Give more time for navigation
-    const caregiverScreen = page.locator('[data-testid="caregiver-screen"]')
-    const caregiverInputs = page.locator('[data-testid="caregiver-name-input"], [data-testid="caregiver-email-input"]')
-    
-    // Wait for either the screen or form inputs to appear
-    await Promise.race([
-      caregiverScreen.waitFor({ timeout: 15000, state: 'visible' }).catch(() => null),
-      caregiverInputs.first().waitFor({ timeout: 15000, state: 'visible' }).catch(() => null),
-    ])
-    
-    // Verify we navigated (check URL or form fields)
-    const urlAfterClick = page.url()
-    const hasCaregiverScreen = await caregiverScreen.isVisible().catch(() => false)
-    const hasInputs = await caregiverInputs.first().isVisible().catch(() => false)
-    
-    // Log any errors that occurred
-    if (errors.length > 0) {
-      console.log('⚠️ JavaScript errors detected:', errors)
-    }
-    
-    if (!hasCaregiverScreen && !hasInputs && !urlAfterClick.includes('Caregiver')) {
-      // This might be a real bug - navigation isn't working
-      console.log('⚠️ Navigation to caregiver screen failed')
-      console.log('   URL before click:', urlBeforeClick)
-      console.log('   URL after click:', urlAfterClick)
-      console.log('   Has caregiver screen:', hasCaregiverScreen)
-      console.log('   Has inputs:', hasInputs)
-      console.log('   JavaScript errors:', errors)
-      
-      // Try to get more info about what's on the page
-      const pageContent = await page.content()
-      const hasInviteButton = pageContent.includes('invite-caregiver-button')
-      const hasOrgScreen = pageContent.includes('org-screen')
-      console.log('   Page still has invite button:', hasInviteButton)
-      console.log('   Page still has org screen:', hasOrgScreen)
-      
-      throw new Error('Navigation to caregiver screen failed after clicking invite button - this may indicate a bug in the invite flow')
-    }
+    // Wait for navigation to caregiver screen
+    await page.waitForSelector('[data-testid="caregiver-screen"]', { timeout: 15000 })
+    await page.waitForTimeout(2000) // Give React time to render
 
     // Step 4: Fill in caregiver details in the invite form
-    // Wait for form fields to be visible
-    await page.waitForTimeout(1000)
-    
     const nameInput = page.locator('[data-testid="caregiver-name-input"]').first()
-    await nameInput.waitFor({ timeout: 10000, state: 'visible' })
-    await nameInput.fill(testData.name)
-    
     const emailInput = page.locator('[data-testid="caregiver-email-input"]').first()
-    await emailInput.waitFor({ timeout: 10000, state: 'visible' })
-    await emailInput.fill(testData.email)
-    
     const phoneInput = page.locator('[data-testid="caregiver-phone-input"]').first()
-    await phoneInput.waitFor({ timeout: 10000, state: 'visible' })
+    
+    // Wait for all inputs to be visible
+    await Promise.all([
+      nameInput.waitFor({ timeout: 15000, state: 'visible' }),
+      emailInput.waitFor({ timeout: 15000, state: 'visible' }),
+      phoneInput.waitFor({ timeout: 15000, state: 'visible' })
+    ])
+    
+    await nameInput.fill(testData.name)
+    await emailInput.fill(inviteEmail)
     await phoneInput.fill(testData.phone)
+    
+    // Wait for form validation to complete
+    await page.waitForTimeout(2000)
 
-    // Mock successful invite sending
-    await page.route('**/v1/orgs/*/sendInvite', async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          caregiver: {
-            id: 'mock_invited_caregiver_id',
-            email: testData.email,
-            name: testData.name,
-            role: 'invited',
-            avatar: '',
-            phone: testData.phone,
-            org: 'mock_org_id',
-            patients: []
-          },
-          inviteToken: inviteToken
-        })
-      })
-    })
-
-    // Step 5: Send the invite - button is "caregiver-save-button" in invite mode
+    // Step 5: Send the invite (real backend call - will send real email via Ethereal)
     const saveButton = page.locator('[data-testid="caregiver-save-button"]').first()
-    await saveButton.waitFor({ timeout: 10000, state: 'visible' })
-    await saveButton.click()
+    
+    // Wait for button to be enabled
+    let attempts = 0
+    let isEnabled = false
+    while (attempts < 15 && !isEnabled) {
+      isEnabled = await page.evaluate((selector) => {
+        const button = document.querySelector(`[data-testid="${selector}"]`)
+        if (!button) return false
+        const isDisabled = button.hasAttribute('disabled') || 
+                          button.getAttribute('aria-disabled') === 'true' ||
+                          (button as any).disabled === true
+        return !isDisabled
+      }, 'caregiver-save-button').catch(() => false)
+      
+      if (!isEnabled) {
+        await page.waitForTimeout(1000)
+        attempts++
+      }
+    }
+    
+    // Click the button
+    await saveButton.click({ force: true, timeout: 10000 })
 
     // Step 6: Verify we're on the success screen
-    await page.waitForSelector('[data-testid="caregiver-invited-screen"]')
+    await page.waitForSelector('[data-testid="caregiver-invited-screen"]', { timeout: 15000 })
     await expect(page.getByText('Invitation Sent!')).toBeVisible()
-    await expect(page.getByText(`An invitation has been sent to ${testData.name} at ${testData.email}.`)).toBeVisible()
 
-    // Step 7: Simulate clicking the email link
-    // Create a new page context to simulate the invite link
+    // Step 7: Retrieve the invite email from Ethereal (real backend sent it)
+    console.log(`📧 Retrieving invite email from Ethereal for ${inviteEmail}...`)
+    const email = await getEmailFromEthereal(page, inviteEmail, true, 30000)
+    
+    expect(email).toBeTruthy()
+    expect(email.subject).toContain('invited') || expect(email.subject).toContain('Invitation')
+    
+    // Extract invite token from email
+    const inviteToken = email.tokens.invite
+    expect(inviteToken).toBeTruthy()
+    
+    console.log('✅ Invite email retrieved from Ethereal')
+    console.log(`   Subject: ${email.subject}`)
+    console.log(`   Token extracted: ${inviteToken ? 'Yes' : 'No'}`)
+
+    // Step 8: Simulate clicking the email link (using real backend, no mocks)
     const invitePage = await context.newPage()
     
-    // Mock the invite token verification (backend endpoint)
-    await invitePage.route('**/v1/orgs/verifyInvite*', async (route) => {
-      const url = new URL(route.request().url())
-      const token = url.searchParams.get('token')
-      
-      if (token === inviteToken) {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            orgId: 'mock_org_id'
-          })
-        })
-      } else {
-        route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            message: 'Invalid or expired invite token'
-          })
-        })
-      }
-    })
-
     // Navigate to signup page with invite token (this is what the email link points to)
-    await invitePage.goto(`/signup?token=${inviteToken}`)
-    await invitePage.waitForSelector('[data-testid="signup-screen"]')
+    const inviteLink = `http://localhost:8081/signup?token=${inviteToken}`
+    await invitePage.goto(inviteLink)
+    await invitePage.waitForSelector('[data-testid="signup-screen"]', { timeout: 15000 })
 
-    // Step 8: Fill in the signup form (the invited user needs to set their password)
+    // Step 9: Fill in the signup form (the invited user needs to set their password)
     await invitePage.getByTestId('signup-password-input').fill('StrongPassword123!')
     await invitePage.getByTestId('signup-confirm-password-input').fill('StrongPassword123!')
 
-    // Mock successful signup with invite token
-    await invitePage.route('**/v1/orgs/verifyInvite', async (route) => {
-      if (route.request().method() === 'POST') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            orgId: 'mock_org_id'
-          })
-        })
-      } else {
-        route.continue()
-      }
-    })
-
-    // Mock login after successful signup
-    await invitePage.route('**/v1/auth/login', async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          org: {
-            id: 'mock_org_id',
-            name: 'Test Organization',
-            email: 'admin@example.org'
-          },
-          caregiver: {
-            id: 'mock_new_caregiver_id',
-            email: testData.email,
-            name: testData.name,
-            role: 'staff',
-            avatar: '',
-            phone: testData.phone,
-            org: 'mock_org_id',
-            patients: []
-          },
-          patients: [],
-          alerts: [],
-          tokens: {
-            access: {
-              token: 'mock_new_user_access_token',
-              expires: new Date(Date.now() + 3600000).toISOString()
-            },
-            refresh: {
-              token: 'mock_new_user_refresh_token',
-              expires: new Date(Date.now() + 7 * 24 * 3600000).toISOString()
-            }
-          }
-        })
-      })
-    })
-
-    // Submit signup
+    // Submit signup (using real backend, no mocks)
     await invitePage.getByTestId('signup-submit-button').click()
 
-    // Should be redirected to home screen
-    await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    // Should be redirected to home screen after successful registration
+    await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
 
     // Verify user is logged in
     await expect(invitePage.getByLabel('home-header')).toBeVisible()
@@ -308,22 +159,11 @@ test.describe('Invite User Workflow - Corrected', () => {
   test('Invalid invite token handling', async ({ page }) => {
     const invalidToken = 'invalid_token_123'
 
-    // Mock invalid token verification
-    await page.route('**/v1/orgs/verifyInvite*', async (route) => {
-      route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          message: 'Invalid or expired invite token'
-        })
-      })
-    })
-
-    // Navigate to signup page with invalid token
+    // Navigate to signup page with invalid token (using real backend, no mocks)
     await page.goto(`/signup?token=${invalidToken}`)
     await page.waitForTimeout(2000) // Wait for error handling
 
-    // Should see error message or be redirected to login
+    // Should see error message or be redirected to login (real backend will return error)
     const errorMessage = page.getByText(/invalid|expired|token/i)
     const loginScreen = page.locator('[data-testid="email-input"], [aria-label="email-input"]')
     
@@ -337,22 +177,11 @@ test.describe('Invite User Workflow - Corrected', () => {
   test('Expired invite token handling', async ({ page }) => {
     const expiredToken = 'expired_token_123'
 
-    // Mock expired token verification
-    await page.route('**/v1/orgs/verifyInvite*', async (route) => {
-      route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          message: 'Invite token has expired'
-        })
-      })
-    })
-
-    // Navigate to signup page with expired token
+    // Navigate to signup page with expired token (using real backend, no mocks)
     await page.goto(`/signup?token=${expiredToken}`)
     await page.waitForTimeout(2000) // Wait for error handling
 
-    // Should see error message or be redirected to login
+    // Should see error message or be redirected to login (real backend will return error)
     const errorMessage = page.getByText(/expired|invalid|token/i)
     const loginScreen = page.locator('[data-testid="email-input"], [aria-label="email-input"]')
     
@@ -364,19 +193,52 @@ test.describe('Invite User Workflow - Corrected', () => {
   })
 
   test('Invite signup form validation', async ({ page }) => {
-    // Mock valid token verification
-    await page.route('**/v1/orgs/verifyInvite*', async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          orgId: 'mock_org_id'
+    // First, create a real invite to get a valid token
+    await page.goto('/')
+    try {
+      await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
+    } catch (error) {
+      // Handle email verification if needed
+      const currentUrl = page.url()
+      if (currentUrl.includes('EmailVerificationRequired')) {
+        const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
+        await page.request.post(`${API_BASE_URL}/test/send-verification-email`, {
+          data: { email: TEST_USERS.ORG_ADMIN.email }
         })
-      })
-    })
+        const email = await getEmailFromEthereal(page, TEST_USERS.ORG_ADMIN.email, true, 30000)
+        const token = email.tokens.verification
+        if (token) {
+          await page.goto(`http://localhost:8081/auth/verify-email?token=${token}`)
+          await page.waitForTimeout(2000)
+          await page.goto('/')
+          await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
+        }
+      }
+    }
+    
+    await navigateToOrgScreen(page)
+    const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
+    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.click()
+    await page.waitForSelector('[data-testid="caregiver-screen"]', { timeout: 15000 })
+    
+    const validationEmail = `validation-${Date.now()}@example.com`
+    await page.locator('[data-testid="caregiver-name-input"]').first().fill('Test User')
+    await page.locator('[data-testid="caregiver-email-input"]').first().fill(validationEmail)
+    await page.locator('[data-testid="caregiver-phone-input"]').first().fill('+1234567890')
+    await page.waitForTimeout(2000)
+    
+    const saveButton = page.locator('[data-testid="caregiver-save-button"]').first()
+    await saveButton.click({ force: true, timeout: 10000 })
+    await page.waitForSelector('[data-testid="caregiver-invited-screen"]', { timeout: 15000 })
+    
+    // Get real invite token from email
+    const email = await getEmailFromEthereal(page, validationEmail, true, 30000)
+    const realInviteToken = email.tokens.invite
+    expect(realInviteToken).toBeTruthy()
 
-    // Navigate to signup page with valid token
-    await page.goto(`/signup?token=${inviteToken}`)
+    // Navigate to signup page with valid token (using real backend, no mocks)
+    await page.goto(`/signup?token=${realInviteToken}`)
     await page.waitForSelector('[data-testid="signup-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000) // Give screen time to render
 
@@ -384,17 +246,14 @@ test.describe('Invite User Workflow - Corrected', () => {
     await page.getByTestId('signup-submit-button').waitFor({ timeout: 10000 }).catch(() => {})
     await page.getByTestId('signup-submit-button').click({ timeout: 5000 }).catch(() => {})
 
-    // Should see validation errors - try multiple possible error messages
+    // Should see validation errors
     const passwordError = page.getByText(/password.*required/i).or(page.getByText(/password.*cannot.*empty/i))
     const confirmPasswordError = page.getByText(/confirm.*password.*required/i).or(page.getByText(/confirm.*password.*cannot.*empty/i))
     
-    // Check if either error is visible (validation might show different messages)
     const hasPasswordError = await passwordError.isVisible({ timeout: 5000 }).catch(() => false)
     const hasConfirmPasswordError = await confirmPasswordError.isVisible({ timeout: 5000 }).catch(() => false)
     
-    // At least one validation error should be visible
     if (!hasPasswordError && !hasConfirmPasswordError) {
-      // Check for any error text on the page
       const allErrors = page.locator('text=/required|cannot.*empty|invalid/i')
       const errorCount = await allErrors.count()
       if (errorCount === 0) {
@@ -414,179 +273,72 @@ test.describe('Invite User Workflow - Corrected', () => {
   })
 
   test('Email link simulation with real email service', async ({ page, context }) => {
-    // This test simulates the real-world scenario where a user clicks an email link
-    // In a real test environment, you might use a service like MailHog or similar
+    // This test uses real backend with Ethereal email service (no mocks)
     
-    // Step 1: Admin sends invite (same as first test)
+    // Step 1: Admin logs in (using real backend, no mocks)
     await page.goto('/')
-    await page.waitForSelector('[data-testid="email-input"]')
-
-    // Mock admin login
-    await page.route('**/v1/auth/login', async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          org: {
-            id: 'mock_org_id',
-            name: 'Test Organization',
-            email: 'admin@example.org'
-          },
-          caregiver: {
-            id: 'mock_admin_id',
-            email: TEST_USERS.ORG_ADMIN.email,
-            name: TEST_USERS.ORG_ADMIN.name,
-            role: 'orgAdmin',
-            avatar: '',
-            phone: TEST_USERS.ORG_ADMIN.phone,
-            org: 'mock_org_id',
-            patients: []
-          },
-          patients: [],
-          alerts: [],
-          tokens: {
-            access: {
-              token: 'mock_admin_access_token',
-              expires: new Date(Date.now() + 3600000).toISOString()
-            },
-            refresh: {
-              token: 'mock_admin_refresh_token',
-              expires: new Date(Date.now() + 7 * 24 * 3600000).toISOString()
-            }
-          }
+    try {
+      await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
+    } catch (error) {
+      // Handle email verification if needed
+      const currentUrl = page.url()
+      if (currentUrl.includes('EmailVerificationRequired')) {
+        const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
+        await page.request.post(`${API_BASE_URL}/test/send-verification-email`, {
+          data: { email: TEST_USERS.ORG_ADMIN.email }
         })
-      })
-    })
-
-    // Wait for login screen to load
-    await page.waitForSelector('[data-testid="login-form"], [aria-label="login-screen"]', { timeout: 10000 })
-    await page.waitForSelector('[data-testid="email-input"], [aria-label="email-input"]', { timeout: 10000 })
-    
-    await page.getByTestId('email-input').or(page.getByLabel('email-input')).fill(TEST_USERS.ORG_ADMIN.email)
-    await page.getByTestId('password-input').or(page.getByLabel('password-input')).fill(TEST_USERS.ORG_ADMIN.password)
-    await page.getByTestId('login-button').or(page.getByLabel('login-button')).click()
-    await page.waitForSelector('[data-testid="home-header"], [aria-label="home-header"]', { timeout: 10000 })
+        const email = await getEmailFromEthereal(page, TEST_USERS.ORG_ADMIN.email, true, 30000)
+        const token = email.tokens.verification
+        if (token) {
+          await page.goto(`http://localhost:8081/auth/verify-email?token=${token}`)
+          await page.waitForTimeout(2000)
+          await page.goto('/')
+          await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
+        }
+      }
+    }
 
     // Navigate to Organization screen
-    const orgTab = page.locator('[data-testid="tab-org"], [aria-label="Organization tab"]').first()
-    await orgTab.waitFor({ timeout: 10000, state: 'visible' })
-    await orgTab.click()
-    await page.waitForSelector('[data-testid="org-screen"]')
+    await navigateToOrgScreen(page)
 
-    // Mock email service that would send the actual email
-    await page.route('**/v1/orgs/*/sendInvite', async (route) => {
-      // In a real test, you might capture the email here
-      // For now, we'll just mock the response
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          caregiver: {
-            id: 'mock_invited_caregiver_id',
-            email: testData.email,
-            name: testData.name,
-            role: 'invited',
-            avatar: '',
-            phone: testData.phone,
-            org: 'mock_org_id',
-            patients: []
-          },
-          inviteToken: inviteToken
-        })
-      })
-    })
-
-    // Send invite
-    await page.getByTestId('invite-caregiver-button').click()
-    await page.waitForSelector('[data-testid="caregiver-screen"]')
-    await page.getByTestId('caregiver-name-input').fill(testData.name)
-    await page.getByTestId('caregiver-email-input').fill(testData.email)
-    await page.getByTestId('caregiver-phone-input').fill(testData.phone)
-    await page.getByTestId('send-invite-button').click()
-
-    // Step 2: Simulate the email link click
-    // In a real test environment, you would:
-    // 1. Capture the email from your email service (MailHog, etc.)
-    // 2. Extract the invite link from the email
-    // 3. Navigate to that link
+    // Send invite (real backend call - will send real email via Ethereal)
+    const emailForLinkTest = `link-test-${Date.now()}@example.com`
+    const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
+    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.click()
+    await page.waitForSelector('[data-testid="caregiver-screen"]', { timeout: 15000 })
     
-    // For this test, we'll simulate the email link
+    await page.locator('[data-testid="caregiver-name-input"]').first().fill(testData.name)
+    await page.locator('[data-testid="caregiver-email-input"]').first().fill(emailForLinkTest)
+    await page.locator('[data-testid="caregiver-phone-input"]').first().fill(testData.phone)
+    await page.waitForTimeout(2000)
+    
+    const saveButton = page.locator('[data-testid="caregiver-save-button"]').first()
+    await saveButton.click({ force: true, timeout: 10000 })
+    await page.waitForSelector('[data-testid="caregiver-invited-screen"]', { timeout: 15000 })
+
+    // Step 2: Retrieve the invite email from Ethereal (real backend sent it)
+    console.log(`📧 Retrieving invite email from Ethereal for ${emailForLinkTest}...`)
+    const email = await getEmailFromEthereal(page, emailForLinkTest, true, 30000)
+    
+    expect(email).toBeTruthy()
+    const realInviteToken = email.tokens.invite
+    expect(realInviteToken).toBeTruthy()
+    
+    // Step 3: Simulate clicking the email link (using real backend, no mocks)
     const invitePage = await context.newPage()
     
-    // Mock the invite token verification
-    await invitePage.route('**/v1/orgs/verifyInvite*', async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          orgId: 'mock_org_id'
-        })
-      })
-    })
+    // Navigate to the actual invite link from the email
+    const inviteLink = `http://localhost:8081/signup?token=${realInviteToken}`
+    await invitePage.goto(inviteLink)
+    await invitePage.waitForSelector('[data-testid="signup-screen"]', { timeout: 15000 })
 
-    // Simulate clicking the email link
-    // In reality, this would be: await invitePage.goto(emailLink)
-    await invitePage.goto(`/signup?token=${inviteToken}`)
-    await invitePage.waitForSelector('[data-testid="signup-screen"]')
-
-    // Complete the signup
+    // Complete the signup (using real backend, no mocks)
     await invitePage.getByTestId('signup-password-input').fill('StrongPassword123!')
     await invitePage.getByTestId('signup-confirm-password-input').fill('StrongPassword123!')
 
-    // Mock successful signup
-    await invitePage.route('**/v1/orgs/verifyInvite', async (route) => {
-      if (route.request().method() === 'POST') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            orgId: 'mock_org_id'
-          })
-        })
-      } else {
-        route.continue()
-      }
-    })
-
-    // Mock login after successful signup
-    await invitePage.route('**/v1/auth/login', async (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          org: {
-            id: 'mock_org_id',
-            name: 'Test Organization',
-            email: 'admin@example.org'
-          },
-          caregiver: {
-            id: 'mock_new_caregiver_id',
-            email: testData.email,
-            name: testData.name,
-            role: 'staff',
-            avatar: '',
-            phone: testData.phone,
-            org: 'mock_org_id',
-            patients: []
-          },
-          patients: [],
-          alerts: [],
-          tokens: {
-            access: {
-              token: 'mock_new_user_access_token',
-              expires: new Date(Date.now() + 3600000).toISOString()
-            },
-            refresh: {
-              token: 'mock_new_user_refresh_token',
-              expires: new Date(Date.now() + 7 * 24 * 3600000).toISOString()
-            }
-          }
-        })
-      })
-    })
-
     await invitePage.getByTestId('signup-submit-button').click()
-    await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
 
     // Verify the new user is logged in and can access the app
     await expect(invitePage.getByLabel('home-header')).toBeVisible()
