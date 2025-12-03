@@ -88,15 +88,14 @@ phases:
       - |
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        # Backend uses Yarn 4, but let's try with corepack
-        # If corepack fails, the packageManager field should auto-activate it
-        corepack enable || true
-        echo "Yarn version before install: $(yarn --version || echo 'yarn not found')"
-        # Try yarn install - corepack should auto-detect Yarn 4 from package.json
-        yarn install --frozen-lockfile 2>&1 | tee /tmp/backend-yarn.log || {
-          echo "❌ Yarn install failed. Error:"
-          cat /tmp/backend-yarn.log | tail -50
-          exit 1
+        # Backend package.json specifies Yarn 4, but use npm for CI reliability
+        # npm can read package.json and install dependencies
+        echo "Using npm for backend (more reliable in CI than Yarn 4)"
+        npm install --legacy-peer-deps || {
+          echo "⚠️  npm install failed, trying yarn with corepack..."
+          corepack enable || npm install -g corepack && corepack enable
+          corepack prepare yarn@4.12.0 --activate
+          yarn install --frozen-lockfile || exit 1
         }
         echo "✅ Backend dependencies installed"
       - echo "Installing frontend dependencies (Yarn 1)..."
