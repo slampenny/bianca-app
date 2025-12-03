@@ -113,7 +113,7 @@ const verifyEmail = async (verifyEmailToken) => {
     if (caregiver.isEmailVerified) {
       // Still return tokens for auto-login if already verified
       const tokens = await tokenService.generateAuthTokens(caregiver);
-      const { orgService } = require('./org.service');
+      const orgService = require('./org.service');
       const { Patient } = require('../models');
       const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
       const patients = await Patient.find({ caregivers: caregiver.id });
@@ -139,7 +139,7 @@ const verifyEmail = async (verifyEmailToken) => {
     const tokens = await tokenService.generateAuthTokens(caregiver);
     
     // Fetch org and patients for the response
-    const { orgService } = require('./org.service');
+    const orgService = require('./org.service');
     const { Patient } = require('../models');
     const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
     const patients = await Patient.find({ caregivers: caregiver.id });
