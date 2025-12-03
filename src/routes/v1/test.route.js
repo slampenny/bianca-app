@@ -297,6 +297,39 @@ router.post('/get-email', async (req, res) => {
       return res.status(503).json({ error: 'Ethereal email retriever service not available' });
     }
 
+    // Ensure email service is initialized with Ethereal (required for test routes)
+    try {
+      const emailService = require('../../services/email.service');
+      
+      // Check if Ethereal account is available
+      let emailStatus = emailService.getStatus();
+      if (!emailStatus.etherealAccount) {
+        // Email service initialized with SES instead of Ethereal
+        // Force reinitialize with Ethereal for test routes
+        logger.info('Email service is using SES, forcing Ethereal initialization for test route...');
+        await emailService.forceEtherealInitialization();
+        emailStatus = emailService.getStatus();
+        
+        if (!emailStatus.etherealAccount) {
+          logger.error('Failed to initialize Ethereal after forcing reinitialization');
+          return res.status(500).json({ 
+            success: false,
+            error: 'Failed to initialize Ethereal email service. Email service status: ' + JSON.stringify(emailStatus)
+          });
+        }
+        logger.info('Successfully forced Ethereal initialization');
+      } else if (!emailService.isReady()) {
+        logger.info('Email service not initialized, initializing now...');
+        await emailService.initializeEmailTransport();
+      }
+    } catch (initError) {
+      logger.error('Failed to initialize email service:', initError);
+      return res.status(500).json({ 
+        success: false,
+        error: `Failed to initialize email service: ${initError.message}` 
+      });
+    }
+
     // Retrieve email from Ethereal
     // Note: retrieveLastEmail signature is (recipientEmail, timeoutMs)
     // If waitForEmail is true, we'll poll with the timeout
@@ -495,10 +528,10 @@ router.post('/generate-invite-link', async (req, res) => {
  *                 format: email
  *               name:
  *                 type: string
- *                 description: Caregiver name (default: "Test Caregiver")
+ *                 description: "Caregiver name (default: Test Caregiver)"
  *               phone:
  *                 type: string
- *                 description: Caregiver phone (default: "+15555555555")
+ *                 description: "Caregiver phone (default: +15555555555)"
  *               orgId:
  *                 type: string
  *                 description: Organization ID to invite to

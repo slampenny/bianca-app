@@ -25,6 +25,7 @@ let transport;
 let etherealTestAccount = null; // To store Ethereal account details if used
 let isInitialized = false;
 let initializationPromise = null; // To prevent multiple concurrent initializations
+let forceEthereal = false; // Flag to force Ethereal even if SES is available
 
 /**
  * Initializes the email transport.
@@ -54,7 +55,8 @@ async function doInitialization() {
     // In test mode, always use Ethereal (skip SES attempt)
     // In production/staging, always use SES
     // In development, use SES if USE_SES_IN_DEV is set, otherwise Ethereal
-    const shouldUseSES = (config.env === 'production' || config.env === 'staging') || (config.env === 'development' && useSESInDev);
+    // If forceEthereal is true, skip SES and use Ethereal
+    const shouldUseSES = !forceEthereal && ((config.env === 'production' || config.env === 'staging') || (config.env === 'development' && useSESInDev));
     
     let sesInitialized = false;
     
@@ -678,6 +680,26 @@ const isReady = () => {
   return isInitialized && !!transport;
 };
 
+/**
+ * Force reinitialize with Ethereal (for test routes)
+ * This resets the initialization state and forces Ethereal to be used
+ */
+const forceEtherealInitialization = async () => {
+  logger.info('Forcing Ethereal initialization for test routes...');
+  // Reset initialization state
+  isInitialized = false;
+  transport = null;
+  etherealTestAccount = null;
+  initializationPromise = null;
+  forceEthereal = true;
+  
+  // Reinitialize with Ethereal
+  await initializeEmailTransport();
+  
+  // Reset the flag after initialization
+  forceEthereal = false;
+};
+
 // Export functions
 module.exports = {
   initializeEmailTransport, // Call this at application startup
@@ -687,5 +709,6 @@ module.exports = {
   sendVerificationEmail,
   sendPrivacyDataEmail,
   getStatus,
-  isReady
+  isReady,
+  forceEtherealInitialization
 };
