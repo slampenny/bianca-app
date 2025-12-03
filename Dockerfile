@@ -32,18 +32,15 @@ RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-de
 # Set environment variable for MongoMemoryServer
 ENV MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod
 
-# Enable Corepack to use the Yarn version specified in package.json
-RUN corepack enable
+# Install Yarn 1 (remove existing yarn if present, then install specific version)
+RUN rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg && npm install -g yarn@1.22.22
 
 # Dependencies stage - this layer will be cached unless package.json changes
 FROM base AS dependencies
-COPY --chown=node:node package.json yarn.lock .yarnrc.yml ./
-# Create .yarn directory structure with proper permissions for Yarn 4
-RUN mkdir -p .yarn/cache .yarn/releases && chown -R node:node .yarn
+COPY --chown=node:node package.json yarn.lock ./
 USER node
-# Yarn 4 - don't use cache mount during build (causes permission issues)
-# The cache will be in the layer anyway, and we'll use named volume at runtime
-RUN yarn install --immutable
+# Yarn 1 - install dependencies
+RUN yarn install --pure-lockfile --frozen-lockfile
 
 # Build stage - copy source and build if needed
 FROM dependencies AS build

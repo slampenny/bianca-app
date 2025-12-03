@@ -18,22 +18,18 @@ services:
       # Unset placeholder credentials to avoid conflicts with AWS_PROFILE
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=
-      # Force Yarn 4 to use project cache instead of global cache
-      - YARN_ENABLE_GLOBAL_CACHE=false
-      - YARN_CACHE_FOLDER=.yarn/cache
     volumes:
       # Mount source code - in dev mode, we'll fix permissions in entrypoint
       - .:/usr/src/bianca-app
-      # Use named volume only for Yarn cache (node_modules will use bind mount with fixed permissions)
-      - bianca-app-yarn-cache:/usr/src/bianca-app/.yarn/cache  # Separate volume for Yarn cache
+      # Use named volume for node_modules to avoid permission issues
+      - bianca-app-node-modules:/usr/src/bianca-app/node_modules
       - /home/jordanlapp/.aws:/home/node/.aws:ro  # Mount AWS config and SSO cache for SES access (node user)
     working_dir: /usr/src/bianca-app
     # Start as root so entrypoint can fix permissions before switching to node user
     user: "0:0"
     entrypoint: ["/usr/src/bianca-app/docker-entrypoint.sh"]
-    # In dev mode, install dependencies first (since volume mount overrides .yarn directory)
-    # Then run dev server
-    command: ["sh", "-c", "yarn install --immutable && yarn dev"]
+    # In dev mode, install dependencies first, then run dev server
+    command: ["sh", "-c", "yarn install --pure-lockfile --frozen-lockfile && yarn dev"]
     ports:
       - "9229:9229"
     cap_add:
@@ -93,4 +89,4 @@ networks: # <-- Add this whole block
 
 # Define volumes
 volumes:
-  bianca-app-yarn-cache:
+  bianca-app-node-modules:
