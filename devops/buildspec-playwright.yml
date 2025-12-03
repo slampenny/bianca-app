@@ -98,12 +98,17 @@ phases:
       - |
         # Ensure Node.js 20 is available
         export NVM_DIR="$HOME/.nvm"
-        source "$NVM_DIR/nvm.sh" || true
-        nvm use 20 || true
-        export PATH="$NVM_DIR/versions/node/$(node --version)/bin:$PATH"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        # Verify Node version
+        NODE_VERSION=$(node --version)
+        echo "Node version: $NODE_VERSION"
+        if [[ ! "$NODE_VERSION" =~ ^v20 ]]; then
+          echo "❌ Node.js 20 not active, current version: $NODE_VERSION"
+          exit 1
+        fi
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        echo "Node version: $(node --version)"
         echo "Yarn version: $(yarn --version)"
         # Backend uses Yarn 1.22.22
         echo "Installing backend dependencies with Yarn 1..."
