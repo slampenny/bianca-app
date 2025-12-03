@@ -14,14 +14,32 @@ phases:
       - |
         # Enable corepack for Yarn 4 support (must be done first)
         # CodeBuild standard:7.0 should have Node 18+ which includes corepack
-        corepack enable || (npm install -g corepack && corepack enable)
-        # Use the exact Yarn version from backend package.json (4.12.0)
-        corepack prepare yarn@4.12.0 --activate
-        yarn --version
-        echo "✅ Yarn version: $(yarn --version)"
-        # Verify it's Yarn 4
-        if ! yarn --version | grep -q "^4\."; then
-          echo "❌ ERROR: Yarn 4 not activated. Current version: $(yarn --version)"
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        
+        # Try corepack first
+        if corepack enable 2>/dev/null; then
+          echo "✅ Corepack enabled"
+          corepack prepare yarn@4.12.0 --activate
+          YARN_VER=$(yarn --version)
+          echo "Yarn version after corepack: $YARN_VER"
+          if echo "$YARN_VER" | grep -q "^4\."; then
+            echo "✅ Yarn 4 activated via corepack"
+          else
+            echo "⚠️  Corepack didn't activate Yarn 4, trying npm install"
+            npm install -g yarn@4.12.0
+          fi
+        else
+          echo "⚠️  Corepack not available, installing Yarn 4 via npm"
+          npm install -g corepack
+          corepack enable
+          corepack prepare yarn@4.12.0 --activate || npm install -g yarn@4.12.0
+        fi
+        
+        YARN_FINAL=$(yarn --version)
+        echo "✅ Final Yarn version: $YARN_FINAL"
+        if ! echo "$YARN_FINAL" | grep -q "^4\."; then
+          echo "❌ ERROR: Yarn 4 not available. Current: $YARN_FINAL"
           exit 1
         fi
       - echo "Installing MongoDB via Docker..."
