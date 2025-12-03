@@ -88,16 +88,25 @@ phases:
       - |
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        # Backend package.json specifies Yarn 4, but use npm for CI reliability
-        # npm can read package.json and install dependencies
-        echo "Using npm for backend (more reliable in CI than Yarn 4)"
-        npm install --legacy-peer-deps || {
-          echo "⚠️  npm install failed, trying yarn with corepack..."
-          corepack enable || npm install -g corepack && corepack enable
+        echo "Default yarn version: $(yarn --version)"
+        # Try Yarn 1 first (default in CodeBuild) - it might work even if package.json says Yarn 4
+        echo "Trying Yarn 1 (default) for backend..."
+        if yarn install --frozen-lockfile 2>&1 | tee /tmp/backend-yarn1.log; then
+          echo "✅ Backend dependencies installed with Yarn 1"
+        else
+          echo "⚠️  Yarn 1 failed, trying Yarn 4 via corepack..."
+          corepack enable || (npm install -g corepack && corepack enable)
           corepack prepare yarn@4.12.0 --activate
-          yarn install --frozen-lockfile || exit 1
-        }
-        echo "✅ Backend dependencies installed"
+          yarn install --frozen-lockfile 2>&1 | tee /tmp/backend-yarn4.log || {
+            echo "❌ Both Yarn 1 and Yarn 4 failed"
+            echo "Yarn 1 error:"
+            tail -30 /tmp/backend-yarn1.log || true
+            echo "Yarn 4 error:"
+            tail -30 /tmp/backend-yarn4.log || true
+            exit 1
+          }
+          echo "✅ Backend dependencies installed with Yarn 4"
+        fi
       - echo "Installing frontend dependencies (Yarn 1)..."
       - |
         cd "$FRONTEND_DIR" || exit 1
