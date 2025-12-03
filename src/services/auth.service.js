@@ -4,6 +4,7 @@ const caregiverService = require('./caregiver.service');
 const Token = require('../models/token.model');
 const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
+const logger = require('../config/logger');
 /**
  * Login with caregivername and password
  * @param {string} email
