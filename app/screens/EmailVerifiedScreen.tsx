@@ -55,7 +55,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 })
 
 export const EmailVerifiedScreen = () => {
-  const navigation = useNavigation()
   const isLoggedIn = useSelector(isAuthenticated)
   const { colors, isLoading: themeLoading } = useTheme()
   const hasNavigated = useRef(false)
