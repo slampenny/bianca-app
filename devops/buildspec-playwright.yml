@@ -84,28 +84,14 @@ phases:
         export BACKEND_DIR="$BACKEND_DIR"
         echo "Frontend: $FRONTEND_DIR"
         echo "Backend: $BACKEND_DIR"
-      - echo "Installing backend dependencies..."
+      - echo "Installing backend dependencies (Yarn 4)..."
       - |
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        echo "Yarn version: $(yarn --version)"
-        echo "Contents of backend directory:"
-        ls -la | head -20
-        echo "Checking for lock files..."
-        ls -la yarn.lock package-lock.json 2>/dev/null || echo "No lock files found"
-        echo "Running yarn install (trying without --frozen-lockfile first to see error)..."
-        # Try with frozen-lockfile first, if it fails, try without to see the actual error
-        if ! yarn install --frozen-lockfile 2>&1 | tee /tmp/yarn-backend.log; then
-          echo "⚠️  --frozen-lockfile failed, trying without it to see error:"
-          yarn install 2>&1 | tee /tmp/yarn-backend-error.log || {
-            echo "❌ Yarn install failed completely. Error logs:"
-            echo "=== With --frozen-lockfile ==="
-            cat /tmp/yarn-backend.log || true
-            echo "=== Without --frozen-lockfile ==="
-            cat /tmp/yarn-backend-error.log || true
-            exit 1
-          }
-        fi
+        # Activate Yarn 4 for backend directory (uses packageManager field)
+        corepack prepare yarn@4.12.0 --activate
+        echo "Yarn version in backend: $(yarn --version)"
+        yarn install --frozen-lockfile || exit 1
       - echo "Installing frontend dependencies (Yarn 1)..."
       - |
         cd "$FRONTEND_DIR" || exit 1
