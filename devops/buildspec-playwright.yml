@@ -201,6 +201,11 @@ phases:
     commands:
       - echo "Running Playwright E2E tests..."
       - |
+        # Ensure Node.js 20 is available
+        export NVM_DIR="$HOME/.nvm"
+        source "$NVM_DIR/nvm.sh" || true
+        nvm use 20 || true
+        export PATH="$NVM_DIR/versions/node/$(node --version)/bin:$PATH"
         # Re-export variables (they may not persist from pre_build)
         S3_DIR=$(dirname "$CODEBUILD_SRC_DIR")
         FRONTEND_DIR="$CODEBUILD_SRC_DIR"
@@ -208,6 +213,7 @@ phases:
         
         echo "Frontend dir: $FRONTEND_DIR"
         echo "Backend dir: $BACKEND_DIR"
+        echo "Node version: $(node --version)"
         cd "$FRONTEND_DIR" || exit 1
         CI=true yarn test:web:e2e --project=chromium || TEST_EXIT_CODE=$?
         if [ -n "$TEST_EXIT_CODE" ]; then
