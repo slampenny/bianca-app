@@ -15,14 +15,20 @@ phases:
         # Install Node.js 20 using nvm (required for weaviate-client)
         export NVM_DIR="$HOME/.nvm"
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-        source "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        echo "Installing Node.js 20..."
         nvm install 20
         nvm use 20
         nvm alias default 20
-        echo "Node version: $(node --version)"
+        # Verify installation
+        NODE_VER=$(node --version)
+        echo "Node version: $NODE_VER"
         echo "NPM version: $(npm --version)"
-        # Make node available in PATH for subsequent commands
-        export PATH="$NVM_DIR/versions/node/$(node --version)/bin:$PATH"
+        if [ -z "$NODE_VER" ] || [ "$(echo "$NODE_VER" | cut -c1-3)" != "v20" ]; then
+          echo "❌ Node.js 20 installation failed or wrong version: $NODE_VER"
+          exit 1
+        fi
+        echo "✅ Node.js 20 installed successfully"
       - echo "Setting up Yarn versions..."
       - |
         # Both frontend and backend use Yarn 1.22.22
@@ -99,17 +105,27 @@ phases:
         echo "Backend: $BACKEND_DIR"
       - echo "Installing backend dependencies..."
       - |
-        # Ensure Node.js 20 is available
+        # Ensure Node.js 20 is available (POSIX-compliant syntax)
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm use 20
-        # Verify Node version
+        # Try to use Node 20, install if not available
+        nvm use 20 2>/dev/null || {
+          echo "Node 20 not found, installing..."
+          nvm install 20
+          nvm use 20
+        }
+        # Verify Node version (POSIX-compliant)
         NODE_VERSION=$(node --version)
         echo "Node version: $NODE_VERSION"
-        if [[ ! "$NODE_VERSION" =~ ^v20 ]]; then
-          echo "❌ Node.js 20 not active, current version: $NODE_VERSION"
-          exit 1
-        fi
+        case "$NODE_VERSION" in
+          v20.*)
+            echo "✅ Node.js 20 is active"
+            ;;
+          *)
+            echo "❌ Node.js 20 not active, current version: $NODE_VERSION"
+            exit 1
+            ;;
+        esac
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
         echo "Yarn version: $(yarn --version)"
