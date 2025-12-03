@@ -106,24 +106,26 @@ class TelemetryService {
     this.enabled = config.telemetry?.enabled || false;
     this.posthog = null;
 
-    if (this.enabled && config.telemetry?.posthog?.apiKey) {
-      try {
-        this.posthog = new PostHog(
-          config.telemetry.posthog.apiKey,
-          {
-            host: config.telemetry.posthog.host,
-            flushAt: 1, // Send immediately for real-time tracking
-            flushInterval: 10000, // Also flush every 10 seconds
-          }
-        );
-        logger.info('PostHog telemetry service initialized');
-      } catch (error) {
-        logger.error('Failed to initialize PostHog:', error);
-        this.enabled = false;
-      }
-    } else {
-      logger.info('Telemetry disabled or not configured');
-    }
+    // PostHog telemetry removed - no longer used
+    // if (this.enabled && config.telemetry?.posthog?.apiKey) {
+    //   try {
+    //     this.posthog = new PostHog(
+    //       config.telemetry.posthog.apiKey,
+    //       {
+    //         host: config.telemetry.posthog.host,
+    //         flushAt: 1, // Send immediately for real-time tracking
+    //         flushInterval: 10000, // Also flush every 10 seconds
+    //       }
+    //     );
+    //     logger.info('PostHog telemetry service initialized');
+    //   } catch (error) {
+    //     logger.error('Failed to initialize PostHog:', error);
+    //     this.enabled = false;
+    //   }
+    // } else {
+    //   logger.info('Telemetry disabled or not configured');
+    // }
+    this.enabled = false; // Telemetry disabled
   }
 
   /**
