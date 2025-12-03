@@ -12,15 +12,10 @@ phases:
       - echo "Starting Playwright E2E test setup..."
       - echo "Setting up Yarn versions..."
       - |
-        # Frontend uses Yarn 1.22.22 (default in CodeBuild)
-        # Backend uses Yarn 4.12.0 (needs corepack)
+        # Both frontend and backend use Yarn 1.22.22 (default in CodeBuild)
         echo "Node version: $(node --version)"
         echo "Default Yarn version: $(yarn --version)"
-        
-        # Setup corepack for backend (Yarn 4)
-        echo "Enabling corepack for backend (Yarn 4)..."
-        corepack enable || (npm install -g corepack && corepack enable)
-        echo "✅ Corepack enabled"
+        echo "✅ Using Yarn 1 (default) for both frontend and backend"
       - echo "Installing MongoDB via Docker..."
       - |
         # Start MongoDB using Docker (better isolation than installing directly)
@@ -88,32 +83,21 @@ phases:
       - |
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        echo "Default yarn version: $(yarn --version)"
-        # Try Yarn 1 first (default in CodeBuild) - it might work even if package.json says Yarn 4
-        echo "Trying Yarn 1 (default) for backend..."
-        if yarn install --frozen-lockfile 2>&1 | tee /tmp/backend-yarn1.log; then
-          echo "✅ Backend dependencies installed with Yarn 1"
-        else
-          echo "⚠️  Yarn 1 failed, trying Yarn 4 via corepack..."
-          corepack enable || (npm install -g corepack && corepack enable)
-          corepack prepare yarn@4.12.0 --activate
-          yarn install --frozen-lockfile 2>&1 | tee /tmp/backend-yarn4.log || {
-            echo "❌ Both Yarn 1 and Yarn 4 failed"
-            echo "Yarn 1 error:"
-            tail -30 /tmp/backend-yarn1.log || true
-            echo "Yarn 4 error:"
-            tail -30 /tmp/backend-yarn4.log || true
-            exit 1
-          }
-          echo "✅ Backend dependencies installed with Yarn 4"
-        fi
+        echo "Yarn version: $(yarn --version)"
+        # Backend uses Yarn 1.22.22 (default in CodeBuild)
+        echo "Installing backend dependencies with Yarn 1..."
+        yarn install --pure-lockfile --frozen-lockfile || {
+          echo "❌ Backend dependency installation failed"
+          exit 1
+        }
+        echo "✅ Backend dependencies installed with Yarn 1"
       - echo "Installing frontend dependencies (Yarn 1)..."
       - |
         cd "$FRONTEND_DIR" || exit 1
         echo "Frontend directory: $(pwd)"
         # Frontend uses Yarn 1.22.22 (default, no corepack needed)
         echo "Yarn version in frontend: $(yarn --version)"
-        yarn install --frozen-lockfile || exit 1
+        yarn install --pure-lockfile --frozen-lockfile || exit 1
       - echo "Installing Playwright browsers..."
       - |
         cd "$FRONTEND_DIR" || exit 1

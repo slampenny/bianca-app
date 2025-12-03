@@ -51,12 +51,6 @@ test('PatientScreen should load without crashing', async ({ page }) => {
   
   await page.waitForTimeout(2000)
   
-  // Navigate to home tab (might already be there, but ensure we're on it)
-  const homeTab = page.locator('[data-testid="tab-home"]').first()
-  }
-  
-  await page.waitForTimeout(2000)
-  
   // Click add patient button to navigate to PatientScreen
   const addPatientButton = page.getByTestId('add-patient-button')
   await addPatientButton.waitFor({ state: 'visible', timeout: 10000 })
