@@ -10,12 +10,20 @@ phases:
   pre_build:
     commands:
       - echo "Starting Playwright E2E test setup..."
+      - echo "Installing Node.js 20..."
+      - |
+        # Install Node.js 20 (required for weaviate-client)
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
       - echo "Setting up Yarn versions..."
       - |
-        # Both frontend and backend use Yarn 1.22.22 (default in CodeBuild)
-        echo "Node version: $(node --version)"
-        echo "Default Yarn version: $(yarn --version)"
-        echo "✅ Using Yarn 1 (default) for both frontend and backend"
+        # Both frontend and backend use Yarn 1.22.22
+        # Install Yarn 1.22.22 globally
+        npm install -g yarn@1.22.22
+        echo "Yarn version: $(yarn --version)"
+        echo "✅ Using Yarn 1.22.22 for both frontend and backend"
       - echo "Installing MongoDB via Docker..."
       - |
         # Start MongoDB using Docker (better isolation than installing directly)
