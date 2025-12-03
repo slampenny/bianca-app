@@ -84,14 +84,21 @@ phases:
         export BACKEND_DIR="$BACKEND_DIR"
         echo "Frontend: $FRONTEND_DIR"
         echo "Backend: $BACKEND_DIR"
-      - echo "Installing backend dependencies (Yarn 4)..."
+      - echo "Installing backend dependencies..."
       - |
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        # Activate Yarn 4 for backend directory (uses packageManager field)
-        corepack prepare yarn@4.12.0 --activate
-        echo "Yarn version in backend: $(yarn --version)"
-        yarn install --frozen-lockfile || exit 1
+        # Backend uses Yarn 4, but let's try with corepack
+        # If corepack fails, the packageManager field should auto-activate it
+        corepack enable || true
+        echo "Yarn version before install: $(yarn --version || echo 'yarn not found')"
+        # Try yarn install - corepack should auto-detect Yarn 4 from package.json
+        yarn install --frozen-lockfile 2>&1 | tee /tmp/backend-yarn.log || {
+          echo "❌ Yarn install failed. Error:"
+          cat /tmp/backend-yarn.log | tail -50
+          exit 1
+        }
+        echo "✅ Backend dependencies installed"
       - echo "Installing frontend dependencies (Yarn 1)..."
       - |
         cd "$FRONTEND_DIR" || exit 1
