@@ -197,7 +197,8 @@ export const VerifyEmailScreen = () => {
         } else if (error?.status === 'FETCH_ERROR' || error?.error === 'FETCH_ERROR') {
           setErrorMessage(translate("emailVerificationScreen.errorNetwork") || "Unable to connect to server. Please check your internet connection and try again.")
         } else {
-          setErrorMessage(error?.data?.message || error?.message || translate("emailVerificationScreen.errorVerificationFailed"))
+          // Backend returns 'error' field in JSON response, but we also check 'message' for compatibility
+          setErrorMessage(error?.data?.error || error?.data?.message || error?.message || translate("emailVerificationScreen.errorVerificationFailed"))
         }
       }
     }

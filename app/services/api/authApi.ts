@@ -119,7 +119,8 @@ export const authApi = createApi({
             const json = await response.json()
             return { 
               success: json.success || response.ok, 
-              message: json.message,
+              message: json.message || json.error, // Backend returns 'error' field on failure
+              error: json.error, // Also include error field directly
               caregiver: json.caregiver,
               tokens: json.tokens,
               org: json.org,

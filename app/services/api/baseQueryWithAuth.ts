@@ -92,14 +92,17 @@ function baseQueryWithReauth(
 
     // If we get a 401, show the login modal
     // BUT: Don't intercept 401s from the login endpoint itself (those are invalid credentials, not expired tokens)
+    // Also don't intercept 401s from verify-email endpoint (those are invalid/expired verification tokens, not expired auth tokens)
     if (result.error && result.error.status === 401) {
       // Check if this is the login endpoint - if so, don't intercept (let the error propagate)
       const url = typeof args === 'string' ? args : (args as FetchArgs).url || ''
       const isLoginEndpoint = url.includes('/auth/login') || url.includes('/v1/auth/login')
+      const isVerifyEmailEndpoint = url.includes('/auth/verify-email') || url.includes('/v1/auth/verify-email')
       
-      if (isLoginEndpoint) {
+      if (isLoginEndpoint || isVerifyEmailEndpoint) {
         // Login endpoint 401 = invalid credentials, not expired token
-        // Let the error propagate so LoginForm can handle it
+        // Verify-email endpoint 401 = invalid/expired verification token, not expired auth token
+        // Let the error propagate so the respective handlers can handle it
         return result
       }
       
