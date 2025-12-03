@@ -190,8 +190,34 @@ phases:
           sleep 2
         done
       - echo "Seeding database..."
-      - sleep 5
-      - curl -X POST http://localhost:3000/v1/test/seed || echo "⚠️  Seeding failed, continuing..."
+      - |
+        # Wait a bit more for backend to be fully ready
+        sleep 3
+        # Retry seeding up to 3 times
+        SEED_SUCCESS=false
+        for attempt in 1 2 3; do
+          echo "Seeding attempt $attempt..."
+          SEED_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/test/seed)
+          SEED_HTTP_CODE=$(echo "$SEED_RESPONSE" | tail -n1)
+          SEED_BODY=$(echo "$SEED_RESPONSE" | sed '$d')
+          if [ "$SEED_HTTP_CODE" = "200" ]; then
+            echo "✅ Database seeded successfully"
+            echo "$SEED_BODY" | head -20
+            SEED_SUCCESS=true
+            break
+          else
+            echo "⚠️  Seeding attempt $attempt failed with HTTP $SEED_HTTP_CODE"
+            echo "$SEED_BODY" | head -10
+            if [ $attempt -lt 3 ]; then
+              sleep 5
+            fi
+          fi
+        done
+        if [ "$SEED_SUCCESS" = "false" ]; then
+          echo "❌ Database seeding failed after 3 attempts, but continuing..."
+          echo "Backend log (last 50 lines):"
+          tail -50 /tmp/backend.log || true
+        fi
       - echo "Starting frontend server..."
       - |
         # Ensure Node.js 20 is available
@@ -203,20 +229,40 @@ phases:
         FRONTEND_PID=$!
         echo $FRONTEND_PID > /tmp/frontend.pid
         echo "Frontend PID: $FRONTEND_PID"
-        # Wait for frontend to be ready
-        for i in {1..60}; do
-          if curl -f http://localhost:8081 2>/dev/null; then
-            echo "✅ Frontend is ready!"
-            break
-          fi
-          if [ $i -eq 60 ]; then
-            echo "❌ Frontend failed to start after 120 seconds"
+        # Wait for frontend to be ready with more robust checks
+        FRONTEND_READY=false
+        for i in {1..90}; do
+          # Check if process is still running
+          if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+            echo "❌ Frontend process died"
             echo "Frontend log:"
             cat /tmp/frontend.log || true
             exit 1
           fi
+          # Check if frontend is responding
+          if curl -f -s http://localhost:8081 > /dev/null 2>&1; then
+            # Additional check: verify it's actually serving content
+            if curl -f -s http://localhost:8081 | grep -q -i "html\|expo\|react" 2>/dev/null; then
+              echo "✅ Frontend is ready and serving content!"
+              FRONTEND_READY=true
+              break
+            fi
+          fi
+          if [ $i -eq 90 ]; then
+            echo "❌ Frontend failed to start after 180 seconds"
+            echo "Frontend log (last 100 lines):"
+            tail -100 /tmp/frontend.log || true
+            echo "Checking if port 8081 is in use:"
+            netstat -tuln | grep 8081 || true
+            exit 1
+          fi
           sleep 2
         done
+        # Give frontend a bit more time to fully initialize
+        if [ "$FRONTEND_READY" = "true" ]; then
+          echo "Waiting additional 5 seconds for frontend to fully initialize..."
+          sleep 5
+        fi
 
   build:
     commands:
