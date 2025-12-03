@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { View, ViewStyle, StyleSheet } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
-import { Screen, Text, Button, TextField } from "app/components"
+import { Screen, Text, Button, TextField, PasswordField } from "app/components"
 import { LoadingButton } from "app/components/LoadingButton"
 import { spacing } from "app/theme"
 import { useSetPasswordForSSOMutation, authApi } from "app/services/api/authApi"
@@ -268,32 +268,34 @@ export const SSOAccountLinkingScreen = () => {
         )}
 
         <View style={styles.fieldContainer}>
-          <TextField
+          <PasswordField
             value={password}
             onChangeText={setPassword}
             labelTx="ssoLinkingScreen.passwordLabel"
             placeholderTx="ssoLinkingScreen.passwordPlaceholder"
-            secureTextEntry={true}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!isSettingPassword && !isSSOLoading}
             accessibilityLabel="password-input"
             testID="password-input"
+            showRules={true}
           />
         </View>
 
         <View style={styles.fieldContainer}>
-          <TextField
+          <PasswordField
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             labelTx="ssoLinkingScreen.confirmPasswordLabel"
             placeholderTx="ssoLinkingScreen.confirmPasswordPlaceholder"
-            secureTextEntry={true}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!isSettingPassword && !isSSOLoading}
             accessibilityLabel="confirm-password-input"
             testID="confirm-password-input"
+            isConfirmField={true}
+            comparePassword={password}
+            showRules={false}
           />
         </View>
 

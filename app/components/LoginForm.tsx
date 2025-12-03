@@ -5,7 +5,7 @@ import { useLoginMutation } from "../services/api/authApi"
 import { setAuthEmail, setAuthTokens, setCurrentUser, getValidationError, getAuthEmail } from "../store/authSlice"
 import { setCaregiver } from "../store/caregiverSlice"
 import { setOrg } from "../store/orgSlice"
-import { Button, Text, TextField } from "app/components"
+import { Button, Text, TextField, PasswordField } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { SSOLoginButtons } from "./SSOLoginButtons"
 import { translate } from "../i18n"
@@ -74,7 +74,6 @@ export const LoginForm: FC<LoginFormProps> = ({
   const authEmail = useSelector(getAuthEmail)
 
   const [authPassword, setAuthPassword] = useState("")
-  const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true)
   const [errorMessage, setErrorMessage] = useState(initialErrorMessage || "")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -373,7 +372,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         editable={true}
         disabled={false}
       />
-      <TextField
+      <PasswordField
         testID="password-input"
         accessibilityLabel="Password"
         ref={authPasswordInput}
@@ -381,7 +380,6 @@ export const LoginForm: FC<LoginFormProps> = ({
         onChangeText={setAuthPassword}
         placeholderTx="loginScreen.passwordFieldLabel"
         labelTx="loginScreen.passwordFieldLabel"
-        secureTextEntry={isAuthPasswordHidden}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="done"
@@ -391,6 +389,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         style={styles.input}
         editable={true}
         disabled={false}
+        showRules={false}
       />
       
       {/* Error message displayed above login button */}

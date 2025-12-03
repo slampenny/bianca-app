@@ -5,7 +5,7 @@ import Toast from "../components/Toast"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute, useNavigation } from "@react-navigation/native"
 import { useResetPasswordMutation } from "../services/api/authApi"
-import { Button, Text, TextField, Screen, Header } from "app/components"
+import { Button, Text, TextField, PasswordField, Screen, Header } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { spacing } from "app/theme"
 import { translate } from "../i18n"
@@ -430,7 +430,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
         ) : null}
 
         <View style={styles.form}>
-          <TextField
+          <PasswordField
             testID="new-password-input"
             accessibilityLabel={translate("confirmResetScreen.newPasswordLabel") || "New password"}
             value={newPassword}
@@ -440,13 +440,13 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
             }}
             label={translate("confirmResetScreen.newPasswordLabel")}
             placeholder={translate("confirmResetScreen.newPasswordPlaceholder")}
-            secureTextEntry
             status={passwordError ? "error" : undefined}
             helper={passwordError}
             containerStyle={styles.textField}
+            showRules={true}
           />
 
-          <TextField
+          <PasswordField
             testID="confirm-password-input"
             accessibilityLabel={translate("confirmResetScreen.confirmPasswordLabel") || "Confirm password"}
             value={confirmPassword}
@@ -456,10 +456,12 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
             }}
             label={translate("confirmResetScreen.confirmPasswordLabel")}
             placeholder={translate("confirmResetScreen.confirmPasswordPlaceholder")}
-            secureTextEntry
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError}
             containerStyle={styles.textField}
+            isConfirmField={true}
+            comparePassword={newPassword}
+            showRules={false}
           />
 
           <Button

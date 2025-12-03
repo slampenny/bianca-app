@@ -6,7 +6,7 @@ import { isAuthenticated } from "app/store/authSlice"
 import { Screen, Text } from "app/components"
 import { spacing } from "app/theme"
 import { useTheme } from "app/theme/ThemeContext"
-import { navigationRef } from "app/navigators/navigationUtilities"
+import { navigationRef, resetRoot } from "app/navigators/navigationUtilities"
 import { translate } from "app/i18n"
 import type { ThemeColors } from "../types"
 
@@ -85,19 +85,22 @@ export const EmailVerifiedScreen = () => {
       return
     }
 
-    // Show success message briefly, then navigate to MainTabs
-    // Use navigationRef to navigate globally across stacks
+    // Show success message briefly (3 seconds), then navigate to MainTabs
+    // Use resetRoot to properly reset the navigation stack to MainTabs
     const timer = setTimeout(() => {
       if (hasNavigated.current) {
         return
       }
       hasNavigated.current = true
-      // Use navigationRef to navigate globally to MainTabs
-      // This works regardless of which stack we're in
+      // Use resetRoot to properly reset navigation stack to MainTabs
+      // This ensures we're at the root of the authenticated stack
       if (navigationRef.isReady()) {
-        navigationRef.navigate("MainTabs" as never)
+        resetRoot({
+          index: 0,
+          routes: [{ name: "MainTabs" as never }],
+        })
       }
-    }, 2000)
+    }, 3000)
 
     return () => clearTimeout(timer)
   }, [isLoggedIn])
@@ -109,12 +112,18 @@ export const EmailVerifiedScreen = () => {
       if (isLoggedIn && !hasNavigated.current) {
         hasNavigated.current = true
         if (navigationRef.isReady()) {
-          navigationRef.navigate("MainTabs" as never)
+          resetRoot({
+            index: 0,
+            routes: [{ name: "MainTabs" as never }],
+          })
         }
       } else if (!isLoggedIn && !hasNavigated.current) {
         hasNavigated.current = true
         if (navigationRef.isReady()) {
-          navigationRef.navigate("Login" as never)
+          resetRoot({
+            index: 0,
+            routes: [{ name: "Login" as never }],
+          })
         }
       }
     }, [isLoggedIn])

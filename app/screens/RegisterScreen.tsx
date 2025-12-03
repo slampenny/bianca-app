@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
 import { StyleSheet, View, Pressable, ScrollView } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
-import { Button, Text, TextField, PhoneInputWeb, Screen } from "app/components"
+import { Button, Text, TextField, PasswordField, PhoneInputWeb, Screen } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
@@ -319,12 +319,11 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
         </View>
 
         <View style={styles.fieldContainer}>
-          <TextField
+          <PasswordField
             testID="register-password"
             accessibilityLabel={translate("registerScreen.passwordFieldLabel") || "Password"}
             placeholderTx="registerScreen.passwordFieldPlaceholder"
             labelTx="registerScreen.passwordFieldLabel"
-            secureTextEntry
             value={password}
             onChangeText={(text) => {
               setPassword(text)
@@ -332,17 +331,17 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
             }}
             status={passwordError ? "error" : undefined}
             helper={passwordError || undefined}
+            validatePassword={validatePassword}
+            showRules={true}
           />
-          {/* {passwordError ? <Text style={styles.fieldErrorText}>{passwordError}</Text> : null} */}
         </View>
 
         <View style={styles.fieldContainer}>
-          <TextField
+          <PasswordField
             testID="register-confirm-password"
             accessibilityLabel={translate("registerScreen.confirmPasswordFieldLabel") || "Confirm password"}
             placeholderTx="registerScreen.confirmPasswordFieldPlaceholder"
             labelTx="registerScreen.confirmPasswordFieldLabel"
-            secureTextEntry
             value={confirmPassword}
             onChangeText={(text) => {
               setConfirmPassword(text)
@@ -350,8 +349,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
             }}
             status={confirmPasswordError ? "error" : undefined}
             helper={confirmPasswordError || undefined}
+            isConfirmField={true}
+            comparePassword={password}
+            showRules={false}
           />
-          {/* {confirmPasswordError ? (<Text style={styles.fieldErrorText}>{confirmPasswordError}</Text>) : null} */}
         </View>
 
 

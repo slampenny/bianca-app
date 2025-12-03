@@ -5,7 +5,7 @@ import { useRoute } from "@react-navigation/native"
 import { useRegisterWithInviteMutation, useGetInviteInfoQuery } from "../services/api/authApi"
 import { useDispatch } from "react-redux"
 import { setInviteToken } from "app/store/authSlice"
-import { Button, Text, TextField, Screen, Header, PhoneInputWeb } from "app/components"
+import { Button, Text, TextField, PasswordField, Screen, Header, PhoneInputWeb } from "app/components"
 import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
@@ -358,7 +358,7 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         style={styles.input}
       />
 
-      <TextField
+      <PasswordField
         testID="register-password"
         accessibilityLabel="signup-password-input"
         value={password}
@@ -368,16 +368,17 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         }}
         labelTx="signupScreen.passwordLabel"
         placeholderTx="signupScreen.passwordPlaceholder"
-        secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
+        validatePassword={(pwd) => pwd.length >= 6}
+        showRules={true}
       />
       {passwordError ? <Text style={styles.fieldError}>{passwordError}</Text> : null}
 
-      <TextField
+      <PasswordField
         testID="register-confirm-password"
         accessibilityLabel="signup-confirm-password-input"
         value={confirmPassword}
@@ -387,12 +388,14 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
         }}
         labelTx="signupScreen.confirmPasswordLabel"
         placeholderTx="signupScreen.confirmPasswordPlaceholder"
-        secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
         containerStyle={styles.inputContainer}
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
+        isConfirmField={true}
+        comparePassword={password}
+        showRules={false}
       />
       {confirmPasswordError ? <Text style={styles.fieldError}>{confirmPasswordError}</Text> : null}
 

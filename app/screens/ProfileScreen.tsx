@@ -26,6 +26,7 @@ import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver } from "../store/caregiverSlice"
 import { getInviteToken } from "../store/authSlice"
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
+import { useResendVerificationEmailMutation } from "../services/api/authApi"
 import { useGetMFAStatusQuery } from "../services/api/mfaApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
@@ -59,6 +60,7 @@ function ProfileScreen() {
   const [updateCaregiver, { isLoading: isUpdating, error: updateError }] =
     useUpdateCaregiverMutation()
   const [uploadAvatar, { isLoading: isUploading, error: uploadError }] = useUploadAvatarMutation()
+  const [resendVerificationEmail, { isLoading: isResendingEmail }] = useResendVerificationEmailMutation()
   
   // MFA status
   const { data: mfaStatus } = useGetMFAStatusQuery()
@@ -74,6 +76,7 @@ function ProfileScreen() {
   const [emailError, setEmailError] = useState("")
   const [phoneError, setPhoneError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [emailSentMessage, setEmailSentMessage] = useState("")
   
   // Timeout ref for navigation delay
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -126,10 +129,15 @@ function ProfileScreen() {
     }
   }
 
-  // Only prevent navigation if email is not verified or phone is missing
-  // Users can continue with unverified phone number
+  // Only prevent navigation if email is not verified OR phone is missing
+  // Users can continue with unverified phone number (phone exists but not verified)
+  // Do NOT block if only phone is unverified (hasUnverifiedPhone but email is verified and phone exists)
   useEffect(() => {
-    if (isUnverified) {
+    // Only block if email is unverified OR phone is missing
+    // Don't block if phone exists but is just unverified
+    const shouldBlock = !currentUser?.isEmailVerified || hasMissingPhone
+    
+    if (shouldBlock) {
       const unsubscribe = navigation.addListener('beforeRemove', (e) => {
         // Allow logout navigation
         if (e.data.action.type === 'NAVIGATE' && e.data.action.payload?.name === 'Logout') {
@@ -139,13 +147,16 @@ function ProfileScreen() {
         // Prevent default behavior of leaving the screen for other navigations
         e.preventDefault()
         
-        // Show info toast to user
-        showInfo(translate("profileScreen.completeProfileMessage"))
+        // Show appropriate message based on what's missing
+        const message = hasMissingPhone 
+          ? translate("profileScreen.completeProfileMessage")
+          : translate("profileScreen.completeProfileMessageUnverified")
+        showInfo(message)
       })
 
       return unsubscribe
     }
-  }, [navigation, isUnverified, showInfo])
+  }, [navigation, currentUser?.isEmailVerified, hasMissingPhone, showInfo])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -320,8 +331,38 @@ function ProfileScreen() {
                   <Text style={styles.verificationWarning}>
                     ⏳ {translate("profileScreen.emailNotVerified") || "Email Not Verified"}
                   </Text>
+                  <Button
+                    text={translate("profileScreen.verifyEmail") || "Verify Email"}
+                    onPress={async () => {
+                      try {
+                        await resendVerificationEmail({ email: email || currentUser?.email || "" }).unwrap()
+                        setEmailSentMessage(translate("profileScreen.verificationEmailSent") || "Verification email sent! Please check your inbox.")
+                        // Clear message after 5 seconds
+                        setTimeout(() => {
+                          setEmailSentMessage("")
+                        }, 5000)
+                      } catch (error) {
+                        logger.error("Failed to resend verification email:", error)
+                        setEmailSentMessage(translate("profileScreen.verificationEmailFailed") || "Failed to send verification email. Please try again.")
+                        setTimeout(() => {
+                          setEmailSentMessage("")
+                        }, 5000)
+                      }
+                    }}
+                    preset="link"
+                    style={styles.verifyButton}
+                    disabled={isResendingEmail}
+                    loading={isResendingEmail}
+                    testID="verify-email-button"
+                    accessibilityLabel="Verify email button"
+                  />
                 </View>
               )}
+              {emailSentMessage ? (
+                <Text style={emailSentMessage.includes("Failed") ? styles.error : styles.success}>
+                  {emailSentMessage}
+                </Text>
+              ) : null}
             </View>
             <View style={styles.inputContainer}>
               <TextField
