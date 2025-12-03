@@ -1,0 +1,194 @@
+version: 0.2
+
+env:
+  variables:
+    NODE_ENV: test
+    API_BASE_URL: http://localhost:3000/v1
+    MONGODB_URL: mongodb://localhost:27017/bianca-app-test
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting Playwright E2E test setup..."
+      - echo "Installing MongoDB via Docker..."
+      - |
+        # Start MongoDB using Docker (better isolation than installing directly)
+        docker run -d --name mongodb-test \
+          -p 27017:27017 \
+          -e MONGO_INITDB_DATABASE=bianca-app-test \
+          mongo:7.0 || echo "MongoDB container may already exist"
+        # Wait for MongoDB to be ready
+        for i in {1..30}; do
+          if docker exec mongodb-test mongosh --eval "db.adminCommand('ping')" 2>/dev/null; then
+            echo "MongoDB is ready!"
+            break
+          fi
+          sleep 1
+        done
+      - echo "Locating source artifacts..."
+      - |
+        # CodeBuild extracts multiple artifacts to s3/00, s3/01, etc.
+        # Primary source (FrontendSourceOutput) is in CODEBUILD_SRC_DIR (s3/00)
+        # Secondary source (BackendSourceOutput) is in CODEBUILD_SRC_DIR_BackendSourceOutput (s3/01)
+        echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
+        echo "CODEBUILD_SRC_DIR_BackendSourceOutput: ${CODEBUILD_SRC_DIR_BackendSourceOutput:-not set}"
+        
+        # Frontend is primary source (CODEBUILD_SRC_DIR)
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR"
+        if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+          echo "ERROR: Frontend package.json not found in $FRONTEND_DIR"
+          ls -la "$FRONTEND_DIR" || true
+          exit 1
+        fi
+        echo "✅ Frontend found at: $FRONTEND_DIR"
+        
+        # Backend is secondary source
+        S3_DIR=$(dirname "$CODEBUILD_SRC_DIR")
+        BACKEND_DIR="${CODEBUILD_SRC_DIR_BackendSourceOutput:-$S3_DIR/01}"
+        
+        if [ ! -d "$BACKEND_DIR" ] || [ ! -f "$BACKEND_DIR/package.json" ]; then
+          echo "⚠️  Backend not found at $BACKEND_DIR, searching..."
+          ls -la "$S3_DIR/" || true
+          # Try alternative locations
+          for dir in "$S3_DIR/01" "$S3_DIR/00/../01" "$CODEBUILD_SRC_DIR/../01"; do
+            if [ -d "$dir" ] && [ -f "$dir/package.json" ] && [ -f "$dir/src/index.js" ]; then
+              BACKEND_DIR="$dir"
+              echo "✅ Found backend at: $BACKEND_DIR"
+              break
+            fi
+          done
+        else
+          echo "✅ Backend found at: $BACKEND_DIR"
+        fi
+        
+        if [ ! -f "$BACKEND_DIR/src/index.js" ]; then
+          echo "ERROR: Backend source not found or invalid"
+          echo "Searched in: $BACKEND_DIR"
+          ls -la "$BACKEND_DIR" || true
+          exit 1
+        fi
+        
+        # Export for use in build phase
+        export FRONTEND_DIR="$FRONTEND_DIR"
+        export BACKEND_DIR="$BACKEND_DIR"
+        echo "Frontend: $FRONTEND_DIR"
+        echo "Backend: $BACKEND_DIR"
+      - echo "Installing backend dependencies..."
+      - |
+        cd "$BACKEND_DIR" || exit 1
+        echo "Backend directory: $(pwd)"
+        yarn install --frozen-lockfile || exit 1
+      - echo "Installing frontend dependencies..."
+      - |
+        cd "$FRONTEND_DIR" || exit 1
+        echo "Frontend directory: $(pwd)"
+        yarn install --frozen-lockfile || exit 1
+      - echo "Installing Playwright browsers..."
+      - |
+        cd "$FRONTEND_DIR" || exit 1
+        yarn playwright install --with-deps chromium || exit 1
+      - echo "Setting up backend environment..."
+      - |
+        cd "$BACKEND_DIR" || exit 1
+        cat > .env << EOF
+        MONGODB_URL=$MONGODB_URL
+        NODE_ENV=test
+        JWT_SECRET=test-secret-key-for-codebuild-$(date +%s)
+        JWT_ACCESS_EXPIRATION_MINUTES=30
+        JWT_REFRESH_EXPIRATION_DAYS=30
+        EOF
+        echo "Backend .env created:"
+        cat .env
+      - echo "Starting backend server..."
+      - |
+        cd "$BACKEND_DIR" || exit 1
+        yarn dev:test > /tmp/backend.log 2>&1 &
+        BACKEND_PID=$!
+        echo $BACKEND_PID > /tmp/backend.pid
+        echo "Backend PID: $BACKEND_PID"
+        # Wait for backend to be ready
+        for i in {1..60}; do
+          if curl -f http://localhost:3000/health 2>/dev/null; then
+            echo "✅ Backend is ready!"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "❌ Backend failed to start after 120 seconds"
+            echo "Backend log:"
+            cat /tmp/backend.log || true
+            exit 1
+          fi
+          sleep 2
+        done
+      - echo "Seeding database..."
+      - sleep 5
+      - curl -X POST http://localhost:3000/v1/test/seed || echo "⚠️  Seeding failed, continuing..."
+      - echo "Starting frontend server..."
+      - |
+        cd "$FRONTEND_DIR" || exit 1
+        NODE_ENV=test yarn web > /tmp/frontend.log 2>&1 &
+        FRONTEND_PID=$!
+        echo $FRONTEND_PID > /tmp/frontend.pid
+        echo "Frontend PID: $FRONTEND_PID"
+        # Wait for frontend to be ready
+        for i in {1..60}; do
+          if curl -f http://localhost:8081 2>/dev/null; then
+            echo "✅ Frontend is ready!"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "❌ Frontend failed to start after 120 seconds"
+            echo "Frontend log:"
+            cat /tmp/frontend.log || true
+            exit 1
+          fi
+          sleep 2
+        done
+
+  build:
+    commands:
+      - echo "Running Playwright E2E tests..."
+      - |
+        # Re-export variables (they may not persist from pre_build)
+        S3_DIR=$(dirname "$CODEBUILD_SRC_DIR")
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR"
+        BACKEND_DIR="${CODEBUILD_SRC_DIR_BackendSourceOutput:-$S3_DIR/01}"
+        
+        echo "Frontend dir: $FRONTEND_DIR"
+        echo "Backend dir: $BACKEND_DIR"
+        cd "$FRONTEND_DIR" || exit 1
+        CI=true yarn test:web:e2e --project=chromium || TEST_EXIT_CODE=$?
+        if [ -n "$TEST_EXIT_CODE" ]; then
+          echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
+          echo "=== Backend Logs ==="
+          tail -100 /tmp/backend.log || true
+          echo "=== Frontend Logs ==="
+          tail -100 /tmp/frontend.log || true
+          exit $TEST_EXIT_CODE
+        fi
+        echo "✅ All tests passed!"
+
+  post_build:
+    commands:
+      - echo "Cleaning up services..."
+      - |
+        if [ -f /tmp/backend.pid ]; then
+          kill $(cat /tmp/backend.pid) 2>/dev/null || true
+        fi
+        if [ -f /tmp/frontend.pid ]; then
+          kill $(cat /tmp/frontend.pid) 2>/dev/null || true
+        fi
+        pkill -f "node.*index.js" 2>/dev/null || true
+        pkill -f "expo start" 2>/dev/null || true
+        docker stop mongodb-test 2>/dev/null || true
+        docker rm mongodb-test 2>/dev/null || true
+      - echo "Test run completed"
+
+artifacts:
+  files:
+    - '**/playwright-report/**/*'
+    - '**/test-results/**/*'
+    - '**/test-results/junit.xml'
+  base-directory: '**'
+  name: PlaywrightTestResults
+
