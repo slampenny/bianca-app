@@ -40,6 +40,11 @@ phases:
         npm install -g yarn@1.22.22
         echo "Yarn version: $(yarn --version)"
         echo "✅ Using Yarn 1.22.22 for both frontend and backend"
+      - echo "Increasing file watcher limit for frontend..."
+      - |
+        # Increase inotify file watcher limit (fixes ENOSPC error)
+        echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
+        sudo sysctl -p || true
       - echo "Installing MongoDB via Docker..."
       - |
         # Start MongoDB using Docker (better isolation than installing directly)
@@ -161,6 +166,7 @@ phases:
         JWT_SECRET=test-secret-key-for-codebuild-$(date +%s)
         JWT_ACCESS_EXPIRATION_MINUTES=30
         JWT_REFRESH_EXPIRATION_DAYS=30
+        OPENAI_API_KEY=sk-test-dummy-key-for-codebuild-tests
         EOF
         echo "Backend .env created:"
         cat .env
