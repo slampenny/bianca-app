@@ -91,7 +91,15 @@ phases:
       - |
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        yarn install --frozen-lockfile || exit 1
+        echo "Yarn version: $(yarn --version)"
+        echo "Checking for yarn.lock..."
+        ls -la yarn.lock || echo "No yarn.lock found"
+        echo "Running yarn install..."
+        yarn install --frozen-lockfile 2>&1 | tee /tmp/yarn-backend.log || {
+          echo "❌ Yarn install failed. Error log:"
+          cat /tmp/yarn-backend.log
+          exit 1
+        }
       - echo "Installing frontend dependencies..."
       - |
         cd "$FRONTEND_DIR" || exit 1
