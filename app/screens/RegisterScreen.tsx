@@ -204,13 +204,15 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
     <Screen 
       testID="register-screen"
       accessibilityLabel="Register"
+      preset="scroll"
       style={{ backgroundColor: colors.palette.biancaBackground, flex: 1 }}
+      ScrollViewProps={{
+        ref: scrollRef,
+        contentContainerStyle: { padding: 20 },
+        testID: "register-form",
+        showsVerticalScrollIndicator: true,
+      }}
     >
-      <ScrollView 
-        ref={scrollRef}
-        contentContainerStyle={{ padding: 20 }}
-        testID="register-form"
-      >
         {/* Error message block MOVED FROM HERE */}
 
         <View style={styles.buttonContainer}>
@@ -406,7 +408,6 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
         {/* Add extra space at the bottom to ensure scrollability */}
         <View style={{ height: 100 }} />
-      </ScrollView>
     </Screen>
   )
 }

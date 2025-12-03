@@ -77,19 +77,11 @@ phases:
       - |
         cd "$BACKEND_DIR" || exit 1
         echo "Backend directory: $(pwd)"
-        # Ensure corepack is enabled and yarn 4 is active
-        corepack enable
-        corepack prepare yarn@stable --activate
-        yarn --version
         yarn install --frozen-lockfile || exit 1
       - echo "Installing frontend dependencies..."
       - |
         cd "$FRONTEND_DIR" || exit 1
         echo "Frontend directory: $(pwd)"
-        # Ensure corepack is enabled and yarn 4 is active
-        corepack enable
-        corepack prepare yarn@stable --activate
-        yarn --version
         yarn install --frozen-lockfile || exit 1
       - echo "Installing Playwright browsers..."
       - |

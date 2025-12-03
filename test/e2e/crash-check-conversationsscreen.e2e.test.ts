@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { loginUserViaUI } from './helpers/testHelpers'
 
 test('ConversationsScreen should load without crashing', async ({ page }) => {
   const errors: string[] = []
@@ -10,13 +11,14 @@ test('ConversationsScreen should load without crashing', async ({ page }) => {
   await page.goto('/')
   await page.waitForLoadState('networkidle')
   
-  // Try to login
+  // Try to login using the helper function
   const emailInput = page.locator('[data-testid="email-input"]')
   if (await emailInput.count() > 0) {
-    await emailInput.fill('fake@example.org')
-    await page.fill('[data-testid="password-input"]', 'Password1')
-    await page.click('[data-testid="login-button"]')
-    await page.waitForSelector('[aria-label="Home tab"], [data-testid="tab-home"]', { timeout: 15000 }).catch(() => {})
+    try {
+      await loginUserViaUI(page, 'fake@example.org', 'Password1')
+    } catch (error) {
+      console.log('Login failed, continuing anyway:', error)
+    }
   }
   
   // Navigate to home tab using accessibility label

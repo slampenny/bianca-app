@@ -34,9 +34,10 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
     })
   }, [isLoggedIn])
 
-  // Redirect unverified users to profile screen
+  // Redirect users with incomplete profiles to profile screen
+  // Profile is incomplete if email or phone is not verified
   useEffect(() => {
-    if (isLoggedIn && currentUser && currentUser.role === 'unverified') {
+    if (isLoggedIn && currentUser && (!currentUser.isEmailVerified || !currentUser.isPhoneVerified)) {
       // Navigate to profile screen to complete setup
       if (navigationRef.isReady()) {
         navigationRef.navigate('Profile')

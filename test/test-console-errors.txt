@@ -1,25 +1,6 @@
-Page Error: Platform is not defined
-ReferenceError: Platform is not defined
-    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228874:17
-    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
-    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
-    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
-    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228655:23
-    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
-    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
-    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
-    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:117530:24
-    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
 Request Failed: GET https://js.stripe.com/clover/stripe.js - net::ERR_ABORTED
-Page Error: Platform is not defined
-ReferenceError: Platform is not defined
-    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228874:17
-    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
-    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
-    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
-    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:228655:23
-    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
-    at guardedLoadModule (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:176:14)
-    at metroRequire (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:90:75)
-    at http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:117530:24
-    at loadModuleImplementation (http://localhost:8081/node_modules/expo/AppEntry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app:267:7)
+Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_600SemiBold.ttf&platform=web&hash=85caebdc62414beb10457fdc6ca2d4c2 - net::ERR_ABORTED
+Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_300Light.ttf&platform=web&hash=7e767880def9016b433bab4d6493d899 - net::ERR_ABORTED
+Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_500Medium.ttf&platform=web&hash=d52e2a5ca7f9d70f174ac0a7095dbccf - net::ERR_ABORTED
+Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_400Regular.ttf&platform=web&hash=155c2e8af05b78017012be8ff2962731 - net::ERR_ABORTED
+Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_700Bold.ttf&platform=web&hash=b6d08fb2f89a7b71dd0ca70ce941c922 - net::ERR_ABORTED

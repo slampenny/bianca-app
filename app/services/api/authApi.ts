@@ -97,17 +97,43 @@ export const authApi = createApi({
         body: data,
       }),
     }),
-    verifyEmail: builder.mutation<{ success: boolean; message?: string; html?: string }, { token: string }>({
+    verifyEmail: builder.mutation<{ 
+      success: boolean; 
+      message?: string; 
+      html?: string;
+      caregiver?: any;
+      tokens?: any;
+      org?: any;
+      patients?: any[];
+    }, { token: string }>({
       query: ({ token }) => ({
         url: `/auth/verify-email?token=${encodeURIComponent(token)}`,
         method: "GET",
+        headers: {
+          'Accept': 'application/json',
+        },
         responseHandler: async (response) => {
-          // Backend returns HTML, so we handle it as text
-          const text = await response.text()
-          return { success: response.ok, html: text, status: response.status }
+          const contentType = response.headers.get('content-type');
+          if (contentType?.includes('application/json')) {
+            // Backend returns JSON with tokens for auto-login
+            const json = await response.json()
+            return { 
+              success: json.success || response.ok, 
+              message: json.message,
+              caregiver: json.caregiver,
+              tokens: json.tokens,
+              org: json.org,
+              patients: json.patients,
+              status: response.status 
+            }
+          } else {
+            // Backend returns HTML (fallback for direct link clicks)
+            const text = await response.text()
+            return { success: response.ok, html: text, status: response.status }
+          }
         },
         validateStatus: (response, result) => {
-          // Accept all responses (including errors) so we can parse HTML
+          // Accept all responses (including errors) so we can parse HTML or JSON
           return true
         },
       }),
