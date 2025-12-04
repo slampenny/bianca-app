@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
-import { StyleSheet, View, Pressable, ScrollView } from "react-native"
+import { StyleSheet, View, Pressable, ScrollView, Platform } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField, PasswordField, PhoneInputWeb, Screen } from "app/components"
@@ -206,11 +206,24 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
       accessibilityLabel="Register"
       preset="scroll"
       style={{ backgroundColor: colors.palette.biancaBackground, flex: 1 }}
+      KeyboardAvoidingViewProps={Platform.OS === 'web' ? { enabled: false } : undefined}
       ScrollViewProps={{
         ref: scrollRef,
         contentContainerStyle: { padding: 20 },
         testID: "register-form",
         showsVerticalScrollIndicator: true,
+        scrollEnabled: true,
+        nestedScrollEnabled: true,
+        ...(Platform.OS === 'web' && {
+          style: {
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            height: '100vh',
+            maxHeight: '100vh',
+            flex: 1,
+          } as any,
+        }),
       }}
     >
         {/* Error message block MOVED FROM HERE */}
@@ -395,18 +408,6 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           </Text>
         </View>
 
-        {/* Go Back Link */}
-        <Button 
-          testID="register-go-back"
-          accessibilityLabel={translate("registerScreen.goBack") || "Go back"}
-          style={styles.linkButton} 
-          onPress={() => navigation.goBack()}
-          preset="default"
-        >
-          <Text style={styles.linkButtonText} tx="registerScreen.goBack" />
-        </Button>
-
-
         {/* Add extra space at the bottom to ensure scrollability */}
         <View style={{ height: 100 }} />
     </Screen>
@@ -471,15 +472,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.palette.biancaHeader,
     fontSize: 20,
     fontWeight: "600",
-  },
-  linkButton: {
-    marginBottom: 40,
-    marginTop: 15,
-  },
-  linkButtonText: {
-    color: colors.palette.biancaButtonSelected,
-    fontSize: 16,
-    textAlign: "center",
   },
   registerButton: {
     marginTop: 10,

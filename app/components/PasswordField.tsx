@@ -167,9 +167,9 @@ export const PasswordField = forwardRef<TextInput, PasswordFieldProps>((props, r
 })
 
 const $eyeIconContainer: ViewStyle = {
-  padding: spacing.xs,
   justifyContent: "center",
   alignItems: "center",
+  padding: spacing.xxs,
 }
 
 const $rulesContainer: ViewStyle = {

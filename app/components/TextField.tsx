@@ -99,6 +99,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
       outlineWidth: 0,
       outlineColor: "transparent",
       boxShadow: "none",
+      width: "100%",
     },
   ]
 
@@ -123,6 +124,11 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     LeftAccessory && { paddingStart: 0 },
     RightAccessory && { paddingEnd: 0 },
     keyboardFocusStyle, // Add keyboard focus styles (web only)
+    Platform.OS === "web" && {
+      width: "100%",
+      display: "flex",
+      flexDirection: "row",
+    },
     $inputWrapperStyleOverride,
   ]
 
@@ -145,6 +151,10 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
       outlineWidth: 0,
       outlineColor: "transparent",
       boxShadow: "none",
+      minWidth: 0,
+      flex: 1,
+      flexGrow: 1,
+      flexShrink: 1,
     },
   ]
 
@@ -238,6 +248,7 @@ const $inputWrapperStyle: ViewStyle = {
   borderRadius: 6,
   paddingHorizontal: 12,
   paddingVertical: 12,
+  minHeight: 48,
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.1,
   shadowRadius: 3,
@@ -249,7 +260,7 @@ const $inputStyle: TextStyle = {
   fontFamily: typography.primary.normal,
   fontSize: 16,
   lineHeight: 20,
-  height: undefined,
+  minHeight: 24,
   marginVertical: 0,
   marginHorizontal: 0,
   paddingVertical: 0,
@@ -262,10 +273,11 @@ const $helperStyle: TextStyle = {
 }
 
 const $rightAccessoryStyle: ViewStyle = {
-  marginEnd: spacing.xs,
-  height: 40,
+  marginStart: spacing.xxs,
   justifyContent: "center",
   alignItems: "center",
+  flexShrink: 0,
+  flexGrow: 0,
 }
 
 const $leftAccessoryStyle: ViewStyle = {

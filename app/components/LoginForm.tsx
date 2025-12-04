@@ -323,37 +323,8 @@ export const LoginForm: FC<LoginFormProps> = ({
 
   const styles = createStyles(colors, compact)
 
-  return (
-    <View style={styles.container}>
-      {/* App Branding */}
-      {!compact && (
-        <View style={styles.brandingContainer}>
-          <View style={styles.iconWrapper}>
-            <Image 
-              source={require("../../assets/images/icon.png")} 
-              style={styles.appIcon}
-              resizeMode="contain"
-              accessibilityLabel="Bianca App Icon"
-              testID="app-icon"
-              // Web-specific: ensure no default styling interferes
-              {...(Platform.OS === 'web' && {
-                style: [
-                  styles.appIcon,
-                  {
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    boxShadow: 'none',
-                  }
-                ]
-              })}
-            />
-          </View>
-          <Text style={styles.appName}>{translate("loginScreen.appName") || "Bianca"}</Text>
-          <Text style={styles.appTagline}>{translate("loginScreen.tagline") || "Wellness Check Communication"}</Text>
-        </View>
-      )}
-      
+  const formContent = (
+    <>
       <TextField
         testID="email-input"
         accessibilityLabel="Email address"
@@ -391,6 +362,53 @@ export const LoginForm: FC<LoginFormProps> = ({
         disabled={false}
         showRules={false}
       />
+    </>
+  )
+
+  return (
+    <View style={styles.container}>
+      {/* App Branding */}
+      {!compact && (
+        <View style={styles.brandingContainer}>
+          <View style={styles.iconWrapper}>
+            <Image 
+              source={require("../../assets/images/icon.png")} 
+              style={styles.appIcon}
+              resizeMode="contain"
+              accessibilityLabel="Bianca App Icon"
+              testID="app-icon"
+              // Web-specific: ensure no default styling interferes
+              {...(Platform.OS === 'web' && {
+                style: [
+                  styles.appIcon,
+                  {
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    boxShadow: 'none',
+                  }
+                ]
+              })}
+            />
+          </View>
+          <Text style={styles.appName}>{translate("loginScreen.appName") || "Bianca"}</Text>
+          <Text style={styles.appTagline}>{translate("loginScreen.tagline") || "Wellness Check Communication"}</Text>
+        </View>
+      )}
+      
+      {Platform.OS === 'web' ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleLoginPress()
+          }}
+          style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+        >
+          {formContent}
+        </form>
+      ) : (
+        formContent
+      )}
       
       {/* Error message displayed above login button */}
       {errorMessage ? (

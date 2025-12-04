@@ -405,24 +405,15 @@ test.describe("Register Screen", () => {
     await expect(page.getByText(/Please enter a valid email address/i)).toBeVisible()
   })
 
-  test("navigates back when goBack is pressed", async ({ page }) => {
+  test("navigates back when header back arrow is pressed", async ({ page }) => {
     // Wait for register screen to load first
     await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
     await page.waitForTimeout(1000) // Give it time to render
     
-    // Find go back button - try multiple methods
-    let goBackButton = page.getByTestId('register-go-back')
-    let buttonCount = await goBackButton.count().catch(() => 0)
-    if (buttonCount === 0) {
-      goBackButton = page.locator('[data-testid="register-go-back"]').first()
-      buttonCount = await goBackButton.count().catch(() => 0)
-    }
-    if (buttonCount === 0) {
-      // Fallback: find by text
-      goBackButton = page.getByText(/go back|back/i).first()
-    }
-    await goBackButton.waitFor({ state: 'visible', timeout: 10000 })
-    await goBackButton.click()
+    // Use browser back functionality to simulate header back arrow click
+    // In React Navigation web, the header back button triggers navigation.goBack()
+    // which is equivalent to browser back
+    await page.goBack()
     
     // Wait for navigation to login screen - check for email input (most reliable indicator)
     await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })

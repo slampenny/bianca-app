@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
-import { Modal, View, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Text, ScrollView } from "react-native"
-import { LoginForm } from "../components/LoginForm"
+import React, { createContext, useContext, useState, useCallback, ReactNode, lazy, Suspense } from "react"
+import { Modal, View, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Text, ScrollView, ActivityIndicator } from "react-native"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "../store/authSlice"
 import { setShowAuthModalCallback, notifyAuthSuccess, notifyAuthCancelled, getInitialErrorMessage, clearInitialErrorMessage } from "../services/api/baseQueryWithAuth"
@@ -8,6 +7,9 @@ import { useTheme } from "../theme/ThemeContext"
 import type { ThemeColors } from "../types"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
+
+// Lazy load LoginForm to break circular dependency
+const LoginFormLazy = lazy(() => import("../components/LoginForm").then(module => ({ default: module.LoginForm })))
 
 interface AuthModalContextType {
   showAuthModal: () => void
@@ -132,15 +134,21 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
                 contentContainerStyle={styles.loginContainerContent}
                 showsVerticalScrollIndicator={true}
               >
-                <LoginForm
-                  onLoginSuccess={handleLoginSuccess}
-                  showRegisterButton={false}
-                  showForgotPasswordButton={false}
-                  showSSOButtons={true}
-                  compact={true}
-                  onError={showError}
-                  initialErrorMessage={initialErrorMessage}
-                />
+                <Suspense fallback={
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.palette?.biancaButtonSelected || colors.palette?.primary500} />
+                  </View>
+                }>
+                  <LoginFormLazy
+                    onLoginSuccess={handleLoginSuccess}
+                    showRegisterButton={false}
+                    showForgotPasswordButton={false}
+                    showSSOButtons={true}
+                    compact={true}
+                    onError={showError}
+                    initialErrorMessage={initialErrorMessage}
+                  />
+                </Suspense>
               </ScrollView>
             </Pressable>
           </Pressable>
@@ -207,6 +215,12 @@ const createStyles = (colors: ThemeColors) =>
       paddingBottom: 20,
       paddingTop: 10,
       minHeight: 200, // Ensure enough space for error message
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      minHeight: 200,
     },
   })
 
