@@ -4,9 +4,47 @@ export { expect }
 import { asyncStorageMockScript } from './asyncStorageMock'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
+  // Ensure we're on login screen first
+  await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 }).catch(async () => {
+    // If not on login screen, try to navigate there
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+  })
+  
   // Use data-testid for React Native Web
   if (await page.locator('input[data-testid="register-name"]').count() === 0) {
-    await page.getByTestId('register-button').click()
+    // Wait for register button to be visible - try multiple selectors
+    let registerButton = page.getByTestId('register-button')
+    let buttonCount = await registerButton.count().catch(() => 0)
+    
+    if (buttonCount === 0) {
+      // Try alternative selector
+      registerButton = page.locator('[data-testid="register-button"]').first()
+      buttonCount = await registerButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // Last resort: find by text
+      registerButton = page.getByText(/register|create account/i).first()
+      buttonCount = await registerButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      // If still not found, reload the page and try again
+      console.log('⚠️ Register button not found, reloading page...')
+      await page.reload({ waitUntil: 'networkidle' })
+      await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+      registerButton = page.getByTestId('register-button')
+      buttonCount = await registerButton.count().catch(() => 0)
+    }
+    
+    if (buttonCount === 0) {
+      throw new Error('Register button not found on page. Page might not be in login state.')
+    }
+    
+    await registerButton.waitFor({ state: 'visible', timeout: 10000 })
+    await registerButton.click()
     await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
   }
   // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)

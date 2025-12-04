@@ -169,10 +169,14 @@ test.describe('Login Modal Error Display', () => {
     // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
     const emailInput = page.locator('input[data-testid="email-input"]')
     const passwordInput = page.locator('input[data-testid="password-input"]')
-    const loginButton = page.getByTestId('login-button')
     
     await emailInput.fill('sso-unlinked@example.org')
     await passwordInput.fill('SomePassword123')
+    
+    // Find login button - try multiple possible testIDs
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(500) // Small delay to ensure button is ready
     await loginButton.click()
     
     // Wait for navigation - console shows navigation is happening

@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test'
-import { loginIfNeeded, navigateToReportsTab } from './helpers/navigation'
+import { AuthWorkflow } from './workflows/auth.workflow'
+import { navigateToReportsTab } from './helpers/navigation'
 
 test.describe('Fraud Abuse Analysis', () => {
   test.beforeEach(async ({ page }) => {
-    await loginIfNeeded(page)
+    const auth = new AuthWorkflow(page)
+    await auth.givenIAmOnTheLoginScreen()
+    const credentials = await auth.givenIHaveValidCredentials()
+    await auth.whenIEnterCredentials(credentials.email, credentials.password)
+    await auth.whenIClickLoginButton()
+    await auth.thenIShouldBeOnHomeScreen()
   })
 
   test('FraudAbuseAnalysisScreen should load without crashing', async ({ page }) => {

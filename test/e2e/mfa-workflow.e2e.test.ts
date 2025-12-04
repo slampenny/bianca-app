@@ -370,7 +370,12 @@ test.describe('MFA Workflow Tests', () => {
     
     await emailInput.fill('fake@example.org')
     await passwordInput.fill('Password1')
-    await loginButton.click()
+    
+    // Find login button - try multiple possible testIDs
+    const loginButtonToClick = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButtonToClick.waitFor({ state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(500) // Small delay to ensure button is ready
+    await loginButtonToClick.click()
     
     // Wait for either MFA verification screen or home screen
     await page.waitForTimeout(3000)

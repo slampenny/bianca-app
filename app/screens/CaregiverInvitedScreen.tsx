@@ -33,10 +33,15 @@ export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
 
   const handleContinue = () => {
     // Force invalidate caregiver cache before navigating to ensure fresh data
+    // Invalidate both LIST and all Caregiver tags to ensure complete cache refresh
     store.dispatch(
-      caregiverApi.util.invalidateTags([{ type: "Caregiver", id: "LIST" }])
+      caregiverApi.util.invalidateTags([
+        { type: "Caregiver", id: "LIST" },
+        { type: "Caregiver" }, // Invalidate all caregiver tags
+      ])
     )
     // Navigate back to the caregivers list
+    // The useFocusEffect in useSyncOrgCaregivers will trigger a refetch when screen comes into focus
     navigation.navigate("Caregivers")
   }
 

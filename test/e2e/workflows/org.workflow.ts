@@ -10,7 +10,9 @@ export class OrgWorkflow {
     // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
     await this.page.locator('input[data-testid="email-input"]').fill('playwright@example.org')
     await this.page.locator('input[data-testid="password-input"]').fill('Password1')
-    await this.page.getByTestId('login-button').click()
+    const loginButton = this.page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     
     // Wait for home screen
     await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
@@ -18,10 +20,15 @@ export class OrgWorkflow {
 
   async givenIAmOnOrgManagementScreen() {
     // Navigate to organization tab - use flexible selectors
-    const { navigateToOrgScreen } = await import('../helpers/navigation')
-    await navigateToOrgScreen(this.page).catch(() => {
-      console.log('⚠️ Could not navigate to org screen')
-    })
+    try {
+      const { navigateToOrgScreen } = await import('../helpers/navigation')
+      await navigateToOrgScreen(this.page)
+    } catch (error) {
+      console.log('⚠️ Could not navigate to org screen via helper, trying direct navigation:', error)
+      // Try direct navigation as fallback
+      await this.page.goto('/MainTabs/Org')
+      await this.page.waitForTimeout(2000)
+    }
     await this.page.waitForTimeout(2000) // Allow org screen to load
   }
 

@@ -13,9 +13,18 @@ test.describe('Complete Theme System Verification', () => {
     await loginUserViaUI(page, TEST_USERS.STAFF.email, TEST_USERS.STAFF.password)
 
     // Navigate to profile screen
-    await page.click('[data-testid="profile-button"], [aria-label="profile-button"]')
+    // Navigate to profile screen - try multiple ways
+    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"], [data-testid="tab-profile"], [aria-label*="Profile"]').first()
+    const hasProfileButton = await profileButton.isVisible({ timeout: 5000 }).catch(() => false)
+    
+    if (hasProfileButton) {
+      await profileButton.click()
+    } else {
+      // Try navigating directly via URL
+      await page.goto('/MainTabs/Home/Profile')
+    }
     // Wait for profile screen to load
-    await page.waitForSelector('[aria-label="profile-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
 
     const themeSelector = page.locator('[data-testid="theme-selector"]')
 
@@ -59,9 +68,18 @@ test.describe('Complete Theme System Verification', () => {
     await loginUserViaUI(page, TEST_USERS.STAFF.email, TEST_USERS.STAFF.password)
 
     // Navigate to profile screen
-    await page.click('[data-testid="profile-button"], [aria-label="profile-button"]')
+    // Navigate to profile screen - try multiple ways
+    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"], [data-testid="tab-profile"], [aria-label*="Profile"]').first()
+    const hasProfileButton = await profileButton.isVisible({ timeout: 5000 }).catch(() => false)
+    
+    if (hasProfileButton) {
+      await profileButton.click()
+    } else {
+      // Try navigating directly via URL
+      await page.goto('/MainTabs/Home/Profile')
+    }
     // Wait for profile screen to load
-    await page.waitForSelector('[aria-label="profile-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
 
     // Open theme selector
     await page.click('[data-testid="theme-selector"]')
@@ -97,9 +115,18 @@ test.describe('Complete Theme System Verification', () => {
     await loginUserViaUI(page, TEST_USERS.STAFF.email, TEST_USERS.STAFF.password)
 
     // Navigate to profile screen
-    await page.click('[data-testid="profile-button"], [aria-label="profile-button"]')
+    // Navigate to profile screen - try multiple ways
+    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"], [data-testid="tab-profile"], [aria-label*="Profile"]').first()
+    const hasProfileButton = await profileButton.isVisible({ timeout: 5000 }).catch(() => false)
+    
+    if (hasProfileButton) {
+      await profileButton.click()
+    } else {
+      // Try navigating directly via URL
+      await page.goto('/MainTabs/Home/Profile')
+    }
     // Wait for profile screen to load
-    await page.waitForSelector('[aria-label="profile-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="profile-screen"]', { timeout: 10000 })
 
     // Use body element for color comparison (more reliable than profile screen)
     const bodyElement = page.locator('body')

@@ -26,7 +26,7 @@ export function useSyncOrgCaregivers() {
   // Refetch on mount to ensure we have fresh data when navigating to this screen
   logger.debug("orgId:", orgId, "canReadAllCaregivers:", canReadAllCaregivers)
   const { data: caregiversData, refetch } = useGetAllCaregiversQuery(
-    { org: orgId },
+    { org: orgId, limit: 100 }, // Increase limit to ensure we get all caregivers (default might be 10)
     { 
       skip: !orgId || !canReadAllCaregivers,
       refetchOnMountOrArgChange: true, // Always refetch when component mounts or args change
@@ -48,10 +48,15 @@ export function useSyncOrgCaregivers() {
     useCallback(() => {
       if (orgId && canReadAllCaregivers && refetch) {
         logger.debug("CaregiversScreen focused - immediately refetching caregivers")
-        // Refetch immediately when screen comes into focus
-        refetch().catch((error) => {
-          logger.error("Failed to refetch caregivers on focus:", error)
-        })
+        // Small delay to ensure navigation is complete before refetching
+        const timeoutId = setTimeout(() => {
+          // Refetch immediately when screen comes into focus
+          refetch().catch((error) => {
+            logger.error("Failed to refetch caregivers on focus:", error)
+          })
+        }, 100) // Small delay to ensure navigation is complete
+        
+        return () => clearTimeout(timeoutId)
       }
     }, [orgId, canReadAllCaregivers, refetch])
   )

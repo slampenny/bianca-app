@@ -10,7 +10,9 @@ export class PatientDetailedWorkflow {
     // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
     await this.page.locator('input[data-testid="email-input"]').fill('fake@example.org')
     await this.page.locator('input[data-testid="password-input"]').fill('Password1')
-    await this.page.getByTestId('login-button').click()
+    const loginButton = this.page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     
     // Wait for home screen with patients
     await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })

@@ -129,7 +129,8 @@ test.describe('Theme Selection and Verification', () => {
     await page.waitForSelector('text=Select Theme', { timeout: 5000 })
     
     // The selected theme should be visually different (have different styling)
-    const selectedTheme = page.locator('text=Color-Blind Friendly').locator('..')
+    // Use first() to handle multiple matches
+    const selectedTheme = page.locator('text=Color-Blind Friendly').first().locator('..')
     const backgroundColor = await selectedTheme.evaluate(el => 
       window.getComputedStyle(el).backgroundColor
     )

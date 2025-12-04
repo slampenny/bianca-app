@@ -7,9 +7,11 @@ test.describe('Working Patient Detailed Management - Schedules, Conversations, A
     console.log('=== PATIENT DETAILED INTERFACE DISCOVERY ===')
     
     // GIVEN: I am a staff member logged in
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     // WHEN: I check for patients and their detailed management options
@@ -60,9 +62,11 @@ test.describe('Working Patient Detailed Management - Schedules, Conversations, A
     console.log('=== PATIENT SCHEDULE INTERFACE ===')
     
     // GIVEN: I am logged in and have access to patients
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     const patientCards = await page.locator('[data-testid^="patient-card-"]').count()
@@ -116,9 +120,11 @@ test.describe('Working Patient Detailed Management - Schedules, Conversations, A
     console.log('=== PATIENT CONVERSATION INTERFACE ===')
     
     // GIVEN: I am logged in and managing patient communications
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     const patientCards = await page.locator('[data-testid^="patient-card-"]').count()
@@ -188,9 +194,11 @@ test.describe('Working Patient Detailed Management - Schedules, Conversations, A
     console.log('=== PATIENT AVATAR MANAGEMENT ===')
     
     // GIVEN: I want to manage patient avatars
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     const patientCards = await page.locator('[data-testid^="patient-card-"]').count()
@@ -258,10 +266,12 @@ test.describe('Working Patient Detailed Management - Schedules, Conversations, A
   test('COMPLETE Workflow: Patient Detailed Management Discovery', async ({ page }) => {
     console.log('=== COMPLETE PATIENT DETAILED MANAGEMENT ===')
     
-    // GIVEN: I need comprehensive patient management capabilities - use aria-label
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    // GIVEN: I need comprehensive patient management capabilities - use data-testid
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     const patientCards = await page.locator('[data-testid^="patient-card-"]').count()

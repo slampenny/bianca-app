@@ -317,8 +317,16 @@ function CaregiverScreen() {
           logger.debug('Invite successful:', invitedCaregiver)
           
           // Invalidate caregiver list cache so the new invite appears immediately
+          // Since sendInvite is in orgApi and getAllCaregivers is in caregiverApi,
+          // we need to manually invalidate the caregiverApi cache
           store.dispatch(
             caregiverApi.util.invalidateTags([{ type: "Caregiver", id: "LIST" }])
+          )
+          
+          // Also trigger a refetch of all active queries with this tag
+          // This ensures the CaregiversScreen will refetch when it comes into focus
+          store.dispatch(
+            caregiverApi.util.invalidateTags([{ type: "Caregiver" }])
           )
           
           // Clear caregiver state and navigate to success screen

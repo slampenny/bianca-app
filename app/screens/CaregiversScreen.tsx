@@ -26,7 +26,7 @@ export function CaregiversScreen() {
   const [sendInvite, { isLoading: isResendingInvite }] = useSendInviteMutation()
   const [resendingCaregiverId, setResendingCaregiverId] = useState<string | null>(null)
 
-  useSyncOrgCaregivers()
+  const { refetch } = useSyncOrgCaregivers()
 
   // Everyone should be able to view caregivers (backend handles filtering)
   const isAuthorized = true
@@ -83,9 +83,19 @@ export function CaregiversScreen() {
       logger.debug("Invite resent successfully", { caregiverId: caregiver.id, email: caregiver.email })
       
       // Invalidate caregiver list cache to ensure UI is up to date
+      // Invalidate both LIST and all Caregiver tags to ensure complete cache refresh
       store.dispatch(
-        caregiverApi.util.invalidateTags([{ type: "Caregiver", id: "LIST" }])
+        caregiverApi.util.invalidateTags([
+          { type: "Caregiver", id: "LIST" },
+          { type: "Caregiver" }, // Invalidate all caregiver tags
+        ])
       )
+      
+      // Also trigger a manual refetch if available
+      // The useSyncOrgCaregivers hook should handle this, but we can also trigger it manually
+      if (refetch) {
+        setTimeout(() => refetch(), 100) // Small delay to ensure invalidation is processed
+      }
 
       // Navigate to the "invite sent" screen, just like the initial invite
       const invitedCaregiver = result.caregiver || caregiver

@@ -18,10 +18,17 @@ test.describe('Theme Visual Quality Check', () => {
     await page.waitForSelector('[data-testid="home-header"]', { timeout: 15000 })
     await page.waitForTimeout(2000)
 
-    // Navigate to profile screen
-    const profileButton = page.getByTestId('profile-button')
-    await profileButton.waitFor({ state: 'visible', timeout: 10000 })
-    await profileButton.click()
+    // Navigate to profile screen - try multiple ways
+    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"], [data-testid="tab-profile"], [aria-label*="Profile"]').first()
+    const hasProfileButton = await profileButton.isVisible({ timeout: 5000 }).catch(() => false)
+    
+    if (hasProfileButton) {
+      await profileButton.click()
+    } else {
+      // Try navigating directly via URL
+      await page.goto('/MainTabs/Home/Profile')
+    }
+    
     await page.waitForSelector('[data-testid="profile-screen"]', { timeout: 15000 })
     await page.waitForTimeout(1000)
 

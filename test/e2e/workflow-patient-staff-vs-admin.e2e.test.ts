@@ -8,9 +8,11 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     
     try {
       // GIVEN: I am logged in as a STAFF user (limited permissions)
-      await page.locator('[aria-label="email-input"]').fill('fake@example.org') // Staff user
-      await page.locator('[aria-label="password-input"]').fill('Password1')
-      await page.locator('[aria-label="login-button"]').click()
+      await page.locator('input[data-testid="email-input"]').fill('fake@example.org') // Staff user
+      await page.locator('input[data-testid="password-input"]').fill('Password1')
+      const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+      await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+      await loginButton.click()
       await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
       
       console.log('✅ Logged in as STAFF user (fake@example.org)')
@@ -135,9 +137,11 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     
     try {
       // GIVEN: I am logged in as an ADMIN user (full permissions)
-      await page.locator('[aria-label="email-input"]').fill('playwright@example.org') // Playwright test user (orgAdmin role)
-      await page.locator('[aria-label="password-input"]').fill('Password1')
-      await page.locator('[aria-label="login-button"]').click()
+      await page.locator('input[data-testid="email-input"]').fill('playwright@example.org') // Playwright test user (orgAdmin role)
+      await page.locator('input[data-testid="password-input"]').fill('Password1')
+      const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+      await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+      await loginButton.click()
       await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
       
       console.log('✅ Logged in as PLAYWRIGHT TEST USER (playwright@example.org, orgAdmin role)')
@@ -321,9 +325,11 @@ test.describe('Patient Management - Staff vs Admin Permissions', () => {
     console.log('=== PERMISSION ERROR HANDLING ===')
     
     // GIVEN: I want to test how the app handles permission errors
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org') // Staff user with limited permissions
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org') // Staff user with limited permissions
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     console.log('✅ Testing permission error handling with staff user')

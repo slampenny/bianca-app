@@ -7,9 +7,11 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
     console.log('=== CAREGIVER MANAGEMENT WORKFLOW ===')
     
     // GIVEN: I am an organization admin
-    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('playwright@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     // WHEN: I navigate to organization management
@@ -52,9 +54,11 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
 
   test('Workflow: View Caregivers List Journey', async ({ page }) => {
     // GIVEN: I am an admin accessing caregiver management
-    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('playwright@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     await page.locator('[data-testid="tab-org"], [aria-label*="org"], [aria-label*="organization"]').first().click()
@@ -97,9 +101,11 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
 
   test('Workflow: Invite New Caregiver Journey', async ({ page }) => {
     // GIVEN: I am an admin who wants to invite a caregiver
-    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('playwright@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     await page.locator('[data-testid="tab-org"], [aria-label*="org"], [aria-label*="organization"]').first().click()
@@ -156,9 +162,11 @@ test.describe('Working Caregiver Management Workflows - Complete CRUD Operations
     console.log('=== CAREGIVER CRUD DISCOVERY ===')
     
     // GIVEN: I am exploring all caregiver management capabilities
-    await page.locator('[aria-label="email-input"]').fill('playwright@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('playwright@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     await page.locator('[data-testid="tab-org"], [aria-label*="org"], [aria-label*="organization"]').first().click()

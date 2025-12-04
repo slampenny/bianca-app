@@ -32,12 +32,12 @@ test.describe('Core Workflows - Essential User Journeys', () => {
     // WHEN: I navigate to registration
     await auth.givenIAmOnTheRegisterScreen()
     
-    // THEN: I should see the registration form is loaded - use aria-label
-    await page.waitForSelector('[aria-label="register-name"]', { timeout: 10000 })
+    // THEN: I should see the registration form is loaded - use data-testid
+    await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
     
-    // AND: I should be able to interact with form fields - use aria-label
-    await page.locator('[aria-label="register-name"]').fill('Test User')
-    await page.locator('[aria-label="register-email"]').fill('test@example.com')
+    // AND: I should be able to interact with form fields - use data-testid
+    await page.locator('input[data-testid="register-name"]').fill('Test User')
+    await page.locator('input[data-testid="register-email"]').fill('test@example.com')
     
     // This workflow test verifies the form is functional
   })

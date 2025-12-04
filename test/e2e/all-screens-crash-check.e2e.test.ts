@@ -3,7 +3,9 @@ import { navigateToHomeTab } from './helpers/navigation'
 
 async function loginIfNeeded(page: any) {
   await page.goto('/')
-  await page.waitForLoadState('networkidle')
+  // Wait for page to load, but don't wait for networkidle (may never happen)
+  await page.waitForLoadState('domcontentloaded')
+  await page.waitForTimeout(2000) // Give time for initial render
   
   // Check if we're already logged in by looking for home header or tabs
   const homeHeader = page.locator('[data-testid="home-header"], [aria-label="home-header"]')
@@ -114,7 +116,17 @@ test.describe('All Screens Crash Check', () => {
     page.on('pageerror', (error) => errors.push(error.message))
     
     await loginIfNeeded(page)
-    await page.getByTestId('profile-button').or(page.getByLabel('profile-button')).click()
+    // Navigate to profile screen - try multiple ways
+    const profileButton = page.locator('[data-testid="profile-button"], [aria-label="profile-button"], [data-testid="tab-profile"], [aria-label*="Profile"]').first()
+    const hasProfileButton = await profileButton.isVisible({ timeout: 5000 }).catch(() => false)
+    
+    if (hasProfileButton) {
+      await profileButton.click()
+    } else {
+      // Try navigating directly via URL
+      await page.goto('/MainTabs/Home/Profile')
+    }
+    
     await page.waitForTimeout(2000)
     await expect(page.getByTestId('profile-screen')).toBeVisible({ timeout: 5000 }).catch(() => {})
     

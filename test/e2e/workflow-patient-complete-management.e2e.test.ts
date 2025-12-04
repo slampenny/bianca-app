@@ -7,9 +7,11 @@ test.describe('Complete Patient Management - Schedules, Conversations, Avatars, 
     console.log('=== PATIENT EDIT INTERFACE DISCOVERY ===')
     
     // GIVEN: I am a staff member with patients
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     const patientCards = await page.locator('[data-testid^="patient-card-"]').count()
@@ -68,9 +70,11 @@ test.describe('Complete Patient Management - Schedules, Conversations, Avatars, 
     console.log('=== PATIENT AVATAR MANAGEMENT WITH FILE UPLOAD ===')
     
     // GIVEN: I want to manage patient avatars with actual file uploads
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     const editButtons = await page.locator('[data-testid^="edit-patient-button-"]').count()
@@ -243,9 +247,11 @@ test.describe('Complete Patient Management - Schedules, Conversations, Avatars, 
     
     try {
       // GIVEN: I need to edit patient information
-      await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-      await page.locator('[aria-label="password-input"]').fill('Password1')
-      await page.locator('[aria-label="login-button"]').click()
+      await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+      await page.locator('input[data-testid="password-input"]').fill('Password1')
+      const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+      await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+      await loginButton.click()
       await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
       
       const editButtons = await page.locator('[data-testid^="edit-patient-button-"]').count()
@@ -438,9 +444,11 @@ test.describe('Complete Patient Management - Schedules, Conversations, Avatars, 
     console.log('=== PATIENT SCHEDULE MANAGEMENT ===')
     
     // GIVEN: I need to manage patient schedules
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     // WHEN: I look for schedule management interfaces
@@ -557,9 +565,11 @@ test.describe('Complete Patient Management - Schedules, Conversations, Avatars, 
     console.log('=== PATIENT CONVERSATION INTERFACE (SAFE VERSION) ===')
     
     // GIVEN: I need to check patient conversation interfaces WITHOUT calling
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     // WHEN: I check for call buttons WITHOUT clicking them
@@ -585,9 +595,11 @@ test.describe('Complete Patient Management - Schedules, Conversations, Avatars, 
     console.log('=== COMPLETE PATIENT MANAGEMENT CAPABILITIES ===')
     
     // GIVEN: I need comprehensive patient management
-    await page.locator('[aria-label="email-input"]').fill('fake@example.org')
-    await page.locator('[aria-label="password-input"]').fill('Password1')
-    await page.locator('[aria-label="login-button"]').click()
+    await page.locator('input[data-testid="email-input"]').fill('fake@example.org')
+    await page.locator('input[data-testid="password-input"]').fill('Password1')
+    const loginButton = page.locator('[data-testid="login-button"], button[type="submit"], button:has-text("Login"), button:has-text("Sign In")').first()
+    await loginButton.waitFor({ state: 'visible', timeout: 10000 })
+    await loginButton.click()
     await expect(page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     
     const patientCards = await page.locator('[data-testid^="patient-card-"]').count()
