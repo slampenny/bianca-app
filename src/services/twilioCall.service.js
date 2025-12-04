@@ -190,6 +190,12 @@ class TwilioCallService {
 
       // For human answer, connect to Asterisk SIP endpoint
       
+      // Say "Connecting you to Bianca" to make the pause less noticeable
+      twiml.say({
+        voice: 'Polly.Joanna', // Most human-sounding voice for US English
+        language: 'en-US'
+      }, "Connecting you to Bianca");
+      
       // Determine SIP endpoint based on environment
       // Use config.primaryDomain to construct SIP host (single source of truth)
       let sipHost, sipPort;

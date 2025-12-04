@@ -259,12 +259,17 @@ const addPatient = async (caregiverId, patientId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
 
-  // Add patient to caregiver's patients array
-  caregiver.patients.push(patientId);
-  await caregiver.save();
+  // Add patient to caregiver's patients array (with check to avoid duplicates)
+  if (!caregiver.patients.includes(patientId)) {
+    caregiver.patients.push(patientId);
+    await caregiver.save();
+  }
 
-  // Add caregiver to patient's caregivers array
-  patient.caregivers.push(caregiverId);
+  // Add caregiver to patient's caregivers array (with check to avoid duplicates)
+  if (!patient.caregivers.includes(caregiverId)) {
+    patient.caregivers.push(caregiverId);
+  }
+  // Update patient's org to match caregiver's org
   patient.org = caregiver.org;
   await patient.save();
 
