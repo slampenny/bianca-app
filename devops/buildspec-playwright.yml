@@ -287,7 +287,12 @@ phases:
         echo "Backend dir: $BACKEND_DIR"
         echo "Node version: $(node --version)"
         cd "$FRONTEND_DIR" || exit 1
-        CI=true yarn test:web:e2e --project=chromium || TEST_EXIT_CODE=$?
+        # Ensure CI environment doesn't add invalid --headed=false flag
+        # Playwright doesn't accept --headed=false, only --headed or omit it
+        unset PLAYWRIGHT_HEADED
+        unset HEADED
+        # Run tests with explicit headless mode via config (already set in playwright.config.ts)
+        CI=true NODE_ENV=test npx playwright test --project=chromium || TEST_EXIT_CODE=$?
         if [ -n "$TEST_EXIT_CODE" ]; then
           echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
           echo "=== Backend Logs ==="
