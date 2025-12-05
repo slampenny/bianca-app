@@ -52,13 +52,15 @@ phases:
           -p 27017:27017 \
           -e MONGO_INITDB_DATABASE=bianca-app-test \
           mongo:7.0 || echo "MongoDB container may already exist"
-        # Wait for MongoDB to be ready
-        for i in {1..30}; do
+        # Wait for MongoDB to be ready (POSIX-compliant loop)
+        i=1
+        while [ $i -le 30 ]; do
           if docker exec mongodb-test mongosh --eval "db.adminCommand('ping')" 2>/dev/null; then
             echo "MongoDB is ready!"
             break
           fi
           sleep 1
+          i=$((i + 1))
         done
       - echo "Locating source artifacts..."
       - |
@@ -160,16 +162,37 @@ phases:
       - echo "Setting up backend environment..."
       - |
         cd "$BACKEND_DIR" || exit 1
-        cat > .env << EOF
-        MONGODB_URL=$MONGODB_URL
-        NODE_ENV=test
-        JWT_SECRET=test-secret-key-for-codebuild-$(date +%s)
-        JWT_ACCESS_EXPIRATION_MINUTES=30
-        JWT_REFRESH_EXPIRATION_DAYS=30
-        OPENAI_API_KEY=sk-test-dummy-key-for-codebuild-tests
-        EOF
-        echo "Backend .env created:"
-        cat .env
+        # Secrets are loaded from AWS Secrets Manager via CodeBuild environment variables
+        # No .env file needed - backend reads directly from process.env
+        # Export environment variables for the backend process
+        export MONGODB_URL="$MONGODB_URL"
+        export NODE_ENV="test"
+        export JWT_ACCESS_EXPIRATION_MINUTES=30
+        export JWT_REFRESH_EXPIRATION_DAYS=30
+        export AWS_REGION="${AWS_REGION:-us-east-2}"
+        export AWS_SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret}"
+        # Secrets from Secrets Manager are already in environment via CodeBuild
+        # Just verify they're available
+        echo "Verifying secrets are available from environment variables:"
+        echo "STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:+SET (hidden)}"
+        echo "STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:+SET (hidden)}"
+        echo "JWT_SECRET: ${JWT_SECRET:+SET (hidden)}"
+        echo "OPENAI_API_KEY: ${OPENAI_API_KEY:+SET (hidden)}"
+        echo "MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:+SET (hidden)}"
+        echo "TWILIO_AUTHTOKEN: ${TWILIO_AUTHTOKEN:+SET (hidden)}"
+        if [ -z "$STRIPE_SECRET_KEY" ]; then
+          echo "❌ ERROR: STRIPE_SECRET_KEY is not set!"
+          exit 1
+        fi
+        if [ -z "$JWT_SECRET" ]; then
+          echo "❌ ERROR: JWT_SECRET is not set!"
+          exit 1
+        fi
+        if [ -z "$MFA_ENCRYPTION_KEY" ]; then
+          echo "❌ ERROR: MFA_ENCRYPTION_KEY is not set!"
+          exit 1
+        fi
+        echo "✅ All required secrets are available"
       - echo "Starting backend server..."
       - |
         # Ensure Node.js 20 is available
@@ -177,12 +200,30 @@ phases:
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
         cd "$BACKEND_DIR" || exit 1
+        # Export all environment variables for the backend process
+        # Secrets from Secrets Manager are already available as env vars
+        export MONGODB_URL="$MONGODB_URL"
+        export NODE_ENV="test"
+        export JWT_ACCESS_EXPIRATION_MINUTES=30
+        export JWT_REFRESH_EXPIRATION_DAYS=30
+        export AWS_REGION="${AWS_REGION:-us-east-2}"
+        export AWS_SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret}"
+        # STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, JWT_SECRET, OPENAI_API_KEY,
+        # MFA_ENCRYPTION_KEY, TWILIO_AUTHTOKEN are already in environment from CodeBuild
+        # Ensure they're explicitly exported for the backend process
+        export STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY"
+        export STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY"
+        export JWT_SECRET="$JWT_SECRET"
+        export OPENAI_API_KEY="$OPENAI_API_KEY"
+        export MFA_ENCRYPTION_KEY="$MFA_ENCRYPTION_KEY"
+        export TWILIO_AUTHTOKEN="$TWILIO_AUTHTOKEN"
         yarn dev:test > /tmp/backend.log 2>&1 &
         BACKEND_PID=$!
         echo $BACKEND_PID > /tmp/backend.pid
         echo "Backend PID: $BACKEND_PID"
-        # Wait for backend to be ready
-        for i in {1..60}; do
+        # Wait for backend to be ready (POSIX-compliant loop)
+        i=1
+        while [ $i -le 60 ]; do
           if curl -f http://localhost:3000/health 2>/dev/null; then
             echo "✅ Backend is ready!"
             break
@@ -194,6 +235,7 @@ phases:
             exit 1
           fi
           sleep 2
+          i=$((i + 1))
         done
       - echo "Seeding database..."
       - |
@@ -235,9 +277,10 @@ phases:
         FRONTEND_PID=$!
         echo $FRONTEND_PID > /tmp/frontend.pid
         echo "Frontend PID: $FRONTEND_PID"
-        # Wait for frontend to be ready with more robust checks
+        # Wait for frontend to be ready with more robust checks (POSIX-compliant loop)
         FRONTEND_READY=false
-        for i in {1..90}; do
+        i=1
+        while [ $i -le 90 ]; do
           # Check if process is still running
           if ! kill -0 $FRONTEND_PID 2>/dev/null; then
             echo "❌ Frontend process died"
@@ -263,6 +306,7 @@ phases:
             exit 1
           fi
           sleep 2
+          i=$((i + 1))
         done
         # Give frontend a bit more time to fully initialize
         if [ "$FRONTEND_READY" = "true" ]; then
@@ -287,12 +331,45 @@ phases:
         echo "Backend dir: $BACKEND_DIR"
         echo "Node version: $(node --version)"
         cd "$FRONTEND_DIR" || exit 1
+        # Debug: Check what environment variables might affect Playwright
+        echo "=== Environment Debug ==="
+        echo "All CODEBUILD_* variables:"
+        env | grep "^CODEBUILD_" || echo "No CODEBUILD vars"
+        echo "All CI-related variables:"
+        env | grep -i "ci\|headed\|playwright" || echo "No CI-related vars"
+        echo "Current working directory: $(pwd)"
+        echo "Node path: $(which node)"
+        echo "Npx path: $(which npx)"
+        echo "========================"
         # Ensure CI environment doesn't add invalid --headed=false flag
         # Playwright doesn't accept --headed=false, only --headed or omit it
+        # CodeBuild automatically sets CI=true, which might trigger some tooling
+        # Unset all possible environment variables that might add invalid flags
         unset PLAYWRIGHT_HEADED
         unset HEADED
-        # Run tests with explicit headless mode via config (already set in playwright.config.ts)
-        CI=true NODE_ENV=test npx playwright test --project=chromium || TEST_EXIT_CODE=$?
+        unset PLAYWRIGHT_BROWSERS_PATH
+        # Don't unset CI as it's needed, but ensure it doesn't add flags
+        # Explicitly set headless mode via environment (Playwright respects this)
+        export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
+        # Ensure we're using the config file's headless setting, not any env var
+        export PLAYWRIGHT_HEADLESS=1
+        # Run tests directly - ensure we're in the right directory and playwright is available
+        echo "Running Playwright tests in headless mode..."
+        echo "Current directory: $(pwd)"
+        echo "Playwright version check:"
+        npx playwright --version || echo "Playwright not found via npx"
+        # Run the test command - Playwright config already has headless: true
+        # Do NOT pass any --headed flag at all (neither true nor false)
+        # CodeBuild sets CI=true automatically, which is fine
+        echo "Executing: NODE_ENV=test npx playwright test --project=chromium --reporter=list"
+        echo "Full command that will run:"
+        echo "  NODE_ENV=test npx playwright test --project=chromium --reporter=list"
+        # Use explicit command execution to avoid any shell aliases or wrappers
+        /bin/bash -c "NODE_ENV=test npx playwright test --project=chromium --reporter=list" 2>&1 | tee /tmp/playwright-output.log || TEST_EXIT_CODE=$?
+        if [ -n "$TEST_EXIT_CODE" ]; then
+          echo "=== Full Playwright Output ==="
+          cat /tmp/playwright-output.log || true
+        fi
         if [ -n "$TEST_EXIT_CODE" ]; then
           echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
           echo "=== Backend Logs ==="
