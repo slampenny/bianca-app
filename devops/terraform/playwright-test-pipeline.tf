@@ -30,6 +30,50 @@ resource "aws_codebuild_project" "playwright_tests" {
       name  = "MONGODB_URL"
       value = "mongodb://localhost:27017/bianca-app-test"
     }
+    # AWS configuration for Secrets Manager access
+    environment_variable {
+      name  = "AWS_REGION"
+      value = "us-east-2"
+    }
+    # Use staging secret with test keys (not production live keys!)
+    environment_variable {
+      name  = "AWS_SECRET_ID"
+      value = "MySecretsManagerSecret-Staging"
+    }
+    # Load secrets from AWS Secrets Manager - using STAGING secret with TEST keys
+    # Format: secret-name:json-key:version-stage (optional)
+    # IMPORTANT: Staging uses test keys, production uses live keys
+    environment_variable {
+      name  = "JWT_SECRET"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:JWT_SECRET::"
+    }
+    environment_variable {
+      name  = "OPENAI_API_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:OPENAI_API_KEY::"
+    }
+    environment_variable {
+      name  = "STRIPE_SECRET_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:STRIPE_SECRET_KEY::"
+    }
+    environment_variable {
+      name  = "TWILIO_AUTHTOKEN"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:TWILIO_AUTHTOKEN::"
+    }
+    # Additional secrets that may be needed
+    environment_variable {
+      name  = "STRIPE_PUBLISHABLE_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:STRIPE_PUBLISHABLE_KEY::"
+    }
+    environment_variable {
+      name  = "MFA_ENCRYPTION_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:MFA_ENCRYPTION_KEY::"
+    }
   }
 
   source {

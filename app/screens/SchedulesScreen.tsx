@@ -49,6 +49,27 @@ export const SchedulesScreen = () => {
   // Track if schedule has been modified to enable/disable save button
   const [hasChanges, setHasChanges] = useState(false)
   const initialScheduleRef = useRef<Schedule | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  
+  // Validate schedule before saving
+  const isValidSchedule = (schedule: Schedule | null | undefined): boolean => {
+    if (!schedule) return false
+    
+    // Check required fields
+    if (!schedule.frequency) return false
+    if (!schedule.time || schedule.time.trim() === "") return false
+    
+    // Validate time format (HH:mm)
+    const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/
+    if (!timePattern.test(schedule.time)) return false
+    
+    // For weekly and monthly frequencies, intervals must have at least one item
+    if (schedule.frequency === "weekly" || schedule.frequency === "monthly") {
+      if (!schedule.intervals || schedule.intervals.length === 0) return false
+    }
+    
+    return true
+  }
   
   // Check if user exits without creating a schedule and create alert if needed
   // Only for new patient creations, not updates
@@ -178,22 +199,48 @@ export const SchedulesScreen = () => {
   }, [colors, currentTheme])
 
   const handleSave = async () => {
-    // Don't save if there are no changes
+    // Clear any previous error messages
+    setErrorMessage(null)
+    
+    // Don't save if there are no changes (for existing schedules)
     if (!hasChanges && selectedSchedule?.id) {
       return
     }
     
-    if (selectedSchedule && selectedSchedule.id) {
-      await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule })
-      // Reset changes after successful save
-      setHasChanges(false)
-      initialScheduleRef.current = JSON.parse(JSON.stringify(selectedSchedule))
-    } else {
-      if (selectedPatient && selectedPatient.id && selectedSchedule) {
-        await createNewSchedule({ patientId: selectedPatient.id, data: selectedSchedule })
-        // Reset changes after successful create
+    // Validate schedule before saving
+    if (!isValidSchedule(selectedSchedule)) {
+      setErrorMessage(translate("schedulesScreen.invalidScheduleError") || "Please fill in all required schedule fields (frequency, time, and days for weekly/monthly schedules).")
+      return
+    }
+    
+    try {
+      if (selectedSchedule && selectedSchedule.id) {
+        await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule }).unwrap()
+        // Reset changes after successful save
         setHasChanges(false)
+        initialScheduleRef.current = JSON.parse(JSON.stringify(selectedSchedule))
+      } else {
+        if (selectedPatient && selectedPatient.id && selectedSchedule) {
+          await createNewSchedule({ patientId: selectedPatient.id, data: selectedSchedule }).unwrap()
+          // Reset changes after successful create
+          setHasChanges(false)
+        }
       }
+    } catch (error) {
+      logger.error("Failed to save schedule:", error)
+      // Extract error message from the error object
+      let errorMsg = translate("schedulesScreen.errorSavingSchedule") || "Error saving schedule"
+      if (error && typeof error === 'object' && 'data' in error) {
+        const errorData = error.data as any
+        if (errorData?.message) {
+          errorMsg = errorData.message
+        } else if (typeof errorData === 'string') {
+          errorMsg = errorData
+        }
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMsg = (error as any).message
+      }
+      setErrorMessage(errorMsg)
     }
   }
 
@@ -225,6 +272,9 @@ export const SchedulesScreen = () => {
   const handleScheduleChange = (newSchedule: Schedule) => {
     dispatch(setSchedule(newSchedule))
     
+    // Clear error message when schedule changes
+    setErrorMessage(null)
+    
     // Check if schedule has changed from initial state
     if (initialScheduleRef.current) {
       const hasChanged = JSON.stringify(newSchedule) !== JSON.stringify(initialScheduleRef.current)
@@ -253,17 +303,19 @@ export const SchedulesScreen = () => {
   }
 
   const styles = createStyles(colors, fontScale)
+  
+  // Check if save button should be disabled
+  const isSaveDisabled = () => {
+    // For existing schedules: disable if no changes
+    if (selectedSchedule?.id) {
+      return !hasChanges
+    }
+    // For new schedules: disable if no changes OR schedule is invalid
+    return !hasChanges || !isValidSchedule(selectedSchedule)
+  }
 
   if (isUpdating || isCreating || isDeleting) {
     return <LoadingScreen /> // use the LoadingScreen component
-  }
-
-  if (isUpdatingError || isCreatingError || isDeletingError) {
-    return (
-      <View style={styles.container}>
-        <Text>{translate("schedulesScreen.errorLoadingSchedules")}</Text>
-      </View>
-    )
   }
 
   return (
@@ -331,6 +383,18 @@ export const SchedulesScreen = () => {
         }
       />
 
+      {/* Error Message */}
+      {errorMessage && (
+        <Card
+          style={styles.errorCard}
+          ContentComponent={
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          }
+        />
+      )}
+
       {/* Action Buttons */}
       <Button
         text={translate("scheduleScreen.saveSchedule")}
@@ -339,7 +403,7 @@ export const SchedulesScreen = () => {
         preset="primary"
         testID="schedule-save-button"
         accessibilityLabel="schedule-save-button"
-        disabled={!hasChanges && !!selectedSchedule?.id}
+        disabled={isSaveDisabled()}
       />
       {schedules && schedules.length > 0 && selectedSchedule && selectedSchedule.id && (
         <Button
@@ -393,6 +457,20 @@ const createStyles = (colors: ThemeColors, fontScale: number) => StyleSheet.crea
     textAlign: "center",
     lineHeight: 24 * fontScale,
     paddingHorizontal: spacing.md,
+  },
+  errorCard: {
+    marginBottom: spacing.md,
+    backgroundColor: colors.palette?.angry100 || colors.palette?.errorBackground || "#FEE2E2",
+    borderColor: colors.palette?.angry500 || colors.palette?.errorBorder || "#EF4444",
+    borderWidth: 1,
+  },
+  errorContainer: {
+    padding: spacing.md,
+  },
+  errorText: {
+    color: colors.palette?.angry700 || colors.palette?.errorText || "#B91C1C",
+    fontSize: 16 * fontScale,
+    textAlign: "center",
   },
   header: {
     marginBottom: spacing.xl,

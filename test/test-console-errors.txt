@@ -1,6 +1,1 @@
-Request Failed: GET https://js.stripe.com/clover/stripe.js - net::ERR_ABORTED
-Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_600SemiBold.ttf&platform=web&hash=85caebdc62414beb10457fdc6ca2d4c2 - net::ERR_ABORTED
-Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_300Light.ttf&platform=web&hash=7e767880def9016b433bab4d6493d899 - net::ERR_ABORTED
-Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_500Medium.ttf&platform=web&hash=d52e2a5ca7f9d70f174ac0a7095dbccf - net::ERR_ABORTED
-Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_400Regular.ttf&platform=web&hash=155c2e8af05b78017012be8ff2962731 - net::ERR_ABORTED
-Request Failed: GET http://localhost:8081/assets/?unstable_path=.%2Fnode_modules%2F%40expo-google-fonts%2Fspace-grotesk%2FSpaceGrotesk_700Bold.ttf&platform=web&hash=b6d08fb2f89a7b71dd0ca70ce941c922 - net::ERR_ABORTED
+Request Failed: GET http://localhost:8081/ - net::ERR_CONNECTION_REFUSED
