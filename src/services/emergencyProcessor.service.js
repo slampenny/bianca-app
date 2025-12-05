@@ -221,18 +221,31 @@ class EmergencyProcessor {
 
       // Send push notifications if enabled
       let notificationResult = null;
+      logger.info(`[Emergency Processor] Checking SMS notifications - enableSNSPushNotifications: ${config.enableSNSPushNotifications}`);
+      
       if (config.enableSNSPushNotifications) {
         const caregivers = await this.getPatientCaregivers(patientId);
-        notificationResult = await snsService.sendEmergencyAlert(
-          {
-            patientId,
-            patientName: patient.name || patient.preferredName || 'Unknown Patient',
-            severity: alertData.severity,
-            category: alertData.category,
-            phrase: alertData.phrase
-          },
-          caregivers
-        );
+        logger.info(`[Emergency Processor] Found ${caregivers.length} caregiver(s) with phone numbers for patient ${patientId}`);
+        
+        if (caregivers.length === 0) {
+          logger.warn(`[Emergency Processor] No caregivers with phone numbers found for patient ${patientId} - SMS will not be sent`);
+        } else {
+          logger.info(`[Emergency Processor] Sending emergency SMS alerts to ${caregivers.length} caregiver(s)`);
+          notificationResult = await snsService.sendEmergencyAlert(
+            {
+              patientId,
+              patientName: patient.name || patient.preferredName || 'Unknown Patient',
+              severity: alertData.severity,
+              category: alertData.category,
+              phrase: alertData.phrase
+            },
+            caregivers
+          );
+          logger.info(`[Emergency Processor] SMS notification result:`, notificationResult);
+        }
+      } else {
+        logger.warn(`[Emergency Processor] SMS notifications are DISABLED in config - no SMS will be sent`);
+        logger.warn(`[Emergency Processor] To enable, set NODE_ENV=staging/production or set AWS_REGION env var`);
       }
 
       return {

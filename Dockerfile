@@ -31,12 +31,15 @@ RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-de
 # Set environment variable for MongoMemoryServer
 ENV MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod
 
+# Install Yarn 1.x (Classic)
+RUN npm install -g yarn@1.22.22
+
 # Dependencies stage - this layer will be cached unless package.json changes
 FROM base AS dependencies
 COPY --chown=node:node package.json yarn.lock ./
 USER node
 RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --pure-lockfile --frozen-lockfile
+    yarn install --frozen-lockfile
 
 # Build stage - copy source and build if needed
 FROM dependencies AS build

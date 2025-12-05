@@ -1251,7 +1251,8 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "ASTERISK_RETRY_INTERVAL", value = "15000" },    # 15 seconds
         { name = "ASTERISK_MAX_RETRIES", value = "20" },          # Maximum retry attempts
         { name = "ASTERISK_HEALTH_CHECK_INTERVAL", value = "30000" },  # Health check every 30 seconds
-        { name = "ASTERISK_CONNECTION_POOL_SIZE", value = "5" }   # Connection pool size
+        { name = "ASTERISK_CONNECTION_POOL_SIZE", value = "5" },   # Connection pool size
+        { name = "AWS_SECRET_ID", value = var.secrets_manager_secret_name }  # Explicitly set secret ID for loadSecrets()
       ]
       secrets = [
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },

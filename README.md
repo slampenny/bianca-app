@@ -76,9 +76,9 @@ All technical documentation is organized in the [`docs/`](./docs/) directory:
 ### Installation
 
 ```bash
-git clone https://github.com/jordanlapp/myphonefriend-backend.git
-cd myphonefriend-backend
-npm install
+git clone https://github.com/jordanlapp/bianca-app-backend.git
+cd bianca-app-backend
+yarn install
 cp .env.example .env
 # Configure your .env file
 ```

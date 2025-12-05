@@ -64,8 +64,17 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  if (['development', 'test'].includes(config.env)) {
-    logger.error(err);
+  // Log errors in development, test, and staging (not production to avoid PHI exposure)
+  if (['development', 'test', 'staging'].includes(config.env)) {
+    logger.error('Error handled by error middleware:', {
+      statusCode: err.statusCode,
+      message: err.message,
+      stack: err.stack,
+      isOperational: err.isOperational,
+      route: req.path,
+      method: req.method,
+      ...(err.email && { email: err.email }) // Include email if present (for email-related errors)
+    });
   }
 
   res.status(statusCode).send(response);

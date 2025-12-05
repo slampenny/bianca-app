@@ -23,3 +23,7 @@ module.exports.Schedule = require('./schedule.model');
 // HIPAA Compliance
 module.exports.AuditLog = require('./auditLog.model');
 module.exports.BreachLog = require('./breachLog.model');
+
+// PIPEDA Compliance
+module.exports.PrivacyRequest = require('./privacyRequest.model');
+module.exports.ConsentRecord = require('./consentRecord.model');

@@ -6,7 +6,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-      target: dependencies  # Use dependencies stage for development
+      target: build  # Use build stage which has node_modules installed
     env_file:
       - .env
     environment:
@@ -20,10 +20,13 @@ services:
       - AWS_SECRET_ACCESS_KEY=
     volumes:
       - .:/usr/src/bianca-app
-      - /usr/src/bianca-app/node_modules  # Exclude node_modules from volume mount
+      - bianca-app-node-modules:/usr/src/bianca-app/node_modules  # Use named volume for node_modules to avoid permission issues
+      - bianca-app-yarn-cache:/usr/src/bianca-app/.yarn/cache  # Separate volume for Yarn cache
       - /home/jordanlapp/.aws:/home/node/.aws:ro  # Mount AWS config and SSO cache for SES access (node user)
     working_dir: /usr/src/bianca-app
-    command: ["yarn", "dev"]  # Use development command with hot reloading
+    # In dev mode, install dependencies first (since volume mount overrides .yarn directory)
+    # Then run dev server
+    command: ["sh", "-c", "yarn install --frozen-lockfile && yarn dev"]
     ports:
       - "9229:9229"
     cap_add:
@@ -80,3 +83,8 @@ services:
 networks: # <-- Add this whole block
   node-network:
     driver: bridge # Use the default bridge driver
+
+# Define volumes
+volumes:
+  bianca-app-node-modules:
+  bianca-app-yarn-cache:

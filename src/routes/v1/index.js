@@ -13,6 +13,7 @@ const phoneVerificationRoute = require('./phoneVerification.route');
 const patientRoute = require('./patient.route');
 const paymentRoute = require('./payment.route');
 const paymentMethodRoute = require('./paymentMethod.route');
+const privacyRoute = require('./privacy.route');
 const reportRoute = require('./report.route');
 const scheduleRoute = require('./schedule.route');
 const sentimentRoute = require('./sentiment.route');
@@ -86,6 +87,10 @@ const defaultRoutes = [
   {
     path: '/payments',
     route: paymentRoute,
+  },
+  {
+    path: '/privacy',
+    route: privacyRoute,
   },
   {
     path: '/reports',

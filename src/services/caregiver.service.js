@@ -186,35 +186,20 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
     updateBody.phone = normalizedPhone;
   }
   
-  // If this is an unverified or invited user completing their profile with a phone number, promote them appropriately
-  if ((caregiver.role === 'unverified' || caregiver.role === 'invited') && updateBody.phone) {
-    // Set phone first before changing role (to avoid validation issues)
-    caregiver.phone = updateBody.phone;
-    
-    // Also set password before changing role if it's provided (required when becoming staff)
-    if (updateBody.password) {
-      caregiver.password = updateBody.password;
-      delete updateBody.password; // Remove from updateBody to avoid duplicate assignment
-    }
-    
-    delete updateBody.phone; // Remove from updateBody to avoid duplicate assignment
-    
-    if (caregiver.role === 'invited') {
-      // Invited user - promote to staff
-      updateBody.role = 'staff';
-    } else if (caregiver.ssoProvider) {
-      // SSO user who created their own org - promote to orgAdmin
-      updateBody.role = 'orgAdmin';
-      
-      // Also update the organization's phone number if it's not set
-      const org = await Org.findById(caregiver.org);
-      if (org && !org.phone) {
-        org.phone = caregiver.phone;
-        await org.save();
-      }
-    } else {
-      // Unverified user without SSO (shouldn't happen in normal flow, but handle gracefully)
-      updateBody.role = 'staff';
+  // If this is an invited user completing registration (setting password), promote them to staff
+  // Role change happens on registration completion, not on phone verification
+  if (caregiver.role === 'invited' && updateBody.password) {
+    // Invited user completing registration - promote to staff
+    // Phone and verification status are separate concerns
+    updateBody.role = 'staff';
+  }
+  
+  // If orgAdmin or staff is updating their phone, also update the organization's phone if it's not set
+  if ((caregiver.role === 'orgAdmin' || caregiver.role === 'superAdmin') && updateBody.phone) {
+    const org = await Org.findById(caregiver.org);
+    if (org && !org.phone) {
+      org.phone = updateBody.phone;
+      await org.save();
     }
   }
   
@@ -274,12 +259,17 @@ const addPatient = async (caregiverId, patientId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
 
-  // Add patient to caregiver's patients array
-  caregiver.patients.push(patientId);
-  await caregiver.save();
+  // Add patient to caregiver's patients array (with check to avoid duplicates)
+  if (!caregiver.patients.includes(patientId)) {
+    caregiver.patients.push(patientId);
+    await caregiver.save();
+  }
 
-  // Add caregiver to patient's caregivers array
-  patient.caregivers.push(caregiverId);
+  // Add caregiver to patient's caregivers array (with check to avoid duplicates)
+  if (!patient.caregivers.includes(caregiverId)) {
+    patient.caregivers.push(caregiverId);
+  }
+  // Update patient's org to match caregiver's org
   patient.org = caregiver.org;
   await patient.save();
 

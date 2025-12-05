@@ -21,13 +21,8 @@ jest.mock('agenda', () => {
   }));
 });
 
-// Mock services that might try to connect to external APIs
-jest.mock('../../src/services/email.service', () => ({
-  sendResetPasswordEmail: jest.fn().mockResolvedValue(),
-  sendVerificationEmail: jest.fn().mockResolvedValue(),
-  isReady: jest.fn().mockReturnValue(true),
-  getStatus: jest.fn().mockReturnValue('Mocked service')
-}));
+// Don't mock email service - use real Ethereal mail for privacy tests
+// Note: Other tests may still mock it if needed, but privacy tests need real email
 
 jest.mock('../../src/services/ari.client', () => ({
   getAriClientInstance: jest.fn().mockReturnValue({

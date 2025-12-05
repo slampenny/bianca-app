@@ -4,6 +4,7 @@ const caregiverService = require('./caregiver.service');
 const Token = require('../models/token.model');
 const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
+const logger = require('../config/logger');
 /**
  * Login with caregivername and password
  * @param {string} email
@@ -93,20 +94,38 @@ const resetPassword = async (resetPasswordToken, newPassword) => {
  */
 const verifyEmail = async (verifyEmailToken) => {
   try {
+    logger.info(`[Auth Service] Verifying email with token (length: ${verifyEmailToken?.length || 0})`);
+    
     // First, try to verify the token
     const verifyEmailTokenDoc = await tokenService.verifyToken(verifyEmailToken, tokenTypes.VERIFY_EMAIL);
+    logger.info(`[Auth Service] Token verified successfully, caregiver ID: ${verifyEmailTokenDoc.caregiver}`);
+    
     const caregiver = await caregiverService.getCaregiverById(verifyEmailTokenDoc.caregiver);
     
     if (!caregiver) {
+      logger.error(`[Auth Service] Caregiver not found for ID: ${verifyEmailTokenDoc.caregiver}`);
       throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid verification token');
     }
     
+    logger.info(`[Auth Service] Caregiver found: ${caregiver.email}, already verified: ${caregiver.isEmailVerified}`);
+    
     // Check if already verified
     if (caregiver.isEmailVerified) {
+      // Still return tokens for auto-login if already verified
+      const tokens = await tokenService.generateAuthTokens(caregiver);
+      const orgService = require('./org.service');
+      const { Patient } = require('../models');
+      const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
+      const patients = await Patient.find({ caregivers: caregiver.id });
+      
       return {
         success: true,
         alreadyVerified: true,
-        message: 'Your email is already verified. You can proceed to login.'
+        message: 'Your email is already verified. You can proceed to login.',
+        caregiver,
+        tokens,
+        org,
+        patients
       };
     }
     
@@ -116,14 +135,35 @@ const verifyEmail = async (verifyEmailToken) => {
     // Mark email as verified
     await caregiverService.updateCaregiverById(caregiver.id, { isEmailVerified: true });
     
+    // Generate auth tokens for automatic login after verification
+    const tokens = await tokenService.generateAuthTokens(caregiver);
+    
+    // Fetch org and patients for the response
+    const orgService = require('./org.service');
+    const { Patient } = require('../models');
+    const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
+    const patients = await Patient.find({ caregivers: caregiver.id });
+    
     return {
       success: true,
       alreadyVerified: false,
-      message: 'Email verified successfully'
+      message: 'Email verified successfully',
+      caregiver,
+      tokens,
+      org,
+      patients
     };
   } catch (error) {
+    logger.error(`[Auth Service] Error in verifyEmail:`, {
+      message: error.message,
+      stack: error.stack,
+      isApiError: error instanceof ApiError,
+      statusCode: error.statusCode
+    });
+    
     // If it's an ApiError, check if it's a token verification error
     if (error instanceof ApiError) {
+      logger.info(`[Auth Service] ApiError caught, checking if account might already be verified`);
       // Check if the token might be invalid/expired, but account might already be verified
       // Try to find the caregiver by attempting to decode the token
       try {
@@ -131,9 +171,11 @@ const verifyEmail = async (verifyEmailToken) => {
         const config = require('../config/config');
         const decoded = jwt.verify(verifyEmailToken, config.jwt.secret);
         
+        logger.info(`[Auth Service] Token decoded successfully, checking caregiver status`);
         if (decoded.type === tokenTypes.VERIFY_EMAIL && decoded.sub) {
           const caregiver = await caregiverService.getCaregiverById(decoded.sub);
           if (caregiver && caregiver.isEmailVerified) {
+            logger.info(`[Auth Service] Account already verified, returning success`);
             return {
               success: true,
               alreadyVerified: true,
@@ -142,6 +184,7 @@ const verifyEmail = async (verifyEmailToken) => {
           }
         }
       } catch (decodeError) {
+        logger.warn(`[Auth Service] Could not decode token: ${decodeError.message}`);
         // Token is invalid, can't decode it
       }
       
@@ -150,6 +193,7 @@ const verifyEmail = async (verifyEmailToken) => {
     }
     
     // For other errors, throw a generic error
+    logger.error(`[Auth Service] Non-ApiError caught, throwing generic error`);
     throw new ApiError(httpStatus.UNAUTHORIZED, error.message || 'Email verification failed');
   }
 };
