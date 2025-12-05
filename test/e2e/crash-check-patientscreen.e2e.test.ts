@@ -53,7 +53,6 @@ test('PatientScreen should load without crashing', async ({ page }) => {
   
   // Navigate to home tab (might already be there, but ensure we're on it)
   const homeTab = page.locator('[data-testid="tab-home"]').first()
-  }
   
   await page.waitForTimeout(2000)
   
