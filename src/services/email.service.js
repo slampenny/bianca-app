@@ -52,11 +52,13 @@ async function doInitialization() {
   try {
     // Check if SES should be used in development (via environment variable)
     const useSESInDev = process.env.USE_SES_IN_DEV === 'true' || process.env.USE_SES_IN_DEV === '1';
+    // Check if Ethereal should be forced (for test pipelines)
+    const forceEtherealEnv = process.env.FORCE_ETHEREAL === 'true' || process.env.FORCE_ETHEREAL === '1';
     // In test mode, always use Ethereal (skip SES attempt)
-    // In production/staging, always use SES
+    // In production/staging, always use SES (unless FORCE_ETHEREAL is set)
     // In development, use SES if USE_SES_IN_DEV is set, otherwise Ethereal
-    // If forceEthereal is true, skip SES and use Ethereal
-    const shouldUseSES = !forceEthereal && ((config.env === 'production' || config.env === 'staging') || (config.env === 'development' && useSESInDev));
+    // If forceEthereal flag or FORCE_ETHEREAL env var is true, skip SES and use Ethereal
+    const shouldUseSES = !forceEthereal && !forceEtherealEnv && ((config.env === 'production' || config.env === 'staging') || (config.env === 'development' && useSESInDev));
     
     let sesInitialized = false;
     
