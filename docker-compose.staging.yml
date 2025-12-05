@@ -8,7 +8,7 @@ services:
     environment:
       - NODE_ENV=staging
       - AWS_REGION=us-east-2
-      - AWS_SECRET_ID=MySecretsManagerSecret
+      - AWS_SECRET_ID=MySecretsManagerSecret-Staging  # Use staging secret with test keys
       # Base URLs for staging
       - API_BASE_URL=https://staging-api.biancawellness.com
       - FRONTEND_URL=https://staging.biancawellness.com

@@ -1741,6 +1741,27 @@ resource "aws_iam_role_policy_attachment" "codebuild_s3_artifact_attach" {
   policy_arn = aws_iam_policy.codebuild_s3_artifact_policy.arn
 }
 
+resource "aws_iam_policy" "codebuild_secrets_manager_policy" {
+  name        = "CodeBuildSecretsManagerPolicy"
+  description = "Allow CodeBuild to read secrets from AWS Secrets Manager (production and staging)"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect   = "Allow",
+      Action   = "secretsmanager:GetSecretValue",
+      Resource = [
+        "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
+        "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-Staging-*"
+      ]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codebuild_secrets_manager_attach" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = aws_iam_policy.codebuild_secrets_manager_policy.arn
+}
+
 resource "aws_iam_role" "codepipeline_role" {
   name = var.codepipeline_role_name
   assume_role_policy = jsonencode({
