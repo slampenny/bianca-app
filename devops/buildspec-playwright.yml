@@ -365,11 +365,12 @@ phases:
         echo "Full command that will run:"
         echo "  NODE_ENV=test npx playwright test --project=chromium --reporter=list"
         # Use explicit command execution to avoid any shell aliases or wrappers
-        # Capture exit code properly even with tee
+        # Capture exit code properly even with tee - use PIPESTATUS for bash
         set +e  # Don't exit on error, we'll handle it
         NODE_ENV=test npx playwright test --project=chromium --reporter=list 2>&1 | tee /tmp/playwright-output.log
         TEST_EXIT_CODE=${PIPESTATUS[0]}  # Get exit code of playwright, not tee
         set -e  # Re-enable exit on error
+        echo "Playwright exit code: $TEST_EXIT_CODE"
         if [ "$TEST_EXIT_CODE" -ne 0 ]; then
           echo "=== Full Playwright Output ==="
           cat /tmp/playwright-output.log || true
