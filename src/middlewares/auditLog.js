@@ -141,7 +141,7 @@ const auditMiddleware = async (req, res, next) => {
       const auditData = {
         timestamp: new Date(),
         userId: req.caregiver?._id || req.caregiver?.id || new mongoose.Types.ObjectId(),
-        userRole: req.caregiver?.role || 'unverified',
+        userRole: req.caregiver?.role || 'staff',
         action: auditConfig.action,
         resource: auditConfig.resource,
         resourceId: resourceId.toString(),
@@ -239,7 +239,7 @@ const auditAuthFailure = async (email, ipAddress, userAgent, errorMessage) => {
     await AuditLog.createLog({
       timestamp: new Date(),
       userId: systemUserId, // Use ObjectId for system
-      userRole: 'unverified', // Failed logins are from unverified users
+      userRole: null, // Failed logins don't have a user role
       userEmail: email, // Will be hashed by pre-save hook
       action: 'LOGIN_FAILED',
       resource: 'session',

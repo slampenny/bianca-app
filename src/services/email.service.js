@@ -25,6 +25,7 @@ let transport;
 let etherealTestAccount = null; // To store Ethereal account details if used
 let isInitialized = false;
 let initializationPromise = null; // To prevent multiple concurrent initializations
+let forceEthereal = false; // Flag to force Ethereal even if SES is available
 
 /**
  * Initializes the email transport.
@@ -51,10 +52,13 @@ async function doInitialization() {
   try {
     // Check if SES should be used in development (via environment variable)
     const useSESInDev = process.env.USE_SES_IN_DEV === 'true' || process.env.USE_SES_IN_DEV === '1';
+    // Check if Ethereal should be forced (for test pipelines)
+    const forceEtherealEnv = process.env.FORCE_ETHEREAL === 'true' || process.env.FORCE_ETHEREAL === '1';
     // In test mode, always use Ethereal (skip SES attempt)
-    // In production/staging, always use SES
+    // In production/staging, always use SES (unless FORCE_ETHEREAL is set)
     // In development, use SES if USE_SES_IN_DEV is set, otherwise Ethereal
-    const shouldUseSES = (config.env === 'production' || config.env === 'staging') || (config.env === 'development' && useSESInDev);
+    // If forceEthereal flag or FORCE_ETHEREAL env var is true, skip SES and use Ethereal
+    const shouldUseSES = !forceEthereal && !forceEtherealEnv && ((config.env === 'production' || config.env === 'staging') || (config.env === 'development' && useSESInDev));
     
     let sesInitialized = false;
     
@@ -219,9 +223,10 @@ process.on('exit', () => {
  * @param {string} subject
  * @param {string} text
  * @param {string} [html] - Optional HTML content
+ * @param {Array} [attachments] - Optional attachments array
  * @returns {Promise<import('nodemailer/lib/smtp-transport').SentMessageInfo | object>}
  */
-const sendEmail = async (to, subject, text, html) => {
+const sendEmail = async (to, subject, text, html, attachments = null) => {
   try {
     // Ensure transport is initialized
     if (!isInitialized || !transport) {
@@ -249,8 +254,12 @@ const sendEmail = async (to, subject, text, html) => {
     if (html) {
       mailOptions.html = html;
     }
+    
+    if (attachments) {
+      mailOptions.attachments = attachments;
+    }
 
-    logger.info(`Sending email to ${to} with subject: ${subject}`);
+    logger.info(`Sending email to ${to} with subject: ${subject}${attachments ? ` (with ${attachments.length} attachment(s))` : ''}`);
     
     // Retry logic for sending emails (handles transient connection issues)
     let retries = 3;
@@ -316,21 +325,48 @@ const sendEmail = async (to, subject, text, html) => {
           }
         } else {
           // Not retryable or out of retries
+          logger.warn(`[Email Service] Email send failed (not retryable or out of retries): ${error.message}`, {
+            errorMessage: error.message,
+            errorName: error.name,
+            errorCode: error.code,
+            retriesRemaining: retries,
+            isRetryable,
+            to,
+            subject
+          });
           break;
         }
       }
     }
     
     // If we get here, all retries failed
+    logger.error(`[Email Service] All retry attempts exhausted for email to ${to}`, {
+      errorMessage: lastError?.message,
+      errorName: lastError?.name,
+      errorCode: lastError?.code,
+      totalRetries: 3,
+      to,
+      subject
+    });
     throw lastError;
     
   } catch (error) {
-    logger.error(`Failed to send email to ${to}: ${error.message}`, {
-      error: error.message,
+    // Log comprehensive error details for debugging
+    logger.error(`[Email Service] Failed to send email to ${to}`, {
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
       stack: error.stack,
       to,
       subject,
-      awsErrorCode: error.name
+      senderAddress: config.email.from,
+      awsErrorCode: error.name, // AWS SDK errors have a 'name' property
+      awsRequestId: error.$metadata?.requestId, // AWS SDK v3 request ID
+      awsStatusCode: error.$metadata?.httpStatusCode, // AWS SDK v3 status code
+      awsRetryAttempts: error.$metadata?.attempts, // Number of retry attempts
+      isInitialized,
+      hasTransport: !!transport,
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)) // Include all error properties
     });
     throw error;
   }
@@ -464,6 +500,7 @@ const sendVerificationEmail = async (to, token, caregiverName = null, locale = '
   // Always use frontend URL - frontend will handle routing to backend
   // This ensures the verification page appears in the frontend app
   const verificationLink = `${config.frontendUrl}/auth/verify-email?token=${token}`;
+  logger.info(`[Email Service] Generated verification link - frontendUrl: ${config.frontendUrl}, link: ${verificationLink.substring(0, 100)}...`);
   
   // Use caregiver name if provided, otherwise use generic greeting
   const greeting = caregiverName ? `Dear ${caregiverName},` : 'Dear caregiver,';
@@ -501,12 +538,116 @@ const sendVerificationEmail = async (to, token, caregiverName = null, locale = '
     </div>
   `;
   
-  await sendEmail(to, subject, text, html);
+  try {
+    await sendEmail(to, subject, text, html);
+    logger.info(`[Email Service] Verification email successfully queued for ${to} (locale: ${locale})`);
+    logger.info(`[Email Service] Verification link: ${verificationLink}`);
+  } catch (error) {
+    // Log comprehensive error details for debugging
+    logger.error(`[Email Service] Failed to send verification email to ${to}`, {
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
+      stack: error.stack,
+      to,
+      locale,
+      verificationLink,
+      awsErrorCode: error.name, // AWS SDK errors have a 'name' property (e.g., 'InvalidParameterValueException')
+      awsRequestId: error.$metadata?.requestId, // AWS SDK v3 request ID
+      awsStatusCode: error.$metadata?.httpStatusCode, // AWS SDK v3 status code
+      awsRetryAttempts: error.$metadata?.attempts, // Number of retry attempts
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)) // Include all error properties
+    });
+    throw error; // Re-throw to let caller handle
+  }
   
   // Restore previous locale
   i18n.setLocale(previousLocale);
+};
+
+/**
+ * Send privacy data export email with JSON attachment
+ * @param {string} to
+ * @param {string} name
+ * @param {string} jsonData - JSON string of user data
+ * @param {string} requestId
+ * @param {string} [locale='en'] - User's preferred language
+ * @returns {Promise}
+ */
+const sendPrivacyDataEmail = async (to, name, jsonData, requestId, locale = 'en') => {
+  // Set locale for this email
+  const previousLocale = i18n.getLocale();
+  i18n.setLocale(locale);
   
-  logger.info(`Verification email successfully queued for ${to} (locale: ${locale})`);
+  const subject = 'Bianca Wellness - Your Personal Data Export';
+  
+  const text = `Dear ${name || 'Caregiver'},
+
+Your request for access to your personal information has been processed.
+
+Attached to this email is a complete export of all your personal data stored in the Bianca Wellness platform, including:
+- Your profile information
+- Associated patients
+- Conversation history
+- Medical analysis data
+- Consent history
+
+Request ID: ${requestId}
+Date: ${new Date().toISOString()}
+
+This data is provided in JSON format. You can open it with any text editor or JSON viewer.
+
+If you have any questions about this data or need assistance, please contact us at privacy@biancawellness.com.
+
+Best regards,
+The Bianca Wellness Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #2c3e50; margin-top: 0;">Your Personal Data Export</h2>
+        <p style="color: #555; line-height: 1.6;">Dear ${name || 'Caregiver'},</p>
+        <p style="color: #555; line-height: 1.6;">Your request for access to your personal information has been processed.</p>
+        <p style="color: #555; line-height: 1.6;">Attached to this email is a complete export of all your personal data stored in the Bianca Wellness platform, including:</p>
+        <ul style="color: #555; line-height: 1.8;">
+          <li>Your profile information</li>
+          <li>Associated patients</li>
+          <li>Conversation history</li>
+          <li>Medical analysis data</li>
+          <li>Consent history</li>
+        </ul>
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <p style="color: #777; font-size: 14px; margin: 5px 0;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="color: #777; font-size: 14px; margin: 5px 0;"><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+        <p style="color: #555; line-height: 1.6;">This data is provided in JSON format. You can open it with any text editor or JSON viewer.</p>
+        <p style="color: #555; line-height: 1.6;">If you have any questions about this data or need assistance, please contact us at <a href="mailto:privacy@biancawellness.com">privacy@biancawellness.com</a>.</p>
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">Best regards,<br>The Bianca Wellness Team</p>
+        <hr style="border: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">Bianca Wellness - Secure Healthcare Communication</p>
+      </div>
+    </div>
+  `;
+  
+  // Create attachment
+  const attachments = [
+    {
+      filename: `bianca-wellness-data-export-${requestId}.json`,
+      content: jsonData,
+      contentType: 'application/json'
+    }
+  ];
+  
+  try {
+    await sendEmail(to, subject, text, html, attachments);
+    logger.info(`[Email Service] Privacy data email sent to ${to} (locale: ${locale})`);
+  } catch (error) {
+    logger.error(`[Email Service] Failed to send privacy data email to ${to}:`, error);
+    throw error;
+  }
+  
+  // Restore previous locale
+  i18n.setLocale(previousLocale);
 };
 
 /**
@@ -541,6 +682,26 @@ const isReady = () => {
   return isInitialized && !!transport;
 };
 
+/**
+ * Force reinitialize with Ethereal (for test routes)
+ * This resets the initialization state and forces Ethereal to be used
+ */
+const forceEtherealInitialization = async () => {
+  logger.info('Forcing Ethereal initialization for test routes...');
+  // Reset initialization state
+  isInitialized = false;
+  transport = null;
+  etherealTestAccount = null;
+  initializationPromise = null;
+  forceEthereal = true;
+  
+  // Reinitialize with Ethereal
+  await initializeEmailTransport();
+  
+  // Reset the flag after initialization
+  forceEthereal = false;
+};
+
 // Export functions
 module.exports = {
   initializeEmailTransport, // Call this at application startup
@@ -548,6 +709,8 @@ module.exports = {
   sendInviteEmail,
   sendResetPasswordEmail,
   sendVerificationEmail,
+  sendPrivacyDataEmail,
   getStatus,
-  isReady
+  isReady,
+  forceEtherealInitialization
 };

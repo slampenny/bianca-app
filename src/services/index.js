@@ -64,3 +64,6 @@ module.exports.cacheService = require('./cache.service');
 // HIPAA Compliance Services
 module.exports.mfaService = require('./mfa.service');
 module.exports.breachDetectionService = require('./breachDetection.service');
+
+// PIPEDA Compliance Services
+module.exports.privacyService = require('./privacy.service');

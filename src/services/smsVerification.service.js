@@ -245,8 +245,9 @@ class SMSVerificationService {
    */
   isVerificationRequired(role) {
     // All caregivers and admins need phone verification (they receive emergency alerts)
+    // Invited users don't need verification until they accept the invite
     // Patients don't create accounts, so this applies to all account creators
-    return role !== 'unverified' && role !== 'invited';
+    return role !== 'invited';
   }
 }
 

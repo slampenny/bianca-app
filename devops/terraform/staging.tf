@@ -272,6 +272,7 @@ resource "aws_launch_template" "staging" {
     region         = var.aws_region
     aws_account_id = var.aws_account_id
     environment    = "staging"
+    eip_address    = aws_eip.staging.public_ip
   }))
 
   # Force recreation when userdata changes
@@ -284,6 +285,15 @@ resource "aws_launch_template" "staging" {
       Environment = "staging"
       AutoStop    = "true"
     }
+  }
+}
+
+# Elastic IP for staging instance (prevents IP changes on restart, same as production)
+resource "aws_eip" "staging" {
+  domain = "vpc"
+  tags = {
+    Name        = "bianca-staging-eip"
+    Environment = "staging"
   }
 }
 
@@ -319,6 +329,12 @@ resource "aws_instance" "staging" {
   lifecycle {
     ignore_changes = [user_data]
   }
+}
+
+# Associate Elastic IP with staging instance
+resource "aws_eip_association" "staging" {
+  instance_id   = aws_instance.staging.id
+  allocation_id = aws_eip.staging.id
 }
 
 # EBS Volume for MongoDB data persistence
@@ -482,7 +498,7 @@ resource "aws_route53_record" "staging_sip" {
   name    = "staging-sip.myphonefriend.com"
   type    = "A"
   ttl     = 60
-  records = [aws_instance.staging.public_ip]
+  records = [aws_eip.staging.public_ip]
 }
 
 # Route 53 for staging frontend
@@ -516,7 +532,7 @@ resource "aws_route53_record" "staging_sip_primary" {
   name    = "staging-sip.${var.primary_domain}"
   type    = "A"
   ttl     = 60
-  records = [aws_instance.staging.public_ip]
+  records = [aws_eip.staging.public_ip]
 }
 
 resource "aws_route53_record" "staging_frontend_primary" {
