@@ -228,13 +228,37 @@ if (envVars.NODE_ENV === 'staging') {
 // Add method to load secrets from AWS Secrets Manager (if used)
 baselineConfig.loadSecrets = async () => {
   // Skip in development and test, but load for staging and production
-  if (baselineConfig.env === 'development' || baselineConfig.env === 'test') {
+  // Exception: In test mode, if secrets are already in process.env (from CI/CD), use them
+  if (baselineConfig.env === 'development' || (baselineConfig.env === 'test' && !process.env.STRIPE_SECRET_KEY)) {
     logger.info('Skipping AWS Secrets Manager in development/test environment.');
     logger.info('Using Stripe keys from .env file for localhost/dev.');
     return baselineConfig;
   }
+  
+  // In test mode with secrets in env vars (from CodeBuild), just apply them
+  if (baselineConfig.env === 'test' && process.env.STRIPE_SECRET_KEY) {
+    logger.info('Test environment with secrets from environment variables (CI/CD).');
+    logger.info('Applying secrets from environment variables.');
+    // Apply secrets that are already in process.env
+    const secrets = {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
+      JWT_SECRET: process.env.JWT_SECRET,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      MFA_ENCRYPTION_KEY: process.env.MFA_ENCRYPTION_KEY,
+      TWILIO_AUTHTOKEN: process.env.TWILIO_AUTHTOKEN,
+    };
+    applyAllSecrets(baselineConfig, secrets);
+    // MFA_ENCRYPTION_KEY needs to be set in process.env for the MFA service
+    if (secrets.MFA_ENCRYPTION_KEY) {
+      process.env.MFA_ENCRYPTION_KEY = secrets.MFA_ENCRYPTION_KEY;
+    }
+    return baselineConfig;
+  }
 
-  // Use the same production secrets for staging (real API keys, etc.)
+  // Use environment-specific secrets
+  // Staging should use test keys, production uses live keys
+  // Default to production secret for backwards compatibility
   const secretId = process.env.AWS_SECRET_ID || 'MySecretsManagerSecret';
   const region = process.env.AWS_REGION || 'us-east-2'; // Use env var for region
 
