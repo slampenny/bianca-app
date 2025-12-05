@@ -208,6 +208,8 @@ phases:
         export JWT_REFRESH_EXPIRATION_DAYS=30
         export AWS_REGION="${AWS_REGION:-us-east-2}"
         export AWS_SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret}"
+        # Force Ethereal Mail for test pipeline (don't use real SES - staging uses real email)
+        export FORCE_ETHEREAL="true"
         # STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, JWT_SECRET, OPENAI_API_KEY,
         # MFA_ENCRYPTION_KEY, TWILIO_AUTHTOKEN are already in environment from CodeBuild
         # Ensure they're explicitly exported for the backend process
