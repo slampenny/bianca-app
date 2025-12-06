@@ -1,6 +1,6 @@
 // seedDatabase.js - Refactored version using modular seeders
 const mongoose = require('mongoose');
-const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
+const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice, EmergencyPhrase } = require('../models');
 const config = require('../config/config');
 
 // Import seeders
@@ -29,7 +29,7 @@ async function clearDatabase() {
   await Schedule.deleteMany({});
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
-  // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
+  await EmergencyPhrase.deleteMany({}); // Clear emergency phrases so they can be re-seeded
   console.log('Database cleared');
 }
 
