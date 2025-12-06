@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, lazy, Suspense } from "react"
-import { Modal, View, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Text, ScrollView, ActivityIndicator } from "react-native"
+import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
+import { Modal, View, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Text, ScrollView } from "react-native"
 import { useSelector } from "react-redux"
 import { isAuthenticated } from "../store/authSlice"
 import { setShowAuthModalCallback, notifyAuthSuccess, notifyAuthCancelled, getInitialErrorMessage, clearInitialErrorMessage } from "../services/api/baseQueryWithAuth"
@@ -7,14 +7,7 @@ import { useTheme } from "../theme/ThemeContext"
 import type { ThemeColors } from "../types"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
-
-// Lazy load LoginForm to break circular dependency
-const loginFormImport = () => import("../components/LoginForm").then(module => ({ default: module.LoginForm }))
-const LoginFormLazy = lazy(loginFormImport)
-
-// Preload the LoginForm component - start loading it immediately
-// This ensures it's ready when the modal opens, eliminating the loading delay
-loginFormImport()
+import { LoginForm } from "../components/LoginForm"
 
 interface AuthModalContextType {
   showAuthModal: () => void
@@ -46,13 +39,6 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   // Use refs to track previous state and prevent unwanted modal closures
   const wasAuthenticatedRef = React.useRef(isAuthenticatedUser)
   const modalWasExplicitlyOpenedRef = React.useRef(false)
-
-  // Preload LoginForm when provider mounts to reduce loading time when modal opens
-  React.useEffect(() => {
-    loginFormImport().catch(() => {
-      // Silently fail - component will load when needed
-    })
-  }, [])
 
   const showAuthModal = useCallback((errorMessage?: string) => {
     // Prevent opening multiple modals - if already visible, don't open again
@@ -160,29 +146,15 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
                 contentContainerStyle={styles.loginContainerContent}
                 showsVerticalScrollIndicator={true}
               >
-                <Suspense fallback={
-                  <View style={styles.loadingContainer}>
-                    {/* Show a skeleton of the form while loading for better UX */}
-                    <View style={styles.skeletonInput} />
-                    <View style={styles.skeletonInput} />
-                    <View style={styles.skeletonButton} />
-                    <ActivityIndicator 
-                      size="small" 
-                      color={colors.palette?.biancaButtonSelected || colors.palette?.primary500}
-                      style={styles.skeletonSpinner}
-                    />
-                  </View>
-                }>
-                  <LoginFormLazy
-                    onLoginSuccess={handleLoginSuccess}
-                    showRegisterButton={false}
-                    showForgotPasswordButton={false}
-                    showSSOButtons={true}
-                    compact={true}
-                    onError={showError}
-                    initialErrorMessage={initialErrorMessage}
-                  />
-                </Suspense>
+                <LoginForm
+                  onLoginSuccess={handleLoginSuccess}
+                  showRegisterButton={false}
+                  showForgotPasswordButton={false}
+                  showSSOButtons={true}
+                  compact={true}
+                  onError={showError}
+                  initialErrorMessage={initialErrorMessage}
+                />
               </ScrollView>
             </Pressable>
           </Pressable>
@@ -249,12 +221,6 @@ const createStyles = (colors: ThemeColors) =>
       paddingBottom: 20,
       paddingTop: 10,
       minHeight: 200, // Ensure enough space for error message
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      minHeight: 200,
     },
   })
 
