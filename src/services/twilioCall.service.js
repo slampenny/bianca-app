@@ -191,8 +191,9 @@ class TwilioCallService {
       // For human answer, connect to Asterisk SIP endpoint
       
       // Say "Connecting you to Bianca" to make the pause less noticeable
+      // This greeting plays before connecting to the SIP endpoint
       twiml.say({
-        voice: 'Polly.Joanna', // Most human-sounding voice for US English
+        voice: 'alice', // Standard Twilio voice that's always available
         language: 'en-US'
       }, "Connecting you to Bianca");
       
