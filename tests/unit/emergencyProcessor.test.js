@@ -282,4 +282,60 @@ describe('Emergency Processor', () => {
       expect(status.deduplicatorStats).toBeDefined();
     });
   });
+
+  describe('fallback to basic detector', () => {
+    test('should fallback to basic detector when no phrases are loaded in database', async () => {
+      // Clear all emergency phrases to simulate empty database
+      const { EmergencyPhrase } = require('../../src/models');
+      await EmergencyPhrase.deleteMany({});
+      
+      // Clear the cache to force reload
+      const { localizedEmergencyDetector } = require('../../src/services/localizedEmergencyDetector.service');
+      localizedEmergencyDetector.clearCache();
+      await localizedEmergencyDetector.loadPhrases();
+      
+      // Verify cache is empty
+      const phrases = localizedEmergencyDetector.phraseCache.get('en') || [];
+      expect(phrases.length).toBe(0);
+      
+      // Process utterance - should fallback to basic detector
+      const result = await processor.processUtterance(
+        mockPatient._id.toString(), 
+        "I'm having a heart attack"
+      );
+      
+      // Should still detect emergency via fallback
+      expect(result.shouldAlert).toBe(true);
+      expect(result.alertData).toBeDefined();
+      expect(result.alertData.severity).toBe('CRITICAL');
+      expect(result.alertData.category).toBe('Medical');
+      expect(result.alertData.phrase).toBe('heart attack');
+      expect(result.reason).toContain('Emergency detected');
+    });
+
+    test('should fallback to basic detector for different languages when no phrases exist', async () => {
+      // Clear all emergency phrases
+      const { EmergencyPhrase } = require('../../src/models');
+      await EmergencyPhrase.deleteMany({});
+      
+      // Clear cache
+      const { localizedEmergencyDetector } = require('../../src/services/localizedEmergencyDetector.service');
+      localizedEmergencyDetector.clearCache();
+      await localizedEmergencyDetector.loadPhrases();
+      
+      // Update patient to have Spanish language
+      const { Patient } = require('../../src/models');
+      await Patient.findByIdAndUpdate(mockPatient._id, { preferredLanguage: 'es' });
+      
+      // Process utterance in Spanish - should fallback to basic detector
+      const result = await processor.processUtterance(
+        mockPatient._id.toString(), 
+        "I'm having a heart attack"
+      );
+      
+      // Should still detect emergency via fallback (basic detector works for any language)
+      expect(result.shouldAlert).toBe(true);
+      expect(result.alertData.severity).toBe('CRITICAL');
+    });
+  });
 });

@@ -87,16 +87,23 @@ class LocalizedEmergencyDetector {
       }
 
       // Get phrases for the specified language from cache
-      const phrases = this.phraseCache.get(language) || [];
+      let phrases = this.phraseCache.get(language) || [];
+      
+      // If cache is empty, try to load from database
+      if (phrases.length === 0 && this.isCacheValid()) {
+        logger.warn(`[Localized Emergency Detector] No phrases in cache for language: ${language}, attempting to load from database`);
+        phrases = await this.getPhrasesForLanguage(language);
+      }
       
       if (phrases.length === 0) {
-        logger.warn(`No emergency phrases found for language: ${language}`);
+        logger.warn(`[Localized Emergency Detector] ⚠️  No emergency phrases found for language: ${language}. Emergency detection will fallback to basic detector.`);
         return { 
           isEmergency: false, 
           severity: null, 
           matchedPhrase: null, 
           category: null,
-          language: language
+          language: language,
+          fallbackNeeded: true // Signal that fallback is needed
         };
       }
 
@@ -351,6 +358,11 @@ class LocalizedEmergencyDetector {
 
 // Create singleton instance
 const localizedEmergencyDetector = new LocalizedEmergencyDetector();
+
+// Initialize on module load (async, but won't block)
+localizedEmergencyDetector.initialize().catch((error) => {
+  logger.error('[Localized Emergency Detector] Failed to initialize on startup:', error);
+});
 
 module.exports = {
   LocalizedEmergencyDetector,
