@@ -804,7 +804,8 @@ router.post('/seed', async (req, res) => {
       data: {
         org: result.org ? result.org._id : null,
         caregiver: result.caregiver ? result.caregiver._id : null,
-        patients: result.patients ? result.patients.map(p => p._id) : []
+        patients: result.patients ? result.patients.map(p => p._id) : [],
+        emergencyPhrases: result.emergencyPhrases || null
       }
     });
   } catch (error) {
