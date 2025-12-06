@@ -9,7 +9,12 @@ import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
 
 // Lazy load LoginForm to break circular dependency
-const LoginFormLazy = lazy(() => import("../components/LoginForm").then(module => ({ default: module.LoginForm })))
+const loginFormImport = () => import("../components/LoginForm").then(module => ({ default: module.LoginForm }))
+const LoginFormLazy = lazy(loginFormImport)
+
+// Preload the LoginForm component - start loading it immediately
+// This ensures it's ready when the modal opens, eliminating the loading delay
+loginFormImport()
 
 interface AuthModalContextType {
   showAuthModal: () => void
@@ -42,20 +47,41 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   const wasAuthenticatedRef = React.useRef(isAuthenticatedUser)
   const modalWasExplicitlyOpenedRef = React.useRef(false)
 
+  // Preload LoginForm when provider mounts to reduce loading time when modal opens
+  React.useEffect(() => {
+    loginFormImport().catch(() => {
+      // Silently fail - component will load when needed
+    })
+  }, [])
+
   const showAuthModal = useCallback((errorMessage?: string) => {
-    setIsVisible(true)
-    modalWasExplicitlyOpenedRef.current = true
-    // Store the initial error message that triggered the modal
-    if (errorMessage) {
-      setInitialErrorMessage(errorMessage)
-    } else {
-      // If no error message provided, try to get it from baseQueryWithAuth
-      const storedMessage = getInitialErrorMessage()
-      if (storedMessage) {
-        setInitialErrorMessage(storedMessage)
+    // Prevent opening multiple modals - if already visible, don't open again
+    setIsVisible((prevVisible) => {
+      if (prevVisible) {
+        // Modal is already visible, don't open another one
+        return prevVisible
+      }
+      // Modal is not visible, open it
+      return true
+    })
+    
+    // Only update refs and error message if we're actually opening the modal
+    // Use a ref to track if modal is visible to avoid stale closure issues
+    const currentIsVisible = isVisible
+    if (!currentIsVisible) {
+      modalWasExplicitlyOpenedRef.current = true
+      // Store the initial error message that triggered the modal
+      if (errorMessage) {
+        setInitialErrorMessage(errorMessage)
+      } else {
+        // If no error message provided, try to get it from baseQueryWithAuth
+        const storedMessage = getInitialErrorMessage()
+        if (storedMessage) {
+          setInitialErrorMessage(storedMessage)
+        }
       }
     }
-  }, [])
+  }, [isVisible])
 
   const hideAuthModal = useCallback(() => {
     setIsVisible(false)
@@ -136,7 +162,15 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
               >
                 <Suspense fallback={
                   <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.palette?.biancaButtonSelected || colors.palette?.primary500} />
+                    {/* Show a skeleton of the form while loading for better UX */}
+                    <View style={styles.skeletonInput} />
+                    <View style={styles.skeletonInput} />
+                    <View style={styles.skeletonButton} />
+                    <ActivityIndicator 
+                      size="small" 
+                      color={colors.palette?.biancaButtonSelected || colors.palette?.primary500}
+                      style={styles.skeletonSpinner}
+                    />
                   </View>
                 }>
                   <LoginFormLazy

@@ -107,7 +107,7 @@ const en = {
   },
   emailVerifiedScreen: {
     title: "Email Verified!",
-    message: "Your My Phone Friend account has been successfully verified.",
+    message: "Your Bianca Wellness account has been successfully verified.",
     redirecting: "Redirecting you to the app...",
   },
   phoneVerificationBanner: {
@@ -372,7 +372,7 @@ const en = {
   },
   privacyPracticesScreen: {
     content: `# Notice of Privacy Practices
-## MyPhoneFriend Healthcare Communication Services
+## Bianca Wellness Healthcare Communication Services
 
 **Effective Date**: October 15, 2025
 
@@ -573,7 +573,7 @@ All business associates sign Business Associate Agreements and must protect your
 **Privacy Officer**:
 - Email: privacy@biancawellness.com
 - Phone: +1-604-562-4263
-- Mail: MyPhoneFriend Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+- Mail: Bianca Wellness Privacy Office, 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
 
 **Hours**: Monday-Friday, 9 AM - 5 PM PST
 
