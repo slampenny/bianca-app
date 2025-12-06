@@ -1632,14 +1632,27 @@ class OpenAIRealtimeService {
       // EMERGENCY DETECTION: Post-message analysis for user messages
       if ((role === 'user' || role === 'patient') && conn.patientId && content && content.trim().length > 10) {
         try {
+          logger.info(`[Emergency Detection] Processing utterance for emergency detection`, {
+            patientId: conn.patientId,
+            text: content.substring(0, 100),
+            callId
+          });
+          
           const emergencyResult = await emergencyProcessor.processUtterance(
             conn.patientId,
             content,
             Date.now()
           );
 
+          logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}`, {
+            patientId: conn.patientId,
+            shouldAlert: emergencyResult.shouldAlert,
+            reason: emergencyResult.reason,
+            processing: emergencyResult.processing
+          });
+
           if (emergencyResult.shouldAlert && !emergencyResult.processing.falsePositive) {
-            logger.warn(`[Emergency Detection] Post-message emergency detected for patient ${conn.patientId}: ${emergencyResult.reason}`);
+            logger.warn(`[Emergency Detection] 🚨 EMERGENCY DETECTED for patient ${conn.patientId}: ${emergencyResult.reason}`);
             
             const alertResult = await emergencyProcessor.createAlert(
               conn.patientId,
@@ -1648,13 +1661,15 @@ class OpenAIRealtimeService {
             );
 
             if (alertResult.success) {
-              logger.info(`[Emergency Detection] Post-message alert created: ${alertResult.alert._id}`);
+              logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert._id}`);
             } else {
-              logger.error(`[Emergency Detection] Failed to create post-message alert: ${alertResult.error}`);
+              logger.error(`[Emergency Detection] ❌ Failed to create alert: ${alertResult.error}`);
             }
+          } else {
+            logger.debug(`[Emergency Detection] No alert needed - ${emergencyResult.reason}`);
           }
         } catch (error) {
-          logger.error(`[Emergency Detection] Error in post-message detection for ${callId}:`, error);
+          logger.error(`[Emergency Detection] ❌ Error in post-message detection for ${callId}:`, error);
         }
       }
     } catch (err) {

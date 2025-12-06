@@ -77,10 +77,38 @@ class EmergencyProcessor {
       contextWindow.addUtterance(patientId, text, 'user', timestamp);
 
       // Step 1: Detect emergency patterns using localized detector
-      const emergencyResult = await localizedEmergencyDetector.detectEmergency(text, patientLanguage);
+      let emergencyResult = await localizedEmergencyDetector.detectEmergency(text, patientLanguage);
+      
+      // CRITICAL FIX: Fallback to basic detector if localized detector has no phrases
+      // This ensures emergencies are detected even if database phrases aren't loaded
+      if (!emergencyResult.isEmergency && !emergencyResult.error && emergencyResult.fallbackNeeded) {
+        logger.warn(`[Emergency Detection] No phrases found for language ${patientLanguage}, falling back to basic detector`);
+        // Fallback to basic emergency detector
+        const basicDetector = require('../utils/emergencyDetector');
+        const basicResult = basicDetector.detectEmergency(text);
+        if (basicResult.isEmergency) {
+          logger.info(`[Emergency Detection] ✅ Basic detector found emergency: ${basicResult.matchedPhrase} (${basicResult.severity} ${basicResult.category})`);
+          // Convert basic detector result to match localized detector format
+          emergencyResult = {
+            isEmergency: true,
+            severity: basicResult.severity,
+            matchedPhrase: basicResult.matchedPhrase,
+            phrase: basicResult.matchedPhrase,
+            category: basicResult.category,
+            language: patientLanguage
+          };
+        } else {
+          logger.debug(`[Emergency Detection] Basic detector also found no emergency for: "${text.substring(0, 50)}"`);
+        }
+      }
       
       if (config.logging.logAllDetections) {
-        logger.info(`Emergency detection for patient ${patientId}:`, emergencyResult);
+        logger.info(`[Emergency Detection] Processing utterance for emergency detection`, {
+          patientId,
+          text: text.substring(0, 100),
+          language: patientLanguage,
+          result: emergencyResult
+        });
       }
 
       // Step 2: Context-aware false positive filtering
@@ -171,12 +199,14 @@ class EmergencyProcessor {
       };
 
       // Step 8: Log alert decision
-      if (config.logging.logAlertDecisions) {
-        logger.info(`Alert decision for patient ${patientId}:`, {
+      if (config.logging.logAlertDecisions || shouldAlert) {
+        logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${shouldAlert}`, {
+          patientId,
           shouldAlert,
           reason: response.reason,
           severity: alertData?.severity,
-          category: alertData?.category
+          category: alertData?.category,
+          processing: response.processing
         });
       }
 

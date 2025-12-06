@@ -13,6 +13,7 @@ const alertsSeeder = require('./seeders/alerts.seeder');
 const paymentMethodsSeeder = require('./seeders/paymentMethods.seeder');
 const invoicesSeeder = require('./seeders/invoices.seeder');
 const sentimentAnalysisSeeder = require('./seeders/sentimentAnalysis.seeder');
+const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
 
 /**
  * Clear all database collections
@@ -28,6 +29,7 @@ async function clearDatabase() {
   await Schedule.deleteMany({});
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
+  // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
   console.log('Database cleared');
 }
 
@@ -42,6 +44,9 @@ async function seedDatabase() {
 
     // Clear the database
     await clearDatabase();
+
+    // Seed emergency phrases first (needed for emergency detection)
+    await emergencyPhrasesSeeder.seedEmergencyPhrases();
 
     // Seed organizations
     const org = await orgsSeeder.seedOrgs();
