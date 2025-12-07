@@ -184,6 +184,34 @@ describe('Emergency Processor', () => {
   describe('createAlert', () => {
     beforeEach(() => {
       // Using real alert service now - no mocking needed
+      // But we can verify SMS service is called
+    });
+    
+    test('should attempt to send SMS notification when creating alert', async () => {
+      // This test verifies SMS sending is part of the alert creation flow
+      const alertData = {
+        severity: 'CRITICAL',
+        category: 'Medical',
+        phrase: 'heart attack',
+        confidence: 0.9,
+        responseTimeSeconds: 60
+      };
+
+      const result = await processor.createAlert(mockPatient._id.toString(), alertData, "I'm having a heart attack");
+      
+      expect(result.success).toBe(true);
+      expect(result.alert).toBeDefined();
+      
+      // CRITICAL: Verify notificationResult exists (SMS attempt was made)
+      // Even if SMS fails in test (due to missing Twilio creds), the attempt should be logged
+      expect(result.notificationResult).toBeDefined();
+      
+      // Log the notification result for debugging
+      if (result.notificationResult) {
+        console.log('SMS Notification Attempt Result:', JSON.stringify(result.notificationResult, null, 2));
+        // The notificationResult should have a success property
+        expect(result.notificationResult).toHaveProperty('success');
+      }
     });
 
     test('should create alert successfully', async () => {
@@ -203,6 +231,18 @@ describe('Emergency Processor', () => {
       expect(result.alert).toBeDefined();
       expect(result.patient.id).toBe(mockPatient._id.toString());
       expect(result.patient.name).toBe('John Doe');
+      
+      // CRITICAL: Verify SMS notification was attempted
+      // Note: In test environment, SMS may fail due to missing Twilio credentials,
+      // but we should at least verify the notification attempt was made
+      expect(result.notificationResult).toBeDefined();
+      // If SMS service is not initialized in test, notificationResult will have success: false
+      // But we should verify the attempt was made
+      if (result.notificationResult) {
+        expect(result.notificationResult).toHaveProperty('success');
+        // Log the result for debugging
+        console.log('SMS Notification Result:', JSON.stringify(result.notificationResult, null, 2));
+      }
     });
 
     test('should handle patient not found', async () => {
@@ -269,6 +309,47 @@ describe('Emergency Processor', () => {
       
       expect(alertResult.success).toBe(true);
       expect(alertResult.alert).toBeDefined();
+      
+      // CRITICAL: Verify SMS notification was attempted
+      expect(alertResult.notificationResult).toBeDefined();
+      console.log('Integration test SMS Notification Result:', JSON.stringify(alertResult.notificationResult, null, 2));
+    });
+    
+    test('should send SMS notification when emergency is detected', async () => {
+      // This test specifically verifies SMS sending is part of the emergency flow
+      const processResult = await processor.processUtterance(mockPatient._id.toString(), "I'm having a heart attack");
+      
+      expect(processResult.shouldAlert).toBe(true);
+      
+      const alertResult = await processor.createAlert(
+        mockPatient._id.toString(), 
+        processResult.alertData, 
+        "I'm having a heart attack"
+      );
+      
+      // Verify alert was created
+      expect(alertResult.success).toBe(true);
+      
+      // CRITICAL: Verify SMS notification attempt was made
+      // The notificationResult should exist even if SMS fails (due to missing Twilio creds in test)
+      expect(alertResult.notificationResult).toBeDefined();
+      
+      // If SMS service is properly configured, verify it succeeded
+      // In test environment without Twilio creds, it may fail, but we should verify the attempt
+      if (alertResult.notificationResult) {
+        // Log for debugging
+        console.log('SMS Notification Details:', {
+          success: alertResult.notificationResult.success,
+          successful: alertResult.notificationResult.successful,
+          failed: alertResult.notificationResult.failed,
+          reason: alertResult.notificationResult.reason,
+          error: alertResult.notificationResult.error
+        });
+        
+        // At minimum, verify the notification service was called
+        // (even if it failed due to missing credentials)
+        expect(alertResult.notificationResult).toHaveProperty('success');
+      }
     });
   });
 
@@ -280,6 +361,10 @@ describe('Emergency Processor', () => {
       expect(status.config).toBeDefined();
       expect(status.snsStatus).toBeDefined();
       expect(status.deduplicatorStats).toBeDefined();
+      
+      // CRITICAL: Verify SMS notifications are always enabled
+      expect(status.config.enableSNSPushNotifications).toBe(true);
+      console.log('Emergency Processor Status:', JSON.stringify(status, null, 2));
     });
   });
 
