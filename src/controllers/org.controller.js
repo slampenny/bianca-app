@@ -72,6 +72,39 @@ const verifyInvite = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ orgId });
 });
 
+const updateCallRetrySettings = catchAsync(async (req, res) => {
+  const { orgId } = req.params;
+  const { retrySettings } = req.body;
+  
+  // Check if user is org admin
+  const caregiver = req.caregiver;
+  if (!caregiver) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Not authenticated');
+  }
+  
+  // Verify caregiver is org admin for this org
+  const org = await orgService.getOrgById(orgId);
+  if (!org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
+  }
+  
+  // Check if caregiver belongs to this org and is orgAdmin
+  const caregiverInOrg = org.caregivers.find(c => c.toString() === caregiver.id.toString());
+  if (!caregiverInOrg) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Caregiver does not belong to this organization');
+  }
+  
+  // Get full caregiver object to check role
+  const { Caregiver } = require('../models');
+  const fullCaregiver = await Caregiver.findById(caregiver.id);
+  if (!fullCaregiver || fullCaregiver.role !== 'orgAdmin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Only org admins can update call retry settings');
+  }
+  
+  const updatedOrg = await orgService.updateCallRetrySettings(orgId, retrySettings);
+  res.status(httpStatus.OK).send(updatedOrg);
+});
+
 module.exports = {
   createOrg,
   getOrgs,
@@ -83,4 +116,5 @@ module.exports = {
   setRole,
   sendInvite,
   verifyInvite,
+  updateCallRetrySettings,
 };

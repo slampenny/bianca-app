@@ -114,6 +114,8 @@ class LocalizedEmergencyDetector {
       // Log the text being analyzed for debugging
       if (normalizedText.toLowerCase().includes('heart') || normalizedText.toLowerCase().includes('attack')) {
         logger.info(`[Emergency Detection] Analyzing text for heart attack: "${normalizedText}"`);
+        logger.info(`[Emergency Detection] Total phrases to check: ${phrases.length}`);
+        logger.info(`[Emergency Detection] Phrases in cache: ${phrases.map(p => `${p.phrase} (${p.pattern})`).join(', ')}`);
       }
 
       for (const phraseDoc of phrases) {
@@ -121,10 +123,14 @@ class LocalizedEmergencyDetector {
           const pattern = this.getCompiledPattern(phraseDoc);
           if (pattern) {
             const matches = pattern.test(normalizedText);
+            // Enhanced logging for heart attack detection
+            if (normalizedText.toLowerCase().includes('heart') || normalizedText.toLowerCase().includes('attack')) {
+              logger.debug(`[Emergency Detection] Testing pattern "${phraseDoc.pattern}" (phrase: "${phraseDoc.phrase}") against text: "${normalizedText}" - Match: ${matches}`);
+            }
             if (matches) {
-              // Log when heart attack pattern is tested
-              if (phraseDoc.phrase === 'heart attack') {
-                logger.info(`[Emergency Detection] Heart attack pattern matched! Pattern: ${phraseDoc.pattern}, Text: "${normalizedText}"`);
+              // Log when heart attack pattern is matched
+              if (phraseDoc.phrase === 'heart attack' || phraseDoc.phrase.toLowerCase().includes('heart')) {
+                logger.info(`[Emergency Detection] ✅ Heart attack pattern matched! Pattern: ${phraseDoc.pattern}, Phrase: "${phraseDoc.phrase}", Text: "${normalizedText}", Severity: ${phraseDoc.severity}`);
               }
               // If no match yet or this match has higher severity
               if (!highestSeverityMatch || 

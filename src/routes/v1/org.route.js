@@ -221,6 +221,9 @@ router.route('/:orgId/invite').patch(/* auth('updateOwn:org'), */ orgController.
  */
 router.route('/:orgId/verify-invite/:token').patch(auth('updateOwn:caregiver'), orgController.verifyInvite);
 
+// Call retry settings endpoint (only org admins)
+router.route('/:orgId/call-retry-settings').patch(auth('updateOwn:org'), orgController.updateCallRetrySettings);
+
 module.exports = router;
 
 /**

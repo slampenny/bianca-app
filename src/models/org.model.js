@@ -71,6 +71,33 @@ const orgSchema = mongoose.Schema(
     ],
     caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
+    // Call retry settings (only org admins can change)
+    callRetrySettings: {
+      retryCount: {
+        type: Number,
+        default: 2,
+        min: 0,
+        max: 10,
+        validate: {
+          validator: Number.isInteger,
+          message: 'Retry count must be an integer'
+        }
+      },
+      retryIntervalMinutes: {
+        type: Number,
+        default: 15,
+        min: 1,
+        max: 1440, // Max 24 hours
+        validate: {
+          validator: Number.isInteger,
+          message: 'Retry interval must be an integer (minutes)'
+        }
+      },
+      alertOnAllMissedCalls: {
+        type: Boolean,
+        default: true, // Alert on every missed call/retry by default
+      }
+    }
   },
   {
     timestamps: true,
