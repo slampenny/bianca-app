@@ -14,7 +14,7 @@ import { setOrg } from "../store/orgSlice"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
 import type { ThemeColors } from "../types"
-import { Button, Text, TextField } from "app/components"
+import { Button, Text, TextField, Toggle } from "app/components"
 import { logger } from "../utils/logger"
 
 export function OrgScreen() {
@@ -29,6 +29,9 @@ export function OrgScreen() {
   const [phone, setPhone] = useState("")
   const [logo, setLogo] = useState<string | null>(null)
   const [logoBlob, setLogoBlob] = useState<Blob | null>(null)
+  const [retryCount, setRetryCount] = useState("2")
+  const [retryIntervalMinutes, setRetryIntervalMinutes] = useState("15")
+  const [alertOnAllMissedCalls, setAlertOnAllMissedCalls] = useState(false)
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
 
@@ -46,6 +49,17 @@ export function OrgScreen() {
         setEmail(currentOrg.email)
         setPhone(currentOrg.phone)
         setLogo(currentOrg.logo || null)
+        // Initialize call retry settings
+        if (currentOrg.callRetrySettings) {
+          setRetryCount(String(currentOrg.callRetrySettings.retryCount ?? 2))
+          setRetryIntervalMinutes(String(currentOrg.callRetrySettings.retryIntervalMinutes ?? 15))
+          setAlertOnAllMissedCalls(currentOrg.callRetrySettings.alertOnAllMissedCalls ?? false)
+        } else {
+          // Use defaults if not set
+          setRetryCount("2")
+          setRetryIntervalMinutes("15")
+          setAlertOnAllMissedCalls(false)
+        }
         setIsLoading(false)
         return
       }
@@ -84,6 +98,11 @@ export function OrgScreen() {
           email,
           phone,
           logo,
+          callRetrySettings: {
+            retryCount: parseInt(retryCount, 10) || 2,
+            retryIntervalMinutes: parseInt(retryIntervalMinutes, 10) || 15,
+            alertOnAllMissedCalls,
+          },
         },
       })
     }
@@ -181,6 +200,48 @@ export function OrgScreen() {
           inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
           style={!canEditOrg ? styles.readonlyInput : styles.input}
         />
+
+        {/* Call Retry Settings Section */}
+        <View style={styles.callRetrySection}>
+          <Text style={styles.sectionTitle} preset="formLabel">
+            {translate("orgScreen.callRetrySettings")}
+          </Text>
+          
+          <TextField
+            labelTx="orgScreen.retryCountLabel"
+            helperTx="orgScreen.retryCountHelper"
+            value={retryCount}
+            onChangeText={setRetryCount}
+            keyboardType="numeric"
+            editable={canEditOrg}
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+            style={!canEditOrg ? styles.readonlyInput : styles.input}
+          />
+          
+          <TextField
+            labelTx="orgScreen.retryIntervalMinutesLabel"
+            helperTx="orgScreen.retryIntervalMinutesHelper"
+            value={retryIntervalMinutes}
+            onChangeText={setRetryIntervalMinutes}
+            keyboardType="numeric"
+            editable={canEditOrg}
+            containerStyle={styles.inputContainer}
+            inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+            style={!canEditOrg ? styles.readonlyInput : styles.input}
+          />
+          
+          <Toggle
+            variant="switch"
+            labelTx="orgScreen.alertOnAllMissedCallsLabel"
+            helperTx="orgScreen.alertOnAllMissedCallsHelper"
+            value={alertOnAllMissedCalls}
+            onValueChange={setAlertOnAllMissedCalls}
+            editable={canEditOrg}
+            containerStyle={styles.inputContainer}
+          />
+        </View>
+
         {canEditOrg && (
           <Button 
             preset="primary"
@@ -295,6 +356,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.palette.neutral300,
+  },
+  callRetrySection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
   },
   sectionTitle: {
     fontSize: 16,

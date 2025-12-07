@@ -87,6 +87,11 @@ export interface Org {
   patients: string[]
   planName?: string
   nextBillingDate?: string
+  callRetrySettings?: {
+    retryCount: number
+    retryIntervalMinutes: number
+    alertOnAllMissedCalls: boolean
+  }
 }
 
 export interface PatientPages {

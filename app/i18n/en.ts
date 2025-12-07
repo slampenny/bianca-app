@@ -1022,6 +1022,25 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     disableFailed: "Failed to disable MFA. Please check your code.",
     regenerateFailed: "Failed to regenerate backup codes.",
   },
+  orgScreen: {
+    organizationLogo: "Organization Logo",
+    noLogoSet: "No logo set",
+    namePlaceholder: "Organization Name",
+    emailPlaceholder: "Email",
+    phonePlaceholder: "Phone",
+    save: "Save",
+    organizationActions: "Organization Actions",
+    viewCaregivers: "View Caregivers",
+    inviteCaregiver: "Invite Caregiver",
+    payments: "Payments",
+    callRetrySettings: "Call Retry Settings",
+    retryCountLabel: "Call Retry Count",
+    retryCountHelper: "Number of times to retry a call if it's not answered (0-10)",
+    retryIntervalMinutesLabel: "Retry Interval (Minutes)",
+    retryIntervalMinutesHelper: "Time to wait between retry attempts (default: 15 minutes)",
+    alertOnAllMissedCallsLabel: "Alert on All Missed Calls",
+    alertOnAllMissedCallsHelper: "Send alerts for every missed call and retry attempt",
+  },
 }
 
 export default en
