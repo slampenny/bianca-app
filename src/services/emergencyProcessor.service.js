@@ -251,31 +251,76 @@ class EmergencyProcessor {
 
       // Send push notifications if enabled
       let notificationResult = null;
-      logger.info(`[Emergency Processor] Checking SMS notifications - enableSNSPushNotifications: ${config.enableSNSPushNotifications}`);
+      
+      // COMPREHENSIVE DIAGNOSTICS: Log all relevant config and environment variables
+      logger.info(`[Emergency Processor] ===== SMS NOTIFICATION DIAGNOSTICS =====`);
+      logger.info(`[Emergency Processor] NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
+      logger.info(`[Emergency Processor] AWS_REGION: ${process.env.AWS_REGION || 'NOT SET'}`);
+      logger.info(`[Emergency Processor] enableSNSPushNotifications: ${config.enableSNSPushNotifications}`);
+      logger.info(`[Emergency Processor] snsService available: ${!!snsService}`);
+      if (snsService) {
+        const snsStatus = snsService.getStatus();
+        logger.info(`[Emergency Processor] snsService status:`, JSON.stringify(snsStatus, null, 2));
+      }
+      logger.info(`[Emergency Processor] ==========================================`);
       
       if (config.enableSNSPushNotifications) {
-        const caregivers = await this.getPatientCaregivers(patientId);
-        logger.info(`[Emergency Processor] Found ${caregivers.length} caregiver(s) with phone numbers for patient ${patientId}`);
-        
-        if (caregivers.length === 0) {
-          logger.warn(`[Emergency Processor] No caregivers with phone numbers found for patient ${patientId} - SMS will not be sent`);
+        if (!snsService) {
+          logger.error(`[Emergency Processor] ❌ CRITICAL: snsService is not available! SMS cannot be sent.`);
+          logger.error(`[Emergency Processor] This is a code issue - snsService should be imported and available.`);
         } else {
-          logger.info(`[Emergency Processor] Sending emergency SMS alerts to ${caregivers.length} caregiver(s)`);
-          notificationResult = await snsService.sendEmergencyAlert(
-            {
-              patientId,
-              patientName: patient.name || patient.preferredName || 'Unknown Patient',
-              severity: alertData.severity,
-              category: alertData.category,
-              phrase: alertData.phrase
-            },
-            caregivers
-          );
-          logger.info(`[Emergency Processor] SMS notification result:`, notificationResult);
+          const caregivers = await this.getPatientCaregivers(patientId);
+          logger.info(`[Emergency Processor] Found ${caregivers.length} caregiver(s) with phone numbers for patient ${patientId}`);
+          
+          if (caregivers.length === 0) {
+            logger.warn(`[Emergency Processor] ⚠️ No caregivers with phone numbers found for patient ${patientId} - SMS will not be sent`);
+            logger.warn(`[Emergency Processor] Patient ID: ${patientId}`);
+            // Try to get patient info for debugging
+            try {
+              const patientDebug = await Patient.findById(patientId).populate('caregivers').select('name preferredName caregivers');
+              logger.warn(`[Emergency Processor] Patient debug info:`, {
+                name: patientDebug?.name,
+                preferredName: patientDebug?.preferredName,
+                caregiverCount: patientDebug?.caregivers?.length || 0,
+                caregiversWithPhones: patientDebug?.caregivers?.filter(c => c?.phone)?.length || 0,
+                caregiverPhones: patientDebug?.caregivers?.map(c => ({ id: c?._id, phone: c?.phone || 'MISSING' })) || []
+              });
+            } catch (debugErr) {
+              logger.error(`[Emergency Processor] Error getting patient debug info: ${debugErr.message}`);
+            }
+          } else {
+            logger.info(`[Emergency Processor] ✅ Sending emergency SMS alerts to ${caregivers.length} caregiver(s)`);
+            logger.info(`[Emergency Processor] Caregiver phone numbers:`, caregivers.map(c => ({ id: c._id, phone: c.phone, name: c.name })));
+            
+            try {
+              notificationResult = await snsService.sendEmergencyAlert(
+                {
+                  patientId,
+                  patientName: patient.name || patient.preferredName || 'Unknown Patient',
+                  severity: alertData.severity,
+                  category: alertData.category,
+                  phrase: alertData.phrase
+                },
+                caregivers
+              );
+              logger.info(`[Emergency Processor] ✅ SMS notification result:`, JSON.stringify(notificationResult, null, 2));
+              
+              if (!notificationResult || !notificationResult.success) {
+                logger.error(`[Emergency Processor] ❌ SMS notification FAILED!`);
+                logger.error(`[Emergency Processor] Result:`, notificationResult);
+              } else {
+                logger.info(`[Emergency Processor] ✅ SMS sent successfully: ${notificationResult.successful || 0} successful, ${notificationResult.failed || 0} failed`);
+              }
+            } catch (smsError) {
+              logger.error(`[Emergency Processor] ❌ EXCEPTION while sending SMS:`, smsError);
+              logger.error(`[Emergency Processor] Error stack:`, smsError.stack);
+              notificationResult = { success: false, error: smsError.message };
+            }
+          }
         }
       } else {
-        logger.warn(`[Emergency Processor] SMS notifications are DISABLED in config - no SMS will be sent`);
-        logger.warn(`[Emergency Processor] To enable, set NODE_ENV=staging/production or set AWS_REGION env var`);
+        logger.error(`[Emergency Processor] ❌ CRITICAL ERROR: SMS notifications should ALWAYS be enabled but config.enableSNSPushNotifications = ${config.enableSNSPushNotifications}`);
+        logger.error(`[Emergency Processor] This is a configuration error - emergency SMS should never be disabled!`);
       }
 
       return {

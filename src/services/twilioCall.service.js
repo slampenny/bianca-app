@@ -359,11 +359,22 @@ class TwilioCallService {
       }
       
       // Get patient and org for retry settings
-      const patient = await Patient.findById(conversation.patientId).populate('org');
+      // conversation.patientId is already populated, so use it directly
+      let patient = conversation.patientId;
+      if (patient && patient._id) {
+        // Patient is already populated, just populate org if needed
+        if (!patient.org || typeof patient.org !== 'object' || !patient.org._id) {
+          await patient.populate('org');
+        }
+      } else {
+        // Fallback: patientId might be just an ID (shouldn't happen with populate, but be safe)
+        patient = await Patient.findById(conversation.patientId).populate('org');
+      }
       const org = patient?.org;
       
       // Log conversation status for debugging
       logger.info(`[Twilio Service] Conversation status before update: ${conversation.status}, failureReason: ${conversation.failureReason}`);
+      logger.info(`[Twilio Service] Patient: ${patient?._id || 'not found'}, Org: ${org?._id || 'not found'}, alertOnAllMissedCalls: ${org?.callRetrySettings?.alertOnAllMissedCalls ?? 'default (true)'}`);
       
       // Update conversation with new status
       conversation.lastStatus = CallStatus;

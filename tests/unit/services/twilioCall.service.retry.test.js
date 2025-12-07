@@ -270,6 +270,55 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       expect(alertService.createAlert).toHaveBeenCalled();
     });
 
+    it('should correctly use populated patientId and retrieve org settings', async () => {
+      // This test verifies that we're correctly using the already-populated patientId
+      // and that org settings are properly retrieved for alert logic
+      org.callRetrySettings.alertOnAllMissedCalls = true;
+      org.callRetrySettings.retryCount = 3;
+      await org.save();
+
+      // Reload patient to ensure org is populated
+      await patient.populate('org');
+      
+      const req = {
+        body: {
+          CallSid: conversation.callSid,
+          CallStatus: 'no-answer',
+          CallDuration: '0',
+        },
+      };
+
+      await twilioCallService.handleCallStatus(req);
+
+      // Verify alert was created (proving org settings were correctly retrieved)
+      expect(alertService.createAlert).toHaveBeenCalled();
+      const alertCall = alertService.createAlert.mock.calls[0][0];
+      expect(alertCall.relatedPatient.toString()).toBe(patient._id.toString());
+      expect(alertCall.alertType).toBe('patient');
+    });
+
+    it('should correctly retrieve org settings from populated patient', async () => {
+      // Verify that org settings are correctly retrieved and used for alert logic
+      org.callRetrySettings.alertOnAllMissedCalls = true;
+      org.callRetrySettings.retryCount = 3;
+      await org.save();
+
+      const req = {
+        body: {
+          CallSid: conversation.callSid,
+          CallStatus: 'no-answer',
+          CallDuration: '0',
+        },
+      };
+
+      await twilioCallService.handleCallStatus(req);
+
+      // Verify alert was created with correct settings
+      expect(alertService.createAlert).toHaveBeenCalled();
+      const alertCall = alertService.createAlert.mock.calls[0][0];
+      expect(alertCall.relatedPatient.toString()).toBe(patient._id.toString());
+    });
+
     it('should cancel remaining retries when retry call succeeds', async () => {
       const originalCallId = new mongoose.Types.ObjectId();
       conversation.originalCallId = originalCallId;
