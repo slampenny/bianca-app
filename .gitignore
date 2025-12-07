@@ -111,6 +111,9 @@ metro-cache/
 # Test/coverage
 coverage/
 test-results/
+**/test-results/
+test-console-*.txt
+**/test-console-*.txt
 
 # Build artifacts
 *.aab
@@ -142,12 +145,18 @@ Thumbs.db
 crash.log
 *.tfplan
 
-# Playwright
+# Playwright test results and artifacts
 playwright-report/
+**/playwright-report/
 playwright/.cache/
+**/playwright/.cache/
+test-results/
+**/test-results/
 *.trace
 *.webm
 *.mp4
+.playwright/
+**/.playwright/
 
 # Deployment logs and temporary files
 deployment.log

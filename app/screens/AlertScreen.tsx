@@ -22,7 +22,6 @@ export function AlertScreen() {
   const unreadAlertCount = useSelector(selectUnreadAlertCount)
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
   const [showUnread, setShowUnread] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const { colors, isLoading: themeLoading } = useTheme()
 
   const {
@@ -30,7 +29,25 @@ export function AlertScreen() {
     isLoading: isFetching,
     error: fetchError,
     refetch,
-  } = useGetAllAlertsQuery()
+  } = useGetAllAlertsQuery(undefined, {
+    // Poll every 30 seconds to automatically fetch new alerts (or 3 seconds in test mode)
+    // Check multiple ways to detect test mode since process.env might not be available in browser
+    pollingInterval: (() => {
+      if (typeof window !== 'undefined') {
+        // Check URL parameter (set by Playwright tests)
+        if (window.location.search.includes('playwright_test=1')) return 3000;
+        // Check localStorage (can be set by tests)
+        if (localStorage.getItem('playwright_test') === '1') return 3000;
+      }
+      // Check process.env (works in Node.js, might work in some build configs)
+      if (process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1') return 3000;
+      return 30000;
+    })(),
+    // Refetch when the screen comes into focus
+    refetchOnFocus: true,
+    // Refetch when the app reconnects
+    refetchOnReconnect: true,
+  })
 
   const {
     data: patientsData,
@@ -101,12 +118,6 @@ export function AlertScreen() {
       }
     }
   }, [fetchAllAlerts, dispatch, currentUser?.id])
-
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    await refetch()
-    setRefreshing(false)
-  }
 
   const handleMarkAllAsRead = async () => {
     if (!currentUser) return
@@ -355,11 +366,6 @@ export function AlertScreen() {
           />
         )}
 
-        <Button
-          text={refreshing ? translate("alertScreen.refreshing") : translate("alertScreen.refresh")}
-          onPress={handleRefresh}
-          style={styles.refreshButton}
-        />
       </View>
     </View>
   )

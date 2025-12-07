@@ -388,6 +388,61 @@ phases:
 
   post_build:
     commands:
+      - echo "Collecting test artifacts and logs..."
+      - |
+        # Create artifacts directory
+        mkdir -p /tmp/playwright-artifacts
+        
+        # Copy Playwright reports and test results
+        if [ -d "$FRONTEND_DIR/playwright-report" ]; then
+          cp -r "$FRONTEND_DIR/playwright-report" /tmp/playwright-artifacts/ || true
+        fi
+        if [ -d "$FRONTEND_DIR/test-results" ]; then
+          cp -r "$FRONTEND_DIR/test-results" /tmp/playwright-artifacts/ || true
+        fi
+        
+        # Copy all logs
+        if [ -f /tmp/backend.log ]; then
+          cp /tmp/backend.log /tmp/playwright-artifacts/backend.log || true
+        fi
+        if [ -f /tmp/frontend.log ]; then
+          cp /tmp/frontend.log /tmp/playwright-artifacts/frontend.log || true
+        fi
+        if [ -f /tmp/playwright-output.log ]; then
+          cp /tmp/playwright-output.log /tmp/playwright-artifacts/playwright-output.log || true
+        fi
+        
+        # Create summary file
+        cat > /tmp/playwright-artifacts/run-summary.txt << EOF
+Playwright Test Run Summary
+==========================
+Build ID: ${CODEBUILD_BUILD_ID}
+Build Number: ${CODEBUILD_BUILD_NUMBER}
+Source Version: ${CODEBUILD_SOURCE_VERSION}
+Start Time: ${CODEBUILD_START_TIME}
+Environment: ${NODE_ENV}
+Node Version: $(node --version)
+Yarn Version: $(yarn --version)
+
+Test Execution:
+- Exit Code: ${TEST_EXIT_CODE:-unknown}
+- Frontend: http://localhost:8081
+- Backend: http://localhost:3000
+- MongoDB: mongodb://localhost:27017/bianca-app-test
+
+Artifacts:
+- Playwright Report: playwright-report/index.html
+- Test Results: test-results/
+- Backend Log: backend.log
+- Frontend Log: frontend.log
+- Playwright Output: playwright-output.log
+EOF
+        
+        # Copy artifacts to frontend directory for CodeBuild artifact collection
+        cp -r /tmp/playwright-artifacts/* "$FRONTEND_DIR/" 2>/dev/null || true
+        
+        echo "✅ Artifacts collected"
+        ls -la /tmp/playwright-artifacts/ || true
       - echo "Cleaning up services..."
       - |
         if [ -f /tmp/backend.pid ]; then
@@ -407,6 +462,10 @@ artifacts:
     - '**/playwright-report/**/*'
     - '**/test-results/**/*'
     - '**/test-results/junit.xml'
+    - '**/backend.log'
+    - '**/frontend.log'
+    - '**/playwright-output.log'
+    - '**/run-summary.txt'
   base-directory: '**'
   name: PlaywrightTestResults
 
