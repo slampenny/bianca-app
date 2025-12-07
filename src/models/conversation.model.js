@@ -68,6 +68,12 @@ const conversationSchema = mongoose.Schema(
       default: 'initiated',
     },
     
+    failureReason: {
+      type: String,
+      enum: ['no-answer', 'busy', 'failed', 'canceled', 'voicemail', null],
+      default: null,
+    },
+    
     asteriskChannelId: {
       type: String,
       // For tracking the Asterisk side of the call
@@ -196,6 +202,26 @@ const conversationSchema = mongoose.Schema(
     callNotes: {
       type: String,
       default: '',
+    },
+    
+    // Call retry tracking fields
+    retryAttempt: {
+      type: Number,
+      default: 0, // 0 = original call, 1 = first retry, 2 = second retry, etc.
+      min: 0,
+    },
+    originalCallId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Conversation',
+      default: null, // Points to the original failed call if this is a retry
+    },
+    retryScheduledAt: {
+      type: Date,
+      default: null, // When the next retry is scheduled
+    },
+    maxRetries: {
+      type: Number,
+      default: null, // Max retries from org settings at time of call
     }
   },
   {
