@@ -1407,4 +1407,221 @@ router.post('/verify-alert-query', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/emergency-sms:
+ *   post:
+ *     summary: Test emergency SMS functionality
+ *     description: Tests the complete emergency detection and SMS notification flow with detailed diagnostics
+ *     tags: [Test]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               patientId:
+ *                 type: string
+ *                 description: Patient ID to test with (optional, will use first patient if not provided)
+ *               text:
+ *                 type: string
+ *                 description: Text to test emergency detection with (default: "I'm having a heart attack")
+ *     responses:
+ *       "200":
+ *         description: Emergency test result with detailed diagnostics
+ */
+router.post('/emergency-sms', auth(), async (req, res) => {
+  try {
+    const { patientId, text = "I'm having a heart attack" } = req.body;
+    const { emergencyProcessor } = require('../../services/emergencyProcessor.service');
+    const { Patient } = require('../../models');
+    const { config: emergencyConfig } = require('../../config/emergency.config');
+    const { twilioSmsService } = require('../../services/twilioSms.service');
+    const { snsService } = require('../../services/sns.service');
+    
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      input: {
+        patientId: patientId || 'auto-detect',
+        text: text
+      },
+      steps: {},
+      result: null,
+      errors: []
+    };
+
+    // Step 1: Find or validate patient
+    let testPatientId = patientId;
+    if (!testPatientId) {
+      logger.info('[Test Emergency SMS] No patientId provided, finding first patient...');
+      const firstPatient = await Patient.findOne().select('_id name preferredName phone caregivers');
+      if (!firstPatient) {
+        return res.status(404).json({
+          success: false,
+          error: 'No patients found in database. Please provide a patientId or create a patient first.',
+          diagnostics
+        });
+      }
+      testPatientId = firstPatient._id.toString();
+      diagnostics.steps.patientLookup = {
+        success: true,
+        method: 'auto-detect',
+        patient: {
+          id: firstPatient._id.toString(),
+          name: firstPatient.name,
+          preferredName: firstPatient.preferredName,
+          phone: firstPatient.phone
+        }
+      };
+      logger.info(`[Test Emergency SMS] Using patient: ${firstPatient.name} (${testPatientId})`);
+    } else {
+      const patient = await Patient.findById(testPatientId).select('_id name preferredName phone caregivers');
+      if (!patient) {
+        return res.status(404).json({
+          success: false,
+          error: `Patient not found: ${testPatientId}`,
+          diagnostics
+        });
+      }
+      diagnostics.steps.patientLookup = {
+        success: true,
+        method: 'provided',
+        patient: {
+          id: patient._id.toString(),
+          name: patient.name,
+          preferredName: patient.preferredName,
+          phone: patient.phone
+        }
+      };
+    }
+
+    // Step 2: Check configuration
+    diagnostics.steps.configuration = {
+      enableSNSPushNotifications: emergencyConfig.enableSNSPushNotifications,
+      NODE_ENV: process.env.NODE_ENV || 'NOT SET',
+      AWS_REGION: process.env.AWS_REGION || 'NOT SET'
+    };
+
+    // Step 3: Check Twilio SMS service status
+    diagnostics.steps.twilioSmsService = {
+      available: !!twilioSmsService,
+      status: twilioSmsService ? twilioSmsService.getStatus() : null
+    };
+
+    // Step 4: Check SNS service status
+    diagnostics.steps.snsService = {
+      available: !!snsService,
+      status: snsService ? snsService.getStatus() : null
+    };
+
+    // Step 5: Process utterance for emergency detection
+    logger.info(`[Test Emergency SMS] Processing utterance: "${text}" for patient ${testPatientId}`);
+    const processResult = await emergencyProcessor.processUtterance(testPatientId, text, Date.now());
+    
+    diagnostics.steps.emergencyDetection = {
+      shouldAlert: processResult.shouldAlert,
+      reason: processResult.reason,
+      processing: processResult.processing,
+      alertData: processResult.alertData
+    };
+
+    if (!processResult.shouldAlert) {
+      return res.json({
+        success: false,
+        message: 'Emergency was NOT detected',
+        reason: processResult.reason,
+        diagnostics
+      });
+    }
+
+    // Step 6: Get caregivers
+    const patient = await Patient.findById(testPatientId).populate('caregivers');
+    diagnostics.steps.caregivers = {
+      totalCaregivers: patient?.caregivers?.length || 0,
+      caregiversWithPhones: patient?.caregivers?.filter(c => c?.phone)?.length || 0,
+      caregiverDetails: patient?.caregivers?.map(c => ({
+        id: c._id.toString(),
+        name: c.name,
+        phone: c.phone || 'MISSING',
+        hasPhone: !!c.phone
+      })) || []
+    };
+
+    if (!patient?.caregivers || patient.caregivers.length === 0) {
+      return res.json({
+        success: false,
+        message: 'Emergency detected but NO CAREGIVERS found for patient',
+        diagnostics
+      });
+    }
+
+    const caregiversWithPhones = patient.caregivers.filter(c => c && c.phone);
+    if (caregiversWithPhones.length === 0) {
+      return res.json({
+        success: false,
+        message: 'Emergency detected but NO CAREGIVERS with phone numbers found',
+        diagnostics
+      });
+    }
+
+    // Step 7: Create alert and send SMS
+    logger.info(`[Test Emergency SMS] Creating alert and sending SMS...`);
+    const alertResult = await emergencyProcessor.createAlert(
+      testPatientId,
+      processResult.alertData,
+      text
+    );
+
+    diagnostics.steps.alertCreation = {
+      success: alertResult.success,
+      alertId: alertResult.alert?._id?.toString() || null,
+      error: alertResult.error || null
+    };
+
+    diagnostics.steps.smsNotification = alertResult.notificationResult || null;
+
+    // Final result
+    const smsSuccess = alertResult.notificationResult?.success === true;
+    const smsSuccessful = alertResult.notificationResult?.successful || 0;
+    const smsFailed = alertResult.notificationResult?.failed || 0;
+
+    diagnostics.result = {
+      emergencyDetected: true,
+      alertCreated: alertResult.success,
+      smsSent: smsSuccess,
+      smsSuccessful: smsSuccessful,
+      smsFailed: smsFailed,
+      totalRecipients: alertResult.notificationResult?.total || 0
+    };
+
+    // Determine overall success
+    const overallSuccess = alertResult.success && smsSuccess && smsSuccessful > 0;
+
+    res.json({
+      success: overallSuccess,
+      message: overallSuccess 
+        ? `✅ Emergency detected, alert created, and SMS sent to ${smsSuccessful} caregiver(s)`
+        : smsSuccess === false
+        ? `⚠️ Emergency detected and alert created, but SMS failed (${smsFailed} failed, ${smsSuccessful} successful)`
+        : `⚠️ Emergency detected and alert created, but SMS notification result unclear`,
+      diagnostics
+    });
+
+  } catch (error) {
+    logger.error('[Test Emergency SMS] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      errorStack: error.stack,
+      diagnostics: {
+        timestamp: new Date().toISOString(),
+        errors: [error.message]
+      }
+    });
+  }
+});
+
 module.exports = router;

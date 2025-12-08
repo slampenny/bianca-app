@@ -101,4 +101,96 @@ describe('alertService', () => {
     expect(adminAlerts).toEqual(expect.arrayContaining([expect.objectContaining({ _id: alert2._id })]));
     expect(regularAlerts).not.toEqual(expect.arrayContaining([expect.objectContaining({ _id: alert2._id })]));
   });
+
+  it('should prevent duplicate patient alerts with same message, relatedPatient, and visibility', async () => {
+    const alertData = {
+      message: 'Patient Test Patient has no schedule configured',
+      importance: 'medium',
+      alertType: 'patient',
+      relatedPatient: patient._id,
+      createdBy: patient._id,
+      createdModel: 'Patient',
+      visibility: 'assignedCaregivers',
+      relevanceUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+    };
+
+    // Create first alert
+    const firstAlert = await alertService.createAlert(alertData);
+    expect(firstAlert).toHaveProperty('id');
+    expect(firstAlert.message).toBe(alertData.message);
+
+    // Try to create duplicate alert - should return the existing one
+    const duplicateAlert = await alertService.createAlert(alertData);
+    expect(duplicateAlert._id.toString()).toBe(firstAlert._id.toString());
+    expect(duplicateAlert.message).toBe(alertData.message);
+
+    // Verify only one alert exists in database
+    const allAlerts = await Alert.find({ relatedPatient: patient._id, message: alertData.message });
+    expect(allAlerts).toHaveLength(1);
+  });
+
+  it('should allow different alerts with different messages for same patient', async () => {
+    const alertData1 = {
+      message: 'Patient Test Patient has no schedule configured',
+      importance: 'medium',
+      alertType: 'patient',
+      relatedPatient: patient._id,
+      createdBy: patient._id,
+      createdModel: 'Patient',
+      visibility: 'assignedCaregivers',
+      relevanceUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    };
+
+    const alertData2 = {
+      message: 'Patient Test Patient needs attention',
+      importance: 'high',
+      alertType: 'patient',
+      relatedPatient: patient._id,
+      createdBy: patient._id,
+      createdModel: 'Patient',
+      visibility: 'assignedCaregivers',
+      relevanceUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    };
+
+    const alert1 = await alertService.createAlert(alertData1);
+    const alert2 = await alertService.createAlert(alertData2);
+
+    expect(alert1._id.toString()).not.toBe(alert2._id.toString());
+    expect(alert1.message).not.toBe(alert2.message);
+  });
+
+  it('should allow duplicate alert if previous one is expired', async () => {
+    const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // 1 day ago
+    const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+    const expiredAlertData = {
+      message: 'Patient Test Patient has no schedule configured',
+      importance: 'medium',
+      alertType: 'patient',
+      relatedPatient: patient._id,
+      createdBy: patient._id,
+      createdModel: 'Patient',
+      visibility: 'assignedCaregivers',
+      relevanceUntil: pastDate, // Expired
+    };
+
+    const newAlertData = {
+      message: 'Patient Test Patient has no schedule configured',
+      importance: 'medium',
+      alertType: 'patient',
+      relatedPatient: patient._id,
+      createdBy: patient._id,
+      createdModel: 'Patient',
+      visibility: 'assignedCaregivers',
+      relevanceUntil: futureDate, // Still relevant
+    };
+
+    // Create expired alert
+    const expiredAlert = await alertService.createAlert(expiredAlertData);
+    expect(expiredAlert).toHaveProperty('id');
+
+    // Create new alert with same message - should create new one since old is expired
+    const newAlert = await alertService.createAlert(newAlertData);
+    expect(newAlert._id.toString()).not.toBe(expiredAlert._id.toString());
+  });
 });
