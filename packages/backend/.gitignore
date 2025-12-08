@@ -1,0 +1,84 @@
+# Dependencies
+logs
+node_modules
+uploads/
+.terraform/
+.terraform.lock.hcl
+.terraform*
+terraform.tfstate
+terraform.tfstate.backup
+terraform.*.backup
+.vscode
+# yarn error logs
+yarn-error.log
+
+# Environment variables
+.env*
+!.env*.example
+
+# Code coverage
+coverage
+
+# Temporary files from curl commands and shell operations
+-[a-zA-Z0-9]
+-[a-zA-Z0-9]*
+test_results.json
+
+# Deployment logs and temporary files
+deployment.log
+*.deployment.log
+deploy-*.log
+*.tmp
+*.temp
+*.cache
+
+# Test and development logs
+test-output.txt
+docker-dev.log
+*.test.log
+
+# Docker build cache and temporary files
+.dockerignore.tmp
+docker-compose.override.yml
+
+# AWS and deployment artifacts
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Process files
+*.pid
+*.sock
+*.pid.lock
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Lambda deployment packages (build artifacts)
+devops/terraform/lambda-backup.zip
+devops/terraform/lambda-restore.zip
+devops/terraform/lambda-verify-backup.zip
+
+./credentials/google.api.json
+devops/asterisk/recordings

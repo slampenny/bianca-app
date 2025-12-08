@@ -1,0 +1,48 @@
+{
+  "debounceMinutes": 5,
+  "maxAlertsPerHour": 10,
+  "cleanupIntervalMinutes": 30,
+  "enableFalsePositiveFilter": true,
+  "falsePositiveConfidenceThreshold": 0.7,
+  "severityResponseTimes": {
+    "CRITICAL": 60,
+    "HIGH": 300,
+    "MEDIUM": 900
+  },
+  "enableAlertsAPI": true,
+  "enableSNSPushNotifications": false,
+  "sns": {
+    "region": "us-east-2",
+    "topicArn": null,
+    "messageTemplate": {
+      "CRITICAL": "🚨 CRITICAL EMERGENCY: {patientName} - {category}: {phrase}",
+      "HIGH": "⚠️ HIGH PRIORITY: {patientName} - {category}: {phrase}",
+      "MEDIUM": "📢 ALERT: {patientName} - {category}: {phrase}"
+    }
+  },
+  "emergencyDetection": {
+    "enableSeverityLevels": true,
+    "enableCategories": true,
+    "enablePatternMatching": true,
+    "caseInsensitive": true
+  },
+  "logging": {
+    "logAllDetections": false,
+    "logFalsePositives": true,
+    "logAlertDecisions": true
+  },
+  "confidence": {
+    "baseConfidence": 0.8,
+    "severityMultiplier": {
+      "CRITICAL": 1.2,
+      "HIGH": 1.0,
+      "MEDIUM": 0.8
+    },
+    "categoryMultiplier": {
+      "Medical": 1.1,
+      "Safety": 1.0,
+      "Physical": 0.9,
+      "Request": 0.8
+    }
+  }
+}

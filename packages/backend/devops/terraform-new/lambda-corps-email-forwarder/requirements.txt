@@ -1,0 +1,8 @@
+# AWS SDK for Python (boto3)
+# Note: boto3 is included in Lambda runtime, but we specify it here for local testing
+boto3>=1.28.0
+
+
+
+
+

@@ -1,0 +1,8 @@
+{
+    "watch": [
+      ".env",    
+      "src/"     
+    ],
+    "ext": "js,json,env", 
+    "ignore": ["node_modules/", "logs/"]
+  }

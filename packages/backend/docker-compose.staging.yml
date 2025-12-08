@@ -1,0 +1,76 @@
+# Staging override - uses staging environment with AWS secrets
+services:
+  bianca-app:
+    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
+    build:  # Disable build, use pre-built ECR image
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=staging
+      - AWS_REGION=us-east-2
+      - AWS_SECRET_ID=MySecretsManagerSecret-Staging  # Use staging secret with test keys
+      # Base URLs for staging
+      - API_BASE_URL=https://staging-api.biancawellness.com
+      - FRONTEND_URL=https://staging.biancawellness.com
+      - WEBSOCKET_URL=wss://staging-api.biancawellness.com
+      # MongoDB for staging (using containerized version)
+      - MONGODB_URL=mongodb://localhost:27017/bianca-service
+      # Redis for caching (zero cost - runs on same instance)
+      - REDIS_URL=redis://localhost:6379
+      - CACHE_TYPE=redis
+      # Email configuration
+      - EMAIL_FROM=no-reply@biancawellness.com
+      # Enable EC2 metadata service for IAM role credentials
+      - AWS_EC2_METADATA_DISABLED=false
+    # Don't mount ~/.aws - use EC2 instance IAM role via metadata service
+    # Using host network to access EC2 metadata at 169.254.169.254
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    networks: {}
+
+  mongodb:
+    network_mode: host
+    command: ["mongod", "--config", "/etc/mongod.conf"]
+    volumes:
+      - /opt/mongodb-data:/data/db  # Mount EBS volume for data persistence
+    networks: {}
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    network_mode: host  # Use host network to match other services
+    volumes:
+      - /opt/redis-data:/data  # Mount EBS volume for data persistence
+    command: redis-server --appendonly yes --port 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks: {}
+
+  # Completely override asterisk service (don't merge with base)
+  asterisk:
+    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+    container_name: asterisk
+    restart: always
+    network_mode: host
+    environment:
+      # These come from host environment (set by staging-userdata.sh from AWS Secrets)
+      - ARI_PASSWORD=${ARI_PASSWORD:-}
+      - BIANCA_PASSWORD=${BIANCA_PASSWORD:-}
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS:-}
+      - RTP_START_PORT=10000
+      - RTP_END_PORT=10100
+      - ASTERISK_USERNAME=myphonefriend
+    volumes:
+      # Mount recordings for staging debugging
+      - /opt/asterisk-recordings:/var/spool/asterisk/recording
+
+# Note: Using host network mode for all services (overrides base docker-compose.yml networks)
+# This allows containers to access EC2 metadata service for IAM credentials
+# and enables localhost communication between containers

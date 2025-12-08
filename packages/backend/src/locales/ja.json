@@ -1,0 +1,39 @@
+{
+	"sendResetPasswordEmail": {
+		"subject": "Bianca Wellness - パスワードリセットリクエスト",
+		"text": "介護者の皆様へ\n\nBianca Wellnessアカウントのパスワードリセットリクエストを受信しました。\n\nパスワードをリセットするには、以下のリンクをクリックしてください：\n\n%s\n\nこのリセットリンクはセキュリティ上の理由により1時間で期限切れになります。\n\nパスワードリセットをリクエストしていない場合は、このメールを無視してください。アカウントは安全です。\n\n敬具\nBianca Wellnessチーム\n\n---\nBianca Wellness - 安全な医療コミュニケーション\nこのメールは検証済みドメインから送信されました：biancawellness.com"
+	},
+	"sendVerificationEmail": {
+		"subject": "Bianca Wellness - メールアドレスの確認をお願いします",
+		"text": "介護者の皆様へ\n\nBianca Wellnessアカウントを作成していただき、ありがとうございます！登録を完了し、アカウントのセキュリティを確保するため、メールアドレスを確認してください。\n\n以下のリンクをクリックしてメールを確認してください：\n\n%s\n\nこの確認リンクはセキュリティ上の理由により24時間で期限切れになります。\n\nBianca Wellnessアカウントを作成していない場合は、このメールを無視してください。\n\n安全な医療コミュニケーションへようこそ！\n\n敬具\nBianca Wellnessチーム\n\n---\nBianca Wellness - 安全な医療コミュニケーション\nこのメールは検証済みドメインから送信されました：biancawellness.com"
+	},
+	"inviteEmail": {
+		"subject": "Bianca Wellnessへようこそ - 参加への招待",
+		"text": "介護者の皆様へ\n\nBianca Wellnessへの参加に招待されました。Bianca Wellnessは安全な医療コミュニケーションプラットフォームです。\n\n招待を受け入れてアカウントを設定するには、以下のリンクをクリックしてください：\n\n%s\n\nこの招待はセキュリティ上の理由により7日で期限切れになります。\n\nこの招待を期待していない場合は、このメールを無視してください。\n\n敬具\nBianca Wellnessチーム\n\n---\nBianca Wellness - 安全な医療コミュニケーション\nこのメールは検証済みドメインから送信されました：biancawellness.com"
+	},
+	"emailVerifiedPage": {
+		"title": "メール確認済み！",
+		"titleAlreadyVerified": "既に確認済み",
+		"message": "Bianca Wellnessアカウントが正常に確認されました。",
+		"messageAlreadyVerified": "メールは既に確認されています。ログインに進むことができます。",
+		"redirecting": "アプリにリダイレクト中...",
+		"continueButton": "アプリに続く"
+	},
+	"emailVerificationFailedPage": {
+		"title": "確認失敗",
+		"messageInvalid": "この確認リンクは無効または期限切れです。",
+		"messageExpired": "この確認リンクは期限切れです。",
+		"helpExpired": "ログイン画面から新しい確認メールをリクエストしてください。",
+		"helpGeneric": "これがエラーだと思われる場合は、サポートにお問い合わせください。",
+		"loginButton": "ログインへ"
+	},
+	"smsVerification": {
+		"message": "Bianca確認コードは %s です。このコードは10分で期限切れになります。"
+	},
+	"emergencyAlert": {
+		"CRITICAL": "🚨 緊急事態：%s - %s：%s",
+		"HIGH": "⚠️ 高優先度：%s - %s：%s",
+		"MEDIUM": "📢 アラート：%s - %s：%s"
+	}
+}
+

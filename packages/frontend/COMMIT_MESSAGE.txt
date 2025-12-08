@@ -1,0 +1,58 @@
+feat: Complete dark mode implementation, modern 2025 color palette, and consistent button system
+
+BREAKING CHANGES: None - all changes are backward compatible
+
+## Major Features
+- Complete dark mode support across all screens and components
+- Modern 2025 color palette with warm undertones and sophisticated colors
+- Consistent button color system with clear visual hierarchy
+- Fully theme-aware navigation system
+
+## Dark Mode Fixes
+- Fixed invisible text bubbles in conversation messages
+- Fixed invisible text in all input fields (PhoneInputWeb, TextField)
+- Fixed invisible back buttons and navigation icons
+- Fixed invisible button text in CaregiverScreen and other screens
+- Fixed invisible text in modals, cards, and all UI components
+- Fixed navigation theme to update dynamically when switching themes
+
+## UI/UX Improvements
+- Replaced TextInput with TextField (Ignite) for theme consistency
+- Replaced Pressable with Button components for standardized styling
+- Improved button grouping and spacing on OrgScreen
+- Better visual hierarchy with consistent action button presets
+- Updated all sentiment analysis components for theme awareness
+
+## Color System Updates
+- Light theme: Modern indigo primary, emerald success, rose errors, warm grays
+- Dark theme: Rich dark grays (not pure black), balanced bright colors
+- Colorblind theme: Modern colors while maintaining full accessibility
+- All hardcoded colors replaced with theme-aware equivalents
+
+## Button System
+- Primary (blue): Main actions (Save, Invite, Submit, Call)
+- Default (outlined): Secondary actions (View, Navigate, Cancel)
+- Success (green): Assign/confirm actions
+- Danger (red): Destructive actions (Delete, Logout)
+- Standardized across 20+ screens and components
+
+## Technical Changes
+- 54 component/screen files updated for theme awareness
+- Enhanced Button component with comprehensive preset system
+- Dynamic navigation theming via getNavigationTheme()
+- All styles now use createStyles(colors) pattern
+- Removed all static color imports in favor of useTheme()
+
+## Files Changed
+- 3 color theme files completely redesigned
+- All screen components updated
+- All sentiment analysis components updated
+- Navigation system enhanced
+- Button component enhanced with documentation
+
+Resolves dark mode visibility issues across the entire application.
+
+
+
+
+
