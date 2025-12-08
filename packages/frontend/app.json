@@ -1,0 +1,103 @@
+{
+  "name": "bianca_app_frontend",
+  "displayName": "Bianca",
+  "expo": {
+    "name": "Bianca",
+    "slug": "bianca_app_frontend",
+    "scheme": "bianca",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/app-icon-all.png",
+    "splash": {
+      "image": "./assets/images/splash-logo-all.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#191015"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "jsEngine": "hermes",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "icon": "./assets/images/playstore.png",
+      "package": "com.negascout.bianca",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
+        "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
+      },
+      "splash": {
+        "image": "./assets/images/splash-logo-android-universal.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#191015"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
+    },
+    "ios": {
+      "icon": "./assets/images/appstore.png",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.negascout.bianca",
+      "associatedDomains": [
+        "applinks:app.biancawellness.com",
+        "applinks:staging.biancawellness.com"
+      ],
+      "splash": {
+        "image": "./assets/images/splash-logo-ios-mobile.png",
+        "tabletImage": "./assets/images/splash-logo-ios-tablet.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#191015"
+      },
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone to make phone calls for wellness checks.",
+        "NSCameraUsageDescription": "This app may need access to the camera for profile pictures."
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/app-icon-web-favicon.png",
+      "name": "Bianca",
+      "splash": {
+        "image": "./assets/images/splash-logo-web.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#191015"
+      },
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-localization",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "newArchEnabled": false,
+            "flipper": false
+          },
+          "android": {
+            "newArchEnabled": false
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "privacy": "public",
+    "extra": {
+      "eas": {
+        "projectId": "fb5ec1ef-180c-455a-8b64-2c41f9c8ca2d"
+      },
+      "environment": "production"
+    },
+    "owner": "negascout"
+  },
+  "ignite": {
+    "version": "9.6.2"
+  }
+}

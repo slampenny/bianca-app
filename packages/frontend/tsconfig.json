@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "jsx": "react-native",
+    // Change this line:
+    "module": "esnext", // Or "es2020", "es2022", "commonjs", "node16", "node18", or "nodenext"
+    "moduleResolution": "node",
+    "strict": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false,
+    "noUnusedLocals": false,
+    "sourceMap": true,
+    "target": "esnext",
+    "lib": ["esnext", "dom"],
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "app/*": ["./app/*"],
+      "assets/*": ["./assets/*"]
+    }
+  },
+  "extends": "expo/tsconfig.base",
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
+  "include": ["index.js", "App.tsx", "app", "types", "plugins", "app.config.ts", "public/external/stripe-web.js"],
+  "exclude": ["node_modules", "test/**/*"]
+}
+

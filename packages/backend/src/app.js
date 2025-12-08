@@ -1,0 +1,262 @@
+// app.js
+const express = require('express');
+const i18n = require('i18n');
+const helmet = require('helmet');
+const xss = require('xss-clean');
+const mongoSanitize = require('express-mongo-sanitize');
+const compression = require('compression');
+const cors = require('cors');
+const passport = require('passport');
+const bodyParser = require('body-parser');
+const httpStatus = require('http-status');
+const path = require('path');
+const config = require('./config/config');
+const morgan = require('./config/morgan');
+const { jwtStrategy } = require('./config/passport');
+const { authLimiter } = require('./middlewares/rateLimiter');
+const { auditMiddleware } = require('./middlewares/auditLog');
+const { sessionTimeoutMiddleware } = require('./middlewares/sessionTimeout');
+const routes = require('./routes/v1');
+const { errorConverter, errorHandler } = require('./middlewares/error');
+const ApiError = require('./utils/ApiError');
+const logger = require('./config/logger');
+
+const app = express();
+
+// Enhanced health check that includes service status
+app.get('/health', (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    
+    // Check email service status
+    let emailStatus = { ready: false, status: 'Service not loaded' };
+    try {
+      const emailService = require('./services/email.service');
+      emailStatus = {
+        ready: emailService.isReady(),
+        status: emailService.getStatus()
+      };
+    } catch (error) {
+      emailStatus = { ready: false, status: 'Service not available' };
+    }
+
+    // Check ARI client status
+    let ariStatus = { ready: false, status: 'Service not loaded' };
+    try {
+      const { getAriClientInstance } = require('./services/ari.client');
+      const ariClient = getAriClientInstance();
+      ariStatus = {
+        ready: ariClient && ariClient.isConnected,
+        status: ariClient && ariClient.isConnected ? 'Connected' : 'Not connected'
+      };
+    } catch (error) {
+      ariStatus = { ready: false, status: 'Service not available' };
+    }
+
+    const healthData = {
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      environment: config.env,
+      services: {
+        mongodb: {
+          ready: mongoose.connection.readyState === 1,
+          status: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+        },
+        email: emailStatus,
+        asterisk: ariStatus
+      }
+    };
+
+    // Always return 200 - the app is healthy if it can respond to HTTP requests
+    // Individual service status is informational but doesn't affect overall health
+    res.status(200).json(healthData);
+    
+  } catch (error) {
+    // Fallback if something goes wrong
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      environment: config.env,
+      error: 'Could not retrieve service status'
+    });
+  }
+});
+
+// Trust proxy headers
+app.set('trust proxy', true);
+
+// i18n configuration
+i18n.configure({
+  locales: ['en', 'es'],
+  directory: `${__dirname}/locales`,
+  objectNotation: true,
+  logWarnFn(msg) {
+    // do nothing
+  },
+});
+app.use(i18n.init); // Attach i18n to the request
+
+// Log HTTP requests if not in test mode
+// if (config.env !== 'test') {
+app.use(morgan.successHandler);
+app.use(morgan.errorHandler);
+// }
+
+// Parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// Sanitize request data
+app.use(xss());
+app.use(mongoSanitize());
+
+// Gzip compression
+app.use(compression());
+
+// Enable CORS
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      // New primary domain
+      'https://app.biancawellness.com',
+      'http://app.biancawellness.com',
+      'https://www.biancawellness.com',
+      'http://www.biancawellness.com',
+      'https://biancawellness.com',
+      'http://biancawellness.com',
+      'https://staging.biancawellness.com',
+      'http://staging.biancawellness.com',
+      'https://staging-api.biancawellness.com',
+      'http://staging-api.biancawellness.com',
+      'https://api.biancawellness.com',
+      'http://api.biancawellness.com',
+      // Legacy domain (for redirects)
+      'https://app.myphonefriend.com',
+      'http://app.myphonefriend.com',
+      'https://www.myphonefriend.com',
+      'http://www.myphonefriend.com',
+      'https://myphonefriend.com',
+      'http://myphonefriend.com',
+      'https://staging.myphonefriend.com',
+      'http://staging.myphonefriend.com',
+      'https://staging-api.myphonefriend.com',
+      'http://staging-api.myphonefriend.com',
+      'https://api.myphonefriend.com',
+      'http://api.myphonefriend.com',
+      // Local development
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8080',
+      'http://localhost:8081',
+      'http://localhost:8082',  // For Playwright E2E tests
+      'http://127.0.0.1:3000',   // Alternative localhost format
+      'http://127.0.0.1:3001',
+      'null'                     // Some browsers send 'null' as origin for file:// URLs
+    ];
+    
+    // In development, allow all localhost origins for easier testing
+    if (config.env === 'development') {
+      // Allow localhost and 127.0.0.1 with any port
+      if (origin.startsWith('http://localhost:') || 
+          origin.startsWith('http://127.0.0.1:') ||
+          origin === 'null') {
+        return callback(null, true);
+      }
+    }
+    
+    // Check if it's an allowed origin
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel preview deployments (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Block all other origins
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// JWT authentication
+app.use(passport.initialize());
+passport.use('jwt', jwtStrategy);
+
+app.use(express.json({ limit: '50mb' }));
+
+// Rate limiting for auth endpoints in production
+if (config.env === 'production') {
+  app.use('/v1/auth', authLimiter);
+}
+
+// Log incoming requests
+app.use((req, res, next) => {
+  logger.debug(`Incoming request: ${req.method} ${req.url}`);
+  next();
+});
+
+// Set security HTTP headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts
+      connectSrc: ["'self'", "wss:", "https://app.biancawellness.com", "https://api.biancawellness.com", "https://staging.biancawellness.com", "https://staging-api.biancawellness.com", "https://app.myphonefriend.com", "https://api.myphonefriend.com"], // Allow WebSocket connections and API calls
+    }
+  }
+}));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+// Serve Universal Links and App Links verification files
+// These must be served at the root domain, not under /v1
+// IMPORTANT: For Universal Links to work, these files must be on the same domain as the email links
+const wellKnownRoute = require('./routes/.well-known.route');
+app.use('/.well-known', wellKnownRoute);
+
+// HIPAA Compliance: Session timeout (automatic logoff after 15 min idle)
+// Must be placed AFTER authentication (passport)
+app.use('/v1', sessionTimeoutMiddleware);
+
+// HIPAA Compliance: Audit logging for all PHI access
+// Must be placed AFTER authentication (passport) and BEFORE routes
+app.use('/v1', auditMiddleware);
+
+// v1 API routes
+app.use('/v1', routes);
+
+// 404 handler for unknown routes
+app.use((req, res, next) => {
+  next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
+});
+
+// Error conversion and handling
+app.use(errorConverter);
+app.use(errorHandler);
+
+// Handle uncaught exceptions and rejections
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Start background jobs, etc.
+if (process.env.NODE_ENV !== 'test') {
+  require('./config/agenda');
+}
+
+module.exports = app;

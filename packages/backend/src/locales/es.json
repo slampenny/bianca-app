@@ -1,0 +1,38 @@
+{
+	"sendResetPasswordEmail": {
+		"subject": "Bianca Wellness - Solicitud de restablecimiento de contraseña",
+		"text": "Estimado cuidador,\n\nHemos recibido una solicitud para restablecer la contraseña de su cuenta Bianca Wellness.\n\nPara restablecer su contraseña, por favor haga clic en el enlace de abajo:\n\n%s\n\nEste enlace de restablecimiento expirará en 1 hora por razones de seguridad.\n\nSi no solicitó un restablecimiento de contraseña, por favor ignore este correo. Su cuenta permanece segura.\n\nSaludos cordiales,\nEl equipo de Bianca Wellness\n\n---\nBianca Wellness - Comunicación sanitaria segura\nEste correo fue enviado desde un dominio verificado: biancawellness.com"
+	},
+	"sendVerificationEmail": {
+		"subject": "Bianca Wellness - Por favor verifique su dirección de correo electrónico",
+		"text": "Estimado cuidador,\n\n¡Gracias por crear su cuenta Bianca Wellness! Para completar su registro y asegurar la seguridad de la cuenta, por favor verifique su dirección de correo electrónico.\n\nHaga clic en el enlace de abajo para verificar su correo:\n\n%s\n\nEste enlace de verificación expirará en 24 horas por razones de seguridad.\n\nSi no creó una cuenta Bianca Wellness, por favor ignore este correo.\n\n¡Bienvenido a la comunicación sanitaria segura!\n\nSaludos cordiales,\nEl equipo de Bianca Wellness\n\n---\nBianca Wellness - Comunicación sanitaria segura\nEste correo fue enviado desde un dominio verificado: biancawellness.com"
+	},
+	"inviteEmail": {
+		"subject": "Bienvenido a Bianca Wellness - Invitación para unirse",
+		"text": "Estimado cuidador,\n\nHa sido invitado a unirse a Bianca Wellness, una plataforma segura para la comunicación sanitaria.\n\nPara aceptar su invitación y configurar su cuenta, por favor haga clic en el enlace de abajo:\n\n%s\n\nEsta invitación expirará en 7 días por razones de seguridad.\n\nSi no esperaba esta invitación, por favor ignore este correo.\n\nSaludos cordiales,\nEl equipo de Bianca Wellness\n\n---\nBianca Wellness - Comunicación sanitaria segura\nEste correo fue enviado desde un dominio verificado: biancawellness.com"
+	},
+	"emailVerifiedPage": {
+		"title": "¡Correo verificado!",
+		"titleAlreadyVerified": "Ya verificado",
+		"message": "Su cuenta Bianca Wellness ha sido verificada exitosamente.",
+		"messageAlreadyVerified": "Su correo electrónico ya está verificado. Puede proceder a iniciar sesión.",
+		"redirecting": "Redirigiendo a la aplicación...",
+		"continueButton": "Continuar a la aplicación"
+	},
+	"emailVerificationFailedPage": {
+		"title": "Verificación fallida",
+		"messageInvalid": "Este enlace de verificación es inválido o ha expirado.",
+		"messageExpired": "Este enlace de verificación ha expirado.",
+		"helpExpired": "Por favor solicite un nuevo correo de verificación desde la pantalla de inicio de sesión.",
+		"helpGeneric": "Si cree que esto es un error, por favor contacte al soporte.",
+		"loginButton": "Ir al inicio de sesión"
+	},
+	"smsVerification": {
+		"message": "Su código de verificación de Bianca es: %s. Este código expira en 10 minutos."
+	},
+	"emergencyAlert": {
+		"CRITICAL": "🚨 EMERGENCIA CRÍTICA: %s - %s: %s",
+		"HIGH": "⚠️ ALTA PRIORIDAD: %s - %s: %s",
+		"MEDIUM": "📢 ALERTA: %s - %s: %s"
+	}
+}

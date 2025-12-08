@@ -1,0 +1,487 @@
+import React, { useState, useEffect, useRef } from "react"
+import { View, ViewStyle, StyleSheet, Linking } from "react-native"
+import { StackScreenProps } from "@react-navigation/stack"
+import { useRoute } from "@react-navigation/native"
+import { useRegisterWithInviteMutation, useGetInviteInfoQuery } from "../services/api/authApi"
+import { useDispatch } from "react-redux"
+import { setInviteToken } from "app/store/authSlice"
+import { Button, Text, TextField, PasswordField, Screen, Header, PhoneInputWeb } from "app/components"
+import { LegalLinks } from "app/components/LegalLinks"
+import { LoginStackParamList } from "app/navigators/navigationTypes"
+import { useTheme } from "app/theme/ThemeContext"
+import { logger } from "../utils/logger"
+
+type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
+
+export const SignupScreen = (props: SignupScreenRouteProp) => {
+  const { navigation } = props
+  const route = useRoute()
+  const routeToken = (route.params as any)?.token
+  const dispatch = useDispatch()
+  const { colors, isLoading: themeLoading } = useTheme()
+
+  const [registerWithInvite, { isLoading }] = useRegisterWithInviteMutation()
+  const [token, setToken] = useState<string | undefined>(routeToken)
+
+  // Fetch invite info to prefill form
+  const { data: inviteInfo, isLoading: isLoadingInviteInfo, error: inviteInfoError } = useGetInviteInfoQuery(
+    { token: token || "" },
+    { skip: !token }
+  )
+
+  // Form state - name, email, phone will be prefilled from invite
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+
+  // Error states
+  const [passwordError, setPasswordError] = useState("")
+  const [confirmPasswordError, setConfirmPasswordError] = useState("")
+  const [generalError, setGeneralError] = useState("")
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Extract token from URL on web (React Navigation might not parse query params automatically)
+  useEffect(() => {
+    let subscription: { remove: () => void } | null = null
+    let isMounted = true
+
+    const extractTokenFromUrl = async () => {
+      // If we already have a token from route params, use it
+      if (token) {
+        return
+      }
+
+      try {
+        // On web: Check window.location for query parameters (fast, synchronous)
+        if (typeof window !== 'undefined' && window.location) {
+          const urlParams = new URLSearchParams(window.location.search)
+          const urlToken = urlParams.get('token')
+          if (urlToken && isMounted) {
+            setToken(urlToken)
+            navigation.setParams({ token: urlToken } as any)
+            return
+          }
+        }
+
+        // On mobile: Check Linking for deep link URL with timeout
+        // Use Promise.race to add a timeout so it doesn't hang
+        try {
+          const initialUrlPromise = Linking.getInitialURL()
+          const timeoutPromise = new Promise<string | null>((resolve) => {
+            setTimeout(() => resolve(null), 2000) // 2 second timeout
+          })
+          
+          const initialUrl = await Promise.race([initialUrlPromise, timeoutPromise])
+          
+          if (initialUrl && isMounted) {
+            try {
+              const urlObj = new URL(initialUrl)
+              const urlToken = urlObj.searchParams.get('token')
+              if (urlToken) {
+                setToken(urlToken)
+                navigation.setParams({ token: urlToken } as any)
+                return
+              }
+            } catch (e) {
+              // URL parsing failed, try regex as fallback
+              const tokenMatch = initialUrl.match(/[?&]token=([^&]+)/)
+              if (tokenMatch && tokenMatch[1] && isMounted) {
+                const decodedToken = decodeURIComponent(tokenMatch[1])
+                setToken(decodedToken)
+                navigation.setParams({ token: decodedToken } as any)
+                return
+              }
+            }
+          }
+        } catch (e) {
+          logger.debug('Linking.getInitialURL() failed or timed out:', e)
+          // Continue to set up event listener as fallback
+        }
+
+        // Set up listener for URL changes (in case link is opened while app is running)
+        // This is set up outside the async flow so it's always available
+        if (isMounted) {
+          subscription = Linking.addEventListener('url', (event) => {
+            if (!isMounted) return
+            
+            try {
+              const urlObj = new URL(event.url)
+              const urlToken = urlObj.searchParams.get('token')
+              if (urlToken) {
+                setToken(urlToken)
+                navigation.setParams({ token: urlToken } as any)
+              }
+            } catch (e) {
+              // Try regex fallback
+              const tokenMatch = event.url.match(/[?&]token=([^&]+)/)
+              if (tokenMatch && tokenMatch[1]) {
+                const decodedToken = decodeURIComponent(tokenMatch[1])
+                setToken(decodedToken)
+                navigation.setParams({ token: decodedToken } as any)
+              }
+            }
+          })
+        }
+      } catch (e) {
+        logger.error('Error extracting token from URL:', e)
+        // Still set up the event listener as fallback
+        if (isMounted) {
+          subscription = Linking.addEventListener('url', (event) => {
+            if (!isMounted) return
+            try {
+              const urlObj = new URL(event.url)
+              const urlToken = urlObj.searchParams.get('token')
+              if (urlToken) {
+                setToken(urlToken)
+                navigation.setParams({ token: urlToken } as any)
+              }
+            } catch (e) {
+              const tokenMatch = event.url.match(/[?&]token=([^&]+)/)
+              if (tokenMatch && tokenMatch[1]) {
+                const decodedToken = decodeURIComponent(tokenMatch[1])
+                setToken(decodedToken)
+                navigation.setParams({ token: decodedToken } as any)
+              }
+            }
+          })
+        }
+      }
+    }
+
+    // If no token in route params, try to extract from URL
+    if (!token) {
+      extractTokenFromUrl().catch((error) => {
+        logger.error('Failed to extract token from URL:', error)
+      })
+    }
+
+    // Cleanup function - properly placed in useEffect return
+    return () => {
+      isMounted = false
+      if (subscription) {
+        subscription.remove()
+      }
+    }
+  }, [token, navigation])
+
+  // Prefill form when invite info is loaded
+  useEffect(() => {
+    if (inviteInfo) {
+      setName(inviteInfo.name || "")
+      setEmail(inviteInfo.email || "")
+      setPhone(inviteInfo.phone || "")
+      logger.debug("Prefilled form from invite info:", inviteInfo)
+    }
+  }, [inviteInfo])
+
+  // Handle invite info errors
+  useEffect(() => {
+    if (inviteInfoError && token) {
+      const errorMessage = (inviteInfoError as any)?.data?.message || (inviteInfoError as any)?.message || "Invalid or expired invite token"
+      setGeneralError(errorMessage)
+      logger.error("Failed to load invite info:", inviteInfoError)
+    }
+  }, [inviteInfoError, token])
+
+  // Check if we have an invite token and persist it
+  useEffect(() => {
+    if (token) {
+      // Store the invite token in Redux so it persists across navigation
+      dispatch(setInviteToken(token))
+      logger.debug("Signup with invite token:", token)
+    } else {
+      // Only show error if we've had a chance to extract from URL
+      // Wait a bit to allow URL extraction to complete
+      const checkTokenTimeout = setTimeout(() => {
+        if (!token) {
+          setGeneralError("Invalid or expired invite token")
+          // Navigate to login after a short delay to show the error
+          timeoutRef.current = setTimeout(() => {
+            navigation.navigate("Login")
+            timeoutRef.current = null
+          }, 2000)
+        }
+      }, 1000) // Give URL extraction 1 second to complete
+      
+      // Cleanup on unmount
+      return () => {
+        clearTimeout(checkTokenTimeout)
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+          timeoutRef.current = null
+        }
+      }
+    }
+
+    // TODO: Decode token to prefill user information
+    // For now, we'll let the backend handle token validation
+  }, [token, navigation, dispatch])
+
+  // Handle backend error messages for different token states
+  useEffect(() => {
+    // Check if we have specific error messages from the backend
+    if (generalError.includes("Invalid or expired invite token") || 
+        generalError.includes("Invite token has expired")) {
+      // Don't navigate immediately, let the error be visible
+      return
+    }
+  }, [generalError])
+
+  const validateForm = () => {
+    let isValid = true
+    
+    // Reset errors
+    setPasswordError("")
+    setConfirmPasswordError("")
+    setGeneralError("")
+
+    // Validate password
+    if (!password) {
+      setPasswordError("Password is required")
+      isValid = false
+    } else if (password.length < 6) {
+      setPasswordError("Password must be at least 6 characters")
+      isValid = false
+    }
+
+    // Validate confirm password
+    if (!confirmPassword) {
+      setConfirmPasswordError("Please confirm your password")
+      isValid = false
+    } else if (password !== confirmPassword) {
+      setConfirmPasswordError("Passwords do not match")
+      isValid = false
+    }
+
+    return isValid
+  }
+
+  const handleSignup = async () => {
+    if (!validateForm()) return
+    if (!token) return
+
+    try {
+      const result = await registerWithInvite({
+        token,
+        password,
+        name,
+        email,
+        phone,
+      }).unwrap()
+
+      logger.debug("Signup successful:", result)
+      
+      // Navigate to main app since user is now registered and logged in
+      navigation.navigate("MainTabs" as any)
+      
+    } catch (error: unknown) {
+      logger.error("Signup error:", error)
+      
+      if (error?.data?.message) {
+        setGeneralError(error.data.message)
+      } else if (error?.message) {
+        setGeneralError(error.message)
+      } else {
+        setGeneralError("An error occurred during signup. Please try again.")
+      }
+      
+      // For specific token errors, don't navigate away
+      const errorMessage = error?.data?.message || error?.message || ""
+      if (errorMessage.includes("Invalid or expired invite token") || 
+          errorMessage.includes("Invite token has expired")) {
+        return // Stay on the page to show the error
+      }
+    }
+  }
+
+  // Don't block rendering while theme loads - use default colors if needed
+  const styles = createStyles(colors || { palette: { biancaBackground: '#ffffff', biancaHeader: '#000000', biancaError: '#ff0000', neutral100: '#ffffff', neutral600: '#666666', biancaButtonSelected: '#007AFF', biancaBorder: '#e0e0e0', neutral900: '#000000' } })
+
+  // Show loading state while fetching invite info
+  if (isLoadingInviteInfo && token) {
+    return (
+      <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
+        <Header titleTx="signupScreen.title" />
+        <Text style={styles.infoText}>Loading invitation details...</Text>
+      </Screen>
+    )
+  }
+
+  return (
+    <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
+      <Header titleTx="signupScreen.title" />
+      
+      {generalError ? (
+        <Text testID="signup-error" style={styles.error}>{generalError}</Text>
+      ) : null}
+
+      <TextField
+        testID="register-name"
+        accessibilityLabel="signup-name-input"
+        value={name}
+        onChangeText={setName}
+        labelTx="signupScreen.fullNameLabel"
+        placeholderTx="signupScreen.fullNamePlaceholder"
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+        editable={!isLoadingInviteInfo}
+      />
+
+      <TextField
+        testID="register-email"
+        accessibilityLabel="signup-email-input"
+        value={email}
+        onChangeText={setEmail}
+        labelTx="signupScreen.emailLabel"
+        placeholderTx="signupScreen.emailPlaceholder"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        editable={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+      />
+
+      <PhoneInputWeb
+        testID="register-phone"
+        accessibilityLabel="signup-phone-input"
+        value={phone}
+        onChangeText={setPhone}
+        labelTx="signupScreen.phoneLabel"
+        placeholderTx="signupScreen.phonePlaceholder"
+        editable={!isLoadingInviteInfo}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+      />
+
+      <PasswordField
+        testID="register-password"
+        accessibilityLabel="signup-password-input"
+        value={password}
+        onChangeText={(text) => {
+          setPassword(text)
+          setPasswordError("")
+        }}
+        labelTx="signupScreen.passwordLabel"
+        placeholderTx="signupScreen.passwordPlaceholder"
+        autoCapitalize="none"
+        autoCorrect={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+        validatePassword={(pwd) => pwd.length >= 6}
+        showRules={true}
+      />
+      {passwordError ? <Text style={styles.fieldError}>{passwordError}</Text> : null}
+
+      <PasswordField
+        testID="register-confirm-password"
+        accessibilityLabel="signup-confirm-password-input"
+        value={confirmPassword}
+        onChangeText={(text) => {
+          setConfirmPassword(text)
+          setConfirmPasswordError("")
+        }}
+        labelTx="signupScreen.confirmPasswordLabel"
+        placeholderTx="signupScreen.confirmPasswordPlaceholder"
+        autoCapitalize="none"
+        autoCorrect={false}
+        containerStyle={styles.inputContainer}
+        inputWrapperStyle={styles.inputWrapper}
+        style={styles.input}
+        isConfirmField={true}
+        comparePassword={password}
+        showRules={false}
+      />
+      {confirmPasswordError ? <Text style={styles.fieldError}>{confirmPasswordError}</Text> : null}
+
+      <Button
+        testID="register-submit"
+        accessibilityLabel="signup-submit-button"
+        tx="signupScreen.completeRegistration"
+        onPress={handleSignup}
+        preset="primary"
+        style={styles.signupButton}
+        textStyle={styles.signupButtonText}
+        disabled={isLoading || !password || !confirmPassword}
+      />
+
+      <Text 
+        style={styles.infoText}
+        tx="signupScreen.preconfiguredMessage"
+      />
+
+      <LegalLinks />
+    </Screen>
+  )
+}
+
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    alignItems: "center",
+    backgroundColor: colors.palette.biancaBackground,
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
+  error: {
+    color: colors.palette.biancaError,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  fieldError: {
+    color: colors.palette.biancaError,
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  input: {
+    color: colors.palette.biancaHeader,
+    fontSize: 16,
+  },
+  inputContainer: {
+    marginBottom: 16,
+    width: "100%",
+  },
+  inputWrapper: {
+    backgroundColor: colors.palette.neutral100,
+    borderColor: colors.palette.biancaBorder,
+    borderRadius: 6,
+    borderWidth: 1,
+    elevation: 1,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    shadowColor: colors.palette.neutral900,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  signupButton: {
+    backgroundColor: colors.palette.biancaButtonSelected,
+    borderRadius: 5,
+    marginBottom: 16,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    width: "100%",
+  },
+  signupButtonText: {
+    color: colors.palette.neutral100,
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  infoText: {
+    color: colors.palette.neutral600,
+    fontSize: 14,
+    fontStyle: "italic",
+    marginBottom: 20,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+})
