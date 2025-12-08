@@ -1,0 +1,98 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      docker: 20
+      nodejs: 18
+    commands:
+      - echo "Installing dependencies..."
+      - yarn install --frozen-lockfile
+
+  pre_build:
+    commands:
+      - echo "Detecting changes..."
+      - bash scripts/detect-changes.sh
+      - source env.sh
+      - echo "BUILD_BACKEND=$BUILD_BACKEND"
+      - echo "BUILD_FRONTEND=$BUILD_FRONTEND"
+      - echo "BUILD_ASTERISK=$BUILD_ASTERISK"
+      - |
+        if [ "$BUILD_BACKEND" = "true" ] || [ "$BUILD_FRONTEND" = "true" ] || [ "$BUILD_ASTERISK" = "true" ]; then
+          echo "Logging in to Amazon ECR..."
+          aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+        fi
+
+  build:
+    commands:
+      - |
+        if [ "$BUILD_BACKEND" = "true" ]; then
+          echo "Building backend Docker image..."
+          cd packages/backend
+          docker build -t $ECR_REGISTRY/bianca-app-backend:staging .
+          docker tag $ECR_REGISTRY/bianca-app-backend:staging $ECR_REGISTRY/bianca-app-backend:latest
+        fi
+      - |
+        if [ "$BUILD_FRONTEND" = "true" ]; then
+          echo "Building frontend Docker image..."
+          cd packages/frontend
+          docker build -t $ECR_REGISTRY/bianca-app-frontend:staging .
+          docker tag $ECR_REGISTRY/bianca-app-frontend:staging $ECR_REGISTRY/bianca-app-frontend:latest
+        fi
+      - |
+        if [ "$BUILD_ASTERISK" = "true" ]; then
+          echo "Building asterisk Docker image..."
+          cd packages/backend/devops/asterisk
+          docker build -t $ECR_REGISTRY/bianca-app-asterisk:staging .
+          docker tag $ECR_REGISTRY/bianca-app-asterisk:staging $ECR_REGISTRY/bianca-app-asterisk:latest
+        fi
+
+  test:
+    commands:
+      - |
+        if [ "$BUILD_BACKEND" = "true" ]; then
+          echo "Running backend tests..."
+          yarn workspace @bianca-app/backend test || true
+        fi
+      - |
+        if [ "$BUILD_FRONTEND" = "true" ]; then
+          echo "Running frontend tests..."
+          yarn workspace @bianca-app/frontend test || true
+        fi
+
+  post_build:
+    commands:
+      - |
+        if [ "$BUILD_BACKEND" = "true" ]; then
+          echo "Pushing backend image to ECR..."
+          docker push $ECR_REGISTRY/bianca-app-backend:staging
+          docker push $ECR_REGISTRY/bianca-app-backend:latest
+          echo "Creating imagedefinitions for backend..."
+          echo '[{"name":"bianca-app-backend","imageUri":"'$ECR_REGISTRY'/bianca-app-backend:staging"}]' > imagedefinitions_backend.json
+        fi
+      - |
+        if [ "$BUILD_FRONTEND" = "true" ]; then
+          echo "Pushing frontend image to ECR..."
+          docker push $ECR_REGISTRY/bianca-app-frontend:staging
+          docker push $ECR_REGISTRY/bianca-app-frontend:latest
+          echo "Creating imagedefinitions for frontend..."
+          echo '[{"name":"bianca-app-frontend","imageUri":"'$ECR_REGISTRY'/bianca-app-frontend:staging"}]' > imagedefinitions_frontend.json
+        fi
+      - |
+        if [ "$BUILD_ASTERISK" = "true" ]; then
+          echo "Pushing asterisk image to ECR..."
+          docker push $ECR_REGISTRY/bianca-app-asterisk:staging
+          docker push $ECR_REGISTRY/bianca-app-asterisk:latest
+        fi
+
+cache:
+  paths:
+    - 'node_modules/**/*'
+    - 'packages/*/node_modules/**/*'
+
+artifacts:
+  files:
+    - 'appspec.yml'
+    - 'scripts/**/*'
+    - 'imagedefinitions*.json'
+  name: BuildOutput
