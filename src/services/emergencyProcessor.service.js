@@ -345,14 +345,38 @@ class EmergencyProcessor {
    */
   async getPatientCaregivers(patientId) {
     try {
+      logger.info(`[Emergency Processor] Getting caregivers for patient ${patientId}`);
       const patient = await Patient.findById(patientId).populate('caregivers');
-      if (!patient || !patient.caregivers) {
+      
+      if (!patient) {
+        logger.warn(`[Emergency Processor] Patient ${patientId} not found`);
         return [];
       }
-
-      return patient.caregivers.filter(caregiver => caregiver && caregiver.phone);
+      
+      if (!patient.caregivers) {
+        logger.warn(`[Emergency Processor] Patient ${patientId} has no caregivers array`);
+        return [];
+      }
+      
+      logger.info(`[Emergency Processor] Patient ${patientId} has ${patient.caregivers.length} caregiver(s) in array`);
+      
+      const caregiversWithPhones = patient.caregivers.filter(caregiver => {
+        const hasPhone = caregiver && caregiver.phone;
+        if (!hasPhone) {
+          logger.warn(`[Emergency Processor] Caregiver ${caregiver?._id || 'unknown'} has no phone number`);
+        }
+        return hasPhone;
+      });
+      
+      logger.info(`[Emergency Processor] Found ${caregiversWithPhones.length} caregiver(s) with phone numbers out of ${patient.caregivers.length} total`);
+      caregiversWithPhones.forEach((cg, idx) => {
+        logger.info(`[Emergency Processor] Caregiver ${idx + 1}: id=${cg._id}, name=${cg.name || 'unknown'}, phone=${cg.phone || 'MISSING'}`);
+      });
+      
+      return caregiversWithPhones;
     } catch (error) {
-      logger.error('Error getting patient caregivers:', error);
+      logger.error(`[Emergency Processor] Error getting patient caregivers for ${patientId}:`, error);
+      logger.error(`[Emergency Processor] Error stack:`, error.stack);
       return [];
     }
   }
