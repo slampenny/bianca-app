@@ -929,6 +929,7 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     scheduleDetails: "Schedule Details",
     selectSchedule: "Select a schedule:",
     scheduleNumber: "Schedule",
+    newSchedule: "New Schedule",
     noSchedulesAvailable: "No schedules available. Please create a new one.",
     errorLoadingSchedules: "Error loading schedules.",
     invalidScheduleError: "Please fill in all required schedule fields (frequency, time, and days for weekly/monthly schedules).",

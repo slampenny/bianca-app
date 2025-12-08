@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react"
-import { View, ScrollView, StyleSheet, Platform } from "react-native"
+import { View, ScrollView, StyleSheet, Platform, TouchableOpacity } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native"
 import type { HomeStackParamList } from "../navigators/navigationTypes"
@@ -44,31 +44,70 @@ export const SchedulesScreen = () => {
   const { colors, isLoading: themeLoading, currentTheme, fontScale } = useTheme()
   
   // Track if we've already checked for missing schedule to avoid duplicate alerts
-  const hasCheckedForAlert = useRef(false)
+  // Store the patient ID we've checked to prevent duplicates even if component re-renders
+  const alertCheckRef = useRef<{ patientId: string | null; hasChecked: boolean }>({
+    patientId: null,
+    hasChecked: false,
+  })
   
   // Track if schedule has been modified to enable/disable save button
   const [hasChanges, setHasChanges] = useState(false)
   const initialScheduleRef = useRef<Schedule | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [scheduleKey, setScheduleKey] = useState(0) // Key to force ScheduleComponent reset
   
-  // Validate schedule before saving
-  const isValidSchedule = (schedule: Schedule | null | undefined): boolean => {
-    if (!schedule) return false
+  // Validate schedule before saving and return specific error message
+  const validateSchedule = (schedule: Schedule | null | undefined): string | null => {
+    if (!schedule) {
+      return "Schedule is missing. Please configure a schedule."
+    }
     
     // Check required fields
-    if (!schedule.frequency) return false
-    if (!schedule.time || schedule.time.trim() === "") return false
+    if (!schedule.frequency) {
+      return "Please select a frequency (daily, weekly, or monthly)."
+    }
+    
+    if (!schedule.time || schedule.time.trim() === "") {
+      return "Please select a start time."
+    }
     
     // Validate time format (HH:mm)
     const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/
-    if (!timePattern.test(schedule.time)) return false
-    
-    // For weekly and monthly frequencies, intervals must have at least one item
-    if (schedule.frequency === "weekly" || schedule.frequency === "monthly") {
-      if (!schedule.intervals || schedule.intervals.length === 0) return false
+    if (!timePattern.test(schedule.time)) {
+      return "Time format is invalid. Please select a valid time."
     }
     
-    return true
+    // For weekly and monthly frequencies, intervals must have at least one item
+    if (schedule.frequency === "weekly") {
+      if (!schedule.intervals || schedule.intervals.length === 0) {
+        return "Please select at least one day of the week for weekly schedules."
+      }
+      // Check if any interval has a valid day (0-6)
+      const hasValidDay = schedule.intervals.some(interval => 
+        interval.day !== undefined && interval.day >= 0 && interval.day <= 6
+      )
+      if (!hasValidDay) {
+        return "Please select at least one day of the week for weekly schedules."
+      }
+    }
+    
+    if (schedule.frequency === "monthly") {
+      if (!schedule.intervals || schedule.intervals.length === 0) {
+        return "Please select a day of the month for monthly schedules."
+      }
+      // Check if the interval has a valid day (1-31)
+      const day = schedule.intervals[0]?.day
+      if (day === undefined || day === null || day < 1 || day > 31) {
+        return "Please select a valid day of the month (1-31) for monthly schedules."
+      }
+    }
+    
+    return null // No errors
+  }
+  
+  // Legacy function for backward compatibility
+  const isValidSchedule = (schedule: Schedule | null | undefined): boolean => {
+    return validateSchedule(schedule) === null
   }
   
   // Check if user exits without creating a schedule and create alert if needed
@@ -76,13 +115,16 @@ export const SchedulesScreen = () => {
   // useFocusEffect works for both stack navigation and tab navigation
   useFocusEffect(
     React.useCallback(() => {
-      // Reset check flag when screen gains focus
-      hasCheckedForAlert.current = false
+      // Reset check flag when screen gains focus (but keep patient ID to prevent duplicates)
+      const currentPatientId = selectedPatient?.id || null
+      if (alertCheckRef.current.patientId !== currentPatientId) {
+        alertCheckRef.current = { patientId: currentPatientId, hasChecked: false }
+      }
       
       // Return cleanup function that runs when screen loses focus
       return () => {
-        // Only check if this is a new patient creation and we haven't checked yet
-        if (!isNewPatient || hasCheckedForAlert.current) {
+        // Only check if this is a new patient creation and we haven't checked yet for this patient
+        if (!isNewPatient || alertCheckRef.current.hasChecked) {
           return
         }
 
@@ -95,8 +137,11 @@ export const SchedulesScreen = () => {
           return
         }
 
-        // Mark as checked to prevent duplicate alerts
-        hasCheckedForAlert.current = true
+        // Mark as checked for this patient to prevent duplicate alerts
+        alertCheckRef.current = {
+          patientId: selectedPatient.id,
+          hasChecked: true,
+        }
 
         // Check if any schedules exist for this patient
         // Use patient.schedules if available (from API), otherwise fall back to Redux schedules
@@ -122,15 +167,17 @@ export const SchedulesScreen = () => {
               const relevanceUntil = new Date()
               relevanceUntil.setDate(relevanceUntil.getDate() + 30)
               
+              // Use assignedCaregivers visibility with patient as creator so all caregivers
+              // assigned to this patient see the alert (one alert visible to all assigned caregivers)
               const result = await createAlert({
                 message: `Patient ${selectedPatient.name} has no schedule configured`,
                 importance: 'medium',
                 alertType: 'patient',
                 relatedPatient: selectedPatient.id,
-                createdBy: currentUser.id,
-                createdModel: 'Caregiver',
-                visibility: 'allCaregivers',
-                relevanceUntil: relevanceUntil.toISOString(),
+                createdBy: selectedPatient.id, // Patient ID so all assigned caregivers can see it
+                createdModel: 'Patient',
+                visibility: 'assignedCaregivers', // Only show to caregivers assigned to this patient
+                relevanceUntil: relevanceUntil.toISOString() as any, // API accepts ISO string, type definition expects Date
               }).unwrap()
               logger.info(`Alert created successfully for patient ${selectedPatient.name} with no schedule`, result)
             } catch (error) {
@@ -204,26 +251,32 @@ export const SchedulesScreen = () => {
     
     // Don't save if there are no changes (for existing schedules)
     if (!hasChanges && selectedSchedule?.id) {
+      setErrorMessage("No changes to save. Please make changes to the schedule before saving.")
       return
     }
     
-    // Validate schedule before saving
-    if (!isValidSchedule(selectedSchedule)) {
-      setErrorMessage(translate("schedulesScreen.invalidScheduleError") || "Please fill in all required schedule fields (frequency, time, and days for weekly/monthly schedules).")
+    // Validate schedule before saving and show specific error
+    const validationError = validateSchedule(selectedSchedule)
+    if (validationError) {
+      setErrorMessage(validationError)
       return
     }
     
     try {
       if (selectedSchedule && selectedSchedule.id) {
+        // Update existing schedule
         await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule }).unwrap()
         // Reset changes after successful save
         setHasChanges(false)
         initialScheduleRef.current = JSON.parse(JSON.stringify(selectedSchedule))
       } else {
+        // Create new schedule (no ID or ID is null/undefined)
         if (selectedPatient && selectedPatient.id && selectedSchedule) {
           await createNewSchedule({ patientId: selectedPatient.id, data: selectedSchedule }).unwrap()
           // Reset changes after successful create
           setHasChanges(false)
+          // Note: The schedule will be updated with an ID by Redux after creation
+          // The useEffect watching selectedSchedule?.id will update initialScheduleRef
         }
       }
     } catch (error) {
@@ -242,6 +295,32 @@ export const SchedulesScreen = () => {
       }
       setErrorMessage(errorMsg)
     }
+  }
+
+  const handleNewSchedule = () => {
+    // Clear any error messages
+    setErrorMessage(null)
+    
+    // Create a new empty schedule with no ID
+    const newSchedule: Schedule = {
+      id: null,
+      patient: selectedPatient?.id || null,
+      frequency: "daily",
+      intervals: [],
+      time: "00:00",
+      isActive: true,
+    }
+    
+    // Set the new schedule in Redux
+    dispatch(setSchedule(newSchedule))
+    
+    // Reset the initial schedule reference to the new empty schedule
+    // This ensures change tracking works correctly
+    initialScheduleRef.current = JSON.parse(JSON.stringify(newSchedule))
+    setHasChanges(false) // Start with no changes since it's a fresh schedule
+    
+    // Increment key to force ScheduleComponent to reset
+    setScheduleKey(prev => prev + 1)
   }
 
   const handleDelete = async () => {
@@ -303,16 +382,6 @@ export const SchedulesScreen = () => {
   }
 
   const styles = createStyles(colors, fontScale)
-  
-  // Check if save button should be disabled
-  const isSaveDisabled = () => {
-    // For existing schedules: disable if no changes
-    if (selectedSchedule?.id) {
-      return !hasChanges
-    }
-    // For new schedules: disable if no changes OR schedule is invalid
-    return !hasChanges || !isValidSchedule(selectedSchedule)
-  }
 
   if (isUpdating || isCreating || isDeleting) {
     return <LoadingScreen /> // use the LoadingScreen component
@@ -332,28 +401,39 @@ export const SchedulesScreen = () => {
           ContentComponent={
             <View style={styles.selectorContent}>
               <Text style={styles.selectorLabel}>{translate("schedulesScreen.selectSchedule")}</Text>
-              <View style={styles.pickerWrapper}>
-                <Picker
-                  selectedValue={selectedSchedule?.id}
-                  onValueChange={(itemValue) => {
-                    const selected = schedules.find((schedule) => schedule.id === itemValue)
-                    if (selected) {
-                      dispatch(setSchedule(selected))
-                    }
-                  }}
-                  style={styles.picker}
-                  dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-                  itemStyle={styles.pickerItem}
+              <View style={styles.pickerRow}>
+                <TouchableOpacity
+                  onPress={handleNewSchedule}
+                  style={styles.newScheduleButton}
+                  testID="schedule-new-button"
+                  accessibilityLabel="New Schedule"
+                  accessibilityHint="Creates a new schedule"
                 >
-                  {schedules.map((schedule, index) => (
-                    <Picker.Item 
-                      key={schedule.id} 
-                      label={`${translate("schedulesScreen.scheduleNumber")} ${index + 1}`} 
-                      value={schedule.id}
-                      color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-                    />
-                  ))}
-                </Picker>
+                  <Text style={styles.newScheduleButtonText}>+</Text>
+                </TouchableOpacity>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={selectedSchedule?.id || undefined}
+                    onValueChange={(itemValue) => {
+                      const selected = schedules.find((schedule) => schedule.id === itemValue)
+                      if (selected) {
+                        dispatch(setSchedule(selected))
+                      }
+                    }}
+                    style={styles.picker}
+                    dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+                    itemStyle={styles.pickerItem}
+                  >
+                    {schedules.map((schedule, index) => (
+                      <Picker.Item 
+                        key={schedule.id} 
+                        label={`${translate("schedulesScreen.scheduleNumber")} ${index + 1}`} 
+                        value={schedule.id}
+                        color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+                      />
+                    ))}
+                  </Picker>
+                </View>
               </View>
             </View>
           }
@@ -377,6 +457,7 @@ export const SchedulesScreen = () => {
         style={styles.scheduleCard}
         ContentComponent={
           <ScheduleComponent
+            key={scheduleKey}
             initialSchedule={selectedSchedule}
             onScheduleChange={handleScheduleChange}
           />
@@ -403,7 +484,6 @@ export const SchedulesScreen = () => {
         preset="primary"
         testID="schedule-save-button"
         accessibilityLabel="schedule-save-button"
-        disabled={isSaveDisabled()}
       />
       {schedules && schedules.length > 0 && selectedSchedule && selectedSchedule.id && (
         <Button
@@ -501,6 +581,7 @@ const createStyles = (colors: ThemeColors, fontScale: number) => StyleSheet.crea
     borderRadius: 5,
     borderWidth: 1,
     overflow: "hidden",
+    flex: 1,
   },
   selectorContent: {
     paddingHorizontal: 20, // Match Schedule component container horizontal padding for alignment
@@ -512,6 +593,27 @@ const createStyles = (colors: ThemeColors, fontScale: number) => StyleSheet.crea
     color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
     fontSize: 18 * fontScale,
     marginBottom: 8,
+  },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  newScheduleButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 5,
+    backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
+    borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  newScheduleButtonText: {
+    fontSize: 24,
+    fontWeight: "300",
+    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+    lineHeight: 28,
   },
 
   scheduleCard: {

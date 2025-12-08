@@ -521,20 +521,6 @@ function PatientScreen() {
                 textStyle={styles.buttonText}
               />
 
-              <Button
-                text={translate("patientScreen.viewSentimentAnalysis")}
-                onPress={() => navigation.navigate("SentimentAnalysis", {
-                  patientId: patient.id!,
-                  patientName: patient.name,
-                })}
-                disabled={isLoading}
-                testID="view-sentiment-analysis-button"
-                accessibilityHint="Opens sentiment analysis report for this patient"
-                preset="default"
-                style={[styles.button, styles.manageButton]}
-                textStyle={styles.buttonText}
-              />
-
               {canManageCaregivers && (
                 <Button
                   text={translate("patientScreen.manageCaregivers")}

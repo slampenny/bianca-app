@@ -140,6 +140,15 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       marginBottom: 20,
       padding: 10,
     },
+    monthlyContainer: {
+      // CRITICAL: Use theme-aware background and border
+      backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
+      borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
+      borderRadius: 5,
+      borderWidth: 1,
+      marginBottom: 20,
+      padding: 10,
+    },
   })
   
   const styles = createStyles(colors)
@@ -197,16 +206,41 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   // Only reset state when the schedule ID changes (switching to a different schedule)
   // Don't reset when the same schedule is updated (e.g., when toggle changes isActive)
   useEffect(() => {
-    // Only update if the schedule ID has changed (new schedule selected)
-    if (initialSchedule.id !== id) {
+    // Update if the schedule ID has changed (new schedule selected)
+    // This handles: switching between schedules, creating new schedule (null -> null but different object), etc.
+    const currentId = id ?? null
+    const newId = initialSchedule.id ?? null
+    
+    if (currentId !== newId) {
       setId(initialSchedule.id)
       setPatient(initialSchedule.patient)
       setFrequency(initialSchedule.frequency)
       setIntervals(initialSchedule.intervals)
       setIsActive(initialSchedule.isActive)
       setTime(initialSchedule.time)
+    } else if (currentId === null && newId === null) {
+      // Both are null/undefined - check if it's actually a different schedule by comparing other fields
+      // This handles the case where user creates a new schedule, then creates another new one
+      // We'll reset if frequency, time, or other key fields differ significantly
+      if (initialSchedule.frequency !== frequency || 
+          initialSchedule.time !== time ||
+          JSON.stringify(initialSchedule.intervals) !== JSON.stringify(intervals)) {
+        setId(initialSchedule.id)
+        setPatient(initialSchedule.patient)
+        setFrequency(initialSchedule.frequency)
+        setIntervals(initialSchedule.intervals)
+        setIsActive(initialSchedule.isActive)
+        setTime(initialSchedule.time)
+      }
     }
-  }, [initialSchedule.id, initialSchedule.patient, id]) // Only depend on ID and patient, not the whole object
+  }, [initialSchedule.id, initialSchedule.patient, initialSchedule.frequency, initialSchedule.time, initialSchedule.intervals, id, frequency, time, intervals]) // Include key fields to detect new schedule creation
+
+  // Initialize monthly intervals with default day if empty
+  useEffect(() => {
+    if (frequency === "monthly" && (intervals.length === 0 || intervals[0]?.day === undefined || intervals[0]?.day === 0)) {
+      setIntervals([{ day: 1 }])
+    }
+  }, [frequency, intervals])
 
   useEffect(() => {
     const newSchedule: Schedule = { id, patient, frequency, intervals, isActive, time }
@@ -218,6 +252,11 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       ? [...intervals, { day: dayIndex }]
       : intervals.filter((interval) => interval.day !== dayIndex)
     setIntervals(newIntervals)
+  }
+
+  const handleMonthlyDayChange = (day: number) => {
+    // For monthly schedules, we only store one day in intervals
+    setIntervals([{ day }])
   }
 
   const formatSchedule = (schedule: Schedule) => {
@@ -338,6 +377,30 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
               )
             },
           )}
+        </View>
+      )}
+
+      {frequency === "monthly" && (
+        <View style={styles.monthlyContainer}>
+          <Text style={styles.label}>Day of Month</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker
+              selectedValue={intervals.length > 0 && intervals[0].day !== undefined ? intervals[0].day : 1}
+              onValueChange={handleMonthlyDayChange}
+              style={styles.picker}
+              itemStyle={styles.pickerItem}
+              dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+            >
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                <Picker.Item
+                  key={day}
+                  label={day.toString()}
+                  value={day}
+                  color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+                />
+              ))}
+            </Picker>
+          </View>
         </View>
       )}
 
