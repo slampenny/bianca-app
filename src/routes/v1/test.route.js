@@ -1411,11 +1411,9 @@ router.post('/verify-alert-query', async (req, res) => {
  * @swagger
  * /test/emergency-sms:
  *   post:
- *     summary: Test emergency SMS functionality
- *     description: Tests the complete emergency detection and SMS notification flow with detailed diagnostics
+ *     summary: Test emergency SMS functionality (Staging/Test Only)
+ *     description: Tests the complete emergency detection and SMS notification flow with detailed diagnostics. One-click test with defaults - no parameters required.
  *     tags: [Test]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: false
  *       content:
@@ -1426,16 +1424,44 @@ router.post('/verify-alert-query', async (req, res) => {
  *               patientId:
  *                 type: string
  *                 description: Patient ID to test with (optional, will use first patient if not provided)
+ *                 default: null
  *               text:
  *                 type: string
- *                 description: Text to test emergency detection with (default: "I'm having a heart attack")
+ *                 description: Text to test emergency detection with
+ *                 default: "I'm having a heart attack"
+ *           example:
+ *             {}
  *     responses:
  *       "200":
  *         description: Emergency test result with detailed diagnostics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 diagnostics:
+ *                   type: object
+ *                   description: Detailed step-by-step diagnostics
  */
-router.post('/emergency-sms', auth(), async (req, res) => {
+router.post('/emergency-sms', async (req, res) => {
   try {
-    const { patientId, text = "I'm having a heart attack" } = req.body;
+    // Only allow in staging/test environments
+    if (config.env === 'production') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Emergency SMS test is not allowed in production' 
+      });
+    }
+
+    // Default values for one-click testing
+    const { 
+      patientId = null, 
+      text = "I'm having a heart attack" 
+    } = req.body || {};
     const { emergencyProcessor } = require('../../services/emergencyProcessor.service');
     const { Patient } = require('../../models');
     const { config: emergencyConfig } = require('../../config/emergency.config');
