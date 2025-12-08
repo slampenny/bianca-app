@@ -47,3 +47,4 @@ fi
 
 echo "Done! Review the changes with 'git status' and commit when ready."
 echo "Note: Files are removed from git but kept locally."
+

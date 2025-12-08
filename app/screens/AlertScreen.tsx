@@ -125,8 +125,32 @@ export function AlertScreen() {
       ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!))
       : alerts
 
-    await markAllAsRead({ alerts: filteredAlerts })
-    await refetch()
+    try {
+      await markAllAsRead({ alerts: filteredAlerts }).unwrap()
+      await refetch()
+    } catch (error: any) {
+      // Handle authentication errors gracefully
+      const errorStatus = error?.status
+      const errorData = error?.data
+      const customError = error?.error
+      
+      // Check if this is an authentication error (401 or CUSTOM_ERROR from cancelled auth)
+      if (errorStatus === 401 || (customError && customError.status === 'CUSTOM_ERROR')) {
+        // Authentication error - the auth modal should already be showing
+        // Don't show additional error messages, just log it
+        logger.debug('[AlertScreen] Mark all as read failed due to authentication error:', {
+          status: errorStatus,
+          error: customError?.error || errorData?.message || 'Authentication required'
+        })
+        // Don't refetch on auth error - let the user authenticate first
+        return
+      }
+      
+      // For other errors, log and potentially show a user-friendly message
+      logger.error('[AlertScreen] Failed to mark all alerts as read:', error)
+      // Optionally show an error toast or message to the user
+      // For now, we'll just log it and not refetch
+    }
   }
 
   const handleAlertPress = async (alert: Alert) => {
