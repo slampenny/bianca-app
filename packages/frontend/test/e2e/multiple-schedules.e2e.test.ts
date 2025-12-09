@@ -146,10 +146,40 @@ async function createSchedule(page: any, time: string): Promise<void> {
   // Click save button
   const saveButton = page.locator('[data-testid="schedule-save-button"]')
   await saveButton.waitFor({ timeout: 5000, state: 'visible' })
+  
+  // Wait for the save to complete by waiting for network request
+  const savePromise = page.waitForResponse(response => 
+    response.url().includes('/schedules/patients/') && response.request().method() === 'POST',
+    { timeout: 10000 }
+  ).catch(() => null) // Don't fail if we can't catch the response
+  
   await saveButton.click()
   
-  // Wait for save to complete and Redux to update
-  await page.waitForTimeout(3000) // Wait for API call and Redux update
+  // Wait for the API response and verify it succeeded
+  const response = await savePromise
+  if (response) {
+    const status = response.status()
+    if (status >= 400) {
+      const responseBody = await response.json().catch(() => ({}))
+      throw new Error(`Schedule creation failed with status ${status}: ${JSON.stringify(responseBody)}`)
+    }
+  }
+  
+  // Wait for loading to complete (the screen shows LoadingScreen while saving)
+  await page.waitForSelector('[data-testid="schedules-screen"]', { timeout: 15000, state: 'visible' })
+  
+  // Wait a bit more for Redux to update and UI to refresh
+  await page.waitForTimeout(3000)
+  
+  // Check for error messages
+  const errorMessage = page.locator('[data-testid*="error"], .error, [class*="error"]')
+  const errorCount = await errorMessage.count()
+  if (errorCount > 0) {
+    const errorText = await errorMessage.first().textContent().catch(() => '')
+    if (errorText && !errorText.includes('No changes')) {
+      console.log(`Warning: Error message found: ${errorText}`)
+    }
+  }
 }
 
 test.describe("Multiple Schedules for Patient", () => {
@@ -174,15 +204,22 @@ test.describe("Multiple Schedules for Patient", () => {
     console.log('Creating first schedule (09:00)...')
     await createSchedule(page, '09:00')
     
-    // Wait a bit for the schedule to appear in the picker
-    await page.waitForTimeout(2000)
+    // Wait for the schedule to appear in the picker - retry up to 10 times
+    let schedulePickerAfterFirst = null
+    let validScheduleCountAfterFirst = initialScheduleCount
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(1000)
+      schedulePickerAfterFirst = await getScheduleSelectorPicker(page)
+      if (schedulePickerAfterFirst) {
+        validScheduleCountAfterFirst = await countSchedulesInPicker(schedulePickerAfterFirst)
+        if (validScheduleCountAfterFirst === initialScheduleCount + 1) {
+          break
+        }
+      }
+    }
     
     // Verify first schedule was created - the schedule selector should now exist
-    const schedulePickerAfterFirst = await getScheduleSelectorPicker(page)
     expect(schedulePickerAfterFirst).not.toBeNull()
-    
-    // Count schedules after first creation
-    const validScheduleCountAfterFirst = await countSchedulesInPicker(schedulePickerAfterFirst)
     expect(validScheduleCountAfterFirst).toBe(initialScheduleCount + 1)
     console.log(`Schedule count after first creation: ${validScheduleCountAfterFirst}`)
     
@@ -190,11 +227,21 @@ test.describe("Multiple Schedules for Patient", () => {
     console.log('Creating second schedule (14:00)...')
     await createSchedule(page, '14:00')
     
-    // Wait for the second schedule to be created
-    await page.waitForTimeout(2000)
+    // Wait for the second schedule to appear in the picker - retry up to 10 times
+    let schedulePickerAfterSecond = null
+    let validScheduleCountAfterSecond = validScheduleCountAfterFirst
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(1000)
+      schedulePickerAfterSecond = await getScheduleSelectorPicker(page)
+      if (schedulePickerAfterSecond) {
+        validScheduleCountAfterSecond = await countSchedulesInPicker(schedulePickerAfterSecond)
+        if (validScheduleCountAfterSecond >= initialScheduleCount + 2) {
+          break
+        }
+      }
+    }
     
     // Verify both schedules exist
-    const schedulePickerAfterSecond = await getScheduleSelectorPicker(page)
     expect(schedulePickerAfterSecond).not.toBeNull()
     await schedulePickerAfterSecond.waitFor({ timeout: 5000, state: 'visible' })
     
@@ -216,14 +263,15 @@ test.describe("Multiple Schedules for Patient", () => {
       }
     }
     
-    const validScheduleCountAfterSecond = scheduleValues.length
-    console.log(`Final schedule count: ${validScheduleCountAfterSecond}`)
+    // Use the count we already calculated
+    const finalScheduleCount = scheduleValues.length
+    console.log(`Final schedule count: ${finalScheduleCount}`)
     console.log(`Schedule values: ${scheduleValues.join(', ')}`)
     console.log(`Schedule labels in picker: ${scheduleLabels.join(', ')}`)
     
     // Verify we have at least 2 schedules (the two we just created)
     // We might have more if there were existing schedules
-    expect(validScheduleCountAfterSecond).toBeGreaterThanOrEqual(initialScheduleCount + 2)
+    expect(finalScheduleCount).toBeGreaterThanOrEqual(initialScheduleCount + 2)
     
     // Verify we have multiple schedule options
     expect(scheduleLabels.length).toBeGreaterThanOrEqual(2)
@@ -246,6 +294,141 @@ test.describe("Multiple Schedules for Patient", () => {
     } else {
       throw new Error(`Expected at least 2 schedules, but only found ${scheduleValues.length}`)
     }
+  })
+
+  test("can delete a schedule and only the selected schedule is deleted", async ({ page }) => {
+    // Navigate to schedules screen via patient
+    await navigateToSchedulesViaPatient(page)
+    
+    // Verify we're on schedules screen
+    await expect(page.locator('[data-testid="schedules-screen"]')).toBeVisible({ timeout: 10000 })
+    
+    // Get initial schedule count
+    const initialSchedulePicker = await getScheduleSelectorPicker(page)
+    const initialScheduleCount = initialSchedulePicker ? await countSchedulesInPicker(initialSchedulePicker) : 0
+    
+    if (initialScheduleCount < 2) {
+      // Need at least 2 schedules to test deletion - create them first
+      console.log('Creating schedules for delete test...')
+      await createSchedule(page, '10:00')
+      await page.waitForTimeout(2000)
+      await createSchedule(page, '11:00')
+      await page.waitForTimeout(2000)
+    }
+    
+    // Get the schedule picker and all schedule values
+    const schedulePicker = await getScheduleSelectorPicker(page)
+    expect(schedulePicker).not.toBeNull()
+    await schedulePicker.waitFor({ timeout: 5000, state: 'visible' })
+    
+    // Get all schedule options
+    const options = schedulePicker.locator('option')
+    const optionCount = await options.count()
+    const allScheduleValues: string[] = []
+    const allScheduleLabels: string[] = []
+    
+    for (let i = 0; i < optionCount; i++) {
+      const option = options.nth(i)
+      const value = await option.getAttribute('value').catch(() => null)
+      const text = await option.textContent().catch(() => null)
+      if (value && value !== '' && value !== 'null' && value !== 'undefined') {
+        allScheduleValues.push(value)
+        if (text && text.trim() !== '') {
+          allScheduleLabels.push(text.trim())
+        }
+      }
+    }
+    
+    const scheduleCountBeforeDelete = allScheduleValues.length
+    expect(scheduleCountBeforeDelete).toBeGreaterThanOrEqual(2)
+    
+    console.log(`Schedules before delete: ${scheduleCountBeforeDelete}`)
+    console.log(`Schedule values: ${allScheduleValues.join(', ')}`)
+    
+    // Select the second schedule (not the first one)
+    const scheduleToDelete = allScheduleValues[1]
+    const scheduleToKeep = allScheduleValues[0]
+    
+    console.log(`Selecting schedule to delete: ${scheduleToDelete}`)
+    console.log(`Schedule to keep: ${scheduleToKeep}`)
+    
+    // Select the schedule we want to delete
+    await schedulePicker.selectOption(scheduleToDelete)
+    await page.waitForTimeout(1000) // Wait for selection to process
+    
+    // Verify the schedule is selected
+    const selectedValue = await schedulePicker.inputValue().catch(() => null)
+    expect(selectedValue).toBe(scheduleToDelete)
+    
+    // Click the delete button
+    const deleteButton = page.locator('[data-testid="schedule-delete-button"]')
+    await deleteButton.waitFor({ timeout: 5000, state: 'visible' })
+    
+    // Wait for the delete to complete by waiting for network request
+    const deletePromise = page.waitForResponse(response => 
+      response.url().includes('/schedules/') && response.request().method() === 'DELETE',
+      { timeout: 10000 }
+    ).catch(() => null)
+    
+    await deleteButton.click()
+    
+    // Wait for the API response
+    const deleteResponse = await deletePromise
+    if (deleteResponse) {
+      const status = deleteResponse.status()
+      if (status >= 400) {
+        const responseBody = await deleteResponse.json().catch(() => ({}))
+        throw new Error(`Schedule deletion failed with status ${status}: ${JSON.stringify(responseBody)}`)
+      }
+    }
+    
+    // Wait for loading to complete
+    await page.waitForSelector('[data-testid="schedules-screen"]', { timeout: 15000, state: 'visible' })
+    await page.waitForTimeout(2000) // Wait for Redux to update
+    
+    // Verify the deleted schedule is gone and other schedules remain
+    const schedulePickerAfterDelete = await getScheduleSelectorPicker(page)
+    
+    // If there are still schedules, verify the count decreased by 1
+    if (schedulePickerAfterDelete) {
+      const scheduleCountAfterDelete = await countSchedulesInPicker(schedulePickerAfterDelete)
+      expect(scheduleCountAfterDelete).toBe(scheduleCountBeforeDelete - 1)
+      console.log(`Schedule count after delete: ${scheduleCountAfterDelete}`)
+      
+      // Verify the deleted schedule is not in the list
+      const optionsAfterDelete = schedulePickerAfterDelete.locator('option')
+      const optionCountAfterDelete = await optionsAfterDelete.count()
+      const remainingScheduleValues: string[] = []
+      
+      for (let i = 0; i < optionCountAfterDelete; i++) {
+        const option = optionsAfterDelete.nth(i)
+        const value = await option.getAttribute('value').catch(() => null)
+        if (value && value !== '' && value !== 'null' && value !== 'undefined') {
+          remainingScheduleValues.push(value)
+        }
+      }
+      
+      // Verify the deleted schedule is not in the remaining schedules
+      expect(remainingScheduleValues).not.toContain(scheduleToDelete)
+      console.log(`Deleted schedule ${scheduleToDelete} is not in remaining schedules`)
+      
+      // Verify the schedule we wanted to keep is still there
+      expect(remainingScheduleValues).toContain(scheduleToKeep)
+      console.log(`Schedule ${scheduleToKeep} is still present (correctly preserved)`)
+      
+      console.log(`Remaining schedule values: ${remainingScheduleValues.join(', ')}`)
+    } else {
+      // If no picker, we might have deleted the last schedule
+      // In that case, verify we're still on the schedules screen (not navigated away)
+      const schedulesScreen = page.locator('[data-testid="schedules-screen"]')
+      await expect(schedulesScreen).toBeVisible({ timeout: 5000 })
+      console.log('All schedules deleted - still on schedules screen')
+    }
+    
+    // Verify we're still on the schedules screen (control remains after deletion)
+    const schedulesScreen = page.locator('[data-testid="schedules-screen"]')
+    await expect(schedulesScreen).toBeVisible({ timeout: 5000 })
+    console.log('✅ Successfully deleted schedule and remained on schedules screen')
   })
 })
 
