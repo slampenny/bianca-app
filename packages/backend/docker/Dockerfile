@@ -31,8 +31,8 @@ RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-de
 # Set environment variable for MongoMemoryServer
 ENV MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod
 
-# Install Yarn 1.x (Classic)
-RUN npm install -g yarn@1.22.22
+# Install Yarn 1.x (Classic) - use --force to overwrite if it already exists
+RUN npm install -g yarn@1.22.22 --force || yarn --version
 
 # Dependencies stage - this layer will be cached unless package.json changes
 FROM base AS dependencies
