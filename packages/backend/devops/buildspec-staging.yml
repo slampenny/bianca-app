@@ -67,14 +67,15 @@ phases:
         echo Checking before_install.sh content...
         head -5 devops/codedeploy/scripts/before_install.sh
         wc -l devops/codedeploy/scripts/before_install.sh
-        cp devops/codedeploy/appspec.yml appspec.yml
-        # Copy scripts directory contents (not the directory itself)
-        mkdir -p scripts
-        cp devops/codedeploy/scripts/* scripts/
-        chmod +x scripts/*.sh
+        # Copy artifacts to root directory for CodeBuild
+        cp devops/codedeploy/appspec.yml "$CODEBUILD_SRC_DIR/appspec.yml"
+        # Copy scripts directory contents to root
+        mkdir -p "$CODEBUILD_SRC_DIR/scripts"
+        cp devops/codedeploy/scripts/* "$CODEBUILD_SRC_DIR/scripts/"
+        chmod +x "$CODEBUILD_SRC_DIR/scripts"/*.sh
         echo Verifying copied scripts...
-        ls -la scripts/
-        wc -l scripts/before_install.sh
+        ls -la "$CODEBUILD_SRC_DIR/scripts/"
+        wc -l "$CODEBUILD_SRC_DIR/scripts/before_install.sh"
         echo CodeDeploy artifacts packaged
 
 artifacts:
