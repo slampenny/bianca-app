@@ -18,9 +18,11 @@ phases:
         # Build backend image
         echo "🔨 Building backend image..."
         cd packages/backend
-        # Don't use --cache-from for staging to ensure we always get fresh code
-        # Staging should always rebuild with latest code, not use cached layers
-        docker build --build-arg BUILD_TIMESTAMP=$(date +%s) \
+        # Use --no-cache for staging to ensure we always get fresh code
+        # Staging should always rebuild with latest code, not use any cached layers
+        echo "   Building with --no-cache to ensure fresh code..."
+        docker build --no-cache \
+                     --build-arg BUILD_TIMESTAMP=$(date +%s) \
                      --build-arg GIT_COMMIT=$CODEBUILD_RESOLVED_SOURCE_VERSION \
                      -t $ECR_REGISTRY/bianca-app-backend:latest \
                      -t $ECR_REGISTRY/bianca-app-backend:staging \
