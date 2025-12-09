@@ -80,7 +80,7 @@ class TwilioCallService {
         statusCallback: statusCallbackUrl,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
         statusCallbackMethod: 'POST',
-        answerOnBridge: true,
+        // answerOnBridge: true, // REMOVED: This was causing Twilio to skip the initial TwiML "Connecting you to Bianca" message
         machineDetection: 'DetectMessageEnd', // Detect answering machines
         machineDetectionTimeout: 10, // Wait 10 seconds for detection
         timeout: 30 // Ring for 30 seconds before giving up
@@ -189,8 +189,7 @@ class TwilioCallService {
       }
 
       // For human answer, connect to Asterisk SIP endpoint
-      
-      // Say "Connecting you to Bianca" to make the pause less noticeable
+      // Say "Connecting you to Bianca" to cover the delay while connecting to Asterisk and setting up Bianca
       twiml.say({
         voice: 'Polly.Joanna', // Most human-sounding voice for US English
         language: 'en-US'
