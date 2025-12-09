@@ -34,17 +34,21 @@ phases:
         # Build asterisk image
         echo "🔨 Building asterisk image..."
         cd packages/backend/devops/asterisk
-        docker build -t $ECR_REGISTRY/bianca-app-asterisk:staging .
+        # Use --no-cache for staging to ensure we always get fresh code
+        docker build --no-cache -t $ECR_REGISTRY/bianca-app-asterisk:staging .
         cd ../../..
         echo "✅ Asterisk build complete"
       - |
         # Build frontend image
         echo "🔨 Building frontend image..."
         cd packages/frontend
-        docker build -t $ECR_REGISTRY/bianca-app-frontend:latest \
+        # Use --no-cache for staging to ensure we always get fresh code
+        echo "   Building with --no-cache to ensure fresh code..."
+        docker build --no-cache \
+                     --build-arg BUILD_ENV=staging \
+                     -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:staging \
-                     -f devops/Dockerfile \
-                     --build-arg BUILD_ENV=staging .
+                     -f devops/Dockerfile .
         cd ../..
         echo "✅ Frontend build complete"
       - |
