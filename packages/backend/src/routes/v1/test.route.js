@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require('express'); // Test auto-trigger
 const auth = require('../../middlewares/auth');
 const router = express.Router();
 const logger = require('../../config/logger');
