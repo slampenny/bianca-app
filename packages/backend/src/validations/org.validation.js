@@ -63,6 +63,7 @@ const updateOrg = {
           return value;
         }),
       logo: Joi.string().allow(null, '').optional(),
+      timezone: Joi.string().optional(), // IANA timezone identifier
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

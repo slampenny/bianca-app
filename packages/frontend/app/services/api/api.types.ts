@@ -83,6 +83,7 @@ export interface Org {
   email: string
   phone: string
   isEmailVerified: boolean
+  timezone?: string // IANA timezone identifier (e.g., 'America/New_York', 'Europe/London')
   caregivers: string[]
   patients: string[]
   planName?: string

@@ -322,7 +322,7 @@ export const SchedulesScreen = () => {
       patient: selectedPatient?.id || null,
       frequency: "daily",
       intervals: [],
-      time: "00:00",
+      time: "09:00",
       isActive: true,
     }
     
