@@ -76,6 +76,33 @@ const orgSchema = mongoose.Schema(
       default: 'America/New_York',
       trim: true,
     },
+    // Call retry settings for the organization
+    callRetrySettings: {
+      retryCount: {
+        type: Number,
+        default: 2,
+        min: [0, 'Retry count cannot be negative'],
+        max: [10, 'Retry count cannot exceed 10'],
+        validate: {
+          validator: Number.isInteger,
+          message: 'Retry count must be an integer',
+        },
+      },
+      retryIntervalMinutes: {
+        type: Number,
+        default: 15,
+        min: [1, 'Retry interval must be at least 1 minute'],
+        max: [1440, 'Retry interval cannot exceed 1440 minutes (24 hours)'],
+        validate: {
+          validator: Number.isInteger,
+          message: 'Retry interval must be an integer',
+        },
+      },
+      alertOnAllMissedCalls: {
+        type: Boolean,
+        default: true,
+      },
+    },
     caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },

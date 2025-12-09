@@ -98,6 +98,19 @@ describe('Org routes', () => {
     expect(org.email).toEqual('updatedorg@example.com');
   });
 
+  it('should update org timezone', async () => {
+    const superAdminAccessToken = tokenService.generateToken(superAdminId);
+    const res = await request(app).patch(`/v1/orgs/${orgId}`).set('Authorization', `Bearer ${superAdminAccessToken}`).send({
+      timezone: 'America/Los_Angeles',
+    });
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    expect(res.body.timezone).toEqual('America/Los_Angeles');
+
+    // Check that the org timezone has been updated in the database
+    const org = await Org.findById(orgId);
+    expect(org.timezone).toEqual('America/Los_Angeles');
+  });
+
   it('should delete a specific org', async () => {
     const superAdminAccessToken = tokenService.generateToken(superAdminId);
     const res = await request(app).delete(`/v1/orgs/${orgId}`).set('Authorization', `Bearer ${superAdminAccessToken}`);

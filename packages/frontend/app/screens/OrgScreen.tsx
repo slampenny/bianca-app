@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { ScrollView, StyleSheet, View, Image } from "react-native"
+import { ScrollView, StyleSheet, View, Image, Platform } from "react-native"
 import { Picker } from "@react-native-picker/picker"
 import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
@@ -54,7 +54,7 @@ export function OrgScreen() {
   const dispatch = useDispatch()
   const currentOrg = useSelector(getOrg)
   const currentUser = useSelector(getCurrentUser)
-  const { colors, isLoading: themeLoading } = useTheme()
+  const { colors, isLoading: themeLoading, currentTheme } = useTheme()
   const [updateOrg, { isError, error }] = useUpdateOrgMutation()
   const [isLoading, setIsLoading] = useState(true)
   const [name, setName] = useState("")
@@ -123,6 +123,56 @@ export function OrgScreen() {
 
     loadOrg()
   }, [currentOrg, currentUser?.org, dispatch])
+
+  // Inject CSS for web Picker dropdown theming
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const isDarkMode = currentTheme === "dark"
+      
+      const dropdownBg = isDarkMode 
+        ? (colors.palette?.neutral500 || "#525252") 
+        : (colors.palette?.neutral100 || "#FFFFFF")
+      const dropdownText = isDarkMode
+        ? (colors.text || colors.palette?.neutral900 || "#FAFAFA")
+        : (colors.text || colors.palette?.neutral800 || "#000000")
+      const hoverBg = isDarkMode
+        ? (colors.palette?.neutral400 || "#404040")
+        : (colors.palette?.neutral200 || "#FAFAFA")
+
+      const styleId = 'picker-dropdown-theme-org'
+      let styleElement = document.getElementById(styleId)
+      
+      if (!styleElement) {
+        styleElement = document.createElement('style')
+        styleElement.id = styleId
+        document.head.appendChild(styleElement)
+      }
+
+      styleElement.textContent = `
+        select {
+          background-color: ${dropdownBg} !important;
+          color: ${dropdownText} !important;
+        }
+        select option {
+          background-color: ${dropdownBg} !important;
+          color: ${dropdownText} !important;
+        }
+        select option:hover,
+        select option:checked {
+          background-color: ${hoverBg} !important;
+          color: ${dropdownText} !important;
+        }
+      `
+
+      return () => {
+        // Cleanup on unmount
+        const element = document.getElementById(styleId)
+        if (element) {
+          element.remove()
+        }
+      }
+    }
+  }, [colors, currentTheme])
 
   const handleSave = async () => {
     if (currentOrg?.id) {
