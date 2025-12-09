@@ -84,15 +84,3 @@ artifacts:
     - 'scripts/**/*'
   name: BuildOutput
 
-cache:
-  paths:
-    - 'node_modules/**/*'
-    - 'packages/*/node_modules/**/*'
-
-artifacts:
-  files:
-    - 'appspec.yml'
-    - 'scripts/**/*'
-    - 'imagedefinitions*.json'
-  name: BuildOutput
-
