@@ -41,6 +41,15 @@ phases:
       - |
         # Build frontend image
         echo "🔨 Building frontend image..."
+        # Ensure we're in the root directory
+        cd "$CODEBUILD_SRC_DIR"
+        pwd
+        ls -la packages/ | head -5
+        if [ ! -d "packages/frontend" ]; then
+          echo "ERROR: packages/frontend directory not found!"
+          ls -la packages/
+          exit 1
+        fi
         cd packages/frontend
         # Use --no-cache for staging to ensure we always get fresh code
         echo "   Building with --no-cache to ensure fresh code..."
@@ -49,7 +58,6 @@ phases:
                      -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:staging \
                      -f devops/Dockerfile .
-        cd ../..
         echo "✅ Frontend build complete"
       - |
         # Push all images
