@@ -3,10 +3,11 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const faker = require('faker');
 const httpStatus = require('http-status');
 const app = require('../../../src/app');
-const { Schedule, Patient, Caregiver } = require('../../../src/models');
+const { Schedule, Patient, Caregiver, Org } = require('../../../src/models');
 const { scheduleService } = require('../../../src/services');
 const { scheduleOne, scheduleTwo, insertSchedules } = require('../../fixtures/schedule.fixture');
 const { patientOne, insertPatients } = require('../../fixtures/patient.fixture');
+const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 
 let mongoServer;
 
@@ -27,6 +28,7 @@ describe('Schedule Service', () => {
     await Caregiver.deleteMany();
     await Patient.deleteMany();
     await Schedule.deleteMany();
+    await Org.deleteMany();
   });
 
   describe('createSchedule', () => {
@@ -36,7 +38,9 @@ describe('Schedule Service', () => {
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
       expect(schedule).toHaveProperty('id');
-      expect(schedule.patient.toString()).toEqual(patient.id.toString());
+      // schedule.patient is now populated, so check the ID from the populated object
+      const patientId = typeof schedule.patient === 'object' ? schedule.patient._id.toString() : schedule.patient.toString();
+      expect(patientId).toEqual(patient.id.toString());
 
       const updatedPatient = await Patient.findById(patient.id);
       expect(updatedPatient.schedules.map((id) => id.toString())).toContainEqual(schedule.id.toString());
@@ -92,6 +96,130 @@ describe('Schedule Service', () => {
       const invalidId = new mongoose.Types.ObjectId();
 
       await expect(scheduleService.getScheduleById(invalidId)).rejects.toThrow('Schedule not found');
+    });
+  });
+
+  describe('Timezone conversion', () => {
+    test('should convert org time to UTC when creating schedule', async () => {
+      // Create org with Eastern timezone
+      const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/New_York' }]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      
+      // Create schedule with 9:00 AM Eastern time
+      const scheduleData = {
+        frequency: 'daily',
+        intervals: [],
+        time: '09:00',
+        isActive: true,
+      };
+
+      const schedule = await scheduleService.createSchedule(patient.id, scheduleData);
+
+      // Time should be stored in UTC (9:00 AM EST = 14:00 UTC or 9:00 AM EDT = 13:00 UTC)
+      expect(['13:00', '14:00']).toContain(schedule.time);
+    });
+
+    test('should convert org time to UTC when updating schedule', async () => {
+      // Create org with Pacific timezone
+      const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/Los_Angeles' }]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      
+      // Create initial schedule
+      const schedule = await scheduleService.createSchedule(patient.id, {
+        frequency: 'daily',
+        intervals: [],
+        time: '09:00',
+        isActive: true,
+      });
+
+      // Update with new time in org timezone
+      const updatedSchedule = await scheduleService.updateSchedule(schedule.id, {
+        time: '12:00', // Noon Pacific
+      });
+
+      // Should be converted to UTC (12:00 PM PST = 20:00 UTC or 12:00 PM PDT = 19:00 UTC)
+      expect(['19:00', '20:00']).toContain(updatedSchedule.time);
+    });
+
+    test('should use default timezone (America/New_York) if org has no timezone', async () => {
+      // Create org without timezone (should default to America/New_York)
+      const [org] = await insertOrgs([orgOne]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      
+      const scheduleData = {
+        frequency: 'daily',
+        intervals: [],
+        time: '09:00',
+        isActive: true,
+      };
+
+      const schedule = await scheduleService.createSchedule(patient.id, scheduleData);
+
+      // Should still convert using default timezone
+      expect(['13:00', '14:00']).toContain(schedule.time);
+    });
+
+    test('should handle different timezones correctly', async () => {
+      const timezones = [
+        { tz: 'America/New_York', orgTime: '09:00', expectedUTC: ['13:00', '14:00'] },
+        { tz: 'America/Los_Angeles', orgTime: '09:00', expectedUTC: ['16:00', '17:00'] },
+        { tz: 'Europe/London', orgTime: '09:00', expectedUTC: ['08:00', '09:00'] },
+        { tz: 'Asia/Tokyo', orgTime: '09:00', expectedUTC: ['00:00'] },
+      ];
+
+      for (const { tz, orgTime, expectedUTC } of timezones) {
+        const [org] = await insertOrgs([{ ...orgOne, timezone: tz }]);
+        const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+        
+        const schedule = await scheduleService.createSchedule(patient.id, {
+          frequency: 'daily',
+          intervals: [],
+          time: orgTime,
+          isActive: true,
+        });
+
+        expect(expectedUTC).toContain(schedule.time);
+        
+        // Cleanup
+        await Schedule.deleteMany();
+        await Patient.deleteMany();
+        await Org.deleteMany();
+      }
+    });
+
+    test('should populate patient.org when creating schedule', async () => {
+      const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/New_York' }]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      
+      const schedule = await scheduleService.createSchedule(patient.id, {
+        frequency: 'daily',
+        intervals: [],
+        time: '09:00',
+        isActive: true,
+      });
+
+      // Schedule should have patient populated with org
+      expect(schedule.patient).toBeDefined();
+      expect(schedule.patient.org).toBeDefined();
+      expect(schedule.patient.org.timezone).toBe('America/New_York');
+    });
+
+    test('should populate patient.org when getting schedule by ID', async () => {
+      const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/Chicago' }]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      
+      const schedule = await scheduleService.createSchedule(patient.id, {
+        frequency: 'daily',
+        intervals: [],
+        time: '09:00',
+        isActive: true,
+      });
+
+      const foundSchedule = await scheduleService.getScheduleById(schedule.id);
+
+      expect(foundSchedule.patient).toBeDefined();
+      expect(foundSchedule.patient.org).toBeDefined();
+      expect(foundSchedule.patient.org.timezone).toBe('America/Chicago');
     });
   });
 });
