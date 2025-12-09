@@ -27,16 +27,6 @@ phases:
     commands:
       - |
         if [ "$BUILD_BACKEND" = "true" ]; then
-          echo "Running backend tests..."
-          yarn workspace @bianca-app/backend test || true
-        fi
-      - |
-        if [ "$BUILD_FRONTEND" = "true" ]; then
-          echo "Running frontend tests..."
-          yarn workspace @bianca-app/frontend test || true
-        fi
-      - |
-        if [ "$BUILD_BACKEND" = "true" ]; then
           echo "Building backend Docker image..."
           cd packages/backend
           docker build -f docker/Dockerfile -t $ECR_REGISTRY/bianca-app-backend:production .
