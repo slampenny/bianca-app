@@ -8,7 +8,7 @@ services:
         - bianca-app:latest
     image: bianca-app
     env_file:
-      - .env
+      - ../.env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/bianca-app
       - NODE_ENV=development
@@ -40,8 +40,6 @@ services:
       - '27017:27017'
     volumes:
       - dbdata:/data/db
-      - ./mongod.conf:/etc/mongod.conf:ro
-    command: ["mongod", "--config", "/etc/mongod.conf"]
     networks:
       - node-network
     # Optional: Add healthcheck for better container orchestration
@@ -52,20 +50,22 @@ services:
       retries: 5
       start_period: 40s
   asterisk:
-    build: ./devops/asterisk
+    build:
+      context: ../devops/asterisk
+      dockerfile: Dockerfile
     container_name: asterisk
     restart: always
     environment:
-      - ARI_PASSWORD=${ARI_PASSWORD}  # Used in ari.conf
-      - BIANCA_PASSWORD=${BIANCA_PASSWORD}  # Used in pjsip.conf
-      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
+      - ARI_PASSWORD=${ARI_PASSWORD:-}  # Used in ari.conf
+      - BIANCA_PASSWORD=${BIANCA_PASSWORD:-}  # Used in pjsip.conf
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS:-}
     ports:
       - '5060:5060/udp'
       - '5061:5061/tcp'
       - '10000-10100:10000-10100/udp'
       - '8088:8088/tcp'  # Exposing ARI port for easier debugging
     volumes:
-      - ./devops/asterisk/logs:/var/log/asterisk
+      - ../devops/asterisk/logs:/var/log/asterisk
     healthcheck:
       test: ["CMD-SHELL", "asterisk -rx 'core show uptime' || exit 1"]
       interval: 15s

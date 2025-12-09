@@ -2,8 +2,41 @@
  * Asterisk/ARI Configuration
  */
 
+const fs = require('fs');
+
+/**
+ * Normalizes Asterisk host/URL for local development
+ * Replaces Docker service name "asterisk" with "localhost" when running outside Docker
+ */
+const normalizeAsteriskHost = (host) => {
+  if (!host) return host;
+  
+  // Check if we're running in Docker by checking for common Docker environment indicators
+  const isDocker = process.env.DOCKER_CONTAINER === 'true' || 
+                   process.env.IN_DOCKER === 'true' ||
+                   fs.existsSync('/.dockerenv');
+  
+  // If not in Docker and host is Docker service name, replace with localhost
+  if (!isDocker && host === 'asterisk') {
+    return 'localhost';
+  }
+  
+  return host;
+};
+
 const buildAsteriskConfig = (envVars) => {
-  const defaultAsteriskHost = envVars.ASTERISK_HOST || 'asterisk';
+  const defaultAsteriskHost = normalizeAsteriskHost(envVars.ASTERISK_HOST || 'asterisk');
+  
+  // Normalize ASTERISK_URL if it contains Docker service name
+  let asteriskUrl = envVars.ASTERISK_URL;
+  if (asteriskUrl && asteriskUrl.includes('://asterisk:')) {
+    const isDocker = process.env.DOCKER_CONTAINER === 'true' || 
+                     process.env.IN_DOCKER === 'true' ||
+                     fs.existsSync('/.dockerenv');
+    if (!isDocker) {
+      asteriskUrl = asteriskUrl.replace('://asterisk:', '://localhost:');
+    }
+  }
   
   return {
     asterisk: {
@@ -13,9 +46,9 @@ const buildAsteriskConfig = (envVars) => {
       operationTimeout: process.env.ARI_OPERATION_TIMEOUT || 30000,
       enabled: envVars.ASTERISK_ENABLED,
       host: defaultAsteriskHost,
-      url: `http://${defaultAsteriskHost}:8088`,
+      url: asteriskUrl || `http://${defaultAsteriskHost}:8088`,
       rtpBiancaHost: envVars.RTP_BIANCA_HOST || 'bianca-app',
-      rtpAsteriskHost: envVars.RTP_ASTERISK_HOST || 'asterisk',
+      rtpAsteriskHost: normalizeAsteriskHost(envVars.RTP_ASTERISK_HOST || 'asterisk'),
       externalPort: envVars.EXTERNAL_PORT || 5061,
       sipUserName: envVars.SIP_USER_NAME || 'bianca',
       username: envVars.ASTERISK_USERNAME || 'myphonefriend',

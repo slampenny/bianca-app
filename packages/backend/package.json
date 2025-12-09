@@ -34,7 +34,8 @@
   },
   "scripts": {
     "start": "pm2 start ecosystem.config.json --no-daemon",
-    "dev": "cross-env NODE_ENV=development nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
+    "dev": "yarn docker:dev:services && cross-env NODE_ENV=development nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
+    "docker:dev:services": "(docker stop asterisk 2>/dev/null && docker rm asterisk 2>/dev/null || true) && docker-compose --env-file .env -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up -d mongodb redis asterisk",
     "dev:staging": "cross-env NODE_ENV=staging nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
     "dev:test": "cross-env NODE_ENV=test nodemon -x 'node --inspect=0.0.0.0:9229' src/index.js",
     "test": "NODE_NO_IOURING=1 jest -i --colors --verbose --detectOpenHandles --config jest.config.js",
