@@ -245,9 +245,9 @@ async function seedEmergencyPhrases() {
     // Check if phrases already exist
     const existingCount = await EmergencyPhrase.countDocuments();
     if (existingCount > 0) {
-      console.log(`Found ${existingCount} existing emergency phrases. Deleting and re-seeding...`);
-      await EmergencyPhrase.deleteMany({});
-      console.log('   Deleted existing phrases, proceeding with seed...');
+      console.log(`Found ${existingCount} existing emergency phrases. Skipping seed.`);
+      console.log('   (To re-seed, delete existing phrases first)');
+      return;
     }
 
     const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn']; // All supported languages

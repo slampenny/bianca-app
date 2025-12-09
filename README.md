@@ -1,145 +1,74 @@
-# MyPhoneFriend Backend API
+# Bianca App Monorepo
 
-> Secure healthcare communication platform for caregivers and wellness monitoring
+Bianca Wellness - Secure healthcare communication platform for caregivers and wellness monitoring.
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Express.js](https://img.shields.io/badge/Express.js-4.x-blue.svg)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green.svg)](https://www.mongodb.com/)
-[![AWS](https://img.shields.io/badge/AWS-Cloud-orange.svg)](https://aws.amazon.com/)
+## Structure
 
-## 🏥 Overview
+This is a monorepo managed with Yarn workspaces.
 
-MyPhoneFriend Backend is a comprehensive healthcare communication API that enables secure caregiver coordination, automated wellness checks, and patient monitoring. Built with enterprise-grade security and HIPAA compliance.
+```
+bianca-app/
+├── packages/
+│   ├── backend/          # Backend API service
+│   └── frontend/         # Frontend application
+├── package.json          # Root workspace configuration
+└── yarn.lock            # Workspace lock file
+```
 
-### 🎯 Key Features
+## Getting Started
 
-- 🔐 **Secure Authentication** - JWT-based auth with role-based access control
-- 📞 **Voice Communication** - Real-time voice calls via Asterisk/FreePBX
-- 🤖 **AI Transcription** - Automated call transcription using OpenAI Whisper
-- 👥 **Patient Management** - Comprehensive patient and caregiver coordination
-- 📅 **Scheduling System** - Automated wellness check scheduling
-- 📧 **Email Services** - HIPAA-compliant email notifications via AWS SES
-- 🏢 **Multi-Organization** - Support for healthcare organizations
-- 📊 **Analytics & Reporting** - Wellness check analytics and insights
-- 💳 **Automated Billing** - Real-time cost calculation and daily billing cycles
-- 🔒 **HIPAA Compliance** - End-to-end encryption and audit trails
-
-## 🛠️ Technology Stack
-
-### Core Framework
-- **Node.js 18+** - Runtime environment
-- **Express.js** - Web application framework
-- **MongoDB Atlas** - NoSQL database with encryption
-- **Mongoose** - MongoDB object modeling
-
-### Security & Authentication
-- **JWT** - Stateless authentication
-- **bcrypt** - Password hashing
-- **Helmet.js** - Security headers
-- **Rate Limiting** - API abuse prevention
-
-### Communication & Voice
-- **Asterisk/FreePBX** - VoIP server for voice calls
-- **Twilio** - SIP trunk provider
-- **WebRTC** - Real-time peer-to-peer communication
-- **Socket.io** - Real-time bidirectional communication
-
-### AI & Machine Learning
-- **OpenAI API** - GPT-4 integration
-- **OpenAI Whisper** - Speech-to-text transcription
-
-### Cloud Infrastructure (AWS)
-- **ECS** - Container orchestration
-- **SES** - Email delivery
-- **S3** - File storage
-- **Route53** - DNS management
-- **VPC** - Network isolation
-
-## 📚 Documentation
-
-All technical documentation is organized in the [`docs/`](./docs/) directory:
-
-- **[📋 Documentation Index](./docs/INDEX.md)** - Complete list of all documentation
-- **[🚨 Emergency System](./docs/EMERGENCY_SYSTEM.md)** - Emergency detection and notification system
-- **[📞 Call Workflows](./docs/CALL_WORKFLOW_README.md)** - Voice call handling and workflows
-- **[🧠 AI & Analysis](./docs/SENTIMENT_ANALYSIS_API.md)** - AI-powered analysis features
-- **[🧪 Testing](./docs/testing-strategy.md)** - Testing strategies and test suites
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+
-- MongoDB Atlas account
-- AWS account with SES configured
-- Docker (optional)
-
-### Installation
+### Install Dependencies
 
 ```bash
-git clone https://github.com/jordanlapp/bianca-app-backend.git
-cd bianca-app-backend
 yarn install
-cp .env.example .env
-# Configure your .env file
 ```
 
 ### Development
 
 ```bash
-npm run dev     # Start development server
-npm test        # Run tests
-npm run lint    # Lint code
+# Run backend in development mode
+yarn dev
+
+# Run backend tests
+yarn test
+
+# Run linting
+yarn lint
 ```
 
-## 📁 Project Structure
+## Workspace Commands
 
+All commands are run from the root directory. Use `yarn workspace <package-name> <command>` to run commands in specific packages.
+
+### Backend (`@bianca-app/backend`)
+
+```bash
+# Development
+yarn workspace @bianca-app/backend dev
+
+# Testing
+yarn workspace @bianca-app/backend test
+
+# Docker
+yarn workspace @bianca-app/backend docker:dev
 ```
-src/
-├── config/          # Configuration files
-├── controllers/     # Request handlers
-├── middleware/      # Custom middleware
-├── models/          # Database models
-├── routes/          # API routes
-├── services/        # Business logic
-├── utils/           # Utility functions
-└── validations/     # Request validations
-```
 
-## 🔌 API Endpoints
+## Packages
 
-### Authentication
-- `POST /v1/auth/register` - Register new user
-- `POST /v1/auth/login` - User login
-- `GET /v1/auth/verify-email` - Verify email address
+### `@bianca-app/backend`
 
-### Patients & Care
-- `GET /v1/patients` - Get patients
-- `POST /v1/patients` - Create patient
-- `GET /v1/wellness-checks` - Get wellness checks
-- `POST /v1/calls/initiate` - Initiate voice call
+Backend API service providing:
+- REST API
+- Real-time voice calls
+- AI-powered transcription
+- HIPAA-compliant patient care coordination
 
-### Billing & Payments
-- `GET /v1/payments/orgs/:orgId/unbilled-costs` - Get unbilled costs by organization
-- `POST /v1/payments/patients/:patientId/invoices` - Create invoice for patient
-- `GET /v1/payments/orgs/:orgId/invoices` - Get invoices by organization
-- `GET /v1/payments/patients/:patientId/invoices` - Get invoices by patient
+See `packages/backend/README.md` for more details.
 
-## 📚 Documentation
+### `@bianca-app/frontend`
 
-- **[Documentation Hub](docs/README.md)** - Complete documentation index
-- **[Workflows](docs/WORKFLOWS.md)** - System workflows sorted by business value
-- **[Billing System](docs/BILLING_SYSTEM.md)** - Automated billing and payment processing
-- **[AI Test Suite](docs/AI_TEST_SUITE.md)** - AI tests and diagnostic capabilities
-- **[Testing Strategy](docs/testing-strategy.md)** - Comprehensive testing approach
-- **[Medical Analysis API](docs/MEDICAL_ANALYSIS_API.md)** - Medical analysis endpoints
-- **[Emergency System](docs/EMERGENCY_SYSTEM.md)** - Emergency detection system
+Frontend application (see `packages/frontend/` for details).
 
-## 📞 Support
+## License
 
-- **Email**: support@biancawellness.com
-- **Phone**: +1-604-562-4263
-- **Address**: 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
-
----
-
-**MyPhoneFriend** - Secure Healthcare Communication Platform
+UNLICENSED

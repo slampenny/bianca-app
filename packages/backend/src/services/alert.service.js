@@ -5,24 +5,6 @@ const ApiError = require('../utils/ApiError');
 const { translateAlertMessage, parseAlertMessage } = require('../utils/alertTranslations');
 
 const createAlert = async (alertData) => {
-  // For patient-type alerts, check if a similar alert already exists to prevent duplicates
-  // This ensures the same alert never shows up more than once for a caregiver
-  if (alertData.alertType === 'patient' && alertData.relatedPatient) {
-    // Check for existing alert with same message, relatedPatient, and still relevant
-    const existingAlert = await Alert.findOne({
-      message: alertData.message,
-      alertType: 'patient',
-      relatedPatient: alertData.relatedPatient,
-      visibility: alertData.visibility,
-      relevanceUntil: { $gte: new Date() }, // Still relevant
-    });
-
-    if (existingAlert) {
-      // Return existing alert instead of creating a duplicate
-      return existingAlert;
-    }
-  }
-
   return await Alert.create(alertData);
 };
 
@@ -110,9 +92,6 @@ const getAlerts = async (caregiverId, showRead = false) => {
     };
     alerts = await Alert.find(conditions);
   }
-
-  // MongoDB's find() already returns unique documents, so no deduplication needed
-  // Duplicates are prevented at creation time in createAlert()
 
   // Translate alert messages based on caregiver's preferred language
   const caregiverLanguage = caregiver.preferredLanguage || 'en';
