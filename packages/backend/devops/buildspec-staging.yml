@@ -20,7 +20,10 @@ phases:
         cd packages/backend
         # Pull latest staging image for cache, but don't fail if it doesn't exist
         docker pull $ECR_REGISTRY/bianca-app-backend:staging || echo "No previous staging image found"
+        # Use BUILD_TIMESTAMP and GIT_COMMIT to help with cache invalidation
         docker build --cache-from $ECR_REGISTRY/bianca-app-backend:staging \
+                     --build-arg BUILD_TIMESTAMP=$(date +%s) \
+                     --build-arg GIT_COMMIT=$CODEBUILD_RESOLVED_SOURCE_VERSION \
                      -t $ECR_REGISTRY/bianca-app-backend:latest \
                      -t $ECR_REGISTRY/bianca-app-backend:staging \
                      -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION \

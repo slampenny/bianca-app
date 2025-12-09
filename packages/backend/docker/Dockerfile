@@ -43,10 +43,13 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
 
 # Build stage - copy source and build if needed
 FROM dependencies AS build
+# Build arg to bust cache when code changes
+ARG BUILD_TIMESTAMP
+ARG GIT_COMMIT
 # Copy static config files (rarely change)
 COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
 
-# Copy source code
+# Copy source code (cache will be busted if files change)
 COPY --chown=node:node src/ ./src/
 COPY --chown=node:node tests/ ./tests/
 # Note: devops/ directory not needed in container - used only for infrastructure deployment
