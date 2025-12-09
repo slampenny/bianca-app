@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
       target: build  # Use build stage which has node_modules installed
     env_file:
-      - .env
+      - ../.env
     environment:
       - NODE_ENV=development
       - USE_SES_IN_DEV=${USE_SES_IN_DEV:-false}  # Default to Ethereal for local dev (set to true if you want SES)
@@ -77,7 +77,7 @@ services:
     # We are just adding/merging the volumes section here.
     volumes:
       # This will be merged with any volumes defined in the main docker-compose.yml for asterisk
-      - ./devops/asterisk/recordings:/var/spool/asterisk/recording # Mount for recordings
+      - ../devops/asterisk/recordings:/var/spool/asterisk/recording # Mount for recordings
 
 # Define the network at the top level
 networks: # <-- Add this whole block

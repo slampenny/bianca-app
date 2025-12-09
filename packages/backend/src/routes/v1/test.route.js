@@ -915,8 +915,6 @@ router.post('/reset-mfa', async (req, res) => {
  *       3. Send SMS notifications to caregivers via Twilio (real SMS, not mocked)
  *       4. Return detailed diagnostic information
  *     tags: [Test]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -988,7 +986,7 @@ router.post('/reset-mfa', async (req, res) => {
  *       "500":
  *         description: Error processing emergency
  */
-router.post('/emergency-processor', auth(), async (req, res) => {
+router.post('/emergency-processor', async (req, res) => {
   try {
     const { patientId, text } = req.body;
     

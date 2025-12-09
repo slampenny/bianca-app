@@ -13,7 +13,9 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "yarn workspace @bianca-app/backend dev",
+    "dev": "yarn workspace @bianca-app/backend dev & yarn workspace @bianca-app/frontend start",
+    "dev:backend": "yarn workspace @bianca-app/backend dev",
+    "dev:frontend": "yarn workspace @bianca-app/frontend start",
     "dev:staging": "yarn workspace @bianca-app/backend dev:staging",
     "dev:test": "yarn workspace @bianca-app/backend dev:test",
     "test": "yarn workspace @bianca-app/backend test",
