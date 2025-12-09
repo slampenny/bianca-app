@@ -1,85 +1,85 @@
 version: 0.2
 
 phases:
-  install:
-    runtime-versions:
-      nodejs: 20
-    commands:
-      - echo "Installing dependencies..."
-      - yarn install --frozen-lockfile
-
   pre_build:
     commands:
-      - echo "Detecting changes..."
-      - bash scripts/detect-changes.sh
-      - source env.sh
-      - echo "BUILD_BACKEND=$BUILD_BACKEND"
-      - echo "BUILD_FRONTEND=$BUILD_FRONTEND"
-      - echo "BUILD_ASTERISK=$BUILD_ASTERISK"
-      - |
-        if [ "$BUILD_BACKEND" = "true" ] || [ "$BUILD_FRONTEND" = "true" ] || [ "$BUILD_ASTERISK" = "true" ]; then
-          echo "Logging in to Amazon ECR..."
-          aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-        fi
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - echo Build started on `date`
+      - echo Building Docker images...
 
   build:
     commands:
+      - echo Building backend, frontend, and asterisk images...
+      - pwd
+      - echo Source directory is $CODEBUILD_SRC_DIR
+      - ls -la | head -10
       - |
-        if [ "$BUILD_BACKEND" = "true" ]; then
-          echo "Building backend Docker image..."
-          cd packages/backend
-          docker build -f docker/Dockerfile -t $ECR_REGISTRY/bianca-app-backend:production .
-          docker tag $ECR_REGISTRY/bianca-app-backend:production $ECR_REGISTRY/bianca-app-backend:latest
-        fi
+        # Build backend image
+        echo "🔨 Building backend image..."
+        cd packages/backend
+        docker build -t $ECR_REGISTRY/bianca-app-backend:latest \
+                     -t $ECR_REGISTRY/bianca-app-backend:production \
+                     -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION \
+                     -f docker/Dockerfile .
+        cd ../..
+        echo "✅ Backend build complete"
       - |
-        if [ "$BUILD_FRONTEND" = "true" ]; then
-          echo "Building frontend Docker image..."
-          cd packages/frontend
-          docker build -t $ECR_REGISTRY/bianca-app-frontend:production .
-          docker tag $ECR_REGISTRY/bianca-app-frontend:production $ECR_REGISTRY/bianca-app-frontend:latest
-        fi
+        # Build asterisk image
+        echo "🔨 Building asterisk image..."
+        cd packages/backend/devops/asterisk
+        docker build -t $ECR_REGISTRY/bianca-app-asterisk:production .
+        cd ../../..
+        echo "✅ Asterisk build complete"
       - |
-        if [ "$BUILD_ASTERISK" = "true" ]; then
-          echo "Building asterisk Docker image..."
-          cd packages/backend/devops/asterisk
-          docker build -t $ECR_REGISTRY/bianca-app-asterisk:production .
-          docker tag $ECR_REGISTRY/bianca-app-asterisk:production $ECR_REGISTRY/bianca-app-asterisk:latest
-        fi
+        # Build frontend image
+        echo "🔨 Building frontend image..."
+        cd packages/frontend
+        docker build -t $ECR_REGISTRY/bianca-app-frontend:latest \
+                     -t $ECR_REGISTRY/bianca-app-frontend:production \
+                     -f devops/Dockerfile \
+                     --build-arg BUILD_ENV=production .
+        cd ../..
+        echo "✅ Frontend build complete"
+      - |
+        # Push all images
+        echo "📦 Pushing backend images..."
+        docker push $ECR_REGISTRY/bianca-app-backend:latest
+        docker push $ECR_REGISTRY/bianca-app-backend:production
+        docker push $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION
+        echo "📦 Pushing asterisk image..."
+        docker push $ECR_REGISTRY/bianca-app-asterisk:production
+        echo "📦 Pushing frontend images..."
+        docker push $ECR_REGISTRY/bianca-app-frontend:latest
+        docker push $ECR_REGISTRY/bianca-app-frontend:production
+        echo "✅ All images pushed successfully"
 
   post_build:
     commands:
+      - echo Build completed
+      - echo Packaging CodeDeploy artifacts...
       - |
-        if [ "$BUILD_BACKEND" = "true" ]; then
-          echo "Pushing backend image to ECR..."
-          docker push $ECR_REGISTRY/bianca-app-backend:production
-          docker push $ECR_REGISTRY/bianca-app-backend:latest
-          echo "Creating imagedefinitions for backend..."
-          echo '[{"name":"bianca-app-backend","imageUri":"'$ECR_REGISTRY'/bianca-app-backend:production"}]' > imagedefinitions_backend.json
-        fi
-      - |
-        if [ "$BUILD_FRONTEND" = "true" ]; then
-          echo "Pushing frontend image to ECR..."
-          docker push $ECR_REGISTRY/bianca-app-frontend:production
-          docker push $ECR_REGISTRY/bianca-app-frontend:latest
-          echo "Creating imagedefinitions for frontend..."
-          echo '[{"name":"bianca-app-frontend","imageUri":"'$ECR_REGISTRY'/bianca-app-frontend:production"}]' > imagedefinitions_frontend.json
-        fi
-      - |
-        if [ "$BUILD_ASTERISK" = "true" ]; then
-          echo "Pushing asterisk image to ECR..."
-          docker push $ECR_REGISTRY/bianca-app-asterisk:production
-          docker push $ECR_REGISTRY/bianca-app-asterisk:latest
-        fi
-
-cache:
-  paths:
-    - 'node_modules/**/*'
-    - 'packages/*/node_modules/**/*'
+        # Ensure we're in the backend source directory
+        cd "$CODEBUILD_SRC_DIR/packages/backend"
+        pwd
+        echo Verifying scripts exist...
+        ls -la devops/codedeploy/scripts/
+        echo Checking before_install.sh content...
+        head -5 devops/codedeploy/scripts/before_install.sh
+        wc -l devops/codedeploy/scripts/before_install.sh
+        cp devops/codedeploy/appspec.yml appspec.yml
+        # Copy scripts directory contents (not the directory itself)
+        mkdir -p scripts
+        cp devops/codedeploy/scripts/* scripts/
+        chmod +x scripts/*.sh
+        echo Verifying copied scripts...
+        ls -la scripts/
+        wc -l scripts/before_install.sh
+        echo CodeDeploy artifacts packaged
 
 artifacts:
   files:
     - 'appspec.yml'
     - 'scripts/**/*'
-    - 'imagedefinitions*.json'
   name: BuildOutput
 
