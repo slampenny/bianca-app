@@ -22,6 +22,7 @@
     "testing.automaticallyOpenPeekView": "never",
     "testing.followRunningTest": true,
     "testing.gutterEnabled": true,
-    "testing.openTesting": "openOnTestStart"
+    "testing.openTesting": "openOnTestStart",
+    "testing.automaticallyOpenTestResults": "openOnTestStart"
   }
   

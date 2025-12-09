@@ -24,8 +24,9 @@ const defaultConfig = {
 
   // Alert system settings
   enableAlertsAPI: true,
-  // SMS notifications are ALWAYS enabled - emergency alerts must always be sent
-  enableSNSPushNotifications: true,
+  // Enable SNS in staging/production (AWS_REGION should be set as env var, same as S3/SES)
+  // In development, only enable if AWS_REGION is explicitly set
+  enableSNSPushNotifications: (process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production') || !!process.env.AWS_REGION,
   
   // SNS notification settings (will use main config)
   sns: {
@@ -159,7 +160,12 @@ function validateConfig(config) {
     warnings.push('MEDIUM response time should be between 300-1800 seconds');
   }
 
-  // SMS notifications are always enabled - no validation needed
+  // Validate SNS settings if enabled
+  if (config.enableSNSPushNotifications) {
+    if (!process.env.AWS_REGION) {
+      warnings.push('AWS_REGION not specified, using default us-east-2');
+    }
+  }
 
   return {
     isValid: errors.length === 0,

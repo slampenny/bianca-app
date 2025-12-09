@@ -4,6 +4,5 @@ terraform {
     key     = "backend/terraform.tfstate"
     region  = "us-east-2"
     encrypt = true
-    profile = "jordan"
   }
 } 

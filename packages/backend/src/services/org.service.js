@@ -69,50 +69,6 @@ const updateOrgById = async (orgId, updateBody) => {
 };
 
 /**
- * Update call retry settings for an org (only org admins can do this)
- * @param {ObjectId} orgId - Org ID
- * @param {Object} retrySettings - Retry settings object
- * @param {number} retrySettings.retryCount - Number of retries (0-10)
- * @param {number} retrySettings.retryIntervalMinutes - Minutes between retries (1-1440)
- * @param {boolean} retrySettings.alertOnAllMissedCalls - Alert on every missed call/retry
- * @returns {Promise<Org>}
- */
-const updateCallRetrySettings = async (orgId, retrySettings) => {
-  const org = await getOrgById(orgId);
-  if (!org) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
-  }
-  
-  // Initialize callRetrySettings if it doesn't exist
-  if (!org.callRetrySettings) {
-    org.callRetrySettings = {};
-  }
-  
-  // Validate and update retry settings
-  if (retrySettings.retryCount !== undefined) {
-    if (!Number.isInteger(retrySettings.retryCount) || retrySettings.retryCount < 0 || retrySettings.retryCount > 10) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Retry count must be an integer between 0 and 10');
-    }
-    org.callRetrySettings.retryCount = retrySettings.retryCount;
-  }
-  
-  if (retrySettings.retryIntervalMinutes !== undefined) {
-    if (!Number.isInteger(retrySettings.retryIntervalMinutes) || retrySettings.retryIntervalMinutes < 1 || retrySettings.retryIntervalMinutes > 1440) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Retry interval must be an integer between 1 and 1440 minutes');
-    }
-    org.callRetrySettings.retryIntervalMinutes = retrySettings.retryIntervalMinutes;
-  }
-  
-  if (retrySettings.alertOnAllMissedCalls !== undefined) {
-    org.callRetrySettings.alertOnAllMissedCalls = Boolean(retrySettings.alertOnAllMissedCalls);
-  }
-  
-  await org.save();
-  logger.info(`[Org Service] Updated call retry settings for org ${orgId}: retryCount=${org.callRetrySettings.retryCount}, retryIntervalMinutes=${org.callRetrySettings.retryIntervalMinutes}, alertOnAllMissedCalls=${org.callRetrySettings.alertOnAllMissedCalls}`);
-  return org;
-};
-
-/**
  * Soft delete org by id and all its caregivers and patients
  * @param {ObjectId} orgId
  * @returns {Promise<Org>}
@@ -326,5 +282,4 @@ module.exports = {
   setRole,
   sendInvite,
   verifyInvite,
-  updateCallRetrySettings,
 };
