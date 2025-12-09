@@ -69,6 +69,13 @@ const orgSchema = mongoose.Schema(
         ref: 'PaymentMethod',
       },
     ],
+    // Organization timezone (IANA timezone identifier, e.g., 'America/New_York', 'Europe/London')
+    // Used for converting schedule times to/from UTC
+    timezone: {
+      type: String,
+      default: 'America/New_York',
+      trim: true,
+    },
     caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },

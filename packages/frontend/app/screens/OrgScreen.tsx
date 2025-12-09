@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { ScrollView, StyleSheet, View, Image } from "react-native"
+import { Picker } from "@react-native-picker/picker"
 import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { useUpdateOrgMutation, orgApi } from "../services/api/orgApi"
@@ -17,6 +18,38 @@ import type { ThemeColors } from "../types"
 import { Button, Text, TextField, Toggle } from "app/components"
 import { logger } from "../utils/logger"
 
+// Common timezones list (IANA timezone identifiers)
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
+  { value: 'America/Chicago', label: 'Central Time (US & Canada)' },
+  { value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
+  { value: 'America/Phoenix', label: 'Arizona' },
+  { value: 'America/Anchorage', label: 'Alaska' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii' },
+  { value: 'America/Toronto', label: 'Toronto' },
+  { value: 'America/Vancouver', label: 'Vancouver' },
+  { value: 'America/Mexico_City', label: 'Mexico City' },
+  { value: 'America/Sao_Paulo', label: 'São Paulo' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'Europe/Berlin', label: 'Berlin' },
+  { value: 'Europe/Rome', label: 'Rome' },
+  { value: 'Europe/Madrid', label: 'Madrid' },
+  { value: 'Europe/Amsterdam', label: 'Amsterdam' },
+  { value: 'Europe/Stockholm', label: 'Stockholm' },
+  { value: 'Europe/Zurich', label: 'Zurich' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' },
+  { value: 'Asia/Shanghai', label: 'Shanghai' },
+  { value: 'Asia/Hong_Kong', label: 'Hong Kong' },
+  { value: 'Asia/Singapore', label: 'Singapore' },
+  { value: 'Asia/Dubai', label: 'Dubai' },
+  { value: 'Asia/Kolkata', label: 'Mumbai, New Delhi' },
+  { value: 'Australia/Sydney', label: 'Sydney' },
+  { value: 'Australia/Melbourne', label: 'Melbourne' },
+  { value: 'Pacific/Auckland', label: 'Auckland' },
+]
+
 export function OrgScreen() {
   const dispatch = useDispatch()
   const currentOrg = useSelector(getOrg)
@@ -32,6 +65,7 @@ export function OrgScreen() {
   const [retryCount, setRetryCount] = useState("2")
   const [retryIntervalMinutes, setRetryIntervalMinutes] = useState("15")
   const [alertOnAllMissedCalls, setAlertOnAllMissedCalls] = useState(false)
+  const [timezone, setTimezone] = useState("America/New_York")
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
 
@@ -49,6 +83,7 @@ export function OrgScreen() {
         setEmail(currentOrg.email)
         setPhone(currentOrg.phone)
         setLogo(currentOrg.logo || null)
+        setTimezone(currentOrg.timezone || "America/New_York")
         // Initialize call retry settings
         if (currentOrg.callRetrySettings) {
           setRetryCount(String(currentOrg.callRetrySettings.retryCount ?? 2))
@@ -98,6 +133,7 @@ export function OrgScreen() {
           email,
           phone,
           logo,
+          timezone,
           callRetrySettings: {
             retryCount: parseInt(retryCount, 10) || 2,
             retryIntervalMinutes: parseInt(retryIntervalMinutes, 10) || 15,
@@ -200,6 +236,35 @@ export function OrgScreen() {
           inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
           style={!canEditOrg ? styles.readonlyInput : styles.input}
         />
+
+        {/* Timezone Section */}
+        <View style={styles.timezoneSection}>
+          <Text style={styles.sectionTitle} preset="formLabel">
+            {translate("orgScreen.timezone")}
+          </Text>
+          <Text style={styles.sectionHelper} preset="formHelper">
+            {translate("orgScreen.timezoneHelper")}
+          </Text>
+          <View style={styles.pickerWrapper}>
+            <Picker
+              selectedValue={timezone}
+              onValueChange={setTimezone}
+              enabled={canEditOrg}
+              style={styles.picker}
+              itemStyle={styles.pickerItem}
+              dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+            >
+              {TIMEZONES.map((tz) => (
+                <Picker.Item
+                  key={tz.value}
+                  label={tz.label}
+                  value={tz.value}
+                  color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
 
         {/* Call Retry Settings Section */}
         <View style={styles.callRetrySection}>
@@ -357,11 +422,37 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.palette.neutral300,
   },
+  timezoneSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
+  },
   callRetrySection: {
     marginTop: 20,
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: colors.palette.neutral300,
+  },
+  pickerWrapper: {
+    backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
+    borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
+    borderRadius: 5,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginTop: 8,
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+    backgroundColor: "transparent",
+    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+  },
+  pickerItem: {
+    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
+  },
+  sectionHelper: {
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 16,
