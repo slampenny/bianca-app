@@ -239,7 +239,7 @@ const auditAuthFailure = async (email, ipAddress, userAgent, errorMessage) => {
     await AuditLog.createLog({
       timestamp: new Date(),
       userId: systemUserId, // Use ObjectId for system
-      userRole: null, // Failed logins don't have a user role
+      userRole: 'system', // Failed logins are system-level security events
       userEmail: email, // Will be hashed by pre-save hook
       action: 'LOGIN_FAILED',
       resource: 'session',
