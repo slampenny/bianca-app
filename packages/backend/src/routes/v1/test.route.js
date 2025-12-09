@@ -898,4 +898,249 @@ router.post('/reset-mfa', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/emergency-processor:
+ *   post:
+ *     summary: Test emergency processor with real SMS sending
+ *     description: |
+ *       Tests the emergency processor end-to-end by simulating a patient utterance.
+ *       This bypasses OpenAI transcription and directly tests the emergency detection,
+ *       alert creation, and SMS notification flow using real Twilio.
+ *       
+ *       Use this to diagnose why emergency alerts aren't being sent during calls.
+ *       The test will:
+ *       1. Process the utterance through emergency detection
+ *       2. Create an alert if emergency is detected
+ *       3. Send SMS notifications to caregivers via Twilio (real SMS, not mocked)
+ *       4. Return detailed diagnostic information
+ *     tags: [Test]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - text
+ *             properties:
+ *               patientId:
+ *                 type: string
+ *                 description: Patient ID to test emergency detection for (optional - will use first patient if not provided)
+ *                 example: "507f1f77bcf86cd799439011"
+ *               text:
+ *                 type: string
+ *                 description: Patient utterance text to test (e.g., "I'm having a heart attack")
+ *                 example: "I'm having a heart attack"
+ *                 default: "I'm having a heart attack"
+ *     responses:
+ *       "200":
+ *         description: Emergency processor test result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 processing:
+ *                   type: object
+ *                   properties:
+ *                     emergencyDetected:
+ *                       type: boolean
+ *                     falsePositive:
+ *                       type: boolean
+ *                     deduplicationPassed:
+ *                       type: boolean
+ *                     confidence:
+ *                       type: number
+ *                 shouldAlert:
+ *                   type: boolean
+ *                 alertData:
+ *                   type: object
+ *                   nullable: true
+ *                 alertResult:
+ *                   type: object
+ *                   nullable: true
+ *                 reason:
+ *                   type: string
+ *                 diagnostics:
+ *                   type: object
+ *                   properties:
+ *                     patientFound:
+ *                       type: boolean
+ *                     caregiversFound:
+ *                       type: boolean
+ *                     caregiverCount:
+ *                       type: number
+ *                     smsEnabled:
+ *                       type: boolean
+ *                     twilioInitialized:
+ *                       type: boolean
+ *                     config:
+ *                       type: object
+ *       "400":
+ *         description: Invalid request
+ *       "404":
+ *         description: Patient not found
+ *       "500":
+ *         description: Error processing emergency
+ */
+router.post('/emergency-processor', auth(), async (req, res) => {
+  try {
+    const { patientId, text } = req.body;
+    
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ error: 'text is required and must be a non-empty string' });
+    }
+
+    // Import emergency processor
+    const { emergencyProcessor } = require('../../services/emergencyProcessor.service');
+    const { Patient } = require('../../models');
+    const { snsService } = require('../../services/sns.service');
+    const { twilioSmsService } = require('../../services/twilioSms.service');
+    const { config: emergencyConfig } = require('../../config/emergency.config');
+
+    // Gather diagnostic information
+    const diagnostics = {
+      patientFound: false,
+      caregiversFound: false,
+      caregiverCount: 0,
+      smsEnabled: emergencyConfig.enableSNSPushNotifications,
+      twilioInitialized: twilioSmsService ? twilioSmsService.isInitialized : false,
+      config: {
+        enableSNSPushNotifications: emergencyConfig.enableSNSPushNotifications,
+        enableAlertsAPI: emergencyConfig.enableAlertsAPI,
+        enableFalsePositiveFilter: emergencyConfig.enableFalsePositiveFilter
+      }
+    };
+
+    // Find patient - use provided patientId or get first patient
+    let patient;
+    let actualPatientId = patientId;
+    
+    if (patientId) {
+      patient = await Patient.findById(patientId).populate('caregivers');
+      if (!patient) {
+        return res.status(404).json({ 
+          error: 'Patient not found',
+          diagnostics 
+        });
+      }
+    } else {
+      // Get first patient from database
+      patient = await Patient.findOne().populate('caregivers');
+      if (!patient) {
+        return res.status(404).json({ 
+          error: 'No patients found in database',
+          diagnostics 
+        });
+      }
+      actualPatientId = patient._id.toString();
+      logger.info(`[Test Route] No patientId provided, using first patient: ${actualPatientId}`);
+    }
+    
+    diagnostics.patientFound = true;
+
+    // Check caregivers
+    if (patient.caregivers && patient.caregivers.length > 0) {
+      const caregiversWithPhone = patient.caregivers.filter(cg => cg && cg.phone);
+      diagnostics.caregiversFound = caregiversWithPhone.length > 0;
+      diagnostics.caregiverCount = caregiversWithPhone.length;
+      
+      // Log caregiver phone numbers for debugging
+      caregiversWithPhone.forEach((cg, idx) => {
+        logger.info(`[Test Route] Caregiver ${idx + 1}: ${cg.name || cg.email} - phone: ${cg.phone}`);
+      });
+      
+      if (caregiversWithPhone.length === 0) {
+        logger.warn(`[Test Route] Patient ${actualPatientId} has ${patient.caregivers.length} caregiver(s) but none have phone numbers`);
+      }
+    } else {
+      logger.warn(`[Test Route] Patient ${actualPatientId} has no caregivers assigned`);
+    }
+
+    logger.info(`[Test Route] Testing emergency processor for patient ${actualPatientId} (${patient.name || patient.preferredName || 'Unknown'}) with text: "${text.substring(0, 100)}"`);
+
+    // Step 1: Process utterance through emergency detection
+    const processingResult = await emergencyProcessor.processUtterance(
+      actualPatientId,
+      text,
+      Date.now()
+    );
+
+    logger.info(`[Test Route] Emergency detection result:`, {
+      shouldAlert: processingResult.shouldAlert,
+      reason: processingResult.reason,
+      processing: processingResult.processing
+    });
+
+    // Step 2: If emergency detected, create alert (which will trigger SMS)
+    let alertResult = null;
+    if (processingResult.shouldAlert && processingResult.alertData) {
+      logger.info(`[Test Route] Emergency detected, creating alert...`);
+      alertResult = await emergencyProcessor.createAlert(
+        actualPatientId,
+        processingResult.alertData,
+        text
+      );
+
+      logger.info(`[Test Route] Alert creation result:`, {
+        success: alertResult.success,
+        alertId: alertResult.alert?._id,
+        notificationResult: alertResult.notificationResult
+      });
+
+      if (!alertResult.success) {
+        logger.error(`[Test Route] Alert creation failed: ${alertResult.error}`);
+      }
+    } else {
+      logger.info(`[Test Route] No alert created - reason: ${processingResult.reason}`);
+    }
+
+    // Prepare response with full diagnostic information
+    const response = {
+      success: true,
+      patient: {
+        id: actualPatientId,
+        name: patient.name,
+        preferredName: patient.preferredName
+      },
+      processing: processingResult.processing,
+      shouldAlert: processingResult.shouldAlert,
+      alertData: processingResult.alertData,
+      alertResult: alertResult,
+      reason: processingResult.reason,
+      diagnostics: {
+        ...diagnostics,
+        snsStatus: snsService ? snsService.getStatus() : null,
+        twilioStatus: twilioSmsService ? twilioSmsService.getStatus() : null,
+        emergencyProcessorStatus: emergencyProcessor.getStatus()
+      }
+    };
+
+    // Add detailed SMS notification results if available
+    if (alertResult && alertResult.notificationResult) {
+      response.smsResults = {
+        success: alertResult.notificationResult.success,
+        successful: alertResult.notificationResult.successful,
+        failed: alertResult.notificationResult.failed,
+        total: alertResult.notificationResult.total,
+        results: alertResult.notificationResult.results
+      };
+    }
+
+    res.json(response);
+  } catch (error) {
+    logger.error('[Test Route] Error testing emergency processor:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: config.env === 'development' || config.env === 'staging' ? error.stack : undefined
+    });
+  }
+});
+
 module.exports = router;
