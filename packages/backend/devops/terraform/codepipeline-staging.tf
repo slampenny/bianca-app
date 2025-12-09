@@ -220,6 +220,16 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
         Effect   = "Allow"
         Action   = "codestar-connections:UseConnection"
         Resource = var.github_app_connection_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "codestar-connections:PassConnection"
+        Resource = var.github_app_connection_arn
+        Condition = {
+          StringEquals = {
+            "codestar-connections:PassedToService" = "codepipeline.amazonaws.com"
+          }
+        }
       }
     ]
   })
