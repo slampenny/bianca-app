@@ -34,7 +34,7 @@ resource "aws_codebuild_project" "production_build" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "devops/buildspec-production.yml"
+    buildspec = "packages/backend/devops/buildspec-production.yml"
   }
 
   logs_config {
@@ -264,21 +264,6 @@ resource "aws_codepipeline" "production" {
         OutputArtifactFormat = "CODE_ZIP"
       }
     }
-    action {
-      name             = "FrontendSource"
-      category         = "Source"
-      owner            = "AWS"
-      provider         = "CodeStarSourceConnection"
-      version          = "1"
-      output_artifacts = ["FrontendSourceOutput"]
-      configuration = {
-        ConnectionArn        = var.github_app_connection_arn
-        FullRepositoryId     = "slampenny/bianca-app-frontend"
-        BranchName           = "main"
-        OutputArtifactFormat = "CODE_ZIP"
-      }
-      run_order = 1
-    }
   }
 
   stage {
@@ -289,7 +274,7 @@ resource "aws_codepipeline" "production" {
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
-      input_artifacts  = ["SourceOutput", "FrontendSourceOutput"]
+      input_artifacts  = ["SourceOutput"]
       output_artifacts = ["BuildOutput"]
       configuration = {
         ProjectName   = aws_codebuild_project.production_build.name
