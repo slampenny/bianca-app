@@ -53,12 +53,16 @@ phases:
         cd packages/frontend
         # Use --no-cache for staging to ensure we always get fresh code
         echo "   Building with --no-cache to ensure fresh code..."
-        docker build --no-cache \
+        if docker build --no-cache \
                      --build-arg BUILD_ENV=staging \
                      -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:staging \
-                     -f devops/Dockerfile .
-        echo "✅ Frontend build complete"
+                     -f devops/Dockerfile .; then
+          echo "✅ Frontend build complete"
+        else
+          echo "❌ Frontend build FAILED!"
+          exit 1
+        fi
       - |
         # Push all images
         echo "📦 Pushing backend images..."

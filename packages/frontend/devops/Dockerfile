@@ -22,11 +22,11 @@ RUN if [ "$BUILD_ENV" = "staging" ]; then \
       echo "Building for staging environment..." && \
       echo "Setting EXPO_PUBLIC_ENVIRONMENT=staging..." && \
       export EXPO_PUBLIC_ENVIRONMENT=staging && \
-      yarn bundle:web:staging && \
+      yarn bundle:web:staging || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
       echo "Staging build complete"; \
     else \
       echo "Building for production environment..." && \
-      yarn bundle:web && \
+      yarn bundle:web || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
       echo "Production build complete"; \
     fi
 
