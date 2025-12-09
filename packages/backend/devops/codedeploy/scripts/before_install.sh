@@ -117,6 +117,7 @@ fi
 # Parse secrets with error handling
 ARI_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.ARI_PASSWORD // empty' 2>/dev/null)
 BIANCA_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.BIANCA_PASSWORD // empty' 2>/dev/null)
+TWILIO_ACCOUNTSID=$(echo "$SECRET_JSON" | jq -r '.TWILIO_ACCOUNTSID // empty' 2>/dev/null)
 # PostHog removed - no longer used
 
 # Verify required secrets
@@ -208,7 +209,7 @@ services:
       - AWS_SES_REGION=$AWS_REGION
       - EMAIL_FROM=no-reply@biancawellness.com
       - TWILIO_PHONENUMBER=+19285758645
-      - TWILIO_ACCOUNTSID=${TWILIO_ACCOUNTSID}
+      - TWILIO_ACCOUNTSID=$TWILIO_ACCOUNTSID
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
       - RTP_LISTENER_HOST=0.0.0.0
       - RTP_BIANCA_HOST=${CONTAINER_PREFIX}_app
