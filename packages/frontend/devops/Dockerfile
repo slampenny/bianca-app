@@ -2,6 +2,13 @@
 # Use Amazon ECR Public Gallery to avoid Docker Hub credential issues in WSL2
 FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 
+# Install system dependencies for image processing
+RUN apk add --no-cache \
+    file \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    && rm -rf /var/cache/apk/*
+
 # Set working directory
 WORKDIR /app
 
@@ -13,6 +20,19 @@ RUN yarn install --frozen-lockfile
 
 # Copy source code
 COPY . .
+
+# Verify critical assets exist and are valid before building
+RUN if [ ! -f "assets/images/icon.png" ]; then \
+      echo "ERROR: assets/images/icon.png not found!" && \
+      find assets/images -name "*.png" | head -10 && \
+      exit 1; \
+    fi && \
+    chmod 644 assets/images/icon.png && \
+    file assets/images/icon.png && \
+    ls -lh assets/images/icon.png && \
+    head -c 8 assets/images/icon.png | od -An -tx1 && \
+    test -r assets/images/icon.png && \
+    echo "✅ icon.png verified and readable"
 
 # Build argument for environment
 ARG BUILD_ENV=production

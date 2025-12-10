@@ -1,4 +1,42 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-#yarn test
+# Git pre-push hook receives refs via stdin
+# Format: <local_ref> <local_sha> <remote_ref> <remote_sha>
+SHOULD_RUN_TESTS=false
+
+while read local_ref local_sha remote_ref remote_sha
+do
+  # Check if pushing to staging branch
+  if [ "$remote_ref" = "refs/heads/staging" ]; then
+    SHOULD_RUN_TESTS=true
+    break
+  fi
+done
+
+# Only run tests if pushing to staging
+if [ "$SHOULD_RUN_TESTS" = "true" ]; then
+  echo "🚀 Pushing to staging branch - running unit tests..."
+  echo ""
+  
+  # Run unit tests from backend directory
+  cd packages/backend || exit 1
+  yarn test:unit
+  
+  # Exit with the test result code
+  TEST_EXIT_CODE=$?
+  cd ../.. || exit 1
+  
+  if [ $TEST_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ Unit tests failed! Push aborted."
+    echo "   Please fix the failing tests before pushing to staging."
+    exit $TEST_EXIT_CODE
+  fi
+  
+  echo ""
+  echo "✅ All unit tests passed! Proceeding with push to staging..."
+fi
+
+# Allow the push (either tests passed or not pushing to staging)
+exit 0
