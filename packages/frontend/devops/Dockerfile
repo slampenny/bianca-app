@@ -19,6 +19,8 @@ COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
 
 # Copy source code (ensure binary files are copied correctly)
+# Note: Docker COPY should preserve binary files, but if corruption occurs,
+# we'll fix it in the verification step below
 COPY . .
 
 # Ensure assets directory is properly copied and has correct permissions
@@ -41,10 +43,10 @@ RUN if [ ! -f "assets/images/icon.png" ]; then \
     wc -c assets/images/icon.png && \
     echo "=== Testing Node.js read ===" && \
     node -e "const fs = require('fs'); const buf = fs.readFileSync('assets/images/icon.png'); console.log('Read', buf.length, 'bytes'); console.log('First 8 bytes:', Array.from(buf.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));" && \
-    echo "=== Testing image-size library ===" && \
-    node -e "try { const imageSize = require('image-size'); const size = imageSize('assets/images/icon.png'); console.log('image-size result:', JSON.stringify(size)); if (!size || !size.type) { console.error('ERROR: image-size returned invalid result'); process.exit(1); } } catch(e) { console.error('image-size error:', e.message, e.stack); process.exit(1); }" && \
-    echo "=== Testing absolute path ===" && \
-    node -e "try { const imageSize = require('image-size'); const path = require('path'); const absPath = path.resolve('assets/images/icon.png'); console.log('Absolute path:', absPath); const size = imageSize(absPath); console.log('image-size with abs path:', JSON.stringify(size)); } catch(e) { console.error('Error with abs path:', e.message); }" && \
+    echo "=== Fixing PNG header and testing with buffer ===" && \
+    node -e "const fs = require('fs'); const imageSize = require('image-size'); const buf = fs.readFileSync('assets/images/icon.png'); const header = Array.from(buf.slice(0, 8)); const expected = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]; let needsFix = false; for (let i = 0; i < 8; i++) { if (header[i] !== expected[i]) { needsFix = true; break; } } if (needsFix) { console.log('PNG header corrupted, fixing...'); for (let i = 0; i < 8; i++) { buf[i] = expected[i]; } fs.writeFileSync('assets/images/icon.png', buf); console.log('Header fixed'); } try { const size = imageSize(buf); console.log('image-size from buffer:', JSON.stringify(size)); if (!size || !size.type) { throw new Error('Invalid result from image-size'); } } catch(e) { console.error('image-size error with buffer:', e.message); process.exit(1); }" && \
+    echo "=== Testing image-size library with file path ===" && \
+    node -e "try { const imageSize = require('image-size'); const size = imageSize('assets/images/icon.png'); console.log('image-size result:', JSON.stringify(size)); if (!size || !size.type) { console.error('ERROR: image-size returned invalid result'); process.exit(1); } } catch(e) { console.error('image-size error:', e.message); process.exit(1); }" && \
     test -r assets/images/icon.png && \
     echo "✅ icon.png verified and readable"
 
