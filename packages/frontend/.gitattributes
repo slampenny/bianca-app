@@ -1,0 +1,9 @@
+# Ensure image files are treated as binary (override any parent .gitattributes)
+*.png binary -text -diff -merge
+*.jpg binary -text -diff -merge
+*.jpeg binary -text -diff -merge
+*.gif binary -text -diff -merge
+*.webp binary -text -diff -merge
+*.svg binary -text -diff -merge
+*.ico binary -text -diff -merge
+*.bmp binary -text -diff -merge
