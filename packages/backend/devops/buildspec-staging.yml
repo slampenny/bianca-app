@@ -7,6 +7,12 @@ phases:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
       - echo Build started on `date`
       - echo Building Docker images...
+      - echo "Configuring Git to preserve binary files..."
+      - git config --global core.autocrlf false
+      - git config --global core.eol lf
+      - echo "Refreshing Git attributes to ensure binary files are correct..."
+      - cd packages/frontend && git checkout -- assets/images/icon.png 2>/dev/null || true
+      - cd ../..
 
   build:
     commands:
