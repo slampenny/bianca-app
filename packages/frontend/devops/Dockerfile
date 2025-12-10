@@ -18,8 +18,12 @@ COPY package.json yarn.lock ./
 # Install dependencies
 RUN yarn install --frozen-lockfile
 
-# Copy source code
+# Copy source code (ensure binary files are copied correctly)
 COPY . .
+
+# Ensure assets directory is properly copied and has correct permissions
+RUN chmod -R 644 assets/images/*.png 2>/dev/null || true && \
+    find assets/images -name "*.png" -type f -exec chmod 644 {} \;
 
 # Verify critical assets exist and are valid before building
 RUN if [ ! -f "assets/images/icon.png" ]; then \
@@ -28,9 +32,17 @@ RUN if [ ! -f "assets/images/icon.png" ]; then \
       exit 1; \
     fi && \
     chmod 644 assets/images/icon.png && \
+    echo "=== File verification ===" && \
     file assets/images/icon.png && \
     ls -lh assets/images/icon.png && \
+    echo "=== PNG header check ===" && \
     head -c 8 assets/images/icon.png | od -An -tx1 && \
+    echo "=== File size ===" && \
+    wc -c assets/images/icon.png && \
+    echo "=== Testing Node.js read ===" && \
+    node -e "const fs = require('fs'); const buf = fs.readFileSync('assets/images/icon.png'); console.log('Read', buf.length, 'bytes'); console.log('First 8 bytes:', Array.from(buf.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));" && \
+    echo "=== Testing image-size library ===" && \
+    node -e "try { const imageSize = require('image-size'); const size = imageSize('assets/images/icon.png'); console.log('image-size result:', size); } catch(e) { console.log('image-size error:', e.message); }" && \
     test -r assets/images/icon.png && \
     echo "✅ icon.png verified and readable"
 
