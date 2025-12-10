@@ -15,6 +15,11 @@ config.resolver = {
   },
   // Ensure proper resolution of React Native modules
   platforms: ['ios', 'android', 'native', 'web'],
+  // Explicitly include image asset extensions to ensure proper handling
+  assetExts: [
+    ...(config.resolver.assetExts || []),
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff',
+  ],
   // Exclude mobile-only packages from web builds
   blockList: [
     // Block @stripe/stripe-react-native from web builds
