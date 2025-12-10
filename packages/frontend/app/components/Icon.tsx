@@ -85,19 +85,23 @@ export function Icon(props: IconProps) {
   )
 }
 
+import Config from "../config"
+
+const assetsBaseUrl = Config.assetsBaseUrl
+
 export const iconRegistry = {
-  back: require("../../assets/icons/back.png"),
-  bell: require("../../assets/icons/bell.png"),
-  caretLeft: require("../../assets/icons/caretLeft.png"),
-  caretRight: require("../../assets/icons/caretRight.png"),
-  check: require("../../assets/icons/check.png"),
-  hidden: require("../../assets/icons/hidden.png"),
-  lock: require("../../assets/icons/lock.png"),
-  menu: require("../../assets/icons/menu.png"),
-  more: require("../../assets/icons/more.png"),
-  settings: require("../../assets/icons/settings.png"),
-  view: require("../../assets/icons/view.png"),
-  x: require("../../assets/icons/x.png"),
+  back: { uri: `${assetsBaseUrl}/icons/back.png` },
+  bell: { uri: `${assetsBaseUrl}/icons/bell.png` },
+  caretLeft: { uri: `${assetsBaseUrl}/icons/caretLeft.png` },
+  caretRight: { uri: `${assetsBaseUrl}/icons/caretRight.png` },
+  check: { uri: `${assetsBaseUrl}/icons/check.png` },
+  hidden: { uri: `${assetsBaseUrl}/icons/hidden.png` },
+  lock: { uri: `${assetsBaseUrl}/icons/lock.png` },
+  menu: { uri: `${assetsBaseUrl}/icons/menu.png` },
+  more: { uri: `${assetsBaseUrl}/icons/more.png` },
+  settings: { uri: `${assetsBaseUrl}/icons/settings.png` },
+  view: { uri: `${assetsBaseUrl}/icons/view.png` },
+  x: { uri: `${assetsBaseUrl}/icons/x.png` },
 }
 
 const $imageStyleBase: ImageStyle = {

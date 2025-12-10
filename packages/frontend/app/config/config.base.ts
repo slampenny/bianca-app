@@ -3,6 +3,7 @@ export interface ConfigBaseProps {
   catchErrors: "always" | "dev" | "prod" | "never"
   exitRoutes: string[]
   paymentMethodGatewayUrl: string
+  assetsBaseUrl: string
   appIconUrl: string
 }
 
@@ -26,7 +27,10 @@ const BaseConfig: ConfigBaseProps = {
 
   paymentMethodGatewayUrl: "https://biancawellness.com/payment-method",
   
-  // S3 URL for app icon (upload icon.png to this bucket)
+  // S3 base URL for assets
+  assetsBaseUrl: "https://bianca-app-assets.s3.us-east-2.amazonaws.com",
+  
+  // S3 URL for app icon
   appIconUrl: "https://bianca-app-assets.s3.us-east-2.amazonaws.com/icon.png",
 }
 

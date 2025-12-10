@@ -20,10 +20,14 @@ config.resolver = {
     ...(config.resolver.assetExts || []),
     'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff',
   ],
-  // Exclude mobile-only packages from web builds
+  // Exclude mobile-only packages and native-only assets from web builds
   blockList: [
     // Block @stripe/stripe-react-native from web builds
     /node_modules\/@stripe\/stripe-react-native\/.*/,
+    // Block native-only app icons and splash screens from web builds
+    /assets\/images\/app-icon-.*\.png/,
+    /assets\/images\/playstore\.png/,
+    /assets\/images\/appstore\.png/,
   ],
   // Add monorepo node_modules resolution
   nodeModulesPaths: [
