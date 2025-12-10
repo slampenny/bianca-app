@@ -63,7 +63,21 @@ const updateOrgById = async (orgId, updateBody) => {
   if (updateBody.email && (await Org.isEmailTaken(updateBody.email, orgId))) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
-  Object.assign(org, updateBody);
+  
+  // Handle nested callRetrySettings update separately to merge properly
+  if (updateBody.callRetrySettings) {
+    if (!org.callRetrySettings) {
+      org.callRetrySettings = {};
+    }
+    // Merge the nested object
+    Object.assign(org.callRetrySettings, updateBody.callRetrySettings);
+    // Remove from updateBody so Object.assign doesn't overwrite it
+    const { callRetrySettings, ...restUpdateBody } = updateBody;
+    Object.assign(org, restUpdateBody);
+  } else {
+    Object.assign(org, updateBody);
+  }
+  
   await org.save();
   return org;
 };
@@ -270,6 +284,46 @@ const setRole = async (orgId, caregiverId, role) => {
   return caregiver;
 };
 
+/**
+ * Update call retry settings for an org
+ * @param {ObjectId} orgId
+ * @param {Object} retrySettings - Partial retry settings object
+ * @returns {Promise<Org>}
+ */
+const updateCallRetrySettings = async (orgId, retrySettings) => {
+  const org = await getOrgById(orgId);
+  if (!org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
+  }
+
+  // Merge the new settings with existing settings
+  if (!org.callRetrySettings) {
+    org.callRetrySettings = {};
+  }
+
+  // Update only the provided fields
+  if (retrySettings.retryCount !== undefined) {
+    if (!Number.isInteger(retrySettings.retryCount) || retrySettings.retryCount < 0 || retrySettings.retryCount > 10) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Retry count must be an integer between 0 and 10');
+    }
+    org.callRetrySettings.retryCount = retrySettings.retryCount;
+  }
+
+  if (retrySettings.retryIntervalMinutes !== undefined) {
+    if (!Number.isInteger(retrySettings.retryIntervalMinutes) || retrySettings.retryIntervalMinutes < 1 || retrySettings.retryIntervalMinutes > 1440) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Retry interval must be an integer between 1 and 1440 minutes');
+    }
+    org.callRetrySettings.retryIntervalMinutes = retrySettings.retryIntervalMinutes;
+  }
+
+  if (retrySettings.alertOnAllMissedCalls !== undefined) {
+    org.callRetrySettings.alertOnAllMissedCalls = Boolean(retrySettings.alertOnAllMissedCalls);
+  }
+
+  await org.save();
+  return org;
+};
+
 module.exports = {
   createOrg,
   queryOrgs,
@@ -282,4 +336,5 @@ module.exports = {
   setRole,
   sendInvite,
   verifyInvite,
+  updateCallRetrySettings,
 };
