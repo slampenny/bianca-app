@@ -30,6 +30,15 @@ resource "aws_codebuild_project" "staging_build" {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     }
+    # Staging secrets - backend will load from AWS Secrets Manager at runtime
+    environment_variable {
+      name  = "AWS_SECRET_ID"
+      value = "MySecretsManagerSecret-Staging"
+    }
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.aws_region
+    }
   }
 
   source {

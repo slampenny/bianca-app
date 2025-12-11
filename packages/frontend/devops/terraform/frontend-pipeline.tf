@@ -204,6 +204,14 @@ resource "aws_codebuild_project" "frontend_project" {
     type                        = "LINUX_CONTAINER"
     privileged_mode             = true
     image_pull_credentials_type = "CODEBUILD"
+
+    # Production environment variables
+    # Note: Frontend doesn't need secrets during build (static web app)
+    # But we set AWS_REGION for consistency and potential future use
+    environment_variable {
+      name  = "AWS_REGION"
+      value = "us-east-2"
+    }
   }
 
   source {

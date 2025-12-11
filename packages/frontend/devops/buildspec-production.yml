@@ -32,11 +32,11 @@ phases:
           exit 1
         fi
         echo "Building from: $(pwd)"
-      - echo Building frontend Docker image (staging)...
+      - echo Building frontend Docker image (production)...
       - |
-        if docker build --build-arg BUILD_ENV=staging \
+        if docker build --build-arg BUILD_ENV=production \
                      -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG \
-                     -t $REPOSITORY_URI_FRONTEND:staging \
+                     -t $REPOSITORY_URI_FRONTEND:production \
                      -f devops/Dockerfile .; then
           echo "✅ Frontend build complete"
         else
@@ -49,10 +49,11 @@ phases:
       - echo Build completed on $(date)
       - echo Pushing frontend image...
       - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
-      - docker push $REPOSITORY_URI_FRONTEND:staging
+      - docker push $REPOSITORY_URI_FRONTEND:production
       - docker push $REPOSITORY_URI_FRONTEND:latest
       - echo Creating imagedefinitions_frontend.json
       - echo "[{\"name\":\"$FRONTEND_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_FRONTEND:$IMAGE_TAG\"}]" > imagedefinitions_frontend.json
 artifacts:
   files:
-    - imagedefinitions_frontend.json 
+    - imagedefinitions_frontend.json
+
