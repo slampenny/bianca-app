@@ -1,0 +1,99 @@
+
+services:
+  bianca-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - bianca-app:latest
+    image: bianca-app
+    env_file:
+      - ../.env
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017/bianca-app
+      - NODE_ENV=development
+      - ASTERISK_URL=http://asterisk:8088
+      - ASTERISK_USERNAME=myphonefriend
+      - ASTERISK_PASSWORD=${ARI_PASSWORD}  # Use the same ARI_PASSWORD here
+      - ASTERISK_ENABLED=true
+      - AWS_REGION=us-east-2
+      - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:us-east-2:730335291008:bianca-emergency-alerts
+      - REDIS_URL=redis://redis:6379
+      - CACHE_TYPE=redis
+    ports:
+      - '3000:3000'
+    depends_on:
+      mongodb:
+        condition: service_started
+      asterisk:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Removed volume mount to enable Docker layer caching
+    # volumes:
+    #   - .:/usr/src/bianca-app
+    networks:
+      - node-network
+  mongodb:
+    image: mongo:7.0  # Upgraded from 4.2.1-bionic
+    ports:
+      - '27017:27017'
+    volumes:
+      - dbdata:/data/db
+    networks:
+      - node-network
+    # Optional: Add healthcheck for better container orchestration
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+  asterisk:
+    build:
+      context: ../devops/asterisk
+      dockerfile: Dockerfile
+    container_name: asterisk
+    restart: always
+    environment:
+      - ARI_PASSWORD=${ARI_PASSWORD:-}  # Used in ari.conf
+      - BIANCA_PASSWORD=${BIANCA_PASSWORD:-}  # Used in pjsip.conf
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS:-}
+    ports:
+      - '5060:5060/udp'
+      - '5061:5061/tcp'
+      - '10000-10100:10000-10100/udp'
+      - '8088:8088/tcp'  # Exposing ARI port for easier debugging
+    volumes:
+      - ../devops/asterisk/logs:/var/log/asterisk
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show uptime' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - node-network
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes  # Enable persistence (optional)
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - node-network
+volumes:
+  dbdata:
+  redis-data:
+networks:
+  node-network:
+    driver: bridge

@@ -219,7 +219,7 @@ variable "github_owner" {
 variable "github_repo" {
   description = "GitHub repository name."
   type        = string
-  default     = "bianca-app-backend"
+  default     = "bianca-app"
 }
 
 variable "github_branch" {

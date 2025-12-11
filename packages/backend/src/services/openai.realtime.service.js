@@ -1126,46 +1126,17 @@ class OpenAIRealtimeService {
                     }
                     
                     // CRITICAL: Update the EXISTING message - this preserves its _id and position in queue
-                    const transcriptToSave = currentConn.pendingUserTranscript.trim();
                     await Message.findByIdAndUpdate(
                       currentConn.activeUserMessageId,
                       { 
-                        content: transcriptToSave,
+                        content: currentConn.pendingUserTranscript.trim(),
                         messageType: 'user_message',
                       },
                       { timestamps: false, runValidators: false } // Disable auto-timestamps
                     );
-                    logger.info(`[OpenAI Realtime] Updated placeholder user message ${currentConn.activeUserMessageId} with transcript: "${transcriptToSave}" (preserved _id and queue position)`);
+                    logger.info(`[OpenAI Realtime] Updated placeholder user message ${currentConn.activeUserMessageId} with transcript: "${currentConn.pendingUserTranscript}" (preserved _id and queue position)`);
                     userMessageFinalized = true;
                     currentConn.activeUserMessageId = null; // Clear the active message ID
-                    
-                    // CRITICAL: Trigger emergency processing for user transcript (even though we updated directly)
-                    if (currentConn.patientId && transcriptToSave && transcriptToSave.length > 10) {
-                      try {
-                        logger.info(`[Emergency Detection] 🔍 Processing transcript from speech_stopped handler: "${transcriptToSave.substring(0, 100)}..."`);
-                        const emergencyResult = await emergencyProcessor.processUtterance(
-                          currentConn.patientId,
-                          transcriptToSave,
-                          Date.now()
-                        );
-                        
-                        if (emergencyResult.shouldAlert) {
-                          logger.warn(`[Emergency Detection] 🚨 EMERGENCY DETECTED in speech_stopped handler for patient ${currentConn.patientId}: ${emergencyResult.reason}`);
-                          const alertResult = await emergencyProcessor.createAlert(
-                            currentConn.patientId,
-                            emergencyResult.alertData,
-                            transcriptToSave
-                          );
-                          if (alertResult.success) {
-                            logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert._id}`);
-                          } else {
-                            logger.error(`[Emergency Detection] ❌ Failed to create alert: ${alertResult.error}`);
-                          }
-                        }
-                      } catch (error) {
-                        logger.error(`[Emergency Detection] ❌ Error in emergency detection from speech_stopped: ${error.message}`, error);
-                      }
-                    }
                   } catch (err) {
                     logger.error(`[OpenAI Realtime] Failed to update placeholder user message: ${err.message}`);
                     // DO NOT create new message - this would break queue order
@@ -1799,34 +1770,29 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
 
     // EMERGENCY DETECTION: Real-time analysis of user transcript
-    logger.info(`[Emergency Detection] 🔍 Checking transcript - patientId: ${conn.patientId}, transcript: "${message.transcript}", length: ${message.transcript?.trim().length || 0}`);
+    logger.debug(`[Emergency Detection] Checking transcript - patientId: ${conn.patientId}, transcript length: ${message.transcript?.trim().length || 0}`);
     
     if (conn.patientId && message.transcript && message.transcript.trim().length > 10) {
       try {
-        const transcriptText = message.transcript.trim();
-        logger.info(`[Emergency Detection] 🚨 Processing utterance for emergency detection: "${transcriptText.substring(0, 100)}${transcriptText.length > 100 ? '...' : ''}"`);
-        logger.info(`[Emergency Detection] Patient ID: ${conn.patientId}, Call ID: ${callId}`);
-        
+        logger.info(`[Emergency Detection] Processing utterance for emergency detection: "${message.transcript.substring(0, 100)}..."`);
         const emergencyResult = await emergencyProcessor.processUtterance(
           conn.patientId,
-          transcriptText,
+          message.transcript,
           Date.now()
         );
 
-        logger.info(`[Emergency Detection] 📊 Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}, reason: ${emergencyResult.reason}`);
-        logger.info(`[Emergency Detection] Processing details:`, emergencyResult.processing);
+        logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}, reason: ${emergencyResult.reason}`);
 
         if (emergencyResult.shouldAlert) {
-          logger.warn(`[Emergency Detection] 🚨🚨🚨 EMERGENCY DETECTED for patient ${conn.patientId}: ${emergencyResult.reason}`);
+          logger.warn(`[Emergency Detection] EMERGENCY DETECTED for patient ${conn.patientId}: ${emergencyResult.reason}`);
           logger.warn(`[Emergency Detection] Alert data:`, emergencyResult.alertData);
-          logger.warn(`[Emergency Detection] Original transcript: "${transcriptText}"`);
           
           // Create alert and notify caregivers
-          logger.info(`[Emergency Detection] 📞 Calling createAlert for patient ${conn.patientId}`);
+          logger.info(`[Emergency Detection] Calling createAlert for patient ${conn.patientId}`);
           const alertResult = await emergencyProcessor.createAlert(
             conn.patientId,
             emergencyResult.alertData,
-            transcriptText
+            message.transcript
           );
 
           logger.info(`[Emergency Detection] createAlert result - success: ${alertResult.success}, error: ${alertResult.error || 'none'}`);
@@ -1874,17 +1840,14 @@ class OpenAIRealtimeService {
         logger.error(`[Emergency Detection] Error stack:`, error.stack);
         // Don't let emergency detection errors break the conversation
       }
-        } else {
-          if (!conn.patientId) {
-            logger.warn(`[Emergency Detection] ⚠️ Skipping emergency detection - no patientId in connection for ${callId}`);
-          }
-          if (!message.transcript || message.transcript.trim().length <= 10) {
-            logger.debug(`[Emergency Detection] ⚠️ Skipping emergency detection - transcript too short (${message.transcript?.trim().length || 0} chars) for ${callId}`);
-          }
-          if (emergencyResult && !emergencyResult.shouldAlert) {
-            logger.debug(`[Emergency Detection] ℹ️ No emergency detected - ${emergencyResult?.reason || 'unknown reason'}`);
-          }
-        }
+    } else {
+      if (!conn.patientId) {
+        logger.debug(`[Emergency Detection] Skipping - no patientId in connection for ${callId}`);
+      }
+      if (!message.transcript || message.transcript.trim().length <= 10) {
+        logger.debug(`[Emergency Detection] Skipping - transcript too short (${message.transcript?.trim().length || 0} chars) for ${callId}`);
+      }
+    }
 
     // Store the transcript for saving when user stops speaking
     conn.pendingUserTranscript = message.transcript.trim();
@@ -1897,47 +1860,18 @@ class OpenAIRealtimeService {
         const { Message } = require('../models');
         const originalMessage = await Message.findById(conn.activeUserMessageId);
         if (originalMessage) {
-          const delayedTranscript = conn.pendingUserTranscript.trim();
           await Message.findByIdAndUpdate(
             conn.activeUserMessageId,
             { 
-              content: delayedTranscript,
+              content: conn.pendingUserTranscript.trim(),
               messageType: 'user_message',
             },
             { timestamps: false, runValidators: false }
           );
-          logger.info(`[OpenAI Realtime] Updated placeholder user message ${conn.activeUserMessageId} with delayed transcript: "${delayedTranscript}"`);
+          logger.info(`[OpenAI Realtime] Updated placeholder user message ${conn.activeUserMessageId} with delayed transcript: "${conn.pendingUserTranscript}"`);
           conn.activeUserMessageId = null;
           conn._waitingForUserTranscript = false;
           conn.pendingUserTranscript = '';
-          
-          // CRITICAL: Trigger emergency processing for delayed transcript
-          if (conn.patientId && delayedTranscript && delayedTranscript.length > 10) {
-            try {
-              logger.info(`[Emergency Detection] 🔍 Processing delayed transcript: "${delayedTranscript.substring(0, 100)}..."`);
-              const emergencyResult = await emergencyProcessor.processUtterance(
-                conn.patientId,
-                delayedTranscript,
-                Date.now()
-              );
-              
-              if (emergencyResult.shouldAlert) {
-                logger.warn(`[Emergency Detection] 🚨 EMERGENCY DETECTED in delayed transcript handler for patient ${conn.patientId}: ${emergencyResult.reason}`);
-                const alertResult = await emergencyProcessor.createAlert(
-                  conn.patientId,
-                  emergencyResult.alertData,
-                  delayedTranscript
-                );
-                if (alertResult.success) {
-                  logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert._id}`);
-                } else {
-                  logger.error(`[Emergency Detection] ❌ Failed to create alert: ${alertResult.error}`);
-                }
-              }
-            } catch (error) {
-              logger.error(`[Emergency Detection] ❌ Error in emergency detection from delayed transcript: ${error.message}`, error);
-            }
-          }
           
           // If AI placeholder was deferred, create it now
           if (conn._pendingAiPlaceholder && conn._aiIsSpeaking) {

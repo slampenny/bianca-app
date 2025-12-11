@@ -11,9 +11,10 @@ import {
   useDeleteScheduleMutation,
 } from "../services/api/scheduleApi"
 import { useCreateAlertMutation } from "../services/api/alertApi"
-import { getSchedules, setSchedule, getSchedule } from "../store/scheduleSlice"
+import { getSchedules, setSchedule, getSchedule, setSchedules } from "../store/scheduleSlice"
 import { getPatient, setPatient } from "../store/patientSlice"
 import { getCurrentUser } from "../store/authSlice"
+import { store } from "../store/store"
 import { LoadingScreen } from "./LoadingScreen"
 import { Schedule, Patient } from "app/services/api"
 import { spacing } from "app/theme"
@@ -272,9 +273,23 @@ export const SchedulesScreen = () => {
       } else {
         // Create new schedule (no ID or ID is null/undefined)
         if (selectedPatient && selectedPatient.id && selectedSchedule) {
-          await createNewSchedule({ patientId: selectedPatient.id, data: selectedSchedule }).unwrap()
+          // Filter out id and patient fields - they're not allowed in the create request
+          const { id, patient, ...scheduleData } = selectedSchedule
+          const newSchedule = await createNewSchedule({ patientId: selectedPatient.id, data: scheduleData }).unwrap()
           // Reset changes after successful create
           setHasChanges(false)
+          // The Redux matcher (createSchedule.matchFulfilled) automatically adds the schedule to state.schedules
+          // Get the current schedules from Redux state (which should now include the new schedule from the matcher)
+          const currentState = store.getState()
+          const currentSchedules = getSchedules(currentState)
+          // Update the patient's schedules array to keep them in sync
+          const updatedPatient: Patient = {
+            ...selectedPatient,
+            schedules: currentSchedules,
+          }
+          dispatch(setPatient(updatedPatient))
+          // Explicitly update schedules to ensure the picker updates immediately
+          dispatch(setSchedules(currentSchedules))
           // Note: The schedule will be updated with an ID by Redux after creation
           // The useEffect watching selectedSchedule?.id will update initialScheduleRef
         }
@@ -307,7 +322,7 @@ export const SchedulesScreen = () => {
       patient: selectedPatient?.id || null,
       frequency: "daily",
       intervals: [],
-      time: "00:00",
+      time: "09:00",
       isActive: true,
     }
     
@@ -339,6 +354,8 @@ export const SchedulesScreen = () => {
           
           // Update the patient in Redux (setPatient will also update the patients list)
           dispatch(setPatient(updatedPatient))
+          // Also update the schedules in the schedule slice to ensure consistency
+          dispatch(setSchedules(updatedSchedules))
         }
       } catch (error) {
         logger.error("Failed to delete schedule:", error)
@@ -364,6 +381,20 @@ export const SchedulesScreen = () => {
     }
   }
   
+  // Sync schedules from patient when patient changes (but only on initial load or when patient ID changes)
+  // Don't sync on every schedule change to avoid overwriting Redux state updates
+  const previousPatientIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    const currentPatientId = selectedPatient?.id || null
+    // Only sync if patient ID changed (new patient selected) or if schedules are missing
+    if (currentPatientId !== previousPatientIdRef.current || (selectedPatient?.schedules && schedules.length === 0)) {
+      if (selectedPatient?.schedules) {
+        dispatch(setSchedules(selectedPatient.schedules))
+      }
+      previousPatientIdRef.current = currentPatientId
+    }
+  }, [selectedPatient?.id, selectedPatient?.schedules, schedules.length, dispatch])
+
   // Initialize tracking when schedule changes
   useEffect(() => {
     if (selectedSchedule) {
@@ -413,6 +444,7 @@ export const SchedulesScreen = () => {
                 </TouchableOpacity>
                 <View style={styles.pickerWrapper}>
                   <Picker
+                    key={`schedule-picker-${schedules.length}-${schedules.map(s => s.id).join('-')}`}
                     selectedValue={selectedSchedule?.id || undefined}
                     onValueChange={(itemValue) => {
                       const selected = schedules.find((schedule) => schedule.id === itemValue)

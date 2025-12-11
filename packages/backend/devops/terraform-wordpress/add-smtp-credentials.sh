@@ -13,7 +13,9 @@ if grep -q "SES_SMTP_USERNAME" docker-compose.yml; then
 fi
 
 # Add credentials after WORDPRESS_DEBUG line
-sed -i '/WORDPRESS_DEBUG: false/a\      SES_SMTP_USERNAME: "AKIA_PLACEHOLDER_REMOVED"\n      SES_SMTP_PASSWORD: "AWS_SECRET_PLACEHOLDER_REMOVED"' docker-compose.yml
+# SECRETS: SES credentials should be loaded from environment variables or AWS Secrets Manager
+# Example: SES_SMTP_USERNAME and SES_SMTP_PASSWORD should be set as environment variables
+sed -i '/WORDPRESS_DEBUG: false/a\      SES_SMTP_USERNAME: "${SES_SMTP_USERNAME}"\n      SES_SMTP_PASSWORD: "${SES_SMTP_PASSWORD}"' docker-compose.yml
 
 echo "SES SMTP credentials added to docker-compose.yml"
 

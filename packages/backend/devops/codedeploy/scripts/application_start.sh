@@ -43,8 +43,9 @@ echo "   Stopping any existing containers..."
 docker-compose down 2>/dev/null || true
 
 # Start containers - use background process with timeout to prevent hangs
-echo "   Starting containers..."
-docker-compose up -d --remove-orphans > /tmp/docker_start.log 2>&1 &
+# --pull always ensures we use the latest images, --force-recreate ensures new containers
+echo "   Starting containers with newly pulled images..."
+docker-compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete

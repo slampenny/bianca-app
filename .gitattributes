@@ -1,3 +1,17 @@
-# Convert text file line endings to lf
-* text eol=lf
-*.js text
+# Ensure binary files are never modified by Git
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.zip binary
+*.tar binary
+*.gz binary
+

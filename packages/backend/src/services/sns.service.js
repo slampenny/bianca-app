@@ -78,21 +78,16 @@ class SNSService {
         return { success: false, reason: 'Twilio SMS service not available' };
       }
 
-      // CRITICAL: Always reinitialize Twilio before sending emergency alerts
-      // This ensures credentials loaded from AWS Secrets Manager (asynchronously) are picked up
-      // Even if the service was initialized at startup before credentials were available
-      logger.info('[SNS Service] Reinitializing Twilio SMS service to ensure credentials are loaded...');
-      twilioSmsService.reinitialize();
-      
+      // Try to initialize Twilio if not already initialized (lazy init)
       if (!twilioSmsService.isInitialized) {
-        logger.error('[SNS Service] ❌ CRITICAL: Twilio SMS service failed to initialize after reinitialize attempt');
-        const config = require('../config/config');
-        logger.error(`[SNS Service] Config check - accountSid: ${!!config.twilio?.accountSid}, authToken: ${!!config.twilio?.authToken}, phone: ${config.twilio?.phone || 'null'}`);
-        const twilioStatus = twilioSmsService.getStatus();
-        logger.error('[SNS Service] Twilio SMS status:', JSON.stringify(twilioStatus, null, 2));
-        return { success: false, reason: 'Twilio SMS service not initialized - credentials may not be loaded from AWS Secrets Manager' };
+        logger.info('[SNS Service] Twilio SMS not initialized, attempting to reinitialize...');
+        twilioSmsService.reinitialize();
+        if (!twilioSmsService.isInitialized) {
+          logger.error('[SNS Service] Twilio SMS service failed to initialize');
+          return { success: false, reason: 'Twilio SMS service not initialized' };
+        }
+        logger.info('[SNS Service] Twilio SMS service initialized successfully');
       }
-      logger.info('[SNS Service] ✅ Twilio SMS service initialized successfully');
 
       if (!caregivers || caregivers.length === 0) {
         logger.warn('[SNS Service] No caregivers provided for emergency alert');

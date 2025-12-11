@@ -30,11 +30,20 @@ resource "aws_codebuild_project" "staging_build" {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     }
+    # Staging secrets - backend will load from AWS Secrets Manager at runtime
+    environment_variable {
+      name  = "AWS_SECRET_ID"
+      value = "MySecretsManagerSecret-Staging"
+    }
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.aws_region
+    }
   }
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "devops/buildspec-staging.yml"
+    buildspec = "packages/backend/devops/buildspec-staging.yml"
   }
 
   logs_config {
@@ -220,6 +229,16 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
         Effect   = "Allow"
         Action   = "codestar-connections:UseConnection"
         Resource = var.github_app_connection_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "codestar-connections:PassConnection"
+        Resource = var.github_app_connection_arn
+        Condition = {
+          StringEquals = {
+            "codestar-connections:PassedToService" = "codepipeline.amazonaws.com"
+          }
+        }
       }
     ]
   })
@@ -254,21 +273,6 @@ resource "aws_codepipeline" "staging" {
         OutputArtifactFormat = "CODE_ZIP"
       }
     }
-    action {
-      name             = "FrontendSource"
-      category         = "Source"
-      owner            = "AWS"
-      provider         = "CodeStarSourceConnection"
-      version          = "1"
-      output_artifacts = ["FrontendSourceOutput"]
-      configuration = {
-        ConnectionArn        = var.github_app_connection_arn
-        FullRepositoryId     = "slampenny/bianca-app-frontend"
-        BranchName           = "staging"
-        OutputArtifactFormat = "CODE_ZIP"
-      }
-      run_order = 1
-    }
   }
 
   stage {
@@ -279,7 +283,7 @@ resource "aws_codepipeline" "staging" {
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
-      input_artifacts  = ["SourceOutput", "FrontendSourceOutput"]
+      input_artifacts  = ["SourceOutput"]
       output_artifacts = ["BuildOutput"]
       configuration = {
         ProjectName   = aws_codebuild_project.staging_build.name

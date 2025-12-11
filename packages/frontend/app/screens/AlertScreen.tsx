@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { FlatList, View, StyleSheet, ActivityIndicator, Pressable } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { Toggle, Button, EmptyState, ListItem, Text } from "../components"
+import { Toggle, Button, ListItem, Text } from "../components"
 import {
   useMarkAllAsReadMutation,
   useMarkAlertAsReadMutation,

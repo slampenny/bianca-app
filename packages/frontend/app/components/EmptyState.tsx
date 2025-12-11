@@ -4,8 +4,9 @@ import { translate } from "../i18n"
 import { spacing } from "../theme"
 import { Button, ButtonProps } from "./Button"
 import { Text, TextProps } from "./Text"
+import Config from "../config"
 
-const sadFace = require("../../assets/images/sad-face.png")
+const sadFace = { uri: `${Config.assetsBaseUrl}/images/sad-face.png` }
 
 interface EmptyStateProps {
   /**
