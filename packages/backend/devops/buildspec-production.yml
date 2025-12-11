@@ -24,7 +24,11 @@ phases:
         # Build backend image
         echo "🔨 Building backend image..."
         cd packages/backend
-        docker build --build-arg BUILD_TIMESTAMP=$(date +%s) \
+        # Use --no-cache to ensure we always get the latest code from main branch
+        # This prevents Docker layer caching from using old source code
+        echo "   Building with --no-cache to ensure latest code from main branch..."
+        docker build --no-cache \
+                     --build-arg BUILD_TIMESTAMP=$(date +%s) \
                      --build-arg GIT_COMMIT=$CODEBUILD_RESOLVED_SOURCE_VERSION \
                      -t $ECR_REGISTRY/bianca-app-backend:latest \
                      -t $ECR_REGISTRY/bianca-app-backend:production \
@@ -36,7 +40,9 @@ phases:
         # Build asterisk image
         echo "🔨 Building asterisk image..."
         cd packages/backend/devops/asterisk
-        docker build -t $ECR_REGISTRY/bianca-app-asterisk:production .
+        # Use --no-cache to ensure we always get the latest code from main branch
+        echo "   Building with --no-cache to ensure latest code from main branch..."
+        docker build --no-cache -t $ECR_REGISTRY/bianca-app-asterisk:production .
         cd ../../..
         echo "✅ Asterisk build complete"
       - |
@@ -52,7 +58,10 @@ phases:
           exit 1
         fi
         cd packages/frontend
-        if docker build --build-arg BUILD_ENV=production \
+        # Use --no-cache to ensure we always get the latest code from main branch
+        echo "   Building with --no-cache to ensure latest code from main branch..."
+        if docker build --no-cache \
+                     --build-arg BUILD_ENV=production \
                      -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:production \
                      -f devops/Dockerfile .; then
