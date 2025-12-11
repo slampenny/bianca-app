@@ -63,6 +63,12 @@ const updateOrg = {
           return value;
         }),
       logo: Joi.string().allow(null, '').optional(),
+      timezone: Joi.string().optional(), // IANA timezone identifier
+      callRetrySettings: Joi.object().keys({
+        retryCount: Joi.number().integer().min(0).max(10).optional(),
+        retryIntervalMinutes: Joi.number().integer().min(1).max(1440).optional(),
+        alertOnAllMissedCalls: Joi.boolean().optional(),
+      }).optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

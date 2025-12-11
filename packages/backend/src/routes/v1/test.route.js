@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require('express'); // Test auto-trigger
 const auth = require('../../middlewares/auth');
 const router = express.Router();
 const logger = require('../../config/logger');
@@ -804,8 +804,7 @@ router.post('/seed', async (req, res) => {
       data: {
         org: result.org ? result.org._id : null,
         caregiver: result.caregiver ? result.caregiver._id : null,
-        patients: result.patients ? result.patients.map(p => p._id) : [],
-        emergencyPhrases: result.emergencyPhrases || null
+        patients: result.patients ? result.patients.map(p => p._id) : []
       }
     });
   } catch (error) {
@@ -901,295 +900,20 @@ router.post('/reset-mfa', async (req, res) => {
 
 /**
  * @swagger
- * /test/playwright-artifacts:
- *   get:
- *     summary: List Playwright test pipeline executions
- *     description: Lists recent Playwright test pipeline executions with their artifacts (development/test only)
- *     tags: [Test]
- *     parameters:
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Maximum number of executions to return
- *     responses:
- *       "200":
- *         description: List of pipeline executions
- *       "403":
- *         description: Not allowed in production
- *       "500":
- *         description: Error retrieving executions
- */
-router.get('/playwright-artifacts', auth(), async (req, res) => {
-  try {
-    // Only allow in development/test environments
-    if (config.env === 'production') {
-      return res.status(403).json({ error: 'Playwright artifacts view is not allowed in production' });
-    }
-
-    const { S3Client, ListObjectsV2Command } = require('@aws-sdk/client-s3');
-    const pipelineName = 'BiancaPlaywright-Test-Pipeline';
-    const limit = parseInt(req.query.limit) || 10;
-    const region = config.aws?.region || 'us-east-2';
-    const artifactBucket = config.aws?.artifactBucket || process.env.ARTIFACT_BUCKET || 'bianca-codepipeline-artifact-bucket';
-    const s3 = new S3Client({ region });
-
-    // List all pipeline execution directories in S3
-    // CodePipeline stores artifacts as: pipeline-name/execution-id/artifact-name/
-    const pipelinePrefix = `${pipelineName}/`;
-    
-    const listResult = await s3.send(new ListObjectsV2Command({
-      Bucket: artifactBucket,
-      Prefix: pipelinePrefix,
-      Delimiter: '/',
-      MaxKeys: 1000
-    }));
-
-    // Extract execution IDs from common prefixes
-    const executionIds = (listResult.CommonPrefixes || [])
-      .map(prefix => prefix.Prefix.replace(pipelinePrefix, '').replace('/', ''))
-      .filter(id => id && id.length > 0)
-      .slice(0, limit);
-
-    // Enrich executions with artifact information
-    const enrichedExecutions = await Promise.all(
-      executionIds.map(async (executionId) => {
-        // List artifacts for this execution
-        const artifactPrefix = `${pipelineName}/${executionId}/TestResults/`;
-        let artifacts = [];
-        
-        try {
-          const artifactList = await s3.send(new ListObjectsV2Command({
-            Bucket: artifactBucket,
-            Prefix: artifactPrefix,
-            MaxKeys: 100
-          }));
-
-          artifacts = (artifactList.Contents || []).map(obj => ({
-            key: obj.Key,
-            size: obj.Size,
-            lastModified: obj.LastModified,
-            url: `/v1/test/playwright-artifacts/${executionId}/${encodeURIComponent(obj.Key.replace(artifactPrefix, ''))}`
-          }));
-        } catch (err) {
-          logger.warn(`Error listing artifacts for execution ${executionId}: ${err.message}`);
-        }
-
-        return {
-          executionId,
-          artifactCount: artifacts.length,
-          artifacts: artifacts.slice(0, 20), // Limit to first 20 artifacts
-          viewUrl: `/v1/test/playwright-artifacts/${executionId}`
-        };
-      })
-    );
-
-    res.json({
-      success: true,
-      pipeline: pipelineName,
-      artifactBucket,
-      executions: enrichedExecutions
-    });
-  } catch (error) {
-    logger.error('Error retrieving Playwright artifacts:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * @swagger
- * /test/playwright-artifacts/{executionId}:
- *   get:
- *     summary: List artifacts for a specific pipeline execution
- *     description: Lists all artifacts for a specific Playwright test pipeline execution (development/test only)
- *     tags: [Test]
- *     parameters:
- *       - in: path
- *         name: executionId
- *         required: true
- *         schema:
- *           type: string
- *         description: Pipeline execution ID
- *     responses:
- *       "200":
- *         description: List of artifacts
- *       "403":
- *         description: Not allowed in production
- *       "404":
- *         description: Execution not found
- */
-router.get('/playwright-artifacts/:executionId', auth(), async (req, res) => {
-  try {
-    // Only allow in development/test environments
-    if (config.env === 'production') {
-      return res.status(403).json({ error: 'Playwright artifacts view is not allowed in production' });
-    }
-
-    const { S3Client, ListObjectsV2Command } = require('@aws-sdk/client-s3');
-    const { executionId } = req.params;
-    const pipelineName = 'BiancaPlaywright-Test-Pipeline';
-    const artifactBucket = config.aws?.artifactBucket || process.env.ARTIFACT_BUCKET || 'bianca-codepipeline-artifact-bucket';
-    const region = config.aws?.region || 'us-east-2';
-    const s3 = new S3Client({ region });
-
-    const artifactPrefix = `${pipelineName}/${executionId}/TestResults/`;
-
-    // List all artifacts
-    const listResult = await s3.send(new ListObjectsV2Command({
-      Bucket: artifactBucket,
-      Prefix: artifactPrefix,
-      MaxKeys: 1000
-    }));
-
-    const artifacts = (listResult.Contents || []).map(obj => {
-      const relativeKey = obj.Key.replace(artifactPrefix, '');
-      return {
-        name: relativeKey,
-        key: obj.Key,
-        size: obj.Size,
-        lastModified: obj.LastModified,
-        url: `/v1/test/playwright-artifacts/${executionId}/${encodeURIComponent(relativeKey)}`,
-        downloadUrl: `/v1/test/playwright-artifacts/${executionId}/${encodeURIComponent(relativeKey)}?download=true`
-      };
-    });
-
-    // Organize by type
-    const organized = {
-      reports: artifacts.filter(a => a.name.includes('playwright-report')),
-      testResults: artifacts.filter(a => a.name.includes('test-results')),
-      logs: artifacts.filter(a => a.name.endsWith('.log') || a.name.endsWith('.txt')),
-      other: artifacts.filter(a => 
-        !a.name.includes('playwright-report') && 
-        !a.name.includes('test-results') && 
-        !a.name.endsWith('.log') && 
-        !a.name.endsWith('.txt')
-      )
-    };
-
-    res.json({
-      success: true,
-      executionId,
-      totalArtifacts: artifacts.length,
-      organized,
-      all: artifacts
-    });
-  } catch (error) {
-    logger.error('Error retrieving execution artifacts:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * @swagger
- * /test/playwright-artifacts/{executionId}/*:
- *   get:
- *     summary: View or download a specific artifact
- *     description: Retrieves and serves a specific Playwright test artifact (development/test only)
- *     tags: [Test]
- *     parameters:
- *       - in: path
- *         name: executionId
- *         required: true
- *         schema:
- *           type: string
- *       - in: path
- *         name: artifactPath
- *         required: true
- *         schema:
- *           type: string
- *       - in: query
- *         name: download
- *         schema:
- *           type: boolean
- *         description: Force download instead of viewing
- *     responses:
- *       "200":
- *         description: Artifact content
- *       "403":
- *         description: Not allowed in production
- *       "404":
- *         description: Artifact not found
- */
-router.get('/playwright-artifacts/:executionId/*', auth(), async (req, res) => {
-  try {
-    // Only allow in development/test environments
-    if (config.env === 'production') {
-      return res.status(403).json({ error: 'Playwright artifacts view is not allowed in production' });
-    }
-
-    const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
-    const { executionId } = req.params;
-    const artifactPath = req.params[0]; // Everything after executionId/
-    const pipelineName = 'BiancaPlaywright-Test-Pipeline';
-    const artifactBucket = config.aws?.artifactBucket || process.env.ARTIFACT_BUCKET || 'bianca-codepipeline-artifact-bucket';
-    const download = req.query.download === 'true';
-    const region = config.aws?.region || 'us-east-2';
-    const s3 = new S3Client({ region });
-    const artifactKey = `${pipelineName}/${executionId}/TestResults/${artifactPath}`;
-
-    try {
-      // Get the object from S3
-      const object = await s3.send(new GetObjectCommand({
-        Bucket: artifactBucket,
-        Key: artifactKey
-      }));
-      
-      // Convert stream to buffer
-      const chunks = [];
-      for await (const chunk of object.Body) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-
-      // Determine content type
-      const contentType = object.ContentType || 
-        (artifactPath.endsWith('.html') ? 'text/html' :
-         artifactPath.endsWith('.json') ? 'application/json' :
-         artifactPath.endsWith('.log') || artifactPath.endsWith('.txt') ? 'text/plain' :
-         artifactPath.endsWith('.png') ? 'image/png' :
-         artifactPath.endsWith('.jpg') || artifactPath.endsWith('.jpeg') ? 'image/jpeg' :
-         artifactPath.endsWith('.mp4') ? 'video/mp4' :
-         'application/octet-stream');
-
-      // Set headers
-      res.setHeader('Content-Type', contentType);
-      if (download || contentType === 'application/octet-stream') {
-        res.setHeader('Content-Disposition', `attachment; filename="${artifactPath.split('/').pop()}"`);
-      }
-
-      // Send the content
-      res.send(buffer);
-    } catch (s3Error) {
-      if (s3Error.code === 'NoSuchKey') {
-        return res.status(404).json({ 
-          error: 'Artifact not found',
-          key: artifactKey
-        });
-      }
-      throw s3Error;
-    }
-  } catch (error) {
-    logger.error('Error retrieving artifact:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * @swagger
- * /test/create-alert:
+ * /test/emergency-processor:
  *   post:
- *     summary: Create an alert for testing
- *     description: Creates an alert in the database for a caregiver (test endpoint only)
+ *     summary: Test emergency processor with real SMS sending
+ *     description: |
+ *       Tests the emergency processor end-to-end by simulating a patient utterance.
+ *       This bypasses OpenAI transcription and directly tests the emergency detection,
+ *       alert creation, and SMS notification flow using real Twilio.
+ *       
+ *       Use this to diagnose why emergency alerts aren't being sent during calls.
+ *       The test will:
+ *       1. Process the utterance through emergency detection
+ *       2. Create an alert if emergency is detected
+ *       3. Send SMS notifications to caregivers via Twilio (real SMS, not mocked)
+ *       4. Return detailed diagnostic information
  *     tags: [Test]
  *     requestBody:
  *       required: true
@@ -1198,242 +922,20 @@ router.get('/playwright-artifacts/:executionId/*', auth(), async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - caregiverId
- *               - message
- *             properties:
- *               caregiverId:
- *                 type: string
- *               message:
- *                 type: string
- *               importance:
- *                 type: string
- *                 enum: [low, medium, high, urgent]
- *               alertType:
- *                 type: string
- *                 enum: [patient, system, conversation, schedule]
- *               relatedPatient:
- *                 type: string
- *               visibility:
- *                 type: string
- *               relevanceUntil:
- *                 type: string
- *                 format: date-time
- *     responses:
- *       "200":
- *         description: Alert created successfully
- *       "400":
- *         description: Invalid request
- */
-router.post('/create-alert', async (req, res) => {
-  try {
-    const { caregiverId, message, importance, alertType, relatedPatient, visibility, relevanceUntil } = req.body;
-    
-    if (!caregiverId || !message) {
-      return res.status(400).json({ error: 'caregiverId and message are required' });
-    }
-
-    const { alertService } = require('../../services');
-    const mongoose = require('mongoose');
-    
-    // For patient-type alerts with assignedCaregivers visibility, we need to set createdBy to the patient
-    // so that all caregivers assigned to that patient can see it
-    const finalVisibility = visibility || 'assignedCaregivers';
-    let createdBy = caregiverId;
-    let createdModel = 'Caregiver';
-    
-    // If it's a patient alert with assignedCaregivers visibility, use the patient as creator
-    if (alertType === 'patient' && relatedPatient && finalVisibility === 'assignedCaregivers') {
-      // Ensure patient ID is converted to ObjectId for proper matching in queries
-      createdBy = mongoose.Types.ObjectId.isValid(relatedPatient) 
-        ? new mongoose.Types.ObjectId(relatedPatient)
-        : relatedPatient;
-      createdModel = 'Patient';
-    }
-    
-    // Also ensure relatedPatient is ObjectId if provided
-    const relatedPatientObjId = relatedPatient && mongoose.Types.ObjectId.isValid(relatedPatient)
-      ? new mongoose.Types.ObjectId(relatedPatient)
-      : relatedPatient;
-    
-    const alert = await alertService.createAlert({
-      message,
-      importance: importance || 'medium',
-      alertType: alertType || 'patient',
-      relatedPatient: relatedPatientObjId,
-      createdBy,
-      createdModel,
-      visibility: finalVisibility,
-      relevanceUntil: relevanceUntil ? new Date(relevanceUntil) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-
-    res.json(alert);
-  } catch (err) {
-    logger.error('Error creating alert for test:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * @swagger
- * /test/get-caregiver-by-email:
- *   post:
- *     summary: Get caregiver by email for testing
- *     description: Returns caregiver information by email (test endpoint only)
- *     tags: [Test]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       "200":
- *         description: Caregiver found
- *       "404":
- *         description: Caregiver not found
- */
-router.post('/get-caregiver-by-email', async (req, res) => {
-  try {
-    const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    if (!caregiverService) {
-      return res.status(503).json({ error: 'Caregiver service not available' });
-    }
-
-    const caregiver = await caregiverService.getCaregiverByEmail(email);
-    if (!caregiver) {
-      return res.status(404).json({ error: 'Caregiver not found' });
-    }
-
-    // Populate patients for test purposes - ensure we get the full patient objects
-    await caregiver.populate({
-      path: 'patients',
-      select: '_id name email phone'
-    });
-    
-    res.json(caregiver);
-  } catch (err) {
-    logger.error('Error getting caregiver by email for test:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * @swagger
- * /test/verify-alert-query:
- *   post:
- *     summary: Verify alert query for debugging
- *     description: Checks if an alert would be returned by the alert query for a caregiver (test endpoint only)
- *     tags: [Test]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - caregiverId
- *               - alertId
- *             properties:
- *               caregiverId:
- *                 type: string
- *               alertId:
- *                 type: string
- *     responses:
- *       "200":
- *         description: Query verification result
- */
-router.post('/verify-alert-query', async (req, res) => {
-  try {
-    const { caregiverId, alertId } = req.body;
-    
-    if (!caregiverId || !alertId) {
-      return res.status(400).json({ error: 'caregiverId and alertId are required' });
-    }
-
-    const { Alert, Caregiver } = require('../../models');
-    const mongoose = require('mongoose');
-    
-    // Get the alert
-    const alert = await Alert.findById(alertId);
-    if (!alert) {
-      return res.status(404).json({ error: 'Alert not found' });
-    }
-    
-    // Get the caregiver with patients populated
-    const caregiver = await Caregiver.findById(caregiverId)
-      .populate({ path: 'org', select: 'caregivers' })
-      .populate({ path: 'patients', select: '_id' });
-    
-    if (!caregiver) {
-      return res.status(404).json({ error: 'Caregiver not found' });
-    }
-    
-    // Check if alert would match the query
-    const patientIds = caregiver.patients.map((pt) => pt._id.toString());
-    const alertCreatedBy = alert.createdBy.toString();
-    const isInPatients = patientIds.includes(alertCreatedBy);
-    
-    res.json({
-      alert: {
-        id: alert._id.toString(),
-        createdBy: alertCreatedBy,
-        visibility: alert.visibility,
-        message: alert.message,
-      },
-      caregiver: {
-        id: caregiver._id.toString(),
-        patientIds: patientIds,
-      },
-      match: {
-        isInPatients,
-        visibilityMatches: alert.visibility === 'assignedCaregivers',
-        wouldMatch: isInPatients && alert.visibility === 'assignedCaregivers',
-      }
-    });
-  } catch (err) {
-    logger.error('Error verifying alert query for test:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * @swagger
- * /test/emergency-sms:
- *   post:
- *     summary: Test emergency SMS functionality (Staging/Test Only)
- *     description: Tests the complete emergency detection and SMS notification flow with detailed diagnostics. One-click test with defaults - no parameters required.
- *     tags: [Test]
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
+ *               - text
  *             properties:
  *               patientId:
  *                 type: string
- *                 description: Patient ID to test with (optional, will use first patient if not provided)
- *                 default: null
+ *                 description: Patient ID to test emergency detection for (optional - will use first patient if not provided)
+ *                 example: "507f1f77bcf86cd799439011"
  *               text:
  *                 type: string
- *                 description: Text to test emergency detection with
+ *                 description: Patient utterance text to test (e.g., "I'm having a heart attack")
+ *                 example: "I'm having a heart attack"
  *                 default: "I'm having a heart attack"
- *           example:
- *             {}
  *     responses:
  *       "200":
- *         description: Emergency test result with detailed diagnostics
+ *         description: Emergency processor test result
  *         content:
  *           application/json:
  *             schema:
@@ -1441,211 +943,200 @@ router.post('/verify-alert-query', async (req, res) => {
  *               properties:
  *                 success:
  *                   type: boolean
- *                 message:
+ *                 processing:
+ *                   type: object
+ *                   properties:
+ *                     emergencyDetected:
+ *                       type: boolean
+ *                     falsePositive:
+ *                       type: boolean
+ *                     deduplicationPassed:
+ *                       type: boolean
+ *                     confidence:
+ *                       type: number
+ *                 shouldAlert:
+ *                   type: boolean
+ *                 alertData:
+ *                   type: object
+ *                   nullable: true
+ *                 alertResult:
+ *                   type: object
+ *                   nullable: true
+ *                 reason:
  *                   type: string
  *                 diagnostics:
  *                   type: object
- *                   description: Detailed step-by-step diagnostics
+ *                   properties:
+ *                     patientFound:
+ *                       type: boolean
+ *                     caregiversFound:
+ *                       type: boolean
+ *                     caregiverCount:
+ *                       type: number
+ *                     smsEnabled:
+ *                       type: boolean
+ *                     twilioInitialized:
+ *                       type: boolean
+ *                     config:
+ *                       type: object
+ *       "400":
+ *         description: Invalid request
+ *       "404":
+ *         description: Patient not found
+ *       "500":
+ *         description: Error processing emergency
  */
-router.post('/emergency-sms', async (req, res) => {
+router.post('/emergency-processor', async (req, res) => {
   try {
-    // Only allow in staging/test environments
-    if (config.env === 'production') {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Emergency SMS test is not allowed in production' 
-      });
+    const { patientId, text } = req.body;
+    
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ error: 'text is required and must be a non-empty string' });
     }
 
-    // Default values for one-click testing
-    const { 
-      patientId = null, 
-      text = "I'm having a heart attack" 
-    } = req.body || {};
+    // Import emergency processor
     const { emergencyProcessor } = require('../../services/emergencyProcessor.service');
     const { Patient } = require('../../models');
-    const { config: emergencyConfig } = require('../../config/emergency.config');
-    const { twilioSmsService } = require('../../services/twilioSms.service');
     const { snsService } = require('../../services/sns.service');
-    
+    const { twilioSmsService } = require('../../services/twilioSms.service');
+    const { config: emergencyConfig } = require('../../config/emergency.config');
+
+    // Gather diagnostic information
     const diagnostics = {
-      timestamp: new Date().toISOString(),
-      input: {
-        patientId: patientId || 'auto-detect',
-        text: text
-      },
-      steps: {},
-      result: null,
-      errors: []
-    };
-
-    // Step 1: Find or validate patient
-    let testPatientId = patientId;
-    if (!testPatientId) {
-      logger.info('[Test Emergency SMS] No patientId provided, finding first patient...');
-      const firstPatient = await Patient.findOne().select('_id name preferredName phone caregivers');
-      if (!firstPatient) {
-        return res.status(404).json({
-          success: false,
-          error: 'No patients found in database. Please provide a patientId or create a patient first.',
-          diagnostics
-        });
+      patientFound: false,
+      caregiversFound: false,
+      caregiverCount: 0,
+      smsEnabled: emergencyConfig.enableSNSPushNotifications,
+      twilioInitialized: twilioSmsService ? twilioSmsService.isInitialized : false,
+      config: {
+        enableSNSPushNotifications: emergencyConfig.enableSNSPushNotifications,
+        enableAlertsAPI: emergencyConfig.enableAlertsAPI,
+        enableFalsePositiveFilter: emergencyConfig.enableFalsePositiveFilter
       }
-      testPatientId = firstPatient._id.toString();
-      diagnostics.steps.patientLookup = {
-        success: true,
-        method: 'auto-detect',
-        patient: {
-          id: firstPatient._id.toString(),
-          name: firstPatient.name,
-          preferredName: firstPatient.preferredName,
-          phone: firstPatient.phone
-        }
-      };
-      logger.info(`[Test Emergency SMS] Using patient: ${firstPatient.name} (${testPatientId})`);
-    } else {
-      const patient = await Patient.findById(testPatientId).select('_id name preferredName phone caregivers');
-      if (!patient) {
-        return res.status(404).json({
-          success: false,
-          error: `Patient not found: ${testPatientId}`,
-          diagnostics
-        });
-      }
-      diagnostics.steps.patientLookup = {
-        success: true,
-        method: 'provided',
-        patient: {
-          id: patient._id.toString(),
-          name: patient.name,
-          preferredName: patient.preferredName,
-          phone: patient.phone
-        }
-      };
-    }
-
-    // Step 2: Check configuration
-    diagnostics.steps.configuration = {
-      enableSNSPushNotifications: emergencyConfig.enableSNSPushNotifications,
-      NODE_ENV: process.env.NODE_ENV || 'NOT SET',
-      AWS_REGION: process.env.AWS_REGION || 'NOT SET'
     };
 
-    // Step 3: Check Twilio SMS service status
-    diagnostics.steps.twilioSmsService = {
-      available: !!twilioSmsService,
-      status: twilioSmsService ? twilioSmsService.getStatus() : null
-    };
-
-    // Step 4: Check SNS service status
-    diagnostics.steps.snsService = {
-      available: !!snsService,
-      status: snsService ? snsService.getStatus() : null
-    };
-
-    // Step 5: Process utterance for emergency detection
-    logger.info(`[Test Emergency SMS] Processing utterance: "${text}" for patient ${testPatientId}`);
-    const processResult = await emergencyProcessor.processUtterance(testPatientId, text, Date.now());
+    // Find patient - use provided patientId or get first patient
+    let patient;
+    let actualPatientId = patientId;
     
-    diagnostics.steps.emergencyDetection = {
-      shouldAlert: processResult.shouldAlert,
-      reason: processResult.reason,
-      processing: processResult.processing,
-      alertData: processResult.alertData
-    };
+    if (patientId) {
+      patient = await Patient.findById(patientId).populate('caregivers');
+      if (!patient) {
+        return res.status(404).json({ 
+          error: 'Patient not found',
+          diagnostics 
+        });
+      }
+    } else {
+      // Get first patient from database
+      patient = await Patient.findOne().populate('caregivers');
+      if (!patient) {
+        return res.status(404).json({ 
+          error: 'No patients found in database',
+          diagnostics 
+        });
+      }
+      actualPatientId = patient._id.toString();
+      logger.info(`[Test Route] No patientId provided, using first patient: ${actualPatientId}`);
+    }
+    
+    diagnostics.patientFound = true;
 
-    if (!processResult.shouldAlert) {
-      return res.json({
-        success: false,
-        message: 'Emergency was NOT detected',
-        reason: processResult.reason,
-        diagnostics
+    // Check caregivers
+    if (patient.caregivers && patient.caregivers.length > 0) {
+      const caregiversWithPhone = patient.caregivers.filter(cg => cg && cg.phone);
+      diagnostics.caregiversFound = caregiversWithPhone.length > 0;
+      diagnostics.caregiverCount = caregiversWithPhone.length;
+      
+      // Log caregiver phone numbers for debugging
+      caregiversWithPhone.forEach((cg, idx) => {
+        logger.info(`[Test Route] Caregiver ${idx + 1}: ${cg.name || cg.email} - phone: ${cg.phone}`);
       });
+      
+      if (caregiversWithPhone.length === 0) {
+        logger.warn(`[Test Route] Patient ${actualPatientId} has ${patient.caregivers.length} caregiver(s) but none have phone numbers`);
+      }
+    } else {
+      logger.warn(`[Test Route] Patient ${actualPatientId} has no caregivers assigned`);
     }
 
-    // Step 6: Get caregivers
-    const patient = await Patient.findById(testPatientId).populate('caregivers');
-    diagnostics.steps.caregivers = {
-      totalCaregivers: patient?.caregivers?.length || 0,
-      caregiversWithPhones: patient?.caregivers?.filter(c => c?.phone)?.length || 0,
-      caregiverDetails: patient?.caregivers?.map(c => ({
-        id: c._id.toString(),
-        name: c.name,
-        phone: c.phone || 'MISSING',
-        hasPhone: !!c.phone
-      })) || []
-    };
+    logger.info(`[Test Route] Testing emergency processor for patient ${actualPatientId} (${patient.name || patient.preferredName || 'Unknown'}) with text: "${text.substring(0, 100)}"`);
 
-    if (!patient?.caregivers || patient.caregivers.length === 0) {
-      return res.json({
-        success: false,
-        message: 'Emergency detected but NO CAREGIVERS found for patient',
-        diagnostics
-      });
-    }
-
-    const caregiversWithPhones = patient.caregivers.filter(c => c && c.phone);
-    if (caregiversWithPhones.length === 0) {
-      return res.json({
-        success: false,
-        message: 'Emergency detected but NO CAREGIVERS with phone numbers found',
-        diagnostics
-      });
-    }
-
-    // Step 7: Create alert and send SMS
-    logger.info(`[Test Emergency SMS] Creating alert and sending SMS...`);
-    const alertResult = await emergencyProcessor.createAlert(
-      testPatientId,
-      processResult.alertData,
-      text
+    // Step 1: Process utterance through emergency detection
+    const processingResult = await emergencyProcessor.processUtterance(
+      actualPatientId,
+      text,
+      Date.now()
     );
 
-    diagnostics.steps.alertCreation = {
-      success: alertResult.success,
-      alertId: alertResult.alert?._id?.toString() || null,
-      error: alertResult.error || null
-    };
-
-    diagnostics.steps.smsNotification = alertResult.notificationResult || null;
-
-    // Final result
-    const smsSuccess = alertResult.notificationResult?.success === true;
-    const smsSuccessful = alertResult.notificationResult?.successful || 0;
-    const smsFailed = alertResult.notificationResult?.failed || 0;
-
-    diagnostics.result = {
-      emergencyDetected: true,
-      alertCreated: alertResult.success,
-      smsSent: smsSuccess,
-      smsSuccessful: smsSuccessful,
-      smsFailed: smsFailed,
-      totalRecipients: alertResult.notificationResult?.total || 0
-    };
-
-    // Determine overall success
-    const overallSuccess = alertResult.success && smsSuccess && smsSuccessful > 0;
-
-    res.json({
-      success: overallSuccess,
-      message: overallSuccess 
-        ? `✅ Emergency detected, alert created, and SMS sent to ${smsSuccessful} caregiver(s)`
-        : smsSuccess === false
-        ? `⚠️ Emergency detected and alert created, but SMS failed (${smsFailed} failed, ${smsSuccessful} successful)`
-        : `⚠️ Emergency detected and alert created, but SMS notification result unclear`,
-      diagnostics
+    logger.info(`[Test Route] Emergency detection result:`, {
+      shouldAlert: processingResult.shouldAlert,
+      reason: processingResult.reason,
+      processing: processingResult.processing
     });
 
+    // Step 2: If emergency detected, create alert (which will trigger SMS)
+    let alertResult = null;
+    if (processingResult.shouldAlert && processingResult.alertData) {
+      logger.info(`[Test Route] Emergency detected, creating alert...`);
+      alertResult = await emergencyProcessor.createAlert(
+        actualPatientId,
+        processingResult.alertData,
+        text
+      );
+
+      logger.info(`[Test Route] Alert creation result:`, {
+        success: alertResult.success,
+        alertId: alertResult.alert?._id,
+        notificationResult: alertResult.notificationResult
+      });
+
+      if (!alertResult.success) {
+        logger.error(`[Test Route] Alert creation failed: ${alertResult.error}`);
+      }
+    } else {
+      logger.info(`[Test Route] No alert created - reason: ${processingResult.reason}`);
+    }
+
+    // Prepare response with full diagnostic information
+    const response = {
+      success: true,
+      patient: {
+        id: actualPatientId,
+        name: patient.name,
+        preferredName: patient.preferredName
+      },
+      processing: processingResult.processing,
+      shouldAlert: processingResult.shouldAlert,
+      alertData: processingResult.alertData,
+      alertResult: alertResult,
+      reason: processingResult.reason,
+      diagnostics: {
+        ...diagnostics,
+        snsStatus: snsService ? snsService.getStatus() : null,
+        twilioStatus: twilioSmsService ? twilioSmsService.getStatus() : null,
+        emergencyProcessorStatus: emergencyProcessor.getStatus()
+      }
+    };
+
+    // Add detailed SMS notification results if available
+    if (alertResult && alertResult.notificationResult) {
+      response.smsResults = {
+        success: alertResult.notificationResult.success,
+        successful: alertResult.notificationResult.successful,
+        failed: alertResult.notificationResult.failed,
+        total: alertResult.notificationResult.total,
+        results: alertResult.notificationResult.results
+      };
+    }
+
+    res.json(response);
   } catch (error) {
-    logger.error('[Test Emergency SMS] Error:', error);
+    logger.error('[Test Route] Error testing emergency processor:', error);
     res.status(500).json({
       success: false,
       error: error.message,
-      errorStack: error.stack,
-      diagnostics: {
-        timestamp: new Date().toISOString(),
-        errors: [error.message]
-      }
+      stack: config.env === 'development' || config.env === 'staging' ? error.stack : undefined
     });
   }
 });

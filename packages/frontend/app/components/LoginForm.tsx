@@ -12,6 +12,7 @@ import { translate } from "../i18n"
 import { navigationRef } from "../navigators/navigationUtilities"
 import { logger } from "../utils/logger"
 import { AuthModalContext } from "../contexts/AuthModalContext"
+import Config from "../config"
 
 // Temporary interfaces to avoid import issues
 interface SSOUser {
@@ -372,12 +373,11 @@ export const LoginForm: FC<LoginFormProps> = ({
         <View style={styles.brandingContainer}>
           <View style={styles.iconWrapper}>
             <Image 
-              source={require("../../assets/images/icon.png")} 
+              source={{ uri: Config.appIconUrl }}
               style={styles.appIcon}
               resizeMode="contain"
               accessibilityLabel="Bianca App Icon"
               testID="app-icon"
-              // Web-specific: ensure no default styling interferes
               {...(Platform.OS === 'web' && {
                 style: [
                   styles.appIcon,

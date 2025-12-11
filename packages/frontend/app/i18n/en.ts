@@ -1034,6 +1034,8 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     viewCaregivers: "View Caregivers",
     inviteCaregiver: "Invite Caregiver",
     payments: "Payments",
+    timezone: "Timezone",
+    timezoneHelper: "Select your organization's timezone. Schedule times will be based on this timezone.",
     callRetrySettings: "Call Retry Settings",
     retryCountLabel: "Call Retry Count",
     retryCountHelper: "Number of times to retry a call if it's not answered (0-10)",

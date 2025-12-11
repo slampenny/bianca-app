@@ -1,6 +1,6 @@
 // seedDatabase.js - Refactored version using modular seeders
 const mongoose = require('mongoose');
-const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice, EmergencyPhrase } = require('../models');
+const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
 const config = require('../config/config');
 
 // Import seeders
@@ -29,7 +29,7 @@ async function clearDatabase() {
   await Schedule.deleteMany({});
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
-  await EmergencyPhrase.deleteMany({}); // Clear emergency phrases so they can be re-seeded
+  // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
   console.log('Database cleared');
 }
 
@@ -46,7 +46,7 @@ async function seedDatabase() {
     await clearDatabase();
 
     // Seed emergency phrases first (needed for emergency detection)
-    const emergencyPhrases = await emergencyPhrasesSeeder.seedEmergencyPhrases();
+    await emergencyPhrasesSeeder.seedEmergencyPhrases();
 
     // Seed organizations
     const org = await orgsSeeder.seedOrgs();
@@ -145,27 +145,12 @@ async function seedDatabase() {
     }
 
     console.log('Database seeded successfully!');
-    
-    // Calculate emergency phrases summary
-    const emergencyPhrasesSummary = {
-      total: emergencyPhrases.length,
-      byLanguage: emergencyPhrases.reduce((acc, p) => {
-        acc[p.language] = (acc[p.language] || 0) + 1;
-        return acc;
-      }, {}),
-      bySeverity: emergencyPhrases.reduce((acc, p) => {
-        acc[p.severity] = (acc[p.severity] || 0) + 1;
-        return acc;
-      }, {})
-    };
-    
     return { 
       org, 
       caregiver: caregiverOneRecord, 
       patients: [patient1, patient2, patient3], 
       invoice, 
-      paymentMethods,
-      emergencyPhrases: emergencyPhrasesSummary
+      paymentMethods 
     };
   } catch (error) {
     console.error('Error seeding database:', error);

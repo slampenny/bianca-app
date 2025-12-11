@@ -1,0 +1,59 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: us-east-2
+    AWS_ACCOUNT_ID: 730335291008
+    REPOSITORY_NAME_FRONTEND: bianca-app-frontend
+    FRONTEND_CONTAINER_NAME: bianca-frontend
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_FRONTEND
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)-$(date +%Y%m%d%H%M%S)
+      - echo "Configuring Git to preserve binary files..."
+      - git config --global core.autocrlf false
+      - git config --global core.eol lf
+  build:
+    commands:
+      - echo Build started on $(date)
+      - pwd
+      - echo Source directory is $CODEBUILD_SRC_DIR
+      - |
+        # Handle both monorepo and separate repo cases
+        if [ -d "packages/frontend" ]; then
+          echo "Monorepo detected, changing to packages/frontend..."
+          cd packages/frontend
+        elif [ ! -f "package.json" ]; then
+          echo "ERROR: package.json not found in current directory or packages/frontend"
+          ls -la
+          exit 1
+        fi
+        echo "Building from: $(pwd)"
+      - echo Building frontend Docker image (production)...
+      - |
+        if docker build --build-arg BUILD_ENV=production \
+                     -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG \
+                     -t $REPOSITORY_URI_FRONTEND:production \
+                     -f devops/Dockerfile .; then
+          echo "✅ Frontend build complete"
+        else
+          echo "❌ Frontend build FAILED!"
+          exit 1
+        fi
+      - docker tag $REPOSITORY_URI_FRONTEND:$IMAGE_TAG $REPOSITORY_URI_FRONTEND:latest
+  post_build:
+    commands:
+      - echo Build completed on $(date)
+      - echo Pushing frontend image...
+      - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_FRONTEND:production
+      - docker push $REPOSITORY_URI_FRONTEND:latest
+      - echo Creating imagedefinitions_frontend.json
+      - echo "[{\"name\":\"$FRONTEND_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_FRONTEND:$IMAGE_TAG\"}]" > imagedefinitions_frontend.json
+artifacts:
+  files:
+    - imagedefinitions_frontend.json
+

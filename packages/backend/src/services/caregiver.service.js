@@ -259,16 +259,29 @@ const addPatient = async (caregiverId, patientId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
 
+  // Convert to ObjectId for consistent comparison
+  const caregiverObjectId = mongoose.Types.ObjectId.isValid(caregiverId) 
+    ? new mongoose.Types.ObjectId(caregiverId) 
+    : caregiverId;
+  const patientObjectId = mongoose.Types.ObjectId.isValid(patientId) 
+    ? new mongoose.Types.ObjectId(patientId) 
+    : patientId;
+
   // Add patient to caregiver's patients array (with check to avoid duplicates)
-  if (!caregiver.patients.includes(patientId)) {
-    caregiver.patients.push(patientId);
+  // Convert patient.patients to strings for comparison
+  const caregiverPatientIds = caregiver.patients.map(id => id.toString());
+  if (!caregiverPatientIds.includes(patientObjectId.toString())) {
+    caregiver.patients.push(patientObjectId);
     await caregiver.save();
   }
 
   // Add caregiver to patient's caregivers array (with check to avoid duplicates)
-  if (!patient.caregivers.includes(caregiverId)) {
-    patient.caregivers.push(caregiverId);
+  // Convert patient.caregivers to strings for comparison
+  const patientCaregiverIds = patient.caregivers.map(id => id.toString());
+  if (!patientCaregiverIds.includes(caregiverObjectId.toString())) {
+    patient.caregivers.push(caregiverObjectId);
   }
+  
   // Update patient's org to match caregiver's org
   patient.org = caregiver.org;
   await patient.save();

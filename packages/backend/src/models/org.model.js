@@ -69,35 +69,42 @@ const orgSchema = mongoose.Schema(
         ref: 'PaymentMethod',
       },
     ],
-    caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
-    patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
-    // Call retry settings (only org admins can change)
+    // Organization timezone (IANA timezone identifier, e.g., 'America/New_York', 'Europe/London')
+    // Used for converting schedule times to/from UTC
+    timezone: {
+      type: String,
+      default: 'America/New_York',
+      trim: true,
+    },
+    // Call retry settings for the organization
     callRetrySettings: {
       retryCount: {
         type: Number,
         default: 2,
-        min: 0,
-        max: 10,
+        min: [0, 'Retry count cannot be negative'],
+        max: [10, 'Retry count cannot exceed 10'],
         validate: {
           validator: Number.isInteger,
-          message: 'Retry count must be an integer'
-        }
+          message: 'Retry count must be an integer',
+        },
       },
       retryIntervalMinutes: {
         type: Number,
         default: 15,
-        min: 1,
-        max: 1440, // Max 24 hours
+        min: [1, 'Retry interval must be at least 1 minute'],
+        max: [1440, 'Retry interval cannot exceed 1440 minutes (24 hours)'],
         validate: {
           validator: Number.isInteger,
-          message: 'Retry interval must be an integer (minutes)'
-        }
+          message: 'Retry interval must be an integer',
+        },
       },
       alertOnAllMissedCalls: {
         type: Boolean,
-        default: true, // Alert on every missed call/retry by default
-      }
-    }
+        default: true,
+      },
+    },
+    caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
+    patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
   },
   {
     timestamps: true,

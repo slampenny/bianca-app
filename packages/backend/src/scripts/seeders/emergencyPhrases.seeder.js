@@ -56,19 +56,19 @@ function getPhrasesForLanguage(language) {
     fr: [
       // CRITICAL - Medical (French)
       { phrase: 'crise cardiaque', pattern: '\\b(crise\\s+cardiaque|infarctus|infarctus\\s+du\\s+myocarde|je\\s+fais\\s+une\\s+crise\\s+cardiaque)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Urgence cardiaque - crise cardiaque' },
-      { phrase: "je ne peux pas respirer", pattern: '\\b(je\\s+ne\\s+peux\\s+pas\\s+respirer|j\\'ai\\s+du\\s+mal\\s+à\\s+respirer)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Urgence respiratoire' },
-      { phrase: 'étouffement', pattern: '\\b(étouffement|je\\s+m\\'étouffe|étouffe)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Urgence d\'étouffement' },
+      { phrase: "je ne peux pas respirer", pattern: "\\b(je\\s+ne\\s+peux\\s+pas\\s+respirer|j'ai\\s+du\\s+mal\\s+à\\s+respirer)\\b", severity: 'CRITICAL', category: 'Medical', description: 'Urgence respiratoire' },
+      { phrase: 'étouffement', pattern: "\\b(étouffement|je\\s+m'étouffe|étouffe)\\b", severity: 'CRITICAL', category: 'Medical', description: 'Urgence d\'étouffement' },
       { phrase: 'accident vasculaire cérébral', pattern: '\\b(accident\\s+vasculaire\\s+cérébral|avc|attaque\\s+cérébrale)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Urgence d\'accident vasculaire cérébral' },
       // CRITICAL - Safety
       { phrase: 'suicide', pattern: '\\b(suicide|me\\s+tuer|je\\s+veux\\s+mourir|mettre\\s+fin\\s+à\\s+ma\\s+vie)\\b', severity: 'CRITICAL', category: 'Safety', description: 'Menace de suicide' },
       // HIGH - Physical
-      { phrase: 'je suis tombé', pattern: '\\b(je\\s+suis\\s+tombé|je\\s+suis\\s+tombée|j\\'ai\\s+glissé)\\b', severity: 'HIGH', category: 'Physical', description: 'Incident de chute' },
+      { phrase: 'je suis tombé', pattern: "\\b(je\\s+suis\\s+tombé|je\\s+suis\\s+tombée|j'ai\\s+glissé)\\b", severity: 'HIGH', category: 'Physical', description: 'Incident de chute' },
       { phrase: 'je ne peux pas me lever', pattern: '\\b(je\\s+ne\\s+peux\\s+pas\\s+me\\s+lever|je\\s+ne\\s+peux\\s+pas\\s+me\\s+relever)\\b', severity: 'HIGH', category: 'Physical', description: 'Je ne peux pas me lever après une chute' },
       // HIGH - Medical
       { phrase: 'douleur à la poitrine', pattern: '\\b(douleur\\s+à\\s+la\\s+poitrine|douleur\\s+thoracique|pression\\s+dans\\s+la\\s+poitrine)\\b', severity: 'HIGH', category: 'Medical', description: 'Douleur ou pression dans la poitrine' },
       // MEDIUM - Request
-      { phrase: 'appeler le 911', pattern: '\\b(appeler\\s+le\\s+911|appeler\\s+les\\s+urgences|services\\s+d\\'urgence)\\b', severity: 'MEDIUM', category: 'Request', description: 'Demande de services d\'urgence' },
-      { phrase: 'besoin d\'aide', pattern: '\\b(besoin\\s+d\\'aide|j\\'ai\\s+besoin\\s+d\\'aide|aidez-moi)\\b', severity: 'MEDIUM', category: 'Request', description: 'Demande d\'aide' }
+      { phrase: 'appeler le 911', pattern: "\\b(appeler\\s+le\\s+911|appeler\\s+les\\s+urgences|services\\s+d'urgence)\\b", severity: 'MEDIUM', category: 'Request', description: 'Demande de services d\'urgence' },
+      { phrase: 'besoin d\'aide', pattern: "\\b(besoin\\s+d'aide|j'ai\\s+besoin\\s+d'aide|aidez-moi)\\b", severity: 'MEDIUM', category: 'Request', description: 'Demande d\'aide' }
     ],
     de: [
       // CRITICAL - Medical (German)
@@ -245,9 +245,9 @@ async function seedEmergencyPhrases() {
     // Check if phrases already exist
     const existingCount = await EmergencyPhrase.countDocuments();
     if (existingCount > 0) {
-      console.log(`Found ${existingCount} existing emergency phrases. Deleting and re-seeding...`);
-      await EmergencyPhrase.deleteMany({});
-      console.log('   Deleted existing phrases, proceeding with seed...');
+      console.log(`Found ${existingCount} existing emergency phrases. Skipping seed.`);
+      console.log('   (To re-seed, delete existing phrases first)');
+      return;
     }
 
     const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn']; // All supported languages

@@ -56,103 +56,44 @@ agenda.define('processDailyBilling', { concurrency: 1, lockLifetime: 1800000 }, 
   }
 });
 
-// Call retry job definition - supports high concurrency for thousands of users
-agenda.define('retryMissedCall', { 
-  concurrency: 100, // Allow up to 100 concurrent retry calls
-  lockLifetime: 300000 // 5 minutes lock lifetime
-}, async (job, done) => {
-  try {
-    const { conversationId, patientId, retryAttempt, originalCallId } = job.attrs.data;
-    logger.info(`[Call Retry] Processing retry attempt ${retryAttempt} for conversation ${conversationId}, patient ${patientId}`);
-    
-    // Find the conversation
-    const conversation = await Conversation.findById(conversationId);
-    if (!conversation) {
-      logger.error(`[Call Retry] Conversation ${conversationId} not found`);
-      return done(new Error(`Conversation ${conversationId} not found`));
-    }
-    
-    // Get patient to find org
-    const patient = await Patient.findById(patientId).populate('org');
-    if (!patient || !patient.org) {
-      logger.error(`[Call Retry] Patient ${patientId} or org not found`);
-      return done(new Error(`Patient ${patientId} or org not found`));
-    }
-    
-    const org = patient.org;
-    const retrySettings = org.callRetrySettings || {};
-    const maxRetries = retrySettings.retryCount || 2;
-    
-    // Check if we've exceeded max retries
-    if (retryAttempt > maxRetries) {
-      logger.info(`[Call Retry] Max retries (${maxRetries}) exceeded for conversation ${conversationId}`);
-      return done();
-    }
-    
-    // Initiate the retry call
-    try {
-      logger.info(`[Call Retry] Initiating retry call ${retryAttempt} for patient ${patientId}`);
-      const callSid = await twilioCallService.initiateCall(patientId);
-      
-      // Create a new conversation for the retry
-      const retryConversation = new Conversation({
-        callSid: callSid,
-        patientId: patientId,
-        startTime: new Date(),
-        callType: 'wellness-check',
-        status: 'initiated',
-        retryAttempt: retryAttempt,
-        originalCallId: originalCallId || conversationId,
-        maxRetries: maxRetries
-      });
-      await retryConversation.save();
-      
-      // Update the original conversation to track that a retry was scheduled
-      if (conversation) {
-        conversation.retryScheduledAt = null; // Clear since we've initiated the retry
-        await conversation.save();
-      }
-      
-      logger.info(`[Call Retry] ✅ Retry call ${retryAttempt} initiated successfully for patient ${patientId}, conversation ${retryConversation._id}`);
-      done();
-    } catch (error) {
-      logger.error(`[Call Retry] ❌ Failed to initiate retry call ${retryAttempt} for patient ${patientId}: ${error.message}`);
-      done(error);
-    }
-  } catch (error) {
-    logger.error(`[Call Retry] Error in retryMissedCall job: ${error.message}`);
-    done(error);
-  }
-});
-
 async function runSchedules() {
   const now = new Date();
+  const nowUTC = new Date(Date.now()); // Ensure we're using UTC
   const schedules = await Schedule.find({
     isActive: true,
-    nextCallDate: { $lte: now },
+    nextCallDate: { $lte: nowUTC },
   });
 
   for (const schedule of schedules) {
-    // Check if today's day matches the schedule's day
+    // Check if today's day matches the schedule's day (using UTC)
+    // schedule.time is stored in UTC, so we compare with UTC time
     const interval = schedule.intervals.find(
-      (i) => i.day === (schedule.frequency === 'weekly' ? now.getDay() : now.getDate())
+      (i) => i.day === (schedule.frequency === 'weekly' ? nowUTC.getUTCDay() : nowUTC.getUTCDate())
     );
     if (!interval) continue;
 
-    // Check if the current time is within 1 hour of the scheduled time
+    // Check if the current UTC time is within 1 hour of the scheduled UTC time
+    // schedule.time is stored in UTC (HH:mm format)
     const [scheduledHour, scheduledMinute] = schedule.time.split(':').map(Number);
-    const scheduledTime = new Date(now);
-    scheduledTime.setHours(scheduledHour, scheduledMinute, 0, 0);
+    const scheduledTimeUTC = new Date(Date.UTC(
+      nowUTC.getUTCFullYear(),
+      nowUTC.getUTCMonth(),
+      nowUTC.getUTCDate(),
+      scheduledHour,
+      scheduledMinute,
+      0,
+      0
+    ));
     
-    const timeDiff = Math.abs(now.getTime() - scheduledTime.getTime());
+    const timeDiff = Math.abs(nowUTC.getTime() - scheduledTimeUTC.getTime());
     const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
     
     if (timeDiff > oneHour) {
-      logger.info(`Skipping schedule ${schedule.id} - current time ${now.toLocaleTimeString()} is more than 1 hour from scheduled time ${schedule.time}`);
+      logger.info(`Skipping schedule ${schedule.id} - current UTC time ${nowUTC.toISOString()} is more than 1 hour from scheduled UTC time ${schedule.time}`);
       continue;
     }
 
-    logger.info(`Running schedule ${schedule.id} for time ${schedule.time} (current time: ${now.toLocaleTimeString()})`);
+    logger.info(`Running schedule ${schedule.id} for UTC time ${schedule.time} (current UTC time: ${nowUTC.toISOString()})`);
 
     // Check that the schedule has a valid patient id
     if (!schedule.patient) {
