@@ -19,13 +19,15 @@ COPY package.json yarn.lock ./
 # Try frozen lockfile first, but allow updates if lockfile is out of sync (common in staging)
 RUN yarn install --frozen-lockfile || (echo "Lockfile out of sync, updating..." && yarn install && echo "Lockfile updated")
 
-# Copy source code
-# Note: Docker COPY preserves binary files, but we'll verify and fix if needed
-COPY . .
+# Copy source code, excluding node_modules and other build artifacts
+# Copy everything except node_modules first
+COPY --chown=root:root . .
 
-# Ensure assets directory is properly copied and has correct permissions
-RUN chmod -R 644 assets/images/*.png 2>/dev/null || true && \
-    find assets/images -name "*.png" -type f -exec chmod 644 {} \;
+# Ensure binary files are preserved correctly (fix any line ending issues)
+RUN find assets/images -name "*.png" -type f -exec file {} \; | head -5 || true
+
+# Ensure assets directory has correct permissions
+RUN find assets/images -name "*.png" -type f -exec chmod 644 {} \; 2>/dev/null || true
 
 # Validate that all image files exist and are valid before build
 RUN echo "Validating image files..." && \
@@ -48,15 +50,26 @@ RUN echo "Validating image files..." && \
 ARG BUILD_ENV=production
 
 # Fix broken expo symlink if needed (monorepo symlinks point to workspace root)
-RUN if [ -L "node_modules/.bin/expo" ] && [ ! -e "node_modules/.bin/expo" ]; then \
+RUN echo "Checking expo CLI..." && \
+    if [ -L "node_modules/.bin/expo" ] && [ ! -e "node_modules/.bin/expo" ]; then \
       echo "Fixing broken expo symlink..." && \
-      rm -f node_modules/.bin/expo && \
-      if [ -f "node_modules/expo/bin/cli.js" ]; then \
-        ln -s "../expo/bin/cli.js" node_modules/.bin/expo; \
-      elif [ -f "node_modules/@expo/cli/build/bin/cli.js" ]; then \
-        ln -s "../@expo/cli/build/bin/cli.js" node_modules/.bin/expo; \
-      fi; \
+      rm -f node_modules/.bin/expo; \
     fi && \
+    if [ ! -f "node_modules/.bin/expo" ] || [ ! -e "node_modules/.bin/expo" ]; then \
+      if [ -f "node_modules/expo/bin/cli.js" ]; then \
+        echo "Creating expo symlink to expo/bin/cli.js" && \
+        ln -sf "../expo/bin/cli.js" node_modules/.bin/expo; \
+      elif [ -f "node_modules/@expo/cli/build/bin/cli.js" ]; then \
+        echo "Creating expo symlink to @expo/cli" && \
+        ln -sf "../@expo/cli/build/bin/cli.js" node_modules/.bin/expo; \
+      else \
+        echo "ERROR: Could not find expo CLI!" && \
+        find node_modules -name "cli.js" -path "*expo*" 2>&1 | head -5 && \
+        exit 1; \
+      fi && \
+      chmod +x node_modules/.bin/expo 2>/dev/null || true; \
+    fi && \
+    ls -la node_modules/.bin/expo && \
     echo "✅ Expo CLI ready"
 
 # Build the frontend with the specified environment

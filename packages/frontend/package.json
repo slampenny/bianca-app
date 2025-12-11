@@ -20,7 +20,8 @@
   ],
   "resolutions": {
     "react-native": "0.73.2",
-    "expo": "~50.0.21"
+    "expo": "~50.0.21",
+    "jsonfile": "^6.1.0"
   },
   "scripts": {
     "compile": "tsc --noEmit -p . --pretty",
