@@ -20,31 +20,32 @@ COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile || (echo "Lockfile out of sync, updating..." && yarn install && echo "Lockfile updated")
 
 # Copy source code, excluding node_modules and other build artifacts
-# Copy everything except node_modules first
 COPY --chown=root:root . .
-
-# Ensure binary files are preserved correctly (fix any line ending issues)
-RUN find assets/images -name "*.png" -type f -exec file {} \; | head -5 || true
 
 # Ensure assets directory has correct permissions
 RUN find assets/images -name "*.png" -type f -exec chmod 644 {} \; 2>/dev/null || true
 
-# Validate that all image files exist and are valid before build
-RUN echo "Validating image files..." && \
-    find assets/images -name "*.png" -type f | while read img; do \
-      if [ ! -s "$img" ]; then \
-        echo "ERROR: Image file is empty or missing: $img" && \
+# Validate only web-required images (mobile images are blocked by metro.config.js for web builds)
+# For web builds, we only need: app-icon-web-favicon.png and splash-logo-web.png
+RUN echo "Validating web-required images..." && \
+    WEB_IMAGES="assets/images/app-icon-web-favicon.png assets/images/splash-logo-web.png" && \
+    for img in $WEB_IMAGES; do \
+      if [ ! -f "$img" ]; then \
+        echo "ERROR: Required web image missing: $img" && \
         exit 1; \
       fi && \
-      file "$img" | grep -q "PNG image" || (echo "ERROR: Invalid PNG file: $img" && exit 1); \
+      if [ ! -s "$img" ]; then \
+        echo "ERROR: Image file is empty: $img" && \
+        exit 1; \
+      fi && \
+      if ! file "$img" | grep -q "PNG image"; then \
+        echo "ERROR: Invalid PNG file: $img" && \
+        file "$img" && \
+        exit 1; \
+      fi && \
+      echo "✅ $img validated"; \
     done && \
-    echo "✅ All image files validated successfully" && \
-    echo "Verifying web-specific images..." && \
-    [ -f "assets/images/app-icon-web-favicon.png" ] && \
-    [ -f "assets/images/splash-logo-web.png" ] && \
-    file "assets/images/app-icon-web-favicon.png" | grep -q "PNG image" && \
-    file "assets/images/splash-logo-web.png" | grep -q "PNG image" && \
-    echo "✅ Web-specific images verified"
+    echo "✅ Web-required images validated"
 
 # Build argument for environment
 ARG BUILD_ENV=production
