@@ -16,12 +16,21 @@ phases:
   build:
     commands:
       - echo Build started on $(date)
-      - echo Installing dependencies...
-      - yarn install
-      - echo Building frontend for web (staging)...
-      - yarn bundle:web:staging
-      - echo Building frontend Docker image...
-      - docker build -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG -f devops/Dockerfile .
+      - pwd
+      - echo Source directory is $CODEBUILD_SRC_DIR
+      - |
+        # Handle both monorepo and separate repo cases
+        if [ -d "packages/frontend" ]; then
+          echo "Monorepo detected, changing to packages/frontend..."
+          cd packages/frontend
+        elif [ ! -f "package.json" ]; then
+          echo "ERROR: package.json not found in current directory or packages/frontend"
+          ls -la
+          exit 1
+        fi
+        echo "Building from: $(pwd)"
+      - echo Building frontend Docker image (staging)...
+      - docker build --build-arg BUILD_ENV=staging -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG -f devops/Dockerfile .
       - docker tag $REPOSITORY_URI_FRONTEND:$IMAGE_TAG $REPOSITORY_URI_FRONTEND:latest
   post_build:
     commands:

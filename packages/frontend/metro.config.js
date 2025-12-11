@@ -34,6 +34,8 @@ config.resolver = {
     path.resolve(projectRoot, 'node_modules'),
     path.resolve(workspaceRoot, 'node_modules'),
   ],
+  // Disable package exports to avoid metro-cache FileStore import issues
+  unstable_enablePackageExports: false,
 };
 
 // Update watchFolders for monorepo

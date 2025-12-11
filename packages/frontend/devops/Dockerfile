@@ -26,20 +26,52 @@ COPY . .
 RUN chmod -R 644 assets/images/*.png 2>/dev/null || true && \
     find assets/images -name "*.png" -type f -exec chmod 644 {} \;
 
-# Skip icon.png verification - it's optional and will be handled gracefully if missing/corrupted
+# Validate that all image files exist and are valid before build
+RUN echo "Validating image files..." && \
+    find assets/images -name "*.png" -type f | while read img; do \
+      if [ ! -s "$img" ]; then \
+        echo "ERROR: Image file is empty or missing: $img" && \
+        exit 1; \
+      fi && \
+      file "$img" | grep -q "PNG image" || (echo "ERROR: Invalid PNG file: $img" && exit 1); \
+    done && \
+    echo "✅ All image files validated successfully" && \
+    echo "Verifying web-specific images..." && \
+    [ -f "assets/images/app-icon-web-favicon.png" ] && \
+    [ -f "assets/images/splash-logo-web.png" ] && \
+    file "assets/images/app-icon-web-favicon.png" | grep -q "PNG image" && \
+    file "assets/images/splash-logo-web.png" | grep -q "PNG image" && \
+    echo "✅ Web-specific images verified"
 
 # Build argument for environment
 ARG BUILD_ENV=production
 
+# Fix broken expo symlink if needed (monorepo symlinks point to workspace root)
+RUN if [ -L "node_modules/.bin/expo" ] && [ ! -e "node_modules/.bin/expo" ]; then \
+      echo "Fixing broken expo symlink..." && \
+      rm -f node_modules/.bin/expo && \
+      if [ -f "node_modules/expo/bin/cli.js" ]; then \
+        ln -s "../expo/bin/cli.js" node_modules/.bin/expo; \
+      elif [ -f "node_modules/@expo/cli/build/bin/cli.js" ]; then \
+        ln -s "../@expo/cli/build/bin/cli.js" node_modules/.bin/expo; \
+      fi; \
+    fi && \
+    echo "✅ Expo CLI ready"
+
 # Build the frontend with the specified environment
 RUN if [ "$BUILD_ENV" = "staging" ]; then \
       echo "Building for staging environment..." && \
+      echo "Using app.staging.json for staging build..." && \
+      cp app.staging.json app.json && \
+      echo "Clearing Metro cache..." && \
+      rm -rf .expo .metro node_modules/.cache 2>/dev/null || true && \
       echo "Setting EXPO_PUBLIC_ENVIRONMENT=staging..." && \
       export EXPO_PUBLIC_ENVIRONMENT=staging && \
-      yarn bundle:web:staging || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
+      EXPO_PUBLIC_ENVIRONMENT=staging yarn bundle:web:staging || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
       echo "Staging build complete"; \
     else \
       echo "Building for production environment..." && \
+      rm -rf .expo .metro node_modules/.cache 2>/dev/null || true && \
       yarn bundle:web || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
       echo "Production build complete"; \
     fi
