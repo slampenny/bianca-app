@@ -7,6 +7,12 @@ phases:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
       - echo Build started on `date`
       - echo Building Docker images...
+      - echo "Configuring Git to preserve binary files..."
+      - git config --global core.autocrlf false
+      - git config --global core.eol lf
+      - echo "Refreshing Git attributes to ensure binary files are correct..."
+      - cd packages/frontend && git checkout -- assets/images/icon.png 2>/dev/null || true
+      - cd ../..
 
   build:
     commands:
@@ -18,7 +24,9 @@ phases:
         # Build backend image
         echo "🔨 Building backend image..."
         cd packages/backend
-        docker build -t $ECR_REGISTRY/bianca-app-backend:latest \
+        docker build --build-arg BUILD_TIMESTAMP=$(date +%s) \
+                     --build-arg GIT_COMMIT=$CODEBUILD_RESOLVED_SOURCE_VERSION \
+                     -t $ECR_REGISTRY/bianca-app-backend:latest \
                      -t $ECR_REGISTRY/bianca-app-backend:production \
                      -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION \
                      -f docker/Dockerfile .
@@ -34,13 +42,25 @@ phases:
       - |
         # Build frontend image
         echo "🔨 Building frontend image..."
+        # Ensure we're in the root directory
+        cd "$CODEBUILD_SRC_DIR"
+        pwd
+        ls -la packages/ | head -5
+        if [ ! -d "packages/frontend" ]; then
+          echo "ERROR: packages/frontend directory not found!"
+          ls -la packages/
+          exit 1
+        fi
         cd packages/frontend
-        docker build -t $ECR_REGISTRY/bianca-app-frontend:latest \
+        if docker build --build-arg BUILD_ENV=production \
+                     -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:production \
-                     -f devops/Dockerfile \
-                     --build-arg BUILD_ENV=production .
-        cd ../..
-        echo "✅ Frontend build complete"
+                     -f devops/Dockerfile .; then
+          echo "✅ Frontend build complete"
+        else
+          echo "❌ Frontend build FAILED!"
+          exit 1
+        fi
       - |
         # Push all images
         echo "📦 Pushing backend images..."
