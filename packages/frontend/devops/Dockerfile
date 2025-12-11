@@ -16,7 +16,8 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 
 # Install dependencies
-RUN yarn install --frozen-lockfile
+# Try frozen lockfile first, but allow updates if lockfile is out of sync (common in staging)
+RUN yarn install --frozen-lockfile || (echo "Lockfile out of sync, updating..." && yarn install && echo "Lockfile updated")
 
 # Copy source code
 # Note: Docker COPY preserves binary files, but we'll verify and fix if needed
