@@ -46,10 +46,16 @@ FROM dependencies AS build
 # Build arg to bust cache when code changes
 ARG BUILD_TIMESTAMP
 ARG GIT_COMMIT
+# Use build args in a way that busts cache when they change
+# This ensures we always get the latest code even with Docker layer caching
+RUN echo "Build timestamp: ${BUILD_TIMESTAMP:-unknown}, Git commit: ${GIT_COMMIT:-unknown}"
+
 # Copy static config files (rarely change)
 COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
 
 # Copy source code (cache will be busted if files change)
+# Using GIT_COMMIT in a comment to help with cache invalidation
+# Build: ${GIT_COMMIT:-unknown}
 COPY --chown=node:node src/ ./src/
 COPY --chown=node:node tests/ ./tests/
 # Note: devops/ directory not needed in container - used only for infrastructure deployment
