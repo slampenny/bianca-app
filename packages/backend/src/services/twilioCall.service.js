@@ -3,9 +3,10 @@ const twilio = require('twilio');
 const httpStatus = require('http-status');
 const config = require('../config/config');
 const logger = require('../config/logger');
-const { Conversation, Patient } = require('../models');
+const { Call, Conversation, Patient, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { chatService, alertService } = require('.');
+const { agenda } = require('../config/agenda');
 
 // Create Twilio client (will be validated before use)
 let twilioClient;
@@ -118,30 +119,26 @@ class TwilioCallService {
       
       logger.info(`[Twilio Service] Call initiated with SID: ${call.sid}`);
 
-      // Create conversation record
-      conversation = new Conversation({
+      // Create Call record (not Conversation - Conversation is only created when call is answered)
+      const callRecord = await Call.create({
         callSid: call.sid,
         patientId: patient._id,
         startTime: new Date(),
+        callStartTime: new Date(),
         callType: 'wellness-check',
-        status: 'initiated'
+        status: 'initiated',
+        callStatus: 'initiating',
       });
       
-      await conversation.save();
-      logger.info(`[Twilio Service] Conversation record created: ${conversation._id}`);
+      logger.info(`[Twilio Service] Call record created: ${callRecord._id}`);
 
       return call.sid;
     } catch (error) {
       logger.error(`[Twilio Service] Error initiating call: ${error.message}`);
       logger.error(`[Twilio Service] Error stack: ${error.stack}`);
       
-      // Clean up conversation if created but call failed
-      if (conversation && conversation._id) {
-        logger.warn(`[Twilio Service] Cleaning up conversation ${conversation._id} due to error`);
-        await Conversation.findByIdAndDelete(conversation._id).catch(err => 
-          logger.error(`[Twilio Service] Failed to clean up conversation: ${err.message}`)
-        );
-      }
+      // Clean up call record if created but call failed
+      // Note: We don't need to clean up - failed calls should still be recorded
       
       // Re-throw appropriate error (ApiError instances already have proper status codes)
       if (error instanceof ApiError) throw error;
@@ -182,8 +179,8 @@ class TwilioCallService {
         twiml.hangup();
         logger.info(`[Twilio Service] Generated answering machine message for ${CallSid}`);
         
-        // Update conversation record
-        this.updateConversationStatus(CallSid, 'machine');
+        // Update call record
+        this.updateCallStatus(CallSid, 'machine');
         
         return twiml.toString();
       }
@@ -238,8 +235,8 @@ class TwilioCallService {
       const twimlString = twiml.toString();
       logger.info(`[Twilio Service] Complete TwiML: ${twimlString}`);
       
-      // Update conversation record
-      this.updateConversationStatus(CallSid, 'in-progress');
+      // Update call record
+      this.updateCallStatus(CallSid, 'in-progress');
       
       return twimlString;
     } catch (error) {
@@ -270,19 +267,19 @@ class TwilioCallService {
   }
 
   /**
-   * Update conversation status in the database
+   * Update call status in the database
    * @param {string} callSid - The call SID
    * @param {string} status - New status
    */
-  async updateConversationStatus(callSid, status) {
+  async updateCallStatus(callSid, status) {
     try {
-      await Conversation.findOneAndUpdate(
+      await Call.findOneAndUpdate(
         { callSid },
-        { status, lastUpdated: new Date() }
+        { status, callStatus: status === 'in-progress' ? 'answered' : status }
       );
-      logger.info(`[Twilio Service] Updated conversation status to ${status} for ${callSid}`);
+      logger.info(`[Twilio Service] Updated call status to ${status} for ${callSid}`);
     } catch (err) {
-      logger.error(`[Twilio Service] Failed to update conversation status: ${err.message}`);
+      logger.error(`[Twilio Service] Failed to update call status: ${err.message}`);
     }
   }
 
@@ -295,37 +292,114 @@ class TwilioCallService {
     logger.info(`[Twilio Service] Call status update for ${CallSid}: ${CallStatus} (${AnsweredBy || 'unknown'})`);
     
     try {
-      // Find the conversation
-      const conversation = await Conversation.findOne({ callSid: CallSid });
-      if (!conversation) {
-        logger.warn(`[Twilio Service] No conversation found for CallSid: ${CallSid}`);
+      // Find the call record
+      const call = await Call.findOne({ callSid: CallSid });
+      if (!call) {
+        logger.warn(`[Twilio Service] No call found for CallSid: ${CallSid}`);
         return;
       }
       
-      // Update conversation with new status
-      conversation.lastStatus = CallStatus;
+      // Check if this is a voicemail/answering machine (can come as completed status with AnsweredBy)
+      const isVoicemail = AnsweredBy === 'machine_start' || AnsweredBy === 'machine_end' || CallStatus === 'machine';
       
       switch (CallStatus) {
         case 'completed':
-          // Call ended normally
-          conversation.endTime = new Date();
-          conversation.duration = parseInt(CallDuration, 10) || 0;
-          conversation.status = 'completed';
-          
-          // Calculate cost based on duration and billing rate
-          conversation.cost = this.calculateCallCost(conversation.duration);
-          
-          // Summarize the conversation if there are messages
-          if (conversation.messages && conversation.messages.length > 0) {
-            try {
-              conversation.summary = await chatService.summarize(conversation);
-              logger.info(`[Twilio Service] Created summary for call ${CallSid}`);
-            } catch (summaryError) {
-              logger.error(`[Twilio Service] Failed to summarize: ${summaryError.message}`);
-              conversation.summary = 'Error generating summary';
+          // Check if this was actually a voicemail (completed but answered by machine)
+          if (isVoicemail) {
+            // Treat as voicemail - same logic as machine case
+            call.endTime = new Date();
+            call.callEndTime = new Date();
+            call.status = 'failed';
+            call.callOutcome = 'voicemail';
+            call.duration = parseInt(CallDuration, 10) || 0;
+            call.callDuration = call.duration;
+            
+            // Calculate cost for failed calls (minimum billable duration)
+            call.cost = this.calculateCallCost(call.duration);
+            
+            // Save call first
+            await call.save();
+            
+            // Get patient and org for retry logic
+            const voicemailPatient = await Patient.findById(call.patientId).populate('org');
+            const voicemailOrg = voicemailPatient?.org;
+            
+            // Schedule retry if org has retry settings enabled
+            if (voicemailOrg && voicemailOrg.callRetrySettings && voicemailOrg.callRetrySettings.retryCount > 0) {
+              try {
+                await this.scheduleRetryCall(call, voicemailOrg);
+              } catch (retryError) {
+                logger.error(`[Twilio Service] Failed to schedule retry: ${retryError.message}`);
+              }
+            }
+            
+            // Create alert for voicemail call
+            const voicemailAlertOnAllMissedCalls = voicemailOrg?.callRetrySettings?.alertOnAllMissedCalls !== false;
+            const voicemailCurrentRetryAttempt = call.retryAttempt || 0;
+            const voicemailMaxRetries = voicemailOrg?.callRetrySettings?.retryCount || 2;
+            const voicemailShouldAlert = voicemailAlertOnAllMissedCalls || voicemailCurrentRetryAttempt >= voicemailMaxRetries;
+            
+            if (voicemailShouldAlert) {
+              try {
+                await alertService.createAlert({
+                  message: `Wellness check call went to voicemail`,
+                  importance: 'medium',
+                  alertType: 'patient',
+                  relatedPatient: call.patientId,
+                  relatedCall: call._id,
+                  createdBy: call.patientId,
+                  createdModel: 'Patient',
+                  visibility: 'assignedCaregivers',
+                  relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                });
+                logger.info(`[Twilio Service] Created alert for voicemail call ${CallSid}`);
+              } catch (alertError) {
+                logger.error(`[Twilio Service] Failed to create alert: ${alertError.message}`);
+              }
             }
           } else {
-            conversation.summary = 'No conversation recorded';
+            // Call ended normally - answered and had conversation
+            call.endTime = new Date();
+            call.callEndTime = new Date();
+            call.duration = parseInt(CallDuration, 10) || 0;
+            call.callDuration = call.duration;
+            call.status = 'completed';
+            call.callStatus = 'ended';
+            call.callOutcome = 'answered';
+            
+            // Calculate cost based on duration and billing rate
+            call.cost = this.calculateCallCost(call.duration);
+            
+            // If this is a successful retry call, cancel any remaining retry jobs
+            if (call.originalCallId && call.retryAttempt > 0) {
+              try {
+                const remainingJobs = await agenda.jobs({
+                  name: 'retryMissedCall',
+                  'data.originalCallId': call.originalCallId.toString(),
+                });
+                
+                for (const job of remainingJobs) {
+                  await job.remove();
+                  logger.info(`[Twilio Service] Cancelled remaining retry job ${job.attrs._id} for successful retry call ${CallSid}`);
+                }
+              } catch (cancelError) {
+                logger.error(`[Twilio Service] Failed to cancel remaining retries: ${cancelError.message}`);
+              }
+            }
+            
+            // Summarize the conversation if it exists and has messages
+            if (call.conversationId) {
+              const conversation = await Conversation.findById(call.conversationId);
+              if (conversation && conversation.messages && conversation.messages.length > 0) {
+                try {
+                  conversation.summary = await chatService.summarize(conversation);
+                  await conversation.save();
+                  logger.info(`[Twilio Service] Created summary for call ${CallSid}`);
+                } catch (summaryError) {
+                  logger.error(`[Twilio Service] Failed to summarize: ${summaryError.message}`);
+                }
+              }
+            }
           }
           break;
           
@@ -333,59 +407,197 @@ class TwilioCallService {
         case 'failed':
         case 'no-answer':
           // Call was not successful
-          conversation.endTime = new Date();
-          conversation.status = 'failed';
-          conversation.failureReason = CallStatus;
+          call.endTime = new Date();
+          call.callEndTime = new Date();
+          call.status = 'failed';
+          call.callStatus = CallStatus === 'no-answer' ? 'no_answer' : CallStatus;
+          // Map Twilio CallStatus to callOutcome
+          call.callOutcome = CallStatus === 'no-answer' ? 'no_answer' : CallStatus;
           
           // Calculate cost for failed calls (minimum billable duration)
-          conversation.cost = this.calculateCallCost(conversation.duration);
+          call.cost = this.calculateCallCost(call.duration);
+          
+          // Save call first to ensure it's persisted before scheduling retry
+          await call.save();
+          
+          // Get patient and org for retry logic
+          const patient = await Patient.findById(call.patientId).populate('org');
+          const org = patient?.org;
+          
+          // Schedule retry if org has retry settings enabled
+          if (org && org.callRetrySettings && org.callRetrySettings.retryCount > 0) {
+            try {
+              await this.scheduleRetryCall(call, org);
+            } catch (retryError) {
+              logger.error(`[Twilio Service] Failed to schedule retry: ${retryError.message}`);
+            }
+          }
           
           // Create alert for failed call
-          try {
-            await alertService.createAlert({
-              message: `Wellness check call failed: ${CallStatus}`,
-              importance: 'medium',
-              alertType: 'patient',
-              relatedPatient: conversation.patientId,
-              relatedConversation: conversation._id,
-              createdBy: conversation.patientId, // Using patient as creator since it's about their call
-              createdModel: 'Patient',
-              visibility: 'assignedCaregivers',
-              relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
-            });
-            logger.info(`[Twilio Service] Created alert for failed call ${CallSid}`);
-          } catch (alertError) {
-            logger.error(`[Twilio Service] Failed to create alert: ${alertError.message}`);
+          // Alert logic: if alertOnAllMissedCalls is false, only alert when all retries are exhausted
+          // Otherwise, alert on every missed call
+          const alertOnAllMissedCalls = org?.callRetrySettings?.alertOnAllMissedCalls !== false; // Default to true
+          const currentRetryAttempt = call.retryAttempt || 0;
+          const maxRetries = org?.callRetrySettings?.retryCount || 2;
+          const shouldAlert = alertOnAllMissedCalls || currentRetryAttempt >= maxRetries;
+          
+          if (shouldAlert) {
+            try {
+              await alertService.createAlert({
+                message: `Wellness check call failed: ${CallStatus}`,
+                importance: 'medium',
+                alertType: 'patient',
+                relatedPatient: call.patientId,
+                relatedCall: call._id,
+                createdBy: call.patientId, // Using patient as creator since it's about their call
+                createdModel: 'Patient',
+                visibility: 'assignedCaregivers',
+                relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
+              });
+              logger.info(`[Twilio Service] Created alert for failed call ${CallSid}`);
+            } catch (alertError) {
+              logger.error(`[Twilio Service] Failed to create alert: ${alertError.message}`);
+            }
+          }
+          break;
+        
+        case 'machine':
+          // Answering machine detected - treat as voicemail
+          call.endTime = new Date();
+          call.callEndTime = new Date();
+          call.status = 'failed';
+          call.callOutcome = 'voicemail';
+          
+          // Calculate cost for failed calls (minimum billable duration)
+          call.cost = this.calculateCallCost(call.duration);
+          
+          // Save call first
+          await call.save();
+          
+          // Get patient and org for retry logic
+          const machinePatient = await Patient.findById(call.patientId).populate('org');
+          const machineOrg = machinePatient?.org;
+          
+          // Schedule retry if org has retry settings enabled
+          if (machineOrg && machineOrg.callRetrySettings && machineOrg.callRetrySettings.retryCount > 0) {
+            try {
+              await this.scheduleRetryCall(call, machineOrg);
+            } catch (retryError) {
+              logger.error(`[Twilio Service] Failed to schedule retry: ${retryError.message}`);
+            }
+          }
+          
+          // Create alert for voicemail call (same logic as other failed calls)
+          const machineAlertOnAllMissedCalls = machineOrg?.callRetrySettings?.alertOnAllMissedCalls !== false;
+          const machineCurrentRetryAttempt = call.retryAttempt || 0;
+          const machineMaxRetries = machineOrg?.callRetrySettings?.retryCount || 2;
+          const machineShouldAlert = machineAlertOnAllMissedCalls || machineCurrentRetryAttempt >= machineMaxRetries;
+          
+          if (machineShouldAlert) {
+            try {
+              await alertService.createAlert({
+                message: `Wellness check call went to voicemail`,
+                importance: 'medium',
+                alertType: 'patient',
+                relatedPatient: call.patientId,
+                relatedCall: call._id,
+                createdBy: call.patientId,
+                createdModel: 'Patient',
+                visibility: 'assignedCaregivers',
+                relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              });
+              logger.info(`[Twilio Service] Created alert for voicemail call ${CallSid}`);
+            } catch (alertError) {
+              logger.error(`[Twilio Service] Failed to create alert: ${alertError.message}`);
+            }
           }
           break;
           
         default:
-          // Map Twilio statuses to our conversation statuses
+          // Map Twilio statuses to our call statuses
           switch (CallStatus) {
             case 'ringing':
-              conversation.status = 'in-progress';
+              call.status = 'in-progress';
+              call.callStatus = 'ringing';
               break;
             case 'initiated':
-              conversation.status = 'initiated';
+              call.status = 'initiated';
+              call.callStatus = 'initiating';
               break;
             case 'in-progress':
-              conversation.status = 'in-progress';
+              call.status = 'in-progress';
+              call.callStatus = 'connected';
               break;
             case 'answered':
-              conversation.status = 'in-progress';
+              call.status = 'in-progress';
+              call.callStatus = 'answered';
               break;
             default:
               // For any other status, keep as initiated
-              conversation.status = 'initiated';
+              call.status = 'initiated';
+              call.callStatus = 'initiating';
               logger.warn(`[Twilio Service] Unknown call status: ${CallStatus}, defaulting to initiated`);
           }
       }
       
-      // Save the updated conversation
-      await conversation.save();
-      logger.info(`[Twilio Service] Updated conversation for ${CallSid} with status ${CallStatus}`);
+      // Save the updated call (if not already saved in case blocks above)
+      if (!call.isNew && call.isModified()) {
+        await call.save();
+      }
+      logger.info(`[Twilio Service] Updated call for ${CallSid} with status ${CallStatus}`);
     } catch (error) {
       logger.error(`[Twilio Service] Error handling call status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Schedule a retry call for a missed call
+   * @param {Object} call - Call object
+   * @param {Object} org - Organization object with retry settings
+   * @returns {Promise<void>}
+   */
+  async scheduleRetryCall(call, org) {
+    try {
+      // Get retry settings from org
+      const retrySettings = org.callRetrySettings || {};
+      const maxRetries = retrySettings.retryCount || 2;
+      const retryIntervalMinutes = retrySettings.retryIntervalMinutes || 15;
+
+      // Determine current retry attempt
+      const currentRetryAttempt = call.retryAttempt || 0;
+      const originalCallId = call.originalCallId || call._id;
+
+      // Check if we've reached max retries
+      if (currentRetryAttempt >= maxRetries) {
+        logger.info(`[Twilio Service] Max retries (${maxRetries}) reached for call ${call._id}, not scheduling retry`);
+        return;
+      }
+
+      // Calculate next retry attempt
+      const nextRetryAttempt = currentRetryAttempt + 1;
+
+      // Calculate retry time
+      const retryTime = new Date(Date.now() + retryIntervalMinutes * 60 * 1000);
+
+      // Schedule the retry job
+      await agenda.schedule(retryTime, 'retryMissedCall', {
+        callId: call._id.toString(),
+        patientId: call.patientId.toString(),
+        retryAttempt: nextRetryAttempt,
+        originalCallId: originalCallId.toString(),
+      });
+
+      // Update call with retry info
+      call.retryScheduledAt = retryTime;
+      call.retryAttempt = nextRetryAttempt;
+      call.originalCallId = originalCallId;
+      call.maxRetries = maxRetries;
+      await call.save();
+
+      logger.info(`[Twilio Service] Scheduled retry call #${nextRetryAttempt} for call ${call._id} at ${retryTime.toISOString()}`);
+    } catch (error) {
+      logger.error(`[Twilio Service] Error scheduling retry call: ${error.message}`);
+      throw error;
     }
   }
 
@@ -452,5 +664,6 @@ module.exports = {
   initiateCall: twilioCallService.initiateCall.bind(twilioCallService),
   generateCallTwiML: twilioCallService.generateCallTwiML.bind(twilioCallService),
   hangupCall: twilioCallService.hangupCall.bind(twilioCallService),
-  handleCallStatus: twilioCallService.handleCallStatus.bind(twilioCallService)
+  handleCallStatus: twilioCallService.handleCallStatus.bind(twilioCallService),
+  scheduleRetryCall: twilioCallService.scheduleRetryCall.bind(twilioCallService)
 };

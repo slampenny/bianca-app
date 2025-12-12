@@ -105,10 +105,6 @@ const envVarsSchema = Joi.object({
   REDIS_ENDPOINT: Joi.string().optional(), // Redis endpoint (alternative to REDIS_URL)
   REDIS_PORT: Joi.number().optional().default(6379),
   
-  // PostHog Telemetry Configuration (HIPAA-compliant, self-hosted)
-  POSTHOG_API_KEY: Joi.string().optional().description('PostHog API key for telemetry'),
-  POSTHOG_HOST: Joi.string().uri().optional().description('PostHog host URL (self-hosted instance)'),
-  TELEMETRY_ENABLED: Joi.boolean().default(false).description('Enable telemetry tracking'),
 }).unknown();
 
 // Validate environment variables
@@ -174,13 +170,6 @@ const baselineConfig = {
     encoding: 'MP3'
   },
   multer: { dest: path.join(__dirname, '../../uploads') },
-  telemetry: {
-    enabled: envVars.TELEMETRY_ENABLED || false,
-    posthog: {
-      apiKey: envVars.POSTHOG_API_KEY,
-      host: envVars.POSTHOG_HOST || 'http://posthog:8000', // Self-hosted PostHog. For cloud: https://us.i.posthog.com
-    },
-  },
   // Merge domain-specific configurations
   ...buildAllConfigs(envVars),
 };

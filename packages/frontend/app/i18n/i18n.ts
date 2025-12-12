@@ -5,13 +5,14 @@ import * as storage from "../utils/storage"
 import { notifyLanguageChange } from "../hooks/languageNotifications"
 import { logger } from "../utils/logger"
 
-// Type-only import to avoid loading the large en.ts file synchronously
+// Import English synchronously to ensure it's always available
+// This prevents users from seeing raw localization keys
+import enTranslations from "./en"
 import type { Translations } from "./en"
 
-// Lazy load ALL languages (including English) to improve initial app load time
-// This prevents the 40KB+ en.ts file from blocking app startup
+// Lazy load other languages to improve initial app load time
+// English is pre-loaded synchronously above
 const languageModules = {
-  en: () => import("./en"),
   ar: () => import("./ar"),
   ko: () => import("./ko"),
   fr: () => import("./fr"),
@@ -26,8 +27,11 @@ const languageModules = {
 
 i18n.fallbacks = true
 
-// Start with empty translations - they'll be loaded asynchronously
-i18n.translations = {}
+// Pre-load English translations immediately so users never see raw keys
+i18n.translations = {
+  en: enTranslations.default,
+  "en-US": enTranslations.default,
+}
 
 const fallbackLocale = "en-US"
 const LANGUAGE_STORAGE_KEY = "user_selected_language"
@@ -36,6 +40,11 @@ const LANGUAGE_STORAGE_KEY = "user_selected_language"
 const loadLanguage = async (locale: string): Promise<void> => {
   if (i18n.translations[locale]) {
     return // Already loaded
+  }
+
+  // English is already pre-loaded, skip it
+  if (locale === "en" || locale === "en-US") {
+    return
   }
 
   const moduleLoader = languageModules[locale as keyof typeof languageModules]
@@ -54,14 +63,7 @@ const loadLanguage = async (locale: string): Promise<void> => {
 export const initializeLanguage = async () => {
   logger.debug("Initializing language...")
   
-  // CRITICAL: Load English first as it's the fallback language
-  // This must happen before any other language operations
-  await loadLanguage("en")
-  if (i18n.translations.en) {
-    // Also set en-US to use English translations
-    i18n.translations["en-US"] = i18n.translations.en
-  }
-  
+  // English is already pre-loaded synchronously, so we can proceed directly
   // First, set a default to prevent undefined errors
   i18n.locale = "en"
   
@@ -166,12 +168,12 @@ export const changeLanguage = async (languageCode: string) => {
 const systemLocale = Localization.getLocales()[0]
 const systemLocaleTag = systemLocale?.languageTag ?? "en-US"
 
-// Set a default locale immediately (translations will be loaded asynchronously)
-// This prevents blocking, but translations may not be available until initializeLanguage completes
+// Set a default locale immediately
+// English translations are already pre-loaded, so users will see English text, not raw keys
 i18n.locale = systemLocaleTag === "en" || systemLocaleTag === "en-US" ? systemLocaleTag : fallbackLocale
 
 // Initialize language with user preference (async)
-// This will load English translations immediately, then load user's preferred language if different
+// English is already loaded, so this will just load the user's preferred language if different
 initializeLanguage()
 
 // handle RTL languages for initial load

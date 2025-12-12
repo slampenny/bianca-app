@@ -3,7 +3,7 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { conversationService, twilioCallService, patientService, caregiverService } = require('../services');
 const { ConversationDTO } = require('../dtos');
-const { Conversation } = require('../models');
+const { Call, Conversation } = require('../models');
 const logger = require('../config/logger');
 
 /**
@@ -34,47 +34,53 @@ const initiateCall = catchAsync(async (req, res) => {
     // Initiate the call via Twilio
     const callSid = await twilioCallService.initiateCall(patient.id);
     
-    // Find the conversation created by Twilio service, or create one if it doesn't exist
-    conversation = await Conversation.findOne({ callSid });
-    if (!conversation) {
-      // Create conversation if Twilio service didn't create one (e.g., in test environment)
-      conversation = new Conversation({
+    // Find the Call record created by Twilio service
+    let call = await Call.findOne({ callSid });
+    if (!call) {
+      // Create Call if Twilio service didn't create one (e.g., in test environment)
+      call = await Call.create({
         callSid,
         patientId: patient.id,
         startTime: new Date(),
-        callType: 'wellness-check',
-        status: 'initiated'
+        callStartTime: new Date(),
+        callType: 'outbound',
+        status: 'initiated',
+        callStatus: 'initiating',
       });
     }
     
     // Add call workflow-specific fields
-    conversation.agentId = agentId;
-    conversation.callNotes = callNotes;
-    conversation.status = 'in-progress';
-    conversation.startTime = new Date();
-    conversation.callType = 'outbound';
-    await conversation.save();
+    call.agentId = agentId;
+    call.callNotes = callNotes;
+    call.status = 'in-progress';
+    call.callStatus = 'ringing';
+    call.callType = 'outbound';
+    await call.save();
+    
+    // Note: Conversation will be created when call is answered and messages start
+    // For now, we return the call ID - frontend can use this to track the call
 
     logger.info(`[CallWorkflow] Call initiated for patient ${patient.name}, SID: ${callSid}`);
 
     res.status(httpStatus.CREATED).send({
-      conversationId: conversation._id,
+      callId: call._id,
       callSid,
       patientId: patient._id,
       patientName: patient.name,
       patientPhone: patient.phone,
       agentId: agent._id,
       agentName: agent.name,
-      callStatus: conversation.status,
+      callStatus: call.callStatus,
     });
 
   } catch (error) {
     logger.error(`[CallWorkflow] Failed to initiate call for patient ${patient.name}:`, error);
     
-    // Update conversation status to failed
-    if (conversation) {
-      conversation.status = 'failed';
-      await conversation.save();
+    // Update call status to failed if we have a call record
+    if (call) {
+      call.status = 'failed';
+      call.callStatus = 'failed';
+      await call.save();
     }
     
     throw error;
@@ -93,9 +99,17 @@ const getCallStatus = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
   
+  // Get the Call record for call status/metadata
+  const call = await Call.findById(conversation.callId);
+  if (!call) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
+  }
+  
   // Populate patient and agent details
   await conversation.populate('patientId', 'name phone');
   await conversation.populate('agentId', 'name');
+  await call.populate('patientId', 'name phone');
+  await call.populate('agentId', 'name');
   
   // CRITICAL: conversation.messages IS THE QUEUE - use it as-is, don't touch it
   // Messages are added via $push which maintains FIFO order
@@ -183,12 +197,14 @@ const getCallStatus = catchAsync(async (req, res) => {
   
   const status = {
     conversationId: conversation._id,
-    status: conversation.status,
-    startTime: conversation.startTime,
-    endTime: conversation.endTime,
-    duration: conversation.duration,
-    patient: conversation.patientId,
-    agent: conversation.agentId,
+    callId: call._id,
+    status: call.status,
+    callStatus: call.callStatus,
+    startTime: call.startTime,
+    endTime: call.endTime,
+    duration: call.duration,
+    patient: conversation.patientId || call.patientId,
+    agent: call.agentId,
     // Include all messages (patient and assistant) for live call display
     messages: messages,
     // Include AI speaking status
@@ -211,7 +227,13 @@ const updateCallStatus = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
 
-  // Map call status to conversation status
+  // Get the Call record
+  const call = await Call.findById(conversation.callId);
+  if (!call) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
+  }
+
+  // Map call status to our status enum
   const statusMapping = {
     'initiating': 'initiated',
     'ringing': 'in-progress', 
@@ -223,22 +245,28 @@ const updateCallStatus = catchAsync(async (req, res) => {
     'no_answer': 'failed'
   };
   
-  const conversationStatus = statusMapping[status] || 'in-progress';
-  conversation.status = conversationStatus;
-  if (notes) conversation.callNotes = notes;
+  const callStatus = statusMapping[status] || 'in-progress';
+  call.status = callStatus;
+  call.callStatus = status;
+  if (notes) call.callNotes = notes;
+  if (outcome) call.callOutcome = outcome;
 
   // Handle call end
   if (['ended', 'failed', 'busy', 'no_answer'].includes(status)) {
-    conversation.endTime = new Date();
-    if (conversation.startTime) {
-      conversation.duration = Math.round((conversation.endTime - conversation.startTime) / 1000);
+    call.endTime = new Date();
+    call.callEndTime = new Date();
+    if (call.startTime) {
+      call.duration = Math.round((call.endTime - call.startTime) / 1000);
+      call.callDuration = call.duration;
     }
   }
 
-  await conversation.save();
+  await call.save();
 
   logger.info(`[CallWorkflow] Updated call status for conversation ${conversationId} to ${status}`);
 
+  // Return conversation with call data populated
+  await conversation.populate('callId');
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
@@ -262,6 +290,12 @@ const endCall = catchAsync(async (req, res) => {
   const conversation = await conversationService.getConversationById(conversationId);
   if (!conversation) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
+  }
+
+  // Get the Call record
+  const call = await Call.findById(conversation.callId);
+  if (!call) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
   }
 
   // Actually terminate the call by finding the connection and disconnecting everything
@@ -291,12 +325,12 @@ const endCall = catchAsync(async (req, res) => {
       
       // Step 2: Cleanup Asterisk channels (RTP listeners, RTP sender, ports, etc.)
       // This should happen before hanging up Twilio to ensure all resources are released
-      // channelTracker.cleanupCall will also disconnect OpenAI again (idempotent) and update the conversation
-      if (conversation.asteriskChannelId) {
+      // channelTracker.cleanupCall will also disconnect OpenAI again (idempotent) and update the call
+      if (call.asteriskChannelId) {
         try {
           const { channelTracker } = require('../services');
-          await channelTracker.cleanupCall(conversation.asteriskChannelId, 'Call ended by agent');
-          logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${conversation.asteriskChannelId}`);
+          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by agent');
+          logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${call.asteriskChannelId}`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel: ${err.message}`);
           // Continue with Twilio hangup even if Asterisk cleanup fails
@@ -306,53 +340,53 @@ const endCall = catchAsync(async (req, res) => {
       // Step 3: Hang up the Twilio call (this terminates the actual phone call)
       // This should be last because it's the final step that ends the call
       // After this, Twilio will send webhooks indicating the call has ended
-      if (conversation.callSid) {
+      if (call.callSid) {
         try {
-          logger.info(`[CallWorkflow] Attempting to hang up Twilio call ${conversation.callSid}`);
-          await twilioCallService.hangupCall(conversation.callSid);
-          logger.info(`[CallWorkflow] Successfully hung up Twilio call ${conversation.callSid}`);
+          logger.info(`[CallWorkflow] Attempting to hang up Twilio call ${call.callSid}`);
+          await twilioCallService.hangupCall(call.callSid);
+          logger.info(`[CallWorkflow] Successfully hung up Twilio call ${call.callSid}`);
         } catch (err) {
-          logger.error(`[CallWorkflow] FAILED to hang up Twilio call ${conversation.callSid}: ${err.message}`);
+          logger.error(`[CallWorkflow] FAILED to hang up Twilio call ${call.callSid}: ${err.message}`);
           logger.error(`[CallWorkflow] Twilio hangup error stack: ${err.stack}`);
-          // Continue with conversation update even if Twilio hangup fails, but log as error
+          // Continue with call update even if Twilio hangup fails, but log as error
         }
       } else {
-        logger.warn(`[CallWorkflow] No callSid found in conversation ${conversationId} - cannot hang up Twilio call`);
+        logger.warn(`[CallWorkflow] No callSid found in call ${call._id} - cannot hang up Twilio call`);
       }
     } else {
       logger.warn(`[CallWorkflow] No active connection found for conversation ${conversationId}`);
       // Try fallback: disconnect by callSid or asteriskChannelId if connection not found by conversationId
-      if (conversation.callSid) {
+      if (call.callSid) {
         try {
-          await openAIService.disconnect(conversation.callSid);
-          logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket using callSid fallback: ${conversation.callSid}`);
+          await openAIService.disconnect(call.callSid);
+          logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket using callSid fallback: ${call.callSid}`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Fallback disconnect by callSid failed: ${err.message}`);
         }
-      } else if (conversation.asteriskChannelId) {
+      } else if (call.asteriskChannelId) {
         try {
-          await openAIService.disconnect(conversation.asteriskChannelId);
-          logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket using asteriskChannelId fallback: ${conversation.asteriskChannelId}`);
+          await openAIService.disconnect(call.asteriskChannelId);
+          logger.info(`[CallWorkflow] Disconnected OpenAI WebSocket using asteriskChannelId fallback: ${call.asteriskChannelId}`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Fallback disconnect by asteriskChannelId failed: ${err.message}`);
         }
       }
       
       // Even if connection not found, still try to hangup Twilio and cleanup Asterisk
-      if (conversation.asteriskChannelId) {
+      if (call.asteriskChannelId) {
         try {
           const { channelTracker } = require('../services');
-          await channelTracker.cleanupCall(conversation.asteriskChannelId, 'Call ended by agent');
-          logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${conversation.asteriskChannelId} (fallback)`);
+          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by agent');
+          logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${call.asteriskChannelId} (fallback)`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel (fallback): ${err.message}`);
         }
       }
       
-      if (conversation.callSid) {
+      if (call.callSid) {
         try {
-          await twilioCallService.hangupCall(conversation.callSid);
-          logger.info(`[CallWorkflow] Hung up Twilio call ${conversation.callSid} (fallback)`);
+          await twilioCallService.hangupCall(call.callSid);
+          logger.info(`[CallWorkflow] Hung up Twilio call ${call.callSid} (fallback)`);
         } catch (err) {
           logger.error(`[CallWorkflow] Error hanging up Twilio call (fallback): ${err.message}`);
           // Don't swallow the error - log it as error so we can see it
@@ -361,20 +395,27 @@ const endCall = catchAsync(async (req, res) => {
     }
   } catch (err) {
     logger.error(`[CallWorkflow] Error terminating call: ${err.message}`);
-    // Continue with conversation update even if disconnect fails
+    // Continue with call update even if disconnect fails
   }
 
-  conversation.status = 'completed';
-  if (notes) conversation.callNotes = notes;
+  // Update call status
+  call.status = 'completed';
+  call.callStatus = 'ended';
+  if (notes) call.callNotes = notes;
+  if (outcome) call.callOutcome = outcome;
 
-  if (conversation.startTime) {
-    conversation.endTime = new Date();
-    conversation.duration = Math.round((conversation.endTime - conversation.startTime) / 1000);
+  if (call.startTime) {
+    call.endTime = new Date();
+    call.callEndTime = new Date();
+    call.duration = Math.round((call.endTime - call.startTime) / 1000);
+    call.callDuration = call.duration;
   }
 
-  await conversation.save();
+  await call.save();
   logger.info(`[CallWorkflow] Ended call for conversation ${conversationId} with outcome: ${outcome}`);
 
+  // Return conversation with call data populated
+  await conversation.populate('callId');
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
@@ -385,19 +426,31 @@ const endCall = catchAsync(async (req, res) => {
 const getActiveCalls = catchAsync(async (req, res) => {
   const agentId = req.caregiver.id;
   
-  // Get conversations that are active calls for this agent
-  const activeCalls = await Conversation.find({
+  // Get active calls for this agent (Call model tracks call status)
+  const activeCalls = await Call.find({
     agentId,
     status: { $in: ['initiated', 'in-progress'] }
   })
   .populate('patientId', 'name phone')
   .populate('agentId', 'name')
+  .populate('conversationId')
   .limit(50)
   .lean();
   
+  // Map to include conversation data if it exists
+  const callsWithConversations = await Promise.all(
+    activeCalls.map(async (call) => {
+      if (call.conversationId) {
+        const conversation = await Conversation.findById(call.conversationId).lean();
+        return { ...call, conversation };
+      }
+      return call;
+    })
+  );
+  
   res.status(httpStatus.OK).send({
-    data: activeCalls.map(call => ConversationDTO(call)),
-    count: activeCalls.length
+    data: callsWithConversations,
+    count: callsWithConversations.length
   });
 });
 
@@ -413,18 +466,27 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
   }
   
+  // Get the Call record for call details
+  const call = await Call.findById(conversation.callId);
+  if (!call) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
+  }
+  
   // Populate patient and agent details
   await conversation.populate('patientId', 'name phone');
-  await conversation.populate('agentId', 'name');
+  await call.populate('patientId', 'name phone');
+  await call.populate('agentId', 'name');
   
   const callDetails = {
     conversationId: conversation._id,
-    status: conversation.status,
-    startTime: conversation.startTime,
-    endTime: conversation.endTime,
-    duration: conversation.duration,
-    patient: conversation.patientId,
-    agent: conversation.agentId
+    callId: call._id,
+    status: call.status,
+    callStatus: call.callStatus,
+    startTime: call.startTime,
+    endTime: call.endTime,
+    duration: call.duration,
+    patient: conversation.patientId || call.patientId,
+    agent: call.agentId
   };
   
   res.status(httpStatus.OK).send({ data: callDetails });

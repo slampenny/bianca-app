@@ -56,6 +56,68 @@ agenda.define('processDailyBilling', { concurrency: 1, lockLifetime: 1800000 }, 
   }
 });
 
+// Retry missed call job definition
+agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async (job, done) => {
+  try {
+    const { callId, patientId, retryAttempt, originalCallId } = job.attrs.data;
+    
+    logger.info(`[Agenda] Executing retry missed call job: callId=${callId}, retryAttempt=${retryAttempt}`);
+    
+    // Get the original call
+    const { Call } = require('../models');
+    const originalCall = await Call.findById(originalCallId || callId);
+    if (!originalCall) {
+      logger.error(`[Agenda] Original call not found: ${originalCallId || callId}`);
+      return done(new Error('Original call not found'));
+    }
+    
+    // Get patient and org
+    const patient = await Patient.findById(patientId).populate('org');
+    if (!patient) {
+      logger.error(`[Agenda] Patient not found: ${patientId}`);
+      return done(new Error('Patient not found'));
+    }
+    
+    const org = patient.org;
+    if (!org) {
+      logger.error(`[Agenda] Org not found for patient: ${patientId}`);
+      return done(new Error('Org not found'));
+    }
+    
+    // Check retry settings
+    const retrySettings = org.callRetrySettings || {};
+    const maxRetries = retrySettings.retryCount || 2;
+    
+    if (retryAttempt > maxRetries) {
+      logger.info(`[Agenda] Retry attempt ${retryAttempt} exceeds max retries ${maxRetries}, not retrying`);
+      return done();
+    }
+    
+    // Initiate the retry call
+    const newCallSid = await twilioCallService.initiateCall(patientId);
+    
+    // Find the new call record created by initiateCall
+    const retryCall = await Call.findOne({ callSid: newCallSid });
+    if (retryCall) {
+      // Update retry info
+      retryCall.retryAttempt = retryAttempt;
+      retryCall.originalCallId = originalCallId || callId;
+      retryCall.maxRetries = maxRetries;
+      retryCall.callType = originalCall.callType || 'wellness-check';
+      await retryCall.save();
+      
+      logger.info(`[Agenda] Updated retry call ${retryCall._id} for original call ${originalCallId || callId}`);
+    } else {
+      logger.warn(`[Agenda] Retry call record not found for callSid: ${newCallSid}`);
+    }
+    
+    done();
+  } catch (error) {
+    logger.error(`[Agenda] Error in retryMissedCall job: ${error.message}`);
+    done(error);
+  }
+});
+
 async function runSchedules() {
   const now = new Date();
   const nowUTC = new Date(Date.now()); // Ensure we're using UTC
@@ -176,41 +238,42 @@ async function processOrgBilling(org) {
     return;
   }
   
-  // Get unbilled conversations from the last 24 hours
+  // Get unbilled calls from the last 24 hours (Call model tracks billing, not Conversation)
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   
-  const unbilledConversations = await Conversation.find({
+  const { Call } = require('../models');
+  const unbilledCalls = await Call.find({
     patientId: { $in: patients.map(p => p._id) },
     lineItemId: null, // Not yet billed
     endTime: { $gte: yesterday }, // From last 24 hours
     cost: { $gt: 0 } // Has a cost
   }).populate('patientId');
   
-  if (unbilledConversations.length === 0) {
-    logger.info(`[Daily Billing] No unbilled conversations found for org ${org.name}`);
+  if (unbilledCalls.length === 0) {
+    logger.info(`[Daily Billing] No unbilled calls found for org ${org.name}`);
     return;
   }
   
-  logger.info(`[Daily Billing] Found ${unbilledConversations.length} unbilled conversations for org ${org.name}`);
+  logger.info(`[Daily Billing] Found ${unbilledCalls.length} unbilled calls for org ${org.name}`);
   
-  // Group conversations by patient for itemized billing
+  // Group calls by patient for itemized billing
   const patientBilling = {};
   let totalCost = 0;
   
-  for (const conversation of unbilledConversations) {
-    const patientId = conversation.patientId._id.toString();
+  for (const call of unbilledCalls) {
+    const patientId = call.patientId._id.toString();
     if (!patientBilling[patientId]) {
       patientBilling[patientId] = {
-        patient: conversation.patientId,
-        conversations: [],
+        patient: call.patientId,
+        calls: [],
         totalCost: 0
       };
     }
     
-    patientBilling[patientId].conversations.push(conversation);
-    patientBilling[patientId].totalCost += conversation.cost;
-    totalCost += conversation.cost;
+    patientBilling[patientId].calls.push(call);
+    patientBilling[patientId].totalCost += call.cost;
+    totalCost += call.cost;
   }
   
   if (totalCost === 0) {
@@ -218,22 +281,22 @@ async function processOrgBilling(org) {
     return;
   }
   
-  // Double-check that conversations are still unbilled (race condition protection)
-  const stillUnbilledConversations = await Conversation.find({
-    _id: { $in: unbilledConversations.map(c => c._id) },
+  // Double-check that calls are still unbilled (race condition protection)
+  const stillUnbilledCalls = await Call.find({
+    _id: { $in: unbilledCalls.map(c => c._id) },
     lineItemId: null
   });
   
-  if (stillUnbilledConversations.length !== unbilledConversations.length) {
-    logger.warn(`[Daily Billing] Some conversations were already billed for org ${org.name}, skipping`);
+  if (stillUnbilledCalls.length !== unbilledCalls.length) {
+    logger.warn(`[Daily Billing] Some calls were already billed for org ${org.name}, skipping`);
     return;
   }
   
   // Create invoice for the organization
   const invoice = await createOrgInvoice(org, patientBilling, totalCost);
   
-  // Update conversations with their respective line item references
-  const conversationIds = stillUnbilledConversations.map(c => c._id);
+  // Update calls with their respective line item references
+  const callIds = stillUnbilledCalls.map(c => c._id);
   
   // Create a mapping of patientId to lineItemId
   const patientToLineItem = {};
@@ -241,20 +304,20 @@ async function processOrgBilling(org) {
     patientToLineItem[lineItem.patientId.toString()] = lineItem._id;
   }
   
-  // Update each conversation with its patient's line item ID
-  for (const conversation of stillUnbilledConversations) {
-    const patientId = conversation.patientId.toString();
+  // Update each call with its patient's line item ID
+  for (const call of stillUnbilledCalls) {
+    const patientId = call.patientId.toString();
     const lineItemId = patientToLineItem[patientId];
     
     if (lineItemId) {
-      await Conversation.updateOne(
-        { _id: conversation._id },
+      await Call.updateOne(
+        { _id: call._id },
         { $set: { lineItemId: lineItemId } }
       );
     }
   }
   
-  logger.info(`[Daily Billing] Successfully marked ${conversationIds.length} conversations as billed for org ${org.name}`);
+  logger.info(`[Daily Billing] Successfully marked ${callIds.length} calls as billed for org ${org.name}`);
   
   if (invoice) {
     logger.info(`[Daily Billing] Created invoice ${invoice.invoiceNumber} for org ${org.name} with total cost $${totalCost.toFixed(2)}`);
@@ -325,7 +388,7 @@ async function createOrgInvoice(org, patientBilling, totalCost) {
       patientId: billing.patient._id,
       invoiceId: invoice._id,
       amount: billing.totalCost,
-      description: `Daily billing - ${billing.conversations.length} conversation(s)`,
+      description: `Daily billing - ${billing.calls.length} call(s)`,
       periodStart: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
       periodEnd: new Date(), // Now
       quantity: billing.conversations.length,

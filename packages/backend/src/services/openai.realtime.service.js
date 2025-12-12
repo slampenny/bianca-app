@@ -33,7 +33,7 @@ const WebSocket = require('ws');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
-const { Message } = require('../models'); // Assuming Message model is used for saving transcripts
+const { Call, Conversation, Message } = require('../models'); // Assuming Message model is used for saving transcripts
 const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
 const { emergencyProcessor } = require('./emergencyProcessor.service');
 const { getConversationContextWindow } = require('../utils/conversationContextWindow');
@@ -372,9 +372,39 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Emergency detection enabled for patient: ${patientId}`);
     }
 
+    // Ensure Conversation exists (for outbound calls, it might not exist yet)
+    let finalConversationId = conversationId;
+    if (!finalConversationId && callSid) {
+      try {
+        // Find the Call record
+        const call = await Call.findOne({ callSid });
+        if (call) {
+          // Check if Conversation already exists for this call
+          let conversation = await Conversation.findOne({ callId: call._id });
+          if (!conversation) {
+            // Create Conversation when call is answered and conversation starts
+            conversation = await Conversation.create({
+              callId: call._id,
+              patientId: call.patientId,
+            });
+            
+            // Update Call with conversation reference
+            call.conversationId = conversation._id;
+            await call.save();
+            
+            logger.info(`[OpenAI Realtime] Created Conversation ${conversation._id} for call ${call._id}`);
+          }
+          finalConversationId = conversation._id.toString();
+        }
+      } catch (err) {
+        logger.error(`[OpenAI Realtime] Error ensuring Conversation exists: ${err.message}`);
+        // Continue with provided conversationId or null
+      }
+    }
+
     this.connections.set(callId, {
       status: 'initializing',
-      conversationId,
+      conversationId: finalConversationId,
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
       patientId, // Store patient ID for emergency detection

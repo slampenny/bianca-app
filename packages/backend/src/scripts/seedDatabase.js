@@ -38,6 +38,10 @@ async function clearDatabase() {
  */
 async function seedDatabase() {
   try {
+    // Load secrets from AWS Secrets Manager (required for OpenAI API key in production/staging)
+    await config.loadSecrets();
+    console.log('Secrets loaded from AWS Secrets Manager');
+    
     // Connect to the database
     await mongoose.connect(config.mongoose.url);
     console.log('Connected to database');

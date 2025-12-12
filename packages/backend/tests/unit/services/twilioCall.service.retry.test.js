@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Conversation, Patient, Org, Caregiver } = require('../../../src/models');
+const { Call, Conversation, Patient, Org, Caregiver } = require('../../../src/models');
 
 // Mock agenda before importing twilioCallService
 jest.mock('../../../src/config/agenda', () => ({
@@ -43,12 +43,13 @@ afterAll(async () => {
 describe('TwilioCallService - Call Retry Functionality', () => {
   let org;
   let patient;
-  let conversation;
+  let call;
 
   beforeEach(async () => {
     // Clean up
     await Org.deleteMany({});
     await Patient.deleteMany({});
+    await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Caregiver.deleteMany({});
     jest.clearAllMocks();
@@ -72,13 +73,15 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       org: org._id,
     });
 
-    // Create conversation
-    conversation = await Conversation.create({
+    // Create Call record (Call tracks call metadata, not Conversation)
+    call = await Call.create({
       callSid: 'CA1234567890',
       patientId: patient._id,
       startTime: new Date(),
+      callStartTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
+      callStatus: 'initiating',
       retryAttempt: 0,
     });
   });
@@ -87,38 +90,38 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     it('should schedule a retry call when max retries not reached', async () => {
       const retryTime = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
 
-      await twilioCallService.scheduleRetryCall(conversation, org);
+      await twilioCallService.scheduleRetryCall(call, org);
 
       expect(agenda.schedule).toHaveBeenCalledWith(
         expect.any(Date),
         'retryMissedCall',
         {
-          conversationId: conversation._id.toString(),
+          callId: call._id.toString(),
           patientId: patient._id.toString(),
           retryAttempt: 1,
-          originalCallId: conversation._id.toString(),
+          originalCallId: call._id.toString(),
         }
       );
 
-      // Verify conversation was updated
-      const updatedConversation = await Conversation.findById(conversation._id);
-      expect(updatedConversation.retryScheduledAt).toBeDefined();
+      // Verify call was updated
+      const updatedCall = await Call.findById(call._id);
+      expect(updatedCall.retryScheduledAt).toBeDefined();
     });
 
     it('should not schedule retry when max retries already reached', async () => {
-      conversation.retryAttempt = 2; // Already at max
-      await conversation.save();
+      call.retryAttempt = 2; // Already at max
+      await call.save();
 
-      await twilioCallService.scheduleRetryCall(conversation, org);
+      await twilioCallService.scheduleRetryCall(call, org);
 
       expect(agenda.schedule).not.toHaveBeenCalled();
     });
 
     it('should use correct retry attempt number', async () => {
-      conversation.retryAttempt = 1; // First retry already done
-      await conversation.save();
+      call.retryAttempt = 1; // First retry already done
+      await call.save();
 
-      await twilioCallService.scheduleRetryCall(conversation, org);
+      await twilioCallService.scheduleRetryCall(call, org);
 
       expect(agenda.schedule).toHaveBeenCalledWith(
         expect.any(Date),
@@ -131,11 +134,11 @@ describe('TwilioCallService - Call Retry Functionality', () => {
 
     it('should use originalCallId for retry attempts', async () => {
       const originalCallId = new mongoose.Types.ObjectId();
-      conversation.originalCallId = originalCallId;
-      conversation.retryAttempt = 1;
-      await conversation.save();
+      call.originalCallId = originalCallId;
+      call.retryAttempt = 1;
+      await call.save();
 
-      await twilioCallService.scheduleRetryCall(conversation, org);
+      await twilioCallService.scheduleRetryCall(call, org);
 
       expect(agenda.schedule).toHaveBeenCalledWith(
         expect.any(Date),
@@ -151,7 +154,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       await org.save();
 
       const beforeSchedule = Date.now();
-      await twilioCallService.scheduleRetryCall(conversation, org);
+      await twilioCallService.scheduleRetryCall(call, org);
       const afterSchedule = Date.now();
 
       const scheduledTime = agenda.schedule.mock.calls[0][0];
@@ -168,7 +171,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     it('should schedule retry for no-answer call', async () => {
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'no-answer',
           CallDuration: '0',
         },
@@ -177,15 +180,15 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       await twilioCallService.handleCallStatus(req);
 
       expect(agenda.schedule).toHaveBeenCalled();
-      const updatedConversation = await Conversation.findById(conversation._id);
-      expect(updatedConversation.status).toBe('failed');
-      expect(updatedConversation.failureReason).toBe('no-answer');
+      const updatedCall = await Call.findById(call._id);
+      expect(updatedCall.status).toBe('failed');
+      expect(updatedCall.callOutcome).toBe('no_answer');
     });
 
     it('should schedule retry for busy call', async () => {
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'busy',
           CallDuration: '0',
         },
@@ -199,7 +202,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     it('should schedule retry for voicemail call', async () => {
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'completed',
           CallDuration: '10',
           AnsweredBy: 'machine_start',
@@ -209,9 +212,9 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       await twilioCallService.handleCallStatus(req);
 
       expect(agenda.schedule).toHaveBeenCalled();
-      const updatedConversation = await Conversation.findById(conversation._id);
-      expect(updatedConversation.status).toBe('failed');
-      expect(updatedConversation.failureReason).toBe('voicemail');
+      const updatedCall = await Call.findById(call._id);
+      expect(updatedCall.status).toBe('failed');
+      expect(updatedCall.callOutcome).toBe('voicemail');
     });
 
     it('should create alert when alertOnAllMissedCalls is true', async () => {
@@ -220,7 +223,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
 
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'no-answer',
           CallDuration: '0',
         },
@@ -238,7 +241,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
 
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'no-answer',
           CallDuration: '0',
         },
@@ -254,12 +257,12 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       org.callRetrySettings.retryCount = 2;
       await org.save();
 
-      conversation.retryAttempt = 2; // All retries done
-      await conversation.save();
+      call.retryAttempt = 2; // All retries done
+      await call.save();
 
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'no-answer',
           CallDuration: '0',
         },
@@ -282,7 +285,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'no-answer',
           CallDuration: '0',
         },
@@ -305,7 +308,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
 
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'no-answer',
           CallDuration: '0',
         },
@@ -321,9 +324,9 @@ describe('TwilioCallService - Call Retry Functionality', () => {
 
     it('should cancel remaining retries when retry call succeeds', async () => {
       const originalCallId = new mongoose.Types.ObjectId();
-      conversation.originalCallId = originalCallId;
-      conversation.retryAttempt = 1; // This is a retry
-      await conversation.save();
+      call.originalCallId = originalCallId;
+      call.retryAttempt = 1; // This is a retry
+      await call.save();
 
       // Mock agenda.jobs to return remaining retry jobs
       const mockJob1 = {
@@ -339,7 +342,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
 
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'completed',
           CallDuration: '120',
           AnsweredBy: 'human',
@@ -356,12 +359,12 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     });
 
     it('should not cancel retries when original call succeeds (not a retry)', async () => {
-      conversation.retryAttempt = 0; // Original call
-      await conversation.save();
+      call.retryAttempt = 0; // Original call
+      await call.save();
 
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'completed',
           CallDuration: '120',
           AnsweredBy: 'human',
@@ -378,7 +381,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     it('should not schedule retry for successful call', async () => {
       const req = {
         body: {
-          CallSid: conversation.callSid,
+          CallSid: call.callSid,
           CallStatus: 'completed',
           CallDuration: '120',
           AnsweredBy: 'human',
@@ -388,8 +391,8 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       await twilioCallService.handleCallStatus(req);
 
       expect(agenda.schedule).not.toHaveBeenCalled();
-      const updatedConversation = await Conversation.findById(conversation._id);
-      expect(updatedConversation.status).toBe('completed');
+      const updatedCall = await Call.findById(call._id);
+      expect(updatedCall.status).toBe('completed');
     });
   });
 });

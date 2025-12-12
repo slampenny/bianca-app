@@ -222,10 +222,9 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
     } else if (currentId === null && newId === null) {
       // Both are null/undefined - check if it's actually a different schedule by comparing other fields
       // This handles the case where user creates a new schedule, then creates another new one
-      // IMPORTANT: Don't check time here to avoid resetting when user is actively changing it
-      // Only reset if frequency or intervals differ significantly (not time, as user may be editing it)
-      if (initialSchedule.frequency !== frequency || 
-          JSON.stringify(initialSchedule.intervals) !== JSON.stringify(intervals)) {
+      // IMPORTANT: Don't check time, frequency, intervals, or isActive here to avoid resetting when user is actively changing them
+      // Only check patient to detect if it's a different schedule (patient changes are external, not user edits)
+      if (initialSchedule.patient !== patient) {
         setId(initialSchedule.id)
         setPatient(initialSchedule.patient)
         setFrequency(initialSchedule.frequency)
@@ -234,7 +233,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
         setTime(initialSchedule.time)
       }
     }
-  }, [initialSchedule.id, initialSchedule.patient, initialSchedule.frequency, initialSchedule.intervals, id, frequency, intervals]) // Removed time from dependencies to prevent rapid circling
+  }, [initialSchedule.id, initialSchedule.patient, id, patient]) // Removed time, frequency, intervals, and isActive from dependencies to prevent rapid circling/churn
 
   // Initialize monthly intervals with default day if empty
   useEffect(() => {

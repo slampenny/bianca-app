@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Conversation, Patient, Org } = require('../../../src/models');
+const { Call, Conversation, Patient, Org } = require('../../../src/models');
 
 let mongoServer;
 
@@ -16,7 +16,7 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
-describe('Conversation Model - Retry Fields', () => {
+describe('Call Model - Retry Fields', () => {
   let org;
   let patient;
 
@@ -35,11 +35,12 @@ describe('Conversation Model - Retry Fields', () => {
   });
 
   beforeEach(async () => {
+    await Call.deleteMany({});
     await Conversation.deleteMany({});
   });
 
-  it('should create conversation with default retryAttempt of 0', async () => {
-    const conversation = await Conversation.create({
+  it('should create call with default retryAttempt of 0', async () => {
+    const call = await Call.create({
       callSid: 'CA1234567890',
       patientId: patient._id,
       startTime: new Date(),
@@ -47,11 +48,11 @@ describe('Conversation Model - Retry Fields', () => {
       status: 'initiated',
     });
 
-    expect(conversation.retryAttempt).toBe(0);
+    expect(call.retryAttempt).toBe(0);
   });
 
   it('should allow setting retryAttempt', async () => {
-    const conversation = await Conversation.create({
+    const call = await Call.create({
       callSid: 'CA1234567890',
       patientId: patient._id,
       startTime: new Date(),
@@ -60,11 +61,11 @@ describe('Conversation Model - Retry Fields', () => {
       retryAttempt: 1,
     });
 
-    expect(conversation.retryAttempt).toBe(1);
+    expect(call.retryAttempt).toBe(1);
   });
 
   it('should allow setting originalCallId', async () => {
-    const originalConversation = await Conversation.create({
+    const originalCall = await Call.create({
       callSid: 'CA1111111111',
       patientId: patient._id,
       startTime: new Date(),
@@ -72,22 +73,22 @@ describe('Conversation Model - Retry Fields', () => {
       status: 'failed',
     });
 
-    const retryConversation = await Conversation.create({
+    const retryCall = await Call.create({
       callSid: 'CA2222222222',
       patientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
       retryAttempt: 1,
-      originalCallId: originalConversation._id,
+      originalCallId: originalCall._id,
     });
 
-    expect(retryConversation.originalCallId.toString()).toBe(originalConversation._id.toString());
+    expect(retryCall.originalCallId.toString()).toBe(originalCall._id.toString());
   });
 
   it('should allow setting retryScheduledAt', async () => {
     const scheduledTime = new Date(Date.now() + 15 * 60 * 1000);
-    const conversation = await Conversation.create({
+    const call = await Call.create({
       callSid: 'CA1234567890',
       patientId: patient._id,
       startTime: new Date(),
@@ -96,11 +97,11 @@ describe('Conversation Model - Retry Fields', () => {
       retryScheduledAt: scheduledTime,
     });
 
-    expect(conversation.retryScheduledAt).toEqual(scheduledTime);
+    expect(call.retryScheduledAt).toEqual(scheduledTime);
   });
 
   it('should allow setting maxRetries', async () => {
-    const conversation = await Conversation.create({
+    const call = await Call.create({
       callSid: 'CA1234567890',
       patientId: patient._id,
       startTime: new Date(),
@@ -109,11 +110,11 @@ describe('Conversation Model - Retry Fields', () => {
       maxRetries: 3,
     });
 
-    expect(conversation.maxRetries).toBe(3);
+    expect(call.maxRetries).toBe(3);
   });
 
   it('should enforce minimum retryAttempt of 0', async () => {
-    const conversation = new Conversation({
+    const call = new Call({
       callSid: 'CA1234567890',
       patientId: patient._id,
       startTime: new Date(),
@@ -122,11 +123,11 @@ describe('Conversation Model - Retry Fields', () => {
       retryAttempt: -1,
     });
 
-    await expect(conversation.save()).rejects.toThrow();
+    await expect(call.save()).rejects.toThrow();
   });
 
-  it('should allow querying conversations by originalCallId', async () => {
-    const originalConversation = await Conversation.create({
+  it('should allow querying calls by originalCallId', async () => {
+    const originalCall = await Call.create({
       callSid: 'CA1111111111',
       patientId: patient._id,
       startTime: new Date(),
@@ -134,28 +135,28 @@ describe('Conversation Model - Retry Fields', () => {
       status: 'failed',
     });
 
-    const retry1 = await Conversation.create({
+    const retry1 = await Call.create({
       callSid: 'CA2222222222',
       patientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
       retryAttempt: 1,
-      originalCallId: originalConversation._id,
+      originalCallId: originalCall._id,
     });
 
-    const retry2 = await Conversation.create({
+    const retry2 = await Call.create({
       callSid: 'CA3333333333',
       patientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
       retryAttempt: 2,
-      originalCallId: originalConversation._id,
+      originalCallId: originalCall._id,
     });
 
-    const retries = await Conversation.find({
-      originalCallId: originalConversation._id,
+    const retries = await Call.find({
+      originalCallId: originalCall._id,
     });
 
     expect(retries).toHaveLength(2);
@@ -164,8 +165,3 @@ describe('Conversation Model - Retry Fields', () => {
     );
   });
 });
-
-
-
-
-
