@@ -48,32 +48,34 @@ const reportUsage = async (subscriptionItemId, value, metadata = {}, timestamp =
 };
 
 /**
- * Report usage for a conversation (converts duration to billable units)
+ * Report usage for a call (converts duration to billable units)
+ * Note: This function accepts Call objects (Call model tracks billing, not Conversation)
  * @param {string} subscriptionItemId - Stripe subscription item ID
- * @param {Object} conversation - Conversation object
+ * @param {Object} call - Call object (Call model tracks billing)
  * @param {Object} config - Billing configuration
  * @returns {Promise<Object>} Usage record
  */
-const reportConversationUsage = async (subscriptionItemId, conversation, config = {}) => {
+const reportConversationUsage = async (subscriptionItemId, call, config = {}) => {
   try {
     const minimumBillableDuration = config.minimumBillableDuration || 30; // seconds
     const ratePerMinute = config.ratePerMinute || 0.1; // $0.10 per minute
 
     // Calculate billable duration
-    const billableDuration = Math.max(conversation.duration || 0, minimumBillableDuration);
+    const billableDuration = Math.max(call.duration || 0, minimumBillableDuration);
     const billableMinutes = billableDuration / 60;
 
     // Report usage (in minutes)
     const metadata = {
-      conversationId: conversation._id?.toString() || conversation.id,
-      patientId: conversation.patientId?.toString() || conversation.patientId,
-      duration: conversation.duration,
+      callId: call._id?.toString() || call.id,
+      conversationId: call.conversationId?.toString() || call.conversationId,
+      patientId: call.patientId?.toString() || call.patientId,
+      duration: call.duration,
       billableDuration: billableDuration,
     };
 
     return await reportUsage(subscriptionItemId, billableMinutes, metadata);
   } catch (error) {
-    logger.error(`Error reporting conversation usage:`, error);
+    logger.error(`Error reporting call usage:`, error);
     throw error;
   }
 };

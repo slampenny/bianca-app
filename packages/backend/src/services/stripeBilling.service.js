@@ -1,5 +1,5 @@
 const logger = require('../config/logger');
-const { Org, Patient, Conversation } = require('../models');
+const { Org, Patient, Call, Conversation } = require('../models');
 const stripeSubscriptionService = require('./stripeSubscription.service');
 const stripeUsageService = require('./stripeUsage.service');
 const stripeSyncService = require('./stripeSync.service');
@@ -13,12 +13,12 @@ const ApiError = require('../utils/ApiError');
  */
 
 /**
- * Report conversation usage to Stripe and maintain local tracking
+ * Report call usage to Stripe and maintain local tracking
  * @param {string} orgId - Organization ID
- * @param {Object} conversation - Conversation object
+ * @param {Object} call - Call object (Call model tracks billing, not Conversation)
  * @returns {Promise<void>}
  */
-const reportConversationUsage = async (orgId, conversation) => {
+const reportConversationUsage = async (orgId, call) => {
   try {
     const org = await Org.findById(orgId);
     if (!org) {
@@ -49,16 +49,16 @@ const reportConversationUsage = async (orgId, conversation) => {
 
     await stripeUsageService.reportConversationUsage(
       org.stripeSubscriptionItemId,
-      conversation,
+      call,
       billingConfig
     );
 
-    // Note: We don't mark conversation as billed yet
+    // Note: We don't mark call as billed yet
     // Stripe will create invoices on billing cycle, and webhooks will sync them
-    // The conversation.lineItemId will be set when the invoice is synced
+    // The call.lineItemId will be set when the invoice is synced
 
     logger.debug(
-      `Reported conversation ${conversation._id} usage to Stripe for org ${orgId}`
+      `Reported call ${call._id} usage to Stripe for org ${orgId}`
     );
   } catch (error) {
     logger.error(`Error reporting conversation usage:`, error);
@@ -89,40 +89,40 @@ const processOrgBilling = async (orgId) => {
       return;
     }
 
-    // Get unbilled conversations from the last 24 hours
+    // Get unbilled calls from the last 24 hours (Call model tracks billing, not Conversation)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const unbilledConversations = await Conversation.find({
+    const unbilledCalls = await Call.find({
       patientId: { $in: patients.map((p) => p._id) },
       lineItemId: null, // Not yet billed
       endTime: { $gte: yesterday }, // From last 24 hours
       cost: { $gt: 0 }, // Has a cost
     }).populate('patientId');
 
-    if (unbilledConversations.length === 0) {
-      logger.info(`No unbilled conversations found for org ${org.name}`);
+    if (unbilledCalls.length === 0) {
+      logger.info(`No unbilled calls found for org ${org.name}`);
       return;
     }
 
     logger.info(
-      `Found ${unbilledConversations.length} unbilled conversations for org ${org.name}`
+      `Found ${unbilledCalls.length} unbilled calls for org ${org.name}`
     );
 
     // Ensure subscription exists
     await stripeSubscriptionService.getOrCreateSubscription(orgId);
 
-    // Report each conversation to Stripe
+    // Report each call to Stripe
     // Stripe will aggregate and bill on the billing cycle
-    for (const conversation of unbilledConversations) {
+    for (const call of unbilledCalls) {
       try {
-        await reportConversationUsage(orgId, conversation);
+        await reportConversationUsage(orgId, call);
       } catch (error) {
         logger.error(
-          `Failed to report conversation ${conversation._id} usage:`,
+          `Failed to report call ${call._id} usage:`,
           error
         );
-        // Continue with other conversations
+        // Continue with other calls
       }
     }
 
@@ -176,12 +176,12 @@ const getUnbilledCosts = async (orgId, days = 7) => {
       org.stripeSubscriptionId
     );
 
-    // Get unbilled conversations (reported to Stripe but not yet in an invoice)
+    // Get unbilled calls (reported to Stripe but not yet in an invoice)
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     const patients = await Patient.find({ org: orgId });
-    const unbilledConversations = await Conversation.find({
+    const unbilledCalls = await Call.find({
       patientId: { $in: patients.map((p) => p._id) },
       lineItemId: null, // Not yet linked to an invoice
       endTime: { $gte: startDate },
@@ -192,31 +192,31 @@ const getUnbilledCosts = async (orgId, days = 7) => {
     const patientCosts = {};
     let totalUnbilledCost = 0;
 
-    for (const conversation of unbilledConversations) {
-      const patientId = conversation.patientId._id.toString();
-      const patientName = conversation.patientId.name;
+    for (const call of unbilledCalls) {
+      const patientId = call.patientId._id.toString();
+      const patientName = call.patientId.name;
 
       if (!patientCosts[patientId]) {
         patientCosts[patientId] = {
           patientId,
           patientName,
-          conversationCount: 0,
+          callCount: 0,
           totalCost: 0,
-          conversations: [],
+          calls: [],
         };
       }
 
-      patientCosts[patientId].conversationCount++;
-      patientCosts[patientId].totalCost += conversation.cost;
-      patientCosts[patientId].conversations.push({
-        conversationId: conversation._id,
-        startTime: conversation.startTime,
-        duration: conversation.duration,
-        cost: conversation.cost,
-        status: conversation.status,
+      patientCosts[patientId].callCount++;
+      patientCosts[patientId].totalCost += call.cost;
+      patientCosts[patientId].calls.push({
+        callId: call._id,
+        startTime: call.startTime,
+        duration: call.duration,
+        cost: call.cost,
+        status: call.status,
       });
 
-      totalUnbilledCost += conversation.cost;
+      totalUnbilledCost += call.cost;
     }
 
     return {

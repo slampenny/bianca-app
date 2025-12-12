@@ -1,0 +1,319 @@
+version: 0.2
+
+env:
+  variables:
+    NODE_ENV: test
+    API_BASE_URL: http://localhost:3000/v1
+    MONGODB_URL: mongodb://localhost:27017/bianca-app-test
+
+phases:
+  pre_build:
+    commands:
+      - echo "=========================================="
+      - echo "🧪 PRODUCTION TEST STAGE"
+      - echo "Running unit tests and Playwright E2E tests"
+      - echo "=========================================="
+      - echo "Installing Node.js 20 using nvm..."
+      - |
+        # Install Node.js 20 using nvm
+        export NVM_DIR="$HOME/.nvm"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        echo "Installing Node.js 20..."
+        nvm install 20
+        nvm use 20
+        nvm alias default 20
+        # Verify installation
+        NODE_VER=$(node --version)
+        echo "Node version: $NODE_VER"
+        echo "NPM version: $(npm --version)"
+        if [ -z "$NODE_VER" ] || [ "$(echo "$NODE_VER" | cut -c1-3)" != "v20" ]; then
+          echo "❌ Node.js 20 installation failed or wrong version: $NODE_VER"
+          exit 1
+        fi
+        echo "✅ Node.js 20 installed successfully"
+      - echo "Setting up Yarn..."
+      - |
+        # Ensure Node.js 20 is available
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        # Install Yarn 1.22.22 globally
+        npm install -g yarn@1.22.22
+        echo "Yarn version: $(yarn --version)"
+        echo "✅ Using Yarn 1.22.22"
+      - echo "Increasing file watcher limit..."
+      - |
+        # Increase inotify file watcher limit
+        echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
+        sudo sysctl -p || true
+      - echo "Installing MongoDB via Docker..."
+      - |
+        # Start MongoDB using Docker
+        docker run -d --name mongodb-test \
+          -p 27017:27017 \
+          -e MONGO_INITDB_DATABASE=bianca-app-test \
+          mongo:7.0 || echo "MongoDB container may already exist"
+        # Wait for MongoDB to be ready
+        i=1
+        while [ $i -le 30 ]; do
+          if docker exec mongodb-test mongosh --eval "db.adminCommand('ping')" 2>/dev/null; then
+            echo "✅ MongoDB is ready!"
+            break
+          fi
+          sleep 1
+          i=$((i + 1))
+        done
+        if [ $i -gt 30 ]; then
+          echo "❌ MongoDB failed to start"
+          exit 1
+        fi
+      - echo "Installing backend dependencies..."
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        cd packages/backend || exit 1
+        echo "Backend directory: $(pwd)"
+        echo "Installing backend dependencies with Yarn..."
+        yarn install --pure-lockfile --frozen-lockfile || {
+          echo "❌ Backend dependency installation failed"
+          exit 1
+        }
+        echo "✅ Backend dependencies installed"
+      - echo "Installing frontend dependencies..."
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        cd packages/frontend || exit 1
+        echo "Frontend directory: $(pwd)"
+        yarn install --pure-lockfile --frozen-lockfile || exit 1
+        echo "✅ Frontend dependencies installed"
+      - echo "Installing Playwright browsers..."
+      - |
+        cd packages/frontend || exit 1
+        yarn playwright install --with-deps chromium || exit 1
+        echo "✅ Playwright browsers installed"
+
+  build:
+    commands:
+      - echo "=========================================="
+      - echo "🔬 RUNNING UNIT TESTS"
+      - echo "=========================================="
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        cd packages/backend || exit 1
+        
+        # Set up test environment
+        export MONGODB_URL="$MONGODB_URL"
+        export NODE_ENV="test"
+        export JWT_ACCESS_EXPIRATION_MINUTES=30
+        export JWT_REFRESH_EXPIRATION_DAYS=30
+        export AWS_REGION="${AWS_REGION:-us-east-2}"
+        export AWS_SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret}"
+        # Secrets from Secrets Manager should be available as env vars
+        # Verify required secrets are available
+        if [ -z "$JWT_SECRET" ]; then
+          echo "⚠️  WARNING: JWT_SECRET not set, some tests may fail"
+        fi
+        
+        echo "Running backend unit tests..."
+        echo "Test command: yarn test"
+        set +e  # Don't exit on error, we'll handle it
+        yarn test > /tmp/unit-tests.log 2>&1
+        UNIT_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show test output
+        cat /tmp/unit-tests.log
+        echo ""
+        echo "Unit tests exit code: $UNIT_TEST_EXIT_CODE"
+        
+        if [ "$UNIT_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌❌❌ UNIT TESTS FAILED ❌❌❌"
+          echo "Exit code: $UNIT_TEST_EXIT_CODE"
+          echo "=========================================="
+          echo "Last 100 lines of test output:"
+          tail -100 /tmp/unit-tests.log
+          echo "=========================================="
+          exit $UNIT_TEST_EXIT_CODE
+        fi
+        echo "✅✅✅ ALL UNIT TESTS PASSED ✅✅✅"
+      - echo "=========================================="
+      - echo "🎭 RUNNING PLAYWRIGHT E2E TESTS"
+      - echo "=========================================="
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        
+        # Set up backend environment
+        cd packages/backend || exit 1
+        export MONGODB_URL="$MONGODB_URL"
+        export NODE_ENV="test"
+        export JWT_ACCESS_EXPIRATION_MINUTES=30
+        export JWT_REFRESH_EXPIRATION_DAYS=30
+        export AWS_REGION="${AWS_REGION:-us-east-2}"
+        export AWS_SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret}"
+        export FORCE_ETHEREAL="true"
+        # Export secrets for backend
+        export STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY"
+        export STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY"
+        export JWT_SECRET="$JWT_SECRET"
+        export OPENAI_API_KEY="$OPENAI_API_KEY"
+        export MFA_ENCRYPTION_KEY="$MFA_ENCRYPTION_KEY"
+        export TWILIO_AUTHTOKEN="$TWILIO_AUTHTOKEN"
+        
+        echo "Starting backend server for E2E tests..."
+        yarn dev:test > /tmp/backend.log 2>&1 &
+        BACKEND_PID=$!
+        echo $BACKEND_PID > /tmp/backend.pid
+        echo "Backend PID: $BACKEND_PID"
+        
+        # Wait for backend to be ready
+        i=1
+        while [ $i -le 60 ]; do
+          if curl -f http://localhost:3000/health 2>/dev/null; then
+            echo "✅ Backend is ready!"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "❌ Backend failed to start after 120 seconds"
+            echo "Backend log:"
+            cat /tmp/backend.log || true
+            exit 1
+          fi
+          sleep 2
+          i=$((i + 1))
+        done
+        
+        # Seed database
+        echo "Seeding database..."
+        sleep 3
+        SEED_SUCCESS=false
+        for attempt in 1 2 3; do
+          echo "Seeding attempt $attempt..."
+          SEED_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/test/seed)
+          SEED_HTTP_CODE=$(echo "$SEED_RESPONSE" | tail -n1)
+          if [ "$SEED_HTTP_CODE" = "200" ]; then
+            echo "✅ Database seeded successfully"
+            SEED_SUCCESS=true
+            break
+          else
+            echo "⚠️  Seeding attempt $attempt failed with HTTP $SEED_HTTP_CODE"
+            if [ $attempt -lt 3 ]; then
+              sleep 5
+            fi
+          fi
+        done
+        if [ "$SEED_SUCCESS" = "false" ]; then
+          echo "⚠️  Database seeding failed after 3 attempts, but continuing..."
+          tail -50 /tmp/backend.log || true
+        fi
+        
+        # Start frontend server
+        echo "Starting frontend server..."
+        cd ../frontend || exit 1
+        NODE_ENV=test yarn web > /tmp/frontend.log 2>&1 &
+        FRONTEND_PID=$!
+        echo $FRONTEND_PID > /tmp/frontend.pid
+        echo "Frontend PID: $FRONTEND_PID"
+        
+        # Wait for frontend to be ready
+        FRONTEND_READY=false
+        i=1
+        while [ $i -le 90 ]; do
+          if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+            echo "❌ Frontend process died"
+            cat /tmp/frontend.log || true
+            exit 1
+          fi
+          if curl -f -s http://localhost:8081 > /dev/null 2>&1; then
+            if curl -f -s http://localhost:8081 | grep -q -i "html\|expo\|react" 2>/dev/null; then
+              echo "✅ Frontend is ready and serving content!"
+              FRONTEND_READY=true
+              break
+            fi
+          fi
+          if [ $i -eq 90 ]; then
+            echo "❌ Frontend failed to start after 180 seconds"
+            tail -100 /tmp/frontend.log || true
+            exit 1
+          fi
+          sleep 2
+          i=$((i + 1))
+        done
+        
+        if [ "$FRONTEND_READY" = "true" ]; then
+          echo "Waiting additional 5 seconds for frontend to fully initialize..."
+          sleep 5
+        fi
+        
+        # Run Playwright tests
+        echo "Running Playwright E2E tests..."
+        export PLAYWRIGHT_HEADLESS=1
+        set +e  # Don't exit on error, we'll handle it
+        NODE_ENV=test npx playwright test --project=chromium --reporter=list > /tmp/playwright-output.log 2>&1
+        PLAYWRIGHT_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show test output
+        cat /tmp/playwright-output.log
+        echo ""
+        echo "Playwright exit code: $PLAYWRIGHT_EXIT_CODE"
+        
+        if [ "$PLAYWRIGHT_EXIT_CODE" -ne 0 ]; then
+          echo "❌❌❌ PLAYWRIGHT TESTS FAILED ❌❌❌"
+          echo "Exit code: $PLAYWRIGHT_EXIT_CODE"
+          echo "=========================================="
+          echo "=== Backend Logs ==="
+          tail -100 /tmp/backend.log || true
+          echo "=========================================="
+          echo "=== Frontend Logs ==="
+          tail -100 /tmp/frontend.log || true
+          echo "=========================================="
+          echo "=== Playwright Output (last 200 lines) ==="
+          tail -200 /tmp/playwright-output.log
+          echo "=========================================="
+          exit $PLAYWRIGHT_EXIT_CODE
+        fi
+        echo "✅✅✅ ALL PLAYWRIGHT TESTS PASSED ✅✅✅"
+
+  post_build:
+    commands:
+      - echo "=========================================="
+      - echo "🧹 CLEANUP"
+      - echo "=========================================="
+      - |
+        # Clean up services
+        if [ -f /tmp/backend.pid ]; then
+          kill $(cat /tmp/backend.pid) 2>/dev/null || true
+        fi
+        if [ -f /tmp/frontend.pid ]; then
+          kill $(cat /tmp/frontend.pid) 2>/dev/null || true
+        fi
+        pkill -f "node.*index.js" 2>/dev/null || true
+        pkill -f "expo start" 2>/dev/null || true
+        docker stop mongodb-test 2>/dev/null || true
+        docker rm mongodb-test 2>/dev/null || true
+      - echo "=========================================="
+      - echo "✅✅✅ ALL TESTS PASSED ✅✅✅"
+      - echo "Unit tests: ✅"
+      - echo "Playwright E2E tests: ✅"
+      - echo "=========================================="
+
+artifacts:
+  files:
+    - '**/unit-tests.log'
+    - '**/playwright-output.log'
+    - '**/backend.log'
+    - '**/frontend.log'
+    - '**/playwright-report/**/*'
+    - '**/test-results/**/*'
+  base-directory: '**'
+  name: TestResults
+
+
