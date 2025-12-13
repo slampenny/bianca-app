@@ -12,12 +12,16 @@ phases:
       - echo "Starting Playwright E2E test setup using Docker containers..."
       - echo "Setting up ECR registry..."
       - |
-        # Construct ECR_REGISTRY from CodeBuild environment variables if not already set
+        # Get AWS account ID from STS if ECR_REGISTRY is not already set
         if [ -z "$ECR_REGISTRY" ]; then
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          if [ -z "$AWS_ACCOUNT_ID" ]; then
+            echo "❌ ERROR: Could not determine AWS Account ID"
+            exit 1
+          fi
           export ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
         fi
         echo "ECR Registry: $ECR_REGISTRY"
-        echo "AWS Account ID: ${AWS_ACCOUNT_ID}"
         echo "AWS Region: ${AWS_DEFAULT_REGION}"
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
