@@ -413,30 +413,30 @@ phases:
         fi
         
         # Create summary file
-        cat > /tmp/playwright-artifacts/run-summary.txt << EOF
-Playwright Test Run Summary
-==========================
-Build ID: ${CODEBUILD_BUILD_ID}
-Build Number: ${CODEBUILD_BUILD_NUMBER}
-Source Version: ${CODEBUILD_SOURCE_VERSION}
-Start Time: ${CODEBUILD_START_TIME}
-Environment: ${NODE_ENV}
-Node Version: $(node --version)
-Yarn Version: $(yarn --version)
-
-Test Execution:
-- Exit Code: ${TEST_EXIT_CODE:-unknown}
-- Frontend: http://localhost:8081
-- Backend: http://localhost:3000
-- MongoDB: mongodb://localhost:27017/bianca-app-test
-
-Artifacts:
-- Playwright Report: playwright-report/index.html
-- Test Results: test-results/
-- Backend Log: backend.log
-- Frontend Log: frontend.log
-- Playwright Output: playwright-output.log
-EOF
+        {
+          echo "Playwright Test Run Summary"
+          echo "=========================="
+          echo "Build ID: ${CODEBUILD_BUILD_ID}"
+          echo "Build Number: ${CODEBUILD_BUILD_NUMBER}"
+          echo "Source Version: ${CODEBUILD_SOURCE_VERSION}"
+          echo "Start Time: ${CODEBUILD_START_TIME}"
+          echo "Environment: ${NODE_ENV}"
+          echo "Node Version: $(node --version)"
+          echo "Yarn Version: $(yarn --version)"
+          echo ""
+          echo "Test Execution:"
+          echo "- Exit Code: ${TEST_EXIT_CODE:-unknown}"
+          echo "- Frontend: http://localhost:8081"
+          echo "- Backend: http://localhost:3000"
+          echo "- MongoDB: mongodb://localhost:27017/bianca-app-test"
+          echo ""
+          echo "Artifacts:"
+          echo "- Playwright Report: playwright-report/index.html"
+          echo "- Test Results: test-results/"
+          echo "- Backend Log: backend.log"
+          echo "- Frontend Log: frontend.log"
+          echo "- Playwright Output: playwright-output.log"
+        } > /tmp/playwright-artifacts/run-summary.txt
         
         # Copy artifacts to frontend directory for CodeBuild artifact collection
         cp -r /tmp/playwright-artifacts/* "$FRONTEND_DIR/" 2>/dev/null || true
