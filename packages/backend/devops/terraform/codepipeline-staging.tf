@@ -296,7 +296,7 @@ resource "aws_codebuild_project" "staging_tests" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "packages/backend/devops/buildspec-production-tests.yml"
+    buildspec = "packages/frontend/devops/buildspec-playwright.yml"
   }
 
   logs_config {
