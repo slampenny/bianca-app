@@ -81,6 +81,40 @@ phases:
           echo "❌ MongoDB failed to start"
           exit 1
         fi
+      - echo "Retrieving secrets from AWS Secrets Manager..."
+      - |
+        # Install jq if not available
+        if ! command -v jq &> /dev/null; then
+          echo "Installing jq..."
+          apt-get update -qq && apt-get install -y -qq jq > /dev/null 2>&1 || yum install -y -q jq > /dev/null 2>&1 || true
+        fi
+        # Retrieve STAGING secrets from AWS Secrets Manager
+        # This uses staging secrets (MySecretsManagerSecret-Staging) which contain test keys
+        SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret-Staging}"
+        echo "Retrieving STAGING secrets from: $SECRET_ID"
+        SECRET_JSON=$(aws secretsmanager get-secret-value --region "$AWS_REGION" --secret-id "$SECRET_ID" --query SecretString --output text 2>&1)
+        if [ $? -ne 0 ] || [ -z "$SECRET_JSON" ] || [ "$SECRET_JSON" = "None" ]; then
+          echo "❌ ERROR: Failed to retrieve secrets from Secrets Manager"
+          echo "Error: $SECRET_JSON"
+          exit 1
+        fi
+        # Parse and export secrets using jq
+        export JWT_SECRET=$(echo "$SECRET_JSON" | jq -r '.JWT_SECRET // empty')
+        export STRIPE_SECRET_KEY=$(echo "$SECRET_JSON" | jq -r '.STRIPE_SECRET_KEY // empty')
+        export STRIPE_PUBLISHABLE_KEY=$(echo "$SECRET_JSON" | jq -r '.STRIPE_PUBLISHABLE_KEY // empty')
+        export OPENAI_API_KEY=$(echo "$SECRET_JSON" | jq -r '.OPENAI_API_KEY // empty')
+        export MFA_ENCRYPTION_KEY=$(echo "$SECRET_JSON" | jq -r '.MFA_ENCRYPTION_KEY // empty')
+        export TWILIO_AUTHTOKEN=$(echo "$SECRET_JSON" | jq -r '.TWILIO_AUTHTOKEN // empty')
+        # Verify required secrets are set
+        if [ -z "$JWT_SECRET" ] || [ "$JWT_SECRET" = "null" ]; then
+          echo "❌ ERROR: JWT_SECRET is not set or is null"
+          exit 1
+        fi
+        if [ -z "$MFA_ENCRYPTION_KEY" ] || [ "$MFA_ENCRYPTION_KEY" = "null" ]; then
+          echo "❌ ERROR: MFA_ENCRYPTION_KEY is not set or is null"
+          exit 1
+        fi
+        echo "✅ Secrets retrieved successfully"
       - echo "Starting backend container..."
       - |
         # Start backend container with test configuration
