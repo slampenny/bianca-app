@@ -41,7 +41,7 @@ const markAlertAsRead = catchAsync(async (req, res) => {
 
 const markAllAsRead = catchAsync(async (req, res) => {
   const { alertIds } = req.body; // Step 1: Extract alertIds from the request body
-  const successfullyMarkedAlerts = []; // To store IDs of successfully marked alerts
+  const successfullyMarkedAlerts = []; // To store successfully marked alerts
 
   for (const alertId of alertIds) {
     // Step 2: Iterate over alertIds
@@ -54,8 +54,8 @@ const markAllAsRead = catchAsync(async (req, res) => {
     }
   }
 
-  // Step 4: Return the IDs of successfully marked alerts
-  res.status(200).json({ successfullyMarkedAlerts });
+  // Step 4: Return the array of successfully marked alerts (frontend expects an array)
+  res.status(200).json(successfullyMarkedAlerts);
 });
 
 const deleteAlert = catchAsync(async (req, res) => {

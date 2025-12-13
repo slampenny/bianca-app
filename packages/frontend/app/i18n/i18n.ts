@@ -26,11 +26,15 @@ const languageModules = {
 }
 
 i18n.fallbacks = true
+i18n.defaultLocale = "en"
 
 // Pre-load English translations immediately so users never see raw keys
+// Use the same translation object for both en and en-US
+// Note: enTranslations is already the default export, so use it directly
+const englishTranslations = enTranslations
 i18n.translations = {
-  en: enTranslations.default,
-  "en-US": enTranslations.default,
+  en: englishTranslations,
+  "en-US": englishTranslations,
 }
 
 const fallbackLocale = "en-US"
@@ -82,7 +86,8 @@ export const initializeLanguage = async () => {
       }
     } else if (savedLanguage === "en" || savedLanguage === "en-US") {
       logger.debug("Using saved English preference")
-      i18n.locale = savedLanguage
+      // Normalize en-US to en for better translation lookup
+      i18n.locale = "en"
       return
     }
   } catch (error) {
@@ -94,9 +99,10 @@ export const initializeLanguage = async () => {
   const systemLocaleTag = systemLocale?.languageTag ?? "en-US"
   logger.debug("System locale detected:", systemLocaleTag)
 
-  if (systemLocaleTag === "en" || systemLocaleTag === "en-US") {
-    logger.debug("System locale is English, using it")
-    i18n.locale = systemLocaleTag
+    if (systemLocaleTag === "en" || systemLocaleTag === "en-US") {
+      logger.debug("System locale is English, using it")
+      // Normalize en-US to en for better translation lookup
+      i18n.locale = "en"
   } else if (Object.prototype.hasOwnProperty.call(i18n.translations, systemLocaleTag)) {
     // if specific locales like en-FI or en-US is available, set it
     logger.debug("Setting language from system locale:", systemLocaleTag)
@@ -168,9 +174,11 @@ export const changeLanguage = async (languageCode: string) => {
 const systemLocale = Localization.getLocales()[0]
 const systemLocaleTag = systemLocale?.languageTag ?? "en-US"
 
+// Normalize en-US to en for translation lookups (i18n-js works better with "en")
 // Set a default locale immediately
 // English translations are already pre-loaded, so users will see English text, not raw keys
-i18n.locale = systemLocaleTag === "en" || systemLocaleTag === "en-US" ? systemLocaleTag : fallbackLocale
+const normalizedLocale = systemLocaleTag === "en" || systemLocaleTag === "en-US" ? "en" : (systemLocaleTag === fallbackLocale ? "en" : fallbackLocale)
+i18n.locale = normalizedLocale
 
 // Initialize language with user preference (async)
 // English is already loaded, so this will just load the user's preferred language if different

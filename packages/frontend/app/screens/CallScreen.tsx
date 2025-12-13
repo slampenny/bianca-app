@@ -11,7 +11,7 @@ import { useGetConversationQuery } from "../services/api/conversationApi"
 import { useGetCallStatusQuery } from "../services/api/callWorkflowApi"
 import { useTheme } from "app/theme/ThemeContext"
 import { logger } from "../utils/logger"
-import { POLLING_INTERVALS, STRINGS } from "../constants"
+import { STRINGS } from "../constants"
 
 export function CallScreen() {
   const dispatch = useDispatch()
@@ -20,7 +20,7 @@ export function CallScreen() {
   const currentConversation = useSelector(getConversation)
   const { colors, isLoading: themeLoading } = useTheme()
 
-  // Use the same call status polling that CallStatusBanner uses (this is working!)
+  // Get call status - no polling (polling only for alerts)
   const { 
     data: callStatusData, 
     error: callStatusError,
@@ -29,12 +29,11 @@ export function CallScreen() {
   } = useGetCallStatusQuery(
     activeCall?.conversationId || '',
     {
-      pollingInterval: POLLING_INTERVALS.CALL_STATUS,
       skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID,
     }
   )
 
-  // Fallback: Try to get full conversation data if call status is working
+  // Get full conversation data if call status is working
   const { 
     data: liveConversationData, 
     error: conversationError,
@@ -43,15 +42,14 @@ export function CallScreen() {
   } = useGetConversationQuery(
     { conversationId: activeCall?.conversationId || '' },
     {
-      pollingInterval: POLLING_INTERVALS.CONVERSATION,
       skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID || !callStatusData,
       // Only try conversation API if call status is working
     }
   )
 
-  // Log call status and conversation polling activity
+  // Log call status and conversation activity
   React.useEffect(() => {
-    logger.debug('💬 CallScreen - Call status polling:', {
+    logger.debug('💬 CallScreen - Call status:', {
       conversationId: activeCall?.conversationId,
       callStatusLoading: isCallStatusLoading,
       callStatusFetching: isCallStatusFetching,
@@ -196,8 +194,8 @@ export function CallScreen() {
       {__DEV__ && (
         <View style={styles.debugContainer}>
           <Text style={styles.debugText}>Debug: activeCall = {JSON.stringify(activeCall, null, 2)}</Text>
-          <Text style={styles.debugText}>Debug: call status polling = {isCallStatusFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
-          <Text style={styles.debugText}>Debug: conversation polling = {isConversationFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
+          <Text style={styles.debugText}>Debug: call status fetching = {isCallStatusFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
+          <Text style={styles.debugText}>Debug: conversation fetching = {isConversationFetching ? 'ACTIVE' : 'INACTIVE'}</Text>
           <Text style={styles.debugText}>Debug: live conversation messages = {conversationToDisplay?.messages?.length || 0}</Text>
           <Text style={styles.debugText}>Debug: using call status data = {!!callStatusData && !liveConversationData ? 'YES' : 'NO'}</Text>
           {(conversationError as any)?.status === 404 && callStatusData && (

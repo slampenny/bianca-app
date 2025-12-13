@@ -23,6 +23,8 @@ export default defineConfig({
   },
   // Capture console logs and errors
   globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
+  // Note: Backend (port 3000) and Frontend (port 8081) servers must be running
+  // Start them with `yarn dev` from the root directory before running tests
   projects: [
     {
       name: 'chromium',

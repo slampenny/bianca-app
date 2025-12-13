@@ -2,7 +2,8 @@ version: 0.2
 
 env:
   variables:
-    NODE_ENV: test
+    # NODE_ENV is set per-phase, not globally
+    # Tests use NODE_ENV=test, but other phases may need different values
     API_BASE_URL: http://localhost:3000/v1
     MONGODB_URL: mongodb://localhost:27017/bianca-app-test
 
@@ -315,5 +316,6 @@ artifacts:
     - '**/test-results/**/*'
   base-directory: '**'
   name: TestResults
+
 
 

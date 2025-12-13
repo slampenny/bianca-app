@@ -129,6 +129,11 @@ async function doInitialization() {
       try {
         etherealTestAccount = await nodemailer.createTestAccount();
         
+        // Log the Ethereal email address so it's visible in logs
+        logger.info(`✅ Ethereal account created! Email: ${etherealTestAccount.user}`);
+        logger.info(`   SMTP: ${etherealTestAccount.smtp.host}:${etherealTestAccount.smtp.port}`);
+        logger.info(`   IMAP: imap.ethereal.email:993`);
+        
         // Ethereal uses STARTTLS on port 587, not SSL on 465
         // Ensure we use the correct configuration
         const smtpConfig = {
@@ -697,6 +702,12 @@ const forceEtherealInitialization = async () => {
   
   // Reinitialize with Ethereal
   await initializeEmailTransport();
+  
+  // Log the Ethereal account details after initialization
+  if (etherealTestAccount) {
+    logger.info(`✅ Ethereal account ready! Email: ${etherealTestAccount.user}`);
+    logger.info(`   Use this email address for testing: ${etherealTestAccount.user}`);
+  }
   
   // Reset the flag after initialization
   forceEthereal = false;

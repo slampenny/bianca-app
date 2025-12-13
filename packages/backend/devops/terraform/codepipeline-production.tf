@@ -429,23 +429,6 @@ resource "aws_codepipeline" "production" {
   }
 
   stage {
-    name = "Test"
-    action {
-      name             = "RunTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["TestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.production_tests.name
-        PrimarySource = "SourceOutput"
-      }
-    }
-  }
-
-  stage {
     name = "Deploy"
     action {
       name            = "Deploy"

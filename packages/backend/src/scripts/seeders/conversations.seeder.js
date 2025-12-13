@@ -1,4 +1,4 @@
-const { Conversation, Message } = require('../../models');
+const { Conversation, Message, Call } = require('../../models');
 const conversationFixture = require('../../../tests/fixtures/conversation.fixture');
 
 /**
@@ -14,7 +14,27 @@ async function addDecliningPatientConversations(patientId) {
   const month1Date = new Date();
   month1Date.setMonth(month1Date.getMonth() - 5);
   
+  // Create Call object first
+  const call1 = new Call({
+    callSid: `TEST_CALL_DECLINING_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    patientId: patientId,
+    callType: 'wellness-check',
+    status: 'completed',
+    callStatus: 'ended',
+    callOutcome: 'answered',
+    startTime: month1Date,
+    endTime: new Date(month1Date.getTime() + 30 * 60 * 1000),
+    callStartTime: month1Date,
+    callEndTime: new Date(month1Date.getTime() + 30 * 60 * 1000),
+    duration: 30,
+    callDuration: 30,
+    cost: 0.30,
+    lineItemId: null
+  });
+  await call1.save();
+  
   const conv1 = new Conversation({
+    callId: call1._id,
     patientId: patientId,
     messages: [],
     history: 'Patient discussing medication management and overall health status.',
@@ -76,7 +96,27 @@ async function addRecentPatientConversations(patientId) {
     convDate.setDate(convDate.getDate() - days);
     convDate.setHours(10, 0, 0, 0);
     
+    // Create Call object first
+    const call = new Call({
+      callSid: `TEST_CALL_RECENT_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+      patientId: patientId,
+      callType: 'wellness-check',
+      status: 'completed',
+      callStatus: 'ended',
+      callOutcome: 'answered',
+      startTime: convDate,
+      endTime: new Date(convDate.getTime() + 25 * 60 * 1000),
+      callStartTime: convDate,
+      callEndTime: new Date(convDate.getTime() + 25 * 60 * 1000),
+      duration: 25,
+      callDuration: 25,
+      cost: 0.25,
+      lineItemId: null
+    });
+    await call.save();
+    
     const conv = new Conversation({
+      callId: call._id,
       patientId: patientId,
       messages: [],
       history: `Recent wellness check conversation from ${days} days ago.`,
@@ -181,7 +221,27 @@ async function addFraudAbuseConversations(patientId) {
   ];
   
   for (let i = 0; i < financialDates.length; i++) {
+    // Create Call object first
+    const call = new Call({
+      callSid: `TEST_CALL_FINANCIAL_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+      patientId: patientId,
+      callType: 'wellness-check',
+      status: 'completed',
+      callStatus: 'ended',
+      callOutcome: 'answered',
+      startTime: financialDates[i],
+      endTime: new Date(financialDates[i].getTime() + 20 * 60 * 1000),
+      callStartTime: financialDates[i],
+      callEndTime: new Date(financialDates[i].getTime() + 20 * 60 * 1000),
+      duration: 20,
+      callDuration: 20,
+      cost: 0.20,
+      lineItemId: null
+    });
+    await call.save();
+    
     const conv = new Conversation({
+      callId: call._id,
       patientId: patientId,
       messages: [],
       history: `Financial exploitation pattern conversation ${i + 1}`,
@@ -225,7 +285,27 @@ async function addFraudAbuseConversations(patientId) {
   ];
   
   for (let i = 0; i < abuseDates.length; i++) {
+    // Create Call object first
+    const call = new Call({
+      callSid: `TEST_CALL_ABUSE_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+      patientId: patientId,
+      callType: 'wellness-check',
+      status: 'completed',
+      callStatus: 'ended',
+      callOutcome: 'answered',
+      startTime: abuseDates[i],
+      endTime: new Date(abuseDates[i].getTime() + 15 * 60 * 1000),
+      callStartTime: abuseDates[i],
+      callEndTime: new Date(abuseDates[i].getTime() + 15 * 60 * 1000),
+      duration: 15,
+      callDuration: 15,
+      cost: 0.15,
+      lineItemId: null
+    });
+    await call.save();
+    
     const conv = new Conversation({
+      callId: call._id,
       patientId: patientId,
       messages: [],
       history: `Physical abuse pattern conversation ${i + 1}`,
@@ -269,7 +349,27 @@ async function addFraudAbuseConversations(patientId) {
   ];
   
   for (let i = 0; i < emotionalDates.length; i++) {
+    // Create Call object first
+    const call = new Call({
+      callSid: `TEST_CALL_EMOTIONAL_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+      patientId: patientId,
+      callType: 'wellness-check',
+      status: 'completed',
+      callStatus: 'ended',
+      callOutcome: 'answered',
+      startTime: emotionalDates[i],
+      endTime: new Date(emotionalDates[i].getTime() + 18 * 60 * 1000),
+      callStartTime: emotionalDates[i],
+      callEndTime: new Date(emotionalDates[i].getTime() + 18 * 60 * 1000),
+      duration: 18,
+      callDuration: 18,
+      cost: 0.18,
+      lineItemId: null
+    });
+    await call.save();
+    
     const conv = new Conversation({
+      callId: call._id,
       patientId: patientId,
       messages: [],
       history: `Emotional abuse pattern conversation ${i + 1}`,
@@ -313,7 +413,27 @@ async function addFraudAbuseConversations(patientId) {
   ];
   
   for (let i = 0; i < neglectDates.length; i++) {
+    // Create Call object first
+    const call = new Call({
+      callSid: `TEST_CALL_NEGLECT_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+      patientId: patientId,
+      callType: 'wellness-check',
+      status: 'completed',
+      callStatus: 'ended',
+      callOutcome: 'answered',
+      startTime: neglectDates[i],
+      endTime: new Date(neglectDates[i].getTime() + 22 * 60 * 1000),
+      callStartTime: neglectDates[i],
+      callEndTime: new Date(neglectDates[i].getTime() + 22 * 60 * 1000),
+      duration: 22,
+      callDuration: 22,
+      cost: 0.22,
+      lineItemId: null
+    });
+    await call.save();
+    
     const conv = new Conversation({
+      callId: call._id,
       patientId: patientId,
       messages: [],
       history: `Neglect pattern conversation ${i + 1}`,
