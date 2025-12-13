@@ -47,7 +47,8 @@ FROM dependencies AS build
 ARG BUILD_TIMESTAMP
 ARG GIT_COMMIT
 # Copy static config files (rarely change)
-COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
+# NOTE: .env files are NOT copied - Docker containers should get config from environment variables only
+COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
 
 # Copy source code (cache will be busted if files change)
 COPY --chown=node:node src/ ./src/

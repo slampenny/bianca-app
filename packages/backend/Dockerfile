@@ -44,7 +44,8 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
 # Build stage - copy source and build if needed
 FROM dependencies AS build
 # Copy static config files (rarely change)
-COPY --chown=node:node .env* .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json docker-compose*.yml ./
+# NOTE: .env files are NOT copied - Docker containers should get config from environment variables only
+COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json docker-compose*.yml ./
 
 # Copy source code
 COPY --chown=node:node src/ ./src/
