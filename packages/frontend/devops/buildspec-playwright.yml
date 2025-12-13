@@ -9,221 +9,84 @@ env:
 phases:
   pre_build:
     commands:
-      - echo "Starting Playwright E2E test setup..."
-      - echo "Installing Node.js 20 using nvm..."
+      - echo "Starting Playwright E2E test setup using Docker containers..."
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - echo "Pulling Docker images from ECR..."
       - |
-        # Install Node.js 20 using nvm (required for weaviate-client)
+        # Pull the staging images that were just built
+        docker pull $ECR_REGISTRY/bianca-app-backend:staging
+        docker pull $ECR_REGISTRY/bianca-app-frontend:staging
+        echo "✅ Docker images pulled successfully"
+      - echo "Installing Node.js 20 for Playwright..."
+      - |
+        # Install Node.js 20 using nvm (needed for Playwright)
         export NVM_DIR="$HOME/.nvm"
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        echo "Installing Node.js 20..."
         nvm install 20
         nvm use 20
-        nvm alias default 20
-        # Verify installation
-        NODE_VER=$(node --version)
-        echo "Node version: $NODE_VER"
-        echo "NPM version: $(npm --version)"
-        if [ -z "$NODE_VER" ] || [ "$(echo "$NODE_VER" | cut -c1-3)" != "v20" ]; then
-          echo "❌ Node.js 20 installation failed or wrong version: $NODE_VER"
+        echo "✅ Node.js 20 installed"
+      - echo "Locating source code for Playwright tests..."
+      - |
+        # Source code is in CODEBUILD_SRC_DIR (from SourceOutput)
+        echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/frontend"
+        if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+          echo "ERROR: Frontend package.json not found"
           exit 1
         fi
-        echo "✅ Node.js 20 installed successfully"
-      - echo "Setting up Yarn versions..."
+        echo "✅ Frontend test code found at: $FRONTEND_DIR"
+        export FRONTEND_DIR="$FRONTEND_DIR"
+      - echo "Installing Playwright dependencies..."
       - |
-        # Both frontend and backend use Yarn 1.22.22
-        # Ensure Node.js 20 is available
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
-        # Install Yarn 1.22.22 globally
-        npm install -g yarn@1.22.22
-        echo "Yarn version: $(yarn --version)"
-        echo "✅ Using Yarn 1.22.22 for both frontend and backend"
-      - echo "Increasing file watcher limit for frontend..."
+        cd "$FRONTEND_DIR" || exit 1
+        # Only install Playwright and its dependencies, not the entire app
+        yarn install --frozen-lockfile --ignore-scripts || true
+        yarn playwright install --with-deps chromium || exit 1
+        echo "✅ Playwright installed"
+      - echo "Starting MongoDB container..."
       - |
-        # Increase inotify file watcher limit (fixes ENOSPC error)
-        echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
-        sudo sysctl -p || true
-      - echo "Installing MongoDB via Docker..."
-      - |
-        # Start MongoDB using Docker (better isolation than installing directly)
         docker run -d --name mongodb-test \
           -p 27017:27017 \
           -e MONGO_INITDB_DATABASE=bianca-app-test \
           mongo:7.0 || echo "MongoDB container may already exist"
-        # Wait for MongoDB to be ready (POSIX-compliant loop)
+        # Wait for MongoDB to be ready
         i=1
         while [ $i -le 30 ]; do
           if docker exec mongodb-test mongosh --eval "db.adminCommand('ping')" 2>/dev/null; then
-            echo "MongoDB is ready!"
+            echo "✅ MongoDB is ready!"
             break
           fi
           sleep 1
           i=$((i + 1))
         done
-      - echo "Locating source artifacts..."
-      - |
-        # CodeBuild extracts multiple artifacts to s3/00, s3/01, etc.
-        # Primary source (FrontendSourceOutput) is in CODEBUILD_SRC_DIR (s3/00)
-        # Secondary source (BackendSourceOutput) is in CODEBUILD_SRC_DIR_BackendSourceOutput (s3/01)
-        echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
-        echo "CODEBUILD_SRC_DIR_BackendSourceOutput: ${CODEBUILD_SRC_DIR_BackendSourceOutput:-not set}"
-        
-        # Frontend is primary source (CODEBUILD_SRC_DIR)
-        FRONTEND_DIR="$CODEBUILD_SRC_DIR"
-        if [ ! -f "$FRONTEND_DIR/package.json" ]; then
-          echo "ERROR: Frontend package.json not found in $FRONTEND_DIR"
-          ls -la "$FRONTEND_DIR" || true
+        if [ $i -gt 30 ]; then
+          echo "❌ MongoDB failed to start"
           exit 1
         fi
-        echo "✅ Frontend found at: $FRONTEND_DIR"
-        
-        # Backend is secondary source
-        S3_DIR=$(dirname "$CODEBUILD_SRC_DIR")
-        BACKEND_DIR="${CODEBUILD_SRC_DIR_BackendSourceOutput:-$S3_DIR/01}"
-        
-        if [ ! -d "$BACKEND_DIR" ] || [ ! -f "$BACKEND_DIR/package.json" ]; then
-          echo "⚠️  Backend not found at $BACKEND_DIR, searching..."
-          ls -la "$S3_DIR/" || true
-          # Try alternative locations
-          for dir in "$S3_DIR/01" "$S3_DIR/00/../01" "$CODEBUILD_SRC_DIR/../01"; do
-            if [ -d "$dir" ] && [ -f "$dir/package.json" ] && [ -f "$dir/src/index.js" ]; then
-              BACKEND_DIR="$dir"
-              echo "✅ Found backend at: $BACKEND_DIR"
-              break
-            fi
-          done
-        else
-          echo "✅ Backend found at: $BACKEND_DIR"
-        fi
-        
-        if [ ! -f "$BACKEND_DIR/src/index.js" ]; then
-          echo "ERROR: Backend source not found or invalid"
-          echo "Searched in: $BACKEND_DIR"
-          ls -la "$BACKEND_DIR" || true
-          exit 1
-        fi
-        
-        # Export for use in build phase
-        export FRONTEND_DIR="$FRONTEND_DIR"
-        export BACKEND_DIR="$BACKEND_DIR"
-        echo "Frontend: $FRONTEND_DIR"
-        echo "Backend: $BACKEND_DIR"
-      - echo "Installing backend dependencies..."
+      - echo "Starting backend container..."
       - |
-        # Ensure Node.js 20 is available (POSIX-compliant syntax)
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        # Try to use Node 20, install if not available
-        nvm use 20 2>/dev/null || {
-          echo "Node 20 not found, installing..."
-          nvm install 20
-          nvm use 20
-        }
-        # Verify Node version (POSIX-compliant)
-        NODE_VERSION=$(node --version)
-        echo "Node version: $NODE_VERSION"
-        case "$NODE_VERSION" in
-          v20.*)
-            echo "✅ Node.js 20 is active"
-            ;;
-          *)
-            echo "❌ Node.js 20 not active, current version: $NODE_VERSION"
-            exit 1
-            ;;
-        esac
-        cd "$BACKEND_DIR" || exit 1
-        echo "Backend directory: $(pwd)"
-        echo "Yarn version: $(yarn --version)"
-        # Backend uses Yarn 1.22.22
-        echo "Installing backend dependencies with Yarn 1..."
-        yarn install --pure-lockfile --frozen-lockfile || {
-          echo "❌ Backend dependency installation failed"
-          exit 1
-        }
-        echo "✅ Backend dependencies installed with Yarn 1"
-      - echo "Installing frontend dependencies (Yarn 1)..."
-      - |
-        # Ensure Node.js 20 is available
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm use 20
-        cd "$FRONTEND_DIR" || exit 1
-        echo "Frontend directory: $(pwd)"
-        echo "Node version: $(node --version)"
-        # Frontend uses Yarn 1.22.22
-        echo "Yarn version in frontend: $(yarn --version)"
-        yarn install --pure-lockfile --frozen-lockfile || exit 1
-      - echo "Installing Playwright browsers..."
-      - |
-        cd "$FRONTEND_DIR" || exit 1
-        yarn playwright install --with-deps chromium || exit 1
-      - echo "Setting up backend environment..."
-      - |
-        cd "$BACKEND_DIR" || exit 1
-        # Secrets are loaded from AWS Secrets Manager via CodeBuild environment variables
-        # No .env file needed - backend reads directly from process.env
-        # Export environment variables for the backend process
-        export MONGODB_URL="$MONGODB_URL"
-        export NODE_ENV="test"
-        export JWT_ACCESS_EXPIRATION_MINUTES=30
-        export JWT_REFRESH_EXPIRATION_DAYS=30
-        export AWS_REGION="${AWS_REGION:-us-east-2}"
-        export AWS_SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret}"
-        # Secrets from Secrets Manager are already in environment via CodeBuild
-        # Just verify they're available
-        echo "Verifying secrets are available from environment variables:"
-        echo "STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:+SET (hidden)}"
-        echo "STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:+SET (hidden)}"
-        echo "JWT_SECRET: ${JWT_SECRET:+SET (hidden)}"
-        echo "OPENAI_API_KEY: ${OPENAI_API_KEY:+SET (hidden)}"
-        echo "MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:+SET (hidden)}"
-        echo "TWILIO_AUTHTOKEN: ${TWILIO_AUTHTOKEN:+SET (hidden)}"
-        if [ -z "$STRIPE_SECRET_KEY" ]; then
-          echo "❌ ERROR: STRIPE_SECRET_KEY is not set!"
-          exit 1
-        fi
-        if [ -z "$JWT_SECRET" ]; then
-          echo "❌ ERROR: JWT_SECRET is not set!"
-          exit 1
-        fi
-        if [ -z "$MFA_ENCRYPTION_KEY" ]; then
-          echo "❌ ERROR: MFA_ENCRYPTION_KEY is not set!"
-          exit 1
-        fi
-        echo "✅ All required secrets are available"
-      - echo "Starting backend server..."
-      - |
-        # Ensure Node.js 20 is available
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm use 20
-        cd "$BACKEND_DIR" || exit 1
-        # Export all environment variables for the backend process
-        # Secrets from Secrets Manager are already available as env vars
-        export MONGODB_URL="$MONGODB_URL"
-        export NODE_ENV="test"
-        export JWT_ACCESS_EXPIRATION_MINUTES=30
-        export JWT_REFRESH_EXPIRATION_DAYS=30
-        export AWS_REGION="${AWS_REGION:-us-east-2}"
-        export AWS_SECRET_ID="${AWS_SECRET_ID:-MySecretsManagerSecret}"
-        # Force Ethereal Mail for test pipeline (don't use real SES - staging uses real email)
-        export FORCE_ETHEREAL="true"
-        # STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, JWT_SECRET, OPENAI_API_KEY,
-        # MFA_ENCRYPTION_KEY, TWILIO_AUTHTOKEN are already in environment from CodeBuild
-        # Ensure they're explicitly exported for the backend process
-        export STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY"
-        export STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY"
-        export JWT_SECRET="$JWT_SECRET"
-        export OPENAI_API_KEY="$OPENAI_API_KEY"
-        export MFA_ENCRYPTION_KEY="$MFA_ENCRYPTION_KEY"
-        export TWILIO_AUTHTOKEN="$TWILIO_AUTHTOKEN"
-        yarn dev:test > /tmp/backend.log 2>&1 &
-        BACKEND_PID=$!
-        echo $BACKEND_PID > /tmp/backend.pid
-        echo "Backend PID: $BACKEND_PID"
-        # Wait for backend to be ready (POSIX-compliant loop)
+        # Start backend container with test configuration
+        # Use host network so backend can access MongoDB on localhost:27017
+        docker run -d --name backend-test \
+          --network host \
+          -e NODE_ENV=test \
+          -e MONGODB_URL=mongodb://localhost:27017/bianca-app-test \
+          -e AWS_REGION="$AWS_REGION" \
+          -e AWS_SECRET_ID="$AWS_SECRET_ID" \
+          -e FORCE_ETHEREAL=true \
+          -e STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+          -e STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
+          -e JWT_SECRET="$JWT_SECRET" \
+          -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+          -e MFA_ENCRYPTION_KEY="$MFA_ENCRYPTION_KEY" \
+          -e TWILIO_AUTHTOKEN="$TWILIO_AUTHTOKEN" \
+          $ECR_REGISTRY/bianca-app-backend:staging
+        # Wait for backend to be ready
         i=1
         while [ $i -le 60 ]; do
           if curl -f http://localhost:3000/health 2>/dev/null; then
@@ -231,9 +94,8 @@ phases:
             break
           fi
           if [ $i -eq 60 ]; then
-            echo "❌ Backend failed to start after 120 seconds"
-            echo "Backend log:"
-            cat /tmp/backend.log || true
+            echo "❌ Backend failed to start"
+            docker logs backend-test || true
             exit 1
           fi
           sleep 2
@@ -241,147 +103,97 @@ phases:
         done
       - echo "Seeding database..."
       - |
-        # Wait a bit more for backend to be fully ready
         sleep 3
-        # Retry seeding up to 3 times
         SEED_SUCCESS=false
         for attempt in 1 2 3; do
           echo "Seeding attempt $attempt..."
           SEED_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/test/seed)
           SEED_HTTP_CODE=$(echo "$SEED_RESPONSE" | tail -n1)
-          SEED_BODY=$(echo "$SEED_RESPONSE" | sed '$d')
           if [ "$SEED_HTTP_CODE" = "200" ]; then
             echo "✅ Database seeded successfully"
-            echo "$SEED_BODY" | head -20
             SEED_SUCCESS=true
             break
           else
             echo "⚠️  Seeding attempt $attempt failed with HTTP $SEED_HTTP_CODE"
-            echo "$SEED_BODY" | head -10
             if [ $attempt -lt 3 ]; then
               sleep 5
             fi
           fi
         done
         if [ "$SEED_SUCCESS" = "false" ]; then
-          echo "❌ Database seeding failed after 3 attempts, but continuing..."
-          echo "Backend log (last 50 lines):"
-          tail -50 /tmp/backend.log || true
+          echo "⚠️  Database seeding failed, but continuing..."
+          docker logs backend-test | tail -50 || true
         fi
-      - echo "Starting frontend server..."
+      - echo "Starting frontend container..."
       - |
-        # Ensure Node.js 20 is available
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm use 20
-        cd "$FRONTEND_DIR" || exit 1
-        NODE_ENV=test yarn web > /tmp/frontend.log 2>&1 &
-        FRONTEND_PID=$!
-        echo $FRONTEND_PID > /tmp/frontend.pid
-        echo "Frontend PID: $FRONTEND_PID"
-        # Wait for frontend to be ready with more robust checks (POSIX-compliant loop)
+        # Start frontend container
+        # Use host network so frontend can access backend on localhost:3000
+        docker run -d --name frontend-test \
+          --network host \
+          -e NODE_ENV=test \
+          -e API_BASE_URL=http://localhost:3000/v1 \
+          $ECR_REGISTRY/bianca-app-frontend:staging
+        # Wait for frontend to be ready
         FRONTEND_READY=false
         i=1
         while [ $i -le 90 ]; do
-          # Check if process is still running
-          if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-            echo "❌ Frontend process died"
-            echo "Frontend log:"
-            cat /tmp/frontend.log || true
-            exit 1
-          fi
-          # Check if frontend is responding
           if curl -f -s http://localhost:8081 > /dev/null 2>&1; then
-            # Additional check: verify it's actually serving content
             if curl -f -s http://localhost:8081 | grep -q -i "html\|expo\|react" 2>/dev/null; then
-              echo "✅ Frontend is ready and serving content!"
+              echo "✅ Frontend is ready!"
               FRONTEND_READY=true
               break
             fi
           fi
           if [ $i -eq 90 ]; then
-            echo "❌ Frontend failed to start after 180 seconds"
-            echo "Frontend log (last 100 lines):"
-            tail -100 /tmp/frontend.log || true
-            echo "Checking if port 8081 is in use:"
-            netstat -tuln | grep 8081 || true
+            echo "❌ Frontend failed to start"
+            docker logs frontend-test || true
             exit 1
           fi
           sleep 2
           i=$((i + 1))
         done
-        # Give frontend a bit more time to fully initialize
         if [ "$FRONTEND_READY" = "true" ]; then
-          echo "Waiting additional 5 seconds for frontend to fully initialize..."
+          echo "Waiting 5 seconds for frontend to fully initialize..."
           sleep 5
         fi
 
   build:
     commands:
-      - echo "Running Playwright E2E tests..."
+      - echo "Running Playwright E2E tests against Docker containers..."
       - |
         # Ensure Node.js 20 is available
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
         # Re-export variables (they may not persist from pre_build)
-        S3_DIR=$(dirname "$CODEBUILD_SRC_DIR")
-        FRONTEND_DIR="$CODEBUILD_SRC_DIR"
-        BACKEND_DIR="${CODEBUILD_SRC_DIR_BackendSourceOutput:-$S3_DIR/01}"
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/frontend"
+        export FRONTEND_DIR="$FRONTEND_DIR"
         
-        echo "Frontend dir: $FRONTEND_DIR"
-        echo "Backend dir: $BACKEND_DIR"
+        echo "Frontend test code: $FRONTEND_DIR"
         echo "Node version: $(node --version)"
         cd "$FRONTEND_DIR" || exit 1
-        # Debug: Check what environment variables might affect Playwright
-        echo "=== Environment Debug ==="
-        echo "All CODEBUILD_* variables:"
-        env | grep "^CODEBUILD_" || echo "No CODEBUILD vars"
-        echo "All CI-related variables:"
-        env | grep -i "ci\|headed\|playwright" || echo "No CI-related vars"
-        echo "Current working directory: $(pwd)"
-        echo "Node path: $(which node)"
-        echo "Npx path: $(which npx)"
-        echo "========================"
-        # Ensure CI environment doesn't add invalid --headed=false flag
-        # Playwright doesn't accept --headed=false, only --headed or omit it
-        # CodeBuild automatically sets CI=true, which might trigger some tooling
-        # Unset all possible environment variables that might add invalid flags
-        unset PLAYWRIGHT_HEADED
-        unset HEADED
-        unset PLAYWRIGHT_BROWSERS_PATH
-        # Don't unset CI as it's needed, but ensure it doesn't add flags
-        # Explicitly set headless mode via environment (Playwright respects this)
-        export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
-        # Ensure we're using the config file's headless setting, not any env var
+        
+        # Set headless mode
         export PLAYWRIGHT_HEADLESS=1
-        # Run tests directly - ensure we're in the right directory and playwright is available
-        echo "Running Playwright tests in headless mode..."
-        echo "Current directory: $(pwd)"
-        echo "Playwright version check:"
-        npx playwright --version || echo "Playwright not found via npx"
-        # Run the test command - Playwright config already has headless: true
-        # Do NOT pass any --headed flag at all (neither true nor false)
-        # CodeBuild sets CI=true automatically, which is fine
-        echo "Executing: NODE_ENV=test npx playwright test --project=chromium --reporter=list"
-        echo "Full command that will run:"
-        echo "  NODE_ENV=test npx playwright test --project=chromium --reporter=list"
-        # Use explicit command execution to avoid any shell aliases or wrappers
-        # Capture exit code properly - run without pipe to get real exit code
+        
+        # Run Playwright tests
+        echo "Running Playwright tests against containers..."
         set +e  # Don't exit on error, we'll handle it
         NODE_ENV=test npx playwright test --project=chromium --reporter=list > /tmp/playwright-output.log 2>&1
         TEST_EXIT_CODE=$?
         set -e  # Re-enable exit on error
+        
         # Show output
         cat /tmp/playwright-output.log
         echo ""
         echo "Playwright exit code: $TEST_EXIT_CODE"
+        
         if [ "$TEST_EXIT_CODE" -ne 0 ]; then
           echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
-          echo "=== Backend Logs ==="
-          tail -100 /tmp/backend.log || true
-          echo "=== Frontend Logs ==="
-          tail -100 /tmp/frontend.log || true
+          echo "=== Backend Container Logs ==="
+          docker logs backend-test --tail 100 || true
+          echo "=== Frontend Container Logs ==="
+          docker logs frontend-test --tail 100 || true
           exit $TEST_EXIT_CODE
         fi
         echo "✅ All tests passed!"
@@ -401,13 +213,9 @@ phases:
           cp -r "$FRONTEND_DIR/test-results" /tmp/playwright-artifacts/ || true
         fi
         
-        # Copy all logs
-        if [ -f /tmp/backend.log ]; then
-          cp /tmp/backend.log /tmp/playwright-artifacts/backend.log || true
-        fi
-        if [ -f /tmp/frontend.log ]; then
-          cp /tmp/frontend.log /tmp/playwright-artifacts/frontend.log || true
-        fi
+        # Copy container logs
+        docker logs backend-test > /tmp/playwright-artifacts/backend.log 2>&1 || true
+        docker logs frontend-test > /tmp/playwright-artifacts/frontend.log 2>&1 || true
         if [ -f /tmp/playwright-output.log ]; then
           cp /tmp/playwright-output.log /tmp/playwright-artifacts/playwright-output.log || true
         fi
@@ -443,18 +251,10 @@ phases:
         
         echo "✅ Artifacts collected"
         ls -la /tmp/playwright-artifacts/ || true
-      - echo "Cleaning up services..."
+      - echo "Cleaning up Docker containers..."
       - |
-        if [ -f /tmp/backend.pid ]; then
-          kill $(cat /tmp/backend.pid) 2>/dev/null || true
-        fi
-        if [ -f /tmp/frontend.pid ]; then
-          kill $(cat /tmp/frontend.pid) 2>/dev/null || true
-        fi
-        pkill -f "node.*index.js" 2>/dev/null || true
-        pkill -f "expo start" 2>/dev/null || true
-        docker stop mongodb-test 2>/dev/null || true
-        docker rm mongodb-test 2>/dev/null || true
+        docker stop backend-test frontend-test mongodb-test 2>/dev/null || true
+        docker rm backend-test frontend-test mongodb-test 2>/dev/null || true
       - echo "Test run completed"
 
 artifacts:
