@@ -197,8 +197,7 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
           "codebuild:BatchGetBuilds"
         ]
         Resource = [
-          aws_codebuild_project.production_build.arn,
-          aws_codebuild_project.production_tests.arn
+          aws_codebuild_project.production_build.arn
         ]
       },
       {
@@ -222,8 +221,7 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
         Effect   = "Allow"
         Action   = "iam:PassRole"
         Resource = [
-          aws_iam_role.codebuild_production_role.arn,
-          aws_iam_role.codebuild_production_tests_role.arn
+          aws_iam_role.codebuild_production_role.arn
         ]
         Condition = {
           StringEqualsIfExists = {
