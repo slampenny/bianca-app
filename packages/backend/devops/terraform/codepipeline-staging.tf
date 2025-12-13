@@ -293,7 +293,7 @@ resource "aws_codebuild_project" "staging_tests" {
       name  = "API_BASE_URL"
       value = "http://localhost:3000/v1"
     }
-    # Staging secrets - backend will load from AWS Secrets Manager at runtime
+    # Staging secrets - inject directly from AWS Secrets Manager
     environment_variable {
       name  = "AWS_SECRET_ID"
       value = "MySecretsManagerSecret-Staging"
@@ -305,6 +305,37 @@ resource "aws_codebuild_project" "staging_tests" {
     environment_variable {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+    }
+    # Inject secrets from Secrets Manager (CodeBuild handles permissions automatically)
+    environment_variable {
+      name  = "JWT_SECRET"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:JWT_SECRET::"
+    }
+    environment_variable {
+      name  = "STRIPE_SECRET_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:STRIPE_SECRET_KEY::"
+    }
+    environment_variable {
+      name  = "STRIPE_PUBLISHABLE_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:STRIPE_PUBLISHABLE_KEY::"
+    }
+    environment_variable {
+      name  = "OPENAI_API_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:OPENAI_API_KEY::"
+    }
+    environment_variable {
+      name  = "MFA_ENCRYPTION_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:MFA_ENCRYPTION_KEY::"
+    }
+    environment_variable {
+      name  = "TWILIO_AUTHTOKEN"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:TWILIO_AUTHTOKEN::"
     }
   }
 
