@@ -74,6 +74,7 @@ router.get('/service-status', auth(), async (req, res) => {
       hasTransport: emailStatus.hasTransport,
       environment: emailStatus.environment,
       etherealAvailable: !!emailStatus.etherealAccount,
+      etherealEmail: emailStatus.etherealAccount?.user || null, // Show the actual Ethereal email address
       fromAddress: emailStatus.fromAddress,
     };
   } catch (err) {
@@ -333,12 +334,27 @@ router.post('/get-email', async (req, res) => {
     // Retrieve email from Ethereal
     // Note: retrieveLastEmail signature is (recipientEmail, timeoutMs)
     // If waitForEmail is true, we'll poll with the timeout
-    const emailData = await etherealEmailRetriever.retrieveLastEmail(email, waitForEmail ? maxWaitMs : 5000);
+    let emailData;
+    try {
+      emailData = await etherealEmailRetriever.retrieveLastEmail(email, waitForEmail ? maxWaitMs : 5000);
+    } catch (retrieveError) {
+      // Handle "no emails found" as a 404, not a 500 error
+      if (retrieveError.message && retrieveError.message.includes('No emails found')) {
+        return res.status(404).json({ 
+          success: false,
+          error: 'No emails found in inbox',
+          message: 'Email not found in Ethereal inbox. It may not have been sent yet or may have been delayed.'
+        });
+      }
+      // Re-throw other errors to be handled by outer catch
+      throw retrieveError;
+    }
     
     if (!emailData) {
       return res.status(404).json({ 
         success: false,
-        message: 'Email not found' 
+        error: 'Email not found',
+        message: 'Email not found in Ethereal inbox'
       });
     }
 
@@ -1137,6 +1153,302 @@ router.post('/emergency-processor', async (req, res) => {
       success: false,
       error: error.message,
       stack: config.env === 'development' || config.env === 'staging' ? error.stack : undefined
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /test/get-caregiver-by-email:
+ *   post:
+ *     summary: Get caregiver by email (test only)
+ *     description: Returns caregiver data including patients for testing (development/test only)
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 description: Email of the caregiver to retrieve
+ *     responses:
+ *       "200":
+ *         description: Caregiver found
+ *       "404":
+ *         description: Caregiver not found
+ *       "500":
+ *         description: Error retrieving caregiver
+ */
+router.post('/get-caregiver-by-email', async (req, res) => {
+  try {
+    // Only allow in development/test environments
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'This endpoint is not available in production' });
+    }
+
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    if (!caregiverService) {
+      return res.status(503).json({ error: 'Caregiver service not available' });
+    }
+
+    // Find caregiver by email with patients and org populated
+    const caregiver = await caregiverService.getCaregiverByEmail(email, {
+      populatePatients: true,
+      populateOrg: true,
+    });
+    if (!caregiver) {
+      return res.status(404).json({ error: 'Caregiver not found' });
+    }
+
+    res.json(caregiver);
+  } catch (error) {
+    logger.error('Error getting caregiver by email:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /test/create-alert:
+ *   post:
+ *     summary: Create alert for testing (test only)
+ *     description: Creates an alert for testing purposes (development/test only)
+ *     tags: [Test]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - caregiverId
+ *               - message
+ *             properties:
+ *               caregiverId:
+ *                 type: string
+ *                 description: ID of the caregiver to create alert for
+ *               message:
+ *                 type: string
+ *                 description: Alert message
+ *               importance:
+ *                 type: string
+ *                 enum: [low, medium, high, urgent]
+ *                 description: Alert importance level
+ *               alertType:
+ *                 type: string
+ *                 enum: [patient, system, conversation, schedule]
+ *                 description: Type of alert
+ *               relatedPatient:
+ *                 type: string
+ *                 description: ID of related patient (if alertType is patient)
+ *     responses:
+ *       "200":
+ *         description: Alert created successfully
+ *       "400":
+ *         description: Invalid request
+ *       "500":
+ *         description: Error creating alert
+ */
+router.post('/create-alert', async (req, res) => {
+  try {
+    // Only allow in development/test environments
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'This endpoint is not available in production' });
+    }
+
+    const { caregiverId, message, importance = 'medium', alertType = 'system', relatedPatient, visibility = 'allCaregivers', relevanceUntil } = req.body;
+    
+    if (!caregiverId || !message) {
+      return res.status(400).json({ error: 'caregiverId and message are required' });
+    }
+
+    const alertService = require('../../services/alert.service');
+    
+    const alertData = {
+      createdBy: caregiverId, // The caregiver creating the alert
+      createdModel: 'Caregiver', // Alerts created via test endpoint are from Caregiver
+      message,
+      importance,
+      alertType,
+      visibility: visibility || 'allCaregivers', // Default visibility for test alerts
+      relatedPatient,
+      readBy: [],
+      relevanceUntil: relevanceUntil ? new Date(relevanceUntil) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to 7 days from now
+    };
+
+    if (relatedPatient) {
+      alertData.relatedPatient = relatedPatient;
+    }
+
+    const alert = await alertService.createAlert(alertData);
+    
+    res.json(alert);
+  } catch (error) {
+    logger.error('Error creating alert:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /test/get-ethereal-account:
+ *   get:
+ *     summary: Get Ethereal email account details (test only)
+ *     description: Returns the Ethereal test email account details including email address and credentials
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: Ethereal account details
+ *       "404":
+ *         description: Ethereal account not available
+ */
+router.get('/get-ethereal-account', async (req, res) => {
+  try {
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'This endpoint is not available in production' });
+    }
+
+    const emailService = require('../../services/email.service');
+    const emailStatus = emailService.getStatus();
+    
+    if (!emailStatus.etherealAccount) {
+      // Try to force initialization
+      try {
+        await emailService.forceEtherealInitialization();
+        const newStatus = emailService.getStatus();
+        if (!newStatus.etherealAccount) {
+          return res.status(404).json({ 
+            success: false,
+            error: 'Ethereal account not available',
+            message: 'Ethereal account could not be initialized. Check logs for details.'
+          });
+        }
+        // Return the newly created account
+        return res.json({
+          success: true,
+          account: {
+            email: newStatus.etherealAccount.user,
+            smtp: {
+              host: newStatus.etherealAccount.host,
+              port: newStatus.etherealAccount.smtp?.port || 587
+            },
+            imap: newStatus.etherealAccount.imap
+          }
+        });
+      } catch (initError) {
+        return res.status(500).json({ 
+          success: false,
+          error: `Failed to initialize Ethereal: ${initError.message}`
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      account: {
+        email: emailStatus.etherealAccount.user,
+        smtp: {
+          host: emailStatus.etherealAccount.host,
+          port: emailStatus.etherealAccount.smtp?.port || 587
+        },
+        imap: emailStatus.etherealAccount.imap
+      }
+    });
+  } catch (err) {
+    logger.error('Error getting Ethereal account:', err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /test/get-ethereal-account:
+ *   get:
+ *     summary: Get Ethereal email account details (test only)
+ *     description: Returns the Ethereal test email account details including email address
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: Ethereal account details
+ *       "404":
+ *         description: Ethereal account not available
+ */
+router.get('/get-ethereal-account', async (req, res) => {
+  try {
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'This endpoint is not available in production' });
+    }
+
+    const emailService = require('../../services/email.service');
+    const emailStatus = emailService.getStatus();
+    
+    if (!emailStatus.etherealAccount) {
+      // Try to force initialization
+      try {
+        await emailService.forceEtherealInitialization();
+        const newStatus = emailService.getStatus();
+        if (!newStatus.etherealAccount) {
+          return res.status(404).json({ 
+            success: false,
+            error: 'Ethereal account not available',
+            message: 'Ethereal account could not be initialized. Check logs for details.'
+          });
+        }
+        // Return the newly created account
+        return res.json({
+          success: true,
+          account: {
+            email: newStatus.etherealAccount.user,
+            smtp: {
+              host: newStatus.etherealAccount.host,
+              port: newStatus.etherealAccount.smtp?.port || 587
+            },
+            imap: newStatus.etherealAccount.imap
+          }
+        });
+      } catch (initError) {
+        return res.status(500).json({ 
+          success: false,
+          error: `Failed to initialize Ethereal: ${initError.message}`
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      account: {
+        email: emailStatus.etherealAccount.user,
+        smtp: {
+          host: emailStatus.etherealAccount.host,
+          port: emailStatus.etherealAccount.smtp?.port || 587
+        },
+        imap: emailStatus.etherealAccount.imap
+      }
+    });
+  } catch (err) {
+    logger.error('Error getting Ethereal account:', err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
     });
   }
 });

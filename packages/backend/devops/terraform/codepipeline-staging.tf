@@ -196,7 +196,10 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
           "codebuild:StopBuild",
           "codebuild:BatchGetBuilds"
         ]
-        Resource = aws_codebuild_project.staging_build.arn
+        Resource = [
+          aws_codebuild_project.staging_build.arn,
+          aws_codebuild_project.staging_tests.arn
+        ]
       },
       {
         Effect = "Allow"
@@ -245,6 +248,71 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
 }
 
 ################################################################################
+# CODEBUILD PROJECT FOR TESTS (STAGING)
+################################################################################
+
+resource "aws_codebuild_project" "staging_tests" {
+  name         = "bianca-staging-tests"
+  description  = "Runs unit tests and Playwright E2E tests for staging pipeline"
+  service_role = aws_iam_role.codebuild_staging_role.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_MEDIUM"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "NODE_ENV"
+      value = "test"
+    }
+    environment_variable {
+      name  = "MONGODB_URL"
+      value = "mongodb://localhost:27017/bianca-app-test"
+    }
+    environment_variable {
+      name  = "API_BASE_URL"
+      value = "http://localhost:3000/v1"
+    }
+    # Staging secrets - backend will load from AWS Secrets Manager at runtime
+    environment_variable {
+      name  = "AWS_SECRET_ID"
+      value = "MySecretsManagerSecret-Staging"
+    }
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.aws_region
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/backend/devops/buildspec-production-tests.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-staging-tests"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-staging-tests"
+    Environment = "staging"
+  }
+}
+
+################################################################################
 # CODEPIPELINE FOR STAGING
 ################################################################################
 
@@ -289,6 +357,22 @@ resource "aws_codepipeline" "staging" {
         ProjectName   = aws_codebuild_project.staging_build.name
         PrimarySource = "SourceOutput"
       }
+      run_order = 1
+    }
+    # Tests run in parallel with Build (same run_order) - doesn't block deployment
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_tests.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1  # Same as Build - runs in parallel, doesn't block Deploy
     }
   }
 
@@ -305,6 +389,7 @@ resource "aws_codepipeline" "staging" {
         ApplicationName     = aws_codedeploy_app.staging.name
         DeploymentGroupName = aws_codedeploy_deployment_group.staging.deployment_group_name
       }
+      run_order = 1  # Only depends on Build, not Tests - can deploy immediately
     }
   }
 
