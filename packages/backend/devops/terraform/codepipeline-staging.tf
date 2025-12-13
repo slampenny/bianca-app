@@ -292,6 +292,10 @@ resource "aws_codebuild_project" "staging_tests" {
       name  = "AWS_REGION"
       value = var.aws_region
     }
+    environment_variable {
+      name  = "ECR_REGISTRY"
+      value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+    }
   }
 
   source {
@@ -359,21 +363,6 @@ resource "aws_codepipeline" "staging" {
       }
       run_order = 1
     }
-    # Tests run in parallel with Build (same run_order) - doesn't block deployment
-    action {
-      name             = "RunTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput"]
-      output_artifacts = ["TestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.staging_tests.name
-        PrimarySource = "SourceOutput"
-      }
-      run_order = 1  # Same as Build - runs in parallel, doesn't block Deploy
-    }
   }
 
   stage {
@@ -389,7 +378,23 @@ resource "aws_codepipeline" "staging" {
         ApplicationName     = aws_codedeploy_app.staging.name
         DeploymentGroupName = aws_codedeploy_deployment_group.staging.deployment_group_name
       }
-      run_order = 1  # Only depends on Build, not Tests - can deploy immediately
+      run_order = 1
+    }
+    # Tests run in parallel with Deploy (same run_order) - doesn't block deployment
+    # Tests use Docker containers from build stage for faster, more accurate testing
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_tests.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1  # Same as Deploy - runs in parallel, doesn't block deployment
     }
   }
 
