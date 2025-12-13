@@ -154,18 +154,23 @@ phases:
       - echo "Starting frontend container..."
       - |
         # Start frontend container
-        # Use host network so frontend can access backend on localhost:3000
+        # Map container port 80 to host port 8081 (tests expect 8081)
+        # Frontend needs to access backend on host's localhost:3000
+        # Use host.docker.internal or host IP to reach backend from container
+        HOST_IP=$(ip route | grep default | awk '{print $3}' | head -1 || echo "172.17.0.1")
+        echo "Host IP for backend access: $HOST_IP"
         docker run -d --name frontend-test \
-          --network host \
+          -p 8081:80 \
           -e NODE_ENV=test \
-          -e API_BASE_URL=http://localhost:3000/v1 \
+          -e API_BASE_URL=http://${HOST_IP}:3000/v1 \
           $ECR_REGISTRY/bianca-app-frontend:staging
         # Wait for frontend to be ready
         FRONTEND_READY=false
         i=1
         while [ $i -le 90 ]; do
           if curl -f -s http://localhost:8081 > /dev/null 2>&1; then
-            if curl -f -s http://localhost:8081 | grep -q -i "html\|expo\|react" 2>/dev/null; then
+            RESPONSE=$(curl -s http://localhost:8081)
+            if echo "$RESPONSE" | grep -q -i "html\|expo\|react\|root\|div" 2>/dev/null; then
               echo "✅ Frontend is ready!"
               FRONTEND_READY=true
               break
@@ -173,7 +178,12 @@ phases:
           fi
           if [ $i -eq 90 ]; then
             echo "❌ Frontend failed to start"
+            echo "Checking container status..."
+            docker ps -a | grep frontend-test || true
+            echo "Container logs:"
             docker logs frontend-test || true
+            echo "Testing port 8081:"
+            curl -v http://localhost:8081 2>&1 | head -20 || true
             exit 1
           fi
           sleep 2
