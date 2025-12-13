@@ -128,6 +128,46 @@ phases:
           sleep 2
           i=$((i + 1))
         done
+      - echo "Verifying backend environment configuration..."
+      - |
+        # Check backend logs for environment
+        echo "=== Backend Environment Verification ==="
+        docker logs backend-test 2>&1 | grep -i "environment\|env:" | head -5 || echo "No environment log found"
+        # Verify NODE_ENV is set correctly in container
+        CONTAINER_NODE_ENV=$(docker exec backend-test printenv NODE_ENV 2>/dev/null || echo "NOT_SET")
+        echo "NODE_ENV in container: $CONTAINER_NODE_ENV"
+        # Check health endpoint for environment
+        HEALTH_RESPONSE=$(curl -s http://localhost:3000/health 2>/dev/null || echo "{}")
+        BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | grep -o '"environment":"[^"]*"' | cut -d'"' -f4 || echo "UNKNOWN")
+        echo "Backend config.env from /health: $BACKEND_ENV"
+        # Verify environment is correct
+        if [ "$CONTAINER_NODE_ENV" != "test" ] || [ "$BACKEND_ENV" != "test" ]; then
+          echo "❌ ERROR: Backend is not in test mode!"
+          echo "  Container NODE_ENV: $CONTAINER_NODE_ENV"
+          echo "  Backend config.env: $BACKEND_ENV"
+          echo "This will cause:"
+          echo "  - Test routes to be blocked (403)"
+          echo "  - Rate limiting to be enabled (429 errors)"
+          echo "Backend logs (last 50 lines):"
+          docker logs backend-test --tail 50 || true
+          exit 1
+        fi
+        echo "✅ Backend is confirmed to be in test mode"
+        # Test if test routes are accessible (should not return 403 in test mode)
+        TEST_ROUTE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3000/v1/test/clean 2>/dev/null || echo "000")
+        echo "Test route /test/clean status: $TEST_ROUTE_STATUS"
+        if [ "$TEST_ROUTE_STATUS" = "403" ]; then
+          echo "❌ ERROR: Test routes are blocked (403) even though environment is test!"
+          echo "This suggests a code issue, not an environment variable issue."
+          echo "Backend logs (last 50 lines):"
+          docker logs backend-test --tail 50 || true
+          exit 1
+        elif [ "$TEST_ROUTE_STATUS" = "200" ] || [ "$TEST_ROUTE_STATUS" = "500" ]; then
+          echo "✅ Test routes are accessible (status $TEST_ROUTE_STATUS)"
+        else
+          echo "⚠️  Test route returned unexpected status: $TEST_ROUTE_STATUS"
+        fi
+        echo "========================================"
       - echo "Seeding database..."
       - |
         sleep 3
@@ -156,9 +196,27 @@ phases:
         # Start frontend container
         # Map container port 80 to host port 8081 (tests expect 8081)
         # Frontend needs to access backend on host's localhost:3000
-        # Use host.docker.internal or host IP to reach backend from container
-        HOST_IP=$(ip route | grep default | awk '{print $3}' | head -1 || echo "172.17.0.1")
+        # Backend uses --network host, so it's on the host network
+        # Get host IP from Docker bridge network gateway
+        HOST_IP=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "")
+        # Fallback: try to get from ip route if Docker inspect fails
+        if [ -z "$HOST_IP" ] || [ "$HOST_IP" = "172.17.0.1" ]; then
+          # More robust method: get default gateway IP
+          HOST_IP=$(ip -4 route show default | grep -Po 'via \K\S+' 2>/dev/null || echo "")
+        fi
+        # Final fallback
+        if [ -z "$HOST_IP" ]; then
+          HOST_IP=$(ip route | grep default | awk '{print $3}' | head -1 || echo "172.17.0.1")
+        fi
+        # If still empty, use default
+        if [ -z "$HOST_IP" ]; then
+          HOST_IP="172.17.0.1"
+        fi
         echo "Host IP for backend access: $HOST_IP"
+        # Test if we can reach backend from host first
+        if ! curl -f -s http://localhost:3000/health > /dev/null 2>&1; then
+          echo "⚠️  Warning: Backend health check failed from host, but continuing..."
+        fi
         docker run -d --name frontend-test \
           -p 8081:80 \
           -e NODE_ENV=test \
