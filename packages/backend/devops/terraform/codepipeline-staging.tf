@@ -138,6 +138,16 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           "ec2:DescribeInstanceInformation"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-Staging-*"
+        ]
       }
     ]
   })
