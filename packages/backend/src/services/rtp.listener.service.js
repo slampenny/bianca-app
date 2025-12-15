@@ -160,8 +160,8 @@ class RtpListener {
             }
             this.lastSequenceNumber = rtpPacket.sequenceNumber;
             
-            // Apply noise reduction processing (Stage 1: Noise Gate)
-            const processedPayload = noiseReductionService.processAudio(rtpPacket.payload, this.callId);
+            // Apply noise reduction processing (all enabled stages)
+            const processedPayload = await noiseReductionService.processAudio(rtpPacket.payload, this.callId);
             
             // Buffer the processed audio payload for OpenAI
             this.audioBuffer = Buffer.concat([this.audioBuffer, processedPayload]);

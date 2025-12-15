@@ -943,13 +943,13 @@ class OpenAIRealtimeService {
         input_audio_format: 'g711_ulaw',
         output_audio_format: 'g711_ulaw',
 
-        // CRITICAL: Add turn detection - optimized for faster response and natural interruptions
-        // Reduced delays for more conversational feel
+        // CRITICAL: Add turn detection - optimized for noisy environments
+        // Longer silence duration and padding help in noisy rooms to avoid false positives
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.6,              // More selective (ignores quiet background)
-          prefix_padding_ms: 200,      // Reduced from 300ms - faster speech start detection
-          silence_duration_ms: 500     // Reduced from 1000ms - faster response after user stops speaking
+          threshold: 0.6,              // More selective (ignores quiet background noise)
+          prefix_padding_ms: 300,      // Increased to 300ms - better capture of speech starts in noise
+          silence_duration_ms: 1000   // Increased to 1000ms - wait longer to confirm speech end in noisy environments
         },
 
         // Add input transcription for debugging

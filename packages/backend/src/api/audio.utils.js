@@ -228,6 +228,50 @@ class AudioUtils {
     }
 
     /**
+     * Simple but effective high-pass filter using windowed sinc
+     * High-pass filter = original signal - low-pass filtered signal
+     * @private
+     */
+    static applyHighPassFilter(samples, cutoffRatio) {
+        // High-pass = original - low-pass
+        const lowPassed = this.applyLowPassFilter(samples, cutoffRatio);
+        const highPassed = new Float32Array(samples.length);
+        
+        for (let i = 0; i < samples.length; i++) {
+            highPassed[i] = samples[i] - lowPassed[i];
+        }
+        
+        return highPassed;
+    }
+
+    /**
+     * Apply band-pass filter (high-pass + low-pass) to focus on speech frequencies
+     * @param {Float32Array} samples - PCM samples as Float32Array
+     * @param {number} sampleRate - Sample rate in Hz (default: 8000 for telephone)
+     * @param {number} lowCutoff - Low frequency cutoff in Hz (default: 300Hz for speech)
+     * @param {number} highCutoff - High frequency cutoff in Hz (default: 3400Hz for speech)
+     * @returns {Float32Array} Filtered samples
+     */
+    static applyBandPassFilter(samples, sampleRate = 8000, lowCutoff = 300, highCutoff = 3400) {
+        if (!samples || samples.length === 0) {
+            return samples;
+        }
+        
+        // Convert Hz to normalized frequency (0-1, where 1 = Nyquist = sampleRate/2)
+        const nyquist = sampleRate / 2;
+        const lowCutoffRatio = Math.min(lowCutoff / nyquist, 0.99); // Cap at 0.99 to avoid issues
+        const highCutoffRatio = Math.min(highCutoff / nyquist, 0.99);
+        
+        // Apply high-pass filter first (remove low frequencies)
+        let filtered = this.applyHighPassFilter(samples, lowCutoffRatio);
+        
+        // Then apply low-pass filter (remove high frequencies)
+        filtered = this.applyLowPassFilter(filtered, highCutoffRatio);
+        
+        return filtered;
+    }
+
+    /**
      * Original linear interpolation method (renamed, used for downsampling)
      * @private
      */
