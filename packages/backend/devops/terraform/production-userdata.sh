@@ -115,8 +115,8 @@ SECRET_VALUE=$(aws secretsmanager get-secret-value --region ${region} --secret-i
 ARI_PASSWORD=$(echo $SECRET_VALUE | jq -r .ARI_PASSWORD)
 BIANCA_PASSWORD=$(echo $SECRET_VALUE | jq -r .BIANCA_PASSWORD)
 
-# Create docker compose.yml - Asterisk passwords loaded from Secrets Manager
-cat > docker compose.yml <<EOF
+# Create docker-compose.yml - Asterisk passwords loaded from Secrets Manager
+cat > docker-compose.yml <<EOF
 version: '3.8'
 
 services:

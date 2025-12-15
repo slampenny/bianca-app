@@ -89,8 +89,8 @@ else
     echo "Warning: EBS volume /dev/sdf not found"
 fi
 
-# Create docker compose.yml - NO SECRETS HARDCODED
-cat > docker compose.yml <<EOF
+# Create docker-compose.yml - NO SECRETS HARDCODED
+cat > docker-compose.yml <<EOF
 version: '3.8'
 
 services:

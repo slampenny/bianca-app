@@ -42,7 +42,7 @@ else
   echo "   Using cached ECR token"
 fi
 
-# Note: docker compose.yml is already on the instance at $DEPLOY_DIR/docker compose.yml
+# Note: docker-compose.yml is already on the instance at $DEPLOY_DIR/docker-compose.yml
 # We just need to pull the latest images
 
 # Pull latest images (with timeout to prevent hangs)
