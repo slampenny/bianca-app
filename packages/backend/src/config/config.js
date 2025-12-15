@@ -11,7 +11,9 @@ const { AwsContext } = require('twilio/lib/rest/accounts/v1/credential/aws');
 const { buildAllConfigs, applyAllSecrets } = require('./domains');
 
 // Load .env file (if present)
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// CRITICAL: Use override: false to ensure container environment variables take precedence
+// This prevents .env file from overriding NODE_ENV set by Docker/CodeBuild
+dotenv.config({ path: path.join(__dirname, '../../.env'), override: false });
 
 // Define the environment variable schema, including new variables
 const envVarsSchema = Joi.object({
@@ -124,8 +126,10 @@ const primaryDomain = envVars.PRIMARY_DOMAIN || 'biancawellness.com';
 
 // Build a baseline configuration object based on environment variables
 // Base configuration (not domain-specific)
+// CRITICAL: Always use process.env.NODE_ENV directly to ensure runtime value is used
+// This prevents issues where .env file or cached values might be used instead of container env vars
 const baselineConfig = {
-  env: envVars.NODE_ENV,
+  env: process.env.NODE_ENV || envVars.NODE_ENV,
   primaryDomain: primaryDomain,  // Expose primary domain in config,
   port: envVars.PORT,
   aws: {
@@ -273,7 +277,13 @@ baselineConfig.loadSecrets = async () => {
 
     // Update process.env first - important if other modules read directly from process.env
     // In staging/production, AWS secrets should override .env values
+    // CRITICAL: Never override NODE_ENV from secrets - it must come from runtime environment
     for (const key in secrets) {
+        // Skip NODE_ENV - it must always come from the runtime environment (Docker, CodeBuild, etc.)
+        if (key === 'NODE_ENV') {
+            logger.warn('NODE_ENV found in secrets - ignoring it. NODE_ENV must come from runtime environment.');
+            continue;
+        }
         // Override process.env with AWS secrets for staging/production
         // This ensures AWS secrets take precedence over .env values
         process.env[key] = secrets[key];
@@ -281,6 +291,13 @@ baselineConfig.loadSecrets = async () => {
 
     // Apply secrets using domain modules (this will override config with AWS secrets)
     applyAllSecrets(baselineConfig, secrets);
+    
+    // CRITICAL: Ensure config.env matches runtime NODE_ENV (never override from secrets)
+    // This ensures that even if secrets contained NODE_ENV, we use the runtime value
+    if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
+      logger.warn(`Config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
+      baselineConfig.env = process.env.NODE_ENV;
+    }
     
     // MFA Encryption Key (special case - sets process.env)
     if (secrets.MFA_ENCRYPTION_KEY) {
