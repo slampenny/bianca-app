@@ -63,10 +63,11 @@ phases:
         echo "✅ Playwright installed"
       - echo "Starting MongoDB container..."
       - |
+        # Use AWS ECR public image to avoid Docker Hub rate limits
         docker run -d --name mongodb-test \
           -p 27017:27017 \
           -e MONGO_INITDB_DATABASE=bianca-app-test \
-          mongo:7.0 || echo "MongoDB container may already exist"
+          public.ecr.aws/docker/library/mongo:7.0 || echo "MongoDB container may already exist"
         # Wait for MongoDB to be ready
         i=1
         while [ $i -le 30 ]; do
