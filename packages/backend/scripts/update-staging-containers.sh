@@ -94,7 +94,7 @@ fi
 if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "null" ]; then
     echo "Updating containers on staging instance: $STAGING_IP"
     
-    echo "ℹ️  Using docker compose.yml created by instance userdata (contains AWS secrets)"
+    echo "ℹ️  Using docker-compose.yml created by instance userdata (contains AWS secrets)"
     
     # Prepare the commands to run
     DEPLOY_COMMANDS="
@@ -106,7 +106,7 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
       # Create MongoDB data directory
       sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
       
-      # Pull latest images (use only the userdata-created docker compose.yml)
+      # Pull latest images (use only the userdata-created docker-compose.yml)
       docker compose pull
       
       echo 'Stopping and removing application containers (preserving MongoDB)...'

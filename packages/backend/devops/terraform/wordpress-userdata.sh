@@ -103,8 +103,8 @@ fi
 DB_ROOT_PASSWORD=$(openssl rand -hex 16)
 DB_PASSWORD=$(openssl rand -hex 16)
 
-# Create WordPress docker compose.yml
-cat > $WORDPRESS_DIR/docker compose.yml <<EOF
+# Create WordPress docker-compose.yml
+cat > $WORDPRESS_DIR/docker-compose.yml <<EOF
 version: '3.8'
 
 services:
@@ -317,7 +317,7 @@ echo "3. Access WordPress at: https://$WP_DOMAIN"
 echo "4. Complete WordPress installation wizard"
 echo ""
 echo "⚠️  If SSL setup failed, run manually:"
-echo "   docker compose -f $WORDPRESS_DIR/docker compose.yml run --rm certbot certonly --webroot -w /var/www/certbot -d $WP_DOMAIN -d www.$WP_DOMAIN"
+echo "   docker compose -f $WORDPRESS_DIR/docker-compose.yml run --rm certbot certonly --webroot -w /var/www/certbot -d $WP_DOMAIN -d www.$WP_DOMAIN"
 echo "=========================================="
 
 docker ps

@@ -74,8 +74,8 @@ else
     echo "Warning: WordPress DB volume /dev/xvdg not found. Using local storage."
 fi
 
-# Create WordPress docker compose.yml
-cat > $WORDPRESS_DIR/docker compose.yml <<'EOF'
+# Create WordPress docker-compose.yml
+cat > $WORDPRESS_DIR/docker-compose.yml <<'EOF'
 version: '3.8'
 
 services:
