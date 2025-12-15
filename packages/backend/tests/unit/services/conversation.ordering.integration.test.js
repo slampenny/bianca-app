@@ -6,7 +6,7 @@ process.env.OPENAI_API_KEY = 'test-openai-api-key';
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Message, Conversation } = require('../../../src/models');
+const { Message, Conversation, Call } = require('../../../src/models');
 
 // Mock only external dependencies
 jest.mock('ws');
@@ -48,18 +48,25 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Clear database
     await Message.deleteMany({});
     await Conversation.deleteMany({});
+    await Call.deleteMany({});
 
     conversationId = new mongoose.Types.ObjectId();
-    callId = 'test-call-sid-123';
+    const callSid = 'test-call-sid-123';
+    
+    // Create a Call first (Conversation requires callId)
+    const call = await Call.create({
+      callSid: callSid,
+      patientId: new mongoose.Types.ObjectId(),
+      status: 'in-progress',
+      duration: 0
+    });
+    callId = callSid; // Keep for connection mapping
 
     // Create test conversation in database
     const conversation = new Conversation({
       _id: conversationId,
       patientId: new mongoose.Types.ObjectId(),
-      agentId: new mongoose.Types.ObjectId(),
-      callSid: callId,
-      status: 'in-progress',
-      startTime: new Date(),
+      callId: call._id, // Use Call ObjectId, not callSid
       messages: []
     });
     await conversation.save();

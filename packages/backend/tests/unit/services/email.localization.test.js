@@ -80,7 +80,7 @@ describe('Email Service - Localization', () => {
       expect(emailContent).toBeTruthy();
       expect(emailContent.subject).toContain('Please Verify Your Email Address');
       // Text content is localized
-      expect(emailContent.text).toContain('Thank you for creating your My Phone Friend account');
+      expect(emailContent.text).toContain('Thank you for creating your Bianca Wellness account');
       expect(emailContent.text).toContain('Dear');
       // HTML template is currently hardcoded in English, but text content is localized
       expect(emailContent.html).toBeTruthy();

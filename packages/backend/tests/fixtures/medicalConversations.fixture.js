@@ -1,6 +1,6 @@
 // tests/fixtures/medicalConversations.fixture.js
 const mongoose = require('mongoose');
-const { Conversation, Message } = require('../../src/models');
+const { Conversation, Message, Call } = require('../../src/models');
 
 /**
  * Medical Conversation Fixtures
@@ -692,17 +692,27 @@ const createConversationsFromFixture = async (patientId, conversationData) => {
   
   for (const monthData of Object.values(conversationData)) {
     for (const convData of monthData) {
-      // Create conversation
+      // Create a Call first (Conversation requires callId)
+      const call = await Call.create({
+        callSid: `CA${new mongoose.Types.ObjectId().toString()}`,
+        patientId,
+        duration: 30 * 60, // 30 minutes in seconds
+        status: 'completed',
+        startTime: convData.date,
+        endTime: new Date(convData.date.getTime() + 30 * 60 * 1000)
+      });
+      
+      // Create conversation with callId reference
+      // Note: Conversation model uses createdAt (from timestamps), not startTime
+      // We'll set createdAt explicitly to match the conversation date
       const conversation = new Conversation({
         patientId,
-        startTime: convData.date,
-        endTime: new Date(convData.date.getTime() + 30 * 60 * 1000), // 30 minutes later
-        duration: 30,
-        status: 'completed',
-        callType: 'inbound',
+        callId: call._id,
         messages: []
       });
       
+      // Set createdAt explicitly to match the conversation date
+      conversation.createdAt = convData.date;
       await conversation.save();
       
       // Create messages
@@ -724,7 +734,9 @@ const createConversationsFromFixture = async (patientId, conversationData) => {
       conversation.messages = messageIds;
       await conversation.save();
       
-      conversations.push(conversation);
+      // Reload conversation to ensure all fields are populated
+      const reloadedConversation = await Conversation.findById(conversation._id);
+      conversations.push(reloadedConversation);
     }
   }
   

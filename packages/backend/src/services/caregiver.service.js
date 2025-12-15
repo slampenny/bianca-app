@@ -208,8 +208,8 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
   }
   
   // If this is an invited user completing registration (setting password), promote them to staff
-  // Role change happens on registration completion, not on phone verification
-  if (caregiver.role === 'invited' && updateBody.password) {
+  // Also promote if they already have a password and are adding a phone (completing profile)
+  if (caregiver.role === 'invited' && (updateBody.password || (updateBody.phone && caregiver.password))) {
     // Invited user completing registration - promote to staff
     // Phone and verification status are separate concerns
     updateBody.role = 'staff';

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Org, Conversation, Invoice, LineItem, Patient } = require('../../../src/models');
+const { Org, Conversation, Call, Invoice, LineItem, Patient } = require('../../../src/models');
 const paymentService = require('../../../src/services/payment.service');
 const config = require('../../../src/config/config');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
@@ -27,6 +27,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await Promise.all([
     Conversation.deleteMany({}),
+    Call.deleteMany({}),
     Invoice.deleteMany({}),
     LineItem.deleteMany({}),
     Patient.deleteMany({}),
@@ -65,30 +66,31 @@ describe('paymentService', () => {
       const patientData = { ...patientOne, org: org._id };
       const [patient] = await insertPatients([patientData]);
       
-      // Insert two conversations for the patient with no invoice link.
-      // First conversation: 120 seconds (2 minutes).
-      // Second conversation: 180 seconds (3 minutes).
-      await insertConversations([
+      // Insert two calls for the patient with no invoice link.
+      // First call: 120 seconds (2 minutes).
+      // Second call: 180 seconds (3 minutes).
+      await Call.insertMany([
         { 
-          ...conversationOne, 
           patientId: patient._id, 
+          org: org._id,
+          callSid: 'CA1234567890abcdef',
           duration: 120,
           lineItemId: null,
           startTime: new Date('2023-01-01T10:00:00Z'),
-          endTime: new Date('2023-01-01T10:02:00Z')
+          endTime: new Date('2023-01-01T10:02:00Z'),
+          status: 'completed'
         },
         { 
-          ...conversationTwo, 
           patientId: patient._id, 
+          org: org._id,
+          callSid: 'CA0987654321fedcba',
           duration: 180,
           lineItemId: null,
           startTime: new Date('2023-01-02T14:00:00Z'),
-          endTime: new Date('2023-01-02T14:03:00Z')
+          endTime: new Date('2023-01-02T14:03:00Z'),
+          status: 'completed'
         }
       ]);
-      
-      // IMPORTANT: Do NOT stub Conversation.aggregateUnchargedConversations.
-      // Let the real aggregation pipeline run against the inserted conversations.
       
       // Execute the service method to create an invoice.
       const invoice = await paymentService.createInvoiceFromConversations(patient._id);
@@ -117,10 +119,10 @@ describe('paymentService', () => {
       expect(lineItem.unitPrice).toBe(config.billing.ratePerMinute);
       expect(lineItem.description).toContain('300 seconds');
       
-      // Verify that all conversations for the patient have been updated with the created line item ID.
-      const updatedConversations = await Conversation.find({ patientId: patient._id });
-      updatedConversations.forEach(conv => {
-        expect(conv.lineItemId?.toString()).toBe(lineItem._id.toString());
+      // Verify that all calls for the patient have been updated with the created line item ID.
+      const updatedCalls = await Call.find({ patientId: patient._id });
+      updatedCalls.forEach(call => {
+        expect(call.lineItemId?.toString()).toBe(lineItem._id.toString());
       });
     });
     
@@ -130,12 +132,11 @@ describe('paymentService', () => {
       const patientData = { ...patientOne, org: org._id };
       const [patient] = await insertPatients([patientData]);
       
-      // Mock empty result from aggregation
-      Conversation.aggregateUnchargedConversations = jest.fn().mockResolvedValue([]);
+      // No calls exist, so the service will find no uncharged calls
       
       // Expect an error when trying to create an invoice
       await expect(paymentService.createInvoiceFromConversations(patient._id))
-        .rejects.toThrow('No uncharged conversations found');
+        .rejects.toThrow('No uncharged calls found');
     });
 
     it('should throw an error if patient is not found', async () => {
