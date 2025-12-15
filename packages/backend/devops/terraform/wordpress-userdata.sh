@@ -24,9 +24,9 @@ systemctl enable docker
 usermod -a -G docker ec2-user
 
 # Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
+chmod +x /usr/local/bin/docker compose
+ln -s /usr/local/bin/docker compose /usr/bin/docker compose
 
 # Note: SSL is handled by ALB with AWS ACM certificate - no need for certbot/Let's Encrypt
 
@@ -103,8 +103,8 @@ fi
 DB_ROOT_PASSWORD=$(openssl rand -hex 16)
 DB_PASSWORD=$(openssl rand -hex 16)
 
-# Create WordPress docker-compose.yml
-cat > $WORDPRESS_DIR/docker-compose.yml <<EOF
+# Create WordPress docker compose.yml
+cat > $WORDPRESS_DIR/docker compose.yml <<EOF
 version: '3.8'
 
 services:
@@ -224,14 +224,14 @@ chmod -R 775 $WORDPRESS_DATA_DIR/wp-content
 
 # Start WordPress services (without nginx first - SSL cert needed)
 cd $WORDPRESS_DIR
-docker-compose up -d wordpress-db wordpress
+docker compose up -d wordpress-db wordpress
 
 # Wait for WordPress to be ready
 echo "Waiting for WordPress to start..."
 sleep 30
 
 # Start nginx (HTTP-only initially)
-docker-compose up -d nginx
+docker compose up -d nginx
 
 # Wait for nginx to be ready
 sleep 10
@@ -254,8 +254,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$WORDPRESS_DIR
-ExecStart=/usr/bin/docker-compose up -d
-ExecStop=/usr/bin/docker-compose down
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
 StandardOutput=journal
 
 [Install]
@@ -317,7 +317,7 @@ echo "3. Access WordPress at: https://$WP_DOMAIN"
 echo "4. Complete WordPress installation wizard"
 echo ""
 echo "⚠️  If SSL setup failed, run manually:"
-echo "   docker-compose -f $WORDPRESS_DIR/docker-compose.yml run --rm certbot certonly --webroot -w /var/www/certbot -d $WP_DOMAIN -d www.$WP_DOMAIN"
+echo "   docker compose -f $WORDPRESS_DIR/docker compose.yml run --rm certbot certonly --webroot -w /var/www/certbot -d $WP_DOMAIN -d www.$WP_DOMAIN"
 echo "=========================================="
 
 docker ps

@@ -94,7 +94,7 @@ fi
 if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "null" ]; then
     echo "Updating containers on staging instance: $STAGING_IP"
     
-    echo "ℹ️  Using docker-compose.yml created by instance userdata (contains AWS secrets)"
+    echo "ℹ️  Using docker compose.yml created by instance userdata (contains AWS secrets)"
     
     # Prepare the commands to run
     DEPLOY_COMMANDS="
@@ -106,14 +106,14 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
       # Create MongoDB data directory
       sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
       
-      # Pull latest images (use only the userdata-created docker-compose.yml)
-      docker-compose pull
+      # Pull latest images (use only the userdata-created docker compose.yml)
+      docker compose pull
       
       echo 'Stopping and removing application containers (preserving MongoDB)...'
       
       # Stop and remove only the application containers (not MongoDB)
-      docker-compose stop app asterisk frontend nginx || true
-      docker-compose rm -f app asterisk frontend nginx || true
+      docker compose stop app asterisk frontend nginx || true
+      docker compose rm -f app asterisk frontend nginx || true
       
       # Remove any orphaned containers with our project names (force remove by name)
       for container_name in staging_app staging_asterisk staging_frontend staging_nginx staging_bianca-app; do
@@ -156,10 +156,10 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
           docker rm -f \"\$EXISTING_MONGODB\" 2>/dev/null || true
         fi
         echo 'Starting all containers (MongoDB will be recreated)...'
-        docker-compose up -d
+        docker compose up -d
       else
         echo 'Starting all containers (including MongoDB)...'
-        docker-compose up -d
+        docker compose up -d
       fi
       
       # Wait for MongoDB to be ready (up to 30 seconds)

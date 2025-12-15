@@ -27,8 +27,8 @@ cd "$DEPLOY_DIR" || {
 }
 
 # Verify required files exist
-if [ ! -f "docker-compose.yml" ]; then
-  echo "❌ ERROR: docker-compose.yml not found in $DEPLOY_DIR"
+if [ ! -f "docker compose.yml" ]; then
+  echo "❌ ERROR: docker compose.yml not found in $DEPLOY_DIR"
   ls -la "$DEPLOY_DIR/" || true
   exit 1
 fi
@@ -40,12 +40,12 @@ fi
 
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
-docker-compose down 2>/dev/null || true
+docker compose down 2>/dev/null || true
 
 # Start containers - use background process with timeout to prevent hangs
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
-docker-compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete
@@ -74,7 +74,7 @@ if [ $EXIT_CODE -ne 0 ]; then
   if [ -f /tmp/docker_start.log ]; then
     tail -50 /tmp/docker_start.log >&2 || true
   fi
-  docker-compose logs --tail 50 2>&1 || true
+  docker compose logs --tail 50 2>&1 || true
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
   # Don't exit - let ValidateService decide if deployment failed
