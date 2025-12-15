@@ -178,6 +178,13 @@ const baselineConfig = {
   ...buildAllConfigs(envVars),
 };
 
+// CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation
+// This prevents issues where .env file or Docker image build-time values override runtime env vars
+if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
+  logger.warn(`Initial config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
+  baselineConfig.env = process.env.NODE_ENV;
+}
+
 // Set production-specific overrides (Restored and updated)
 if (envVars.NODE_ENV === 'production') {
   // Use environment variables set by Terraform, or construct from PRIMARY_DOMAIN
@@ -218,34 +225,31 @@ if (envVars.NODE_ENV === 'staging') {
   baselineConfig.twilio.websocketUrl = envVars.WEBSOCKET_URL || `wss://${apiBaseUrl.replace('https://', '')}`;
 }
 
+// Helper function to ensure config.env always matches runtime NODE_ENV
+// This is critical to prevent staging/production config from being used in test mode
+const ensureEnvMatchesRuntime = () => {
+  if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
+    logger.warn(`Config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
+    baselineConfig.env = process.env.NODE_ENV;
+  }
+};
+
 // Add method to load secrets from AWS Secrets Manager (if used)
 baselineConfig.loadSecrets = async () => {
-  // Skip in development and test, but load for staging and production
-  // Exception: In test mode, if secrets are already in process.env (from CI/CD), use them
-  if (baselineConfig.env === 'development' || (baselineConfig.env === 'test' && !process.env.STRIPE_SECRET_KEY)) {
-    logger.info('Skipping AWS Secrets Manager in development/test environment.');
-    logger.info('Using Stripe keys from .env file for localhost/dev.');
-    return baselineConfig;
-  }
+  // CRITICAL: Always ensure env matches runtime NODE_ENV at the start
+  // This prevents issues where config was initialized with wrong env value
+  ensureEnvMatchesRuntime();
   
-  // In test mode with secrets in env vars (from CodeBuild), just apply them
-  if (baselineConfig.env === 'test' && process.env.STRIPE_SECRET_KEY) {
-    logger.info('Test environment with secrets from environment variables (CI/CD).');
-    logger.info('Applying secrets from environment variables.');
-    // Apply secrets that are already in process.env
-    const secrets = {
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-      STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
-      JWT_SECRET: process.env.JWT_SECRET,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      MFA_ENCRYPTION_KEY: process.env.MFA_ENCRYPTION_KEY,
-      TWILIO_AUTHTOKEN: process.env.TWILIO_AUTHTOKEN,
-    };
-    applyAllSecrets(baselineConfig, secrets);
-    // MFA_ENCRYPTION_KEY needs to be set in process.env for the MFA service
-    if (secrets.MFA_ENCRYPTION_KEY) {
-      process.env.MFA_ENCRYPTION_KEY = secrets.MFA_ENCRYPTION_KEY;
-    }
+  // Skip in development and test, but load for staging and production
+  // CRITICAL: In test mode, always skip loading secrets (even if present) to match local test behavior
+  // This ensures pipeline tests work the same way as local tests - no real Stripe/AWS calls
+  if (baselineConfig.env === 'development' || baselineConfig.env === 'test') {
+    logger.info('Skipping AWS Secrets Manager in development/test environment.');
+    logger.info('Using keys from .env file for localhost/dev (or defaults if not set).');
+    // Note: If secrets are in process.env (from CodeBuild), they'll be available but not applied to config
+    // This means Stripe won't be initialized with real keys, matching local test behavior
+    // Ensure env is still correct before returning
+    ensureEnvMatchesRuntime();
     return baselineConfig;
   }
 
@@ -268,6 +272,8 @@ baselineConfig.loadSecrets = async () => {
 
     if (!data.SecretString) {
         logger.warn(`SecretString is empty for SecretId: ${secretId}`);
+        // Ensure env is still correct before returning
+        ensureEnvMatchesRuntime();
         return baselineConfig;
     }
 
@@ -294,10 +300,7 @@ baselineConfig.loadSecrets = async () => {
     
     // CRITICAL: Ensure config.env matches runtime NODE_ENV (never override from secrets)
     // This ensures that even if secrets contained NODE_ENV, we use the runtime value
-    if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
-      logger.warn(`Config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
-      baselineConfig.env = process.env.NODE_ENV;
-    }
+    ensureEnvMatchesRuntime();
     
     // MFA Encryption Key (special case - sets process.env)
     if (secrets.MFA_ENCRYPTION_KEY) {
@@ -313,10 +316,14 @@ baselineConfig.loadSecrets = async () => {
 
     // Add other mappings as needed...
     logger.info('Configuration updated with values from AWS Secrets Manager.');
+    // Ensure env is still correct before returning
+    ensureEnvMatchesRuntime();
     return baselineConfig;
   } catch (err) {
     // Log error but return baseline config to allow app to potentially start with defaults/env vars
     logger.error(`Error retrieving secret from AWS Secrets Manager (SecretId: ${secretId}): ${err.code} - ${err.message}`);
+    // Ensure env is still correct before returning
+    ensureEnvMatchesRuntime();
     return baselineConfig;
   }
 };
