@@ -13,7 +13,7 @@ echo "Checking WordPress database connection on instance: $INSTANCE_ID"
 echo ""
 
 # Command to check and fix
-COMMAND='cd /opt/bianca-wordpress && echo "=== Container Status ===" && docker ps -a && echo "" && echo "=== Testing Database Connection ===" && docker exec bianca-wordpress ping -c 2 wordpress-db 2>&1 || echo "Database not reachable" && echo "" && echo "=== Restarting All Containers ===" && docker-compose restart && sleep 20 && echo "" && echo "=== Verifying After Restart ===" && docker ps && docker exec bianca-wordpress ping -c 2 wordpress-db 2>&1'
+COMMAND='cd /opt/bianca-wordpress && echo "=== Container Status ===" && docker ps -a && echo "" && echo "=== Testing Database Connection ===" && docker exec bianca-wordpress ping -c 2 wordpress-db 2>&1 || echo "Database not reachable" && echo "" && echo "=== Restarting All Containers ===" && docker compose restart && sleep 20 && echo "" && echo "=== Verifying After Restart ===" && docker ps && docker exec bianca-wordpress ping -c 2 wordpress-db 2>&1'
 
 echo "Sending command to instance..."
 aws ssm send-command \

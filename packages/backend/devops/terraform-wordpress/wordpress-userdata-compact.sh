@@ -11,9 +11,9 @@ yum install -y docker git
 systemctl start docker
 systemctl enable docker
 usermod -a -G docker ec2-user
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
+chmod +x /usr/local/bin/docker compose
+ln -s /usr/local/bin/docker compose /usr/bin/docker compose
 if ! command -v aws &> /dev/null; then
     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     unzip -q awscliv2.zip
@@ -84,7 +84,7 @@ else
     fi
 fi
 echo "Database credentials retrieved successfully"
-cat > $WORDPRESS_DIR/docker-compose.yml <<EOF
+cat > $WORDPRESS_DIR/docker compose.yml <<EOF
 version: '3.8'
 services:
   wordpress-db:
@@ -178,10 +178,10 @@ cd $WORDPRESS_DIR
 mkdir -p $WORDPRESS_DATA_DIR/wp-content/uploads
 chown -R 33:33 $WORDPRESS_DATA_DIR/wp-content
 chmod -R 775 $WORDPRESS_DATA_DIR/wp-content
-docker-compose up -d wordpress-db wordpress
+docker compose up -d wordpress-db wordpress
 echo "Waiting for WordPress to start..."
 sleep 30
-docker-compose up -d nginx
+docker compose up -d nginx
 sleep 10
 echo "✅ WordPress deployment complete"
 echo "📍 HTTP:  http://$WP_DOMAIN (via ALB)"
@@ -198,8 +198,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$WORDPRESS_DIR
-ExecStart=/usr/bin/docker-compose up -d
-ExecStop=/usr/bin/docker-compose down
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
 StandardOutput=journal
 [Install]
 WantedBy=multi-user.target
@@ -284,7 +284,7 @@ check_db_connectivity() {
 restart_services() {
     log "🔄 Restarting WordPress services..."
     cd "$WORDPRESS_DIR" || return 1
-    docker-compose restart || docker-compose up -d
+    docker compose restart || docker compose up -d
     sleep 15
     log "✅ Services restarted"
 }
@@ -353,6 +353,6 @@ echo "3. Access WordPress at: https://$WP_DOMAIN"
 echo "4. Complete WordPress installation wizard"
 echo ""
 echo "⚠️  If SSL setup failed, run manually:"
-echo "   docker-compose -f $WORDPRESS_DIR/docker-compose.yml run --rm certbot certonly --webroot -w /var/www/certbot -d $WP_DOMAIN -d www.$WP_DOMAIN"
+echo "   docker compose -f $WORDPRESS_DIR/docker compose.yml run --rm certbot certonly --webroot -w /var/www/certbot -d $WP_DOMAIN -d www.$WP_DOMAIN"
 echo "=========================================="
 docker ps

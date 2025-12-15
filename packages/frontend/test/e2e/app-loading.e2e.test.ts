@@ -16,9 +16,10 @@ test.describe('App Loading', () => {
     })
 
     console.log('Navigating to app...')
-    await page.goto('/')
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 })
     console.log('Waiting for app to load...')
-    await page.waitForLoadState('networkidle')
+    // Wait for root element instead of networkidle (networkidle can timeout on long-running connections)
+    await page.waitForSelector('#root', { timeout: 30000 })
 
     console.log('=== CONSOLE LOGS ===')
     // Console logs are captured by page.on('console') above

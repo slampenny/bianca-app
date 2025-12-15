@@ -8,9 +8,9 @@ echo "=== Starting Staging Containers ==="
 
 cd /opt/bianca-staging
 
-# Check if docker-compose.yml exists
-if [ ! -f "docker-compose.yml" ]; then
-  echo "❌ docker-compose.yml not found in /opt/bianca-staging"
+# Check if docker compose.yml exists
+if [ ! -f "docker compose.yml" ]; then
+  echo "❌ docker compose.yml not found in /opt/bianca-staging"
   exit 1
 fi
 
@@ -22,11 +22,11 @@ fi
 
 # Stop any existing containers
 echo "Stopping existing containers..."
-docker-compose down 2>/dev/null || true
+docker compose down 2>/dev/null || true
 
 # Start containers
 echo "Starting containers..."
-docker-compose up -d --remove-orphans
+docker compose up -d --remove-orphans
 
 # Wait for containers to start
 echo "Waiting for containers to initialize..."
@@ -35,7 +35,7 @@ sleep 15
 # Check container status
 echo ""
 echo "=== Container Status ==="
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "=== Checking Port 80 ==="

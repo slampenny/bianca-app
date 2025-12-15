@@ -138,6 +138,16 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           "ec2:DescribeInstanceInformation"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-Staging-*"
+        ]
       }
     ]
   })
@@ -196,7 +206,10 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
           "codebuild:StopBuild",
           "codebuild:BatchGetBuilds"
         ]
-        Resource = aws_codebuild_project.staging_build.arn
+        Resource = [
+          aws_codebuild_project.staging_build.arn,
+          aws_codebuild_project.staging_tests.arn
+        ]
       },
       {
         Effect = "Allow"
@@ -245,6 +258,106 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
 }
 
 ################################################################################
+# CODEBUILD PROJECT FOR TESTS (STAGING)
+################################################################################
+
+resource "aws_codebuild_project" "staging_tests" {
+  name         = "bianca-staging-tests"
+  description  = "Runs unit tests and Playwright E2E tests for staging pipeline"
+  service_role = aws_iam_role.codebuild_staging_role.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_MEDIUM"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "NODE_ENV"
+      value = "test"
+    }
+    environment_variable {
+      name  = "MONGODB_URL"
+      value = "mongodb://localhost:27017/bianca-app-test"
+    }
+    environment_variable {
+      name  = "API_BASE_URL"
+      value = "http://localhost:3000/v1"
+    }
+    # Staging secrets - inject directly from AWS Secrets Manager
+    environment_variable {
+      name  = "AWS_SECRET_ID"
+      value = "MySecretsManagerSecret-Staging"
+    }
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "ECR_REGISTRY"
+      value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+    }
+    # Inject secrets from Secrets Manager (CodeBuild handles permissions automatically)
+    environment_variable {
+      name  = "JWT_SECRET"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:JWT_SECRET::"
+    }
+    environment_variable {
+      name  = "STRIPE_SECRET_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:STRIPE_SECRET_KEY::"
+    }
+    environment_variable {
+      name  = "STRIPE_PUBLISHABLE_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:STRIPE_PUBLISHABLE_KEY::"
+    }
+    environment_variable {
+      name  = "OPENAI_API_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:OPENAI_API_KEY::"
+    }
+    environment_variable {
+      name  = "MFA_ENCRYPTION_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:MFA_ENCRYPTION_KEY::"
+    }
+    environment_variable {
+      name  = "TWILIO_AUTHTOKEN"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:TWILIO_AUTHTOKEN::"
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/frontend/devops/buildspec-playwright.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-staging-tests"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-staging-tests"
+    Environment = "staging"
+  }
+}
+
+################################################################################
 # CODEPIPELINE FOR STAGING
 ################################################################################
 
@@ -289,6 +402,7 @@ resource "aws_codepipeline" "staging" {
         ProjectName   = aws_codebuild_project.staging_build.name
         PrimarySource = "SourceOutput"
       }
+      run_order = 1
     }
   }
 
@@ -305,6 +419,23 @@ resource "aws_codepipeline" "staging" {
         ApplicationName     = aws_codedeploy_app.staging.name
         DeploymentGroupName = aws_codedeploy_deployment_group.staging.deployment_group_name
       }
+      run_order = 1
+    }
+    # Tests run in parallel with Deploy (same run_order) - doesn't block deployment
+    # Tests use Docker containers from build stage for faster, more accurate testing
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_tests.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1  # Same as Deploy - runs in parallel, doesn't block deployment
     }
   }
 

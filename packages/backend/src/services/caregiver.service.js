@@ -108,10 +108,31 @@ const getPatientById = async (id) => {
 /**
  * Get caregiver by email
  * @param {string} email
+ * @param {Object} options - Optional query options
+ * @param {boolean} options.populatePatients - Whether to populate patients (default: false)
+ * @param {boolean} options.populateOrg - Whether to populate org (default: false)
  * @returns {Promise<Caregiver>}
  */
-const getCaregiverByEmail = async (email) => {
-  return await Caregiver.findOne({ email });
+const getCaregiverByEmail = async (email, options = {}) => {
+  const { populatePatients = false, populateOrg = false } = options;
+  
+  let query = Caregiver.findOne({ email });
+  
+  if (populateOrg) {
+    query = query.populate('org');
+  }
+  
+  if (populatePatients) {
+    query = query.populate({
+      path: 'patients',
+      populate: {
+        path: 'schedules',
+        model: 'Schedule',
+      },
+    });
+  }
+  
+  return await query;
 };
 
 const getLoginCaregiverData = async (email) => {

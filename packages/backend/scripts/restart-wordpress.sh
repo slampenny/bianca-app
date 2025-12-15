@@ -18,7 +18,7 @@ echo ""
 aws ssm send-command \
     --instance-ids "$INSTANCE_ID" \
     --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["cd /opt/bianca-wordpress && docker-compose restart && sleep 15 && docker ps"]' \
+    --parameters 'commands=["cd /opt/bianca-wordpress && docker compose restart && sleep 15 && docker ps"]' \
     --output text --query 'Command.CommandId' 2>/dev/null
 
 echo ""

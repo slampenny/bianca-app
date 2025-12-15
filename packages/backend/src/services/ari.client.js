@@ -7,7 +7,7 @@ const EventEmitter = require('events');
 const config = require('../config/config');
 const logger = require('../config/logger');
 const openAIService = require('./openai.realtime.service');
-const { Conversation, Patient } = require('../models');
+const { Call, Conversation, Patient } = require('../models');
 const channelTracker = require('./channel.tracker');
 const portManager = require('./port.manager.service');
 const rtpListenerService = require('./rtp.listener.service');
@@ -2153,42 +2153,65 @@ async handleStasisStartForPlayback(channel, channelName, event) {
         }
     }
 
-    async createConversationRecord(twilioCallSid, asteriskChannelId, patientId) {
+    async createConversationRecord(twilioCallSid, asteriskChannelId, patientId, callType = 'inbound') {
         if (!patientId || !twilioCallSid) {
             throw new Error('PatientID and twilioCallSid are required for conversation record');
         }
 
-        const conversationData = {
-            callSid: twilioCallSid,
-            asteriskChannelId,
-            startTime: new Date(),
-            callType: 'inbound',
-            status: 'in-progress',
-            patientId: null
-        };
-
         try {
             const patientDoc = await Patient.findById(patientId).select('_id name').lean();
             
-            if (patientDoc?._id) {
-                conversationData.patientId = patientDoc._id;
-                logger.info(`[ARI Pipeline] Found patient ${patientDoc._id} for patientId ${patientId}`);
-            } else {
+            if (!patientDoc?._id) {
                 throw new Error(`Patient with ID ${patientId} not found`);
             }
+            
+            logger.info(`[ARI Pipeline] Found patient ${patientDoc._id} for patientId ${patientId}`);
 
-            const conversation = await Conversation.findOneAndUpdate(
-                { callSid: twilioCallSid },
-                { $set: conversationData, $setOnInsert: { createdAt: new Date() } },
-                { new: true, upsert: true, runValidators: true }
-            );
-
-            if (conversation?._id) {
-                logger.info(`[ARI Pipeline] Conversation record ${conversation._id} created/updated`);
-                return conversation._id.toString();
+            // First, find or create the Call record (Call tracks the phone call attempt)
+            let call = await Call.findOne({ callSid: twilioCallSid });
+            
+            if (!call) {
+                // Create Call record for inbound call
+                call = await Call.create({
+                    callSid: twilioCallSid,
+                    patientId: patientDoc._id,
+                    asteriskChannelId,
+                    startTime: new Date(),
+                    callStartTime: new Date(),
+                    callType: callType || 'inbound',
+                    status: 'in-progress',
+                    callStatus: 'answered',
+                });
+                logger.info(`[ARI Pipeline] Created Call record ${call._id} for inbound call ${twilioCallSid}`);
             } else {
-                throw new Error('Failed to create/update conversation record');
+                // Update existing call with asterisk channel ID and status
+                call.asteriskChannelId = asteriskChannelId;
+                call.status = 'in-progress';
+                call.callStatus = 'answered';
+                await call.save();
+                logger.info(`[ARI Pipeline] Updated existing Call record ${call._id} for call ${twilioCallSid}`);
             }
+
+            // Now create Conversation record (only when call is answered and conversation starts)
+            // Check if conversation already exists for this call
+            let conversation = await Conversation.findOne({ callId: call._id });
+            
+            if (!conversation) {
+                conversation = await Conversation.create({
+                    callId: call._id,
+                    patientId: patientDoc._id,
+                });
+                
+                // Update call with conversation reference
+                call.conversationId = conversation._id;
+                await call.save();
+                
+                logger.info(`[ARI Pipeline] Created Conversation record ${conversation._id} for call ${call._id}`);
+            } else {
+                logger.info(`[ARI Pipeline] Conversation record ${conversation._id} already exists for call ${call._id}`);
+            }
+
+            return conversation._id.toString();
         } catch (err) {
             logger.error(`[ARI Pipeline] Error creating conversation record: ${err.message}`);
             throw err;

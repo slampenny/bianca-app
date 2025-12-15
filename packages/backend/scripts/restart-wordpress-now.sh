@@ -28,7 +28,7 @@ aws ssm send-command \
     --profile jordan \
     --instance-ids "$INSTANCE_ID" \
     --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["cd /opt/bianca-wordpress && echo \"Restarting containers...\" && docker-compose restart && sleep 20 && echo \"Verifying...\" && docker ps"]' \
+    --parameters 'commands=["cd /opt/bianca-wordpress && echo \"Restarting containers...\" && docker compose restart && sleep 20 && echo \"Verifying...\" && docker ps"]' \
     --output text --query 'Command.CommandId' 2>/dev/null
 
 echo ""
