@@ -2,7 +2,7 @@ const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { conversationService } = require('../services');
-const { Caregiver } = require('../models');
+const { Call, Caregiver } = require('../models');
 
 const { SentimentTrendDTO, SentimentSummaryDTO } = require('../dtos');
 
@@ -100,9 +100,14 @@ const analyzeConversationSentiment = catchAsync(async (req, res) => {
     }
   }
 
-  // Check if conversation is completed
-  if (conversation.status !== 'completed') {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Can only analyze sentiment for completed conversations');
+  // Check if call is completed (get Call record to check status)
+  const call = await Call.findById(conversation.callId);
+  if (!call) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
+  }
+  
+  if (call.status !== 'completed') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Can only analyze sentiment for completed calls');
   }
 
   // Trigger sentiment analysis

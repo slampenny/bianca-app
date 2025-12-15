@@ -22,10 +22,10 @@ systemctl enable docker
 # Add ec2-user to docker group
 usermod -a -G docker ec2-user
 
-# Install docker-compose
-curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+# Install docker compose
+curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker compose-linux-x86_64" -o /usr/local/bin/docker compose
+chmod +x /usr/local/bin/docker compose
+ln -s /usr/local/bin/docker compose /usr/bin/docker compose
 
 # Install AWS CLI v2 if not present
 if ! command -v aws &> /dev/null; then
@@ -89,8 +89,8 @@ else
     echo "Warning: EBS volume /dev/sdf not found"
 fi
 
-# Create docker-compose.yml - NO SECRETS HARDCODED
-cat > docker-compose.yml <<EOF
+# Create docker compose.yml - NO SECRETS HARDCODED
+cat > docker compose.yml <<EOF
 version: '3.8'
 
 services:
@@ -239,8 +239,8 @@ aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS
 
 # Pull and start containers
 echo "Starting containers..."
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 
 # Copy source code to host for editing (after containers are running)
 echo "Copying source code to host for editing..."
@@ -262,8 +262,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/bianca-staging
-ExecStart=/usr/bin/docker-compose up -d
-ExecStop=/usr/bin/docker-compose down
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
 StandardOutput=journal
 
 [Install]

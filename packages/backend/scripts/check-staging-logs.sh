@@ -35,7 +35,7 @@ sudo docker logs staging_nginx --tail 50 2>&1 || echo "Cannot get nginx logs"
 echo ""
 
 echo "=== Docker Compose Status ==="
-sudo docker-compose ps 2>/dev/null || echo "Cannot get docker-compose status"
+sudo docker compose ps 2>/dev/null || echo "Cannot get docker compose status"
 echo ""
 
 echo "=== System Resources ==="

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const faker = require('faker');
-const { Conversation, Message } = require('../../src/models');
+const { Conversation, Message, Call } = require('../../src/models');
 
 const generateMessage = (role) => {
   const userMessages = [
@@ -70,8 +70,31 @@ const insertConversations = async (conversations) => {
     if (conversationData.lineItemId === undefined) {
       conversationData.lineItemId = null;
     }
-    // Create the conversation first without messages
-    const conversation = new Conversation(conversationData);
+    
+    // Create a Call object first (required for conversation)
+    const call = new Call({
+      callSid: `TEST_CALL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      patientId: conversationData.patientId,
+      callType: conversationData.callType || 'inbound',
+      status: 'completed',
+      callStatus: 'ended',
+      callOutcome: 'answered',
+      startTime: conversationData.startTime || new Date(),
+      endTime: conversationData.endTime || new Date(),
+      callStartTime: conversationData.startTime || new Date(),
+      callEndTime: conversationData.endTime || new Date(),
+      duration: conversationData.duration || 0,
+      callDuration: conversationData.duration || 0,
+      cost: conversationData.cost || 0,
+      lineItemId: conversationData.lineItemId || null,
+    });
+    await call.save();
+    
+    // Create the conversation with the callId
+    const conversation = new Conversation({
+      ...conversationData,
+      callId: call._id,
+    });
     await conversation.save();
     
     // Create messages with the conversation ID

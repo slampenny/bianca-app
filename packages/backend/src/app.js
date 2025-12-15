@@ -194,8 +194,9 @@ passport.use('jwt', jwtStrategy);
 
 app.use(express.json({ limit: '50mb' }));
 
-// Rate limiting for auth endpoints in production
-if (config.env === 'production') {
+// Rate limiting for auth endpoints
+// Disabled in test and development, enabled in production and staging
+if (config.env === 'production' || config.env === 'staging') {
   app.use('/v1/auth', authLimiter);
 }
 

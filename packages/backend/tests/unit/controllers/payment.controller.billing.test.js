@@ -5,17 +5,31 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../../utils/integration-app');
-const { Org, Patient, Conversation, Invoice, LineItem, Caregiver } = require('../../../src/models');
+const { Org, Patient, Call, Conversation, Invoice, LineItem, Caregiver } = require('../../../src/models');
 const { tokenService } = require('../../../src/services');
+
+// Mock Stripe usage service
+jest.mock('../../../src/services/stripeUsage.service', () => ({
+  getUsageSummary: jest.fn().mockResolvedValue({
+    subscriptionId: 'sub_test123',
+    subscriptionItemId: 'si_test123',
+    currentPeriodStart: Math.floor(Date.now() / 1000) - 86400 * 7, // 7 days ago
+    currentPeriodEnd: Math.floor(Date.now() / 1000) + 86400 * 23, // 23 days from now
+    usageRecords: [],
+    totalUsage: 0,
+  }),
+  reportUsage: jest.fn().mockResolvedValue({}),
+  reportConversationUsage: jest.fn().mockResolvedValue({}),
+}));
 
 describe('Payment Controller - Billing', () => {
   let mongoServer;
   let org;
   let patient1;
   let patient2;
-  let conversation1;
-  let conversation2;
-  let conversation3;
+  let call1;
+  let call2;
+  let call3;
   let accessToken;
 
   beforeAll(async () => {
@@ -32,6 +46,8 @@ describe('Payment Controller - Billing', () => {
 
   beforeEach(async () => {
     // Clear the database before each test
+    await Call.deleteMany({});
+    await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Patient.deleteMany({});
     await Org.deleteMany({});
@@ -43,7 +59,8 @@ describe('Payment Controller - Billing', () => {
     org = await Org.create({
       name: 'Test Healthcare Org',
       email: 'test@healthcare.com',
-      phone: '+12345678901'
+      phone: '+12345678901',
+      stripeSubscriptionId: 'sub_test123', // Required for getUnbilledCostsByOrg
     });
 
     patient1 = await Patient.create({
@@ -60,7 +77,7 @@ describe('Payment Controller - Billing', () => {
       org: org._id
     });
 
-    // Create test conversations
+    // Create test Call records (Call tracks billing, not Conversation)
     const startTime1 = new Date();
     const endTime1 = new Date(startTime1.getTime() + 120000); // 2 minutes later
     
@@ -70,7 +87,7 @@ describe('Payment Controller - Billing', () => {
     const startTime3 = new Date();
     const endTime3 = new Date(startTime3.getTime() + 90000); // 1.5 minutes later
 
-    conversation1 = await Conversation.create({
+    call1 = await Call.create({
       callSid: 'CA11111111111111111111111111111111',
       patientId: patient1._id,
       duration: 120, // 2 minutes
@@ -81,7 +98,7 @@ describe('Payment Controller - Billing', () => {
       lineItemId: null // Unbilled
     });
 
-    conversation2 = await Conversation.create({
+    call2 = await Call.create({
       callSid: 'CA22222222222222222222222222222222',
       patientId: patient1._id,
       duration: 180, // 3 minutes
@@ -92,7 +109,7 @@ describe('Payment Controller - Billing', () => {
       lineItemId: null // Unbilled
     });
 
-    conversation3 = await Conversation.create({
+    call3 = await Call.create({
       callSid: 'CA33333333333333333333333333333333',
       patientId: patient2._id,
       duration: 90, // 1.5 minutes
@@ -134,17 +151,17 @@ describe('Payment Controller - Billing', () => {
       const patient1Cost = res.body.patientCosts.find(p => p.patientId === patient1._id.toString());
       expect(patient1Cost).toBeDefined();
       expect(patient1Cost.patientName).toBe('John Doe');
-      expect(patient1Cost.conversationCount).toBe(2);
+      expect(patient1Cost.callCount).toBe(2);
       expect(patient1Cost.totalCost).toBe(0.50); // 0.20 + 0.30
-      expect(patient1Cost.conversations).toHaveLength(2);
+      expect(patient1Cost.calls).toHaveLength(2);
       
       // Check patient 2 (Jane Smith)
       const patient2Cost = res.body.patientCosts.find(p => p.patientId === patient2._id.toString());
       expect(patient2Cost).toBeDefined();
       expect(patient2Cost.patientName).toBe('Jane Smith');
-      expect(patient2Cost.conversationCount).toBe(1);
+      expect(patient2Cost.callCount).toBe(1);
       expect(patient2Cost.totalCost).toBe(0.15);
-      expect(patient2Cost.conversations).toHaveLength(1);
+      expect(patient2Cost.calls).toHaveLength(1);
     });
 
     it('should accept custom days parameter', async () => {
@@ -158,9 +175,9 @@ describe('Payment Controller - Billing', () => {
       expect(res.body.period.endDate).toBeDefined();
     });
 
-    it('should return empty result when no unbilled conversations exist', async () => {
-      // Mark all conversations as billed
-      await Conversation.updateMany({}, { lineItemId: new mongoose.Types.ObjectId() });
+    it('should return empty result when no unbilled calls exist', async () => {
+      // Mark all calls as billed
+      await Call.updateMany({}, { lineItemId: new mongoose.Types.ObjectId() });
 
       const res = await request(app)
         .get(`/v1/payments/orgs/${org._id}/unbilled-costs`)
@@ -175,7 +192,7 @@ describe('Payment Controller - Billing', () => {
       });
 
       // Restore unbilled status for other tests
-      await Conversation.updateMany({}, { $unset: { lineItemId: 1 } });
+      await Call.updateMany({}, { $unset: { lineItemId: 1 } });
     });
 
     it('should return 404 for non-existent organization', async () => {
@@ -214,7 +231,7 @@ describe('Payment Controller - Billing', () => {
   });
 
   describe('POST /payments/patients/:patientId/invoices', () => {
-    it('should create invoice from patient conversations', async () => {
+    it('should create invoice from patient calls', async () => {
       const res = await request(app)
         .post(`/v1/payments/patients/${patient1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
@@ -239,22 +256,22 @@ describe('Payment Controller - Billing', () => {
       }
     });
 
-    it('should mark conversations as billed after creating invoice', async () => {
-      // Reset conversations to unbilled state
-      await Conversation.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
+    it('should mark calls as billed after creating invoice', async () => {
+      // Reset calls to unbilled state
+      await Call.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
 
       await request(app)
         .post(`/v1/payments/patients/${patient1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(201);
 
-      const updatedConversations = await Conversation.find({ patientId: patient1._id });
-      expect(updatedConversations.every(conv => conv.lineItemId !== null)).toBe(true);
+      const updatedCalls = await Call.find({ patientId: patient1._id });
+      expect(updatedCalls.every(call => call.lineItemId !== null)).toBe(true);
     });
 
-    it('should return 404 when no unbilled conversations exist', async () => {
-      // Mark all conversations as billed
-      await Conversation.updateMany({ patientId: patient1._id }, { 
+    it('should return 404 when no unbilled calls exist', async () => {
+      // Mark all calls as billed
+      await Call.updateMany({ patientId: patient1._id }, { 
         lineItemId: new mongoose.Types.ObjectId() 
       });
 
@@ -264,7 +281,7 @@ describe('Payment Controller - Billing', () => {
         .expect(404);
 
       // Restore unbilled status
-      await Conversation.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
+      await Call.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
     });
 
     it('should return 404 for non-existent patient', async () => {

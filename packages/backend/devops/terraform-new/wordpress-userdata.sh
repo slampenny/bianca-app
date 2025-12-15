@@ -22,9 +22,9 @@ systemctl enable docker
 usermod -a -G docker ec2-user
 
 # Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
+chmod +x /usr/local/bin/docker compose
+ln -s /usr/local/bin/docker compose /usr/bin/docker compose
 
 # Install AWS CLI v2 if not present
 if ! command -v aws &> /dev/null; then
@@ -99,8 +99,8 @@ fi
 DB_ROOT_PASSWORD=$(openssl rand -hex 16)
 DB_PASSWORD=$(openssl rand -hex 16)
 
-# Create WordPress docker-compose.yml
-cat > $WORDPRESS_DIR/docker-compose.yml <<EOF
+# Create WordPress docker compose.yml
+cat > $WORDPRESS_DIR/docker compose.yml <<EOF
 version: '3.8'
 
 services:
@@ -172,7 +172,7 @@ chmod -R 775 $WORDPRESS_DATA_DIR/wp-content
 
 # Start WordPress services
 cd $WORDPRESS_DIR
-docker-compose up -d
+docker compose up -d
 
 # Create systemd service for auto-restart
 cat > /etc/systemd/system/bianca-wordpress.service <<EOF
@@ -185,8 +185,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$WORDPRESS_DIR
-ExecStart=/usr/bin/docker-compose up -d
-ExecStop=/usr/bin/docker-compose down
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
 StandardOutput=journal
 
 [Install]

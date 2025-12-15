@@ -1,6 +1,6 @@
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { Org, Patient, Conversation, Invoice, LineItem } = require('../models');
+const { Org, Patient, Call, Conversation, Invoice, LineItem } = require('../models');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const logger = require('../config/logger');
@@ -14,21 +14,22 @@ const createInvoiceFromConversations = async (patientId) => {
   const orgId = patient.org;
 
   // Use direct query instead of aggregation for better test compatibility
-  const unchargedConversations = await Conversation.find({ 
+  // Query Call records instead of Conversation (Call tracks billing, Conversation tracks messages)
+  const unchargedCalls = await Call.find({ 
     patientId: new mongoose.Types.ObjectId(patientId),
     lineItemId: null 
   });
   
-  if (!unchargedConversations.length) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'No uncharged conversations found');
+  if (!unchargedCalls.length) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No uncharged calls found');
   }
 
-  const totalDuration = unchargedConversations.reduce((sum, conv) => sum + conv.duration, 0);
-  const conversationIds = unchargedConversations.map(conv => conv._id);
+  const totalDuration = unchargedCalls.reduce((sum, call) => sum + call.duration, 0);
+  const callIds = unchargedCalls.map(call => call._id);
   
-  // Check if there are any conversations to bill (even if total duration is 0)
-  if (!conversationIds || conversationIds.length === 0) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'No uncharged conversations found');
+  // Check if there are any calls to bill (even if total duration is 0)
+  if (!callIds || callIds.length === 0) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No uncharged calls found');
   }
 
   const lastInvoice = await Invoice.findOne({}, {}, { sort: { createdAt: -1 } });
@@ -66,7 +67,7 @@ const createInvoiceFromConversations = async (patientId) => {
       patientId,
       invoiceId: invoice._id,
       amount,
-      description: `Billing for ${totalDuration} seconds of conversation`,
+      description: `Billing for ${totalDuration} seconds of calls`,
       periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Default to 30 days ago
       periodEnd: new Date(), // Default to now
       quantity: totalDuration / 60,
@@ -88,15 +89,15 @@ const createInvoiceFromConversations = async (patientId) => {
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to update invoice');
   }
 
-  // Update conversations - use updateMany with error handling
-  // If this fails, invoice and line item exist but conversations aren't marked as billed
+  // Update calls - use updateMany with error handling
+  // If this fails, invoice and line item exist but calls aren't marked as billed
   // This is acceptable - they'll be picked up on retry and won't be double-billed due to lineItemId check
   try {
-    await Conversation.updateMany({ _id: { $in: conversationIds } }, { $set: { lineItemId: lineItem._id } });
+    await Call.updateMany({ _id: { $in: callIds } }, { $set: { lineItemId: lineItem._id } });
   } catch (error) {
-    // Log error but don't fail - invoice is created, conversations can be updated later
+    // Log error but don't fail - invoice is created, calls can be updated later
     // The lineItemId: null check prevents double-billing
-    logger.warn(`Failed to update conversations with lineItemId, invoice ${invoice._id} created but conversations not marked as billed:`, error);
+    logger.warn(`Failed to update calls with lineItemId, invoice ${invoice._id} created but calls not marked as billed:`, error);
   }
 
   return await Invoice.findById(invoice._id).populate('lineItems');

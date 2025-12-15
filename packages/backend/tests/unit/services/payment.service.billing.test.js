@@ -1,18 +1,45 @@
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 const httpStatus = require('http-status');
-const { paymentService } = require('../../../src/services');
-const { Org, Patient, Conversation, Invoice, LineItem } = require('../../../src/models');
 const ApiError = require('../../../src/utils/ApiError');
+
+// Mock agenda before importing anything that uses it
+jest.mock('../../../src/config/agenda', () => ({
+  agenda: {
+    on: jest.fn(),
+    every: jest.fn(),
+    schedule: jest.fn(),
+    jobs: jest.fn(),
+    define: jest.fn(),
+  },
+}));
+
+// Mock Stripe usage service
+jest.mock('../../../src/services/stripeUsage.service', () => ({
+  getUsageSummary: jest.fn().mockResolvedValue({
+    subscriptionId: 'sub_test123',
+    subscriptionItemId: 'si_test123',
+    currentPeriodStart: Math.floor(Date.now() / 1000) - 86400 * 7, // 7 days ago
+    currentPeriodEnd: Math.floor(Date.now() / 1000) + 86400 * 23, // 23 days from now
+    usageRecords: [],
+    totalUsage: 0,
+  }),
+  reportUsage: jest.fn().mockResolvedValue({}),
+  reportConversationUsage: jest.fn().mockResolvedValue({}),
+}));
+
+// Now import services and models
+const { paymentService } = require('../../../src/services');
+const { Org, Patient, Call, Conversation, Invoice, LineItem } = require('../../../src/models');
 
 describe('Payment Service - Billing', () => {
   let mongoServer;
   let org;
   let patient1;
   let patient2;
-  let conversation1;
-  let conversation2;
-  let conversation3;
+  let call1;
+  let call2;
+  let call3;
 
   beforeAll(async () => {
     mongoServer = new MongoMemoryServer();
@@ -28,17 +55,19 @@ describe('Payment Service - Billing', () => {
 
   beforeEach(async () => {
     // Clear the database before each test
+    await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Patient.deleteMany({});
     await Org.deleteMany({});
     await Invoice.deleteMany({});
     await LineItem.deleteMany({});
     
-    // Create test organization
+    // Create test organization with Stripe subscription ID for billing tests
     org = await Org.create({
       name: 'Test Healthcare Org',
       email: 'test@healthcare.com',
-      phone: '+12345678901'
+      phone: '+12345678901',
+      stripeSubscriptionId: 'sub_test123', // Required for getUnbilledCostsByOrg
     });
 
     // Create test patients
@@ -56,32 +85,35 @@ describe('Payment Service - Billing', () => {
       org: org._id
     });
 
-    // Create test conversations with proper start/end times
+    // Create test Call records (Call tracks billing, not Conversation)
     const baseTime = new Date();
-    conversation1 = await Conversation.create({
+    call1 = await Call.create({
       callSid: 'CA11111111111111111111111111111111',
       patientId: patient1._id,
       cost: 0.20,
+      duration: 120,
       status: 'completed',
       startTime: baseTime,
       endTime: new Date(baseTime.getTime() + 120000), // 2 minutes later
       lineItemId: null // Unbilled
     });
 
-    conversation2 = await Conversation.create({
+    call2 = await Call.create({
       callSid: 'CA22222222222222222222222222222222',
       patientId: patient1._id,
       cost: 0.30,
+      duration: 180,
       status: 'completed',
       startTime: baseTime,
       endTime: new Date(baseTime.getTime() + 180000), // 3 minutes later
       lineItemId: null // Unbilled
     });
 
-    conversation3 = await Conversation.create({
+    call3 = await Call.create({
       callSid: 'CA33333333333333333333333333333333',
       patientId: patient2._id,
       cost: 0.15,
+      duration: 90,
       status: 'completed',
       startTime: baseTime,
       endTime: new Date(baseTime.getTime() + 90000), // 1.5 minutes later
@@ -90,6 +122,7 @@ describe('Payment Service - Billing', () => {
   });
 
   afterEach(async () => {
+    await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Patient.deleteMany({});
     await Org.deleteMany({});
@@ -110,22 +143,22 @@ describe('Payment Service - Billing', () => {
       const johnDoe = result.patientCosts.find(p => p.patientName === 'John Doe');
       expect(johnDoe).toBeDefined();
       expect(johnDoe.patientId.toString()).toBe(patient1._id.toString());
-      expect(johnDoe.conversationCount).toBe(2);
+      expect(johnDoe.callCount).toBe(2);
       expect(johnDoe.totalCost).toBe(0.50); // 0.20 + 0.30
-      expect(johnDoe.conversations).toHaveLength(2);
+      expect(johnDoe.calls).toHaveLength(2);
       
       // Check Jane Smith's data
       const janeSmith = result.patientCosts.find(p => p.patientName === 'Jane Smith');
       expect(janeSmith).toBeDefined();
       expect(janeSmith.patientId.toString()).toBe(patient2._id.toString());
-      expect(janeSmith.conversationCount).toBe(1);
+      expect(janeSmith.callCount).toBe(1);
       expect(janeSmith.totalCost).toBe(0.15);
-      expect(janeSmith.conversations).toHaveLength(1);
+      expect(janeSmith.calls).toHaveLength(1);
     });
 
-    it('should return empty result when no unbilled conversations exist', async () => {
-      // Mark all conversations as billed
-      await Conversation.updateMany({}, { lineItemId: new mongoose.Types.ObjectId() });
+    it('should return empty result when no unbilled calls exist', async () => {
+      // Mark all calls as billed
+      await Call.updateMany({}, { lineItemId: new mongoose.Types.ObjectId() });
 
       const result = await paymentService.getUnbilledCostsByOrg(org._id, 7);
 
@@ -138,11 +171,11 @@ describe('Payment Service - Billing', () => {
     });
 
     it('should filter by date range', async () => {
-      // Create an old conversation
+      // Create an old call
       const oldDate = new Date();
       oldDate.setDate(oldDate.getDate() - 10); // 10 days ago
       
-      await Conversation.create({
+      await Call.create({
         callSid: 'CA44444444444444444444444444444444',
         patientId: patient1._id,
         duration: 60,
@@ -156,13 +189,13 @@ describe('Payment Service - Billing', () => {
       // Query for last 7 days only
       const result = await paymentService.getUnbilledCostsByOrg(org._id, 7);
 
-      expect(result.totalUnbilledCost).toBe(0.65); // Should not include the old conversation
-      expect(result.patientCosts[0].conversationCount).toBe(2); // Only recent conversations
+      expect(result.totalUnbilledCost).toBe(0.65); // Should not include the old call
+      expect(result.patientCosts[0].callCount).toBe(2); // Only recent calls
     });
 
-    it('should exclude conversations with zero cost', async () => {
-      // Create a conversation with zero cost
-      await Conversation.create({
+    it('should exclude calls with zero cost', async () => {
+      // Create a call with zero cost
+      await Call.create({
         callSid: 'CA55555555555555555555555555555555',
         patientId: patient1._id,
         duration: 0,
@@ -175,7 +208,7 @@ describe('Payment Service - Billing', () => {
 
       const result = await paymentService.getUnbilledCostsByOrg(org._id, 7);
 
-      expect(result.totalUnbilledCost).toBe(0.65); // Should not include zero-cost conversation
+      expect(result.totalUnbilledCost).toBe(0.65); // Should not include zero-cost call
     });
 
     it('should throw error for non-existent organization', async () => {
@@ -201,7 +234,7 @@ describe('Payment Service - Billing', () => {
   });
 
   describe('createInvoiceFromConversations', () => {
-    it('should create invoice with line items for unbilled conversations', async () => {
+    it('should create invoice with line items for unbilled calls', async () => {
       const invoice = await paymentService.createInvoiceFromConversations(patient1._id);
 
       expect(invoice.org.toString()).toBe(org._id.toString());
@@ -219,16 +252,16 @@ describe('Payment Service - Billing', () => {
       expect(invoice.lineItems[0].quantity).toBe(5); // 5 minutes total (120 + 180 seconds = 300 seconds = 5 minutes)
     });
 
-    it('should mark conversations as billed after creating invoice', async () => {
+    it('should mark calls as billed after creating invoice', async () => {
       await paymentService.createInvoiceFromConversations(patient1._id);
 
-      const updatedConversations = await Conversation.find({ patientId: patient1._id });
-      expect(updatedConversations.every(conv => conv.lineItemId !== null)).toBe(true);
+      const updatedCalls = await Call.find({ patientId: patient1._id });
+      expect(updatedCalls.every(call => call.lineItemId !== null)).toBe(true);
     });
 
-    it('should throw error when no unbilled conversations exist', async () => {
-      // Mark all conversations as billed
-      await Conversation.updateMany({ patientId: patient1._id }, { 
+    it('should throw error when no unbilled calls exist', async () => {
+      // Mark all calls as billed
+      await Call.updateMany({ patientId: patient1._id }, { 
         lineItemId: new mongoose.Types.ObjectId() 
       });
 

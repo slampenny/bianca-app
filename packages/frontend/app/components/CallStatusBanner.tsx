@@ -9,7 +9,6 @@ import { useAppDispatch, useAppSelector } from "../store/store"
 import { setCallStatus, updateCallStatus } from "../store/callSlice"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
-import { POLLING_INTERVALS } from "../constants"
 
 interface CallStatusBannerProps {
   conversationId: string
@@ -40,16 +39,15 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   const [callStartTime, setCallStartTime] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   
-  // RTK Query hooks
+  // RTK Query hooks - no polling (polling only for alerts)
   const { data: callStatusData, error: callStatusError, isLoading, isFetching } = useGetCallStatusQuery(conversationId, {
-    pollingInterval: POLLING_INTERVALS.CALL_STATUS,
-    // Only skip polling when call is in a terminal state
+    // Only skip when call is in a terminal state
     skip: conversationId === 'temp-call' || ['completed', 'failed', 'busy', 'no_answer', 'ended'].includes(status)
   })
 
-  // Log polling activity
+  // Log status activity
   React.useEffect(() => {
-    logger.debug('🔄 CallStatusBanner - Polling status check:', {
+    logger.debug('🔄 CallStatusBanner - Status check:', {
       conversationId,
       isLoading,
       isFetching,

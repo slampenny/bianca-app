@@ -56,11 +56,16 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# dotenv environment variables file - NEVER include .env files in Docker images
+# Docker containers should get all configuration from environment variables
 .env
+.env*
+!.env.example
 .env.test
 .env.local
 .env.production
+.env.staging
+.env.development
 
 # parcel-bundler cache
 .cache

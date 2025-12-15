@@ -328,7 +328,7 @@ if [ -n "$PRODUCTION_IP" ]; then
     MAX_WAIT=300  # 5 minutes
     ELAPSED=0
     while [ $ELAPSED -lt $MAX_WAIT ]; do
-        if ssh -i ~/.ssh/bianca-key-pair.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$PRODUCTION_IP "test -d /opt/bianca-production && test -f /opt/bianca-production/docker-compose.yml" 2>/dev/null; then
+        if ssh -i ~/.ssh/bianca-key-pair.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$PRODUCTION_IP "test -d /opt/bianca-production && test -f /opt/bianca-production/docker compose.yml" 2>/dev/null; then
             echo "✅ Instance initialization complete!"
             break
         fi
@@ -343,10 +343,10 @@ if [ -n "$PRODUCTION_IP" ]; then
         exit 1
     fi
     
-    # NOTE: Do NOT copy docker-compose files!
-    # The production-userdata.sh script creates docker-compose.yml dynamically
+    # NOTE: Do NOT copy docker compose files!
+    # The production-userdata.sh script creates docker compose.yml dynamically
     # with secrets from AWS Secrets Manager. Copying local files would overwrite these.
-    echo "ℹ️  Using docker-compose.yml created by instance userdata (contains AWS secrets)"
+    echo "ℹ️  Using docker compose.yml created by instance userdata (contains AWS secrets)"
     
     # Add SSH options to avoid host key verification prompts
     SSH_OPTS="-i ~/.ssh/bianca-key-pair.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -367,15 +367,15 @@ if [ -n "$PRODUCTION_IP" ]; then
       # Create MongoDB data directory
       sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
       
-      # Pull latest images in parallel (docker-compose pull already does this, but we optimize)
+      # Pull latest images in parallel (docker compose pull already does this, but we optimize)
       echo 'Pulling latest images...'
-      docker-compose pull --parallel 2>/dev/null || docker-compose pull
+      docker compose pull --parallel 2>/dev/null || docker compose pull
       
       if [ '$FORCE_CLEANUP' = 'true' ]; then
         echo 'Force cleanup: Stopping and removing ALL containers...'
         
         # Stop and remove all containers
-        docker-compose down || true
+        docker compose down || true
         
         # Force stop all running containers
         docker stop \$(docker ps -q) 2>/dev/null || true
@@ -392,9 +392,9 @@ if [ -n "$PRODUCTION_IP" ]; then
         echo 'Stopping and removing application containers (preserving MongoDB)...'
         
         # Stop and remove only the application containers (not MongoDB)
-        # Note: docker-compose uses service names, not container names
-        docker-compose stop app asterisk frontend nginx || true
-        docker-compose rm -f app asterisk frontend nginx || true
+        # Note: docker compose uses service names, not container names
+        docker compose stop app asterisk frontend nginx || true
+        docker compose rm -f app asterisk frontend nginx || true
         
         # Remove any orphaned containers with our project names
         docker rm -f \$(docker ps -aq --filter 'name=production_app') 2>/dev/null || true
@@ -423,11 +423,11 @@ if [ -n "$PRODUCTION_IP" ]; then
           docker rm -f \"\$EXISTING_MONGODB\" 2>/dev/null || true
         fi
         echo 'Starting all containers (MongoDB will be recreated)...'
-        docker-compose up -d
+        docker compose up -d
       else
         echo 'Starting all containers (including MongoDB)...'
         # Start all containers (MongoDB will be created)
-        docker-compose up -d
+        docker compose up -d
       fi
       
       # Wait for services to be ready with optimized health checks
