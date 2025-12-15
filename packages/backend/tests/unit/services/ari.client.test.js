@@ -126,7 +126,7 @@ describe('ARI Client', () => {
       
       const AriClient = require('ari-client');
       expect(AriClient.connect).toHaveBeenCalledWith(
-        'http://asterisk:8088',
+        'http://localhost:8088', // In test environment, uses localhost
         'myphonefriend',
         expect.any(String), // Password comes from config, not hardcoded
         expect.objectContaining({

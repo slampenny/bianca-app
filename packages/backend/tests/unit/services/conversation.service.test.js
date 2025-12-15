@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const conversationService = require('../../../src/services/conversation.service');
-const { Conversation, Message, Patient } = require('../../../src/models');
+const { Conversation, Message, Patient, Call } = require('../../../src/models');
 
 let mongoServer;
 
@@ -22,6 +22,7 @@ describe('conversationService', () => {
     await Patient.deleteMany();
     await Conversation.deleteMany();
     await Message.deleteMany();
+    await Call.deleteMany();
   });
 
   it('should create a new conversation for a patient', async () => {
@@ -34,9 +35,19 @@ describe('conversationService', () => {
     });
     await patient.save();
 
-    const conversation = await conversationService.createConversationForPatient(patient._id);
+    // Create a call first (conversations require a callId)
+    const call = new Call({
+      patientId: patient._id,
+      callSid: 'CA1234567890abcdef',
+      status: 'completed',
+      duration: 60
+    });
+    await call.save();
+
+    const conversation = await conversationService.createConversationForPatient(patient._id, call._id);
     expect(conversation).toHaveProperty('_id');
     expect(conversation).toHaveProperty('patientId', patient._id);
+    expect(conversation).toHaveProperty('callId', call._id);
   });
 
   it('should add a message to a conversation', async () => {
@@ -49,7 +60,16 @@ describe('conversationService', () => {
     });
     await patient.save();
 
-    const conversation = await conversationService.createConversationForPatient(patient._id);
+    // Create a call first
+    const call = new Call({
+      patientId: patient._id,
+      callSid: 'CA1234567890abcdef',
+      status: 'completed',
+      duration: 60
+    });
+    await call.save();
+
+    const conversation = await conversationService.createConversationForPatient(patient._id, call._id);
     const messageContent = 'Hello, world!';
     const updatedConversation = await conversationService.addMessageToConversation(
       conversation._id,
@@ -71,7 +91,16 @@ describe('conversationService', () => {
     });
     await patient.save();
 
-    const conversation = await conversationService.createConversationForPatient(patient._id);
+    // Create a call first
+    const call = new Call({
+      patientId: patient._id,
+      callSid: 'CA1234567890abcdef',
+      status: 'completed',
+      duration: 60
+    });
+    await call.save();
+
+    const conversation = await conversationService.createConversationForPatient(patient._id, call._id);
     const fetchedConversation = await conversationService.getConversationById(conversation._id);
     expect(fetchedConversation).toHaveProperty('_id', conversation._id);
   });
@@ -86,8 +115,25 @@ describe('conversationService', () => {
     });
     await patient.save();
 
-    await conversationService.createConversationForPatient(patient._id);
-    await conversationService.createConversationForPatient(patient._id);
+    // Create calls for each conversation
+    const call1 = new Call({
+      patientId: patient._id,
+      callSid: 'CA1111111111111111',
+      status: 'completed',
+      duration: 60
+    });
+    await call1.save();
+
+    const call2 = new Call({
+      patientId: patient._id,
+      callSid: 'CA2222222222222222',
+      status: 'completed',
+      duration: 60
+    });
+    await call2.save();
+
+    await conversationService.createConversationForPatient(patient._id, call1._id);
+    await conversationService.createConversationForPatient(patient._id, call2._id);
     const conversations = await conversationService.getConversationsByPatient(patient._id);
     expect(conversations).toHaveLength(2);
   });

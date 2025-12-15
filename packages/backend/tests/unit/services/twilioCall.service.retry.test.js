@@ -2,6 +2,34 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { Call, Conversation, Patient, Org, Caregiver } = require('../../../src/models');
 
+// Mock Twilio library (external service)
+jest.mock('twilio', () => {
+  const mockTwilioClient = {
+    calls: {
+      create: jest.fn().mockResolvedValue({
+        sid: 'CA1234567890abcdef1234567890abcdef',
+        status: 'queued'
+      }),
+      get: jest.fn().mockReturnValue({
+        fetch: jest.fn().mockResolvedValue({
+          sid: 'CA1234567890abcdef1234567890abcdef',
+          status: 'completed',
+          duration: 120
+        })
+      })
+    }
+  };
+  const mockTwilio = jest.fn(() => mockTwilioClient);
+  mockTwilio.twiml = {
+    VoiceResponse: jest.fn().mockImplementation(() => ({
+      say: jest.fn().mockReturnThis(),
+      dial: jest.fn().mockReturnThis(),
+      toString: jest.fn().mockReturnValue('<Response></Response>')
+    }))
+  };
+  return mockTwilio;
+});
+
 // Mock agenda before importing twilioCallService
 jest.mock('../../../src/config/agenda', () => ({
   agenda: {

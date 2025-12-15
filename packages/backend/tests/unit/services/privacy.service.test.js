@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const privacyService = require('../../../src/services/privacy.service');
-const { PrivacyRequest, ConsentRecord, Caregiver, Patient, Conversation, MedicalAnalysis } = require('../../../src/models');
+const { PrivacyRequest, ConsentRecord, Caregiver, Patient, Conversation, MedicalAnalysis, Call } = require('../../../src/models');
 const ApiError = require('../../../src/utils/ApiError');
 const emailService = require('../../../src/services/email.service');
 
@@ -35,6 +35,7 @@ describe('Privacy Service', () => {
     await Caregiver.deleteMany({});
     await Patient.deleteMany({});
     await Conversation.deleteMany({});
+    await Call.deleteMany({});
     await MedicalAnalysis.deleteMany({});
 
     // Create test caregiver
@@ -195,9 +196,17 @@ describe('Privacy Service', () => {
 
   describe('processAccessRequest', () => {
     it('should automatically gather and email all user data', async () => {
-      // Create test data
+      // Create test data - first create a call (conversations require callId)
+      const call = await Call.create({
+        patientId: patientId,
+        callSid: 'CA1234567890abcdef',
+        status: 'completed',
+        duration: 60
+      });
+
       const conversation = await Conversation.create({
         patientId: patientId,
+        callId: call._id,
         agentId: caregiverId,
         status: 'completed',
         startTime: new Date(),

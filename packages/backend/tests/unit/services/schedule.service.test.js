@@ -2,6 +2,22 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const faker = require('faker');
 const httpStatus = require('http-status');
+
+// Mock agenda before importing app to prevent connection attempts in tests
+jest.mock('../../../src/config/agenda', () => {
+  const mockAgenda = {
+    on: jest.fn(),
+    every: jest.fn(),
+    start: jest.fn(),
+    stop: jest.fn(),
+    define: jest.fn(),
+    now: jest.fn(),
+    schedule: jest.fn(),
+    cancel: jest.fn(),
+  };
+  return { agenda: mockAgenda };
+});
+
 const app = require('../../../src/app');
 const { Schedule, Patient, Caregiver, Org } = require('../../../src/models');
 const { scheduleService } = require('../../../src/services');

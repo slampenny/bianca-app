@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Conversation, Patient, Org } = require('../../../src/models');
+const { Conversation, Patient, Org, Call } = require('../../../src/models');
 
 // Mock config and logger before requiring agenda
 jest.mock('../../../src/config/config', () => ({
@@ -28,6 +28,27 @@ jest.mock('agenda', () => {
     every: jest.fn(),
   };
   return jest.fn().mockImplementation(() => mockAgendaInstance);
+});
+
+// Mock Twilio library (external service)
+jest.mock('twilio', () => {
+  const mockTwilioClient = {
+    calls: {
+      create: jest.fn().mockResolvedValue({
+        sid: 'CA1234567890abcdef1234567890abcdef',
+        status: 'queued'
+      })
+    }
+  };
+  const mockTwilio = jest.fn(() => mockTwilioClient);
+  mockTwilio.twiml = {
+    VoiceResponse: jest.fn().mockImplementation(() => ({
+      say: jest.fn().mockReturnThis(),
+      dial: jest.fn().mockReturnThis(),
+      toString: jest.fn().mockReturnValue('<Response></Response>')
+    }))
+  };
+  return mockTwilio;
 });
 
 // Mock twilioCallService.initiateCall
@@ -94,15 +115,20 @@ describe('Agenda - Retry Missed Call Job', () => {
       org: org._id,
     });
 
-    // Create failed conversation
-    conversation = await Conversation.create({
+    // Create a Call first (Conversation requires callId)
+    const call = await Call.create({
       callSid: 'CA1234567890',
       patientId: patient._id,
-      startTime: new Date(),
-      callType: 'wellness-check',
+      org: org._id,
       status: 'failed',
-      failureReason: 'no-answer',
-      retryAttempt: 0,
+      duration: 0
+    });
+    
+    // Create failed conversation
+    conversation = await Conversation.create({
+      callId: call._id,
+      patientId: patient._id,
+      status: 'failed',
     });
   });
 
@@ -134,20 +160,29 @@ describe('Agenda - Retry Missed Call Job', () => {
 
       const newCallSid = await twilioCallService.initiateCall(patient._id);
       
-      const newConversation = await Conversation.create({
+      // Create a Call first (Conversation requires callId)
+      // Retry fields are on Call, not Conversation
+      const originalCall = await Call.findOne({ callSid: 'CA1234567890' });
+      const newCall = await Call.create({
         callSid: newCallSid,
         patientId: patient._id,
-        startTime: new Date(),
-        callType: 'wellness-check',
+        org: org._id,
         status: 'initiated',
+        duration: 0,
         retryAttempt: jobData.retryAttempt,
-        originalCallId: jobData.originalCallId,
+        originalCallId: originalCall._id,
         maxRetries: maxRetries,
+      });
+      
+      const newConversation = await Conversation.create({
+        callId: newCall._id,
+        patientId: patient._id,
+        status: 'initiated',
       });
 
       expect(twilioCallService.initiateCall).toHaveBeenCalledWith(patient._id);
-      expect(newConversation.retryAttempt).toBe(1);
-      expect(newConversation.originalCallId.toString()).toBe(conversation._id.toString());
+      expect(newCall.retryAttempt).toBe(1);
+      expect(newCall.originalCallId.toString()).toBe(originalCall._id.toString());
     }
   });
 
