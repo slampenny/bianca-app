@@ -76,6 +76,20 @@ const orgSchema = mongoose.Schema(
       default: 'America/New_York',
       trim: true,
     },
+    // Organization country (ISO 3166-1 alpha-2 country code, e.g., 'US', 'CA')
+    // Used for determining applicable privacy regulations (HIPAA, PIPEDA, etc.)
+    country: {
+      type: String,
+      required: false,
+      trim: true,
+      uppercase: true,
+      enum: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'CH', 'JP', 'CN', 'HK', 'SG', 'AE', 'IN', 'MX', 'BR', 'OTHER'],
+      validate(value) {
+        if (value && value.length !== 2 && value !== 'OTHER') {
+          throw new Error('Country must be a 2-letter ISO code or "OTHER"');
+        }
+      },
+    },
     // Call retry settings for the organization
     callRetrySettings: {
       retryCount: {

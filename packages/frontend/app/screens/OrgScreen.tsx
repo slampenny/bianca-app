@@ -18,6 +18,30 @@ import type { ThemeColors } from "../types"
 import { Button, Text, TextField, Toggle } from "app/components"
 import { logger } from "../utils/logger"
 
+// Common countries list (ISO 3166-1 alpha-2 codes)
+const COUNTRIES = [
+  { value: 'US', label: 'United States' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'GB', label: 'United Kingdom' },
+  { value: 'AU', label: 'Australia' },
+  { value: 'DE', label: 'Germany' },
+  { value: 'FR', label: 'France' },
+  { value: 'IT', label: 'Italy' },
+  { value: 'ES', label: 'Spain' },
+  { value: 'NL', label: 'Netherlands' },
+  { value: 'SE', label: 'Sweden' },
+  { value: 'CH', label: 'Switzerland' },
+  { value: 'JP', label: 'Japan' },
+  { value: 'CN', label: 'China' },
+  { value: 'HK', label: 'Hong Kong' },
+  { value: 'SG', label: 'Singapore' },
+  { value: 'AE', label: 'United Arab Emirates' },
+  { value: 'IN', label: 'India' },
+  { value: 'MX', label: 'Mexico' },
+  { value: 'BR', label: 'Brazil' },
+  { value: 'OTHER', label: 'Other' },
+]
+
 // Common timezones list (IANA timezone identifiers)
 const TIMEZONES = [
   { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
@@ -66,6 +90,7 @@ export function OrgScreen() {
   const [retryIntervalMinutes, setRetryIntervalMinutes] = useState("15")
   const [alertOnAllMissedCalls, setAlertOnAllMissedCalls] = useState(false)
   const [timezone, setTimezone] = useState("America/New_York")
+  const [country, setCountry] = useState<string>("US")
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
 
@@ -84,6 +109,7 @@ export function OrgScreen() {
         setPhone(currentOrg.phone)
         setLogo(currentOrg.logo || null)
         setTimezone(currentOrg.timezone || "America/New_York")
+        setCountry(currentOrg.country || "US")
         // Initialize call retry settings
         if (currentOrg.callRetrySettings) {
           setRetryCount(String(currentOrg.callRetrySettings.retryCount ?? 2))
@@ -184,6 +210,7 @@ export function OrgScreen() {
           phone,
           logo,
           timezone,
+          country,
           callRetrySettings: {
             retryCount: parseInt(retryCount, 10) || 2,
             retryIntervalMinutes: parseInt(retryIntervalMinutes, 10) || 15,
@@ -286,6 +313,35 @@ export function OrgScreen() {
           inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
           style={!canEditOrg ? styles.readonlyInput : styles.input}
         />
+
+        {/* Country Section */}
+        <View style={styles.countrySection}>
+          <Text style={styles.sectionTitle} preset="formLabel">
+            {translate("orgScreen.country")}
+          </Text>
+          <Text style={styles.sectionHelper} preset="formHelper">
+            {translate("orgScreen.countryHelper")}
+          </Text>
+          <View style={styles.pickerWrapper}>
+            <Picker
+              selectedValue={country}
+              onValueChange={setCountry}
+              enabled={canEditOrg}
+              style={styles.picker}
+              itemStyle={styles.pickerItem}
+              dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+            >
+              {COUNTRIES.map((c) => (
+                <Picker.Item
+                  key={c.value}
+                  label={c.label}
+                  value={c.value}
+                  color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
 
         {/* Timezone Section */}
         <View style={styles.timezoneSection}>
@@ -471,6 +527,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.palette.neutral300,
+  },
+  countrySection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
   },
   timezoneSection: {
     marginTop: 20,

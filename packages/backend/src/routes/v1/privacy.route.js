@@ -110,6 +110,29 @@ router
     privacyController.getPrivacyStatistics
   );
 
+// Complaints (PIPEDA and HIPAA)
+router
+  .route('/complaints')
+  .post(
+    auth(), // Any authenticated user can create a complaint
+    privacyController.createComplaint
+  )
+  .get(
+    auth(), // Users can see their own complaints, admins can see all
+    privacyController.getComplaints
+  );
+
+router
+  .route('/complaints/:complaintId')
+  .get(
+    auth(), // Users can see their own, admins can see all
+    privacyController.getComplaint
+  )
+  .patch(
+    auth('updateAny:privacy'), // Admin only
+    privacyController.updateComplaint
+  );
+
 module.exports = router;
 
 

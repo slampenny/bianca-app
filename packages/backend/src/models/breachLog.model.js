@@ -6,7 +6,11 @@
  * - §164.404 - Notification to Individuals
  * - §164.406 - Notification to the Secretary
  * 
- * Tracks potential and confirmed security breaches for HIPAA compliance
+ * PIPEDA Requirements:
+ * - Notification to individuals "as soon as feasible"
+ * - Notification to Privacy Commissioner of Canada for significant harm
+ * 
+ * Tracks potential and confirmed security breaches for HIPAA and PIPEDA compliance
  */
 
 const mongoose = require('mongoose');
@@ -129,6 +133,34 @@ const breachLogSchema = new mongoose.Schema(
       type: Date,
     },
     
+    // PIPEDA-specific fields
+    requiresPrivacyCommissionerNotification: {
+      type: Boolean,
+      default: false, // True if breach involves significant harm (PIPEDA)
+    },
+    
+    privacyCommissionerNotified: {
+      type: Boolean,
+      default: false,
+    },
+    
+    privacyCommissionerNotifiedAt: {
+      type: Date,
+    },
+    
+    significantHarmAssessment: {
+      type: String, // Assessment of whether breach involves significant harm (PIPEDA)
+      enum: ['NOT_ASSESSED', 'NO_SIGNIFICANT_HARM', 'SIGNIFICANT_HARM', 'PENDING'],
+      default: 'NOT_ASSESSED'
+    },
+    
+    // Organization country for jurisdiction determination
+    organizationCountry: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    
     // Response Actions
     mitigationSteps: [{
       action: String,
@@ -172,6 +204,8 @@ breachLogSchema.index({ detectedAt: -1 });
 breachLogSchema.index({ status: 1, severity: 1 });
 breachLogSchema.index({ userId: 1, detectedAt: -1 });
 breachLogSchema.index({ requiresHHSNotification: 1, hhsNotified: 1 });
+breachLogSchema.index({ requiresPrivacyCommissionerNotification: 1, privacyCommissionerNotified: 1 });
+breachLogSchema.index({ organizationCountry: 1, detectedAt: -1 });
 
 // Plugin to convert mongoose to JSON
 breachLogSchema.plugin(toJSON);
@@ -184,6 +218,7 @@ breachLogSchema.statics.getNotificationRequired = async function() {
     status: 'CONFIRMED',
     $or: [
       { requiresHHSNotification: true, hhsNotified: false },
+      { requiresPrivacyCommissionerNotification: true, privacyCommissionerNotified: false },
       { individualsNotified: false }
     ]
   }).sort({ detectedAt: 1 });
