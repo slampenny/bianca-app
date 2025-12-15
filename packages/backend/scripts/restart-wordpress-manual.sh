@@ -39,7 +39,7 @@ echo ""
 COMMAND_ID=$(aws ssm send-command --profile jordan \
     --instance-ids "$INSTANCE_ID" \
     --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["cd /opt/bianca-wordpress && docker-compose restart && sleep 15 && docker ps"]' \
+    --parameters 'commands=["cd /opt/bianca-wordpress && docker compose restart && sleep 15 && docker ps"]' \
     --output text --query 'Command.CommandId' 2>&1)
 
 if [ $? -eq 0 ] && [ -n "$COMMAND_ID" ]; then
@@ -65,7 +65,7 @@ if [ $? -eq 0 ] && [ -n "$COMMAND_ID" ]; then
     echo "   You may need to:"
     echo "   1. SSH into the instance and restart WordPress manually:"
     echo "      ssh ec2-user@18.225.149.168"
-    echo "      cd /opt/bianca-wordpress && docker-compose restart"
+    echo "      cd /opt/bianca-wordpress && docker compose restart"
     echo "   2. Or restart the SSM agent: sudo systemctl restart amazon-ssm-agent"
 else
     echo "❌ Failed to send restart command"

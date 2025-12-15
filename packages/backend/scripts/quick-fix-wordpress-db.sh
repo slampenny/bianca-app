@@ -29,7 +29,7 @@ docker ps -a
 
 echo ""
 echo "=== Stopping All Containers ==="
-docker-compose down
+docker compose down
 
 echo ""
 echo "=== Removing Old Network (if exists) ==="
@@ -37,7 +37,7 @@ docker network rm bianca-wordpress_wordpress-network 2>/dev/null || true
 
 echo ""
 echo "=== Starting Containers ==="
-docker-compose up -d
+docker compose up -d
 
 echo ""
 echo "=== Waiting for Containers to Start ==="
@@ -101,7 +101,7 @@ echo "✅ Fix command completed"
 echo ""
 echo "If the issue persists, the containers may need to be recreated:"
 echo "  cd /opt/bianca-wordpress"
-echo "  docker-compose down -v"
-echo "  docker-compose up -d"
+echo "  docker compose down -v"
+echo "  docker compose up -d"
 echo "=========================================="
 

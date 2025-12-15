@@ -100,7 +100,7 @@ set -e
 cd /opt/bianca-app-backend 2>/dev/null || cd /home/ec2-user/bianca-app-backend 2>/dev/null || { echo "Could not find app directory"; exit 1; }
 export NODE_ENV=${env}
 echo "Running seed script in ${env} environment..."
-docker exec -i \$(docker ps -q --filter 'name=app' | head -1) node src/scripts/seedDatabase.js || docker-compose -f docker-compose.yml -f docker-compose.${env}.yml exec -T app node src/scripts/seedDatabase.js || { echo "Failed to run seed script"; exit 1; }
+docker exec -i \$(docker ps -q --filter 'name=app' | head -1) node src/scripts/seedDatabase.js || docker compose -f docker compose.yml -f docker compose.${env}.yml exec -T app node src/scripts/seedDatabase.js || { echo "Failed to run seed script"; exit 1; }
 echo "✓ Seed script completed successfully on ${env}"
 EOF
     

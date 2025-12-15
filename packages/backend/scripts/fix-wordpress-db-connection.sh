@@ -49,9 +49,9 @@ docker exec bianca-wordpress cat /var/www/html/wp-config.php 2>/dev/null | grep 
 echo ""
 echo "=== Restarting Docker Containers ==="
 cd /opt/bianca-wordpress
-docker-compose down
+docker compose down
 sleep 5
-docker-compose up -d
+docker compose up -d
 
 echo ""
 echo "=== Waiting for containers to start ==="
@@ -110,7 +110,7 @@ echo ""
 echo "=========================================="
 echo "If the issue persists, try:"
 echo "1. Check if containers are on the same network: docker network inspect bianca-wordpress_wordpress-network"
-echo "2. Restart all containers: cd /opt/bianca-wordpress && docker-compose restart"
-echo "3. Recreate the network: docker network rm bianca-wordpress_wordpress-network && docker-compose up -d"
+echo "2. Restart all containers: cd /opt/bianca-wordpress && docker compose restart"
+echo "3. Recreate the network: docker network rm bianca-wordpress_wordpress-network && docker compose up -d"
 echo "=========================================="
 

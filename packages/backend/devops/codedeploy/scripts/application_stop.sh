@@ -26,26 +26,26 @@ if ! cd "$DEPLOY_DIR" 2>/dev/null; then
   exit 0
 fi
 
-# Check if docker-compose.yml exists and use docker-compose if available
-if [ -f "docker-compose.yml" ] && command -v docker-compose >/dev/null 2>&1; then
-  echo "   Stopping containers with docker-compose..."
-  # Use docker-compose down with timeout to prevent hangs
+# Check if docker-compose.yml exists and use docker compose if available
+if [ -f "docker-compose.yml" ] && docker compose version >/dev/null 2>&1; then
+  echo "   Stopping containers with docker compose..."
+  # Use docker compose down with timeout to prevent hangs
   if command -v timeout >/dev/null 2>&1; then
-    timeout 30 docker-compose down --remove-orphans 2>&1 || {
-      echo "   ⚠️  docker-compose down timed out or failed, trying force stop..."
-      timeout 10 docker-compose kill 2>&1 || true
-      timeout 5 docker-compose rm -f 2>&1 || true
+    timeout 30 docker compose down --remove-orphans 2>&1 || {
+      echo "   ⚠️  docker compose down timed out or failed, trying force stop..."
+      timeout 10 docker compose kill 2>&1 || true
+      timeout 5 docker compose rm -f 2>&1 || true
     }
   else
     # Fallback if timeout command not available
-    docker-compose down --remove-orphans 2>&1 || {
-      echo "   ⚠️  docker-compose down failed, trying force stop..."
-      docker-compose kill 2>&1 || true
-      docker-compose rm -f 2>&1 || true
+    docker compose down --remove-orphans 2>&1 || {
+      echo "   ⚠️  docker compose down failed, trying force stop..."
+      docker compose kill 2>&1 || true
+      docker compose rm -f 2>&1 || true
     }
   fi
 else
-  echo "   docker-compose.yml not found or docker-compose not available, stopping individual containers..."
+  echo "   docker-compose.yml not found or docker compose not available, stopping individual containers..."
   # Fallback: stop individual containers
   CONTAINERS="${CONTAINER_PREFIX}_app ${CONTAINER_PREFIX}_frontend ${CONTAINER_PREFIX}_nginx ${CONTAINER_PREFIX}_mongodb ${CONTAINER_PREFIX}_asterisk ${CONTAINER_PREFIX}_posthog ${CONTAINER_PREFIX}_posthog_db ${CONTAINER_PREFIX}_posthog_redis"
   

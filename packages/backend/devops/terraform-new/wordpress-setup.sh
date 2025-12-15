@@ -74,8 +74,8 @@ else
     echo "Warning: WordPress DB volume /dev/xvdg not found. Using local storage."
 fi
 
-# Create WordPress docker-compose.yml
-cat > $WORDPRESS_DIR/docker-compose.yml <<'EOF'
+# Create WordPress docker compose.yml
+cat > $WORDPRESS_DIR/docker compose.yml <<'EOF'
 version: '3.8'
 
 services:
@@ -173,7 +173,7 @@ chmod -R 775 $WORDPRESS_DATA_DIR/wp-content
 
 # Start WordPress services
 cd $WORDPRESS_DIR
-docker-compose up -d
+docker compose up -d
 
 echo "WordPress setup complete!"
 echo "WordPress will be available at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
