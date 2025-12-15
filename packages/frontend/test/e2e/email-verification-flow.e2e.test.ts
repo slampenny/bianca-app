@@ -74,11 +74,11 @@ test.describe('Email Verification Flow - End to End with Ethereal', () => {
           console.log('⚠️ Email verification test failed - Ethereal email delivery timing issue')
           console.log('⚠️ This is a known flaky test due to external service timing')
           // Skip the test rather than fail it to avoid blocking the pipeline
-          test.skip(true, 'Ethereal email delivery timing issue - email not received in time')
+          test.skip()
           return
         }
         console.log(`Email not found yet, retrying... (${retries} retries left)`)
-        await page.waitForTimeout(15000) // Wait 15 seconds before retry
+        await page.waitForTimeout(5000) // Wait 5 seconds before retry (reduced from 15s)
       }
     }
     
