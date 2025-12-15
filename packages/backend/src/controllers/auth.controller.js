@@ -15,6 +15,7 @@ const register = catchAsync(async (req, res, next) => {
       email: req.body.email,
       name: req.body.name,
       phone: req.body.phone,
+      country: req.body.country,
     },
     {
       email: req.body.email,

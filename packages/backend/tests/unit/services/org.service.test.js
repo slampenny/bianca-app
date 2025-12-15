@@ -64,6 +64,13 @@ describe('orgService', () => {
     expect(updatedOrg).toHaveProperty('name', 'Updated Org');
   });
 
+  it('should update an org country', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const updatedOrg = await orgService.updateOrgById(org.id, { country: 'CA' });
+    expect(updatedOrg).toHaveProperty('id', org.id);
+    expect(updatedOrg).toHaveProperty('country', 'CA');
+  });
+
   it('should delete an org', async () => {
     const [org] = await insertOrgs([orgOne]);
     await orgService.deleteOrgById(org.id);

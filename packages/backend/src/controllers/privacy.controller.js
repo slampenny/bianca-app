@@ -169,6 +169,46 @@ const getPrivacyStatistics = catchAsync(async (req, res) => {
   res.send(stats);
 });
 
+/**
+ * Create privacy complaint
+ */
+const createComplaint = catchAsync(async (req, res) => {
+  const complaint = await privacyService.createComplaint(
+    req.body,
+    req.user.id,
+    'Caregiver'
+  );
+  res.status(httpStatus.CREATED).send(complaint);
+});
+
+/**
+ * Get complaint by ID
+ */
+const getComplaint = catchAsync(async (req, res) => {
+  const complaint = await privacyService.getComplaintById(req.params.complaintId, req.user.id);
+  res.send(complaint);
+});
+
+/**
+ * Get complaints
+ */
+const getComplaints = catchAsync(async (req, res) => {
+  const result = await privacyService.queryComplaints(req.query, req.queryOptions, req.user.id);
+  res.send(result);
+});
+
+/**
+ * Update complaint
+ */
+const updateComplaint = catchAsync(async (req, res) => {
+  const complaint = await privacyService.updateComplaint(
+    req.params.complaintId,
+    req.body,
+    req.user.id
+  );
+  res.send(complaint);
+});
+
 module.exports = {
   createAccessRequest,
   createCorrectionRequest,
@@ -185,5 +225,9 @@ module.exports = {
   getApproachingDeadline,
   getOverdueRequests,
   getPrivacyStatistics,
+  createComplaint,
+  getComplaint,
+  getComplaints,
+  updateComplaint,
 };
 

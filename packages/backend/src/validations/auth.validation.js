@@ -7,6 +7,7 @@ const register = {
     password: Joi.string().required().custom(password),
     name: Joi.string().required(),
     phone: Joi.string().required(),
+    country: Joi.string().valid('US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'CH', 'JP', 'CN', 'HK', 'SG', 'AE', 'IN', 'MX', 'BR', 'OTHER').optional().uppercase(),
   }),
 };
 
