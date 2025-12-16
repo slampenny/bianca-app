@@ -12,7 +12,11 @@ const { stopAllListeners } = require('./services/rtp.listener.service'); // Upda
 async function startServer() {
   try {
     // Load environment variables and secrets
+    // Debug: Log actual process.env.NODE_ENV before loading secrets
+    logger.info(`[Startup] process.env.NODE_ENV: ${process.env.NODE_ENV || 'NOT_SET'}`);
     await config.loadSecrets();
+    logger.info(`[Startup] config.env after loadSecrets: ${config.env}`);
+    logger.info(`[Startup] process.env.NODE_ENV after loadSecrets: ${process.env.NODE_ENV || 'NOT_SET'}`);
     logger.info(`Environment: ${config.env}`);
 
     // Re-initialize Twilio SMS service after secrets are loaded
