@@ -25,6 +25,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = await Org.create({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
     });
 
     expect(org.callRetrySettings).toBeDefined();
@@ -37,6 +38,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = await Org.create({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryCount: 5,
         retryIntervalMinutes: 30,
@@ -53,6 +55,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = new Org({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryCount: -1,
       },
@@ -65,6 +68,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = new Org({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryCount: 11,
       },
@@ -77,6 +81,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = new Org({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryIntervalMinutes: 0,
       },
@@ -89,6 +94,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = new Org({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryIntervalMinutes: 1441,
       },
@@ -101,6 +107,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = new Org({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryCount: 2.5,
       },
@@ -113,6 +120,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = new Org({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryIntervalMinutes: 15.5,
       },
@@ -125,6 +133,7 @@ describe('Org Model - Call Retry Settings', () => {
     const org = await Org.create({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
     });
 
     org.callRetrySettings.retryCount = 3;
