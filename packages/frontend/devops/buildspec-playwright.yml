@@ -131,24 +131,38 @@ phases:
         done
       - echo "Verifying backend environment configuration..."
       - |
-        # Check backend logs for environment
+        set -e  # Exit on error
         echo "=== Backend Environment Verification ==="
-        docker logs backend-test 2>&1 | grep -i "environment\|env:" | head -5 || echo "No environment log found"
         # Verify NODE_ENV is set correctly in container
-        CONTAINER_NODE_ENV=$(docker exec backend-test printenv NODE_ENV 2>/dev/null || echo "NOT_SET")
-        echo "NODE_ENV in container: $CONTAINER_NODE_ENV"
+        CONTAINER_NODE_ENV=$(docker exec backend-test printenv NODE_ENV 2>/dev/null | tr -d '\n\r\t ' || echo "NOT_SET")
+        echo "Container NODE_ENV: [$CONTAINER_NODE_ENV]"
         # Check health endpoint for environment
         HEALTH_RESPONSE=$(curl -s http://localhost:3000/health 2>/dev/null || echo "{}")
-        BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | grep -o '"environment":"[^"]*"' | cut -d'"' -f4 || echo "UNKNOWN")
-        echo "Backend config.env from /health: $BACKEND_ENV"
-        # Verify environment is correct
-        if [ "$CONTAINER_NODE_ENV" != "test" ] || [ "$BACKEND_ENV" != "test" ]; then
+        # Extract environment value - try jq first, then sed, then grep
+        BACKEND_ENV="UNKNOWN"
+        if command -v jq >/dev/null 2>&1; then
+          BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | jq -r '.environment // empty' 2>/dev/null | tr -d '\n\r\t ' || echo "UNKNOWN")
+        elif echo "$HEALTH_RESPONSE" | grep -q '"environment"'; then
+          BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | sed -n 's/.*"environment"\s*:\s*"\([^"]*\)".*/\1/p' | tr -d '\n\r\t ' || echo "UNKNOWN")
+        fi
+        echo "Backend config.env from /health: [$BACKEND_ENV]"
+        # Verify both values are exactly "test" (case-sensitive, no whitespace)
+        ERROR_COUNT=0
+        if [ "$CONTAINER_NODE_ENV" != "test" ]; then
+          echo "❌ Container NODE_ENV mismatch: got [$CONTAINER_NODE_ENV], expected [test]"
+          ERROR_COUNT=$((ERROR_COUNT + 1))
+        fi
+        if [ "$BACKEND_ENV" != "test" ]; then
+          echo "❌ Backend config.env mismatch: got [$BACKEND_ENV], expected [test]"
+          ERROR_COUNT=$((ERROR_COUNT + 1))
+        fi
+        if [ $ERROR_COUNT -gt 0 ]; then
+          echo ""
           echo "❌ ERROR: Backend is not in test mode!"
-          echo "  Container NODE_ENV: $CONTAINER_NODE_ENV"
-          echo "  Backend config.env: $BACKEND_ENV"
           echo "This will cause:"
           echo "  - Test routes to be blocked (403)"
           echo "  - Rate limiting to be enabled (429 errors)"
+          echo ""
           echo "Backend logs (last 50 lines):"
           docker logs backend-test --tail 50 || true
           exit 1
