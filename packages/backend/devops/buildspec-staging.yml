@@ -13,6 +13,12 @@ phases:
       - echo "Refreshing Git attributes to ensure binary files are correct..."
       - cd packages/frontend && git checkout -- assets/images/icon.png 2>/dev/null || true
       - cd ../..
+      - echo "Pulling base images to avoid Docker Hub rate limits..."
+      - |
+        # Try to pull node:20-bullseye from ECR Public first (no rate limits)
+        docker pull public.ecr.aws/docker/library/node:20-bullseye 2>/dev/null && \
+          docker tag public.ecr.aws/docker/library/node:20-bullseye node:20-bullseye || \
+          echo "ECR Public image not available, will use Docker Hub (may hit rate limit)"
 
   build:
     commands:
@@ -36,13 +42,19 @@ phases:
                      -f docker/Dockerfile .
         cd ../..
         echo "✅ Backend build complete"
-        # Verify ecosystem.config.json doesn't have hardcoded NODE_ENV
+        # Verify ecosystem.config.json doesn't have hardcoded NODE_ENV (only if build succeeded)
         echo "🔍 Verifying ecosystem.config.json in built image..."
-        docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json | grep -q '"NODE_ENV"' && {
-          echo "❌ ERROR: ecosystem.config.json still contains hardcoded NODE_ENV!"
-          docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json
-          exit 1
-        } || echo "✅ Verified: ecosystem.config.json does NOT have hardcoded NODE_ENV"
+        if docker images | grep -q "$ECR_REGISTRY/bianca-app-backend.*staging"; then
+          if docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json 2>/dev/null | grep -q '"NODE_ENV"'; then
+            echo "❌ ERROR: ecosystem.config.json still contains hardcoded NODE_ENV!"
+            docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json
+            exit 1
+          else
+            echo "✅ Verified: ecosystem.config.json does NOT have hardcoded NODE_ENV"
+          fi
+        else
+          echo "⚠️  WARNING: Could not verify - image tag not found locally (will be verified after push)"
+        fi
       - |
         # Build asterisk image
         echo "🔨 Building asterisk image..."
