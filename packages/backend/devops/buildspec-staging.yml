@@ -13,12 +13,20 @@ phases:
       - echo "Refreshing Git attributes to ensure binary files are correct..."
       - cd packages/frontend && git checkout -- assets/images/icon.png 2>/dev/null || true
       - cd ../..
-      - echo "Pulling base images to avoid Docker Hub rate limits..."
+      - echo "Pre-pulling base images to avoid rate limits..."
       - |
-        # Try to pull node:20-bullseye from ECR Public first (no rate limits)
-        docker pull public.ecr.aws/docker/library/node:20-bullseye 2>/dev/null && \
-          docker tag public.ecr.aws/docker/library/node:20-bullseye node:20-bullseye || \
-          echo "ECR Public image not available, will use Docker Hub (may hit rate limit)"
+        # Try multiple sources for node:20-bullseye to avoid Docker Hub rate limits
+        # ECR Public, then Docker Hub with authentication if available
+        if docker pull public.ecr.aws/docker/library/node:20-bullseye 2>/dev/null; then
+          docker tag public.ecr.aws/docker/library/node:20-bullseye node:20-bullseye
+          echo "✅ Using ECR Public node image"
+        else
+          echo "⚠️  ECR Public not available, will try Docker Hub"
+          # Try to authenticate with Docker Hub if credentials are available
+          if [ -n "$DOCKER_HUB_USERNAME" ] && [ -n "$DOCKER_HUB_PASSWORD" ]; then
+            echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin 2>/dev/null || true
+          fi
+        fi
 
   build:
     commands:
