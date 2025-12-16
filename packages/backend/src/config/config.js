@@ -128,8 +128,12 @@ const primaryDomain = envVars.PRIMARY_DOMAIN || 'biancawellness.com';
 // Base configuration (not domain-specific)
 // CRITICAL: Always use process.env.NODE_ENV directly to ensure runtime value is used
 // This prevents issues where .env file or cached values might be used instead of container env vars
+
+// Store a private env value that can be overridden (for tests)
+// But by default, always read from process.env.NODE_ENV at runtime
+let _envOverride = null;
+
 const baselineConfig = {
-  env: process.env.NODE_ENV || envVars.NODE_ENV,
   primaryDomain: primaryDomain,  // Expose primary domain in config,
   port: envVars.PORT,
   aws: {
@@ -227,10 +231,15 @@ if (envVars.NODE_ENV === 'staging') {
 
 // Helper function to ensure config.env always matches runtime NODE_ENV
 // This is critical to prevent staging/production config from being used in test mode
+// Note: With the getter/setter approach, this function is mainly for logging/debugging
 const ensureEnvMatchesRuntime = () => {
+  if (process.env.NODE_ENV && _envOverride !== null && _envOverride !== process.env.NODE_ENV) {
+    logger.warn(`Config env override (${_envOverride}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Clearing override to use runtime value.`);
+    _envOverride = null;
+  }
+  // Verify the getter is returning the correct value (for logging/debugging)
   if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
-    logger.warn(`Config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
-    baselineConfig.env = process.env.NODE_ENV;
+    logger.warn(`Config env getter returned (${baselineConfig.env}) but runtime NODE_ENV is (${process.env.NODE_ENV}). This should not happen.`);
   }
 };
 
@@ -327,6 +336,27 @@ baselineConfig.loadSecrets = async () => {
     return baselineConfig;
   }
 };
+
+// Define env property with getter/setter to always read from process.env.NODE_ENV at runtime
+// This ensures the value is never cached and always reflects the current environment
+// Tests can override it by setting config.env = 'test', but runtime always uses process.env.NODE_ENV
+Object.defineProperty(baselineConfig, 'env', {
+  get() {
+    // If explicitly overridden (for tests), use that value
+    if (_envOverride !== null) {
+      return _envOverride;
+    }
+    // Otherwise, always read from process.env.NODE_ENV at runtime
+    // This ensures container environment variables take precedence over any cached values
+    return process.env.NODE_ENV || envVars.NODE_ENV || 'development';
+  },
+  set(value) {
+    // Allow tests to override the env value
+    _envOverride = value;
+  },
+  enumerable: true,
+  configurable: true
+});
 
 // Export the configuration object
 module.exports = baselineConfig;
