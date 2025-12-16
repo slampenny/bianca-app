@@ -86,6 +86,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     org = await Org.create({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
       callRetrySettings: {
         retryCount: 2,
         retryIntervalMinutes: 15,

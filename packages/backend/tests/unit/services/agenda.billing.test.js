@@ -260,13 +260,15 @@ describe('Daily Billing Agenda Job', () => {
     org1 = await Org.create({
       name: 'Healthcare Org 1',
       email: 'org1@healthcare.com',
-      phone: '+12345678901'
+      phone: '+12345678901',
+      country: 'US'
     });
 
     org2 = await Org.create({
       name: 'Healthcare Org 2',
       email: 'org2@healthcare.com',
-      phone: '+12345678902'
+      phone: '+12345678902',
+      country: 'CA'
     });
 
     // Create test patients
@@ -422,7 +424,8 @@ describe('Daily Billing Agenda Job', () => {
       const emptyOrg = await Org.create({
         name: 'Empty Org',
         email: 'empty@healthcare.com',
-        phone: '+12345678905'
+        phone: '+12345678905',
+        country: 'US'
       });
 
       await mockProcessDailyBilling();
