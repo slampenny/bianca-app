@@ -13,7 +13,14 @@ const { buildAllConfigs, applyAllSecrets } = require('./domains');
 // Load .env file (if present)
 // CRITICAL: Use override: false to ensure container environment variables take precedence
 // This prevents .env file from overriding NODE_ENV set by Docker/CodeBuild
+// Store the NODE_ENV value BEFORE dotenv loads (in case .env file tries to set it)
+const nodeEnvBeforeDotenv = process.env.NODE_ENV;
 dotenv.config({ path: path.join(__dirname, '../../.env'), override: false });
+// CRITICAL: Restore NODE_ENV if dotenv tried to override it (shouldn't happen with override: false, but be safe)
+if (nodeEnvBeforeDotenv && process.env.NODE_ENV !== nodeEnvBeforeDotenv) {
+  logger.warn(`[Config] dotenv tried to override NODE_ENV from "${nodeEnvBeforeDotenv}" to "${process.env.NODE_ENV}". Restoring original value.`);
+  process.env.NODE_ENV = nodeEnvBeforeDotenv;
+}
 
 // Define the environment variable schema, including new variables
 const envVarsSchema = Joi.object({
@@ -346,9 +353,24 @@ Object.defineProperty(baselineConfig, 'env', {
     if (_envOverride !== null) {
       return _envOverride;
     }
-    // Otherwise, always read from process.env.NODE_ENV at runtime
-    // This ensures container environment variables take precedence over any cached values
-    return process.env.NODE_ENV || envVars.NODE_ENV || 'development';
+    // CRITICAL: Always check process.env.NODE_ENV first at runtime
+    // This ensures container environment variables always take precedence
+    const runtimeNodeEnv = process.env.NODE_ENV;
+    
+    // Debug logging (can be removed later)
+    if (runtimeNodeEnv && runtimeNodeEnv !== envVars.NODE_ENV) {
+      logger.info(`[Config] Using runtime NODE_ENV: ${runtimeNodeEnv} (envVars had: ${envVars.NODE_ENV})`);
+    }
+    
+    // Always prefer runtime value if it exists and is truthy
+    if (runtimeNodeEnv) {
+      return runtimeNodeEnv;
+    }
+    
+    // Only fall back to envVars if NODE_ENV is truly not set in process.env
+    // This should rarely happen in production/container environments
+    logger.warn(`[Config] process.env.NODE_ENV is not set, falling back to envVars.NODE_ENV (${envVars.NODE_ENV || 'development'})`);
+    return envVars.NODE_ENV || 'development';
   },
   set(value) {
     // Allow tests to override the env value
