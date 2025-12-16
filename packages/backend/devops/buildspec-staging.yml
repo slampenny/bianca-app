@@ -36,6 +36,13 @@ phases:
                      -f docker/Dockerfile .
         cd ../..
         echo "✅ Backend build complete"
+        # Verify ecosystem.config.json doesn't have hardcoded NODE_ENV
+        echo "🔍 Verifying ecosystem.config.json in built image..."
+        docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json | grep -q '"NODE_ENV"' && {
+          echo "❌ ERROR: ecosystem.config.json still contains hardcoded NODE_ENV!"
+          docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json
+          exit 1
+        } || echo "✅ Verified: ecosystem.config.json does NOT have hardcoded NODE_ENV"
       - |
         # Build asterisk image
         echo "🔨 Building asterisk image..."
