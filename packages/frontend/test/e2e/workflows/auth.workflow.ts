@@ -34,12 +34,29 @@ export class AuthWorkflow {
         console.log('Could not log out, trying to navigate to login:', error)
         // Force navigation to login by going to root
         await this.page.goto('/')
-        await this.page.waitForTimeout(1000)
+        await this.page.waitForTimeout(2000)
       }
     }
     
-    // Now wait for login screen
-    await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+    // Check if we're already on login screen
+    const emailInput = this.page.locator('input[data-testid="email-input"]')
+    const isAlreadyOnLogin = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
+    
+    if (!isAlreadyOnLogin) {
+      // Force navigation to login by going to root
+      await this.page.goto('/')
+      await this.page.waitForTimeout(2000)
+    }
+    
+    // Now wait for login screen with retry logic
+    try {
+      await emailInput.waitFor({ state: 'visible', timeout: 10000 })
+    } catch (error) {
+      // Try navigating again if first attempt failed
+      await this.page.goto('/')
+      await this.page.waitForTimeout(2000)
+      await emailInput.waitFor({ state: 'visible', timeout: 10000 })
+    }
   }
 
   async givenIHaveValidCredentials() {
