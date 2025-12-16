@@ -1,7 +1,8 @@
 # Multi-stage build for better caching and smaller final image
 # syntax=docker/dockerfile:1.4
 # Note: Run 'docker logout' before building to avoid credential issues in WSL2
-FROM node:20-bullseye AS base
+# Use ECR Public to avoid Docker Hub rate limits (falls back to Docker Hub if ECR Public unavailable)
+FROM public.ecr.aws/docker/library/node:20-bullseye AS base
 
 # Create app directory
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
