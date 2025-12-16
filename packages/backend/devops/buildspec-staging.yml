@@ -15,16 +15,17 @@ phases:
       - cd ../..
       - echo "Pre-pulling base images to avoid rate limits..."
       - |
-        # Try multiple sources for node:20-bullseye to avoid Docker Hub rate limits
-        # ECR Public, then Docker Hub with authentication if available
+        # Pre-pull from ECR Public to avoid Docker Hub rate limits
+        # The Dockerfile uses ECR Public directly, but pre-pulling here ensures it's available
+        echo "   Pulling node:20-bullseye from ECR Public..."
         if docker pull public.ecr.aws/docker/library/node:20-bullseye 2>/dev/null; then
-          docker tag public.ecr.aws/docker/library/node:20-bullseye node:20-bullseye
-          echo "✅ Using ECR Public node image"
+          echo "✅ Pre-pulled node image from ECR Public"
         else
-          echo "⚠️  ECR Public not available, will try Docker Hub"
-          # Try to authenticate with Docker Hub if credentials are available
+          echo "⚠️  Could not pre-pull from ECR Public, Dockerfile will try to pull during build"
+          # Try to authenticate with Docker Hub if credentials are available (fallback)
           if [ -n "$DOCKER_HUB_USERNAME" ] && [ -n "$DOCKER_HUB_PASSWORD" ]; then
             echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin 2>/dev/null || true
+            echo "   Authenticated with Docker Hub as fallback"
           fi
         fi
 
@@ -41,27 +42,34 @@ phases:
         # Use --no-cache for staging to ensure we always get fresh code
         # Staging should always rebuild with latest code, not use any cached layers
         echo "   Building with --no-cache to ensure fresh code..."
-        docker build --no-cache \
+        if docker build --no-cache \
                      --build-arg BUILD_TIMESTAMP=$(date +%s) \
                      --build-arg GIT_COMMIT=$CODEBUILD_RESOLVED_SOURCE_VERSION \
                      -t $ECR_REGISTRY/bianca-app-backend:latest \
                      -t $ECR_REGISTRY/bianca-app-backend:staging \
                      -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION \
-                     -f docker/Dockerfile .
-        cd ../..
-        echo "✅ Backend build complete"
-        # Verify ecosystem.config.json doesn't have hardcoded NODE_ENV (only if build succeeded)
-        echo "🔍 Verifying ecosystem.config.json in built image..."
-        if docker images | grep -q "$ECR_REGISTRY/bianca-app-backend.*staging"; then
-          if docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json 2>/dev/null | grep -q '"NODE_ENV"'; then
-            echo "❌ ERROR: ecosystem.config.json still contains hardcoded NODE_ENV!"
-            docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json
-            exit 1
+                     -f docker/Dockerfile .; then
+          cd ../..
+          echo "✅ Backend build complete"
+          # Verify ecosystem.config.json doesn't have hardcoded NODE_ENV (only if build succeeded)
+          echo "🔍 Verifying ecosystem.config.json in built image..."
+          # Only check locally built image - don't pull from ECR
+          if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${ECR_REGISTRY}/bianca-app-backend:staging$"; then
+            if docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json 2>/dev/null | grep -q '"NODE_ENV"'; then
+              echo "❌ ERROR: ecosystem.config.json still contains hardcoded NODE_ENV!"
+              docker run --rm $ECR_REGISTRY/bianca-app-backend:staging cat ecosystem.config.json
+              exit 1
+            else
+              echo "✅ Verified: ecosystem.config.json does NOT have hardcoded NODE_ENV"
+            fi
           else
-            echo "✅ Verified: ecosystem.config.json does NOT have hardcoded NODE_ENV"
+            echo "⚠️  WARNING: Could not verify - image tag not found locally (build may have failed)"
+            exit 1
           fi
         else
-          echo "⚠️  WARNING: Could not verify - image tag not found locally (will be verified after push)"
+          cd ../..
+          echo "❌ Backend build FAILED!"
+          exit 1
         fi
       - |
         # Build asterisk image
