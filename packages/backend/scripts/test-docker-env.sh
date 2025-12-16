@@ -6,12 +6,27 @@ set -e
 
 echo "=== Testing Docker Container NODE_ENV ==="
 
+# Get the repo root directory
+# Script is in packages/backend/scripts/, so go up 2 levels to get repo root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$BACKEND_DIR/.." && pwd)"
+
 # Build or use existing image
 IMAGE_NAME="bianca-app-backend:test"
+# Try to use staging image if it exists (faster for testing)
+if docker images | grep -q "bianca-app-backend.*staging"; then
+  STAGING_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "bianca-app-backend.*staging" | head -1)
+  echo "Using existing staging image: $STAGING_IMAGE"
+  docker tag "$STAGING_IMAGE" "$IMAGE_NAME" 2>/dev/null || true
+fi
+
 if ! docker images | grep -q "$IMAGE_NAME"; then
-  echo "Building Docker image..."
-  cd "$(dirname "$0")/../.."
-  docker build -f packages/backend/Dockerfile -t "$IMAGE_NAME" packages/backend/
+  echo "Building Docker image from $BACKEND_DIR..."
+  echo "This may take several minutes on first run..."
+  cd "$BACKEND_DIR"
+  # Dockerfile expects to be built from packages/backend directory
+  docker build -f Dockerfile -t "$IMAGE_NAME" .
 fi
 
 # Stop and remove existing container if it exists
