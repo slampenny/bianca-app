@@ -211,16 +211,10 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
               index: 0,
             }
           }
-          // Otherwise, use React Navigation's default getStateFromPath with our config
-          // Pass the linking config structure correctly
+          // Otherwise, use React Navigation's default getStateFromPath
+          // Don't pass config in options - React Navigation will use the linking.config from the linking object
           try {
-            if (linking.config) {
-              return getStateFromPathDefault(path, {
-                ...options,
-                config: linking.config,
-              })
-            }
-            // If no config, try using the linking object itself
+            // Just pass options without config - React Navigation uses linking.config automatically
             return getStateFromPathDefault(path, options)
           } catch (error) {
             // If getStateFromPath fails, return Login as fallback

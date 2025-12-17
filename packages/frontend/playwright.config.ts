@@ -8,8 +8,11 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true })
 }
 
+// Detect CI environment
+const isCI = process.env.CI === 'true' || process.env.CODEBUILD_BUILD_ID !== undefined
+
 export default defineConfig({
-  timeout: 60000, // Increase timeout for integration tests
+  timeout: isCI ? 120000 : 60000, // Longer timeout in CI (2 minutes vs 1 minute)
   testDir: './test/e2e',
   use: {
     screenshot: 'only-on-failure',

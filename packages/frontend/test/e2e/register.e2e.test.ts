@@ -217,7 +217,7 @@ test.describe("Register Screen", () => {
     // After registration, user should be navigated to EmailVerificationRequired screen
     // Wait for navigation by checking for the email input field (most reliable indicator)
     // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
-    const emailInput = page.locator('input[data-testid="email-input"]').first()
+    const emailInput = page.locator('input[data-testid="verification-email-input"]')
     const resendButton = page.locator('[data-testid="resend-verification-button"]').first()
     const backToLoginButton = page.locator('[data-testid="back-to-login-button"]').first()
     
@@ -342,7 +342,7 @@ test.describe("Register Screen", () => {
     // After registration, user should be navigated to EmailVerificationRequired screen
     // Wait for navigation by checking for the email input field (most reliable indicator)
     // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
-    const emailInput = page.locator('input[data-testid="email-input"]').first()
+    const emailInput = page.locator('input[data-testid="verification-email-input"]')
     const resendButton = page.locator('[data-testid="resend-verification-button"]').first()
     const backToLoginButton = page.locator('[data-testid="back-to-login-button"]').first()
     

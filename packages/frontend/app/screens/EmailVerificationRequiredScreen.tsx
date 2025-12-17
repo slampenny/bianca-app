@@ -198,8 +198,8 @@ export const EmailVerificationRequiredScreen = () => {
             autoCapitalize="none"
             autoCorrect={false}
             editable={false}
-            accessibilityLabel="email-input"
-            testID="email-input"
+            accessibilityLabel="verification-email-input"
+            testID="verification-email-input"
           />
         </View>
 

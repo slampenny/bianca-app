@@ -4,16 +4,21 @@ export { expect }
 import { asyncStorageMockScript } from './asyncStorageMock'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
+  // Detect CI environment - use longer timeouts
+  const isCI = process.env.CI === 'true' || process.env.CODEBUILD_BUILD_ID !== undefined
+  const baseTimeout = isCI ? 20000 : 10000
+  
   // Ensure we're on login screen first
-  await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 }).catch(async () => {
+  await page.waitForSelector('input[data-testid="email-input"]', { timeout: baseTimeout }).catch(async () => {
     // If not on login screen, try to navigate there
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
-    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: baseTimeout })
   })
   
   // Use data-testid for React Native Web
-  if (await page.locator('input[data-testid="register-name"]').count() === 0) {
+  const registerNameInput = page.locator('input[data-testid="register-name"]')
+  if (await registerNameInput.count() === 0 || !(await registerNameInput.isVisible().catch(() => false))) {
     // Wait for register button to be visible - try multiple selectors
     let registerButton = page.getByTestId('register-button')
     let buttonCount = await registerButton.count().catch(() => 0)
@@ -33,8 +38,8 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
     if (buttonCount === 0) {
       // If still not found, reload the page and try again
       console.log('⚠️ Register button not found, reloading page...')
-      await page.reload({ waitUntil: 'networkidle' })
-      await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.waitForSelector('input[data-testid="email-input"]', { timeout: baseTimeout })
       registerButton = page.getByTestId('register-button')
       buttonCount = await registerButton.count().catch(() => 0)
     }
@@ -43,16 +48,36 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
       throw new Error('Register button not found on page. Page might not be in login state.')
     }
     
-    await registerButton.waitFor({ state: 'visible', timeout: 10000 })
+    await registerButton.waitFor({ state: 'visible', timeout: baseTimeout })
     await registerButton.click()
-    await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
+    
+    // Wait for register form to be visible, not just present
+    await registerNameInput.waitFor({ state: 'visible', timeout: baseTimeout })
+    // Give extra time in CI for form to be fully rendered
+    await page.waitForTimeout(isCI ? 1000 : 500)
   }
+  
   // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
-  await page.locator('input[data-testid="register-name"]').fill(name)
-  await page.locator('input[data-testid="register-email"]').fill(email)
-  await page.locator('input[data-testid="register-password"]').fill(password)
-  await page.locator('input[data-testid="register-confirm-password"]').fill(password)
-  await page.locator('input[data-testid="register-phone"]').fill(phone)
+  // Wait for all inputs to be visible before filling
+  const registerEmailInput = page.locator('input[data-testid="register-email"]')
+  const registerPasswordInput = page.locator('input[data-testid="register-password"]')
+  const registerConfirmPasswordInput = page.locator('input[data-testid="register-confirm-password"]')
+  const registerPhoneInput = page.locator('input[data-testid="register-phone"]')
+  
+  await registerNameInput.waitFor({ state: 'visible', timeout: baseTimeout })
+  await registerEmailInput.waitFor({ state: 'visible', timeout: baseTimeout })
+  await registerPasswordInput.waitFor({ state: 'visible', timeout: baseTimeout })
+  await registerConfirmPasswordInput.waitFor({ state: 'visible', timeout: baseTimeout })
+  await registerPhoneInput.waitFor({ state: 'visible', timeout: baseTimeout })
+  
+  // Give extra time in CI for inputs to be fully ready
+  await page.waitForTimeout(isCI ? 500 : 200)
+  
+  await registerNameInput.fill(name)
+  await registerEmailInput.fill(email)
+  await registerPasswordInput.fill(password)
+  await registerConfirmPasswordInput.fill(password)
+  await registerPhoneInput.fill(phone)
   
   // Find submit button - try getByTestId first, fallback to locator
   let submitButton = page.getByTestId('register-submit')
@@ -60,10 +85,11 @@ export async function registerUserViaUI(page: Page, name: string, email: string,
   if (buttonCount === 0) {
     submitButton = page.locator('[data-testid="register-submit"]').first()
   }
-  await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+  const submitTimeout = isCI ? 15000 : 5000
+  await submitButton.waitFor({ state: 'visible', timeout: submitTimeout })
   await submitButton.click()
   // Wait for navigation after registration - check for email verification screen or home screen
-  await page.waitForTimeout(2000) // Give time for navigation
+  await page.waitForTimeout(isCI ? 3000 : 2000) // Give time for navigation - longer in CI
   
   // Try to find email verification screen indicators
   const emailVerificationButton = page.locator('[data-testid="resend-verification-button"]')
@@ -124,21 +150,30 @@ export async function reliableClick(page: Page, locator: any, options: { timeout
 export async function loginUserViaUI(page: Page, email: string, password: string): Promise<void> {
   console.log(`Attempting to login with email: ${email}`)
   
-  // Wait for login form to be visible - use data-testid for inputs
-  await page.waitForSelector('input[data-testid="email-input"]', { timeout: 5000 })
+  // Detect CI environment - use longer timeouts
+  const isCI = process.env.CI === 'true' || process.env.CODEBUILD_BUILD_ID !== undefined
+  const baseTimeout = isCI ? 15000 : 5000
   
-  await page.waitForTimeout(500) // Small delay to ensure form is ready
+  // Wait for login form to be visible - use data-testid for inputs
+  await page.waitForSelector('input[data-testid="email-input"]', { timeout: baseTimeout })
+  
+  // In CI, wait longer for form to be fully rendered
+  await page.waitForTimeout(isCI ? 1000 : 500)
   
   // Fill in login form - use locator for input elements (getByTestId doesn't work for inputs in React Native Web)
   const emailInput = page.locator('input[data-testid="email-input"]')
   const passwordInput = page.locator('input[data-testid="password-input"]')
   
-  // Wait for inputs to be visible and enabled
-  await expect(emailInput).toBeVisible({ timeout: 5000 })
-  await expect(passwordInput).toBeVisible({ timeout: 5000 })
+  // Wait for inputs to be visible and enabled - use longer timeout in CI
+  await expect(emailInput).toBeVisible({ timeout: baseTimeout })
+  await expect(passwordInput).toBeVisible({ timeout: baseTimeout })
   
-  await emailInput.fill(email, { timeout: 5000 })
-  await passwordInput.fill(password, { timeout: 5000 })
+  // Also wait for inputs to be enabled (not disabled)
+  await emailInput.waitFor({ state: 'visible', timeout: baseTimeout })
+  await passwordInput.waitFor({ state: 'visible', timeout: baseTimeout })
+  
+  await emailInput.fill(email, { timeout: baseTimeout })
+  await passwordInput.fill(password, { timeout: baseTimeout })
   
   // Find login button - try getByTestId first, fallback to locator
   let loginButton = page.getByTestId('login-button')
@@ -149,8 +184,8 @@ export async function loginUserViaUI(page: Page, email: string, password: string
   }
   
   if (buttonCount === 0) {
-    // Wait a bit more for the page to fully render
-    await page.waitForTimeout(1000)
+    // Wait a bit more for the page to fully render - longer in CI
+    await page.waitForTimeout(isCI ? 2000 : 1000)
     loginButton = page.getByTestId('login-button')
     buttonCount = await loginButton.count().catch(() => 0)
     if (buttonCount === 0) {
@@ -184,9 +219,10 @@ export async function loginUserViaUI(page: Page, email: string, password: string
     ]
     
     let foundHome = false
+    const indicatorTimeout = isCI ? 10000 : 5000
     for (const selector of homeIndicators) {
       try {
-        await page.waitForSelector(selector, { timeout: 5000 })
+        await page.waitForSelector(selector, { timeout: indicatorTimeout })
         foundHome = true
         console.log(`Login successful - found home indicator: ${selector}`)
         break
@@ -196,11 +232,11 @@ export async function loginUserViaUI(page: Page, email: string, password: string
     }
     
     if (!foundHome) {
-      // Try waiting a bit more and check again
-      await page.waitForTimeout(2000)
+      // Try waiting a bit more and check again - longer in CI
+      await page.waitForTimeout(isCI ? 3000 : 2000)
       for (const selector of homeIndicators) {
         try {
-          if (await page.locator(selector).isVisible({ timeout: 2000 })) {
+          if (await page.locator(selector).isVisible({ timeout: indicatorTimeout })) {
             foundHome = true
             console.log(`Login successful - found home indicator after wait: ${selector}`)
             break
