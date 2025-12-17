@@ -47,16 +47,25 @@ describe('Medical Analysis Pipeline Integration', () => {
         patientId,
         cognitiveDeclineConversations
       );
+      
+      // Ensure we have conversations and they're valid
+      expect(conversations).toBeDefined();
+      expect(conversations.length).toBeGreaterThan(0);
+      conversations.forEach(c => {
+        expect(c).toBeDefined();
+        expect(c.createdAt).toBeDefined(); // Conversation uses createdAt, not startTime
+      });
 
       // Step 2: Establish baseline from first month
-      const baselineConversations = conversations.filter(c => c.startTime.getMonth() === 0);
+      // Use createdAt instead of startTime (Conversation model uses timestamps)
+      const baselineConversations = conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
       const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
       for (let month = 1; month <= 6; month++) {
-        const monthConversations = conversations.filter(c => c.startTime.getMonth() === month - 1);
+        const monthConversations = conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === month - 1);
         if (monthConversations.length > 0) {
           monthlyAnalyses[`month${month}`] = await analyzer.analyzeMonth(monthConversations, baselineAnalysis);
         }
@@ -89,14 +98,15 @@ describe('Medical Analysis Pipeline Integration', () => {
       );
 
       // Step 2: Establish baseline from first month
-      const baselineConversations = conversations.filter(c => c.startTime.getMonth() === 0);
+      // Ensure conversations have startTime before filtering
+      const baselineConversations = conversations.filter(c => c && c.startTime && c.startTime.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
       const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
       for (let month = 1; month <= 6; month++) {
-        const monthConversations = conversations.filter(c => c.startTime.getMonth() === month - 1);
+        const monthConversations = conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === month - 1);
         if (monthConversations.length > 0) {
           monthlyAnalyses[`month${month}`] = await analyzer.analyzeMonth(monthConversations, baselineAnalysis);
         }
@@ -132,14 +142,15 @@ describe('Medical Analysis Pipeline Integration', () => {
       );
 
       // Step 2: Establish baseline from first month
-      const baselineConversations = conversations.filter(c => c.startTime.getMonth() === 0);
+      // Ensure conversations have startTime before filtering
+      const baselineConversations = conversations.filter(c => c && c.startTime && c.startTime.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
       const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
       for (let month = 1; month <= 6; month++) {
-        const monthConversations = conversations.filter(c => c.startTime.getMonth() === month - 1);
+        const monthConversations = conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === month - 1);
         if (monthConversations.length > 0) {
           monthlyAnalyses[`month${month}`] = await analyzer.analyzeMonth(monthConversations, baselineAnalysis);
         }
@@ -170,14 +181,15 @@ describe('Medical Analysis Pipeline Integration', () => {
       );
 
       // Step 2: Establish baseline from first month
-      const baselineConversations = conversations.filter(c => c.startTime.getMonth() === 0);
+      // Ensure conversations have startTime before filtering
+      const baselineConversations = conversations.filter(c => c && c.startTime && c.startTime.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
       const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
       for (let month = 1; month <= 6; month++) {
-        const monthConversations = conversations.filter(c => c.startTime.getMonth() === month - 1);
+        const monthConversations = conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === month - 1);
         if (monthConversations.length > 0) {
           monthlyAnalyses[`month${month}`] = await analyzer.analyzeMonth(monthConversations, baselineAnalysis);
         }

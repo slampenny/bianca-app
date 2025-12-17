@@ -6,7 +6,7 @@ process.env.OPENAI_API_KEY = 'test-openai-api-key';
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Message, Conversation } = require('../../../src/models');
+const { Message, Conversation, Call } = require('../../../src/models');
 
 // Mock only external dependencies (don't mock fs - mongodb-memory-server needs it)
 
@@ -50,16 +50,25 @@ describe('Conversation Ordering - Message Timestamps', () => {
     // Clear database
     await Message.deleteMany({});
     await Conversation.deleteMany({});
+    await Call.deleteMany({});
 
     conversationId = new mongoose.Types.ObjectId();
-    callId = 'test-call-sid-123';
+    const callSid = 'test-call-sid-123';
+    
+    // Create a Call first (conversations require callId)
+    const call = await Call.create({
+      callSid: callSid,
+      patientId: new mongoose.Types.ObjectId(),
+      status: 'in-progress',
+      duration: 0
+    });
+    callId = callSid; // Keep for connection mapping
 
     // Create test conversation in database
     const conversation = new Conversation({
       _id: conversationId,
       patientId: new mongoose.Types.ObjectId(),
-      agentId: new mongoose.Types.ObjectId(),
-      callSid: callId,
+      callId: call._id, // Use Call ObjectId, not callSid
       status: 'in-progress',
       startTime: new Date(),
       messages: []

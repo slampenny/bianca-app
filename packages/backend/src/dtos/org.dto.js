@@ -18,9 +18,11 @@ const OrgDTO = (org) => {
     phone, 
     isEmailVerified,
     timezone,
+    country,
     caregivers,
     patients,
-    callRetrySettings
+    callRetrySettings,
+    privacyOfficerId
   } = orgObj;
   
   const id = _id;
@@ -45,9 +47,11 @@ const OrgDTO = (org) => {
     phone,
     isEmailVerified: isEmailVerified === true,
     timezone,
+    country,
     caregivers: caregiverIds,
     patients: patientIds,
     callRetrySettings,
+    privacyOfficerId: privacyOfficerId ? (privacyOfficerId instanceof ObjectId ? privacyOfficerId.toString() : (privacyOfficerId?._id || privacyOfficerId)) : null,
   };
 };
 

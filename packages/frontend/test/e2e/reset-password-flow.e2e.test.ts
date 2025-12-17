@@ -77,11 +77,13 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     
     // Step 3: Navigate to reset password screen
     console.log('🔍 Navigating to reset password screen...')
-    await page.goto(resetLink)
+    await page.goto(resetLink, { waitUntil: 'domcontentloaded', timeout: 30000 })
     
-    // Wait for page to load
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(3000) // Give time for React to render
+    // Wait for page to load - use domcontentloaded instead of networkidle to avoid timeouts
+    await page.waitForLoadState('domcontentloaded')
+    // Wait for root element to ensure React has started rendering
+    await page.waitForSelector('#root', { timeout: 10000 }).catch(() => {})
+    await page.waitForTimeout(5000) // Give more time for React to render and theme to load
     
     // Step 4: Check for crash - specifically colors undefined error
     const criticalErrors = consoleErrors.filter(error => 
@@ -227,11 +229,13 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     })
     
     // Navigate to reset password screen
-    await page.goto(resetLink)
+    await page.goto(resetLink, { waitUntil: 'domcontentloaded', timeout: 30000 })
     
-    // Wait for page to load
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(2000) // Give time for React to render
+    // Wait for page to load - use domcontentloaded instead of networkidle to avoid timeouts
+    await page.waitForLoadState('domcontentloaded')
+    // Wait for root element to ensure React has started rendering
+    await page.waitForSelector('#root', { timeout: 10000 }).catch(() => {})
+    await page.waitForTimeout(5000) // Give more time for React to render and theme to load
     
     // Step 8: Verify we're on the reset password screen (not error screen)
     const currentUrl = page.url()

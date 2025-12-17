@@ -11,7 +11,16 @@ const { AwsContext } = require('twilio/lib/rest/accounts/v1/credential/aws');
 const { buildAllConfigs, applyAllSecrets } = require('./domains');
 
 // Load .env file (if present)
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// CRITICAL: Use override: false to ensure container environment variables take precedence
+// This prevents .env file from overriding NODE_ENV set by Docker/CodeBuild
+// Store the NODE_ENV value BEFORE dotenv loads (in case .env file tries to set it)
+const nodeEnvBeforeDotenv = process.env.NODE_ENV;
+dotenv.config({ path: path.join(__dirname, '../../.env'), override: false });
+// CRITICAL: Restore NODE_ENV if dotenv tried to override it (shouldn't happen with override: false, but be safe)
+if (nodeEnvBeforeDotenv && process.env.NODE_ENV !== nodeEnvBeforeDotenv) {
+  logger.warn(`[Config] dotenv tried to override NODE_ENV from "${nodeEnvBeforeDotenv}" to "${process.env.NODE_ENV}". Restoring original value.`);
+  process.env.NODE_ENV = nodeEnvBeforeDotenv;
+}
 
 // Define the environment variable schema, including new variables
 const envVarsSchema = Joi.object({
@@ -124,8 +133,14 @@ const primaryDomain = envVars.PRIMARY_DOMAIN || 'biancawellness.com';
 
 // Build a baseline configuration object based on environment variables
 // Base configuration (not domain-specific)
+// CRITICAL: Always use process.env.NODE_ENV directly to ensure runtime value is used
+// This prevents issues where .env file or cached values might be used instead of container env vars
+
+// Store a private env value that can be overridden (for tests)
+// But by default, always read from process.env.NODE_ENV at runtime
+let _envOverride = null;
+
 const baselineConfig = {
-  env: envVars.NODE_ENV,
   primaryDomain: primaryDomain,  // Expose primary domain in config,
   port: envVars.PORT,
   aws: {
@@ -139,7 +154,7 @@ const baselineConfig = {
   authEnabled: true,
   baseUrl: envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain))),
   apiUrl: (envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain)))) + '/v1',
-  frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging', primaryDomain) : getUrlFromDomain('app', primaryDomain))),
+  frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' || envVars.NODE_ENV === 'test' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging', primaryDomain) : getUrlFromDomain('app', primaryDomain))),
   billing: { 
     ratePerMinute: 0.1,
     minimumBillableDuration: 30,
@@ -173,6 +188,13 @@ const baselineConfig = {
   // Merge domain-specific configurations
   ...buildAllConfigs(envVars),
 };
+
+// CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation
+// This prevents issues where .env file or Docker image build-time values override runtime env vars
+if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
+  logger.warn(`Initial config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
+  baselineConfig.env = process.env.NODE_ENV;
+}
 
 // Set production-specific overrides (Restored and updated)
 if (envVars.NODE_ENV === 'production') {
@@ -214,34 +236,36 @@ if (envVars.NODE_ENV === 'staging') {
   baselineConfig.twilio.websocketUrl = envVars.WEBSOCKET_URL || `wss://${apiBaseUrl.replace('https://', '')}`;
 }
 
+// Helper function to ensure config.env always matches runtime NODE_ENV
+// This is critical to prevent staging/production config from being used in test mode
+// Note: With the getter/setter approach, this function is mainly for logging/debugging
+const ensureEnvMatchesRuntime = () => {
+  if (process.env.NODE_ENV && _envOverride !== null && _envOverride !== process.env.NODE_ENV) {
+    logger.warn(`Config env override (${_envOverride}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Clearing override to use runtime value.`);
+    _envOverride = null;
+  }
+  // Verify the getter is returning the correct value (for logging/debugging)
+  if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
+    logger.warn(`Config env getter returned (${baselineConfig.env}) but runtime NODE_ENV is (${process.env.NODE_ENV}). This should not happen.`);
+  }
+};
+
 // Add method to load secrets from AWS Secrets Manager (if used)
 baselineConfig.loadSecrets = async () => {
-  // Skip in development and test, but load for staging and production
-  // Exception: In test mode, if secrets are already in process.env (from CI/CD), use them
-  if (baselineConfig.env === 'development' || (baselineConfig.env === 'test' && !process.env.STRIPE_SECRET_KEY)) {
-    logger.info('Skipping AWS Secrets Manager in development/test environment.');
-    logger.info('Using Stripe keys from .env file for localhost/dev.');
-    return baselineConfig;
-  }
+  // CRITICAL: Always ensure env matches runtime NODE_ENV at the start
+  // This prevents issues where config was initialized with wrong env value
+  ensureEnvMatchesRuntime();
   
-  // In test mode with secrets in env vars (from CodeBuild), just apply them
-  if (baselineConfig.env === 'test' && process.env.STRIPE_SECRET_KEY) {
-    logger.info('Test environment with secrets from environment variables (CI/CD).');
-    logger.info('Applying secrets from environment variables.');
-    // Apply secrets that are already in process.env
-    const secrets = {
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-      STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
-      JWT_SECRET: process.env.JWT_SECRET,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      MFA_ENCRYPTION_KEY: process.env.MFA_ENCRYPTION_KEY,
-      TWILIO_AUTHTOKEN: process.env.TWILIO_AUTHTOKEN,
-    };
-    applyAllSecrets(baselineConfig, secrets);
-    // MFA_ENCRYPTION_KEY needs to be set in process.env for the MFA service
-    if (secrets.MFA_ENCRYPTION_KEY) {
-      process.env.MFA_ENCRYPTION_KEY = secrets.MFA_ENCRYPTION_KEY;
-    }
+  // Skip in development and test, but load for staging and production
+  // CRITICAL: In test mode, always skip loading secrets (even if present) to match local test behavior
+  // This ensures pipeline tests work the same way as local tests - no real Stripe/AWS calls
+  if (baselineConfig.env === 'development' || baselineConfig.env === 'test') {
+    logger.info('Skipping AWS Secrets Manager in development/test environment.');
+    logger.info('Using keys from .env file for localhost/dev (or defaults if not set).');
+    // Note: If secrets are in process.env (from CodeBuild), they'll be available but not applied to config
+    // This means Stripe won't be initialized with real keys, matching local test behavior
+    // Ensure env is still correct before returning
+    ensureEnvMatchesRuntime();
     return baselineConfig;
   }
 
@@ -264,6 +288,8 @@ baselineConfig.loadSecrets = async () => {
 
     if (!data.SecretString) {
         logger.warn(`SecretString is empty for SecretId: ${secretId}`);
+        // Ensure env is still correct before returning
+        ensureEnvMatchesRuntime();
         return baselineConfig;
     }
 
@@ -273,7 +299,13 @@ baselineConfig.loadSecrets = async () => {
 
     // Update process.env first - important if other modules read directly from process.env
     // In staging/production, AWS secrets should override .env values
+    // CRITICAL: Never override NODE_ENV from secrets - it must come from runtime environment
     for (const key in secrets) {
+        // Skip NODE_ENV - it must always come from the runtime environment (Docker, CodeBuild, etc.)
+        if (key === 'NODE_ENV') {
+            logger.warn('NODE_ENV found in secrets - ignoring it. NODE_ENV must come from runtime environment.');
+            continue;
+        }
         // Override process.env with AWS secrets for staging/production
         // This ensures AWS secrets take precedence over .env values
         process.env[key] = secrets[key];
@@ -281,6 +313,10 @@ baselineConfig.loadSecrets = async () => {
 
     // Apply secrets using domain modules (this will override config with AWS secrets)
     applyAllSecrets(baselineConfig, secrets);
+    
+    // CRITICAL: Ensure config.env matches runtime NODE_ENV (never override from secrets)
+    // This ensures that even if secrets contained NODE_ENV, we use the runtime value
+    ensureEnvMatchesRuntime();
     
     // MFA Encryption Key (special case - sets process.env)
     if (secrets.MFA_ENCRYPTION_KEY) {
@@ -296,13 +332,53 @@ baselineConfig.loadSecrets = async () => {
 
     // Add other mappings as needed...
     logger.info('Configuration updated with values from AWS Secrets Manager.');
+    // Ensure env is still correct before returning
+    ensureEnvMatchesRuntime();
     return baselineConfig;
   } catch (err) {
     // Log error but return baseline config to allow app to potentially start with defaults/env vars
     logger.error(`Error retrieving secret from AWS Secrets Manager (SecretId: ${secretId}): ${err.code} - ${err.message}`);
+    // Ensure env is still correct before returning
+    ensureEnvMatchesRuntime();
     return baselineConfig;
   }
 };
+
+// Define env property with getter/setter to always read from process.env.NODE_ENV at runtime
+// This ensures the value is never cached and always reflects the current environment
+// Tests can override it by setting config.env = 'test', but runtime always uses process.env.NODE_ENV
+Object.defineProperty(baselineConfig, 'env', {
+  get() {
+    // If explicitly overridden (for tests), use that value
+    if (_envOverride !== null) {
+      return _envOverride;
+    }
+    // CRITICAL: Always check process.env.NODE_ENV first at runtime
+    // This ensures container environment variables always take precedence
+    const runtimeNodeEnv = process.env.NODE_ENV;
+    
+    // Debug logging (can be removed later)
+    if (runtimeNodeEnv && runtimeNodeEnv !== envVars.NODE_ENV) {
+      logger.info(`[Config] Using runtime NODE_ENV: ${runtimeNodeEnv} (envVars had: ${envVars.NODE_ENV})`);
+    }
+    
+    // Always prefer runtime value if it exists and is truthy
+    if (runtimeNodeEnv) {
+      return runtimeNodeEnv;
+    }
+    
+    // Only fall back to envVars if NODE_ENV is truly not set in process.env
+    // This should rarely happen in production/container environments
+    logger.warn(`[Config] process.env.NODE_ENV is not set, falling back to envVars.NODE_ENV (${envVars.NODE_ENV || 'development'})`);
+    return envVars.NODE_ENV || 'development';
+  },
+  set(value) {
+    // Allow tests to override the env value
+    _envOverride = value;
+  },
+  enumerable: true,
+  configurable: true
+});
 
 // Export the configuration object
 module.exports = baselineConfig;

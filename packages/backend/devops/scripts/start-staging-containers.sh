@@ -8,9 +8,9 @@ echo "=== Starting Staging Containers ==="
 
 cd /opt/bianca-staging
 
-# Check if docker compose.yml exists
-if [ ! -f "docker compose.yml" ]; then
-  echo "❌ docker compose.yml not found in /opt/bianca-staging"
+# Check if docker-compose.yml exists
+if [ ! -f "docker-compose.yml" ]; then
+  echo "❌ docker-compose.yml not found in /opt/bianca-staging"
   exit 1
 fi
 

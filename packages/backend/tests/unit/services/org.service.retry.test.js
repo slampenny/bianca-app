@@ -27,6 +27,7 @@ describe('orgService - Call Retry Settings', () => {
     org = await Org.create({
       name: 'Test Org',
       email: 'test@example.com',
+      country: 'US',
     });
   });
 

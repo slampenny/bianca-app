@@ -64,6 +64,7 @@ const en = {
     confirmPasswordFieldPlaceholder: "Confirm your password",
     phoneFieldPlaceholder: "(xxx)xxx-xxxx",
     organizationNameFieldPlaceholder: "Enter your Orginization's Name",
+    countryFieldLabel: "Country",
     organizationButton: "Organization",
     individualButton: "Individual",
     individualExplanation: "Register as an individual for personal use.",
@@ -370,6 +371,158 @@ const en = {
     termsOfService: "Terms of Service",
     privacyPractices: "HIPAA Privacy Practices",
   },
+  privacyScreen: {
+    pipedaContent: `## Bianca Wellness - Privacy Policy (PIPEDA)
+
+**Effective Date:** January 2025  
+**Last Updated:** January 2025
+
+Welcome to Bianca Wellness ("we," "us," "our"). We are committed to protecting your privacy in accordance with the **Personal Information Protection and Electronic Documents Act (PIPEDA)**, Canada's federal privacy law. This Privacy Policy explains how we collect, use, disclose, and safeguard your personal information when you use our Bianca Wellness mobile application (the "App") and services (collectively, the "Services").
+
+---
+
+## YOUR PRIVACY RIGHTS UNDER PIPEDA
+
+Under PIPEDA, you have the right to:
+
+- **Access** your personal information
+- **Correct** inaccurate information
+- **Withdraw consent** for collection, use, or disclosure
+- **File a complaint** with the Privacy Commissioner of Canada
+
+---
+
+## 1. INFORMATION WE COLLECT
+
+We collect the following types of personal information:
+
+* **Personal Data:** Your name, email address, phone number, and account credentials
+* **Patient/Recipient Information:** Name and phone number of individuals you call through our service
+* **Call Data:** Recordings, transcriptions, metadata, and wellness information from calls
+* **Derivative Data:** Device information, IP address, and usage patterns
+* **AI Analysis Data:** Results and insights generated from call analysis
+
+---
+
+## 2. PURPOSES FOR COLLECTION
+
+We collect your personal information for the following purposes:
+
+* To create and manage your account
+* To provide wellness check call services
+* To record and transcribe calls (with consent)
+* To analyze calls and provide wellness summaries
+* To enable communication between caregivers and patients
+* To improve our services and AI models
+* To comply with legal obligations
+
+---
+
+## 3. CONSENT
+
+**Your consent is required** for us to collect, use, or disclose your personal information. We obtain consent:
+
+- **Explicitly** when you register and agree to this policy
+- **Implicitly** when you use features that require data collection
+
+**You can withdraw consent** at any time by contacting us. Note: Withdrawing consent for data collection may restrict your ability to use the service.
+
+---
+
+## 4. DISCLOSURE OF YOUR INFORMATION
+
+We may share your information with:
+
+* **Third-Party Service Providers:** 
+  - Azure OpenAI (AI services) - United States
+  - Twilio (voice services) - United States
+  - AWS (cloud hosting) - United States
+  - MongoDB Atlas (database) - United States
+  
+  *Note: These services are located outside Canada. We have contractual safeguards in place to protect your information.*
+
+* **As Required by Law:** When required by Canadian law or court order
+* **With Your Consent:** When you explicitly authorize sharing
+
+---
+
+## 5. CROSS-BORDER DATA TRANSFERS
+
+Your personal information may be transferred to and stored in the United States. We ensure adequate protection through:
+
+- Contractual safeguards (Data Processing Agreements)
+- Technical safeguards (encryption, access controls)
+- Compliance with applicable privacy laws
+
+---
+
+## 6. DATA RETENTION
+
+We retain your personal information only as long as necessary for the purposes outlined in this policy, or as required by law:
+
+- **Patient data:** 7 years after last activity
+- **Call recordings:** 2 years
+- **Conversations:** 5 years
+- **Medical analysis:** 7 years
+- **Consent records:** 7 years (legal requirement)
+
+---
+
+## 7. YOUR PRIVACY RIGHTS
+
+### Access Your Information
+You can request access to your personal information. We will respond within **30 days** (may extend to 60 days with notice).
+
+**How to request:** Email privacy@biancawellness.com or use the "Request My Data" feature in the app.
+
+### Correct Your Information
+You can request correction of inaccurate information. We will respond within **30 days**.
+
+### Withdraw Consent
+You can withdraw consent for data collection, use, or disclosure. Contact us to withdraw consent.
+
+**Important:** Withdrawing consent for data collection will restrict your account access, as we cannot provide services without collecting necessary information.
+
+---
+
+## 8. BREACH NOTIFICATION
+
+If your personal information is improperly accessed or disclosed, we will:
+
+- Investigate immediately
+- Notify you **as soon as feasible** after discovery
+- Notify the Privacy Commissioner of Canada if the breach involves significant harm
+- Explain what happened and steps we're taking
+
+---
+
+## 9. COMPLAINTS
+
+If you believe we have not handled your personal information in accordance with PIPEDA, you can:
+
+**File a complaint with us:**
+- Email: privacy@biancawellness.com
+- Phone: +1-604-562-4263
+
+**File a complaint with the Privacy Commissioner of Canada:**
+- Website: https://www.priv.gc.ca/en/report-a-concern/
+- Phone: 1-800-282-1376
+- Mail: Office of the Privacy Commissioner of Canada, 30 Victoria Street, Gatineau, QC K1A 1H3
+
+---
+
+## 10. CONTACT US
+
+**Privacy Officer:**
+- Email: privacy@biancawellness.com
+- Phone: +1-604-562-4263
+- Address: 2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+
+---
+
+**This Privacy Policy complies with PIPEDA (Personal Information Protection and Electronic Documents Act)**
+`,
+  },
   privacyPracticesScreen: {
     content: `# Notice of Privacy Practices
 ## Bianca Wellness Healthcare Communication Services
@@ -625,6 +778,7 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     fraudAbuseAnalysis: "Fraud & Abuse Analysis",
     privacyPolicy: "Privacy Policy",
     privacyPractices: "HIPAA Privacy Practices",
+    privacyRequest: "Request My Data",
     termsOfService: "Terms of Service",
     mentalHealthReport: "Mental Health Report",
     login: "Sign In",
@@ -895,6 +1049,7 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     logout: "LOGOUT",
     profileUpdatedSuccess: "Your profile was updated successfully!",
     profileUpdateFailed: "Failed to update profile. Please try again.",
+    requestMyData: "Request My Data",
     invalidPhoneFormat: "Invalid phone format (10 digits or +1XXXXXXXXXX)",
     completeProfileTitle: "Complete Your Profile",
     completeProfileMessage: "Please complete your profile by adding a phone number before continuing.",
@@ -1034,6 +1189,8 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     viewCaregivers: "View Caregivers",
     inviteCaregiver: "Invite Caregiver",
     payments: "Payments",
+    country: "Country",
+    countryHelper: "Select your organization's country. This helps determine applicable privacy regulations.",
     timezone: "Timezone",
     timezoneHelper: "Select your organization's timezone. Schedule times will be based on this timezone.",
     callRetrySettings: "Call Retry Settings",
@@ -1043,6 +1200,72 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     retryIntervalMinutesHelper: "Time to wait between retry attempts (default: 15 minutes)",
     alertOnAllMissedCallsLabel: "Alert on All Missed Calls",
     alertOnAllMissedCallsHelper: "Send alerts for every missed call and retry attempt",
+  },
+  privacyRequestScreen: {
+    title: "Request My Data",
+    subtitle: "Under PIPEDA, you have the right to access and correct your personal information. Submit a request to access or correct your data.",
+    requestDataTitle: "Data Access Request",
+    requestDataDescription: "Describe what information you'd like to access. Leave blank to request all your personal information.",
+    correctionRequestTitle: "Data Correction Request",
+    correctionRequestDescription: "Request a correction to your personal information. Please provide details about what needs to be corrected.",
+    correctionNote: "Note: Most data can be edited directly in the app. Use this form for data that cannot be edited, such as historical logs or system-generated records.",
+    informationRequestedLabel: "Information Requested",
+    informationRequestedPlaceholder: "All my personal information (or specify what you need)",
+    additionalInformationLabel: "Additional Information (Optional)",
+    accessMethodLabel: "How would you like to receive your data?",
+    accessMethodEmail: "Email",
+    accessMethodDownload: "Download",
+    accessMethodInfo: "Your data will be emailed to you as a JSON file attachment.",
+    submitRequest: "Submit Request",
+    requestSubmitted: "Your data request has been submitted. You will receive an email with your data shortly.",
+    correctionRequestSubmitted: "Your correction request has been submitted. We will review and process it within 30 days.",
+    requestFailed: "Failed to submit request. Please try again.",
+    correctionFieldsRequired: "Please fill in the field name and requested value.",
+    requestHistoryTitle: "Request History",
+    requestTypeAccess: "Access Request",
+    requestTypeCorrection: "Correction Request",
+    requestedOn: "Requested on",
+    completedOn: "Completed on",
+    correctionFieldLabel: "Field to Correct",
+    correctionFieldPlaceholder: "e.g., Email address, Phone number, Name",
+    currentValueLabel: "Current Value (Optional)",
+    currentValuePlaceholder: "What is the current value?",
+    requestedValueLabel: "Requested Value *",
+    requestedValuePlaceholder: "What should the corrected value be?",
+    correctionReasonLabel: "Reason for Correction (Optional)",
+    correctionReasonPlaceholder: "Why does this information need to be corrected?",
+    field: "Field",
+    currentValue: "Current Value",
+    requestedValue: "Requested Value",
+    reason: "Reason",
+    requestTypeComplaint: "File Complaint",
+    complaintRequestTitle: "Privacy Complaint",
+    complaintRequestDescription: "If you believe we have not handled your personal information in accordance with privacy laws, you can file a complaint. We will investigate and respond within 30 days.",
+    complaintSubjectLabel: "Subject *",
+    complaintSubjectPlaceholder: "Brief description of your complaint",
+    complaintDescriptionLabel: "Description *",
+    complaintDescriptionPlaceholder: "Please provide details about your complaint, including what happened and when.",
+    violationTypeLabel: "Type of Issue (Optional)",
+    violationTypeOther: "Other",
+    violationTypeAccess: "Access Issue",
+    complaintFieldsRequired: "Please fill in subject and description.",
+    complaintSubmitted: "Your complaint has been submitted. We will investigate and respond within 30 days.",
+    complaintHistoryTitle: "Complaint History",
+    filedOn: "Filed on",
+    resolvedOn: "Resolved on",
+    deletionRequestTitle: "Request Data Deletion",
+    deletionRequestDescription: "Under PIPEDA, you can request deletion of your personal information. Note: HIPAA requires 7-year retention, so deletion may not be available for all jurisdictions.",
+    deletionDataTypeLabel: "What data would you like to delete?",
+    deletionTypeAll: "All Data",
+    deletionTypeCalls: "Calls Only",
+    deletionTypeConversations: "Conversations Only",
+    deletionTypeMedicalAnalysis: "Medical Analysis Only",
+    requestDeletion: "Request Data Deletion",
+    deletionConfirmTitle: "Confirm Data Deletion",
+    deletionConfirmMessage: "This will permanently delete your data. This action cannot be undone. Are you sure you want to proceed?",
+    confirmDelete: "Delete",
+    deletionCompleted: "Data deletion completed successfully.",
+    deletionFailed: "Failed to delete data. This may not be available for your jurisdiction due to legal retention requirements.",
   },
 }
 

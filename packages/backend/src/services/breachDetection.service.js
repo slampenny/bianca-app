@@ -10,8 +10,9 @@
  */
 
 const logger = require('../config/logger');
-const { AuditLog, BreachLog, Caregiver } = require('../models');
+const { AuditLog, BreachLog, Caregiver, Org } = require('../models');
 const emailService = require('./email.service');
+const { getJurisdiction, getBreachNotificationDeadline } = require('../utils/jurisdiction.utils');
 
 // Detection thresholds
 const DETECTION_RULES = {
@@ -257,6 +258,8 @@ class BreachDetectionService {
 
   /**
    * Create a breach alert
+   * @param {Object} data - Breach data
+   * @param {string} data.organizationCountry - Optional: Organization country for jurisdiction determination
    */
   async createBreachAlert(data) {
     try {
@@ -273,8 +276,31 @@ class BreachDetectionService {
         return recentBreach;
       }
 
-      // Create breach log
-      const breach = await BreachLog.create({
+      // Determine jurisdiction and notification requirements
+      let organizationCountry = data.organizationCountry;
+      
+      // If country not provided, try to get it from user's organization
+      if (!organizationCountry && data.userId) {
+        try {
+          const caregiver = await Caregiver.findById(data.userId).populate('org');
+          if (caregiver?.org) {
+            organizationCountry = caregiver.org.country;
+          }
+        } catch (error) {
+          logger.warn('[BREACH] Could not determine organization country:', error.message);
+        }
+      }
+
+      const jurisdiction = getJurisdiction(organizationCountry);
+      const notificationDeadline = getBreachNotificationDeadline(organizationCountry);
+
+      // Determine notification requirements based on jurisdiction
+      const requiresHHSNotification = jurisdiction.jurisdiction === 'HIPAA' && data.affectedCount >= 500;
+      const requiresPrivacyCommissionerNotification = jurisdiction.jurisdiction === 'PIPEDA' && 
+        (data.severity === 'CRITICAL' || data.severity === 'HIGH' || data.affectedCount > 0);
+
+      // Create breach log with jurisdiction-aware settings
+      const breachData = {
         type: data.type,
         severity: data.severity,
         userId: data.userId,
@@ -285,10 +311,19 @@ class BreachDetectionService {
         affectedResourceIds: data.affectedResourceIds || [],
         affectedCount: data.affectedCount || 0,
         status: 'INVESTIGATING',
-        // detectedAt will use default (Date.now) from model
-        // HIPAA requires notification within 60 days
-        notificationDeadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
-      });
+        organizationCountry: organizationCountry || 'US',
+        // Jurisdiction-aware notification settings
+        requiresHHSNotification: requiresHHSNotification,
+        requiresPrivacyCommissionerNotification: requiresPrivacyCommissionerNotification,
+        notificationDeadline: notificationDeadline,
+        // PIPEDA-specific: assess significant harm for high/critical breaches
+        significantHarmAssessment: jurisdiction.jurisdiction === 'PIPEDA' && 
+          (data.severity === 'CRITICAL' || data.severity === 'HIGH') ? 'PENDING' : 'NOT_ASSESSED'
+      };
+
+      const breach = await BreachLog.create(breachData);
+
+      logger.warn(`[BREACH] Alert created: ${breach._id} - ${data.type} - ${data.severity} - Jurisdiction: ${jurisdiction.jurisdiction}`);
 
       logger.warn(`[BREACH] Alert created: ${breach._id} - ${data.type} - ${data.severity}`);
 
@@ -359,12 +394,26 @@ class BreachDetectionService {
       const adminEmail = process.env.ADMIN_EMAIL || 'admin@biancatechnologies.com';
       if (adminEmail) {
         try {
-          const subject = `🚨 HIPAA Breach Alert: ${breach.type}`;
+          // Determine jurisdiction for notification message
+          const jurisdiction = getJurisdiction(breach.organizationCountry);
+          const jurisdictionName = jurisdiction.jurisdiction === 'HIPAA' ? 'HIPAA' : 
+                                   jurisdiction.jurisdiction === 'PIPEDA' ? 'PIPEDA' : 'Privacy';
+          
+          const notificationRequirement = breach.notificationDeadline 
+            ? `Notification deadline: ${breach.notificationDeadline.toISOString()} (${jurisdiction.breachNotificationRequirement === 'within_60_days' ? 'within 60 days' : 'as soon as feasible'})`
+            : `Notification required: ${jurisdiction.breachNotificationRequirement === 'as_soon_as_feasible' ? 'AS SOON AS FEASIBLE (PIPEDA)' : 'within 60 days (HIPAA)'}`;
+          
+          const regulatorInfo = jurisdiction.regulator 
+            ? `\nRegulator: ${jurisdiction.regulatorName}\nRegulator Contact: ${jurisdiction.regulatorContact}`
+            : '';
+          
+          const subject = `🚨 ${jurisdictionName} Breach Alert: ${breach.type}`;
           const text = `
-HIPAA Security Breach Detected
+${jurisdictionName} Security Breach Detected
 
 Breach Type: ${breach.type}
 Severity: ${breach.severity}
+Jurisdiction: ${jurisdiction.jurisdiction} (${breach.organizationCountry || 'US'})
 Detected At: ${breach.detectedAt.toISOString()}
 Breach ID: ${breach._id}
 
@@ -375,8 +424,11 @@ ${breach.userId ? `User ID: ${breach.userId}` : ''}
 ${breach.ipAddress ? `IP Address: ${breach.ipAddress}` : ''}
 ${breach.affectedCount > 0 ? `Affected Records: ${breach.affectedCount}` : ''}
 
-Notification Deadline: ${breach.notificationDeadline ? breach.notificationDeadline.toISOString() : 'Not set'}
-(HIPAA requires notification within 60 days of discovery)
+${notificationRequirement}
+${regulatorInfo}
+
+${breach.requiresHHSNotification ? '⚠️ HHS NOTIFICATION REQUIRED (500+ individuals)' : ''}
+${breach.requiresPrivacyCommissionerNotification ? '⚠️ PRIVACY COMMISSIONER NOTIFICATION REQUIRED (significant harm)' : ''}
 
 ACTION REQUIRED: Investigate immediately per SOP_Breach_Response.md
 
@@ -384,10 +436,11 @@ This is an automated alert from the breach detection system.
           `.trim();
 
           const html = `
-<h2>🚨 HIPAA Security Breach Detected</h2>
+<h2>🚨 ${jurisdictionName} Security Breach Detected</h2>
 
 <p><strong>Breach Type:</strong> ${breach.type}<br>
 <strong>Severity:</strong> ${breach.severity}<br>
+<strong>Jurisdiction:</strong> ${jurisdiction.jurisdiction} (${breach.organizationCountry || 'US'})<br>
 <strong>Detected At:</strong> ${breach.detectedAt.toISOString()}<br>
 <strong>Breach ID:</strong> ${breach._id}</p>
 
@@ -398,8 +451,11 @@ ${breach.userId ? `<p><strong>User ID:</strong> ${breach.userId}</p>` : ''}
 ${breach.ipAddress ? `<p><strong>IP Address:</strong> ${breach.ipAddress}</p>` : ''}
 ${breach.affectedCount > 0 ? `<p><strong>Affected Records:</strong> ${breach.affectedCount}</p>` : ''}
 
-<p><strong>Notification Deadline:</strong> ${breach.notificationDeadline ? breach.notificationDeadline.toISOString() : 'Not set'}<br>
-<em>(HIPAA requires notification within 60 days of discovery)</em></p>
+<p><strong>${notificationRequirement}</strong></p>
+${regulatorInfo ? `<p><strong>Regulator:</strong> ${jurisdiction.regulatorName}<br><strong>Contact:</strong> <a href="${jurisdiction.regulatorContact}">${jurisdiction.regulatorContact}</a></p>` : ''}
+
+${breach.requiresHHSNotification ? '<p style="color: red;"><strong>⚠️ HHS NOTIFICATION REQUIRED (500+ individuals)</strong></p>' : ''}
+${breach.requiresPrivacyCommissionerNotification ? '<p style="color: red;"><strong>⚠️ PRIVACY COMMISSIONER NOTIFICATION REQUIRED (significant harm)</strong></p>' : ''}
 
 <p><strong style="color: red;">ACTION REQUIRED:</strong> Investigate immediately per SOP_Breach_Response.md</p>
 

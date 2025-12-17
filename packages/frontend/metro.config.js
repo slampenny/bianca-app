@@ -7,6 +7,37 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 // Ensure we use the project root for the config
 const config = getDefaultConfig(projectRoot);
 
+// Configure Expo Router transformer to suppress routerRoot warnings
+// Set routerRoot to 'app' directory (default Expo Router routes location)
+// This is needed because @expo/metro-runtime triggers Expo Router's transformer
+const originalGetTransformOptions = config.transformer?.getTransformOptions;
+config.transformer = {
+  ...config.transformer,
+  getTransformOptions: async (entryPoints) => {
+    // Get default options from Expo's default config if it exists
+    const defaultOptions = originalGetTransformOptions
+      ? await originalGetTransformOptions(entryPoints)
+      : {
+          transform: {
+            experimentalImportSupport: false,
+            inlineRequires: true,
+          },
+        };
+    
+    // Add routerRoot to suppress Expo Router warnings
+    // Even if not using Expo Router for routing, the transformer still runs
+    if (defaultOptions.transform) {
+      defaultOptions.transform.routerRoot = path.resolve(projectRoot, 'app');
+    } else {
+      defaultOptions.transform = {
+        routerRoot: path.resolve(projectRoot, 'app'),
+      };
+    }
+    
+    return defaultOptions;
+  },
+};
+
 // Add resolver configuration to handle Platform utilities and monorepo
 config.resolver = {
   ...config.resolver,

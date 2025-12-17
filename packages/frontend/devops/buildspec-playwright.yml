@@ -63,10 +63,11 @@ phases:
         echo "✅ Playwright installed"
       - echo "Starting MongoDB container..."
       - |
+        # Use AWS ECR public image to avoid Docker Hub rate limits
         docker run -d --name mongodb-test \
           -p 27017:27017 \
           -e MONGO_INITDB_DATABASE=bianca-app-test \
-          mongo:7.0 || echo "MongoDB container may already exist"
+          public.ecr.aws/docker/library/mongo:7.0 || echo "MongoDB container may already exist"
         # Wait for MongoDB to be ready
         i=1
         while [ $i -le 30 ]; do
@@ -130,24 +131,38 @@ phases:
         done
       - echo "Verifying backend environment configuration..."
       - |
-        # Check backend logs for environment
+        set -e  # Exit on error
         echo "=== Backend Environment Verification ==="
-        docker logs backend-test 2>&1 | grep -i "environment\|env:" | head -5 || echo "No environment log found"
         # Verify NODE_ENV is set correctly in container
-        CONTAINER_NODE_ENV=$(docker exec backend-test printenv NODE_ENV 2>/dev/null || echo "NOT_SET")
-        echo "NODE_ENV in container: $CONTAINER_NODE_ENV"
+        CONTAINER_NODE_ENV=$(docker exec backend-test printenv NODE_ENV 2>/dev/null | tr -d '\n\r\t ' || echo "NOT_SET")
+        echo "Container NODE_ENV: [$CONTAINER_NODE_ENV]"
         # Check health endpoint for environment
         HEALTH_RESPONSE=$(curl -s http://localhost:3000/health 2>/dev/null || echo "{}")
-        BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | grep -o '"environment":"[^"]*"' | cut -d'"' -f4 || echo "UNKNOWN")
-        echo "Backend config.env from /health: $BACKEND_ENV"
-        # Verify environment is correct
-        if [ "$CONTAINER_NODE_ENV" != "test" ] || [ "$BACKEND_ENV" != "test" ]; then
+        # Extract environment value - try jq first, then sed, then grep
+        BACKEND_ENV="UNKNOWN"
+        if command -v jq >/dev/null 2>&1; then
+          BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | jq -r '.environment // empty' 2>/dev/null | tr -d '\n\r\t ' || echo "UNKNOWN")
+        elif echo "$HEALTH_RESPONSE" | grep -q '"environment"'; then
+          BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | sed -n 's/.*"environment"\s*:\s*"\([^"]*\)".*/\1/p' | tr -d '\n\r\t ' || echo "UNKNOWN")
+        fi
+        echo "Backend config.env from /health: [$BACKEND_ENV]"
+        # Verify both values are exactly "test" (case-sensitive, no whitespace)
+        ERROR_COUNT=0
+        if [ "$CONTAINER_NODE_ENV" != "test" ]; then
+          echo "❌ Container NODE_ENV mismatch: got [$CONTAINER_NODE_ENV], expected [test]"
+          ERROR_COUNT=$((ERROR_COUNT + 1))
+        fi
+        if [ "$BACKEND_ENV" != "test" ]; then
+          echo "❌ Backend config.env mismatch: got [$BACKEND_ENV], expected [test]"
+          ERROR_COUNT=$((ERROR_COUNT + 1))
+        fi
+        if [ $ERROR_COUNT -gt 0 ]; then
+          echo ""
           echo "❌ ERROR: Backend is not in test mode!"
-          echo "  Container NODE_ENV: $CONTAINER_NODE_ENV"
-          echo "  Backend config.env: $BACKEND_ENV"
           echo "This will cause:"
           echo "  - Test routes to be blocked (403)"
           echo "  - Rate limiting to be enabled (429 errors)"
+          echo ""
           echo "Backend logs (last 50 lines):"
           docker logs backend-test --tail 50 || true
           exit 1
@@ -346,6 +361,71 @@ phases:
         
         echo "✅ Artifacts collected"
         ls -la /tmp/playwright-artifacts/ || true
+      - echo "Uploading test results to S3 for easy access..."
+      - |
+        # Get the S3 bucket name from the artifact store
+        # CodePipeline stores artifacts in: s3://bucket-name/pipeline-name/execution-id/artifact-name/
+        # We'll upload to a dedicated test-results location
+        PIPELINE_NAME="bianca-staging-pipeline"
+        BUILD_ID="${CODEBUILD_BUILD_ID}"
+        BUILD_NUMBER="${CODEBUILD_BUILD_NUMBER}"
+        
+        # Get S3 bucket from CodePipeline (it's in the artifact store)
+        # We'll use a predictable path structure
+        S3_BUCKET=$(aws codepipeline get-pipeline --name "$PIPELINE_NAME" --query 'pipeline.artifactStore.location' --output text 2>/dev/null || echo "")
+        
+        if [ -z "$S3_BUCKET" ]; then
+          echo "⚠️  Could not determine S3 bucket, skipping S3 upload"
+          echo "   Artifacts are still available via CodePipeline artifacts"
+        else
+          echo "Uploading to S3 bucket: $S3_BUCKET"
+          S3_PREFIX="test-results/${BUILD_NUMBER}-${BUILD_ID}"
+          
+          # Upload HTML report (most important for viewing failures)
+          if [ -d "$FRONTEND_DIR/playwright-report" ]; then
+            echo "Uploading Playwright HTML report..."
+            aws s3 sync "$FRONTEND_DIR/playwright-report" "s3://${S3_BUCKET}/${S3_PREFIX}/playwright-report/" --quiet || true
+            echo "✅ HTML report uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/playwright-report/index.html"
+          fi
+          
+          # Upload test results (screenshots, videos, traces)
+          if [ -d "$FRONTEND_DIR/test-results" ]; then
+            echo "Uploading test results (screenshots, videos, traces)..."
+            aws s3 sync "$FRONTEND_DIR/test-results" "s3://${S3_BUCKET}/${S3_PREFIX}/test-results/" --quiet || true
+            echo "✅ Test results uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/test-results/"
+          fi
+          
+          # Upload logs
+          echo "Uploading logs..."
+          if [ -f /tmp/playwright-artifacts/backend.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/backend.log "s3://${S3_BUCKET}/${S3_PREFIX}/backend.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/frontend.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/frontend.log "s3://${S3_BUCKET}/${S3_PREFIX}/frontend.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/playwright-output.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/playwright-output.log "s3://${S3_BUCKET}/${S3_PREFIX}/playwright-output.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/run-summary.txt ]; then
+            aws s3 cp /tmp/playwright-artifacts/run-summary.txt "s3://${S3_BUCKET}/${S3_PREFIX}/run-summary.txt" --quiet || true
+          fi
+          
+          # Upload JUnit XML if it exists
+          if [ -f "$FRONTEND_DIR/test-results/junit.xml" ]; then
+            aws s3 cp "$FRONTEND_DIR/test-results/junit.xml" "s3://${S3_BUCKET}/${S3_PREFIX}/junit.xml" --quiet || true
+            echo "✅ JUnit XML uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/junit.xml"
+          fi
+          
+          # Create a latest symlink (upload a metadata file pointing to latest)
+          echo "{\"build_id\": \"${BUILD_ID}\", \"build_number\": \"${BUILD_NUMBER}\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"s3_prefix\": \"${S3_PREFIX}\"}" | \
+            aws s3 cp - "s3://${S3_BUCKET}/test-results/latest.json" --content-type "application/json" --quiet || true
+          
+          echo ""
+          echo "✅ Test results uploaded to S3:"
+          echo "   Base path: s3://${S3_BUCKET}/${S3_PREFIX}/"
+          echo "   HTML Report: s3://${S3_BUCKET}/${S3_PREFIX}/playwright-report/index.html"
+          echo "   Latest marker: s3://${S3_BUCKET}/test-results/latest.json"
+        fi
       - echo "Cleaning up Docker containers..."
       - |
         docker stop backend-test frontend-test mongodb-test 2>/dev/null || true

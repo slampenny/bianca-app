@@ -11,8 +11,31 @@ const { stopAllListeners } = require('./services/rtp.listener.service'); // Upda
  */
 async function startServer() {
   try {
+    // Debug: Log actual process.env.NODE_ENV at the very start
+    logger.info(`[Startup] ===== ENVIRONMENT DEBUG =====`);
+    logger.info(`[Startup] process.env.NODE_ENV: ${process.env.NODE_ENV || 'NOT_SET'}`);
+    
+    // Check if ecosystem.config.json exists and what it contains
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const ecosystemPath = path.join(__dirname, '../ecosystem.config.json');
+      if (fs.existsSync(ecosystemPath)) {
+        const ecosystemConfig = JSON.parse(fs.readFileSync(ecosystemPath, 'utf8'));
+        logger.info(`[Startup] ecosystem.config.json exists`);
+        logger.info(`[Startup] ecosystem.config.json env section: ${JSON.stringify(ecosystemConfig.apps[0].env || 'NOT_SET')}`);
+      } else {
+        logger.warn(`[Startup] ecosystem.config.json NOT FOUND at ${ecosystemPath}`);
+      }
+    } catch (err) {
+      logger.warn(`[Startup] Error reading ecosystem.config.json: ${err.message}`);
+    }
+    
     // Load environment variables and secrets
     await config.loadSecrets();
+    logger.info(`[Startup] config.env after loadSecrets: ${config.env}`);
+    logger.info(`[Startup] process.env.NODE_ENV after loadSecrets: ${process.env.NODE_ENV || 'NOT_SET'}`);
+    logger.info(`[Startup] ===== END ENVIRONMENT DEBUG =====`);
     logger.info(`Environment: ${config.env}`);
 
     // Re-initialize Twilio SMS service after secrets are loaded

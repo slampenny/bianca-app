@@ -212,6 +212,7 @@ describe('caregiverService', () => {
         const orgWithoutPhone = await Org.create({
           name: 'Test Org',
           email: 'org@example.com',
+          country: 'US',
           caregivers: [],
         });
 
@@ -246,6 +247,7 @@ describe('caregiverService', () => {
           name: 'Test Org',
           email: 'org@example.com',
           phone: existingPhone,
+          country: 'US',
           caregivers: [],
         });
 

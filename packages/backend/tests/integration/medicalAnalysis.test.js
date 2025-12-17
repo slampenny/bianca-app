@@ -24,6 +24,7 @@ beforeAll(async () => {
     name: 'Test Medical Org',
     email: 'medical@example.com',
     phone: '+16045624263',
+    country: 'US',
     stripeCustomerId: 'test-stripe-id',
     isEmailVerified: true
   });
