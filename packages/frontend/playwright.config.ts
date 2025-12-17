@@ -38,6 +38,7 @@ export default defineConfig({
   ],
   reporter: [
     ['list'],
-    ['html', { open: 'never' }] // Don't automatically open HTML report server
+    ['html', { open: 'never' }], // Don't automatically open HTML report server
+    ['junit', { outputFile: 'test-results/junit.xml' }] // JUnit XML for structured test results
   ],
 })
