@@ -955,7 +955,16 @@ class OpenAIRealtimeService {
         // Add input transcription for debugging
         input_audio_transcription: {
           model: 'whisper-1',
-        }
+        },
+
+        // Enable built-in noise reduction for better background noise handling
+        audio: {
+          input: {
+            noise_reduction: {
+              type: 'near_field', // Optimized for phone calls (microphone close to speaker)
+            },
+          },
+        },
       },
     };
 
@@ -3643,7 +3652,7 @@ class OpenAIRealtimeService {
       }, CONSTANTS.TEST_CONNECTION_TIMEOUT);
 
       try {
-        const model = config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17';
+        const model = config.openai.realtimeModel || 'gpt-realtime';
         const voice = config.openai.realtimeVoice || 'alloy';
         const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
         logger.info(`[OpenAI TestConn] Connecting to ${wsUrl}`);
@@ -3716,7 +3725,7 @@ class OpenAIRealtimeService {
                       input_audio_format: 'g711_ulaw',
                       output_audio_format: 'g711_ulaw',
                       voice: config.openai.realtimeVoice || 'alloy',
-                      model: config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17'
+                      model: config.openai.realtimeModel || 'gpt-realtime'
                     }
                   },
                   receivedMessages,

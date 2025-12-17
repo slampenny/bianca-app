@@ -17,24 +17,24 @@ const AudioUtils = require('../../api/audio.utils');
 class NoiseReductionService {
     constructor() {
         // Stage 1: Noise Gate Configuration
-        this.noiseGateEnabled = config.audio?.noiseReduction?.noiseGateEnabled ?? true;
-        this.noiseGateThreshold = config.audio?.noiseReduction?.noiseGateThreshold ?? 0.1;
+        this.noiseGateEnabled = config.audio.noiseReduction.noiseGateEnabled;
+        this.noiseGateThreshold = config.audio.noiseReduction.noiseGateThreshold;
         
         // Stage 2: Frequency Filtering Configuration
-        this.frequencyFilterEnabled = config.audio?.noiseReduction?.frequencyFilterEnabled ?? true;
-        this.frequencyFilterLowCutoff = config.audio?.noiseReduction?.frequencyFilterLowCutoff ?? 300; // Hz (removes low rumble)
-        this.frequencyFilterHighCutoff = config.audio?.noiseReduction?.frequencyFilterHighCutoff ?? 3400; // Hz (removes high hiss)
+        this.frequencyFilterEnabled = config.audio.noiseReduction.frequencyFilterEnabled;
+        this.frequencyFilterLowCutoff = config.audio.noiseReduction.frequencyFilterLowCutoff; // Hz (removes low rumble)
+        this.frequencyFilterHighCutoff = config.audio.noiseReduction.frequencyFilterHighCutoff; // Hz (removes high hiss)
         this.sampleRate = 8000; // Telephone quality μ-law is 8kHz
         
         // Stage 3: Primary Speaker Detection Configuration
-        this.primarySpeakerEnabled = config.audio?.noiseReduction?.primarySpeakerEnabled ?? false;
-        this.primarySpeakerHistorySize = config.audio?.noiseReduction?.primarySpeakerHistorySize ?? 50; // ~1 second at 20ms packets
-        this.primarySpeakerFocusThreshold = config.audio?.noiseReduction?.primarySpeakerFocusThreshold ?? 0.7; // 70% of max energy
-        this.primarySpeakerEnergyMultiplier = config.audio?.noiseReduction?.primarySpeakerEnergyMultiplier ?? 1.5; // 1.5x average
-        this.primarySpeakerVolumeReduction = config.audio?.noiseReduction?.primarySpeakerVolumeReduction ?? 0.3; // Reduce to 30% if not primary
+        this.primarySpeakerEnabled = config.audio.noiseReduction.primarySpeakerEnabled;
+        this.primarySpeakerHistorySize = config.audio.noiseReduction.primarySpeakerHistorySize; // ~1 second at 20ms packets
+        this.primarySpeakerFocusThreshold = config.audio.noiseReduction.primarySpeakerFocusThreshold; // 70% of max energy
+        this.primarySpeakerEnergyMultiplier = config.audio.noiseReduction.primarySpeakerEnergyMultiplier; // 1.5x average
+        this.primarySpeakerVolumeReduction = config.audio.noiseReduction.primarySpeakerVolumeReduction; // Reduce to 30% if not primary
         
-        // Stage 2: Adaptive Noise Reduction (not yet implemented)
-        this.adaptiveNoiseReductionEnabled = config.audio?.noiseReduction?.adaptiveNoiseReductionEnabled ?? false;
+        // Stage 4: Adaptive Noise Reduction (not yet implemented)
+        this.adaptiveNoiseReductionEnabled = config.audio.noiseReduction.adaptiveNoiseReductionEnabled;
         
         // Per-call energy history for primary speaker detection
         this.energyHistory = new Map(); // callId -> [energy1, energy2, ...]

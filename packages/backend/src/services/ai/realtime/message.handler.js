@@ -53,7 +53,16 @@ class MessageHandler {
         // Add input transcription for debugging
         input_audio_transcription: {
           model: 'whisper-1',
-        }
+        },
+
+        // Enable built-in noise reduction for better background noise handling
+        audio: {
+          input: {
+            noise_reduction: {
+              type: 'near_field', // Optimized for phone calls (microphone close to speaker)
+            },
+          },
+        },
       },
     };
   }

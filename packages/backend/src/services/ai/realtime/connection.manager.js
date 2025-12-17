@@ -25,7 +25,7 @@ class ConnectionManager {
    * @returns {WebSocket} Created WebSocket instance
    */
   static createConnection(connectionState, callId, attachHandlers) {
-    const model = config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17';
+    const model = config.openai.realtimeModel || 'gpt-realtime';
     const voice = config.openai.realtimeVoice || 'alloy';
     const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
     logger.info(`[Connection Manager] Connecting to ${wsUrl} for callId: ${callId}`);

@@ -95,7 +95,7 @@ const envVarsSchema = Joi.object({
     otherwise: Joi.string().optional() // Optional in dev/test environments (can use default for testing)
   }),
   // **NEW:** Realtime API specific variables
-  OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
+  OPENAI_REALTIME_MODEL: Joi.string().default('gpt-realtime'),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
   OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
   OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
