@@ -278,10 +278,15 @@ export class AuthWorkflow {
     // If not on home screen, wait a bit more and check again
     if (!isOnHome) {
       await this.page.waitForTimeout(2000)
+      // Re-check with locators
+      const homeHeaderLocator = this.page.locator('[data-testid="home-header"]')
+      const tabHomeLocator = this.page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
+      const addPatientLocator = this.page.getByText("Add Patient", { exact: true })
+      
       isOnHome = await Promise.race([
-        homeHeader.isVisible({ timeout: 3000 }).catch(() => false),
-        tabHome.isVisible({ timeout: 3000 }).catch(() => false),
-        addPatient.isVisible({ timeout: 3000 }).catch(() => false),
+        homeHeaderLocator.isVisible({ timeout: 3000 }).catch(() => false),
+        tabHomeLocator.isVisible({ timeout: 3000 }).catch(() => false),
+        addPatientLocator.isVisible({ timeout: 3000 }).catch(() => false),
       ])
     }
     
