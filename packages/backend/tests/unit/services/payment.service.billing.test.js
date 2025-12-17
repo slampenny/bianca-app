@@ -67,6 +67,7 @@ describe('Payment Service - Billing', () => {
       name: 'Test Healthcare Org',
       email: 'test@healthcare.com',
       phone: '+12345678901',
+      country: 'US',
       stripeSubscriptionId: 'sub_test123', // Required for getUnbilledCostsByOrg
     });
 

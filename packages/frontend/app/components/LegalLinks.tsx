@@ -1,8 +1,10 @@
 import React from "react"
 import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native"
 import { useNavigation } from "@react-navigation/native"
+import { useSelector } from "react-redux"
 import { colors } from "app/theme/colors"
 import { translate } from "../i18n"
+import { getOrg } from "../store/orgSlice"
 
 interface LegalLinksProps {
   showPrivacyPolicy?: boolean
@@ -20,6 +22,11 @@ export const LegalLinks: React.FC<LegalLinksProps> = ({
   const navigation = useNavigation()
   const { width } = useWindowDimensions()
   const isSmallScreen = width < 400
+  const currentOrg = useSelector(getOrg)
+  
+  // Only show HIPAA Privacy Practices for US orgs
+  // PIPEDA (Canada) doesn't have a separate "Privacy Practices" document
+  const shouldShowPrivacyPractices = showPrivacyPractices && currentOrg?.country === 'US'
 
   const openPrivacyPolicy = () => {
     navigation.navigate("Privacy" as never)
@@ -40,7 +47,7 @@ export const LegalLinks: React.FC<LegalLinksProps> = ({
           <Text style={styles.linkText}>{translate("legalLinks.privacyPolicy")}</Text>
         </Pressable>
       )}
-      {showPrivacyPractices && (
+      {shouldShowPrivacyPractices && (
         <Pressable onPress={openPrivacyPractices} style={[styles.linkContainer, isSmallScreen && styles.linkContainerSmall]}>
           <Text style={styles.linkText}>{translate("legalLinks.privacyPractices")}</Text>
         </Pressable>

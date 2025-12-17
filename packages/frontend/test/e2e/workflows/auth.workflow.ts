@@ -34,12 +34,29 @@ export class AuthWorkflow {
         console.log('Could not log out, trying to navigate to login:', error)
         // Force navigation to login by going to root
         await this.page.goto('/')
-        await this.page.waitForTimeout(1000)
+        await this.page.waitForTimeout(2000)
       }
     }
     
-    // Now wait for login screen
-    await this.page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+    // Check if we're already on login screen
+    const emailInputCheck = this.page.locator('input[data-testid="email-input"]')
+    const isAlreadyOnLogin = await emailInputCheck.isVisible({ timeout: 2000 }).catch(() => false)
+    
+    if (!isAlreadyOnLogin) {
+      // Force navigation to login by going to root
+      await this.page.goto('/')
+      await this.page.waitForTimeout(2000)
+    }
+    
+    // Now wait for login screen with retry logic
+    try {
+      await emailInputCheck.waitFor({ state: 'visible', timeout: 10000 })
+    } catch (error) {
+      // Try navigating again if first attempt failed
+      await this.page.goto('/')
+      await this.page.waitForTimeout(2000)
+      await emailInputCheck.waitFor({ state: 'visible', timeout: 10000 })
+    }
   }
 
   async givenIHaveValidCredentials() {
@@ -261,10 +278,15 @@ export class AuthWorkflow {
     // If not on home screen, wait a bit more and check again
     if (!isOnHome) {
       await this.page.waitForTimeout(2000)
+      // Re-check with locators
+      const homeHeaderLocator = this.page.locator('[data-testid="home-header"]')
+      const tabHomeLocator = this.page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
+      const addPatientLocator = this.page.getByText("Add Patient", { exact: true })
+      
       isOnHome = await Promise.race([
-        homeHeader.isVisible({ timeout: 3000 }).catch(() => false),
-        tabHome.isVisible({ timeout: 3000 }).catch(() => false),
-        addPatient.isVisible({ timeout: 3000 }).catch(() => false),
+        homeHeaderLocator.isVisible({ timeout: 3000 }).catch(() => false),
+        tabHomeLocator.isVisible({ timeout: 3000 }).catch(() => false),
+        addPatientLocator.isVisible({ timeout: 3000 }).catch(() => false),
       ])
     }
     

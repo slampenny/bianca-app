@@ -7,6 +7,7 @@ const orgOne = {
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
+  country: 'US',
 };
 
 const orgTwo = {
@@ -15,6 +16,7 @@ const orgTwo = {
   name: faker.name.findName(),
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
+  country: 'CA',
 };
 
 const insertOrgs = async (orgs) => {

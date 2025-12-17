@@ -27,6 +27,7 @@ describe('Org Model', () => {
       isEmailVerified: false,
       caregivers: [new mongoose.Types.ObjectId()],
       admins: [new mongoose.Types.ObjectId()],
+      country: 'US',
     };
   });
 
@@ -42,6 +43,21 @@ describe('Org Model', () => {
   test('should throw a validation error if phone is invalid', async () => {
     newOrg.phone = 'invalidPhone';
     await expect(new Org(newOrg).validate()).rejects.toThrow();
+  });
+
+  test('should accept valid country codes', async () => {
+    newOrg.country = 'CA';
+    await expect(new Org(newOrg).validate()).resolves.toBeUndefined();
+  });
+
+  test('should throw a validation error if country is invalid', async () => {
+    newOrg.country = 'INVALID';
+    await expect(new Org(newOrg).validate()).rejects.toThrow();
+  });
+
+  test('should accept country as optional', async () => {
+    delete newOrg.country;
+    await expect(new Org(newOrg).validate()).resolves.toBeUndefined();
   });
 
   test('should correctly check if email is taken', async () => {

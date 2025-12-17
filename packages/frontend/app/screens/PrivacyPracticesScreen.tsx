@@ -1,10 +1,13 @@
 import React, { useLayoutEffect } from "react"
 import { StyleSheet, View, ScrollView, Platform, useWindowDimensions } from "react-native"
+import { useMemo } from "react"
 import { useNavigation } from "@react-navigation/native"
+import { useSelector } from "react-redux"
 import { spacing, typography } from "app/theme"
 import { Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
+import { getOrg } from "../store/orgSlice"
 import type { ThemeColors } from "../types"
 import { useLanguage } from "app/hooks/useLanguage"
 import Markdown from 'react-native-markdown-display'
@@ -13,9 +16,24 @@ export const PrivacyPracticesScreen = () => {
   const navigation = useNavigation()
   const { colors, isLoading: themeLoading } = useTheme()
   const { height: windowHeight } = useWindowDimensions()
+  const currentOrg = useSelector(getOrg)
   
   // Use language hook to trigger re-renders on language change
   useLanguage()
+  
+  // Determine which policy to show based on jurisdiction
+  // Use useMemo to ensure it recalculates when currentOrg changes
+  const policyContent = useMemo(() => {
+    const country = currentOrg?.country || 'US'
+    
+    if (country === 'CA') {
+      // For Canada, show PIPEDA policy (same as PrivacyScreen)
+      return translate("privacyScreen.pipedaContent") || translate("privacyPracticesScreen.content")
+    } else {
+      // For US, show HIPAA Notice of Privacy Practices
+      return translate("privacyPracticesScreen.content")
+    }
+  }, [currentOrg?.country])
 
   // Update header options when theme changes
   useLayoutEffect(() => {
@@ -36,9 +54,6 @@ export const PrivacyPracticesScreen = () => {
 
   const styles = createStyles(colors, windowHeight)
   const markdownStyles = createMarkdownStyles(colors)
-  
-  // Get localized markdown content
-  const PRIVACY_PRACTICES_MD = translate("privacyPracticesScreen.content")
 
   return (
     <View style={styles.container}>
@@ -51,7 +66,7 @@ export const PrivacyPracticesScreen = () => {
         alwaysBounceVertical={false}
       >
         <View style={styles.contentCard}>
-          <Markdown style={markdownStyles}>{PRIVACY_PRACTICES_MD}</Markdown>
+          <Markdown style={markdownStyles}>{policyContent}</Markdown>
         </View>
       </ScrollView>
     </View>

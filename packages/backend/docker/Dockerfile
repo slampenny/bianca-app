@@ -1,7 +1,10 @@
 # Multi-stage build for better caching and smaller final image
 # syntax=docker/dockerfile:1.4
 # Note: Run 'docker logout' before building to avoid credential issues in WSL2
-FROM node:20-bullseye AS base
+# Try ECR Public first (no rate limits), fall back to Docker Hub
+# The buildspec pre_build phase will pre-pull the image to avoid rate limits
+# Use ECR Public to avoid Docker Hub rate limits
+FROM public.ecr.aws/docker/library/node:20-bullseye AS base
 
 # Create app directory
 RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
@@ -46,11 +49,17 @@ FROM dependencies AS build
 # Build arg to bust cache when code changes
 ARG BUILD_TIMESTAMP
 ARG GIT_COMMIT
+# Use build args in a way that busts cache when they change
+# This ensures we always get the latest code even with Docker layer caching
+RUN echo "Build timestamp: ${BUILD_TIMESTAMP:-unknown}, Git commit: ${GIT_COMMIT:-unknown}"
+
 # Copy static config files (rarely change)
 # NOTE: .env files are NOT copied - Docker containers should get config from environment variables only
 COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
 
 # Copy source code (cache will be busted if files change)
+# Using GIT_COMMIT in a comment to help with cache invalidation
+# Build: ${GIT_COMMIT:-unknown}
 COPY --chown=node:node src/ ./src/
 COPY --chown=node:node tests/ ./tests/
 # Note: devops/ directory not needed in container - used only for infrastructure deployment

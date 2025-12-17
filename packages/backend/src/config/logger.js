@@ -53,12 +53,42 @@ const PHI_PATTERNS = [
 ];
 
 /**
+ * Safe JSON stringify that handles circular references
+ * @param {any} obj - Object to stringify
+ * @returns {string} JSON string or error message
+ */
+function safeStringify(obj) {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    // Skip circular references
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
+    }
+    // Handle Error objects specially
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+        stack: value.stack,
+        code: value.code,
+        status: value.status,
+        statusCode: value.statusCode
+      };
+    }
+    return value;
+  });
+}
+
+/**
  * Custom Winston format for PHI redaction
  * In staging/development, debug logs don't redact emails for troubleshooting
  */
 const phiRedactor = winston.format((info) => {
   // Convert message to string if it's an object
-  let message = typeof info.message === 'string' ? info.message : JSON.stringify(info.message);
+  let message = typeof info.message === 'string' ? info.message : safeStringify(info.message);
   
   // In staging/development, don't redact emails in debug logs for troubleshooting
   const isDebugLog = info.level === 'debug';
@@ -158,7 +188,7 @@ const logger = winston.createLogger({
       
       // Add metadata if present (already redacted)
       if (Object.keys(meta).length > 0 && process.env.NODE_ENV !== 'production') {
-        log += ` ${JSON.stringify(meta)}`;
+        log += ` ${safeStringify(meta)}`;
       }
       
       return log;

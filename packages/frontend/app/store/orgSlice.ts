@@ -43,8 +43,13 @@ export const orgSlice = createSlice({
       .addMatcher(
         (action) => action.type.endsWith('/updateOrg/fulfilled'),
         (state, action: any) => {
-          if (action.payload?.org) {
-            state.org = action.payload.org as Org
+          // Backend returns org directly, not wrapped in { org: ... }
+          if (action.payload) {
+            // Check if payload is wrapped in { org: ... } or is the org directly
+            const updatedOrg = action.payload.org || action.payload
+            if (updatedOrg && updatedOrg.id) {
+              state.org = updatedOrg as Org
+            }
           }
         }
       )

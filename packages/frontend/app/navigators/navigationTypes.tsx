@@ -42,6 +42,7 @@ export type HomeStackParamList = {
   Privacy: undefined
   PrivacyPractices: undefined
   Terms: undefined
+  PrivacyRequest: undefined
 }
 
 export type ProfileStackParamList = {
@@ -50,6 +51,7 @@ export type ProfileStackParamList = {
   PrivacyPractices: undefined
   Terms: undefined
   MFASetup: undefined
+  PrivacyRequest: undefined
 }
 
 export type AlertStackParamList = {

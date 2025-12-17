@@ -16,6 +16,7 @@ const createOrg = {
           return value;
         }),
       logo: Joi.string().optional(),
+      country: Joi.string().valid('US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'CH', 'JP', 'CN', 'HK', 'SG', 'AE', 'IN', 'MX', 'BR', 'OTHER').optional().uppercase(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     }),
@@ -64,6 +65,7 @@ const updateOrg = {
         }),
       logo: Joi.string().allow(null, '').optional(),
       timezone: Joi.string().optional(), // IANA timezone identifier
+      country: Joi.string().valid('US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'CH', 'JP', 'CN', 'HK', 'SG', 'AE', 'IN', 'MX', 'BR', 'OTHER').optional().uppercase(),
       callRetrySettings: Joi.object().keys({
         retryCount: Joi.number().integer().min(0).max(10).optional(),
         retryIntervalMinutes: Joi.number().integer().min(1).max(1440).optional(),

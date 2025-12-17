@@ -27,6 +27,7 @@ import {
   medicalAnalysisApi,
   fraudAbuseAnalysisApi,
   stripeApi,
+  privacyApi,
 } from "../services/api/"
 
 // Auto-register all APIs for easier maintenance
@@ -47,6 +48,7 @@ const apiServices = {
   medicalAnalysisApi,
   fraudAbuseAnalysisApi,
   stripeApi,
+  privacyApi,
 } as const
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import {

@@ -29,7 +29,8 @@ describe('Billing System Integration Tests', () => {
     org = await Org.create({
       name: 'Integration Test Healthcare Org',
       email: 'integration@healthcare.com',
-      phone: '+12345678901'
+      phone: '+12345678901',
+      country: 'US'
     });
 
     // Create test caregiver
