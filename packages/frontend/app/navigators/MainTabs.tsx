@@ -20,6 +20,7 @@ import {
   LogoutScreen,
   PrivacyScreen,
   TermsScreen,
+  PrivacyRequestScreen,
   ReportsScreen,
   HealthReportScreen,
   SentimentAnalysisScreen,
@@ -104,6 +105,7 @@ function HomeStack() {
       <Stack.Screen name="Profile" component={ProfileScreen} options={() => ({ title: translate("headers.profile") })} />
       <Stack.Screen name="MFASetup" component={MFASetupScreen} options={() => ({ title: translate("mfa.setupTitle") || "Multi-Factor Authentication" })} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={() => ({ title: translate("headers.privacyPolicy") })} />
+      <Stack.Screen name="PrivacyRequest" component={PrivacyRequestScreen} options={() => ({ title: translate("headers.privacyRequest") || "Request My Data" })} />
       <Stack.Screen name="Terms" component={TermsScreen} options={() => ({ title: translate("headers.termsOfService") })} />
       <Stack.Screen name="Logout" component={LogoutScreen} options={() => ({ title: translate("headers.logout") })} />
     </Stack.Navigator>

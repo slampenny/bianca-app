@@ -1,5 +1,6 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
+const pick = require('../utils/pick');
 const privacyService = require('../services/privacy.service');
 const logger = require('../config/logger');
 
@@ -9,16 +10,27 @@ const logger = require('../config/logger');
 const createAccessRequest = catchAsync(async (req, res) => {
   const request = await privacyService.createAccessRequest(
     req.body,
-    req.user.id,
+    req.caregiver.id,
     'Caregiver' // Only caregivers have the app
   );
   
   // Automatically process and email the data
   try {
-    await privacyService.processAccessRequest(request._id, req.user.id);
-    logger.info(`[Privacy Controller] Access request ${request._id} automatically processed and emailed`);
+    await privacyService.processAccessRequest(request._id, req.caregiver.id);
+    logger.info(`[Privacy Controller] Access request ${request._id} automatically processed`);
   } catch (processError) {
-    logger.error(`[Privacy Controller] Failed to auto-process access request:`, processError);
+    // Check if this is an email-related error (which is handled gracefully in the service)
+    const isEmailError = processError.message && (
+      processError.message.includes('email') || 
+      processError.message.includes('Email') ||
+      processError.name === 'MessageRejected'
+    );
+    
+    if (isEmailError) {
+      logger.warn(`[Privacy Controller] Access request ${request._id} processed, but email delivery failed (likely due to test/development environment or unverified email addresses)`);
+    } else {
+      logger.error(`[Privacy Controller] Failed to auto-process access request:`, processError);
+    }
     // Don't fail the request creation - it's still created, just needs manual processing
   }
   
@@ -31,7 +43,7 @@ const createAccessRequest = catchAsync(async (req, res) => {
 const createCorrectionRequest = catchAsync(async (req, res) => {
   const request = await privacyService.createCorrectionRequest(
     req.body,
-    req.user.id,
+    req.caregiver.id,
     'Caregiver'
   );
   res.status(httpStatus.CREATED).send(request);
@@ -41,7 +53,7 @@ const createCorrectionRequest = catchAsync(async (req, res) => {
  * Get privacy request by ID
  */
 const getPrivacyRequest = catchAsync(async (req, res) => {
-  const request = await privacyService.getPrivacyRequestById(req.params.requestId, req.user.id);
+  const request = await privacyService.getPrivacyRequestById(req.params.requestId, req.caregiver.id);
   res.send(request);
 });
 
@@ -49,7 +61,9 @@ const getPrivacyRequest = catchAsync(async (req, res) => {
  * Get privacy requests
  */
 const getPrivacyRequests = catchAsync(async (req, res) => {
-  const result = await privacyService.queryPrivacyRequests(req.query, req.queryOptions, req.user.id);
+  const filter = {};
+  const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  const result = await privacyService.queryPrivacyRequests(filter, options, req.caregiver.id);
   res.send(result);
 });
 
@@ -60,7 +74,7 @@ const updatePrivacyRequest = catchAsync(async (req, res) => {
   const request = await privacyService.updatePrivacyRequest(
     req.params.requestId,
     req.body,
-    req.user.id
+    req.caregiver.id
   );
   res.send(request);
 });
@@ -71,7 +85,7 @@ const updatePrivacyRequest = catchAsync(async (req, res) => {
 const processAccessRequest = catchAsync(async (req, res) => {
   const request = await privacyService.processAccessRequest(
     req.params.requestId,
-    req.user.id
+    req.caregiver.id
   );
   res.send(request);
 });
@@ -83,7 +97,7 @@ const processCorrectionRequest = catchAsync(async (req, res) => {
   const request = await privacyService.processCorrectionRequest(
     req.params.requestId,
     req.body,
-    req.user.id
+    req.caregiver.id
   );
   res.send(request);
 });
@@ -94,7 +108,7 @@ const processCorrectionRequest = catchAsync(async (req, res) => {
 const createConsent = catchAsync(async (req, res) => {
   const consent = await privacyService.createConsentRecord(
     req.body,
-    req.user.id,
+    req.caregiver.id,
     'Caregiver'
   );
   res.status(httpStatus.CREATED).send(consent);
@@ -105,7 +119,7 @@ const createConsent = catchAsync(async (req, res) => {
  */
 const getActiveConsent = catchAsync(async (req, res) => {
   const consent = await privacyService.getActiveConsent(
-    req.user.id,
+    req.caregiver.id,
     'Caregiver',
     req.query.consentType
   );
@@ -117,7 +131,7 @@ const getActiveConsent = catchAsync(async (req, res) => {
  */
 const checkConsent = catchAsync(async (req, res) => {
   const hasConsent = await privacyService.hasConsent(
-    req.user.id,
+    req.caregiver.id,
     'Caregiver',
     req.query.consentType,
     req.query.purpose
@@ -132,7 +146,7 @@ const withdrawConsent = catchAsync(async (req, res) => {
   const consent = await privacyService.withdrawConsent(
     req.params.consentId,
     req.body,
-    req.user.id
+    req.caregiver.id
   );
   res.send(consent);
 });
@@ -141,7 +155,7 @@ const withdrawConsent = catchAsync(async (req, res) => {
  * Get consent history
  */
 const getConsentHistory = catchAsync(async (req, res) => {
-  const history = await privacyService.getConsentHistory(req.user.id, 'Caregiver');
+  const history = await privacyService.getConsentHistory(req.caregiver.id, 'Caregiver');
   res.send(history);
 });
 
@@ -175,7 +189,7 @@ const getPrivacyStatistics = catchAsync(async (req, res) => {
 const createComplaint = catchAsync(async (req, res) => {
   const complaint = await privacyService.createComplaint(
     req.body,
-    req.user.id,
+    req.caregiver.id,
     'Caregiver'
   );
   res.status(httpStatus.CREATED).send(complaint);
@@ -185,7 +199,7 @@ const createComplaint = catchAsync(async (req, res) => {
  * Get complaint by ID
  */
 const getComplaint = catchAsync(async (req, res) => {
-  const complaint = await privacyService.getComplaintById(req.params.complaintId, req.user.id);
+  const complaint = await privacyService.getComplaintById(req.params.complaintId, req.caregiver.id);
   res.send(complaint);
 });
 
@@ -193,7 +207,9 @@ const getComplaint = catchAsync(async (req, res) => {
  * Get complaints
  */
 const getComplaints = catchAsync(async (req, res) => {
-  const result = await privacyService.queryComplaints(req.query, req.queryOptions, req.user.id);
+  const filter = {};
+  const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  const result = await privacyService.queryComplaints(filter, options, req.caregiver.id);
   res.send(result);
 });
 
@@ -204,9 +220,24 @@ const updateComplaint = catchAsync(async (req, res) => {
   const complaint = await privacyService.updateComplaint(
     req.params.complaintId,
     req.body,
-    req.user.id
+    req.caregiver.id
   );
   res.send(complaint);
+});
+
+/**
+ * Request data deletion
+ */
+const requestDataDeletion = catchAsync(async (req, res) => {
+  const { dataType = 'all' } = req.body;
+  const dataDeletionService = require('../services/dataDeletion.service');
+  
+  const result = await dataDeletionService.handleDeletionRequest(
+    req.caregiver.id,
+    dataType
+  );
+  
+  res.status(httpStatus.OK).send(result);
 });
 
 module.exports = {
@@ -229,5 +260,6 @@ module.exports = {
   getComplaint,
   getComplaints,
   updateComplaint,
+  requestDataDeletion,
 };
 

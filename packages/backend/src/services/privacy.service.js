@@ -2,6 +2,7 @@ const httpStatus = require('http-status');
 const { PrivacyRequest, ConsentRecord, PrivacyComplaint, Caregiver, Patient, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const config = require('../config/config');
 const { getJurisdiction } = require('../utils/jurisdiction.utils');
 
 /**
@@ -464,7 +465,16 @@ const processAccessRequest = async (requestId, processedBy) => {
     
     logger.info(`[Privacy Service] Access request data automatically emailed to ${caregiver.email} for request ${requestId}`);
   } catch (emailError) {
-    logger.error(`[Privacy Service] Failed to email access request data:`, emailError);
+    // Check if this is an SES verification error (common in test/dev environments)
+    const isSESVerificationError = emailError.name === 'MessageRejected' || 
+                                   (emailError.message && emailError.message.includes('not verified'));
+    const isTestEnv = config.env === 'test' || config.env === 'development';
+    
+    if (isSESVerificationError || isTestEnv) {
+      logger.warn(`[Privacy Service] Email not sent for access request ${requestId} (${isSESVerificationError ? 'email addresses not verified in SES' : 'test/development environment'}). Request still processed successfully.`);
+    } else {
+      logger.error(`[Privacy Service] Failed to email access request data:`, emailError);
+    }
     // Don't fail the request if email fails - data is still provided
   }
   

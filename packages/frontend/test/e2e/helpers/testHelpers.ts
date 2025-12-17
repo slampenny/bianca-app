@@ -613,6 +613,12 @@ export async function getPatientCount(page: Page): Promise<number> {
   return await patientCards.count()
 }
 
+export async function navigateToPrivacyRequestScreen(page: Page): Promise<void> {
+  // Navigate directly via URL (fastest method)
+  await page.goto('/MainTabs/Home/PrivacyRequest')
+  await page.waitForSelector('[data-testid="privacy-request-screen"], [aria-label="privacy-request-screen"]', { timeout: 10000 })
+}
+
 export async function waitForPatientListToLoad(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="patient-list"]', { timeout: 10000 })
 }

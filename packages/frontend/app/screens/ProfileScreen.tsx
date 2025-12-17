@@ -420,6 +420,16 @@ function ProfileScreen() {
             />
 
             <Button
+              text={translate("profileScreen.requestMyData") || "Request My Data"}
+              onPress={() => navigation.navigate("PrivacyRequest" as never)}
+              preset="default"
+              testID="request-my-data-button"
+              accessibilityLabel={translate("profileScreen.requestMyData") || "Request my data"}
+              accessibilityHint="Opens screen to request your personal data"
+              style={styles.requestDataButton}
+            />
+
+            <Button
               text={translate("profileScreen.updateProfile")}
               onPress={handleSave}
               preset="primary"
@@ -505,6 +515,9 @@ const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
     paddingVertical: 15,
   },
   mfaButton: {
+    marginBottom: 15,
+  },
+  requestDataButton: {
     marginBottom: 15,
   },
   verificationStatus: {
