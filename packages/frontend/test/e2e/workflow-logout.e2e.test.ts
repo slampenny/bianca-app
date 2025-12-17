@@ -1,7 +1,7 @@
 import { test } from './helpers/testHelpers'
 import { expect } from '@playwright/test'
-import { AuthWorkflow } from './workflows/auth.workflow'
 import { LogoutWorkflow } from './workflows/logout.workflow'
+import { MFAWorkflow } from './workflows/mfa.workflow'
 
 /**
  * Logout Workflow Tests
@@ -12,15 +12,12 @@ import { LogoutWorkflow } from './workflows/logout.workflow'
 test.describe('Logout Workflow - Real Backend Integration', () => {
   
   test('Workflow: User can successfully log out', async ({ page }) => {
-    const auth = new AuthWorkflow(page)
-    const logout = new LogoutWorkflow(page)
+    // Use the exact same pattern as MFA workflow which works
+    const mfaWorkflow = new MFAWorkflow(page)
+    await mfaWorkflow.givenIAmLoggedIn()
     
-    // GIVEN: I am logged in as a valid user
-    await auth.givenIAmOnTheLoginScreen()
-    const creds = await auth.givenIHaveValidCredentials()
-    await auth.whenIEnterCredentials(creds.email, creds.password)
-    await auth.whenIClickLoginButton()
-    await auth.thenIShouldBeOnHomeScreen()
+    // Create logout workflow after login (to avoid any potential interference)
+    const logout = new LogoutWorkflow(page)
     
     // WHEN: I navigate to my profile
     await logout.givenIAmOnTheProfileScreen()
@@ -40,15 +37,13 @@ test.describe('Logout Workflow - Real Backend Integration', () => {
   })
 
   test('Workflow: Logout works even when backend API fails', async ({ page }) => {
-    const auth = new AuthWorkflow(page)
-    const logout = new LogoutWorkflow(page)
+    // Navigate to the app first
+    await page.goto('/')
     
-    // GIVEN: I am logged in
-    await auth.givenIAmOnTheLoginScreen()
-    const creds = await auth.givenIHaveValidCredentials()
-    await auth.whenIEnterCredentials(creds.email, creds.password)
-    await auth.whenIClickLoginButton()
-    await auth.thenIShouldBeOnHomeScreen()
+    // GIVEN: I am logged in (using the proven login helper)
+    await loginUserViaUI(page, 'fake@example.org', 'Password1')
+    
+    const logout = new LogoutWorkflow(page)
     
     // AND: The backend logout API is failing
     await page.route('**/v1/auth/logout', async (route) => {
@@ -76,15 +71,10 @@ test.describe('Logout Workflow - Real Backend Integration', () => {
   })
 
   test('Workflow: Logout handles invalid refresh token', async ({ page }) => {
-    const auth = new AuthWorkflow(page)
     const logout = new LogoutWorkflow(page)
     
-    // GIVEN: I am logged in
-    await auth.givenIAmOnTheLoginScreen()
-    const creds = await auth.givenIHaveValidCredentials()
-    await auth.whenIEnterCredentials(creds.email, creds.password)
-    await auth.whenIClickLoginButton()
-    await auth.thenIShouldBeOnHomeScreen()
+    // GIVEN: I am logged in (using the proven login helper)
+    await loginUserViaUI(page, 'fake@example.org', 'Password1')
     
     // AND: My refresh token is invalid/expired
     await page.route('**/v1/auth/logout', async (route) => {
@@ -108,15 +98,10 @@ test.describe('Logout Workflow - Real Backend Integration', () => {
   })
 
   test('Workflow: Multiple rapid logout clicks are handled gracefully', async ({ page }) => {
-    const auth = new AuthWorkflow(page)
     const logout = new LogoutWorkflow(page)
     
-    // GIVEN: I am logged in
-    await auth.givenIAmOnTheLoginScreen()
-    const creds = await auth.givenIHaveValidCredentials()
-    await auth.whenIEnterCredentials(creds.email, creds.password)
-    await auth.whenIClickLoginButton()
-    await auth.thenIShouldBeOnHomeScreen()
+    // GIVEN: I am logged in (using the proven login helper)
+    await loginUserViaUI(page, 'fake@example.org', 'Password1')
     
     // WHEN: I navigate to profile and click logout multiple times rapidly
     await logout.givenIAmOnTheProfileScreen()

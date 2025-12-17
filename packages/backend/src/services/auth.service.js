@@ -41,10 +41,12 @@ const loginCaregiverWithEmailAndPassword = async (email, password) => {
  */
 const logout = async (refreshToken) => {
   const refreshTokenDoc = await Token.findOne({ token: refreshToken, type: tokenTypes.REFRESH, blacklisted: false });
-  if (!refreshTokenDoc) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Not found');
+  if (refreshTokenDoc) {
+    // Token exists - delete it
+    await refreshTokenDoc.deleteOne();
   }
-  await refreshTokenDoc.deleteOne();
+  // If token doesn't exist, that's fine - user is already logged out
+  // Return successfully without throwing an error
 };
 
 /**

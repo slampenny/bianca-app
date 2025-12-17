@@ -49,22 +49,9 @@ export const UnauthStack = () => {
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   const { colors } = useTheme()
   
-  // Ensure we're on Login screen when UnauthStack mounts (e.g., after logout)
-  useEffect(() => {
-    if (navigationRef.isReady()) {
-      // Small delay to ensure the navigator is ready
-      const timer = setTimeout(() => {
-        try {
-          // Reset to Login screen to ensure clean state after logout
-          navigationRef.navigate("Login" as never)
-        } catch (error) {
-          // Navigation might already be on Login, ignore error
-        }
-      }, 100)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [])
+  // Don't automatically reset to Login when UnauthStack mounts
+  // Let the linking config and initialState handle navigation
+  // This allows reset-password and signup URLs to work correctly
   
   return (
     <LoginStack.Navigator 

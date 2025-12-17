@@ -129,6 +129,7 @@ export function HomeScreen() {
         style={cardStyle}
         testID={`patient-card-${item.id}`}
         accessibilityLabel={`patient-card-${item.name}`}
+        onPress={() => handlePatientPress(item)}
         LeftComponent={<AutoImage source={{ uri: item.avatar }} style={styles.avatar} />}
         content={item.name}
         contentStyle={styles.patientName}

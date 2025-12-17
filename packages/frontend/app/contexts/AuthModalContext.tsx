@@ -181,6 +181,8 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: "rgba(0, 0, 0, 0.7)",
       justifyContent: "center",
       alignItems: "center",
+      // Ensure overlay doesn't block clicks when modal is closing
+      pointerEvents: "auto" as any,
     },
     modalContent: {
       width: "90%",

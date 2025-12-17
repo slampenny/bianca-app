@@ -42,14 +42,14 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
 
   if (themeLoading) {
     return (
-      <Screen style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} testID="login-form" accessibilityLabel="login-screen">
+      <Screen style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} testID="login-screen" accessibilityLabel="login-screen">
         <Header titleTx="loginScreen.signIn" />
       </Screen>
     )
   }
 
   return (
-    <Screen style={{ backgroundColor: colors.palette.biancaBackground, flex: 1 }} testID="login-form" accessibilityLabel="login-screen">
+    <Screen style={{ backgroundColor: colors.palette.biancaBackground, flex: 1 }} testID="login-screen" accessibilityLabel="login-screen">
       <Header titleTx="loginScreen.signIn" />
       <LoginForm
         onRegisterPress={handleRegisterPress}

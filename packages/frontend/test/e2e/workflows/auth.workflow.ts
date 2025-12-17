@@ -263,7 +263,7 @@ export class AuthWorkflow {
     })
     
     // If we're not on login screen and we can see any home elements, we're on home
-    const isOnHome = homeHeader || addPatient || addPatientButton || homeScreen || (profileButton && !loginScreen && !emailInput) || (homeTab && !loginScreen && !emailInput)
+    let isOnHome = homeHeader || addPatient || addPatientButton || homeScreen || (profileButton && !loginScreen && !emailInput) || (homeTab && !loginScreen && !emailInput)
     
     if (!isOnHome) {
       // Take a screenshot for debugging

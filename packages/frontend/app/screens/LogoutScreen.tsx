@@ -1,8 +1,8 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { StyleSheet } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import { useLogoutMutation } from "../services/api/authApi"
-import { getAuthTokens, clearAuth } from "../store/authSlice"
+import { getAuthTokens, clearAuth, isAuthenticated } from "../store/authSlice"
 import { clearOrg } from "../store/orgSlice"
 import { clearCaregivers } from "../store/caregiverSlice"
 import { clearPatients } from "../store/patientSlice"
@@ -10,12 +10,31 @@ import { Button, Screen, Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
+import { navigationRef, resetRoot } from "app/navigators/navigationUtilities"
 
 export const LogoutScreen = () => {
   const dispatch = useDispatch()
   const [logout] = useLogoutMutation()
   const { colors, isLoading: themeLoading } = useTheme()
+  const isLoggedIn = useSelector(isAuthenticated)
 
+  // If we're not logged in, this screen shouldn't be visible
+  // AppNavigator should have switched to UnauthStack, but if we're still here, navigate away
+  useEffect(() => {
+    if (!isLoggedIn && navigationRef.isReady()) {
+      // User logged out - navigate to Login screen
+      // This ensures we're not stuck on LogoutScreen after logout
+      try {
+        resetRoot({
+          index: 0,
+          routes: [{ name: "Login" as never }],
+        })
+        logger.debug("LogoutScreen: Navigated to Login after detecting logout")
+      } catch (error) {
+        logger.warn("LogoutScreen: Failed to navigate to Login after logout:", error)
+      }
+    }
+  }, [isLoggedIn])
 
   if (themeLoading) {
     return null
@@ -43,6 +62,9 @@ export const LogoutScreen = () => {
     // Other slices (org, caregiver, patient) will auto-clear via extraReducers listening to logout events
     // Navigation to Login will be handled by AppNavigator when it switches to UnauthStack
   }
+
+  // Navigation to Login is handled by AppNavigator when it switches to UnauthStack
+  // No need to reset navigation here - AppNavigator will handle it
 
   return (
     <Screen style={styles.container} accessibilityLabel="logout-screen">

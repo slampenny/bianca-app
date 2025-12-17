@@ -8,8 +8,9 @@ test('user can fill login form and see error on failure', async ({ page }) => {
   await page.goto('/')
   
   // Wait for login form to be fully loaded and visible - use data-testid
-  const emailInput = page.locator('input[data-testid="email-input"]')
-  const passwordInput = page.locator('input[data-testid="password-input"]')
+  // Use .first() to handle case where auth modal might also have login form
+  const emailInput = page.locator('input[data-testid="email-input"]').first()
+  const passwordInput = page.locator('input[data-testid="password-input"]').first()
   
   await emailInput.waitFor({ state: 'visible', timeout: 5000 })
   await passwordInput.waitFor({ state: 'visible', timeout: 5000 })
