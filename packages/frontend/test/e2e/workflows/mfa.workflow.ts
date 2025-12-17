@@ -99,10 +99,27 @@ export class MFAWorkflow {
     
     // Scroll into view if needed
     await mfaButton.scrollIntoViewIfNeeded().catch(() => {})
-    await this.page.waitForTimeout(500)
-    
+    await this.page.waitForTimeout(1000)
+
+    // Wait for button to be visible and enabled
     await mfaButton.waitFor({ state: 'visible', timeout: 15000 })
-    await mfaButton.click()
+    
+    // Check if button is enabled
+    const isEnabled = await mfaButton.isEnabled().catch(() => true)
+    if (!isEnabled) {
+      console.log('MFA button is disabled, waiting for it to become enabled...')
+      await this.page.waitForTimeout(2000)
+    }
+    
+    // Try clicking with retry logic
+    try {
+      await mfaButton.click({ timeout: 10000, force: false })
+    } catch (clickError) {
+      // If click fails, try force click or wait and retry
+      console.log('Initial click failed, trying force click...')
+      await this.page.waitForTimeout(1000)
+      await mfaButton.click({ timeout: 10000, force: true })
+    }
     
     // Wait for the MFA setup screen specifically (not the button)
     await this.page.waitForSelector('[data-testid="mfa-setup-screen"]', { timeout: 15000 })

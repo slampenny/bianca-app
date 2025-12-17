@@ -194,7 +194,8 @@ export class LogoutWorkflow {
     // Don't use waitForTimeout if page might be closed - it can hang
     try {
       // Wait a moment for logout to complete and navigation to happen
-      await this.page.waitForTimeout(2000)
+      // window.location.replace causes a page reload, so wait for that
+      await this.page.waitForTimeout(3000)
       
       // Check if we're on the login screen immediately
       // Try to find login screen elements - this will throw if page is closed
@@ -220,32 +221,23 @@ export class LogoutWorkflow {
       ])
       
       // Verify we're on login screen after waiting
-      const isLoginScreenAfterWait = await loginScreen.isVisible({ timeout: 3000 }).catch(() => false)
-      const isEmailInputAfterWait = await emailInput.isVisible({ timeout: 3000 }).catch(() => false)
+      // Give more time for navigation reset to complete
+      const isLoginScreenAfterWait = await loginScreen.isVisible({ timeout: 5000 }).catch(() => false)
+      const isEmailInputAfterWait = await emailInput.isVisible({ timeout: 5000 }).catch(() => false)
       
+      // After logout, we should be on login screen
+      // AppNavigator resets navigation to Login when switching to UnauthStack
       if (!isLoginScreenAfterWait && !isEmailInputAfterWait) {
-        // If still not on login screen, try navigating to root explicitly
-        console.log('Not on login screen yet, navigating to root...')
-        await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {})
-        await this.page.waitForTimeout(2000)
+        // Wait a bit more and check URL to see where we are
+        await this.page.waitForTimeout(1000)
+        const currentUrl = this.page.url()
+        console.log(`After logout, current URL: ${currentUrl}`)
         
-        // Check again after navigation
-        const isEmailInputAfterNav = await emailInput.isVisible({ timeout: 10000 }).catch(() => false)
-        if (!isEmailInputAfterNav) {
-          // Last resort: check URL and page content
-          const currentUrl = this.page.url()
-          console.log(`Current URL: ${currentUrl}`)
-          const pageContent = await this.page.content().catch(() => '')
-          const hasEmailInput = pageContent.includes('email-input') || pageContent.includes('data-testid="email-input"')
-          
-          if (!hasEmailInput) {
-            throw new Error(`Failed to verify logout: email input not found. URL: ${currentUrl}`)
-          }
-        }
-      } else {
-        // We're on login screen, verify it
-        expect(isLoginScreenAfterWait || isEmailInputAfterWait).toBe(true)
+        // If we're still not on login, this indicates the navigation reset didn't work
+        throw new Error(`Failed to verify logout: not on login screen. URL: ${currentUrl}, loginScreen visible: ${isLoginScreenAfterWait}, emailInput visible: ${isEmailInputAfterWait}`)
       }
+      
+      expect(isLoginScreenAfterWait || isEmailInputAfterWait).toBe(true)
     } catch (error) {
       // Check if error is due to page being closed (which is valid after logout)
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -258,23 +250,9 @@ export class LogoutWorkflow {
         return // Consider this a success
       }
       
-      // If page didn't close but we're not on login, try to recover
-      try {
-        console.log('Attempting recovery navigation...')
-        await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10000 })
-        await this.page.waitForTimeout(3000)
-        await expect(this.page.locator('input[data-testid="email-input"]')).toBeVisible({ timeout: 10000 })
-      } catch (recoveryError) {
-        const recoveryMessage = recoveryError instanceof Error ? recoveryError.message : String(recoveryError)
-        // If recovery also fails due to page closure, that's still valid
-        if (recoveryMessage.includes('Target page, context or browser has been closed') || 
-            recoveryMessage.includes('page has been closed') ||
-            recoveryMessage.includes('BrowserContext has been closed')) {
-          console.log('✅ Logout succeeded (page closed during recovery, which is valid)')
-          return
-        }
-        throw new Error(`Failed to verify logout: ${errorMessage}`)
-      }
+      // If page didn't close but we're not on login, this is a bug
+      // Logout should always navigate to login screen
+      throw new Error(`Failed to verify logout: ${errorMessage}`)
     }
   }
 

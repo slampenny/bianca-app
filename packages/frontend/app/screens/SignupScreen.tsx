@@ -10,6 +10,7 @@ import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { logger } from "../utils/logger"
+import { navigationRef, resetRoot } from "app/navigators/navigationUtilities"
 
 type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
@@ -274,7 +275,16 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       logger.debug("Signup successful:", result)
       
       // Navigate to main app since user is now registered and logged in
-      navigation.navigate("MainTabs" as any)
+      // Use resetRoot to ensure clean navigation state after signup
+      if (navigationRef.isReady()) {
+        resetRoot({
+          index: 0,
+          routes: [{ name: "MainTabs" as never }],
+        })
+      } else {
+        // Fallback to regular navigation if resetRoot isn't ready
+        navigation.navigate("MainTabs" as any)
+      }
       
     } catch (error: unknown) {
       logger.error("Signup error:", error)

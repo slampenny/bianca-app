@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react"
-import { NavigationContainer } from "@react-navigation/native"
+import { NavigationContainer, getStateFromPath as getStateFromPathDefault } from "@react-navigation/native"
 import { useSelector, useDispatch } from "react-redux"
 import { isAuthenticated, getCurrentUser, getInviteToken } from "app/store/authSlice"
 import { clearAuth } from "app/store/authSlice"
@@ -27,6 +27,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   const currentOrg = useSelector(getOrg)
   const { currentTheme, colors } = useTheme()
   const shouldNavigateToRegister = useRef(false)
+  const hasResetNavigationOnLogout = useRef(false)
 
   // Define back button behavior
   useBackButtonHandler((routeName) => {
@@ -40,6 +41,46 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
     storage.remove("navigationState").catch(() => {
       // Ignore errors if storage is not available
     })
+  }, [isLoggedIn])
+  
+  // When switching to UnauthStack (logout), explicitly reset navigation to Login screen
+  // This ensures users aren't stuck on protected routes after logout
+  // This needs to be a separate effect to run after the stack has switched
+  useEffect(() => {
+    if (!isLoggedIn) {
+      // Reset the flag when user logs back in
+      hasResetNavigationOnLogout.current = false
+    }
+  }, [isLoggedIn])
+  
+  useEffect(() => {
+    if (!isLoggedIn && !hasResetNavigationOnLogout.current && navigationRef.isReady()) {
+      // Mark that we're resetting to prevent multiple resets
+      hasResetNavigationOnLogout.current = true
+      
+      // Use a timeout to ensure the stack has fully switched and rendered
+      const timer = setTimeout(() => {
+        if (navigationRef.isReady() && !isLoggedIn) {
+          try {
+            resetRoot({
+              index: 0,
+              routes: [{ name: "Login" as never }],
+            })
+            logger.debug("Navigation reset to Login after logout")
+          } catch (error) {
+            logger.warn("Failed to reset navigation after logout:", error)
+            // Fallback: try navigating directly
+            try {
+              navigationRef.navigate("Login" as never)
+            } catch (navError) {
+              logger.warn("Failed to navigate to Login after logout:", navError)
+            }
+          }
+        }
+      }, 300)
+      
+      return () => clearTimeout(timer)
+    }
   }, [isLoggedIn])
 
   // Redirect users without org to registration screen
@@ -125,12 +166,70 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   // Get navigation theme based on current app theme
   const navigationTheme = getNavigationTheme(currentTheme, colors)
 
+  // When switching to UnauthStack, ensure navigation is reset to Login
+  // The key prop on NavigationContainer forces a remount, but we also need to ensure
+  // the navigation state is properly reset when the stack switches
+  useEffect(() => {
+    if (!isLoggedIn && navigationRef.isReady()) {
+      // Wait for the stack to switch, then reset navigation to Login
+      const timer = setTimeout(() => {
+        if (navigationRef.isReady() && !isLoggedIn) {
+          try {
+            // Use resetRoot to ensure we're on Login screen
+            resetRoot({
+              index: 0,
+              routes: [{ name: "Login" as never }],
+            })
+          } catch (error) {
+            logger.warn("Failed to reset navigation after logout:", error)
+          }
+        }
+      }, 200)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [isLoggedIn])
+
+  // Create a modified linking config that ignores protected routes when logged out
+  // This prevents the URL from overriding our initialState
+  const getLinkingConfig = () => {
+    if (!isLoggedIn && linking) {
+      // When logged out, create a linking config that only handles unauth routes
+      // This prevents MainTabs URLs from being parsed
+      return {
+        ...linking,
+        // Override getInitialURL to return null when logged out, forcing use of initialState
+        getInitialURL: async () => {
+          // Don't use the current URL when logged out - let initialState handle it
+          return null
+        },
+        getStateFromPath: (path: string, options: any) => {
+          // If path contains MainTabs or other protected routes, ignore it and return Login
+          if (path.includes('MainTabs') || path.includes('/Home') || path.includes('/Profile') || path.includes('/Logout')) {
+            return {
+              routes: [{ name: "Login" as never }],
+              index: 0,
+            }
+          }
+          // Otherwise, use React Navigation's default getStateFromPath with our config
+          return getStateFromPathDefault(path, {
+            ...options,
+            config: linking.config,
+            screens: linking.config?.screens,
+          })
+        },
+      }
+    }
+    return linking
+  }
+
   return (
     <NavigationContainer
+      key={isLoggedIn ? 'auth' : 'unauth'} // Force remount when switching stacks to ensure clean state
       ref={navigationRef}
       theme={navigationTheme}
-      linking={linking}
-      initialState={initialState || navigationPersistenceProps.initialState}
+      linking={getLinkingConfig()}
+      initialState={!isLoggedIn ? { routes: [{ name: "Login" as never }], index: 0 } : (initialState || navigationPersistenceProps.initialState)}
       onStateChange={onStateChange || navigationPersistenceProps.onStateChange}
       {...otherProps}
     >

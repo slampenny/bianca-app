@@ -1,8 +1,8 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { StyleSheet } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
 import { useLogoutMutation } from "../services/api/authApi"
-import { getAuthTokens, clearAuth } from "../store/authSlice"
+import { getAuthTokens, clearAuth, isAuthenticated } from "../store/authSlice"
 import { clearOrg } from "../store/orgSlice"
 import { clearCaregivers } from "../store/caregiverSlice"
 import { clearPatients } from "../store/patientSlice"
@@ -10,11 +10,14 @@ import { Button, Screen, Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
+import { navigationRef, resetRoot } from "app/navigators/navigationUtilities"
 
 export const LogoutScreen = () => {
   const dispatch = useDispatch()
   const [logout] = useLogoutMutation()
   const { colors, isLoading: themeLoading } = useTheme()
+  const isLoggedIn = useSelector(isAuthenticated)
+
 
   if (themeLoading) {
     return null
@@ -40,10 +43,21 @@ export const LogoutScreen = () => {
     // to ensure auth state is cleared immediately
     dispatch(clearAuth())
     // Other slices (org, caregiver, patient) will auto-clear via extraReducers listening to logout events
-    
-    // Navigate to login screen or handle logout completion
-    // The navigation will be handled by the auth state change
+    // Navigation to Login will be handled by the useEffect below when isLoggedIn becomes false
   }
+
+  // Navigate to Login screen when auth state clears after logout
+  useEffect(() => {
+    if (!isLoggedIn && navigationRef.isReady()) {
+      // Use resetRoot to navigate to Login screen
+      // This works even when we're in AuthStack - resetRoot will handle the stack switch
+      resetRoot({
+        index: 0,
+        routes: [{ name: "Login" as never }],
+      })
+      logger.debug("Navigation reset to Login after logout")
+    }
+  }, [isLoggedIn])
 
   return (
     <Screen style={styles.container} accessibilityLabel="logout-screen">

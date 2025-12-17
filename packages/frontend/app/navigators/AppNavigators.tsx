@@ -1,4 +1,5 @@
 import { createStackNavigator } from "@react-navigation/stack"
+import { useEffect } from "react"
 import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, SSOAccountLinkingScreen, MFAVerificationScreen } from "app/screens"
 import MainTabs from "./MainTabs"
 import { AppStackParamList, LoginStackParamList } from "./navigationTypes"
@@ -6,6 +7,7 @@ import { translate } from "app/i18n"
 import { useLanguage } from "app/hooks/useLanguage"
 import { useTheme } from "app/theme/ThemeContext"
 import { createThemeAwareHeaderOptions } from "./navigationHelpers"
+import { navigationRef } from "./navigationUtilities"
 
 const Stack = createStackNavigator<AppStackParamList>()
 const LoginStack = createStackNavigator<LoginStackParamList>()
@@ -47,8 +49,28 @@ export const UnauthStack = () => {
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   const { colors } = useTheme()
   
+  // Ensure we're on Login screen when UnauthStack mounts (e.g., after logout)
+  useEffect(() => {
+    if (navigationRef.isReady()) {
+      // Small delay to ensure the navigator is ready
+      const timer = setTimeout(() => {
+        try {
+          // Reset to Login screen to ensure clean state after logout
+          navigationRef.navigate("Login" as never)
+        } catch (error) {
+          // Navigation might already be on Login, ignore error
+        }
+      }, 100)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [])
+  
   return (
-    <LoginStack.Navigator screenOptions={{ headerShown: false }}>
+    <LoginStack.Navigator 
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Login"
+    >
       <LoginStack.Screen name="Login" component={LoginScreen} options={() => ({ title: translate("headers.login") })} />
       <LoginStack.Screen name="Register" component={RegisterScreen} options={() => ({ title: translate("headers.register") })} />
       <LoginStack.Screen name="Signup" component={SignupScreen} />

@@ -273,18 +273,31 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     let isOnProfile = false
     let isOnHome = false
     
+    // Wait for navigation to complete after signup
+    // Signup now uses resetRoot to navigate to MainTabs, so navigation should be reliable
+    await invitePage.waitForTimeout(2000)
+    
+    // Check for profile or home screen
+    const profileScreen = invitePage.locator('[data-testid="profile-screen"]')
+    const homeHeader = invitePage.locator('[data-testid="home-header"]')
+    
     try {
-      await invitePage.waitForSelector('[data-testid="profile-screen"]', { timeout: 5000 })
-      isOnProfile = true
-      console.log('✅ Invited caregiver redirected to profile screen')
-    } catch {
-      try {
-        await invitePage.waitForSelector('[data-testid="home-header"]', { timeout: 5000 })
-        isOnHome = true
-        console.log('✅ Invited caregiver redirected to home screen')
-      } catch {
-        throw new Error('Neither profile nor home screen found after signup')
+      const isProfileVisible = await profileScreen.isVisible({ timeout: 5000 }).catch(() => false)
+      if (isProfileVisible) {
+        isOnProfile = true
+        console.log('✅ Invited caregiver redirected to profile screen')
+      } else {
+        const isHomeHeaderVisible = await homeHeader.isVisible({ timeout: 5000 }).catch(() => false)
+        if (isHomeHeaderVisible) {
+          isOnHome = true
+          console.log('✅ Invited caregiver redirected to home screen')
+        } else {
+          throw new Error('Neither profile nor home screen found after signup')
+        }
       }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Signup navigation failed: ${errorMsg}`)
     }
 
     // Step 14: Navigate to profile to verify what the invited caregiver sees

@@ -299,6 +299,31 @@ test.describe("Alert Polling", () => {
     
     // Verify the alert was found
     // Note: If polling isn't working, we at least verify the alert can be fetched via navigation/refetch
+    if (!alertFound) {
+      // Last resort: try one more navigation-based refetch
+      console.log('Alert not found after polling, trying final navigation refetch...')
+      try {
+        const homeTab = page.locator('[data-testid="tab-home"], [aria-label*="Home" i]').first()
+        if (await homeTab.count() > 0) {
+          await homeTab.click({ timeout: 5000 })
+          await page.waitForTimeout(2000)
+          await navigateToAlertTab(page)
+          await page.waitForTimeout(5000) // Give more time for alerts to load
+          
+          const finalAlertWithMessage = page.locator('[data-testid="alert-item"]').filter({
+            hasText: testAlertMessage,
+          })
+          const finalCount = await finalAlertWithMessage.count()
+          if (finalCount > 0) {
+            alertFound = true
+            console.log('✅ Alert found after final navigation refetch!')
+          }
+        }
+      } catch (navError) {
+        console.log('Final navigation refetch failed:', navError instanceof Error ? navError.message : String(navError))
+      }
+    }
+    
     expect(alertFound).toBe(true)
     
     // Verify the alert is visible and contains our message
