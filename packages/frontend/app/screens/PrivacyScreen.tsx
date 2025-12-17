@@ -1,4 +1,4 @@
-import React, { useLayoutEffect } from "react"
+import React, { useLayoutEffect, useMemo } from "react"
 import { StyleSheet, View, ScrollView, Platform } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
@@ -164,12 +164,12 @@ If you believe we have not handled your personal information in accordance with 
 `
 
 const PRIVACY_MD = `
-## MyPhoneFriend - Privacy Policy
+## Bianca Wellness - Privacy Policy
 
 **Effective Date:** [Date]
 **Last Updated:** [Date]
 
-Welcome to MyPhoneFriend ("we," "us," "our"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our MyPhoneFriend mobile application (the "App") and services (collectively, the "Services"). Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the app.
+Welcome to Bianca Wellness ("we," "us," "our"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Bianca Wellness mobile application (the "App") and services (collectively, the "Services"). Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the app.
 
 We reserve the right to make changes to this Privacy Policy at any time and for any reason. We will alert you about any changes by updating the "Last Updated" date of this Privacy Policy.
 
@@ -262,7 +262,8 @@ export const PrivacyScreen = () => {
   const currentOrg = useSelector(getOrg)
   
   // Determine jurisdiction based on organization country
-  const getPolicyContent = () => {
+  // Use useMemo to ensure it recalculates when currentOrg changes
+  const policyContent = useMemo(() => {
     const country = currentOrg?.country || 'US'
     
     if (country === 'CA') {
@@ -275,9 +276,7 @@ export const PrivacyScreen = () => {
       // General policy for other countries
       return PRIVACY_MD
     }
-  }
-  
-  const policyContent = getPolicyContent()
+  }, [currentOrg?.country])
 
   // Update header options when theme changes
   useLayoutEffect(() => {

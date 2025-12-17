@@ -41,7 +41,15 @@ function getJurisdiction(country) {
       regulator: 'HHS',
       regulatorName: 'U.S. Department of Health and Human Services',
       regulatorContact: 'https://www.hhs.gov/hipaa/filing-a-complaint',
-      complaintEndpoint: 'HHS'
+      complaintEndpoint: 'HHS',
+      // HIPAA requires 7 years retention
+      dataRetention: {
+        patientData: { years: 7, autoDelete: false }, // HIPAA requires retention
+        callRecordings: { years: 7, autoDelete: false },
+        conversations: { years: 7, autoDelete: false },
+        medicalAnalysis: { years: 7, autoDelete: false },
+        consentRecords: { years: 7, autoDelete: false },
+      }
     };
   }
 
@@ -56,7 +64,15 @@ function getJurisdiction(country) {
       regulator: 'OPC',
       regulatorName: 'Office of the Privacy Commissioner of Canada',
       regulatorContact: 'https://www.priv.gc.ca/en/report-a-concern/',
-      complaintEndpoint: 'PrivacyCommissioner'
+      complaintEndpoint: 'PrivacyCommissioner',
+      // PIPEDA: retain only as long as necessary, then auto-delete
+      dataRetention: {
+        patientData: { years: 7, autoDelete: true }, // After retention period, auto-delete
+        callRecordings: { years: 2, autoDelete: true },
+        conversations: { years: 5, autoDelete: true },
+        medicalAnalysis: { years: 7, autoDelete: true },
+        consentRecords: { years: 7, autoDelete: true }, // Legal requirement
+      }
     };
   }
 
@@ -71,7 +87,15 @@ function getJurisdiction(country) {
     regulator: null,
     regulatorName: null,
     regulatorContact: null,
-    complaintEndpoint: 'INTERNAL'
+    complaintEndpoint: 'INTERNAL',
+    // Default to PIPEDA-like retention (auto-delete after period)
+    dataRetention: {
+      patientData: { years: 7, autoDelete: true },
+      callRecordings: { years: 2, autoDelete: true },
+      conversations: { years: 5, autoDelete: true },
+      medicalAnalysis: { years: 7, autoDelete: true },
+      consentRecords: { years: 7, autoDelete: true },
+    }
   };
 }
 
@@ -130,11 +154,35 @@ function getPrivacyPolicyType(country) {
   return 'GENERAL';
 }
 
+/**
+ * Get data retention period for a specific data type based on jurisdiction
+ * @param {string} country - ISO 3166-1 alpha-2 country code
+ * @param {string} dataType - Type of data ('patientData', 'callRecordings', 'conversations', 'medicalAnalysis', 'consentRecords')
+ * @returns {Object} - Retention period in years and whether to auto-delete
+ */
+function getDataRetentionPeriod(country, dataType) {
+  const jurisdiction = getJurisdiction(country);
+  return jurisdiction.dataRetention?.[dataType] || { years: 7, autoDelete: false };
+}
+
+/**
+ * Check if data should be auto-deleted after retention period for this jurisdiction
+ * @param {string} country - ISO 3166-1 alpha-2 country code
+ * @returns {boolean}
+ */
+function shouldAutoDeleteData(country) {
+  const jurisdiction = getJurisdiction(country);
+  // PIPEDA and other jurisdictions auto-delete, HIPAA does not
+  return jurisdiction.jurisdiction !== 'HIPAA';
+}
+
 module.exports = {
   getJurisdiction,
   requiresHIPAA,
   requiresPIPEDA,
   getBreachNotificationDeadline,
-  getPrivacyPolicyType
+  getPrivacyPolicyType,
+  getDataRetentionPeriod,
+  shouldAutoDeleteData
 };
 

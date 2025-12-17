@@ -133,6 +133,14 @@ router
     privacyController.updateComplaint
   );
 
+// Data Deletion Requests
+router
+  .route('/deletion')
+  .post(
+    auth(), // Any authenticated user can request deletion
+    privacyController.requestDataDeletion
+  );
+
 module.exports = router;
 
 

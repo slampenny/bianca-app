@@ -5,7 +5,7 @@ set -e
 
 CONFLUENCE_URL="${CONFLUENCE_URL:-https://biancatechnologies.atlassian.net}"
 SPACE_KEY="${SPACE_KEY:-BTD}"
-DOCS_DIR="bianca-app-backend/docs"
+DOCS_DIR="${DOCS_DIR:-packages/backend/docs}"
 
 # Determine script directory and calculate path to .env
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

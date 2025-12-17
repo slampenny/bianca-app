@@ -35,10 +35,31 @@ export function useAutoImage(
   useLayoutEffect(() => {
     if (!remoteUri) return
 
-    Image.getSize(remoteUri, (w, h) => setRemoteImageDimensions([w, h]))
-  }, [remoteUri])
+    Image.getSize(
+      remoteUri,
+      (w, h) => setRemoteImageDimensions([w, h]),
+      (error) => {
+        // If image fails to load, use max dimensions as fallback if provided
+        if (maxWidth && maxHeight) {
+          setRemoteImageDimensions([maxWidth, maxHeight])
+        }
+      }
+    )
+  }, [remoteUri, maxWidth, maxHeight])
 
-  if (Number.isNaN(remoteAspectRatio)) return [0, 0]
+  // If dimensions are 0 (image not loaded yet or failed), use max dimensions as fallback
+  if (remoteWidth === 0 || remoteHeight === 0) {
+    if (maxWidth && maxHeight) return [maxWidth, maxHeight]
+    if (maxWidth) return [maxWidth, maxWidth]
+    if (maxHeight) return [maxHeight, maxHeight]
+    return [32, 32] // Default fallback size
+  }
+
+  if (Number.isNaN(remoteAspectRatio)) {
+    // If aspect ratio is invalid, use max dimensions as fallback
+    if (maxWidth && maxHeight) return [maxWidth, maxHeight]
+    return [32, 32] // Default fallback size
+  }
 
   if (maxWidth && maxHeight) {
     const aspectRatio = Math.min(maxWidth / remoteWidth, maxHeight / remoteHeight)
@@ -70,5 +91,14 @@ export function AutoImage(props: AutoImageProps) {
     [maxWidth, maxHeight],
   )
 
-  return <Image {...ImageProps} style={[{ width, height }, props.style]} />
+  // Extract style dimensions as fallback
+  const style = props.style as any
+  const styleWidth = style?.width
+  const styleHeight = style?.height
+
+  // Use calculated dimensions, or fall back to max dimensions, or style dimensions, or default
+  const finalWidth = width > 0 ? width : (maxWidth || styleWidth || 32)
+  const finalHeight = height > 0 ? height : (maxHeight || styleHeight || 32)
+
+  return <Image {...ImageProps} style={[{ width: finalWidth, height: finalHeight }, props.style]} />
 }

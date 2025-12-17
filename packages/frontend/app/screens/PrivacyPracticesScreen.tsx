@@ -1,5 +1,6 @@
 import React, { useLayoutEffect } from "react"
 import { StyleSheet, View, ScrollView, Platform, useWindowDimensions } from "react-native"
+import { useMemo } from "react"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { spacing, typography } from "app/theme"
@@ -21,7 +22,8 @@ export const PrivacyPracticesScreen = () => {
   useLanguage()
   
   // Determine which policy to show based on jurisdiction
-  const getPolicyContent = () => {
+  // Use useMemo to ensure it recalculates when currentOrg changes
+  const policyContent = useMemo(() => {
     const country = currentOrg?.country || 'US'
     
     if (country === 'CA') {
@@ -31,9 +33,7 @@ export const PrivacyPracticesScreen = () => {
       // For US, show HIPAA Notice of Privacy Practices
       return translate("privacyPracticesScreen.content")
     }
-  }
-  
-  const policyContent = getPolicyContent()
+  }, [currentOrg?.country])
 
   // Update header options when theme changes
   useLayoutEffect(() => {

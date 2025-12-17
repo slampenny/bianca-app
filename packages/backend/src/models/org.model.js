@@ -119,6 +119,13 @@ const orgSchema = mongoose.Schema(
     },
     caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
     patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
+    // Privacy Officer (PIPEDA/HIPAA requirement)
+    // Defaults to org creator (first caregiver), but can be reassigned
+    privacyOfficerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Caregiver',
+      required: false,
+    },
   },
   {
     timestamps: true,
@@ -154,7 +161,12 @@ orgSchema.statics.createOrgAndCaregiver = async function (orgBody, caregiverBody
     throw new ApiError(httpStatus.BAD_REQUEST, 'Caregiver Email already taken');
   }
   const caregiver = await Caregiver.create({ ...caregiverBody, role: caregiverBody.role || 'orgAdmin' });
-  const org = await this.create({ ...orgBody, caregivers: [caregiver] });
+  // Set privacy officer to org creator (first caregiver) by default
+  const org = await this.create({ 
+    ...orgBody, 
+    caregivers: [caregiver],
+    privacyOfficerId: caregiver._id // Default privacy officer to org creator
+  });
   caregiver.org = org.id;
   await caregiver.save();
 

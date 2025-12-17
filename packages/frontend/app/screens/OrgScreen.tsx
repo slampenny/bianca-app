@@ -5,6 +5,7 @@ import { Picker } from "@react-native-picker/picker"
 import { getOrg } from "../store/orgSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { useUpdateOrgMutation, orgApi } from "../services/api/orgApi"
+import type { Org } from "../services/api/api.types"
 import { LoadingScreen } from "./LoadingScreen"
 import { goBack } from "app/navigators/navigationUtilities"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
@@ -202,22 +203,32 @@ export function OrgScreen() {
 
   const handleSave = async () => {
     if (currentOrg?.id) {
-      await updateOrg({
-        orgId: currentOrg.id,
-        org: {
-          name,
-          email,
-          phone,
-          logo,
-          timezone,
-          country,
-          callRetrySettings: {
-            retryCount: parseInt(retryCount, 10) || 2,
-            retryIntervalMinutes: parseInt(retryIntervalMinutes, 10) || 15,
-            alertOnAllMissedCalls,
+      try {
+        const result = await updateOrg({
+          orgId: currentOrg.id,
+          org: {
+            name,
+            email,
+            phone,
+            logo,
+            timezone,
+            country,
+            callRetrySettings: {
+              retryCount: parseInt(retryCount, 10) || 2,
+              retryIntervalMinutes: parseInt(retryIntervalMinutes, 10) || 15,
+              alertOnAllMissedCalls,
+            },
           },
-        },
-      })
+        }).unwrap()
+        // Manually update Redux store with the updated org
+        // The backend returns the org directly, not wrapped in { org: ... }
+        if (result) {
+          dispatch(setOrg(result as Org))
+        }
+      } catch (error) {
+        logger.error('Failed to update org:', error)
+        // Error is already handled by isError/error from the mutation hook
+      }
     }
     if (!isError) {
       goBack()

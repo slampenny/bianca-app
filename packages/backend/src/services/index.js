@@ -67,3 +67,4 @@ module.exports.breachDetectionService = require('./breachDetection.service');
 
 // PIPEDA Compliance Services
 module.exports.privacyService = require('./privacy.service');
+module.exports.dataDeletionService = require('./dataDeletion.service');

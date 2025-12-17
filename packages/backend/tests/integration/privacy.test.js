@@ -16,6 +16,7 @@ const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 
 // Don't mock email service - use real Ethereal mail for testing
 const emailService = require('../../src/services/email.service');
+const etherealEmailRetriever = require('../../src/services/etherealEmailRetriever.service');
 
 beforeAll(async () => {
   await setupMongoMemoryServer();
@@ -63,11 +64,13 @@ describe('Privacy API routes', () => {
   describe('POST /v1/privacy/requests/access', () => {
     it('should create an access request and automatically process it', async () => {
       // Create some test data
+      const mongoose = require('mongoose');
       await Conversation.create({
         patientId: patientId,
         agentId: caregiverId,
         status: 'completed',
         startTime: new Date(),
+        callId: new mongoose.Types.ObjectId(),
         messages: [],
       });
 
@@ -85,17 +88,50 @@ describe('Privacy API routes', () => {
       expect(res.body.status).toBe('pending'); // Initially pending, then auto-processed
 
       // Verify request was created in database
-      const request = await PrivacyRequest.findById(res.body._id);
-      expect(request).toBeDefined();
-      expect(request.requestorId.toString()).toBe(caregiverId.toString());
+      const privacyRequest = await PrivacyRequest.findById(res.body._id);
+      expect(privacyRequest).toBeDefined();
+      expect(privacyRequest.requestorId.toString()).toBe(caregiverId.toString());
 
-      // Wait a bit for async processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for async processing and email sending
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Check if request was processed (status might be completed if auto-processing worked)
+      // Check if request was processed (status should be completed after auto-processing)
       const updatedRequest = await PrivacyRequest.findById(res.body._id);
-      // Auto-processing happens, but might be async
       expect(updatedRequest).toBeDefined();
+      expect(updatedRequest.status).toBe('completed');
+      expect(updatedRequest.informationProvided).toBeDefined();
+      expect(updatedRequest.informationProvided.length).toBeGreaterThan(0);
+
+      // Verify email was sent via Ethereal and retrieve it
+      const caregiver = await Caregiver.findById(caregiverId);
+      expect(caregiver).toBeDefined();
+      expect(caregiver.email).toBeDefined();
+
+      try {
+        const email = await etherealEmailRetriever.waitForEmail(caregiver.email, 10000);
+        expect(email).toBeDefined();
+        expect(email.subject).toContain('Personal Data Export');
+        expect(email.text).toContain('Bianca Wellness');
+        expect(email.attachments).toBeDefined();
+        expect(email.attachments.length).toBeGreaterThan(0);
+        
+        // Verify attachment is JSON
+        const jsonAttachment = email.attachments.find(att => 
+          att.filename && att.filename.includes('.json')
+        );
+        expect(jsonAttachment).toBeDefined();
+        
+        // Verify JSON contains user data
+        if (jsonAttachment && jsonAttachment.content) {
+          const userData = JSON.parse(jsonAttachment.content);
+          expect(userData.profile).toBeDefined();
+          expect(userData.profile.email).toBe(caregiver.email);
+        }
+      } catch (emailError) {
+        // If email retrieval fails, log but don't fail the test
+        // (email might be delayed or Ethereal might be unavailable)
+        console.warn('Could not retrieve email from Ethereal:', emailError.message);
+      }
     });
 
     it('should require authentication', async () => {

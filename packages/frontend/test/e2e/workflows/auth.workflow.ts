@@ -39,8 +39,8 @@ export class AuthWorkflow {
     }
     
     // Check if we're already on login screen
-    const emailInput = this.page.locator('input[data-testid="email-input"]')
-    const isAlreadyOnLogin = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
+    const emailInputCheck = this.page.locator('input[data-testid="email-input"]')
+    const isAlreadyOnLogin = await emailInputCheck.isVisible({ timeout: 2000 }).catch(() => false)
     
     if (!isAlreadyOnLogin) {
       // Force navigation to login by going to root
@@ -50,12 +50,12 @@ export class AuthWorkflow {
     
     // Now wait for login screen with retry logic
     try {
-      await emailInput.waitFor({ state: 'visible', timeout: 10000 })
+      await emailInputCheck.waitFor({ state: 'visible', timeout: 10000 })
     } catch (error) {
       // Try navigating again if first attempt failed
       await this.page.goto('/')
       await this.page.waitForTimeout(2000)
-      await emailInput.waitFor({ state: 'visible', timeout: 10000 })
+      await emailInputCheck.waitFor({ state: 'visible', timeout: 10000 })
     }
   }
 
