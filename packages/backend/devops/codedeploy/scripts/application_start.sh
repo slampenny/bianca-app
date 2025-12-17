@@ -27,8 +27,8 @@ cd "$DEPLOY_DIR" || {
 }
 
 # Verify required files exist
-if [ ! -f "docker compose.yml" ]; then
-  echo "❌ ERROR: docker compose.yml not found in $DEPLOY_DIR"
+if [ ! -f "docker-compose.yml" ]; then
+  echo "❌ ERROR: docker-compose.yml not found in $DEPLOY_DIR"
   ls -la "$DEPLOY_DIR/" || true
   exit 1
 fi

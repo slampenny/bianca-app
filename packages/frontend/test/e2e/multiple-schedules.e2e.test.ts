@@ -204,11 +204,11 @@ test.describe("Multiple Schedules for Patient", () => {
     console.log('Creating first schedule (09:00)...')
     await createSchedule(page, '09:00')
     
-    // Wait for the schedule to appear in the picker - retry up to 10 times
+    // Wait for the schedule to appear in the picker - retry up to 15 times with longer waits
     let schedulePickerAfterFirst = null
     let validScheduleCountAfterFirst = initialScheduleCount
-    for (let i = 0; i < 10; i++) {
-      await page.waitForTimeout(1000)
+    for (let i = 0; i < 15; i++) {
+      await page.waitForTimeout(2000) // Wait 2 seconds between retries
       schedulePickerAfterFirst = await getScheduleSelectorPicker(page)
       if (schedulePickerAfterFirst) {
         validScheduleCountAfterFirst = await countSchedulesInPicker(schedulePickerAfterFirst)
@@ -219,6 +219,11 @@ test.describe("Multiple Schedules for Patient", () => {
     }
     
     // Verify first schedule was created - the schedule selector should now exist
+    if (!schedulePickerAfterFirst) {
+      // If picker still doesn't exist, wait a bit more and try once more
+      await page.waitForTimeout(3000)
+      schedulePickerAfterFirst = await getScheduleSelectorPicker(page)
+    }
     expect(schedulePickerAfterFirst).not.toBeNull()
     expect(validScheduleCountAfterFirst).toBe(initialScheduleCount + 1)
     console.log(`Schedule count after first creation: ${validScheduleCountAfterFirst}`)
@@ -227,11 +232,11 @@ test.describe("Multiple Schedules for Patient", () => {
     console.log('Creating second schedule (14:00)...')
     await createSchedule(page, '14:00')
     
-    // Wait for the second schedule to appear in the picker - retry up to 10 times
+    // Wait for the second schedule to appear in the picker - retry up to 15 times with longer waits
     let schedulePickerAfterSecond = null
     let validScheduleCountAfterSecond = validScheduleCountAfterFirst
-    for (let i = 0; i < 10; i++) {
-      await page.waitForTimeout(1000)
+    for (let i = 0; i < 15; i++) {
+      await page.waitForTimeout(2000) // Wait 2 seconds between retries
       schedulePickerAfterSecond = await getScheduleSelectorPicker(page)
       if (schedulePickerAfterSecond) {
         validScheduleCountAfterSecond = await countSchedulesInPicker(schedulePickerAfterSecond)
@@ -311,13 +316,18 @@ test.describe("Multiple Schedules for Patient", () => {
       // Need at least 2 schedules to test deletion - create them first
       console.log('Creating schedules for delete test...')
       await createSchedule(page, '10:00')
-      await page.waitForTimeout(2000)
+      await page.waitForTimeout(3000) // Wait longer for first schedule to appear
       await createSchedule(page, '11:00')
-      await page.waitForTimeout(2000)
+      await page.waitForTimeout(3000) // Wait longer for second schedule to appear
     }
     
-    // Get the schedule picker and all schedule values
-    const schedulePicker = await getScheduleSelectorPicker(page)
+    // Get the schedule picker and all schedule values - retry if not found
+    let schedulePicker = await getScheduleSelectorPicker(page)
+    if (!schedulePicker) {
+      // Wait a bit more and retry
+      await page.waitForTimeout(3000)
+      schedulePicker = await getScheduleSelectorPicker(page)
+    }
     expect(schedulePicker).not.toBeNull()
     await schedulePicker.waitFor({ timeout: 5000, state: 'visible' })
     

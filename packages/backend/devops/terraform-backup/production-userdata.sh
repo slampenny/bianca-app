@@ -37,8 +37,8 @@ unzip awscliv2.zip
 mkdir -p /opt/bianca-production
 cd /opt/bianca-production
 
-# Create docker compose.yml - NO SECRETS HARDCODED
-cat > docker compose.yml <<EOF
+# Create docker-compose.yml - NO SECRETS HARDCODED
+cat > docker-compose.yml <<EOF
 version: '3.8'
 
 services:

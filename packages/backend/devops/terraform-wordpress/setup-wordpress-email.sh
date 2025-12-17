@@ -45,7 +45,7 @@ cat > "$MU_PLUGINS_DIR/ses-smtp-config.php" <<'EOF'
  * Version: 1.0
  * 
  * IMPORTANT: You need to set SES_SMTP_USERNAME and SES_SMTP_PASSWORD
- * environment variables in docker compose.yml or create SMTP credentials
+ * environment variables in docker-compose.yml or create SMTP credentials
  * in AWS SES Console and add them below.
  */
 
@@ -116,8 +116,8 @@ echo "   - Save the username and password"
 echo ""
 echo "2. Add credentials to WordPress:"
 echo ""
-echo "   Option A: Add to docker compose.yml environment variables"
-echo "   Edit /opt/bianca-wordpress/docker compose.yml and add:"
+echo "   Option A: Add to docker-compose.yml environment variables"
+echo "   Edit /opt/bianca-wordpress/docker-compose.yml and add:"
 echo ""
 echo "   environment:"
 echo "     SES_SMTP_USERNAME: \"your-smtp-username\""

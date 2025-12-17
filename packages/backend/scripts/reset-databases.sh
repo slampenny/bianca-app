@@ -126,9 +126,9 @@ reset_database() {
         --document-name "AWS-RunShellScript" \
         --parameters "commands=[
             \"cd /opt/bianca-app-backend || cd /home/ec2-user/bianca-app-backend || exit 1\",
-            \"docker compose -f docker compose.yml -f docker compose.${env_name}.yml up -d mongodb\",
+            \"docker compose -f docker-compose.yml -f docker-compose.${env_name}.yml up -d mongodb\",
             \"sleep 5\",
-            \"docker compose -f docker compose.yml -f docker compose.${env_name}.yml restart app || docker compose -f docker compose.yml -f docker compose.${env_name}.yml up -d app\"
+            \"docker compose -f docker-compose.yml -f docker-compose.${env_name}.yml restart app || docker compose -f docker-compose.yml -f docker-compose.${env_name}.yml up -d app\"
         ]" \
         --output text \
         --query 'Command.CommandId' > /tmp/command-id.txt

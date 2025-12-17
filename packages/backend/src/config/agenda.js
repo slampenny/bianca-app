@@ -30,6 +30,11 @@ agenda.on('ready', () => {
     logger.info('[Agenda] Daily billing is disabled in configuration');
   }
 
+  // Schedule daily data deletion job (runs at 2 AM daily)
+  // Only deletes data for PIPEDA jurisdictions (HIPAA requires retention)
+  agenda.every('0 2 * * *', 'processDataDeletion');
+  logger.info('[Agenda] Daily data deletion scheduled for 2:00 AM daily');
+
   // Start processing jobs only after the connection is ready
   agenda.start();
 });
@@ -52,6 +57,19 @@ agenda.define('processDailyBilling', { concurrency: 1, lockLifetime: 1800000 }, 
     done();
   } catch (error) {
     logger.error(`Error in processDailyBilling job: ${error}`);
+    done(error);
+  }
+});
+
+// Daily data deletion job definition
+// Deletes expired data based on jurisdiction-specific retention rules
+agenda.define('processDataDeletion', { concurrency: 1, lockLifetime: 3600000 }, async (job, done) => {
+  try {
+    const dataDeletionService = require('../services/dataDeletion.service');
+    await dataDeletionService.processDataDeletion();
+    done();
+  } catch (error) {
+    logger.error(`Error in processDataDeletion job: ${error}`);
     done(error);
   }
 });

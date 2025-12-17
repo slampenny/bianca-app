@@ -75,6 +75,7 @@ export interface OrgPages {
 }
 
 export interface Org {
+  country?: string
   id?: string
   stripeCustomerId: string
   name: string

@@ -1,7 +1,9 @@
 const httpStatus = require('http-status');
-const { PrivacyRequest, ConsentRecord, Caregiver, Patient } = require('../models');
+const { PrivacyRequest, ConsentRecord, PrivacyComplaint, Caregiver, Patient, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const config = require('../config/config');
+const { getJurisdiction } = require('../utils/jurisdiction.utils');
 
 /**
  * Create an access request
@@ -463,7 +465,16 @@ const processAccessRequest = async (requestId, processedBy) => {
     
     logger.info(`[Privacy Service] Access request data automatically emailed to ${caregiver.email} for request ${requestId}`);
   } catch (emailError) {
-    logger.error(`[Privacy Service] Failed to email access request data:`, emailError);
+    // Check if this is an SES verification error (common in test/dev environments)
+    const isSESVerificationError = emailError.name === 'MessageRejected' || 
+                                   (emailError.message && emailError.message.includes('not verified'));
+    const isTestEnv = config.env === 'test' || config.env === 'development';
+    
+    if (isSESVerificationError || isTestEnv) {
+      logger.warn(`[Privacy Service] Email not sent for access request ${requestId} (${isSESVerificationError ? 'email addresses not verified in SES' : 'test/development environment'}). Request still processed successfully.`);
+    } else {
+      logger.error(`[Privacy Service] Failed to email access request data:`, emailError);
+    }
     // Don't fail the request if email fails - data is still provided
   }
   
@@ -534,6 +545,164 @@ const processCorrectionRequest = async (requestId, correctionData, processedBy) 
   return request;
 };
 
+/**
+ * Create a privacy complaint
+ * @param {Object} complaintBody
+ * @param {ObjectId} complainantId
+ * @param {string} complainantModel
+ * @returns {Promise<PrivacyComplaint>}
+ */
+const createComplaint = async (complaintBody, complainantId, complainantModel = 'Caregiver') => {
+  // Determine jurisdiction from organization
+  let organizationCountry = 'US';
+  let complaintType = 'GENERAL';
+  
+  try {
+    const user = complainantModel === 'Caregiver' 
+      ? await Caregiver.findById(complainantId).populate('org')
+      : await Patient.findById(complainantId).populate('org');
+    
+    if (user?.org) {
+      organizationCountry = user.org.country || 'US';
+      const jurisdiction = getJurisdiction(organizationCountry);
+      complaintType = jurisdiction.jurisdiction === 'HIPAA' ? 'HIPAA' : 
+                     jurisdiction.jurisdiction === 'PIPEDA' ? 'PIPEDA' : 'GENERAL';
+    }
+  } catch (error) {
+    logger.warn('[Privacy Service] Could not determine jurisdiction for complaint:', error.message);
+  }
+  
+  const complaint = await PrivacyComplaint.create({
+    complaintType,
+    complainantType: complainantModel === 'Caregiver' ? 'caregiver' : 'patient',
+    complainantId,
+    complainantModel,
+    subject: complaintBody.subject,
+    description: complaintBody.description,
+    violationType: complaintBody.violationType || 'other',
+    organizationCountry,
+    status: 'submitted',
+    createdBy: complainantId
+  });
+  
+  logger.info(`[Privacy Service] Complaint created: ${complaint._id} by ${complainantId} (${complaintType})`);
+  return complaint;
+};
+
+/**
+ * Get complaint by ID
+ * @param {ObjectId} complaintId
+ * @param {ObjectId} userId
+ * @returns {Promise<PrivacyComplaint>}
+ */
+const getComplaintById = async (complaintId, userId) => {
+  const complaint = await PrivacyComplaint.findById(complaintId);
+  
+  if (!complaint) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Complaint not found');
+  }
+  
+  // Check authorization - users can only see their own complaints unless admin
+  // This is a simplified check - you may want to add role-based access
+  if (complaint.complainantId.toString() !== userId.toString()) {
+    // Check if user is admin (you may want to add proper role checking here)
+    const caregiver = await Caregiver.findById(userId);
+    if (!caregiver || (caregiver.role !== 'orgAdmin' && caregiver.role !== 'superAdmin')) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Not authorized to view this complaint');
+    }
+  }
+  
+  return complaint;
+};
+
+/**
+ * Query complaints
+ * @param {Object} filter
+ * @param {Object} options
+ * @param {ObjectId} userId
+ * @returns {Promise<Object>}
+ */
+const queryComplaints = async (filter, options, userId) => {
+  // Non-admins can only see their own complaints
+  const caregiver = await Caregiver.findById(userId);
+  const isAdmin = caregiver && (caregiver.role === 'orgAdmin' || caregiver.role === 'superAdmin');
+  
+  if (!isAdmin) {
+    filter.complainantId = userId;
+  }
+  
+  const complaints = await PrivacyComplaint.paginate(filter, options);
+  return complaints;
+};
+
+/**
+ * Update complaint (acknowledge, investigate, resolve)
+ * @param {ObjectId} complaintId
+ * @param {Object} updateBody
+ * @param {ObjectId} updatedBy
+ * @returns {Promise<PrivacyComplaint>}
+ */
+const updateComplaint = async (complaintId, updateBody, updatedBy) => {
+  const complaint = await PrivacyComplaint.findById(complaintId);
+  
+  if (!complaint) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Complaint not found');
+  }
+  
+  // Update status and related fields
+  if (updateBody.status) {
+    complaint.status = updateBody.status;
+    
+    if (updateBody.status === 'acknowledged' && !complaint.acknowledgedAt) {
+      complaint.acknowledgedAt = new Date();
+      complaint.acknowledgedBy = updatedBy;
+    }
+    
+    if (updateBody.status === 'investigating' && !complaint.investigationStartedAt) {
+      complaint.investigationStartedAt = new Date();
+    }
+    
+    if (updateBody.status === 'resolved' && !complaint.resolvedAt) {
+      complaint.resolvedAt = new Date();
+      complaint.resolvedBy = updatedBy;
+      complaint.resolution = updateBody.resolution || 'upheld';
+      complaint.resolutionDetails = updateBody.resolutionDetails;
+    }
+  }
+  
+  // Add investigation notes
+  if (updateBody.investigationNote) {
+    complaint.investigationNotes.push({
+      note: updateBody.investigationNote,
+      addedBy: updatedBy,
+      addedAt: new Date()
+    });
+  }
+  
+  // Add remedial actions
+  if (updateBody.remedialActions) {
+    complaint.remedialActions = updateBody.remedialActions;
+  }
+  
+  // Escalation
+  if (updateBody.escalatedToRegulator) {
+    complaint.escalatedToRegulator = true;
+    complaint.escalatedAt = new Date();
+    complaint.regulatorType = updateBody.regulatorType;
+    complaint.regulatorComplaintNumber = updateBody.regulatorComplaintNumber;
+  }
+  
+  if (updateBody.assignedTo) {
+    complaint.assignedTo = updateBody.assignedTo;
+  }
+  
+  complaint.updatedBy = updatedBy;
+  await complaint.save();
+  
+  logger.info(`[Privacy Service] Complaint updated: ${complaintId} by ${updatedBy}`);
+  return complaint;
+};
+
 module.exports = {
   createAccessRequest,
   createCorrectionRequest,
@@ -550,5 +719,9 @@ module.exports = {
   getPrivacyStatistics,
   processAccessRequest,
   processCorrectionRequest,
+  createComplaint,
+  getComplaintById,
+  queryComplaints,
+  updateComplaint,
 };
 

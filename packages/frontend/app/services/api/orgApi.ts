@@ -27,7 +27,7 @@ export const orgApi = createApi({
         return `/orgs/${orgId}`
       },
     }),
-    updateOrg: builder.mutation<{ org: Org }, { orgId: string; org: any }>({
+    updateOrg: builder.mutation<Org, { orgId: string; org: any }>({
       query: ({ orgId, org }) => {
         logger.debug("[orgApi] updateOrg mutation called for orgId:", orgId, "with org:", org)
         return {
@@ -36,6 +36,7 @@ export const orgApi = createApi({
           body: org,
         }
       },
+      invalidatesTags: ["Org"],
     }),
     deleteOrg: builder.mutation<void, { orgId: string }>({
       query: ({ orgId }) => {

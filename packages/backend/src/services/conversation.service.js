@@ -9,14 +9,18 @@ const { prompts } = require('../templates/prompts'); // Original Bianca system p
 const { prompts: refinedPrompts } = require('../templates/prompts.refined'); // Refined prompt with voice-first rules
 
 // ===== EXISTING METHODS (unchanged) =====
-const createConversationForPatient = async (patientId) => {
+const createConversationForPatient = async (patientId, callId) => {
   // Validate that the patient exists
   const patient = await Patient.findById(patientId);
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
   
-  const conversation = new Conversation({ patientId });
+  if (!callId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'callId is required to create a conversation');
+  }
+  
+  const conversation = new Conversation({ patientId, callId });
   await conversation.save();
   return conversation;
 };

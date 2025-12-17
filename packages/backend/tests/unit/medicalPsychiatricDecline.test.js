@@ -53,12 +53,12 @@ describe('Medical Psychiatric Decline Detection', () => {
       
       // Group conversations by month for analysis
       const conversationsByMonth = {
-        month1: conversations.filter(c => c.startTime.getMonth() === 0), // January
-        month2: conversations.filter(c => c.startTime.getMonth() === 1), // February
-        month3: conversations.filter(c => c.startTime.getMonth() === 2), // March
-        month4: conversations.filter(c => c.startTime.getMonth() === 3), // April
-        month5: conversations.filter(c => c.startTime.getMonth() === 4), // May
-        month6: conversations.filter(c => c.startTime.getMonth() === 5)  // June
+        month1: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 0), // January
+        month2: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 1), // February
+        month3: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 2), // March
+        month4: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 3), // April
+        month5: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 4), // May
+        month6: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 5)  // June
       };
 
       // Analyze each month
@@ -91,9 +91,9 @@ describe('Medical Psychiatric Decline Detection', () => {
 
       const monthlyAnalyses = {};
       const conversationsByMonth = {
-        month1: conversations.filter(c => c.startTime.getMonth() === 0),
-        month3: conversations.filter(c => c.startTime.getMonth() === 2),
-        month6: conversations.filter(c => c.startTime.getMonth() === 5)
+        month1: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 0),
+        month3: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 2),
+        month6: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 5)
       };
 
       for (const [month, monthConversations] of Object.entries(conversationsByMonth)) {
@@ -116,8 +116,8 @@ describe('Medical Psychiatric Decline Detection', () => {
 
       const monthlyAnalyses = {};
       const conversationsByMonth = {
-        month1: conversations.filter(c => c.startTime.getMonth() === 0),
-        month6: conversations.filter(c => c.startTime.getMonth() === 5)
+        month1: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 0),
+        month6: conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 5)
       };
 
       for (const [month, monthConversations] of Object.entries(conversationsByMonth)) {

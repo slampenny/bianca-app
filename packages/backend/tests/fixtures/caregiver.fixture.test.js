@@ -62,6 +62,7 @@ describe('Caregiver Fixture', () => {
         name: 'Test Org',
         email: 'test@example.org',
         phone: '+16045624263',
+        country: 'US',
         caregivers: [],
       });
 
