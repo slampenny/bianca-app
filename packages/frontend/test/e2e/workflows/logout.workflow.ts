@@ -194,8 +194,8 @@ export class LogoutWorkflow {
     // Don't use waitForTimeout if page might be closed - it can hang
     try {
       // Wait a moment for logout to complete and navigation to happen
-      // window.location.replace causes a page reload, so wait for that
-      await this.page.waitForTimeout(3000)
+      // React Navigation's resetRoot doesn't cause a page reload, just navigation state change
+      await this.page.waitForTimeout(2000)
       
       // Check if we're on the login screen immediately
       // Try to find login screen elements - this will throw if page is closed

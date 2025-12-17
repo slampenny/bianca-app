@@ -212,11 +212,24 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
             }
           }
           // Otherwise, use React Navigation's default getStateFromPath with our config
-          return getStateFromPathDefault(path, {
-            ...options,
-            config: linking.config,
-            screens: linking.config?.screens,
-          })
+          // Pass the linking config structure correctly
+          try {
+            if (linking.config) {
+              return getStateFromPathDefault(path, {
+                ...options,
+                config: linking.config,
+              })
+            }
+            // If no config, try using the linking object itself
+            return getStateFromPathDefault(path, options)
+          } catch (error) {
+            // If getStateFromPath fails, return Login as fallback
+            logger.warn("getStateFromPath failed, returning Login:", error)
+            return {
+              routes: [{ name: "Login" as never }],
+              index: 0,
+            }
+          }
         },
       }
     }
