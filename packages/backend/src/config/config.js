@@ -102,7 +102,7 @@ const envVarsSchema = Joi.object({
     otherwise: Joi.string().optional() // Optional in dev/test environments (can use default for testing)
   }),
   // **NEW:** Realtime API specific variables
-  OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
+  OPENAI_REALTIME_MODEL: Joi.string().default('gpt-realtime'),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
   OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
   OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
@@ -170,7 +170,10 @@ const baselineConfig = {
     noiseReduction: {
       noiseGateEnabled: process.env.AUDIO_NOISE_GATE_ENABLED !== 'false', // Default: true
       noiseGateThreshold: parseFloat(process.env.AUDIO_NOISE_GATE_THRESHOLD) || 0.1, // Default: 0.1 (10% energy)
-      primarySpeakerEnabled: process.env.AUDIO_PRIMARY_SPEAKER_ENABLED === 'true', // Default: false
+      frequencyFilterEnabled: process.env.AUDIO_FREQUENCY_FILTER_ENABLED !== 'false', // Default: true (removes frequencies outside 300-3400Hz)
+      frequencyFilterLowCutoff: parseFloat(process.env.AUDIO_FREQUENCY_FILTER_LOW_CUTOFF) || 300, // Default: 300Hz (removes low rumble)
+      frequencyFilterHighCutoff: parseFloat(process.env.AUDIO_FREQUENCY_FILTER_HIGH_CUTOFF) || 3400, // Default: 3400Hz (removes high hiss)
+      primarySpeakerEnabled: process.env.AUDIO_PRIMARY_SPEAKER_ENABLED !== 'false', // Default: true (enabled for noisy environments)
       primarySpeakerHistorySize: parseInt(process.env.AUDIO_PRIMARY_SPEAKER_HISTORY_SIZE) || 50, // Default: 50 packets (~1 second)
       primarySpeakerFocusThreshold: parseFloat(process.env.AUDIO_PRIMARY_SPEAKER_FOCUS_THRESHOLD) || 0.7, // Default: 0.7 (70% of max)
       primarySpeakerEnergyMultiplier: parseFloat(process.env.AUDIO_PRIMARY_SPEAKER_ENERGY_MULTIPLIER) || 1.5, // Default: 1.5x average
