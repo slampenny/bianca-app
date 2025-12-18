@@ -170,6 +170,38 @@ const getUnassignedPatients = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(patients.map((patient) => PatientDTO(patient)));
 });
 
+const getConversationProfile = catchAsync(async (req, res) => {
+  const { patientId } = req.params;
+  const caregiver = req.caregiver;
+
+  // Restrict to superAdmin only (app maker staff)
+  if (caregiver.role !== 'superAdmin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Only super administrators can access conversation profile data');
+  }
+
+  const patient = await patientService.getPatientById(patientId);
+  if (!patient) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+  }
+
+  // Return conversation profile if it exists, otherwise return empty structure
+  const conversationProfile = patient.conversationProfile || {
+    personalPreferences: {},
+    preferredTopics: [],
+    averageResponseLength: 0,
+    averageConversationLength: 0,
+    engagementScore: 0,
+    optimalCallTimes: [],
+    lastUpdated: null
+  };
+
+  res.status(httpStatus.OK).send({
+    patientId: patient._id,
+    patientName: patient.name,
+    conversationProfile
+  });
+});
+
 module.exports = {
   createPatient,
   getPatients,
@@ -183,4 +215,5 @@ module.exports = {
   getPatientsByCaregiver,
   getCaregivers,
   getUnassignedPatients,
+  getConversationProfile,
 };

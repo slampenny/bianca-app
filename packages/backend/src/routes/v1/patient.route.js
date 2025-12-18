@@ -76,6 +76,14 @@ router
   .route('/:patientId/caregivers')
   .get(auth('readAny:caregiver'), validate(patientValidation.getCaregivers), patientController.getCaregivers);
 
+router
+  .route('/:patientId/conversation-profile')
+  .get(
+    auth('readAny:patient'),
+    validate(patientValidation.getPatient),
+    patientController.getConversationProfile
+  );
+
 module.exports = router;
 
 /**
@@ -480,4 +488,108 @@ module.exports = router;
  *                 $ref: '#/components/schemas/Caregiver'
  *       "404":
  *         description: Caregivers not found
+ */
+
+/**
+ * @swagger
+ * /patients/{patientId}/conversation-profile:
+ *   get:
+ *     summary: Get patient conversation profile
+ *     description: Retrieve conversation profile data including preferences, engagement metrics, and optimal call times. Only accessible to superAdmin role (app maker staff).
+ *     tags: [Patients]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Patient ID
+ *     responses:
+ *       "200":
+ *         description: Conversation profile data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 patientId:
+ *                   type: string
+ *                   description: Patient ID
+ *                 patientName:
+ *                   type: string
+ *                   description: Patient name
+ *                 conversationProfile:
+ *                   type: object
+ *                   properties:
+ *                     personalPreferences:
+ *                       type: object
+ *                       description: Extracted preferences (favorite color, hobbies, etc.)
+ *                       additionalProperties: true
+ *                     preferredTopics:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       description: Topics that generate good engagement
+ *                     averageResponseLength:
+ *                       type: number
+ *                       description: Average length of patient responses in characters
+ *                     averageConversationLength:
+ *                       type: number
+ *                       description: Average conversation duration in seconds
+ *                     engagementScore:
+ *                       type: number
+ *                       minimum: 0
+ *                       maximum: 100
+ *                       description: Overall engagement score (0-100)
+ *                     optimalCallTimes:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           hour:
+ *                             type: number
+ *                             minimum: 0
+ *                             maximum: 23
+ *                             description: Hour of day (0-23)
+ *                           qualityScore:
+ *                             type: number
+ *                             minimum: 0
+ *                             maximum: 100
+ *                             description: Average quality score for this hour
+ *                           sampleSize:
+ *                             type: number
+ *                             description: Number of conversations at this hour
+ *                     lastUpdated:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Last time profile was updated
+ *             example:
+ *               patientId: "507f1f77bcf86cd799439011"
+ *               patientName: "John Doe"
+ *               conversationProfile:
+ *                 personalPreferences:
+ *                   favoriteColor: "blue"
+ *                   hobbies: ["gardening", "reading"]
+ *                   rawPreferences: "enjoys outdoor activities"
+ *                 preferredTopics: ["gardening", "family", "weather"]
+ *                 averageResponseLength: 45.2
+ *                 averageConversationLength: 180
+ *                 engagementScore: 72.5
+ *                 optimalCallTimes:
+ *                   - hour: 14
+ *                     qualityScore: 75
+ *                     sampleSize: 5
+ *                   - hour: 10
+ *                     qualityScore: 68
+ *                     sampleSize: 3
+ *                 lastUpdated: "2025-01-15T10:30:00Z"
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *         description: Only super administrators can access conversation profile data
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
  */
