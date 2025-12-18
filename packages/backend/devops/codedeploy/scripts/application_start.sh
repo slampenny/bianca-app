@@ -38,14 +38,26 @@ if [ ! -f "nginx.conf" ]; then
   exit 1
 fi
 
+# Determine which docker compose command to use
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+else
+  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  exit 1
+fi
+
+echo "   Using: $DOCKER_COMPOSE_CMD"
+
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
-docker compose down 2>/dev/null || true
+$DOCKER_COMPOSE_CMD down 2>/dev/null || true
 
 # Start containers - use background process with timeout to prevent hangs
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
-docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+$DOCKER_COMPOSE_CMD up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete
@@ -74,7 +86,7 @@ if [ $EXIT_CODE -ne 0 ]; then
   if [ -f /tmp/docker_start.log ]; then
     tail -50 /tmp/docker_start.log >&2 || true
   fi
-  docker compose logs --tail 50 2>&1 || true
+  $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
   # Don't exit - let ValidateService decide if deployment failed

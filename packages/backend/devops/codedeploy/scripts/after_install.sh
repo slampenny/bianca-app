@@ -45,15 +45,25 @@ fi
 # Note: docker-compose.yml is already on the instance at $DEPLOY_DIR/docker-compose.yml
 # We just need to pull the latest images
 
+# Determine which docker compose command to use
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+else
+  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  exit 1
+fi
+
 # Pull latest images (with timeout to prevent hangs)
 # Remove old images first to force fresh pull
 echo "   Removing old images to force fresh pull..."
 cd "$DEPLOY_DIR"
-docker compose down 2>/dev/null || true
+$DOCKER_COMPOSE_CMD down 2>/dev/null || true
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
 echo "   Pulling latest Docker images (5 min timeout)..."
-timeout 300 docker compose pull || {
+timeout 300 $DOCKER_COMPOSE_CMD pull || {
   echo "⚠️  Image pull timed out or failed, but continuing..."
 }
 
