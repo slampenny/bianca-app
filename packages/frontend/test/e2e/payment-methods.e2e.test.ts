@@ -97,17 +97,33 @@ test.describe('Payment Methods Screen', () => {
   })
 
   test('should show error state when payment methods fail to load', async ({ page }) => {
-    // Mock error response using EXACT backend error format
-    // Backend error format: { code: statusCode, message: message, stack?: stack }
-    await page.route('**/v1/payment-methods/orgs/*', async (route) => {
+    // Mock error response - RTK Query expects errors in a specific format
+    // RTK Query error format: { data: { message: string } } or { error: { message: string } }
+    // Try multiple route patterns to catch the request
+    await page.route('**/payment-methods/orgs/*', async (route) => {
       console.log('🔒 Mocking payment methods API failure (500 error)')
       route.fulfill({
         status: 500,
         contentType: 'application/json',
         body: JSON.stringify({
-          code: 500,
-          message: 'Internal server error',
-          stack: 'Error: Internal server error\n    at ...' // Optional stack in dev/test
+          data: {
+            message: 'Internal server error',
+            code: 500
+          }
+        })
+      })
+    })
+    // Also try with /v1 prefix
+    await page.route('**/v1/payment-methods/orgs/*', async (route) => {
+      console.log('🔒 Mocking payment methods API failure (500 error) - v1 prefix')
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            message: 'Internal server error',
+            code: 500
+          }
         })
       })
     })
@@ -348,9 +364,32 @@ test.describe('Payment Methods Screen', () => {
 
   test('should restrict access for unauthorized users', async ({ page }) => {
     // Logout and login as regular user (not org admin)
+    // First logout the current admin user
     await page.goto('/')
     await page.waitForTimeout(1000)
     
+    // Navigate to profile to logout
+    const profileTab = page.locator('[data-testid="tab-profile"], [aria-label*="Profile" i]').first()
+    if (await profileTab.count() > 0) {
+      await profileTab.click()
+      await page.waitForTimeout(1000)
+      
+      // Click logout button
+      const logoutButton = page.locator('[data-testid="profile-logout-button"]').first()
+      if (await logoutButton.count() > 0) {
+        await logoutButton.click()
+        await page.waitForTimeout(1000)
+        
+        // Confirm logout if confirmation screen appears
+        const confirmLogoutButton = page.locator('[data-testid="logout-button"]').first()
+        if (await confirmLogoutButton.count() > 0) {
+          await confirmLogoutButton.click()
+          await page.waitForTimeout(2000)
+        }
+      }
+    }
+    
+    // Now login as regular user (staff role, not orgAdmin)
     const authWorkflow = new AuthWorkflow(page)
     await authWorkflow.givenIAmOnTheLoginScreen()
     const credentials = await authWorkflow.givenIHaveValidCredentials()

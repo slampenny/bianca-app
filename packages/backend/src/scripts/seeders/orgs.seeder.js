@@ -6,9 +6,11 @@ const orgFixture = require('../../../tests/fixtures/org.fixture');
  */
 async function seedOrgs() {
   console.log('Seeding Organizations...');
-  const { orgOne, insertOrgs } = orgFixture;
-  const [org] = await insertOrgs([orgOne]);
-  console.log('Seeded org:', org._id);
+  const { orgOne, orgTwo, insertOrgs } = orgFixture;
+  // Use orgTwo (CA) for test organization to ensure privacy request tests work correctly
+  // Privacy request UI is different for CA (PIPEDA) vs US (HIPAA)
+  const [org] = await insertOrgs([orgTwo]);
+  console.log('Seeded org:', org._id, 'with country:', org.country);
   return org;
 }
 
