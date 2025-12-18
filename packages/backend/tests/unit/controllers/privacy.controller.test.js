@@ -39,7 +39,7 @@ describe('Privacy Controller', () => {
     next = jest.fn();
 
     caregiverId = new mongoose.Types.ObjectId();
-    req.user = { id: caregiverId };
+    req.caregiver = { id: caregiverId };
   });
 
   describe('createAccessRequest', () => {

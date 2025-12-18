@@ -81,8 +81,9 @@ if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]
   }
 else
   timeout 300 bash -c "$DOCKER_COMPOSE_CMD pull" || {
-  echo "⚠️  Image pull timed out or failed, but continuing..."
-}
+    echo "⚠️  Image pull timed out or failed, but continuing..."
+  }
+fi
 
 echo "✅ AfterInstall completed"
 
