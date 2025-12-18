@@ -45,13 +45,24 @@ fi
 # Note: docker-compose.yml is already on the instance at $DEPLOY_DIR/docker-compose.yml
 # We just need to pull the latest images
 
-# Determine which docker compose command to use
-if docker compose version >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD="docker-compose"
+# Determine which docker compose command to use and create a function
+# Check for docker-compose (standalone) first, as it's more reliable
+if command -v docker-compose >/dev/null 2>&1; then
+  docker_compose_cmd() {
+    docker-compose "$@"
+  }
+  echo "   Using: docker-compose (standalone)"
+# Then check for docker compose (plugin) - must actually work, not just exist
+elif docker compose version >/dev/null 2>&1 && docker compose ps >/dev/null 2>&1; then
+  docker_compose_cmd() {
+    docker compose "$@"
+  }
+  echo "   Using: docker compose (plugin)"
 else
-  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
+  echo "   Checking what's available..." >&2
+  command -v docker-compose >&2 || echo "   docker-compose: not found" >&2
+  docker compose version >&2 || echo "   docker compose: not working" >&2
   exit 1
 fi
 
@@ -59,11 +70,11 @@ fi
 # Remove old images first to force fresh pull
 echo "   Removing old images to force fresh pull..."
 cd "$DEPLOY_DIR"
-$DOCKER_COMPOSE_CMD down 2>/dev/null || true
+docker_compose_cmd down 2>/dev/null || true
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
 echo "   Pulling latest Docker images (5 min timeout)..."
-timeout 300 $DOCKER_COMPOSE_CMD pull || {
+timeout 300 docker_compose_cmd pull || {
   echo "⚠️  Image pull timed out or failed, but continuing..."
 }
 

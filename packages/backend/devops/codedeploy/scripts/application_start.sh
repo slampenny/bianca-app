@@ -38,26 +38,35 @@ if [ ! -f "nginx.conf" ]; then
   exit 1
 fi
 
-# Determine which docker compose command to use
-if docker compose version >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD="docker-compose"
+# Determine which docker compose command to use and create a function
+# Check for docker-compose (standalone) first, as it's more reliable
+if command -v docker-compose >/dev/null 2>&1; then
+  docker_compose_cmd() {
+    docker-compose "$@"
+  }
+  echo "   Using: docker-compose (standalone)"
+# Then check for docker compose (plugin) - must actually work, not just exist
+elif docker compose version >/dev/null 2>&1 && docker compose ps >/dev/null 2>&1; then
+  docker_compose_cmd() {
+    docker compose "$@"
+  }
+  echo "   Using: docker compose (plugin)"
 else
-  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
+  echo "   Checking what's available..." >&2
+  command -v docker-compose >&2 || echo "   docker-compose: not found" >&2
+  docker compose version >&2 || echo "   docker compose: not working" >&2
   exit 1
 fi
 
-echo "   Using: $DOCKER_COMPOSE_CMD"
-
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
-$DOCKER_COMPOSE_CMD down 2>/dev/null || true
+docker_compose_cmd down 2>/dev/null || true
 
 # Start containers - use background process with timeout to prevent hangs
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
-$DOCKER_COMPOSE_CMD up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+docker_compose_cmd up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete
@@ -86,7 +95,7 @@ if [ $EXIT_CODE -ne 0 ]; then
   if [ -f /tmp/docker_start.log ]; then
     tail -50 /tmp/docker_start.log >&2 || true
   fi
-  $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
+  docker_compose_cmd logs --tail 50 2>&1 || true
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
   # Don't exit - let ValidateService decide if deployment failed
