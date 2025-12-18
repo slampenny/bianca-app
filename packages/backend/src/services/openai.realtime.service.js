@@ -3652,7 +3652,7 @@ class OpenAIRealtimeService {
       }, CONSTANTS.TEST_CONNECTION_TIMEOUT);
 
       try {
-        const model = config.openai.realtimeModel || 'gpt-realtime';
+        const model = config.openai.realtimeModel || 'gpt-realtime-2025-08-28';
         const voice = config.openai.realtimeVoice || 'alloy';
         const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
         logger.info(`[OpenAI TestConn] Connecting to ${wsUrl}`);
@@ -3725,7 +3725,7 @@ class OpenAIRealtimeService {
                       input_audio_format: 'g711_ulaw',
                       output_audio_format: 'g711_ulaw',
                       voice: config.openai.realtimeVoice || 'alloy',
-                      model: config.openai.realtimeModel || 'gpt-realtime'
+                      model: config.openai.realtimeModel || 'gpt-realtime-2025-08-28'
                     }
                   },
                   receivedMessages,
