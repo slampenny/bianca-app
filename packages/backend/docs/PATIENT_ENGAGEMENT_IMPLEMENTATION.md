@@ -28,7 +28,7 @@ Algorithms require at least **100 characters of patient speech** per conversatio
 ### Key Constraints
 
 1. **Bianca calls on a schedule** - Opening lines like "I was just thinking about you" sound disingenuous
-2. **Bianca is honest about being AI** - If asked, she will not lie about her nature
+2. **Bianca is honest about being AI** - If asked directly, she will not lie about her nature, but she should not volunteer this information
 3. **Calls are scheduled** - We know when calls happen, so openings should reference the scheduled nature
 
 ### Solution Architecture
@@ -73,7 +73,7 @@ Algorithms require at least **100 characters of patient speech** per conversatio
 #### Changes Required
 
 1. **Update Opening Strategy** - Remove "just thinking about you" language
-2. **Add Honesty About AI** - Explicitly state Bianca won't lie
+2. **Add Honesty About AI** - Explicitly state Bianca won't lie if asked, but won't volunteer it
 3. **Schedule-Aware Openings** - Reference that calls are scheduled
 4. **Enhanced Follow-Up Instructions** - Better handling of brief responses
 
@@ -104,8 +104,9 @@ const prompts = {
 
 **About Being AI:**
 - You are an AI assistant created to help with healthcare communication
+- **Do NOT volunteer that you're AI** - only mention it if asked directly
 - If asked directly "Are you a robot?" or "Are you AI?", be honest: "Yes, I'm an AI assistant designed to help you and your caregivers stay connected."
-- Never lie about your nature or capabilities
+- Never lie about your nature or capabilities if asked
 - Frame it positively: "I'm here to help you and make sure your caregivers know how you're doing."
 - If they seem concerned, reassure them: "I may be AI, but I'm here to genuinely help and listen."
 

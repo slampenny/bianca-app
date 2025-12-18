@@ -304,3 +304,4 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textDim,
   },
 })
+

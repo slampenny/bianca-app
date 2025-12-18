@@ -87,6 +87,55 @@ const patientSchema = mongoose.Schema(
         ref: 'Schedule',
       },
     ],
+    // Conversation profile - tracks engagement patterns and preferences extracted from conversations
+    conversationProfile: {
+      // Personal preferences extracted from conversations (e.g., favorite color, hobbies, interests)
+      personalPreferences: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {},
+        // Stores structured data like: { favoriteColor: "blue", hobbies: ["gardening", "reading"], ... }
+      },
+      // Topics that generate good engagement
+      preferredTopics: [{
+        type: String
+      }],
+      // Average metrics for conversation quality
+      averageResponseLength: {
+        type: Number,
+        default: 0
+      },
+      averageConversationLength: {
+        type: Number,
+        default: 0 // in seconds
+      },
+      engagementScore: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+      },
+      // Optimal call times based on historical data
+      optimalCallTimes: [{
+        hour: {
+          type: Number,
+          min: 0,
+          max: 23
+        },
+        qualityScore: {
+          type: Number,
+          min: 0,
+          max: 100
+        },
+        sampleSize: {
+          type: Number,
+          default: 0
+        }
+      }],
+      // Last time profile was updated
+      lastUpdated: {
+        type: Date
+      }
+    },
   },
   {
     timestamps: true,

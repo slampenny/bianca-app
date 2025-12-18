@@ -235,9 +235,9 @@ const getLanguageName = (languageCode) => {
  */
 const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
   try {
-    // Get patient info
+    // Get patient info including conversation profile
     const patient = await Patient.findById(patientId)
-      .select('name preferredName medicalConditions allergies currentMedications age preferredLanguage')
+      .select('name preferredName medicalConditions allergies currentMedications age preferredLanguage conversationProfile')
       .lean();
 
     if (!patient) {
@@ -283,6 +283,33 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
       enhancedPrompt += `\n\nLast Contact Time: You last spoke with this patient ${lastContactHumanized}.\n- Avoid repeating questions you asked recently (especially if within the last hour).\n- If they told you something important recently, you remember it - don't ask them to repeat it.\n- Use this time gap to vary your questions naturally.`;
     } else {
       enhancedPrompt += `\n\nLast Contact Time: This appears to be your first conversation with this patient, or no recent completed conversations found.`;
+    }
+
+    // Add conversation profile information if available
+    if (patient.conversationProfile && patient.conversationProfile.personalPreferences) {
+      const prefs = patient.conversationProfile.personalPreferences;
+      const profileNotes = [];
+
+      if (prefs.favoriteColor) {
+        profileNotes.push(`Favorite color: ${prefs.favoriteColor}`);
+      }
+
+      if (prefs.hobbies && Array.isArray(prefs.hobbies) && prefs.hobbies.length > 0) {
+        profileNotes.push(`Hobbies/interests: ${prefs.hobbies.join(', ')}`);
+      }
+
+      if (prefs.rawPreferences) {
+        profileNotes.push(`Other preferences: ${prefs.rawPreferences}`);
+      }
+
+      if (profileNotes.length > 0) {
+        enhancedPrompt += `\n\nPatient Preferences (from previous conversations):\n${profileNotes.join('\n')}\n- Use this information naturally in conversation to build rapport\n- Reference these preferences when relevant (e.g., "I remember you like ${prefs.favoriteColor || 'gardening'}")\n- Don't force these into every conversation, but use them to make connections`;
+      }
+    }
+
+    // Add preferred topics if available
+    if (patient.conversationProfile && patient.conversationProfile.preferredTopics && patient.conversationProfile.preferredTopics.length > 0) {
+      enhancedPrompt += `\n\nTopics that have worked well in past conversations: ${patient.conversationProfile.preferredTopics.join(', ')}\n- Consider naturally working these topics into the conversation if appropriate`;
     }
 
     // Add conversation history context if available
@@ -425,11 +452,27 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     
     const summaryPrompt = "Create a concise summary of this patient conversation with Bianca, highlighting key topics discussed, any concerns raised, and the patient's overall mood or needs.";
     
-    const summary = await langChainAPI.summarizeConversation(
-      summaryPrompt,
-      conversationText,
-      userDomain
-    );
+    // Run summarization and user information extraction in parallel
+    const [summary, userInformation] = await Promise.all([
+      langChainAPI.summarizeConversation(
+        summaryPrompt,
+        conversationText,
+        userDomain
+      ),
+      langChainAPI.extractUserInformation(conversationText, userDomain).catch(err => {
+        logger.warn(`[Finalize] Error extracting user information: ${err.message}`);
+        return null; // Don't fail the whole process if extraction fails
+      })
+    ]);
+
+    // Update patient conversation profile with extracted information
+    if (userInformation && conversation.patientId) {
+      const patientId = conversation.patientId._id || conversation.patientId;
+      await updatePatientConversationProfile(patientId, userInformation, conversationId).catch(err => {
+        logger.error(`[Finalize] Error updating patient profile: ${err.message}`);
+        // Don't fail the whole process if profile update fails
+      });
+    }
 
     // Perform sentiment analysis on the conversation
     let sentimentAnalysis = null;
@@ -464,6 +507,12 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       updateData['analyzedData.sentimentAnalyzedAt'] = new Date();
     }
 
+    // Add extracted user information to analyzedData
+    if (userInformation) {
+      updateData['analyzedData.userInformation'] = userInformation;
+      updateData['analyzedData.userInformationExtractedAt'] = new Date();
+    }
+
     await Conversation.findByIdAndUpdate(conversationId, updateData);
 
     logger.info(`[Finalize] Successfully finalized conversation ${conversationId} with ${messages.length} messages${sentimentAnalysis && sentimentAnalysis.success ? ' and sentiment analysis' : ''}`);
@@ -478,7 +527,8 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     
     return {
       summary,
-      sentimentAnalysis: sentimentAnalysis && sentimentAnalysis.success ? sentimentAnalysis.data : null
+      sentimentAnalysis: sentimentAnalysis && sentimentAnalysis.success ? sentimentAnalysis.data : null,
+      userInformation: userInformation || null
     };
 
   } catch (err) {
@@ -1293,6 +1343,194 @@ const triggerAnalysisAfterCall = async (patientId) => {
   }
 };
 
+/**
+ * Update patient conversation profile with extracted user information
+ * @param {string} patientId - Patient ID
+ * @param {string} userInformation - Extracted user information text from LangChain
+ * @param {string} conversationId - Conversation ID for quality metrics
+ */
+const updatePatientConversationProfile = async (patientId, userInformation, conversationId) => {
+  try {
+    const patient = await Patient.findById(patientId);
+    if (!patient) {
+      logger.warn(`[Conversation Profile] Patient ${patientId} not found`);
+      return;
+    }
+
+    // Initialize profile if it doesn't exist
+    if (!patient.conversationProfile) {
+      patient.conversationProfile = {
+        personalPreferences: {},
+        preferredTopics: [],
+        averageResponseLength: 0,
+        averageConversationLength: 0,
+        engagementScore: 0,
+        optimalCallTimes: [],
+        lastUpdated: null
+      };
+    }
+
+    // Parse extracted user information to extract structured data
+    // The LangChain extraction returns text like:
+    // "Personal Preferences: favorite color is blue, enjoys gardening..."
+    // We'll parse this to extract key-value pairs
+    const parsedPreferences = parseUserInformation(userInformation);
+    
+    // Merge with existing preferences (new info takes precedence)
+    if (parsedPreferences && Object.keys(parsedPreferences).length > 0) {
+      patient.conversationProfile.personalPreferences = {
+        ...patient.conversationProfile.personalPreferences,
+        ...parsedPreferences
+      };
+    }
+
+    // Calculate conversation quality metrics if conversationId is provided
+    if (conversationId) {
+      try {
+        const conversation = await Conversation.findById(conversationId).populate('messages');
+        if (conversation && conversation.messages) {
+          const patientMessages = conversation.messages
+            .filter(msg => msg.role === 'patient')
+            .map(msg => msg.content);
+
+          if (patientMessages.length > 0) {
+            const totalChars = patientMessages.join(' ').length;
+            const avgResponseLength = totalChars / patientMessages.length;
+            
+            // Calculate conversation duration
+            // Conversation model uses timestamps (createdAt, updatedAt) - no endTime field
+            let conversationDuration = 0;
+            if (conversation.createdAt) {
+              const startTime = new Date(conversation.createdAt);
+              // Use updatedAt as end time (will be set when conversation is finalized)
+              // If updatedAt is same as createdAt, use a small default duration
+              const endTime = conversation.updatedAt && 
+                new Date(conversation.updatedAt).getTime() > new Date(conversation.createdAt).getTime()
+                ? new Date(conversation.updatedAt)
+                : new Date(startTime.getTime() + 60000); // Default to 1 minute if not updated yet
+              
+              conversationDuration = Math.max(0, Math.floor((endTime - startTime) / 1000));
+            }
+
+            // Calculate quality score (simple heuristic: 0-100)
+            const qualityScore = Math.min(100, Math.max(0, 
+              (totalChars >= 100 ? 40 : (totalChars / 100) * 40) + // Character score (0-40)
+              (avgResponseLength >= 50 ? 30 : (avgResponseLength / 50) * 30) + // Response length score (0-30)
+              (patientMessages.length >= 5 ? 30 : (patientMessages.length / 5) * 30) // Turn count score (0-30)
+            ));
+
+            // Update averages using exponential moving average
+            const alpha = 0.3; // Smoothing factor
+            patient.conversationProfile.averageResponseLength = 
+              patient.conversationProfile.averageResponseLength > 0
+                ? (alpha * avgResponseLength) + ((1 - alpha) * patient.conversationProfile.averageResponseLength)
+                : avgResponseLength;
+
+            patient.conversationProfile.averageConversationLength = 
+              patient.conversationProfile.averageConversationLength > 0
+                ? (alpha * conversationDuration) + ((1 - alpha) * patient.conversationProfile.averageConversationLength)
+                : conversationDuration;
+
+            patient.conversationProfile.engagementScore = 
+              patient.conversationProfile.engagementScore > 0
+                ? (alpha * qualityScore) + ((1 - alpha) * patient.conversationProfile.engagementScore)
+                : qualityScore;
+
+            // Update optimal call times based on this conversation
+            if (conversation.createdAt) {
+              const callHour = new Date(conversation.createdAt).getHours();
+              const existingTime = patient.conversationProfile.optimalCallTimes.find(t => t.hour === callHour);
+              
+              if (existingTime) {
+                // Update existing time entry
+                const newSampleSize = existingTime.sampleSize + 1;
+                existingTime.qualityScore = ((existingTime.qualityScore * existingTime.sampleSize) + qualityScore) / newSampleSize;
+                existingTime.sampleSize = newSampleSize;
+              } else {
+                // Add new time entry
+                patient.conversationProfile.optimalCallTimes.push({
+                  hour: callHour,
+                  qualityScore: qualityScore,
+                  sampleSize: 1
+                });
+              }
+            }
+          }
+        }
+      } catch (qualityErr) {
+        logger.warn(`[Conversation Profile] Error calculating quality metrics: ${qualityErr.message}`);
+      }
+    }
+
+    patient.conversationProfile.lastUpdated = new Date();
+    await patient.save();
+
+    logger.info(`[Conversation Profile] Updated profile for patient ${patientId}`);
+  } catch (error) {
+    logger.error(`[Conversation Profile] Error updating profile: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Parse user information text from LangChain extraction into structured data
+ * @param {string} userInformation - Raw text from LangChain extraction
+ * @returns {Object} Parsed preferences object
+ */
+const parseUserInformation = (userInformation) => {
+  if (!userInformation || typeof userInformation !== 'string') {
+    return {};
+  }
+
+  const preferences = {};
+  const lines = userInformation.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Look for "Personal Preferences:" section
+    if (trimmed.toLowerCase().includes('personal preferences:')) {
+      const prefText = trimmed.split(':')[1]?.trim() || '';
+      // Extract common patterns like "favorite color is blue", "enjoys gardening", etc.
+      const colorMatch = prefText.match(/favorite\s+color\s+is\s+(\w+)/i);
+      if (colorMatch) {
+        preferences.favoriteColor = colorMatch[1];
+      }
+
+      // Extract hobbies/interests
+      const hobbiesMatch = prefText.match(/(?:enjoys?|likes?|loves?|interests?)\s+([^,\.]+)/gi);
+      if (hobbiesMatch) {
+        let hobbies = hobbiesMatch.map(h => h.replace(/^(?:enjoys?|likes?|loves?|interests?)\s+/i, '').trim());
+        // Split hobbies that contain "and" (e.g., "gardening and reading" -> ["gardening", "reading"])
+        hobbies = hobbies.flatMap(hobby => {
+          if (hobby.toLowerCase().includes(' and ')) {
+            return hobby.split(/\s+and\s+/i).map(h => h.trim()).filter(h => h.length > 0);
+          }
+          return [hobby];
+        });
+        if (hobbies.length > 0) {
+          preferences.hobbies = hobbies;
+        }
+      }
+
+      // Store the full text as well for reference
+      if (prefText) {
+        preferences.rawPreferences = prefText;
+      }
+    }
+
+    // Look for other sections that might contain useful info
+    if (trimmed.toLowerCase().includes('family information:')) {
+      const familyText = trimmed.split(':')[1]?.trim() || '';
+      if (familyText) {
+        preferences.familyInfo = familyText;
+      }
+    }
+  }
+
+  return preferences;
+};
+
 module.exports = {
   // Existing methods (unchanged)
   createConversationForPatient,
@@ -1320,5 +1558,8 @@ module.exports = {
   storeMedicalAnalysisResult,
   deleteOldMedicalAnalyses,
   getActivePatients,
-  getConversationsByPatientAndDateRange
+  getConversationsByPatientAndDateRange,
+  
+  // Conversation profile methods
+  updatePatientConversationProfile
 };
