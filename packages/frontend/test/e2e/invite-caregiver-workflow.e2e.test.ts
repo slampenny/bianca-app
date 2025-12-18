@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test'
+import { test, expect, Page, BrowserContext } from '@playwright/test'
 import { generateUniqueTestData, TEST_USERS } from './fixtures/testData'
 import { getEmailFromEthereal } from './helpers/backendHelpers'
 import { loginUserViaUI, logoutViaUI } from './helpers/testHelpers'
@@ -151,6 +151,10 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log('🔓 Logging out admin user before clicking invite link...')
     await logoutViaUI(page)
     
+    // Wait for logout to fully complete - ensure we're on login screen
+    await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
+    await page.waitForTimeout(2000) // Give auth state time to clear
+    
     // Clear cookies and storage to ensure clean session for invitee
     await page.context().clearCookies()
     await page.evaluate(() => {
@@ -160,8 +164,14 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log('✅ Admin user logged out and session cleared')
     
     // Step 10: Simulate clicking the email link
-    // Create a new page context to simulate the invite link
-    const invitePage = await context.newPage()
+    // Create a new browser context (not just a new page) to ensure complete session isolation
+    // This prevents the invitee from inheriting the sender's session
+    const browser = context.browser()
+    if (!browser) {
+      throw new Error('Browser context not available - cannot create isolated context for invitee')
+    }
+    const inviteContext: BrowserContext = await browser.newContext()
+    const invitePage = await inviteContext.newPage()
 
     // Navigate to signup page with invite token (this is what the email link points to)
     const inviteLink = `http://localhost:8081/signup?token=${inviteToken}`
@@ -378,8 +388,9 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log('   - Phone verification banner displayed correctly')
     console.log('   - User can navigate freely (not blocked)')
 
-    // Close the invite page
+    // Close the invite page and context
     await invitePage.close()
+    await inviteContext.close()
   })
 
   test('invite email contains correct link format', async ({ page }) => {

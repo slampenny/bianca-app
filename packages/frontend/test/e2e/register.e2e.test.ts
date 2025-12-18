@@ -140,8 +140,16 @@ test.describe("Register Screen", () => {
     await expect(page.getByText(/organization name cannot be empty/i)).toBeVisible()
   })
 
-  test("can select country when registering as organization", async ({ page }) => {
-    // Find organization toggle button
+  test("country picker is visible for both individual and organization accounts", async ({ page }) => {
+    // Country picker should be visible by default (individual account type)
+    const countryPicker = page.locator('select').filter({ hasText: /united states|canada|estados unidos/i }).first()
+    await expect(countryPicker).toBeVisible({ timeout: 5000 })
+    
+    // Verify default is Canada (CA)
+    const defaultValue = await countryPicker.inputValue()
+    expect(defaultValue).toBe('CA')
+    
+    // Switch to organization and verify country picker is still visible
     let orgToggle = page.getByTestId('register-organization-toggle')
     let toggleCount = await orgToggle.count().catch(() => 0)
     if (toggleCount === 0) {
@@ -149,26 +157,33 @@ test.describe("Register Screen", () => {
     }
     await orgToggle.waitFor({ state: 'visible', timeout: 5000 })
     await orgToggle.click()
-
-    // Wait for country picker to appear
+    
+    // Wait for UI to update
     await page.waitForTimeout(500)
     
-    // Check if country picker is visible (it should be when organization is selected)
-    const countryPicker = page.locator('select').filter({ hasText: /united states|canada/i }).first()
-    const pickerVisible = await countryPicker.isVisible({ timeout: 3000 }).catch(() => false)
+    // Country picker should still be visible
+    await expect(countryPicker).toBeVisible({ timeout: 3000 })
     
-    if (pickerVisible) {
-      // Try to select Canada
-      await countryPicker.selectOption({ value: 'CA' })
-      await page.waitForTimeout(500)
-      
-      // Verify selection worked (check if value is CA)
-      const selectedValue = await countryPicker.inputValue()
-      expect(selectedValue).toBe('CA')
-    } else {
-      // If picker not found, log but don't fail - might be using different component
-      console.log('⚠️ Country picker not found - may be using different component structure')
+    // Verify we can change the country
+    await countryPicker.selectOption({ value: 'US' })
+    await page.waitForTimeout(500)
+    
+    const selectedValue = await countryPicker.inputValue()
+    expect(selectedValue).toBe('US')
+    
+    // Switch back to individual and verify country picker is still visible
+    let individualToggle = page.getByTestId('register-individual-toggle')
+    toggleCount = await individualToggle.count().catch(() => 0)
+    if (toggleCount === 0) {
+      individualToggle = page.locator('[data-testid="register-individual-toggle"]').first()
     }
+    await individualToggle.waitFor({ state: 'visible', timeout: 5000 })
+    await individualToggle.click()
+    
+    await page.waitForTimeout(500)
+    
+    // Country picker should still be visible
+    await expect(countryPicker).toBeVisible({ timeout: 3000 })
   })
 
   test("shows success message after valid individual registration", async ({ page }) => {
@@ -182,6 +197,10 @@ test.describe("Register Screen", () => {
     }
     await individualToggle.waitFor({ state: 'visible', timeout: 5000 })
     await individualToggle.click()
+    
+    // Verify country picker is visible for individual accounts
+    const countryPicker = page.locator('select').filter({ hasText: /united states|canada|estados unidos/i }).first()
+    await expect(countryPicker).toBeVisible({ timeout: 5000 })
     
     await page.locator('input[data-testid="register-name"]').fill(registrationData.name)
     await page.locator('input[data-testid="register-email"]').fill(registrationData.email)
@@ -304,6 +323,13 @@ test.describe("Register Screen", () => {
     }
     await orgToggle.waitFor({ state: 'visible', timeout: 5000 })
     await orgToggle.click()
+    
+    // Wait for UI to update
+    await page.waitForTimeout(500)
+    
+    // Verify country picker is visible for organization accounts
+    const countryPicker = page.locator('select').filter({ hasText: /united states|canada|estados unidos/i }).first()
+    await expect(countryPicker).toBeVisible({ timeout: 5000 })
     
     // Fill organization name first (now at the top)
     await page.locator('input[data-testid="register-org-name"]').fill("Test Organization")

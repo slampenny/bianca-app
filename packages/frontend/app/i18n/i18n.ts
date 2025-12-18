@@ -190,6 +190,13 @@ I18nManager.allowRTL(isRTL)
 I18nManager.forceRTL(isRTL)
 
 /**
+ * Get the current locale
+ */
+export const getLocale = (): string => {
+  return i18n.locale || "en"
+}
+
+/**
  * Builds up valid keypaths for translations.
  */
 export type TxKeyPath = RecursiveKeyOf<Translations>

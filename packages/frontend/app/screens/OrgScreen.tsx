@@ -16,32 +16,8 @@ import { setOrg } from "../store/orgSlice"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
 import type { ThemeColors } from "../types"
-import { Button, Text, TextField, Toggle } from "app/components"
+import { Button, Text, TextField, Toggle, CountryPicker } from "app/components"
 import { logger } from "../utils/logger"
-
-// Common countries list (ISO 3166-1 alpha-2 codes)
-const COUNTRIES = [
-  { value: 'US', label: 'United States' },
-  { value: 'CA', label: 'Canada' },
-  { value: 'GB', label: 'United Kingdom' },
-  { value: 'AU', label: 'Australia' },
-  { value: 'DE', label: 'Germany' },
-  { value: 'FR', label: 'France' },
-  { value: 'IT', label: 'Italy' },
-  { value: 'ES', label: 'Spain' },
-  { value: 'NL', label: 'Netherlands' },
-  { value: 'SE', label: 'Sweden' },
-  { value: 'CH', label: 'Switzerland' },
-  { value: 'JP', label: 'Japan' },
-  { value: 'CN', label: 'China' },
-  { value: 'HK', label: 'Hong Kong' },
-  { value: 'SG', label: 'Singapore' },
-  { value: 'AE', label: 'United Arab Emirates' },
-  { value: 'IN', label: 'India' },
-  { value: 'MX', label: 'Mexico' },
-  { value: 'BR', label: 'Brazil' },
-  { value: 'OTHER', label: 'Other' },
-]
 
 // Common timezones list (IANA timezone identifiers)
 const TIMEZONES = [
@@ -79,7 +55,7 @@ export function OrgScreen() {
   const dispatch = useDispatch()
   const currentOrg = useSelector(getOrg)
   const currentUser = useSelector(getCurrentUser)
-  const { colors, isLoading: themeLoading, currentTheme } = useTheme()
+  const { colors, isLoading: themeLoading } = useTheme()
   const [updateOrg, { isError, error }] = useUpdateOrgMutation()
   const [isLoading, setIsLoading] = useState(true)
   const [name, setName] = useState("")
@@ -91,7 +67,7 @@ export function OrgScreen() {
   const [retryIntervalMinutes, setRetryIntervalMinutes] = useState("15")
   const [alertOnAllMissedCalls, setAlertOnAllMissedCalls] = useState(false)
   const [timezone, setTimezone] = useState("America/New_York")
-  const [country, setCountry] = useState<string>("US")
+  const [country, setCountry] = useState<string>("CA")
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
 
@@ -110,7 +86,7 @@ export function OrgScreen() {
         setPhone(currentOrg.phone)
         setLogo(currentOrg.logo || null)
         setTimezone(currentOrg.timezone || "America/New_York")
-        setCountry(currentOrg.country || "US")
+        setCountry(currentOrg.country || "CA")
         // Initialize call retry settings
         if (currentOrg.callRetrySettings) {
           setRetryCount(String(currentOrg.callRetrySettings.retryCount ?? 2))
@@ -151,55 +127,6 @@ export function OrgScreen() {
     loadOrg()
   }, [currentOrg, currentUser?.org, dispatch])
 
-  // Inject CSS for web Picker dropdown theming
-  useEffect(() => {
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const isDarkMode = currentTheme === "dark"
-      
-      const dropdownBg = isDarkMode 
-        ? (colors.palette?.neutral500 || "#525252") 
-        : (colors.palette?.neutral100 || "#FFFFFF")
-      const dropdownText = isDarkMode
-        ? (colors.text || colors.palette?.neutral900 || "#FAFAFA")
-        : (colors.text || colors.palette?.neutral800 || "#000000")
-      const hoverBg = isDarkMode
-        ? (colors.palette?.neutral400 || "#404040")
-        : (colors.palette?.neutral200 || "#FAFAFA")
-
-      const styleId = 'picker-dropdown-theme-org'
-      let styleElement = document.getElementById(styleId)
-      
-      if (!styleElement) {
-        styleElement = document.createElement('style')
-        styleElement.id = styleId
-        document.head.appendChild(styleElement)
-      }
-
-      styleElement.textContent = `
-        select {
-          background-color: ${dropdownBg} !important;
-          color: ${dropdownText} !important;
-        }
-        select option {
-          background-color: ${dropdownBg} !important;
-          color: ${dropdownText} !important;
-        }
-        select option:hover,
-        select option:checked {
-          background-color: ${hoverBg} !important;
-          color: ${dropdownText} !important;
-        }
-      `
-
-      return () => {
-        // Cleanup on unmount
-        const element = document.getElementById(styleId)
-        if (element) {
-          element.remove()
-        }
-      }
-    }
-  }, [colors, currentTheme])
 
   const handleSave = async () => {
     if (currentOrg?.id) {
@@ -327,31 +254,13 @@ export function OrgScreen() {
 
         {/* Country Section */}
         <View style={styles.countrySection}>
-          <Text style={styles.sectionTitle} preset="formLabel">
-            {translate("orgScreen.country")}
-          </Text>
-          <Text style={styles.sectionHelper} preset="formHelper">
-            {translate("orgScreen.countryHelper")}
-          </Text>
-          <View style={styles.pickerWrapper}>
-            <Picker
-              selectedValue={country}
-              onValueChange={setCountry}
-              enabled={canEditOrg}
-              style={styles.picker}
-              itemStyle={styles.pickerItem}
-              dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-            >
-              {COUNTRIES.map((c) => (
-                <Picker.Item
-                  key={c.value}
-                  label={c.label}
-                  value={c.value}
-                  color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-                />
-              ))}
-            </Picker>
-          </View>
+          <CountryPicker
+            value={country}
+            onValueChange={setCountry}
+            enabled={canEditOrg}
+            labelTx="orgScreen.country"
+            helperTx="orgScreen.countryHelper"
+          />
         </View>
 
         {/* Timezone Section */}
@@ -556,23 +465,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: colors.palette.neutral300,
-  },
-  pickerWrapper: {
-    backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
-    borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
-    borderRadius: 5,
-    borderWidth: 1,
-    overflow: "hidden",
-    marginTop: 8,
-  },
-  picker: {
-    height: 50,
-    width: "100%",
-    backgroundColor: "transparent",
-    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
-  },
-  pickerItem: {
-    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
   },
   sectionHelper: {
     marginBottom: 8,

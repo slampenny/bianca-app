@@ -2,37 +2,12 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
 import { StyleSheet, View, Pressable, ScrollView, Platform } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
-import { Button, Text, TextField, PasswordField, PhoneInputWeb, Screen } from "app/components"
-import { Picker } from "@react-native-picker/picker"
+import { Button, Text, TextField, PasswordField, PhoneInputWeb, Screen, CountryPicker } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import type { ThemeColors } from "../types"
 import { logger } from "../utils/logger"
-
-// Common countries list (ISO 3166-1 alpha-2 codes)
-const COUNTRIES = [
-  { value: 'US', label: 'United States' },
-  { value: 'CA', label: 'Canada' },
-  { value: 'GB', label: 'United Kingdom' },
-  { value: 'AU', label: 'Australia' },
-  { value: 'DE', label: 'Germany' },
-  { value: 'FR', label: 'France' },
-  { value: 'IT', label: 'Italy' },
-  { value: 'ES', label: 'Spain' },
-  { value: 'NL', label: 'Netherlands' },
-  { value: 'SE', label: 'Sweden' },
-  { value: 'CH', label: 'Switzerland' },
-  { value: 'JP', label: 'Japan' },
-  { value: 'CN', label: 'China' },
-  { value: 'HK', label: 'Hong Kong' },
-  { value: 'SG', label: 'Singapore' },
-  { value: 'AE', label: 'United Arab Emirates' },
-  { value: 'IN', label: 'India' },
-  { value: 'MX', label: 'Mexico' },
-  { value: 'BR', label: 'Brazil' },
-  { value: 'OTHER', label: 'Other' },
-]
 
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
   const { navigation } = props
@@ -80,7 +55,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const [confirmPassword, setConfirmPassword] = useState("")
   const [phone, setPhone] = useState("")
   const [organizationName, setOrganizationName] = useState("")
-  const [country, setCountry] = useState<string>("US")
+  const [country, setCountry] = useState<string>("CA")
   const [accountType, setAccountType] = useState("individual")
 
   // Field-specific error messages
@@ -184,7 +159,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
       try {
         // For organization accounts, use organizationName as the org name
         const orgName = accountType === "organization" && organizationName ? organizationName : name
-        const result = await register({ name: orgName, email, password, phone, country: accountType === "organization" ? country : undefined }).unwrap()
+        const result = await register({ name: orgName, email, password, phone, country }).unwrap()
         // Handle the new registration response format
         if (result && result.requiresEmailVerification) {
           // Navigate to email verification required screen with email
@@ -281,47 +256,30 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
         {/* Form Fields */}
         {accountType === "organization" && (
-          <>
-            <View style={styles.fieldContainer}>
-              <TextField
-                testID="register-org-name"
-                accessibilityLabel={translate("registerScreen.organizationNameFieldLabel") || "Organization name"}
-                placeholderTx="registerScreen.organizationNameFieldPlaceholder"
-                labelTx="registerScreen.organizationNameFieldLabel"
-                value={organizationName}
-                onChangeText={(text) => {
-                  setOrganizationName(text)
-                  clearFieldError("organizationName")
-                }}
-                status={organizationNameError ? "error" : undefined}
-                helper={organizationNameError || undefined}
-              />
-            </View>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.label} preset="formLabel">
-                {translate("registerScreen.countryFieldLabel") || "Country"}
-              </Text>
-              <View style={styles.pickerWrapper}>
-                <Picker
-                  selectedValue={country}
-                  onValueChange={setCountry}
-                  style={styles.picker}
-                  itemStyle={styles.pickerItem}
-                  dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-                >
-                  {COUNTRIES.map((c) => (
-                    <Picker.Item
-                      key={c.value}
-                      label={c.label}
-                      value={c.value}
-                      color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-                    />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-          </>
+          <View style={styles.fieldContainer}>
+            <TextField
+              testID="register-org-name"
+              accessibilityLabel={translate("registerScreen.organizationNameFieldLabel") || "Organization name"}
+              placeholderTx="registerScreen.organizationNameFieldPlaceholder"
+              labelTx="registerScreen.organizationNameFieldLabel"
+              value={organizationName}
+              onChangeText={(text) => {
+                setOrganizationName(text)
+                clearFieldError("organizationName")
+              }}
+              status={organizationNameError ? "error" : undefined}
+              helper={organizationNameError || undefined}
+            />
+          </View>
         )}
+
+        {/* Country Section - shown for both individual and organization */}
+        <CountryPicker
+          value={country}
+          onValueChange={setCountry}
+          labelTx="registerScreen.countryFieldLabel"
+          containerStyle={styles.fieldContainer}
+        />
 
         <View style={styles.fieldContainer}>
           <TextField
@@ -566,25 +524,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   consentLink: {
     color: colors.palette.biancaButtonSelected,
     textDecorationLine: "underline",
-  },
-  label: {
-    marginBottom: 8,
-  },
-  pickerWrapper: {
-    backgroundColor: colors.palette?.neutral100 || colors.background || "#FFFFFF",
-    borderColor: colors.palette?.neutral300 || colors.palette?.biancaBorder || colors.border || "#E2E8F0",
-    borderRadius: 5,
-    borderWidth: 1,
-    overflow: "hidden",
-    marginTop: 8,
-  },
-  picker: {
-    height: 50,
-    width: "100%",
-    backgroundColor: "transparent",
-    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
-  },
-  pickerItem: {
-    color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000",
   },
 })
