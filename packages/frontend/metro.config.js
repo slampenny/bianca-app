@@ -43,6 +43,9 @@ config.resolver = {
   ...config.resolver,
   alias: {
     ...config.resolver.alias,
+    // Replace expo-font with polyfill to avoid native module crash
+    // The native module isn't properly registered, so we use a JS polyfill instead
+    "expo-font": path.resolve(projectRoot, "app/utils/expo-font-polyfill.ts"),
   },
   // Ensure proper resolution of React Native modules
   platforms: ['ios', 'android', 'native', 'web'],
@@ -59,6 +62,7 @@ config.resolver = {
     /assets\/images\/app-icon-.*\.png/,
     /assets\/images\/playstore\.png/,
     /assets\/images\/appstore\.png/,
+    // Don't block expo-font - use alias instead so Metro can resolve it
   ],
   // Add monorepo node_modules resolution
   nodeModulesPaths: [

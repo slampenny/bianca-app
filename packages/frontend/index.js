@@ -1,3 +1,7 @@
+// CRITICAL: Load expo-font polyfill FIRST before ANYTHING else
+// This must happen synchronously before any other imports
+require('./app/utils/expo-font-polyfill');
+
 import { registerRootComponent } from 'expo';
 import App from './App';
 

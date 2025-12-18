@@ -82,11 +82,13 @@
             "newArchEnabled": false
           }
         }
-      ],
-      "expo-font"
+      ]
     ],
     "experiments": {
       "tsconfigPaths": true
+    },
+    "autolinking": {
+      "exclude": ["expo-font"]
     },
     "privacy": "public",
     "extra": {

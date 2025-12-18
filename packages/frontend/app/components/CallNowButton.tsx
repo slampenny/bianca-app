@@ -4,7 +4,7 @@ import { Button } from "app/components/Button"
 import { Text } from "app/components/Text"
 import { useNavigation } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
-import { initiateCall } from "../services/api/callWorkflowApi"
+import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { colors } from "app/theme/colors"
 import { useAppDispatch } from "../store/store"
 import { setActiveCall, setCallStatus } from "../store/callSlice"
@@ -28,6 +28,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
   const [error, setError] = useState<string | null>(null)
   const navigation = useNavigation()
   const dispatch = useAppDispatch()
+  const [initiateCall] = useInitiateCallMutation()
 
   const handleCallNow = async () => {
     if (isCalling) return
@@ -39,13 +40,11 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       const response = await initiateCall({
         patientId,
         callNotes: `Manual call initiated by agent to ${patientName}`
-      })
+      }).unwrap()
       
       // Store call data in Redux
       logger.debug('CallNowButton - Full response:', response)
       logger.debug('CallNowButton - response.conversationId:', response.conversationId)
-      logger.debug('CallNowButton - response.data:', (response as any).data)
-      logger.debug('CallNowButton - response.success:', (response as any).success)
       
       dispatch(setActiveCall(response))
       dispatch(setCallStatus({

@@ -18,7 +18,6 @@ if (__DEV__) {
 }
 import "./i18n"
 import "./utils/ignoreWarnings"
-import { useFonts } from "expo-font"
 import React from "react"
 import { Provider } from "react-redux"
 import { persistor, store } from "./store/store"
@@ -28,7 +27,8 @@ import * as Linking from "expo-linking"
 import { AppNavigator, useNavigationPersistence } from "./navigators"
 import { ErrorBoundary } from "./screens/ErrorScreen/ErrorBoundary"
 import * as storage from "./utils/storage"
-import { customFontsToLoad } from "./theme"
+// Temporarily disabled customFontsToLoad to avoid expo-font native module issue
+// import { customFontsToLoad } from "./theme"
 import { ThemeProvider } from "./theme/ThemeContext"
 import Config from "./config"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
@@ -87,14 +87,9 @@ function App(props: AppProps) {
     isRestored: isNavigationStateRestored,
   } = useNavigationPersistence(storage, NAVIGATION_PERSISTENCE_KEY)
 
-  const [areFontsLoaded] = useFonts(customFontsToLoad)
-  
-  // In test mode, don't block on fonts - they may not load in test environment
-  const isTestMode = process.env.NODE_ENV === 'test' || 
-                     process.env.PLAYWRIGHT_TEST === '1' || 
-                     process.env.JEST_WORKER_ID !== undefined
-  // In test mode, assume fonts are loaded (or use fallback fonts)
-  const fontsReady = isTestMode ? true : areFontsLoaded
+  // Temporarily disabled expo-font due to native module linking issue
+  // App will use system fonts until expo-font native module is properly linked
+  const fontsReady = true
 
   const onBeforeLiftPersistGate = () => {
     // If your initialization scripts run very fast, it's good to show the splash screen for just a bit longer to prevent flicker.

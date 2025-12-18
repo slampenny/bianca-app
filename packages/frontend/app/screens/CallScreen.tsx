@@ -169,16 +169,27 @@ export function CallScreen() {
       </View>
 
       {/* Call Status Banner - Prominently displayed */}
-      {activeCall && (
+      {activeCall && activeCall.conversationId && (
         <View style={styles.bannerContainer}>
           <CallStatusBanner
-            conversationId={activeCall.conversationId || 'temp-call'}
+            conversationId={activeCall.conversationId}
             initialStatus={activeCall.status || 'initiated'}
             patientName={patient.name}
             onStatusChange={(status) => {
               logger.debug('Call status changed:', status)
             }}
           />
+        </View>
+      )}
+      
+      {/* Show error if activeCall exists but no conversationId */}
+      {activeCall && !activeCall.conversationId && (
+        <View style={styles.bannerContainer}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>
+              Waiting for conversation to be created...
+            </Text>
+          </View>
         </View>
       )}
       

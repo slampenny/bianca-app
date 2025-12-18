@@ -1,7 +1,7 @@
 #!/bin/bash
 # ValidateService hook - Verify deployment was successful
 
-# Don't use set -e here - we want to handle failures gracefully
+set -e  # Exit on error - we want to fail if validation doesn't pass
 
 echo "✅ ValidateService: Verifying deployment..."
 
@@ -30,23 +30,37 @@ fi
 echo "   Checking container health..."
 
 # Wait a bit for containers to fully start
-sleep 15
+sleep 20
 
 # Check if all required containers are running
 echo "   Checking container status..."
 CONTAINER_STATUS=$(docker ps --filter "name=${CONTAINER_PREFIX}_" --format "{{.Names}}\t{{.Status}}" || true)
 echo "$CONTAINER_STATUS"
 
+# Track validation failures
+VALIDATION_FAILED=false
+
 # Check if backend container is running
 BACKEND_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
 if [ "$BACKEND_RUNNING" -eq 0 ]; then
-  echo "⚠️  Backend container is not running yet" >&2
+  echo "❌ Backend container is not running" >&2
   echo "   Checking for container errors..." >&2
   docker ps -a --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}\t{{.Status}}\t{{.Image}}" || true
   docker logs ${CONTAINER_PREFIX}_app --tail 50 2>&1 || true
-  echo "   Containers may still be starting - this is OK" >&2
-  # Don't exit with error - containers might still be starting
-  # CodeDeploy will retry or we can check again later
+  VALIDATION_FAILED=true
+else
+  echo "✅ Backend container is running"
+fi
+
+# Check if nginx container is running (required for public access)
+NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
+if [ "$NGINX_RUNNING" -eq 0 ]; then
+  echo "❌ Nginx container is not running (required for public access)" >&2
+  docker ps -a --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}\t{{.Status}}\t{{.Image}}" || true
+  docker logs ${CONTAINER_PREFIX}_nginx --tail 50 2>&1 || true
+  VALIDATION_FAILED=true
+else
+  echo "✅ Nginx container is running"
 fi
 
 # Check if frontend container is running (optional - don't fail if missing)
@@ -57,27 +71,48 @@ else
   echo "✅ Frontend container is running"
 fi
 
-# Check if backend is responding to health checks (non-blocking)
-echo "   Checking backend health endpoint (non-blocking)..."
-HEALTH_CHECK_PASSED=false
-for i in {1..5}; do
+# Check if backend is responding to health checks (REQUIRED)
+echo "   Checking backend health endpoint..."
+BACKEND_HEALTH_PASSED=false
+for i in {1..10}; do
   if curl -f -s http://localhost:3000/health > /dev/null 2>&1; then
     echo "✅ Backend health check passed (attempt $i)"
-    HEALTH_CHECK_PASSED=true
+    BACKEND_HEALTH_PASSED=true
     break
   fi
-  echo "   Health check attempt $i/5 failed, retrying in 2 seconds..."
-  sleep 2
+  echo "   Health check attempt $i/10 failed, retrying in 3 seconds..."
+  sleep 3
 done
 
-if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
-  echo "⚠️  Backend health check failed after 5 attempts (this is OK - service may still be starting)"
-  echo "   Checking backend logs..."
-  docker logs ${CONTAINER_PREFIX}_app --tail 20 2>&1 || true
-  echo "   Container status:"
+if [ "$BACKEND_HEALTH_PASSED" = "false" ]; then
+  echo "❌ Backend health check failed after 10 attempts" >&2
+  echo "   Checking backend logs..." >&2
+  docker logs ${CONTAINER_PREFIX}_app --tail 50 2>&1 || true
+  echo "   Container status:" >&2
   docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep ${CONTAINER_PREFIX}_ || true
-  echo "⚠️  Health endpoint not yet ready, but containers are running"
-  echo "   Deployment will continue - health endpoint should be available shortly"
+  VALIDATION_FAILED=true
+fi
+
+# Check if nginx is responding on port 80 (REQUIRED for public access)
+echo "   Checking nginx on port 80..."
+NGINX_HEALTH_PASSED=false
+for i in {1..10}; do
+  if curl -f -s http://localhost:80 > /dev/null 2>&1; then
+    echo "✅ Nginx health check passed (attempt $i)"
+    NGINX_HEALTH_PASSED=true
+    break
+  fi
+  echo "   Nginx health check attempt $i/10 failed, retrying in 3 seconds..."
+  sleep 3
+done
+
+if [ "$NGINX_HEALTH_PASSED" = "false" ]; then
+  echo "❌ Nginx health check failed after 10 attempts" >&2
+  echo "   Checking nginx logs..." >&2
+  docker logs ${CONTAINER_PREFIX}_nginx --tail 50 2>&1 || true
+  echo "   Checking if port 80 is listening..." >&2
+  ss -tlnp 2>/dev/null | grep :80 || netstat -tlnp 2>/dev/null | grep :80 || echo "   Port 80 is not listening" >&2
+  VALIDATION_FAILED=true
 fi
 
 # Disable maintenance mode once deployment is validated
@@ -88,7 +123,22 @@ if [ -f "/opt/bianca-deployment/devops/maintenance/disable-maintenance.sh" ]; th
     }
 fi
 
-echo "✅ ValidateService completed - containers are running"
+# Final validation check
+if [ "$VALIDATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ ValidateService FAILED - Deployment validation did not pass"
+  echo "   One or more required checks failed:"
+  echo "   - Backend container must be running"
+  echo "   - Nginx container must be running"
+  echo "   - Backend health endpoint must respond"
+  echo "   - Nginx must respond on port 80"
+  echo ""
+  echo "   Please check the logs above for details."
+  exit 1
+fi
+
+echo ""
+echo "✅ ValidateService completed successfully - all checks passed"
 exit 0
 
 

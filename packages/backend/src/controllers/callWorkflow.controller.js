@@ -57,12 +57,18 @@ const initiateCall = catchAsync(async (req, res) => {
     call.callType = 'outbound';
     await call.save();
     
-    // Note: Conversation will be created when call is answered and messages start
-    // For now, we return the call ID - frontend can use this to track the call
+    // Create conversation immediately so frontend has a conversationId to track the call
+    // This allows the frontend to display call status and messages from the start
+    conversation = await conversationService.createConversationForPatient(patient.id, call._id);
+    
+    // Link the call to the conversation
+    call.conversationId = conversation._id;
+    await call.save();
 
-    logger.info(`[CallWorkflow] Call initiated for patient ${patient.name}, SID: ${callSid}`);
+    logger.info(`[CallWorkflow] Call initiated for patient ${patient.name}, SID: ${callSid}, Conversation: ${conversation._id}`);
 
     res.status(httpStatus.CREATED).send({
+      conversationId: conversation._id.toString(),
       callId: call._id,
       callSid,
       patientId: patient._id,
@@ -71,6 +77,7 @@ const initiateCall = catchAsync(async (req, res) => {
       agentId: agent._id,
       agentName: agent.name,
       callStatus: call.callStatus,
+      status: call.status,
     });
 
   } catch (error) {
