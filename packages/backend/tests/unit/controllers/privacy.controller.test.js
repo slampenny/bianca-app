@@ -288,7 +288,7 @@ describe('Privacy Controller', () => {
 
   describe('getApproachingDeadline', () => {
     it('should return requests approaching deadline', async () => {
-      req.user.role = 'superAdmin'; // Admin only endpoint
+      req.caregiver.role = 'superAdmin'; // Admin only endpoint
 
       const mockRequests = [
         {
@@ -309,7 +309,7 @@ describe('Privacy Controller', () => {
 
   describe('getOverdueRequests', () => {
     it('should return overdue requests', async () => {
-      req.user.role = 'superAdmin'; // Admin only endpoint
+      req.caregiver.role = 'superAdmin'; // Admin only endpoint
 
       const mockRequests = [
         {
@@ -330,7 +330,7 @@ describe('Privacy Controller', () => {
 
   describe('getPrivacyStatistics', () => {
     it('should return privacy statistics', async () => {
-      req.user.role = 'superAdmin'; // Admin only endpoint
+      req.caregiver.role = 'superAdmin'; // Admin only endpoint
       req.query = { startDate: '2025-01-01', endDate: '2025-12-31' };
 
       const mockStats = {

@@ -39,7 +39,6 @@ const conversationSchema = mongoose.Schema(
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
       ref: 'Call',
-      index: true,
       unique: true, // One conversation per call
     },
     patientId: {

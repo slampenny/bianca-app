@@ -6,7 +6,6 @@ const callSchema = mongoose.Schema(
   {
     callSid: {
       type: String,
-      index: true,
       required: true,
     },
     patientId: {

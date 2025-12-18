@@ -35,3 +35,4 @@ echo ""
 echo "Or use the run script:"
 echo "  ./run-android-with-logs.sh"
 
+
