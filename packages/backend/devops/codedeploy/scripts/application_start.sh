@@ -38,19 +38,18 @@ if [ ! -f "nginx.conf" ]; then
   exit 1
 fi
 
-# Determine which docker compose command to use and create a function
+# Determine which docker compose command to use
 # Check for docker-compose (standalone) first, as it's more reliable
 if command -v docker-compose >/dev/null 2>&1; then
-  docker_compose_cmd() {
-    docker-compose "$@"
-  }
-  echo "   Using: docker-compose (standalone)"
+  DOCKER_COMPOSE_CMD=$(command -v docker-compose)
+  echo "   Using: docker-compose (standalone) at $DOCKER_COMPOSE_CMD"
+  # Use array for reliable execution
+  DOCKER_COMPOSE_ARGS=("$DOCKER_COMPOSE_CMD")
 # Then check for docker compose (plugin) - must actually work, not just exist
 elif docker compose version >/dev/null 2>&1 && docker compose ps >/dev/null 2>&1; then
-  docker_compose_cmd() {
-    docker compose "$@"
-  }
   echo "   Using: docker compose (plugin)"
+  # Use array with two elements for "docker compose"
+  DOCKER_COMPOSE_ARGS=("docker" "compose")
 else
   echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
   echo "   Checking what's available..." >&2
@@ -59,14 +58,28 @@ else
   exit 1
 fi
 
+# Ensure ECR is logged in (token might have expired)
+echo "   Ensuring ECR login..."
+ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
+if [ ! -f "$ECR_TOKEN_FILE" ]; then
+  echo "   Logging into ECR..."
+  aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 730335291008.dkr.ecr.$AWS_REGION.amazonaws.com || {
+    echo "   ⚠️  ECR login failed, but continuing..."
+  }
+  touch "$ECR_TOKEN_FILE"
+else
+  echo "   Using cached ECR token"
+fi
+
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
-docker_compose_cmd down 2>/dev/null || true
+"${DOCKER_COMPOSE_ARGS[@]}" down 2>/dev/null || true
 
 # Start containers - use background process with timeout to prevent hangs
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
-docker_compose_cmd up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+# Use eval to properly handle array in background process
+eval "\"${DOCKER_COMPOSE_ARGS[@]}\" up -d --pull always --force-recreate --remove-orphans" > /tmp/docker_start.log 2>&1 &
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete
@@ -95,7 +108,11 @@ if [ $EXIT_CODE -ne 0 ]; then
   if [ -f /tmp/docker_start.log ]; then
     tail -50 /tmp/docker_start.log >&2 || true
   fi
-  docker_compose_cmd logs --tail 50 2>&1 || true
+  if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]; then
+    $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
+  else
+    bash -c "$DOCKER_COMPOSE_CMD logs --tail 50" 2>&1 || true
+  fi
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
   # Don't exit - let ValidateService decide if deployment failed

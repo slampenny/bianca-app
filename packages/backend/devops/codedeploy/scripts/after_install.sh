@@ -45,19 +45,16 @@ fi
 # Note: docker-compose.yml is already on the instance at $DEPLOY_DIR/docker-compose.yml
 # We just need to pull the latest images
 
-# Determine which docker compose command to use and create a function
-# Check for docker-compose (standalone) first, as it's more reliable
+# Determine which docker compose command to use
+# Prefer docker-compose (standalone) as it's more reliable
+DOCKER_COMPOSE_CMD=""
 if command -v docker-compose >/dev/null 2>&1; then
-  docker_compose_cmd() {
-    docker-compose "$@"
-  }
-  echo "   Using: docker-compose (standalone)"
-# Then check for docker compose (plugin) - must actually work, not just exist
+  DOCKER_COMPOSE_CMD=$(command -v docker-compose)
+  echo "   Using: docker-compose (standalone) at $DOCKER_COMPOSE_CMD"
+# Fallback to docker compose (plugin) if available and working
 elif docker compose version >/dev/null 2>&1 && docker compose ps >/dev/null 2>&1; then
-  docker_compose_cmd() {
-    docker compose "$@"
-  }
   echo "   Using: docker compose (plugin)"
+  DOCKER_COMPOSE_CMD="docker compose"
 else
   echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
   echo "   Checking what's available..." >&2
@@ -70,11 +67,20 @@ fi
 # Remove old images first to force fresh pull
 echo "   Removing old images to force fresh pull..."
 cd "$DEPLOY_DIR"
-docker_compose_cmd down 2>/dev/null || true
+if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]; then
+  $DOCKER_COMPOSE_CMD down 2>/dev/null || true
+else
+  bash -c "$DOCKER_COMPOSE_CMD down" 2>/dev/null || true
+fi
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
 echo "   Pulling latest Docker images (5 min timeout)..."
-timeout 300 docker_compose_cmd pull || {
+if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]; then
+  timeout 300 $DOCKER_COMPOSE_CMD pull || {
+    echo "⚠️  Image pull timed out or failed, but continuing..."
+  }
+else
+  timeout 300 bash -c "$DOCKER_COMPOSE_CMD pull" || {
   echo "⚠️  Image pull timed out or failed, but continuing..."
 }
 
