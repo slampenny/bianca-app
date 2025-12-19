@@ -185,6 +185,18 @@ const baselineConfig = {
       primarySpeakerVolumeReduction: parseFloat(process.env.AUDIO_PRIMARY_SPEAKER_VOLUME_REDUCTION) || 0.3, // Default: 0.3 (30% volume for non-primary)
       // Stage 4: Adaptive Noise Reduction (not yet implemented)
       adaptiveNoiseReductionEnabled: process.env.AUDIO_ADAPTIVE_NOISE_REDUCTION_ENABLED === 'true', // Default: false
+    },
+    // Turn detection settings - feature flag to control response timing
+    // When disabled, uses faster settings (matches main branch behavior)
+    // When enabled, uses slower settings optimized for noisy environments
+    turnDetection: {
+      optimizedForNoise: process.env.AUDIO_TURN_DETECTION_NOISE_OPTIMIZED === 'true', // Default: false (use faster settings)
+      // Fast settings (default, matches main branch)
+      fastSilenceDurationMs: parseInt(process.env.AUDIO_TURN_DETECTION_FAST_SILENCE_MS) || 500, // Default: 500ms
+      fastPrefixPaddingMs: parseInt(process.env.AUDIO_TURN_DETECTION_FAST_PADDING_MS) || 200, // Default: 200ms
+      // Noise-optimized settings (when enabled)
+      noiseSilenceDurationMs: parseInt(process.env.AUDIO_TURN_DETECTION_NOISE_SILENCE_MS) || 1000, // Default: 1000ms
+      noisePrefixPaddingMs: parseInt(process.env.AUDIO_TURN_DETECTION_NOISE_PADDING_MS) || 300, // Default: 300ms
     }
   },
   google: {

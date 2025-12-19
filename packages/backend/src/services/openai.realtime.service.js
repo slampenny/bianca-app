@@ -943,13 +943,18 @@ class OpenAIRealtimeService {
         input_audio_format: 'g711_ulaw',
         output_audio_format: 'g711_ulaw',
 
-        // CRITICAL: Add turn detection - optimized for noisy environments
-        // Longer silence duration and padding help in noisy rooms to avoid false positives
+        // CRITICAL: Add turn detection - feature flag controlled
+        // When optimizedForNoise is false (default): Uses faster settings matching main branch
+        // When optimizedForNoise is true: Uses slower settings for noisy environments
         turn_detection: {
           type: 'server_vad',
           threshold: 0.6,              // More selective (ignores quiet background noise)
-          prefix_padding_ms: 300,      // Increased to 300ms - better capture of speech starts in noise
-          silence_duration_ms: 1000   // Increased to 1000ms - wait longer to confirm speech end in noisy environments
+          prefix_padding_ms: config.audio.turnDetection.optimizedForNoise 
+            ? config.audio.turnDetection.noisePrefixPaddingMs 
+            : config.audio.turnDetection.fastPrefixPaddingMs,
+          silence_duration_ms: config.audio.turnDetection.optimizedForNoise
+            ? config.audio.turnDetection.noiseSilenceDurationMs
+            : config.audio.turnDetection.fastSilenceDurationMs
         },
 
         // Add input transcription for debugging
