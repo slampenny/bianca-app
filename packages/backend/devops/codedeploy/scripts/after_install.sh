@@ -70,9 +70,20 @@ $DOCKER_COMPOSE_CMD down 2>/dev/null || true
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
 echo "   Pulling latest Docker images (5 min timeout)..."
-timeout 300 $DOCKER_COMPOSE_CMD pull || {
+echo "   Using --pull always to ensure we get the latest images from ECR..."
+timeout 300 $DOCKER_COMPOSE_CMD pull --ignore-pull-failures || {
   echo "⚠️  Image pull timed out or failed, but continuing..."
 }
+
+# Verify we got the images
+echo "   Verifying pulled images..."
+$DOCKER_COMPOSE_CMD images || {
+  echo "⚠️  Could not list images, but continuing..."
+}
+
+# Log image digests for verification
+echo "   Image digests (for verification):"
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Digest}}\t{{.CreatedAt}}" | grep "bianca-app" || echo "   (No bianca-app images found)"
 
 echo "✅ AfterInstall completed"
 
