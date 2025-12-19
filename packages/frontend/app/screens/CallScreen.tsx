@@ -11,7 +11,7 @@ import { useGetConversationQuery } from "../services/api/conversationApi"
 import { useGetCallStatusQuery } from "../services/api/callWorkflowApi"
 import { useTheme } from "app/theme/ThemeContext"
 import { logger } from "../utils/logger"
-import { STRINGS } from "../constants"
+import { STRINGS, POLLING_INTERVALS } from "../constants"
 
 export function CallScreen() {
   const dispatch = useDispatch()
@@ -20,7 +20,7 @@ export function CallScreen() {
   const currentConversation = useSelector(getConversation)
   const { colors, isLoading: themeLoading } = useTheme()
 
-  // Get call status - no polling (polling only for alerts)
+  // Get call status - enable polling for dynamic updates (like conversations)
   const { 
     data: callStatusData, 
     error: callStatusError,
@@ -30,6 +30,8 @@ export function CallScreen() {
     activeCall?.conversationId || '',
     {
       skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID,
+      // Enable polling for dynamic status updates
+      pollingInterval: POLLING_INTERVALS.CALL_STATUS,
     }
   )
 
