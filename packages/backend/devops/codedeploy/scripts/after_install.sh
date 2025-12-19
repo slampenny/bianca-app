@@ -45,14 +45,18 @@ fi
 # Note: docker-compose.yml is already on the instance at $DEPLOY_DIR/docker-compose.yml
 # We just need to pull the latest images
 
-# Verify docker compose is available (installed by EC2 userdata)
-if ! docker compose version >/dev/null 2>&1; then
-  echo "❌ ERROR: 'docker compose' is not available" >&2
-  echo "   This should be installed by EC2 userdata script" >&2
-  docker compose version >&2 || true
+# Determine which docker compose command to use
+# EC2 userdata installs docker-compose (standalone), not docker compose (plugin)
+if command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+  echo "   Using: docker-compose (standalone)"
+elif docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+  echo "   Using: docker compose (plugin)"
+else
+  echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
   exit 1
 fi
-echo "   Using: docker compose (plugin)"
 
 # Pull latest images (with timeout to prevent hangs)
 # Remove old images first to force fresh pull
@@ -61,11 +65,11 @@ cd "$DEPLOY_DIR" || {
   echo "❌ ERROR: Cannot cd to $DEPLOY_DIR (directory may not exist yet)"
   exit 1
 }
-docker compose down 2>/dev/null || true
+$DOCKER_COMPOSE_CMD down 2>/dev/null || true
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
 echo "   Pulling latest Docker images (5 min timeout)..."
-timeout 300 docker compose pull || {
+timeout 300 $DOCKER_COMPOSE_CMD pull || {
   echo "⚠️  Image pull timed out or failed, but continuing..."
 }
 

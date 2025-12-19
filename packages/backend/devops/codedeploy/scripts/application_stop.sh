@@ -27,21 +27,29 @@ if ! cd "$DEPLOY_DIR" 2>/dev/null; then
 fi
 
 # Use docker compose to stop containers (installed by EC2 userdata)
-if [ -f "docker-compose.yml" ] && docker compose version >/dev/null 2>&1; then
-  echo "   Stopping containers with docker compose..."
+# Check for docker-compose (standalone) first, then docker compose (plugin)
+DOCKER_COMPOSE_CMD=""
+if command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+elif docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+fi
+
+if [ -f "docker-compose.yml" ] && [ -n "$DOCKER_COMPOSE_CMD" ]; then
+  echo "   Stopping containers with $DOCKER_COMPOSE_CMD..."
   # Use docker compose down with timeout to prevent hangs
   if command -v timeout >/dev/null 2>&1; then
-    timeout 30 docker compose down --remove-orphans 2>&1 || {
-      echo "   ⚠️  docker compose down timed out or failed, trying force stop..."
-      timeout 10 docker compose kill 2>&1 || true
-      timeout 5 docker compose rm -f 2>&1 || true
+    timeout 30 $DOCKER_COMPOSE_CMD down --remove-orphans 2>&1 || {
+      echo "   ⚠️  $DOCKER_COMPOSE_CMD down timed out or failed, trying force stop..."
+      timeout 10 $DOCKER_COMPOSE_CMD kill 2>&1 || true
+      timeout 5 $DOCKER_COMPOSE_CMD rm -f 2>&1 || true
     }
   else
     # Fallback if timeout command not available
-    docker compose down --remove-orphans 2>&1 || {
-      echo "   ⚠️  docker compose down failed, trying force stop..."
-      docker compose kill 2>&1 || true
-      docker compose rm -f 2>&1 || true
+    $DOCKER_COMPOSE_CMD down --remove-orphans 2>&1 || {
+      echo "   ⚠️  $DOCKER_COMPOSE_CMD down failed, trying force stop..."
+      $DOCKER_COMPOSE_CMD kill 2>&1 || true
+      $DOCKER_COMPOSE_CMD rm -f 2>&1 || true
     }
   fi
 else

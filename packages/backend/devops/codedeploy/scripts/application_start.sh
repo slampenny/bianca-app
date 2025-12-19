@@ -38,14 +38,18 @@ if [ ! -f "nginx.conf" ]; then
   exit 1
 fi
 
-# Verify docker compose is available (installed by EC2 userdata)
-if ! docker compose version >/dev/null 2>&1; then
-  echo "❌ ERROR: 'docker compose' is not available" >&2
-  echo "   This should be installed by EC2 userdata script" >&2
-  docker compose version >&2 || true
+# Determine which docker compose command to use
+# EC2 userdata installs docker-compose (standalone), not docker compose (plugin)
+if command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+  echo "   Using: docker-compose (standalone)"
+elif docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+  echo "   Using: docker compose (plugin)"
+else
+  echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
   exit 1
 fi
-echo "   Using: docker compose (plugin)"
 
 # Ensure ECR is logged in (token might have expired)
 echo "   Ensuring ECR login..."
@@ -68,21 +72,33 @@ cd "$DEPLOY_DIR" || {
 
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
-docker compose down 2>/dev/null || true
+$DOCKER_COMPOSE_CMD down 2>/dev/null || true
 
 # Validate docker-compose.yml syntax before starting
 echo "   Validating docker-compose.yml..."
-if ! docker compose config > /dev/null 2>&1; then
-  echo "❌ ERROR: docker-compose.yml has syntax errors!" >&2
-  docker compose config 2>&1 | head -30 >&2
-  exit 1
+if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
+  if ! docker compose config > /dev/null 2>&1; then
+    echo "❌ ERROR: docker-compose.yml has syntax errors!" >&2
+    docker compose config 2>&1 | head -30 >&2
+    exit 1
+  fi
+else
+  if ! docker-compose config > /dev/null 2>&1; then
+    echo "❌ ERROR: docker-compose.yml has syntax errors!" >&2
+    docker-compose config 2>&1 | head -30 >&2
+    exit 1
+  fi
 fi
 echo "   ✅ docker-compose.yml is valid"
 
 # Start containers - use background process with timeout to prevent hangs
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
-docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
+  docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+else
+  docker-compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+fi
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete
@@ -141,13 +157,13 @@ if [ $EXIT_CODE -ne 0 ]; then
     tail -100 /tmp/docker_start.log >&2 || true
   fi
   echo "   Checking docker compose logs..." >&2
-  cd "$DEPLOY_DIR" && docker compose logs --tail 50 2>&1 || true
+  cd "$DEPLOY_DIR" && $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
   echo "   All containers:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20 >&2 || true
   echo "   Checking docker-compose.yml syntax..." >&2
-  cd "$DEPLOY_DIR" && docker compose config 2>&1 | head -20 || echo "   docker-compose.yml has syntax errors!" >&2
+  cd "$DEPLOY_DIR" && $DOCKER_COMPOSE_CMD config 2>&1 | head -20 || echo "   docker-compose.yml has syntax errors!" >&2
   echo "❌ ApplicationStart FAILED - Containers did not start successfully" >&2
   exit 1
 fi
