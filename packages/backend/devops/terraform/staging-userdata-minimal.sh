@@ -22,10 +22,24 @@ systemctl enable docker
 # Add ec2-user to docker group
 usermod -a -G docker ec2-user
 
-# Install docker compose
-curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker compose-linux-x86_64" -o /usr/local/bin/docker compose
-chmod +x /usr/local/bin/docker compose
-ln -s /usr/local/bin/docker compose /usr/bin/docker compose
+# Install docker compose (plugin) - matches local development setup
+echo "Installing docker compose (plugin)..."
+# Remove old docker-compose (standalone) if it exists
+rm -f /usr/local/bin/docker-compose /usr/bin/docker-compose 2>/dev/null || true
+
+# Install docker compose plugin
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Verify installation
+if docker compose version >/dev/null 2>&1; then
+    echo "✅ docker compose (plugin) installed successfully"
+    docker compose version
+else
+    echo "❌ ERROR: docker compose (plugin) installation failed"
+    exit 1
+fi
 
 # Install AWS CLI v2 if not present
 if ! command -v aws &> /dev/null; then
