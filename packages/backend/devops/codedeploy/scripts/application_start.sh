@@ -39,15 +39,16 @@ if [ ! -f "nginx.conf" ]; then
 fi
 
 # Determine which docker compose command to use
-# EC2 userdata installs docker-compose (standalone), not docker compose (plugin)
-if command -v docker-compose >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD="docker-compose"
-  echo "   Using: docker-compose (standalone)"
-elif docker compose version >/dev/null 2>&1; then
+# Prefer docker compose (plugin) - matches local development setup
+# Fallback to docker-compose (standalone) for backwards compatibility
+if docker compose version >/dev/null 2>&1; then
   DOCKER_COMPOSE_CMD="docker compose"
   echo "   Using: docker compose (plugin)"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+  echo "   Using: docker-compose (standalone)"
 else
-  echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
+  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
   exit 1
 fi
 

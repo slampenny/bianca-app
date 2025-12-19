@@ -27,12 +27,12 @@ if ! cd "$DEPLOY_DIR" 2>/dev/null; then
 fi
 
 # Use docker compose to stop containers (installed by EC2 userdata)
-# Check for docker-compose (standalone) first, then docker compose (plugin)
+# Prefer docker compose (plugin), fallback to docker-compose (standalone)
 DOCKER_COMPOSE_CMD=""
-if command -v docker-compose >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD="docker-compose"
-elif docker compose version >/dev/null 2>&1; then
+if docker compose version >/dev/null 2>&1; then
   DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
 fi
 
 if [ -f "docker-compose.yml" ] && [ -n "$DOCKER_COMPOSE_CMD" ]; then
