@@ -962,14 +962,18 @@ class OpenAIRealtimeService {
           model: 'whisper-1',
         },
 
-        // Enable built-in noise reduction for better background noise handling
-        audio: {
-          input: {
-            noise_reduction: {
-              type: 'near_field', // Optimized for phone calls (microphone close to speaker)
+        // Enable built-in noise reduction - feature flag controlled
+        // Disabled by default to match main branch behavior
+        // Set AUDIO_OPENAI_NOISE_REDUCTION_ENABLED=true to enable
+        ...(config.audio.openaiNoiseReduction?.enabled ? {
+          audio: {
+            input: {
+              noise_reduction: {
+                type: config.audio.openaiNoiseReduction.type || 'near_field', // Optimized for phone calls
+              },
             },
           },
-        },
+        } : {}),
       },
     };
 

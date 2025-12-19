@@ -197,6 +197,13 @@ const baselineConfig = {
       // Noise-optimized settings (when enabled)
       noiseSilenceDurationMs: parseInt(process.env.AUDIO_TURN_DETECTION_NOISE_SILENCE_MS) || 1000, // Default: 1000ms
       noisePrefixPaddingMs: parseInt(process.env.AUDIO_TURN_DETECTION_NOISE_PADDING_MS) || 300, // Default: 300ms
+    },
+    // Built-in OpenAI noise reduction - feature flag controlled
+    // Disabled by default to match main branch (main doesn't have this)
+    // Set AUDIO_OPENAI_NOISE_REDUCTION_ENABLED=true to enable
+    openaiNoiseReduction: {
+      enabled: process.env.AUDIO_OPENAI_NOISE_REDUCTION_ENABLED === 'true', // Default: false (matches main)
+      type: process.env.AUDIO_OPENAI_NOISE_REDUCTION_TYPE || 'near_field', // Default: 'near_field' for phone calls
     }
   },
   google: {
