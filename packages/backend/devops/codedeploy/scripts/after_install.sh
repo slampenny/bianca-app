@@ -66,7 +66,10 @@ fi
 # Pull latest images (with timeout to prevent hangs)
 # Remove old images first to force fresh pull
 echo "   Removing old images to force fresh pull..."
-cd "$DEPLOY_DIR"
+cd "$DEPLOY_DIR" || {
+  echo "❌ ERROR: Cannot cd to $DEPLOY_DIR (directory may not exist yet)"
+  exit 1
+}
 if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]; then
   $DOCKER_COMPOSE_CMD down 2>/dev/null || true
 else

@@ -19,7 +19,10 @@ else
   CONTAINER_PREFIX="staging"
 fi
 
-cd "$DEPLOY_DIR"
+cd "$DEPLOY_DIR" || {
+  echo "❌ ERROR: Cannot cd to $DEPLOY_DIR"
+  exit 1
+}
 
 # Check if containers are running
 if [ ! -f "docker-compose.yml" ]; then

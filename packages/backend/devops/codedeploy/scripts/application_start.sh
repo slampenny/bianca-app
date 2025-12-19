@@ -43,13 +43,12 @@ fi
 if command -v docker-compose >/dev/null 2>&1; then
   DOCKER_COMPOSE_CMD=$(command -v docker-compose)
   echo "   Using: docker-compose (standalone) at $DOCKER_COMPOSE_CMD"
-  # Use array for reliable execution
-  DOCKER_COMPOSE_ARGS=("$DOCKER_COMPOSE_CMD")
+  USE_DOCKER_COMPOSE_PLUGIN=false
 # Then check for docker compose (plugin) - must actually work, not just exist
 elif docker compose version >/dev/null 2>&1 && docker compose ps >/dev/null 2>&1; then
   echo "   Using: docker compose (plugin)"
-  # Use array with two elements for "docker compose"
-  DOCKER_COMPOSE_ARGS=("docker" "compose")
+  DOCKER_COMPOSE_CMD="docker compose"
+  USE_DOCKER_COMPOSE_PLUGIN=true
 else
   echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
   echo "   Checking what's available..." >&2
@@ -73,17 +72,25 @@ fi
 
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
-"${DOCKER_COMPOSE_ARGS[@]}" down 2>/dev/null || true
+if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
+  docker compose down 2>/dev/null || true
+else
+  $DOCKER_COMPOSE_CMD down 2>/dev/null || true
+fi
 
 # Start containers - use background process with timeout to prevent hangs
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
-# Use eval to properly handle array in background process
-eval "\"${DOCKER_COMPOSE_ARGS[@]}\" up -d --pull always --force-recreate --remove-orphans" > /tmp/docker_start.log 2>&1 &
+if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
+  docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+else
+  $DOCKER_COMPOSE_CMD up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+fi
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete
 DOCKER_STARTED=false
+EXIT_CODE=0
 for i in {1..120}; do
   if ! kill -0 $DOCKER_PID 2>/dev/null; then
     # Process finished
@@ -99,6 +106,7 @@ done
 if [ "$DOCKER_STARTED" = "false" ]; then
   echo "   ⚠️  Container start taking too long, but continuing..." >&2
   kill $DOCKER_PID 2>/dev/null || true
+  wait $DOCKER_PID 2>/dev/null || true
   EXIT_CODE=0  # Continue anyway - containers might still start
 fi
 
@@ -106,12 +114,14 @@ if [ $EXIT_CODE -ne 0 ]; then
   echo "❌ ERROR: Failed to start containers" >&2
   echo "   Checking for errors..." >&2
   if [ -f /tmp/docker_start.log ]; then
+    echo "   Docker compose output:" >&2
     tail -50 /tmp/docker_start.log >&2 || true
   fi
-  if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]; then
-    $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
+  echo "   Checking docker compose logs..." >&2
+  if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
+    docker compose logs --tail 50 2>&1 || true
   else
-    bash -c "$DOCKER_COMPOSE_CMD logs --tail 50" 2>&1 || true
+    $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
   fi
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
