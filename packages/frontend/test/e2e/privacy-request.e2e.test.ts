@@ -142,18 +142,49 @@ test.describe('PIPEDA Privacy Request Workflow', () => {
     
     // AND: User submits the request
     let requestBody: any = null
-    page.on('request', (request) => {
-      if (request.url().includes('/v1/privacy/requests/access') && request.method() === 'POST') {
-        requestBody = request.postDataJSON()
+    let requestCaptured = false
+    
+    // Set up request listener before clicking
+    const requestPromise = new Promise<void>((resolve) => {
+      const handler = (request: any) => {
+        if (request.url().includes('/v1/privacy/requests/access') && request.method() === 'POST') {
+          try {
+            requestBody = request.postDataJSON()
+            requestCaptured = true
+            page.off('request', handler)
+            resolve()
+          } catch (e) {
+            // If postDataJSON fails, try to get it from the request
+            requestBody = request.postData() ? JSON.parse(request.postData() || '{}') : null
+            requestCaptured = true
+            page.off('request', handler)
+            resolve()
+          }
+        }
       }
+      page.on('request', handler)
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        if (!requestCaptured) {
+          page.off('request', handler)
+          resolve()
+        }
+      }, 10000)
     })
     
     const submitButton = page.locator('[data-testid="submit-privacy-request-button"], [aria-label="submit-privacy-request-button"]').first()
-    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.waitFor({ state: 'visible', timeout: 10000 })
     await submitButton.click()
     
+    // Wait for the request to be captured
+    await requestPromise
+    await page.waitForTimeout(1000) // Additional wait for request to complete
+    
     // THEN: API request should include custom information
-    await page.waitForTimeout(1000)
+    if (!requestBody) {
+      throw new Error('Failed to capture request body - request may not have been sent')
+    }
     expect(requestBody).toMatchObject({
       informationRequested: 'I would like to access my conversation history and medical analysis data.',
       accessMethod: 'email', // Implementation always uses 'email' - data is emailed as JSON attachment

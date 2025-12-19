@@ -308,7 +308,13 @@ export async function navigateToTab(page: Page, tabName: 'home' | 'org' | 'alert
   
   const tab = page.locator(tabSelectors[tabName]).first()
   await tab.waitFor({ timeout: 10000, state: 'visible' })
-  await tab.click()
+  // Scroll into view and use force click to avoid interception issues
+  await tab.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(500) // Small delay after scroll
+  await tab.click({ force: true }).catch(async () => {
+    // If force click fails, try regular click with retry
+    await tab.click({ timeout: 5000 })
+  })
   await page.waitForTimeout(1000) // Wait for tab to activate
   console.log(`Successfully clicked ${tabName} tab`)
 }

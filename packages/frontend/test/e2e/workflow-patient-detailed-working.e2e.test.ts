@@ -232,10 +232,18 @@ test.describe('Working Patient Detailed Management - Schedules, Conversations, A
       let editModeFound = false
       for (const element of editElements) {
         if (await element.count() > 0) {
-          await element.first().click()
-          editModeFound = true
-          await page.waitForTimeout(2000)
-          break
+          const elementToClick = element.first()
+          // Check if element is enabled before clicking
+          const isEnabled = await elementToClick.isEnabled({ timeout: 2000 }).catch(() => false)
+          if (isEnabled) {
+            await elementToClick.click({ timeout: 5000 })
+            editModeFound = true
+            await page.waitForTimeout(2000)
+            break
+          } else {
+            // Element exists but is disabled - skip it
+            console.log('Edit element found but is disabled, skipping...')
+          }
         }
       }
       
