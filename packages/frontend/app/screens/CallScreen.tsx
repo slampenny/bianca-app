@@ -171,7 +171,7 @@ export function CallScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Call with {patient.name} v1</Text>
+        <Text style={styles.headerTitle}>Call with {patient.name} v2</Text>
       </View>
 
       {/* Call Status Banner - Prominently displayed */}
