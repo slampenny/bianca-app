@@ -36,6 +36,7 @@ export function CallScreen() {
   )
 
   // Get full conversation data if call status is working
+  // Enable polling for dynamic message updates (like conversations screen)
   const { 
     data: liveConversationData, 
     error: conversationError,
@@ -46,6 +47,8 @@ export function CallScreen() {
     {
       skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID || !callStatusData,
       // Only try conversation API if call status is working
+      // Enable polling for dynamic message updates
+      pollingInterval: POLLING_INTERVALS.CONVERSATION,
     }
   )
 
