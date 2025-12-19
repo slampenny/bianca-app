@@ -169,7 +169,7 @@ const baselineConfig = {
   audio: {
     noiseReduction: {
       // Master feature flag - set to 'false' to disable ALL noise reduction
-      enabled: process.env.AUDIO_NOISE_REDUCTION_ENABLED !== 'false', // Default: true
+      enabled: process.env.AUDIO_NOISE_REDUCTION_ENABLED === 'true', // Default: false (disabled to match main)
       // Stage 1: Noise Gate - filters low-energy audio
       noiseGateEnabled: process.env.AUDIO_NOISE_GATE_ENABLED !== 'false', // Default: true
       noiseGateThreshold: parseFloat(process.env.AUDIO_NOISE_GATE_THRESHOLD) || 0.1, // Default: 0.1 (10% energy)
