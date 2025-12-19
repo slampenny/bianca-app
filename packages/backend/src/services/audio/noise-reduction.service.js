@@ -16,25 +16,28 @@ const AudioUtils = require('../../api/audio.utils');
 
 class NoiseReductionService {
     constructor() {
+        // Master feature flag - if disabled, all noise reduction is bypassed
+        this.enabled = config.audio.noiseReduction.enabled;
+        
         // Stage 1: Noise Gate Configuration
-        this.noiseGateEnabled = config.audio.noiseReduction.noiseGateEnabled;
+        this.noiseGateEnabled = config.audio.noiseReduction.noiseGateEnabled && this.enabled;
         this.noiseGateThreshold = config.audio.noiseReduction.noiseGateThreshold;
         
         // Stage 2: Frequency Filtering Configuration
-        this.frequencyFilterEnabled = config.audio.noiseReduction.frequencyFilterEnabled;
+        this.frequencyFilterEnabled = config.audio.noiseReduction.frequencyFilterEnabled && this.enabled;
         this.frequencyFilterLowCutoff = config.audio.noiseReduction.frequencyFilterLowCutoff; // Hz (removes low rumble)
         this.frequencyFilterHighCutoff = config.audio.noiseReduction.frequencyFilterHighCutoff; // Hz (removes high hiss)
         this.sampleRate = 8000; // Telephone quality μ-law is 8kHz
         
         // Stage 3: Primary Speaker Detection Configuration
-        this.primarySpeakerEnabled = config.audio.noiseReduction.primarySpeakerEnabled;
+        this.primarySpeakerEnabled = config.audio.noiseReduction.primarySpeakerEnabled && this.enabled;
         this.primarySpeakerHistorySize = config.audio.noiseReduction.primarySpeakerHistorySize; // ~1 second at 20ms packets
         this.primarySpeakerFocusThreshold = config.audio.noiseReduction.primarySpeakerFocusThreshold; // 70% of max energy
         this.primarySpeakerEnergyMultiplier = config.audio.noiseReduction.primarySpeakerEnergyMultiplier; // 1.5x average
         this.primarySpeakerVolumeReduction = config.audio.noiseReduction.primarySpeakerVolumeReduction; // Reduce to 30% if not primary
         
         // Stage 4: Adaptive Noise Reduction (not yet implemented)
-        this.adaptiveNoiseReductionEnabled = config.audio.noiseReduction.adaptiveNoiseReductionEnabled;
+        this.adaptiveNoiseReductionEnabled = config.audio.noiseReduction.adaptiveNoiseReductionEnabled && this.enabled;
         
         // Per-call energy history for primary speaker detection
         this.energyHistory = new Map(); // callId -> [energy1, energy2, ...]
@@ -50,6 +53,7 @@ class NoiseReductionService {
         };
         
         logger.info('[Noise Reduction] Service initialized', {
+            enabled: this.enabled,
             noiseGateEnabled: this.noiseGateEnabled,
             noiseGateThreshold: this.noiseGateThreshold,
             frequencyFilterEnabled: this.frequencyFilterEnabled,
@@ -70,6 +74,11 @@ class NoiseReductionService {
      */
     async processAudio(audioBuffer, callId) {
         if (!audioBuffer || audioBuffer.length === 0) {
+            return audioBuffer;
+        }
+        
+        // Master feature flag - if disabled, return original audio without any processing
+        if (!this.enabled) {
             return audioBuffer;
         }
         
