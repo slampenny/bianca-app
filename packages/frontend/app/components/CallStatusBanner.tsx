@@ -41,12 +41,19 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   const [error, setError] = useState<string | null>(null)
   
   // RTK Query hooks - enable polling for dynamic updates (like conversations)
+  // CRITICAL: Don't skip based on local status - it might be stale and prevent polling from starting
+  // Always start polling, let the API tell us when the call is done
   const { data: callStatusData, error: callStatusError, isLoading, isFetching } = useGetCallStatusQuery(conversationId, {
-    // Only skip when call is in a terminal state
-    skip: conversationId === 'temp-call' || ['completed', 'failed', 'busy', 'no_answer', 'ended'].includes(status),
+    // Only skip if conversationId is invalid - don't skip based on status
+    // This ensures polling always starts, even if local status is wrong
+    skip: !conversationId || conversationId === 'temp-call',
     // Enable polling for dynamic status updates
     pollingInterval: POLLING_INTERVALS.CALL_STATUS,
   })
+  
+  // Determine if call is in terminal state from API data (not local state)
+  const apiStatus = callStatusData?.data?.status || status
+  const isTerminalState = apiStatus ? ['completed', 'failed', 'busy', 'no_answer', 'ended'].includes(apiStatus) : false
 
   // Log status activity
   React.useEffect(() => {
@@ -55,9 +62,11 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       isLoading,
       isFetching,
       status,
-      skip: conversationId === 'temp-call' || ['completed', 'failed'].includes(status)
+      apiStatus,
+      isTerminalState,
+      skip: !conversationId || conversationId === 'temp-call'
     })
-  }, [isLoading, isFetching, conversationId, status])
+  }, [isLoading, isFetching, conversationId, status, apiStatus, isTerminalState])
   
   // Debug logging for call monitoring
   React.useEffect(() => {

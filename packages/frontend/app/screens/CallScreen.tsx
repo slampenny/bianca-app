@@ -45,8 +45,9 @@ export function CallScreen() {
   } = useGetConversationQuery(
     { conversationId: activeCall?.conversationId || '' },
     {
-      skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID || !callStatusData,
-      // Only try conversation API if call status is working
+      // Don't require callStatusData - conversation should work independently
+      // Only skip if conversationId is invalid
+      skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID,
       // Enable polling for dynamic message updates
       pollingInterval: POLLING_INTERVALS.CONVERSATION,
     }
