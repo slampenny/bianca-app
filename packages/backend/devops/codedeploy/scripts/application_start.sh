@@ -72,18 +72,45 @@ fi
 
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
+cd "$DEPLOY_DIR" || {
+  echo "❌ ERROR: Cannot cd to $DEPLOY_DIR for docker compose" >&2
+  exit 1
+}
 if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
-  bash -c "docker compose down" 2>/dev/null || true
+  bash -c "cd '$DEPLOY_DIR' && docker compose down" 2>/dev/null || true
 else
-  $DOCKER_COMPOSE_CMD down 2>/dev/null || true
+  cd "$DEPLOY_DIR" && $DOCKER_COMPOSE_CMD down 2>/dev/null || true
 fi
+
+# Ensure we're in the deploy directory
+cd "$DEPLOY_DIR" || {
+  echo "❌ ERROR: Cannot cd to $DEPLOY_DIR for starting containers" >&2
+  exit 1
+}
+
+# Validate docker-compose.yml syntax before starting
+echo "   Validating docker-compose.yml..."
+if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
+  if ! bash -c "cd '$DEPLOY_DIR' && docker compose config" > /dev/null 2>&1; then
+    echo "❌ ERROR: docker-compose.yml has syntax errors!" >&2
+    bash -c "cd '$DEPLOY_DIR' && docker compose config" 2>&1 | head -30 >&2
+    exit 1
+  fi
+else
+  if ! $DOCKER_COMPOSE_CMD config > /dev/null 2>&1; then
+    echo "❌ ERROR: docker-compose.yml has syntax errors!" >&2
+    $DOCKER_COMPOSE_CMD config 2>&1 | head -30 >&2
+    exit 1
+  fi
+fi
+echo "   ✅ docker-compose.yml is valid"
 
 # Start containers - use background process with timeout to prevent hangs
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
 if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
   # For plugin, need to use bash -c to properly execute "docker compose" as a command
-  bash -c "docker compose up -d --pull always --force-recreate --remove-orphans" > /tmp/docker_start.log 2>&1 &
+  bash -c "cd '$DEPLOY_DIR' && docker compose up -d --pull always --force-recreate --remove-orphans" > /tmp/docker_start.log 2>&1 &
 else
   $DOCKER_COMPOSE_CMD up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 fi
@@ -105,10 +132,26 @@ done
 
 # Kill if still running
 if [ "$DOCKER_STARTED" = "false" ]; then
-  echo "   ⚠️  Container start taking too long, but continuing..." >&2
+  echo "   ⚠️  Container start taking too long, killing process..." >&2
   kill $DOCKER_PID 2>/dev/null || true
   wait $DOCKER_PID 2>/dev/null || true
-  EXIT_CODE=0  # Continue anyway - containers might still start
+  EXIT_CODE=1  # Mark as failed since it timed out
+fi
+
+# Always check if containers actually started, regardless of exit code
+sleep 3  # Give containers a moment to start
+APP_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
+NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
+
+if [ "$APP_RUNNING" -eq 0 ] || [ "$NGINX_RUNNING" -eq 0 ]; then
+  echo "   ⚠️  WARNING: Required containers are not running!" >&2
+  echo "   App container running: $APP_RUNNING" >&2
+  echo "   Nginx container running: $NGINX_RUNNING" >&2
+  EXIT_CODE=1  # Mark as failed
+  
+  # Check for stopped containers
+  echo "   Checking for stopped containers..." >&2
+  docker ps -a --filter "name=${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" >&2 || true
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then
@@ -119,15 +162,22 @@ if [ $EXIT_CODE -ne 0 ]; then
     tail -100 /tmp/docker_start.log >&2 || true
   fi
   echo "   Checking docker compose logs..." >&2
+  cd "$DEPLOY_DIR" || true
   if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
-    bash -c "docker compose logs --tail 50" 2>&1 || true
+    bash -c "cd '$DEPLOY_DIR' && docker compose logs --tail 50" 2>&1 || true
   else
-    $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
+    cd "$DEPLOY_DIR" && $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
   fi
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
   echo "   All containers:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20 >&2 || true
+  echo "   Checking docker-compose.yml syntax..." >&2
+  cd "$DEPLOY_DIR" && if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
+    bash -c "cd '$DEPLOY_DIR' && docker compose config" 2>&1 | head -20 || echo "   docker-compose.yml has syntax errors!" >&2
+  else
+    $DOCKER_COMPOSE_CMD config 2>&1 | head -20 || echo "   docker-compose.yml has syntax errors!" >&2
+  fi
   # Don't exit - let ValidateService decide if deployment failed
   # But log the error clearly so it's visible
 fi
