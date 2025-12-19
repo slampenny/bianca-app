@@ -73,7 +73,7 @@ fi
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
 if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
-  docker compose down 2>/dev/null || true
+  bash -c "docker compose down" 2>/dev/null || true
 else
   $DOCKER_COMPOSE_CMD down 2>/dev/null || true
 fi
@@ -82,7 +82,8 @@ fi
 # --pull always ensures we use the latest images, --force-recreate ensures new containers
 echo "   Starting containers with newly pulled images..."
 if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
-  docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+  # For plugin, need to use bash -c to properly execute "docker compose" as a command
+  bash -c "docker compose up -d --pull always --force-recreate --remove-orphans" > /tmp/docker_start.log 2>&1 &
 else
   $DOCKER_COMPOSE_CMD up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 fi
@@ -111,21 +112,24 @@ if [ "$DOCKER_STARTED" = "false" ]; then
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then
-  echo "❌ ERROR: Failed to start containers" >&2
+  echo "❌ ERROR: Failed to start containers (exit code: $EXIT_CODE)" >&2
   echo "   Checking for errors..." >&2
   if [ -f /tmp/docker_start.log ]; then
     echo "   Docker compose output:" >&2
-    tail -50 /tmp/docker_start.log >&2 || true
+    tail -100 /tmp/docker_start.log >&2 || true
   fi
   echo "   Checking docker compose logs..." >&2
   if [ "$USE_DOCKER_COMPOSE_PLUGIN" = "true" ]; then
-    docker compose logs --tail 50 2>&1 || true
+    bash -c "docker compose logs --tail 50" 2>&1 || true
   else
     $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
   fi
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
+  echo "   All containers:" >&2
+  docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20 >&2 || true
   # Don't exit - let ValidateService decide if deployment failed
+  # But log the error clearly so it's visible
 fi
 
 # Wait for containers to initialize
@@ -135,7 +139,21 @@ sleep 15
 # Check container status
 echo ""
 echo "   Container status:"
-docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep ${CONTAINER_PREFIX}_ || echo "   ⚠️  No ${CONTAINER_PREFIX} containers found"
+CONTAINER_LIST=$(docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep ${CONTAINER_PREFIX}_ || echo "")
+if [ -z "$CONTAINER_LIST" ]; then
+  echo "   ⚠️  WARNING: No ${CONTAINER_PREFIX} containers found running!" >&2
+  echo "   Checking all containers..." >&2
+  docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20 >&2
+  echo "   Checking docker-compose.yml exists..." >&2
+  ls -la docker-compose.yml >&2 || echo "   docker-compose.yml NOT FOUND!" >&2
+  echo "   Checking /tmp/docker_start.log for errors..." >&2
+  if [ -f /tmp/docker_start.log ]; then
+    echo "   Last 50 lines of docker_start.log:" >&2
+    tail -50 /tmp/docker_start.log >&2
+  fi
+else
+  echo "$CONTAINER_LIST"
+fi
 
 # Verify nginx is listening on port 80
 echo ""
