@@ -251,15 +251,15 @@ test.describe('PIPEDA Privacy Request Workflow', () => {
     })
     
     const submitButton = page.locator('[data-testid="submit-privacy-request-button"], [aria-label="submit-privacy-request-button"]').first()
-    await submitButton.waitFor({ state: 'attached', timeout: 10000 })
+    await submitButton.waitFor({ state: 'attached', timeout: 5000 })
     await submitButton.scrollIntoViewIfNeeded()
-    await submitButton.waitFor({ state: 'visible', timeout: 5000 })
+    await submitButton.waitFor({ state: 'visible', timeout: 3000 })
     await submitButton.click()
     
     // THEN: Error should be handled (button still visible means form wasn't reset)
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(300)
     const submitButtonAfterError = page.locator('[data-testid="submit-privacy-request-button"], [aria-label="submit-privacy-request-button"]').first()
-    await expect(submitButtonAfterError).toBeVisible({ timeout: 5000 })
+    await expect(submitButtonAfterError).toBeVisible({ timeout: 3000 })
   })
 
   test('Privacy request screen displays all required UI elements', async ({ page }) => {

@@ -121,7 +121,7 @@ test.describe("Alert Polling", () => {
     // Wait for alert screen to load
     await expect(
       page.getByLabel('alert-screen').or(page.getByTestId('alert-screen'))
-    ).toBeVisible({ timeout: 10000 })
+    ).toBeVisible({ timeout: 5000 })
     
     // Get initial alert count
     const initialAlertItems = page.locator('[data-testid="alert-item"]')
@@ -203,9 +203,9 @@ test.describe("Alert Polling", () => {
     
     // Wait a bit longer than the polling interval to ensure it has time to poll
     // In test mode, polling is 3 seconds, otherwise 30 seconds
-    // Wait for at least 3 polling cycles to ensure the alert is picked up
+    // Wait for at least 2 polling cycles to ensure the alert is picked up
     const pollingInterval = 3000 // Test mode should be 3 seconds
-    const waitTime = (pollingInterval * 3) + 2000 // Wait for 3 polling cycles + 2 second buffer
+    const waitTime = (pollingInterval * 2) + 1000 // Wait for 2 polling cycles + 1 second buffer
     
     await page.waitForTimeout(waitTime)
     console.log(`Waited ${waitTime}ms for polling to occur (3 cycles of ${pollingInterval}ms each)`)
@@ -223,9 +223,9 @@ test.describe("Alert Polling", () => {
     // AND: The new alert should appear in the list without manual refresh
     // Try multiple times with small delays in case polling is slightly delayed
     let alertFound = false
-    const maxAttempts = 20 // Increased attempts
+    const maxAttempts = 10 // Reduced attempts
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      await page.waitForTimeout(1000) // Wait 1 second between attempts
+      await page.waitForTimeout(500) // Wait 0.5 second between attempts
       
       const alertItems = page.locator('[data-testid="alert-item"]')
       const currentAlertCount = await alertItems.count()

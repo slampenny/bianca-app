@@ -125,10 +125,15 @@ export class PatientDetailedWorkflow {
     let scheduleAccessFound = false
     for (const element of scheduleElements) {
       if (await element.count() > 0) {
-        await element.first().click()
-        scheduleAccessFound = true
-        await this.page.waitForTimeout(2000)
-        break
+        const firstElement = element.first()
+        // Check if element is visible before clicking
+        const isVisible = await firstElement.isVisible({ timeout: 1000 }).catch(() => false)
+        if (isVisible) {
+          await firstElement.click()
+          scheduleAccessFound = true
+          await this.page.waitForTimeout(1000)
+          break
+        }
       }
     }
 
@@ -433,9 +438,15 @@ export class PatientDetailedWorkflow {
 
     for (const element of saveElements) {
       if (await element.count() > 0) {
-        await element.first().click()
-        await this.page.waitForTimeout(1000)
-        break
+        const firstElement = element.first()
+        // Check if element is visible and enabled before clicking
+        const isVisible = await firstElement.isVisible({ timeout: 1000 }).catch(() => false)
+        const isEnabled = await firstElement.isEnabled({ timeout: 1000 }).catch(() => false)
+        if (isVisible && isEnabled) {
+          await firstElement.click()
+          await this.page.waitForTimeout(500)
+          break
+        }
       }
     }
 

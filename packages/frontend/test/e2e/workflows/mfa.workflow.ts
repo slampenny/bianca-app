@@ -46,7 +46,7 @@ export class MFAWorkflow {
   async givenIAmOnTheProfileScreen() {
     // Navigate to profile screen
     // Wait for home screen to be fully loaded first
-    await this.page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
+    await this.page.waitForSelector('[data-testid="home-header"]', { timeout: 5000 })
     await this.page.waitForTimeout(1000) // Give time for UI to render
     
     // Find profile button - try getByTestId first, fallback to locator

@@ -241,7 +241,7 @@ export class LogoutWorkflow {
       // But check if page is closed first (which is a valid logout outcome)
       try {
         // Wait a shorter time initially, then check
-        await this.page.waitForTimeout(2000)
+        await this.page.waitForTimeout(1000)
       } catch (timeoutError) {
         // Page might be closed - that's fine for logout
         const errorMessage = timeoutError instanceof Error ? timeoutError.message : String(timeoutError)
@@ -264,7 +264,7 @@ export class LogoutWorkflow {
       // But check if page is closed first
       let isLogoutScreenVisible = false
       try {
-        isLogoutScreenVisible = await logoutScreen.isVisible({ timeout: 2000 }).catch(() => false)
+        isLogoutScreenVisible = await logoutScreen.isVisible({ timeout: 1000 }).catch(() => false)
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         if (errorMessage.includes('Target page, context or browser has been closed') || 
@@ -278,8 +278,8 @@ export class LogoutWorkflow {
       if (isLogoutScreenVisible) {
         // Logout screen still visible - wait for it to disappear (navigation should switch to UnauthStack)
         try {
-          await logoutScreen.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-          await this.page.waitForTimeout(1000)
+          await logoutScreen.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
+          await this.page.waitForTimeout(500)
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           if (errorMessage.includes('Target page, context or browser has been closed') || 
@@ -300,8 +300,8 @@ export class LogoutWorkflow {
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
           // Check immediately without waiting
-          isEmailInputVisible = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
-          isLoginScreenVisible = await loginScreen.isVisible({ timeout: 2000 }).catch(() => false)
+          isEmailInputVisible = await emailInput.isVisible({ timeout: 1000 }).catch(() => false)
+          isLoginScreenVisible = await loginScreen.isVisible({ timeout: 1000 }).catch(() => false)
           
           if (isEmailInputVisible || isLoginScreenVisible) {
             break
@@ -313,8 +313,8 @@ export class LogoutWorkflow {
             if (currentUrl.includes('/Logout')) {
               console.log('Still on logout URL, navigating to root...')
               try {
-                await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 5000 })
-                await this.page.waitForTimeout(1000)
+                await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 3000 })
+                await this.page.waitForTimeout(500)
               } catch (navError) {
                 // Navigation might fail if page closes - that's fine
                 const errorMessage = navError instanceof Error ? navError.message : String(navError)
@@ -330,7 +330,7 @@ export class LogoutWorkflow {
           
           // Wait a bit more before next attempt, but check if page is closed
           try {
-            await this.page.waitForTimeout(1000)
+            await this.page.waitForTimeout(500)
           } catch (timeoutError) {
             const errorMessage = timeoutError instanceof Error ? timeoutError.message : String(timeoutError)
             if (errorMessage.includes('Target page, context or browser has been closed') || 
@@ -356,26 +356,26 @@ export class LogoutWorkflow {
       if (!isEmailInputVisible && !isLoginScreenVisible) {
         // If we still can't see login elements, check what's actually on screen
         const currentUrl = this.page.url()
-        const isLogoutStillVisible = await logoutScreen.isVisible({ timeout: 2000 }).catch(() => false)
+        const isLogoutStillVisible = await logoutScreen.isVisible({ timeout: 1000 }).catch(() => false)
         console.log(`After logout, current URL: ${currentUrl}, emailInput visible: ${isEmailInputVisible}, loginScreen visible: ${isLoginScreenVisible}, logoutScreen visible: ${isLogoutStillVisible}`)
         
         // If we're still on the logout screen URL, try navigating to root to trigger login screen
         if (currentUrl.includes('/Logout') || isLogoutStillVisible) {
           console.log('Still on logout screen, navigating to root to trigger login...')
           try {
-            await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10000 })
-            await this.page.waitForTimeout(2000)
-            isEmailInputVisible = await emailInput.isVisible({ timeout: 5000 }).catch(() => false)
-            isLoginScreenVisible = await loginScreen.isVisible({ timeout: 5000 }).catch(() => false)
+            await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 5000 })
+            await this.page.waitForTimeout(1000)
+            isEmailInputVisible = await emailInput.isVisible({ timeout: 3000 }).catch(() => false)
+            isLoginScreenVisible = await loginScreen.isVisible({ timeout: 3000 }).catch(() => false)
           } catch (navError) {
             console.log('Navigation to root failed, but logout should still be valid')
           }
         } else {
           // One more wait - navigation might still be in progress
           try {
-            await this.page.waitForTimeout(2000)
-            isEmailInputVisible = await emailInput.isVisible({ timeout: 5000 }).catch(() => false)
-            isLoginScreenVisible = await loginScreen.isVisible({ timeout: 5000 }).catch(() => false)
+            await this.page.waitForTimeout(1000)
+            isEmailInputVisible = await emailInput.isVisible({ timeout: 3000 }).catch(() => false)
+            isLoginScreenVisible = await loginScreen.isVisible({ timeout: 3000 }).catch(() => false)
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
             if (errorMessage.includes('Target page, context or browser has been closed') || 
@@ -444,12 +444,12 @@ export class LogoutWorkflow {
     
     // Page is still open - verify login screen is visible
     // If we're still on logout URL, navigate to root to trigger login screen
-    const currentUrl = this.page.url()
-    if (currentUrl.includes('/Logout')) {
-      console.log('Still on logout URL, navigating to root to trigger login screen...')
-      try {
-        await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10000 })
-        await this.page.waitForTimeout(2000)
+      const currentUrl = this.page.url()
+      if (currentUrl.includes('/Logout')) {
+        console.log('Still on logout URL, navigating to root to trigger login screen...')
+        try {
+          await this.page.goto('/', { waitUntil: 'domcontentloaded', timeout: 5000 })
+          await this.page.waitForTimeout(1000)
       } catch (navError) {
         // Navigation might fail if page closes - that's fine
         const errorMessage = navError instanceof Error ? navError.message : String(navError)
@@ -472,19 +472,19 @@ export class LogoutWorkflow {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         await Promise.race([
-          emailInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {}),
-          loginScreen.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+          emailInput.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {}),
+          loginScreen.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
         ])
         
-        isEmailInputVisible = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
-        isLoginScreenVisible = await loginScreen.isVisible({ timeout: 2000 }).catch(() => false)
+        isEmailInputVisible = await emailInput.isVisible({ timeout: 1000 }).catch(() => false)
+        isLoginScreenVisible = await loginScreen.isVisible({ timeout: 1000 }).catch(() => false)
         
         if (isEmailInputVisible || isLoginScreenVisible) {
           break
         }
         
         try {
-          await this.page.waitForTimeout(1000)
+          await this.page.waitForTimeout(500)
         } catch (timeoutError) {
           const errorMessage = timeoutError instanceof Error ? timeoutError.message : String(timeoutError)
           if (errorMessage.includes('Target page, context or browser has been closed') || 

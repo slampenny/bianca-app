@@ -81,7 +81,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
 
     // Step 3: Click "Invite Caregiver" button
     const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
-    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.waitFor({ timeout: 5000, state: 'visible' })
     await inviteButton.click()
     
     // Wait for navigation to caregiver screen
@@ -570,7 +570,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
 
     // Step 3: Send invite
     const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
-    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.waitFor({ timeout: 5000, state: 'visible' })
     await inviteButton.click()
     
     await page.waitForSelector('[data-testid="caregiver-screen"]', { timeout: 15000 })
@@ -723,7 +723,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
 
     // Step 4: Click "Invite Caregiver" button
     const inviteButton = page.locator('[data-testid="invite-caregiver-button"]').first()
-    await inviteButton.waitFor({ timeout: 10000, state: 'visible' })
+    await inviteButton.waitFor({ timeout: 5000, state: 'visible' })
     await inviteButton.click()
     
     await page.waitForSelector('[data-testid="caregiver-screen"]', { timeout: 15000 })

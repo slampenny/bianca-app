@@ -140,7 +140,7 @@ test.describe('Payment Methods Screen', () => {
     await navigateToPaymentMethods(page)
     
     // Wait for error state to appear - try multiple selectors
-    await page.waitForTimeout(3000) // Give time for API call to fail and error to show
+    await page.waitForTimeout(1500) // Give time for API call to fail and error to show
     
     // Should show error message - try multiple possible error indicators
     const errorSelectors = [
