@@ -531,6 +531,9 @@ class TwilioCallService {
             case 'answered':
               call.status = 'in-progress';
               call.callStatus = 'answered';
+              // Force save when call is answered to ensure status updates immediately
+              await call.save();
+              logger.info(`[Twilio Service] Call answered - status updated to in-progress for ${CallSid}`);
               break;
             default:
               // For any other status, keep as initiated
@@ -544,7 +547,7 @@ class TwilioCallService {
       if (!call.isNew && call.isModified()) {
         await call.save();
       }
-      logger.info(`[Twilio Service] Updated call for ${CallSid} with status ${CallStatus}`);
+      logger.info(`[Twilio Service] Updated call for ${CallSid} with status ${CallStatus} (current: ${call.status}, callStatus: ${call.callStatus})`);
     } catch (error) {
       logger.error(`[Twilio Service] Error handling call status: ${error.message}`);
     }
