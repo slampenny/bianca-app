@@ -113,7 +113,7 @@ APP_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Nam
 NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
 
 if [ "$APP_RUNNING" -eq 0 ] || [ "$NGINX_RUNNING" -eq 0 ]; then
-  echo "   ⚠️  WARNING: Required containers are not running!" >&2
+  echo "❌ ERROR: Required containers are not running!" >&2
   echo "   App container running: $APP_RUNNING" >&2
   echo "   Nginx container running: $NGINX_RUNNING" >&2
   EXIT_CODE=1  # Mark as failed
@@ -121,6 +121,16 @@ if [ "$APP_RUNNING" -eq 0 ] || [ "$NGINX_RUNNING" -eq 0 ]; then
   # Check for stopped containers
   echo "   Checking for stopped containers..." >&2
   docker ps -a --filter "name=${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" >&2 || true
+  
+  # Check docker compose logs for errors
+  echo "   Checking docker compose logs for errors..." >&2
+  cd "$DEPLOY_DIR" && docker compose logs --tail 50 2>&1 || true
+  
+  # Check docker_start.log
+  if [ -f /tmp/docker_start.log ]; then
+    echo "   Docker compose startup log:" >&2
+    tail -50 /tmp/docker_start.log >&2 || true
+  fi
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then
@@ -138,8 +148,8 @@ if [ $EXIT_CODE -ne 0 ]; then
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20 >&2 || true
   echo "   Checking docker-compose.yml syntax..." >&2
   cd "$DEPLOY_DIR" && docker compose config 2>&1 | head -20 || echo "   docker-compose.yml has syntax errors!" >&2
-  # Don't exit - let ValidateService decide if deployment failed
-  # But log the error clearly so it's visible
+  echo "❌ ApplicationStart FAILED - Containers did not start successfully" >&2
+  exit 1
 fi
 
 # Wait for containers to initialize
