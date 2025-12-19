@@ -973,7 +973,8 @@ class OpenAIRealtimeService {
       },
     };
 
-    logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId}`);
+    const turnDetectionMode = config.audio.turnDetection.optimizedForNoise ? 'noise-optimized' : 'fast';
+    logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId} (mode: ${turnDetectionMode}, silence: ${sessionConfig.session.turn_detection.silence_duration_ms}ms, padding: ${sessionConfig.session.turn_detection.prefix_padding_ms}ms)`);
     logger.debug(`[OpenAI Realtime] Session config: ${JSON.stringify(sessionConfig.session, null, 2)}`);
 
     try {
