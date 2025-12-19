@@ -45,23 +45,14 @@ fi
 # Note: docker-compose.yml is already on the instance at $DEPLOY_DIR/docker-compose.yml
 # We just need to pull the latest images
 
-# Determine which docker compose command to use
-# Prefer docker-compose (standalone) as it's more reliable
-DOCKER_COMPOSE_CMD=""
-if command -v docker-compose >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD=$(command -v docker-compose)
-  echo "   Using: docker-compose (standalone) at $DOCKER_COMPOSE_CMD"
-# Fallback to docker compose (plugin) if available and working
-elif docker compose version >/dev/null 2>&1 && docker compose ps >/dev/null 2>&1; then
-  echo "   Using: docker compose (plugin)"
-  DOCKER_COMPOSE_CMD="docker compose"
-else
-  echo "❌ ERROR: Neither 'docker-compose' nor 'docker compose' is available" >&2
-  echo "   Checking what's available..." >&2
-  command -v docker-compose >&2 || echo "   docker-compose: not found" >&2
-  docker compose version >&2 || echo "   docker compose: not working" >&2
+# Verify docker compose is available (installed by EC2 userdata)
+if ! docker compose version >/dev/null 2>&1; then
+  echo "❌ ERROR: 'docker compose' is not available" >&2
+  echo "   This should be installed by EC2 userdata script" >&2
+  docker compose version >&2 || true
   exit 1
 fi
+echo "   Using: docker compose (plugin)"
 
 # Pull latest images (with timeout to prevent hangs)
 # Remove old images first to force fresh pull
@@ -70,23 +61,13 @@ cd "$DEPLOY_DIR" || {
   echo "❌ ERROR: Cannot cd to $DEPLOY_DIR (directory may not exist yet)"
   exit 1
 }
-if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]; then
-  $DOCKER_COMPOSE_CMD down 2>/dev/null || true
-else
-  bash -c "$DOCKER_COMPOSE_CMD down" 2>/dev/null || true
-fi
+docker compose down 2>/dev/null || true
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
 echo "   Pulling latest Docker images (5 min timeout)..."
-if [ -n "$DOCKER_COMPOSE_CMD" ] && [ "$DOCKER_COMPOSE_CMD" != "docker compose" ]; then
-  timeout 300 $DOCKER_COMPOSE_CMD pull || {
-    echo "⚠️  Image pull timed out or failed, but continuing..."
-  }
-else
-  timeout 300 bash -c "$DOCKER_COMPOSE_CMD pull" || {
-    echo "⚠️  Image pull timed out or failed, but continuing..."
-  }
-fi
+timeout 300 docker compose pull || {
+  echo "⚠️  Image pull timed out or failed, but continuing..."
+}
 
 echo "✅ AfterInstall completed"
 
