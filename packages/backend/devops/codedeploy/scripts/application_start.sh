@@ -93,12 +93,15 @@ fi
 echo "   ✅ docker-compose.yml is valid"
 
 # Start containers - use background process with timeout to prevent hangs
-# --pull always ensures we use the latest images, --force-recreate ensures new containers
-echo "   Starting containers with newly pulled images..."
+# CRITICAL: --pull always forces Docker to check ECR for latest images
+# --force-recreate ensures new containers even if config hasn't changed
+# --no-deps prevents pulling dependencies (we already pulled everything)
+echo "   Starting containers with --pull always to ensure latest images..."
+echo "   CRITICAL: This will force Docker to check ECR for image updates..."
 if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
-  docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+  docker compose up -d --pull always --force-recreate --remove-orphans --no-deps > /tmp/docker_start.log 2>&1 &
 else
-  docker-compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+  docker-compose up -d --pull always --force-recreate --remove-orphans --no-deps > /tmp/docker_start.log 2>&1 &
 fi
 DOCKER_PID=$!
 

@@ -60,30 +60,48 @@ else
 fi
 
 # Pull latest images (with timeout to prevent hangs)
-# Remove old images first to force fresh pull
-echo "   Removing old images to force fresh pull..."
+# CRITICAL: Remove ALL old images first to force fresh pull
+# Docker's tag-based pulls can use stale cached images even with --pull always
+echo "   Removing ALL old images to force fresh pull..."
 cd "$DEPLOY_DIR" || {
   echo "❌ ERROR: Cannot cd to $DEPLOY_DIR (directory may not exist yet)"
   exit 1
 }
 $DOCKER_COMPOSE_CMD down 2>/dev/null || true
+
+# Remove ALL bianca-app images (by image ID, not just by name)
+echo "   Removing all cached bianca-app images..."
+docker images --format "{{.ID}} {{.Repository}}" | grep "bianca-app" | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
+
+# Also remove by repository name pattern
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
+# Force remove any dangling images
+docker image prune -af || true
+
 echo "   Pulling latest Docker images (5 min timeout)..."
-echo "   Using --pull always to ensure we get the latest images from ECR..."
+echo "   CRITICAL: Removing all cached images first ensures fresh pull from ECR..."
+# docker compose pull doesn't support --pull always, but removing images first forces fresh pull
 timeout 300 $DOCKER_COMPOSE_CMD pull --ignore-pull-failures || {
   echo "⚠️  Image pull timed out or failed, but continuing..."
 }
 
-# Verify we got the images
+# Verify we got the images and log their details
 echo "   Verifying pulled images..."
 $DOCKER_COMPOSE_CMD images || {
   echo "⚠️  Could not list images, but continuing..."
 }
 
-# Log image digests for verification
-echo "   Image digests (for verification):"
-docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Digest}}\t{{.CreatedAt}}" | grep "bianca-app" || echo "   (No bianca-app images found)"
+# Log image details for verification (including digests if available)
+echo "   =========================================="
+echo "   Image Details (for verification):"
+echo "   =========================================="
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Digest}}\t{{.CreatedAt}}\t{{.ID}}" | grep -E "REPOSITORY|bianca-app" || echo "   (No bianca-app images found)"
+echo "   =========================================="
+
+# Also check what's actually in the docker-compose.yml
+echo "   Docker-compose.yml image references:"
+grep -E "image:.*bianca-app" "$DEPLOY_DIR/docker-compose.yml" || echo "   (No image references found)"
 
 echo "✅ AfterInstall completed"
 
