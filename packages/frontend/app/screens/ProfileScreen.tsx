@@ -454,6 +454,13 @@ function ProfileScreen() {
 
             {/* Legal Links */}
             <LegalLinks style={styles.legalLinks} />
+            
+            {/* Version Number - CRITICAL: Increment this on EVERY staging deployment push
+                Format: 0.00.0001 (increment last digit: 0001 -> 0002 -> 0003, etc.)
+                This is the ONLY way to verify the frontend container is actually updating */}
+            <View style={styles.versionContainer}>
+              <Text style={styles.versionText}>Version: 0.00.0001</Text>
+            </View>
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
@@ -565,6 +572,18 @@ const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
   legalLinks: {
     marginTop: 20,
     alignSelf: "center",
+  },
+  versionContainer: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300 || "#d1d5db",
+    alignItems: "center",
+  },
+  versionText: {
+    color: colors.palette.neutral600 || "#6b7280",
+    fontSize: 12 * fontScale,
+    fontFamily: "monospace",
   },
 })
 
