@@ -45,72 +45,62 @@ fi
 # Note: docker-compose.yml is already on the instance at $DEPLOY_DIR/docker-compose.yml
 # We just need to pull the latest images
 
-# Pull latest images (with timeout to prevent hangs)
-# CRITICAL: Remove ALL old images first to force fresh pull
-echo "   Removing ALL old images to force fresh pull..."
-cd "$DEPLOY_DIR"
-docker compose down 2>/dev/null || true
-
-# Remove ALL bianca-app images by ID (most reliable)
-echo "   Removing all cached bianca-app images..."
-docker images --format "{{.ID}} {{.Repository}}" | grep "bianca-app" | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
-docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
-
-# Force remove dangling images
-docker image prune -af || true
-
-# CRITICAL: Pull images directly by tag to force fresh pull from ECR
-# docker compose pull doesn't always pull if tag exists locally
-echo "   Pulling latest Docker images directly from ECR (5 min timeout)..."
-ECR_REGISTRY="730335291008.dkr.ecr.${AWS_REGION}.amazonaws.com"
-
-# Determine image tag based on environment
-if echo "$INSTANCE_NAME" | grep -qi "production"; then
-  IMAGE_TAG="production"
+# Determine which docker compose command to use
+# Prefer docker compose (plugin) - matches local development setup
+# Fallback to docker-compose (standalone) for backwards compatibility
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+  echo "   Using: docker compose (plugin)"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+  echo "   Using: docker-compose (standalone)"
 else
-  IMAGE_TAG="staging"
+  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  exit 1
 fi
 
-# CRITICAL: Force pull with --all-tags to ensure we get the latest
-# Remove the specific tag first to force fresh pull
-echo "   Removing existing image tags to force fresh pull..."
-docker rmi ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG} 2>/dev/null || true
-docker rmi ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG} 2>/dev/null || true
-docker rmi ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG} 2>/dev/null || true
+# Pull latest images (with timeout to prevent hangs)
+# CRITICAL: Remove ALL old images first to force fresh pull
+# Docker's tag-based pulls can use stale cached images even with --pull always
+echo "   Removing ALL old images to force fresh pull..."
+cd "$DEPLOY_DIR" || {
+  echo "❌ ERROR: Cannot cd to $DEPLOY_DIR (directory may not exist yet)"
+  exit 1
+}
+$DOCKER_COMPOSE_CMD down 2>/dev/null || true
 
-echo "   Pulling backend image: ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG}"
-timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG} 2>&1 | tee /tmp/backend-pull.log || {
-  echo "⚠️  Backend image pull failed, trying latest tag..."
-  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:latest 2>&1 | tee /tmp/backend-pull-latest.log || echo "⚠️  Backend pull failed"
+# Remove ALL bianca-app images (by image ID, not just by name)
+echo "   Removing all cached bianca-app images..."
+docker images --format "{{.ID}} {{.Repository}}" | grep "bianca-app" | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
+
+# Also remove by repository name pattern
+docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
+
+# Force remove any dangling images
+docker image prune -af || true
+
+echo "   Pulling latest Docker images (5 min timeout)..."
+echo "   CRITICAL: Removing all cached images first ensures fresh pull from ECR..."
+# docker compose pull doesn't support --pull always, but removing images first forces fresh pull
+timeout 300 $DOCKER_COMPOSE_CMD pull --ignore-pull-failures || {
+  echo "⚠️  Image pull timed out or failed, but continuing..."
 }
 
-echo "   Pulling frontend image: ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG}"
-timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG} 2>&1 | tee /tmp/frontend-pull.log || {
-  echo "⚠️  Frontend image pull failed, trying latest tag..."
-  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:latest 2>&1 | tee /tmp/frontend-pull-latest.log || echo "⚠️  Frontend pull failed"
+# Verify we got the images and log their details
+echo "   Verifying pulled images..."
+$DOCKER_COMPOSE_CMD images || {
+  echo "⚠️  Could not list images, but continuing..."
 }
 
-echo "   Pulling asterisk image: ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG}"
-timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG} 2>&1 | tee /tmp/asterisk-pull.log || {
-  echo "⚠️  Asterisk image pull failed, trying latest tag..."
-  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:latest 2>&1 | tee /tmp/asterisk-pull-latest.log || echo "⚠️  Asterisk pull failed"
-}
-
-# Show what was actually pulled
-echo ""
-echo "   Pull logs (checking if images were updated):"
-echo "   Backend pull:"
-grep -E "Status:|Digest:|Pulling|Downloaded|Already exists" /tmp/backend-pull.log 2>/dev/null | tail -5 || echo "   (No backend pull log)"
-echo "   Frontend pull:"
-grep -E "Status:|Digest:|Pulling|Downloaded|Already exists" /tmp/frontend-pull.log 2>/dev/null | tail -5 || echo "   (No frontend pull log)"
-
-# Verify what we actually pulled
-echo ""
+# Log image details for verification (including digests if available)
 echo "   =========================================="
-echo "   VERIFICATION: Images pulled from ECR"
+echo "   Image Details (for verification):"
 echo "   =========================================="
 docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Digest}}\t{{.CreatedAt}}\t{{.ID}}" | grep -E "REPOSITORY|bianca-app" || echo "   (No bianca-app images found)"
 echo "   =========================================="
 
-echo "✅ AfterInstall completed"
+# Also check what's actually in the docker-compose.yml
+echo "   Docker-compose.yml image references:"
+grep -E "image:.*bianca-app" "$DEPLOY_DIR/docker-compose.yml" || echo "   (No image references found)"
 
+echo "✅ AfterInstall completed"
