@@ -2,21 +2,18 @@
 // markdown file and add links from here
 
 import { Platform } from "react-native"
-import {
-  SpaceGrotesk_300Light as spaceGroteskLight,
-  SpaceGrotesk_400Regular as spaceGroteskRegular,
-  SpaceGrotesk_500Medium as spaceGroteskMedium,
-  SpaceGrotesk_600SemiBold as spaceGroteskSemiBold,
-  SpaceGrotesk_700Bold as spaceGroteskBold,
-} from "@expo-google-fonts/space-grotesk"
+// Temporarily disabled expo-font imports to avoid native module crash
+// TODO: Fix expo-font native module registration
+// import {
+//   SpaceGrotesk_300Light as spaceGroteskLight,
+//   SpaceGrotesk_400Regular as spaceGroteskRegular,
+//   SpaceGrotesk_500Medium as spaceGroteskMedium,
+//   SpaceGrotesk_600SemiBold as spaceGroteskSemiBold,
+//   SpaceGrotesk_700Bold as spaceGroteskBold,
+// } from "@expo-google-fonts/space-grotesk"
 
-export const customFontsToLoad = {
-  spaceGroteskLight,
-  spaceGroteskRegular,
-  spaceGroteskMedium,
-  spaceGroteskSemiBold,
-  spaceGroteskBold,
-}
+// Temporarily use empty object - fonts will fall back to system fonts
+export const customFontsToLoad = {}
 
 const fonts = {
   spaceGrotesk: {

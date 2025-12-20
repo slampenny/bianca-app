@@ -1,4 +1,20 @@
-import * as Localization from "expo-localization"
+// Try to use expo-localization, but handle gracefully if native module not available
+let Localization: any = null
+try {
+  Localization = require("expo-localization")
+} catch (e) {
+  // expo-localization not available - use fallback
+  console.warn("expo-localization not available, using fallback")
+  Localization = {
+    locale: "en-US",
+    locales: ["en-US"],
+    timezone: "UTC",
+    isoCurrencyCodes: [],
+    region: "US",
+    getLocales: () => [{ languageCode: "en", countryCode: "US", languageTag: "en-US" }],
+    getCalendars: () => [],
+  }
+}
 import i18n from "i18n-js"
 import { I18nManager } from "react-native"
 import * as storage from "../utils/storage"
@@ -188,6 +204,13 @@ initializeLanguage()
 export const isRTL = systemLocale?.textDirection === "rtl"
 I18nManager.allowRTL(isRTL)
 I18nManager.forceRTL(isRTL)
+
+/**
+ * Get the current locale
+ */
+export const getLocale = (): string => {
+  return i18n.locale || "en"
+}
 
 /**
  * Builds up valid keypaths for translations.
