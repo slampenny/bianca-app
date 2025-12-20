@@ -38,20 +38,76 @@ if [ ! -f "nginx.conf" ]; then
   exit 1
 fi
 
+# Determine which docker compose command to use
+# Prefer docker compose (plugin) - matches local development setup
+# Fallback to docker-compose (standalone) for backwards compatibility
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+  echo "   Using: docker compose (plugin)"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+  echo "   Using: docker-compose (standalone)"
+else
+  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  exit 1
+fi
+
+# Ensure ECR is logged in (token might have expired)
+echo "   Ensuring ECR login..."
+ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
+if [ ! -f "$ECR_TOKEN_FILE" ]; then
+  echo "   Logging into ECR..."
+  aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 730335291008.dkr.ecr.$AWS_REGION.amazonaws.com || {
+    echo "   ⚠️  ECR login failed, but continuing..."
+  }
+  touch "$ECR_TOKEN_FILE"
+else
+  echo "   Using cached ECR token"
+fi
+
+# Ensure we're in the deploy directory
+cd "$DEPLOY_DIR" || {
+  echo "❌ ERROR: Cannot cd to $DEPLOY_DIR" >&2
+  exit 1
+}
+
 # Stop any existing containers first
 echo "   Stopping any existing containers..."
-docker compose down 2>/dev/null || true
+$DOCKER_COMPOSE_CMD down 2>/dev/null || true
+
+# Validate docker-compose.yml syntax before starting
+echo "   Validating docker-compose.yml..."
+if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
+  if ! docker compose config > /dev/null 2>&1; then
+    echo "❌ ERROR: docker-compose.yml has syntax errors!" >&2
+    docker compose config 2>&1 | head -30 >&2
+    exit 1
+  fi
+else
+  if ! docker-compose config > /dev/null 2>&1; then
+    echo "❌ ERROR: docker-compose.yml has syntax errors!" >&2
+    docker-compose config 2>&1 | head -30 >&2
+    exit 1
+  fi
+fi
+echo "   ✅ docker-compose.yml is valid"
 
 # Start containers - use background process with timeout to prevent hangs
-# CRITICAL: --pull always forces Docker to check ECR even if image exists locally
+# CRITICAL: --pull always forces Docker to check ECR for latest images
 # --force-recreate ensures new containers even if config hasn't changed
+# --no-deps prevents pulling dependencies (we already pulled everything)
 echo "   Starting containers with --pull always to ensure latest images..."
-echo "   CRITICAL: This forces Docker to check ECR for image updates..."
-docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
+echo "   CRITICAL: This will force Docker to check ECR for image updates..."
+if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
+  docker compose up -d --pull always --force-recreate --remove-orphans --no-deps > /tmp/docker_start.log 2>&1 &
+else
+  docker-compose up -d --pull always --force-recreate --remove-orphans --no-deps > /tmp/docker_start.log 2>&1 &
+fi
 DOCKER_PID=$!
 
 # Wait up to 120 seconds for it to complete
 DOCKER_STARTED=false
+EXIT_CODE=0
 for i in {1..120}; do
   if ! kill -0 $DOCKER_PID 2>/dev/null; then
     # Process finished
@@ -65,21 +121,55 @@ done
 
 # Kill if still running
 if [ "$DOCKER_STARTED" = "false" ]; then
-  echo "   ⚠️  Container start taking too long, but continuing..." >&2
+  echo "   ⚠️  Container start taking too long, killing process..." >&2
   kill $DOCKER_PID 2>/dev/null || true
-  EXIT_CODE=0  # Continue anyway - containers might still start
+  wait $DOCKER_PID 2>/dev/null || true
+  EXIT_CODE=1  # Mark as failed since it timed out
+fi
+
+# Always check if containers actually started, regardless of exit code
+sleep 3  # Give containers a moment to start
+APP_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
+NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
+
+if [ "$APP_RUNNING" -eq 0 ] || [ "$NGINX_RUNNING" -eq 0 ]; then
+  echo "❌ ERROR: Required containers are not running!" >&2
+  echo "   App container running: $APP_RUNNING" >&2
+  echo "   Nginx container running: $NGINX_RUNNING" >&2
+  EXIT_CODE=1  # Mark as failed
+  
+  # Check for stopped containers
+  echo "   Checking for stopped containers..." >&2
+  docker ps -a --filter "name=${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" >&2 || true
+  
+  # Check docker compose logs for errors
+  echo "   Checking docker compose logs for errors..." >&2
+  cd "$DEPLOY_DIR" && docker compose logs --tail 50 2>&1 || true
+  
+  # Check docker_start.log
+  if [ -f /tmp/docker_start.log ]; then
+    echo "   Docker compose startup log:" >&2
+    tail -50 /tmp/docker_start.log >&2 || true
+  fi
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then
-  echo "❌ ERROR: Failed to start containers" >&2
+  echo "❌ ERROR: Failed to start containers (exit code: $EXIT_CODE)" >&2
   echo "   Checking for errors..." >&2
   if [ -f /tmp/docker_start.log ]; then
-    tail -50 /tmp/docker_start.log >&2 || true
+    echo "   Docker compose output:" >&2
+    tail -100 /tmp/docker_start.log >&2 || true
   fi
-  docker compose logs --tail 50 2>&1 || true
+  echo "   Checking docker compose logs..." >&2
+  cd "$DEPLOY_DIR" && $DOCKER_COMPOSE_CMD logs --tail 50 2>&1 || true
   echo "   Container status:" >&2
   docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep ${CONTAINER_PREFIX}_ || echo "   No ${CONTAINER_PREFIX} containers found" >&2
-  # Don't exit - let ValidateService decide if deployment failed
+  echo "   All containers:" >&2
+  docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20 >&2 || true
+  echo "   Checking docker-compose.yml syntax..." >&2
+  cd "$DEPLOY_DIR" && $DOCKER_COMPOSE_CMD config 2>&1 | head -20 || echo "   docker-compose.yml has syntax errors!" >&2
+  echo "❌ ApplicationStart FAILED - Containers did not start successfully" >&2
+  exit 1
 fi
 
 # Wait for containers to initialize
@@ -89,7 +179,21 @@ sleep 15
 # Check container status
 echo ""
 echo "   Container status:"
-docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep ${CONTAINER_PREFIX}_ || echo "   ⚠️  No ${CONTAINER_PREFIX} containers found"
+CONTAINER_LIST=$(docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | grep ${CONTAINER_PREFIX}_ || echo "")
+if [ -z "$CONTAINER_LIST" ]; then
+  echo "   ⚠️  WARNING: No ${CONTAINER_PREFIX} containers found running!" >&2
+  echo "   Checking all containers..." >&2
+  docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20 >&2
+  echo "   Checking docker-compose.yml exists..." >&2
+  ls -la docker-compose.yml >&2 || echo "   docker-compose.yml NOT FOUND!" >&2
+  echo "   Checking /tmp/docker_start.log for errors..." >&2
+  if [ -f /tmp/docker_start.log ]; then
+    echo "   Last 50 lines of docker_start.log:" >&2
+    tail -50 /tmp/docker_start.log >&2
+  fi
+else
+  echo "$CONTAINER_LIST"
+fi
 
 # Verify nginx is listening on port 80
 echo ""
@@ -127,5 +231,3 @@ fi
 
 echo ""
 echo "✅ ApplicationStart completed"
-
-
