@@ -52,13 +52,14 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
   const [initialNavigationState, setInitialNavigationState] =
     useState<NavigationProps["initialState"]>()
   const isMounted = useIsMounted()
-  const initNavState = navigationRestoredDefaultState(Config.persistNavigation)
-  const [isRestored, setIsRestored] = useState(initNavState)
-  const routeNameRef = useRef<keyof AppStackParamList | undefined>()
-  // Check if we're in test mode
+  // Check if we're in test mode first
   const isTestMode = process.env.NODE_ENV === 'test' || 
                      process.env.PLAYWRIGHT_TEST === '1' || 
-                     process.env.JEST_WORKER_ID
+                     process.env.JEST_WORKER_ID !== undefined
+  // In test mode, start with isRestored = true to avoid blocking
+  const initNavState = isTestMode ? true : navigationRestoredDefaultState(Config.persistNavigation)
+  const [isRestored, setIsRestored] = useState(initNavState)
+  const routeNameRef = useRef<keyof AppStackParamList | undefined>()
   
   const onNavigationStateChange = (state: NavigationState | undefined) => {
     const previousRouteName = routeNameRef.current
@@ -81,8 +82,11 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
         setInitialNavigationState(undefined)
         // Clear any persisted state in test mode
         if (isTestMode) {
-          await storageKey.remove(persistenceKey)
+          await storageKey.remove(persistenceKey).catch(() => {})
         }
+        // In test mode, mark as restored immediately to avoid blocking
+        if (isMounted()) setIsRestored(true)
+        return
       } else {
         const state = (await storageKey.load(persistenceKey)) as
           | NavigationProps["initialState"]
@@ -122,8 +126,14 @@ export function useNavigationPersistence(storageKey: typeof storage, persistence
     return true
   }
   useEffect(() => {
+    // In test mode, immediately mark as restored if not already
+    if (isTestMode && !isRestored) {
+      setIsRestored(true)
+      setInitialNavigationState(undefined)
+      return
+    }
     if (!isRestored) restoreState()
-  }, [isRestored])
+  }, [isRestored, isTestMode])
   return { onNavigationStateChange, restoreState, isRestored, initialNavigationState }
 }
 

@@ -93,6 +93,8 @@ const Toast: React.FC<ToastProps> = ({
       style={[
         styles.container,
         { backgroundColor: getBackgroundColor(), opacity },
+        // Don't block pointer events - toast should not interfere with clicks
+        { pointerEvents: 'none' as any },
       ]}
       testID={testID}
     >

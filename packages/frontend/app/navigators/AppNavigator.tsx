@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react"
-import { NavigationContainer } from "@react-navigation/native"
+import { NavigationContainer, getStateFromPath as getStateFromPathDefault } from "@react-navigation/native"
 import { useSelector, useDispatch } from "react-redux"
 import { isAuthenticated, getCurrentUser, getInviteToken } from "app/store/authSlice"
 import { clearAuth } from "app/store/authSlice"
@@ -11,11 +11,12 @@ import {
   useBackButtonHandler,
   useNavigationPersistence,
   resetRoot,
+  getActiveRouteName,
 } from "./navigationUtilities"
 import { AuthStack, UnauthStack } from "./AppNavigators"
 import { getNavigationTheme } from "./NavigationConfig"
 import { NavigationProps } from "./navigationTypes"
-import * as storage from "../utils/storage" // Ensure this import is correct
+import * as storage from "../utils/storage"
 import { logger } from "../utils/logger"
 
 export const AppNavigator: React.FC<NavigationProps> = (props) => {
@@ -27,41 +28,94 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   const currentOrg = useSelector(getOrg)
   const { currentTheme, colors } = useTheme()
   const shouldNavigateToRegister = useRef(false)
+  const hasResetNavigationOnLogout = useRef(false)
+  const previousIsLoggedIn = useRef(isLoggedIn)
+  
+  // Calculate justLoggedOut once at the top level (used in multiple places)
+  const justLoggedOut = previousIsLoggedIn.current && !isLoggedIn
 
   // Define back button behavior
   useBackButtonHandler((routeName) => {
-    return true // ['Home', 'Login'].includes(routeName); // Example routes where pressing back should exit the app
+    return true
   })
 
   // Clear navigation state when logging in/out to ensure we start at the correct screen
-  // This prevents corrupted navigation state from causing crashes
   useEffect(() => {
-    // Always clear navigation state on login/logout to prevent [object Object] errors
     storage.remove("navigationState").catch(() => {
       // Ignore errors if storage is not available
     })
   }, [isLoggedIn])
+  
+  useEffect(() => {
+    if (!isLoggedIn) {
+      hasResetNavigationOnLogout.current = false
+    }
+  }, [isLoggedIn])
+
+  // Reset navigation when user logs out
+  useEffect(() => {
+    if (justLoggedOut && !hasResetNavigationOnLogout.current) {
+      // Check if we're on a route that should be accessible when logged out (web only)
+      const isUnauthRoute = typeof window !== 'undefined' && 
+        (window.location.pathname.includes('reset-password') || window.location.pathname.includes('signup'))
+      
+      // Only reset navigation if we're NOT on an unauth route
+      if (!isUnauthRoute) {
+        hasResetNavigationOnLogout.current = true
+        
+        // Wait for NavigationContainer to remount with UnauthStack
+        // The initialState should already be set to Login, but we'll also call resetRoot
+        // to ensure navigation is properly reset
+        let attempts = 0
+        const maxAttempts = 30 // Try for up to 3 seconds (30 * 100ms)
+        const resetNavigation = () => {
+          if (!isLoggedIn && attempts < maxAttempts) {
+            attempts++
+            if (navigationRef.isReady()) {
+              try {
+                // Use resetRoot to ensure we're on Login screen
+                // The format should match the UnauthStack structure
+                resetRoot({
+                  index: 0,
+                  routes: [{ name: "Login" as never }],
+                })
+                logger.debug(`Navigation reset to Login after logout (attempt ${attempts})`)
+              } catch (error) {
+                logger.warn(`Failed to reset navigation after logout (attempt ${attempts}):`, error)
+                // Retry after a delay
+                setTimeout(resetNavigation, 100)
+              }
+            } else {
+              // Navigation not ready yet, try again
+              setTimeout(resetNavigation, 100)
+            }
+          } else if (attempts >= maxAttempts) {
+            logger.warn("Failed to reset navigation after logout: max attempts reached")
+          }
+        }
+        
+        // Start resetting after NavigationContainer has had time to remount
+        // Use a longer delay to ensure NavigationContainer and UnauthStack are fully ready
+        // Also force a re-render by updating the key
+        setTimeout(resetNavigation, 500)
+      }
+    }
+    
+    previousIsLoggedIn.current = isLoggedIn
+  }, [isLoggedIn, justLoggedOut])
 
   // Redirect users without org to registration screen
-  // If user doesn't have an org, they need to complete registration
-  // Since Register is in UnauthStack, we need to log them out first
   useEffect(() => {
     if (isLoggedIn && currentUser && !currentOrg) {
-      // User is logged in but has no org - this shouldn't happen with SSO
-      // (SSO should create org automatically), but if it does, log them out and send to registration
       logger.warn('[AppNavigator] User logged in but has no org - logging out and redirecting to registration', {
         userId: currentUser.id,
         userEmail: currentUser.email
       })
       
-      // Set flag to navigate to Register after logout
       shouldNavigateToRegister.current = true
-      
-      // Clear auth state (this will switch to UnauthStack)
       dispatch(clearAuth())
       dispatch(clearOrg())
     } else if (isLoggedIn && currentOrg) {
-      // User has org, clear the flag
       shouldNavigateToRegister.current = false
     }
   }, [isLoggedIn, currentUser, currentOrg, dispatch])
@@ -69,10 +123,8 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   // Navigate to Register when user is logged out and was previously missing org
   useEffect(() => {
     if (!isLoggedIn && shouldNavigateToRegister.current && navigationRef.isReady()) {
-      // Reset flag
       shouldNavigateToRegister.current = false
       
-      // Navigate to Register screen
       const timer = setTimeout(() => {
         if (navigationRef.isReady()) {
           resetRoot({
@@ -87,13 +139,9 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   }, [isLoggedIn])
 
   // Redirect users with incomplete profiles to profile screen
-  // Profile is incomplete if email is not verified OR phone is missing
-  // Users can continue with unverified phone number
-  // Only check this if user has an org (otherwise they go to registration above)
   useEffect(() => {
     const hasMissingPhone = !currentUser?.phone || (typeof currentUser.phone === 'string' && currentUser.phone.trim() === '')
     if (isLoggedIn && currentUser && currentOrg && (!currentUser.isEmailVerified || hasMissingPhone)) {
-      // Navigate to profile screen to complete setup
       if (navigationRef.isReady()) {
         navigationRef.navigate('Profile')
       }
@@ -103,7 +151,6 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   // Redirect invited users to signup screen
   useEffect(() => {
     if (!isLoggedIn && inviteToken && navigationRef.isReady()) {
-      // User has an invite token but isn't logged in, redirect to signup
       navigationRef.navigate('Signup', { token: inviteToken })
     }
   }, [isLoggedIn, inviteToken])
@@ -122,16 +169,176 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
     }
   }
 
-  // Get navigation theme based on current app theme
   const navigationTheme = getNavigationTheme(currentTheme, colors)
 
+  // Create a modified linking config that handles logout properly
+  const getLinkingConfig = () => {
+    if (!isLoggedIn && linking) {
+      return {
+        ...linking,
+        // Override getInitialURL to return null when logged out on protected routes
+        // This forces React Navigation to use initialState instead of the URL
+        // CRITICAL: This must return null synchronously for protected routes to prevent URL reading
+        getInitialURL: async () => {
+          // On web, check if we're on reset-password or signup (these should work when logged out)
+          if (typeof window !== 'undefined') {
+            const currentPath = window.location.pathname
+            const currentSearch = window.location.search
+            const fullPath = currentPath + currentSearch
+            
+            // Allow reset-password and signup URLs
+            if (fullPath.includes('reset-password') || fullPath.includes('signup')) {
+              return window.location.href
+            }
+            
+            // For protected routes when logged out, ALWAYS return null to force use of initialState
+            // This is critical - React Navigation will use initialState when getInitialURL returns null
+            if (currentPath.includes('MainTabs') || currentPath.includes('/Home') || 
+                currentPath.includes('/Profile') || currentPath.includes('/Logout') ||
+                currentPath.startsWith('/MainTabs')) {
+              // Return null immediately - don't let React Navigation read the URL
+              return null
+            }
+          }
+          // For all other routes when logged out, return null to force use of initialState
+          return null
+        },
+        getStateFromPath: (path: string, options: any) => {
+          // Allow reset-password and signup routes even when logged out
+          if (path.includes('reset-password') || path.includes('signup')) {
+            try {
+              return getStateFromPathDefault(path, options)
+            } catch (error) {
+              logger.warn("getStateFromPath failed for reset-password/signup:", error)
+              return undefined
+            }
+          }
+          // If path contains MainTabs or other protected routes, return Login state
+          // This prevents React Navigation from trying to navigate to protected routes when logged out
+          if (path.includes('MainTabs') || path.includes('/Home') || 
+              path.includes('/Profile') || path.includes('/Logout') ||
+              path.startsWith('/MainTabs')) {
+            logger.debug(`getStateFromPath: Blocking protected route ${path}, returning Login state`)
+            return {
+              routes: [{ name: "Login" as never }],
+              index: 0,
+            }
+          }
+          // Otherwise, use React Navigation's default getStateFromPath
+          try {
+            return getStateFromPathDefault(path, options)
+          } catch (error) {
+            logger.warn("getStateFromPath failed, returning Login:", error)
+            return {
+              routes: [{ name: "Login" as never }],
+              index: 0,
+            }
+          }
+        },
+      }
+    }
+    return linking
+  }
+
+  const linkingConfig = getLinkingConfig()
+  
+  // Determine if we should disable linking when logged out on a protected route
+  // When linking is disabled, React Navigation will use initialState instead of reading the URL
+  // We disable linking when:
+  // 1. User is logged out
+  // 2. We're on web
+  // 3. We're on a protected route (not reset-password or signup)
+  // CRITICAL: We must check this synchronously during render, before NavigationContainer reads the URL
+  const shouldDisableLinking = !isLoggedIn && typeof window !== 'undefined' &&
+    (() => {
+      const currentPath = window.location.pathname
+      // Disable linking if we're on a protected route (unless it's reset-password or signup)
+      const isProtectedRoute = currentPath.includes('MainTabs') || 
+                               currentPath.includes('/Home') || 
+                               currentPath.includes('/Profile') || 
+                               currentPath.includes('/Logout') ||
+                               currentPath.startsWith('/MainTabs')
+      const isUnauthRoute = currentPath.includes('reset-password') || 
+                            currentPath.includes('signup')
+      return isProtectedRoute && !isUnauthRoute
+    })()
+  
+  // Determine initial state - allow reset-password and signup routes when logged out
+  // This must be called AFTER shouldDisableLinking is calculated
+  const getInitialState = () => {
+    if (isLoggedIn) {
+      return initialState || navigationPersistenceProps.initialState
+    }
+    
+    // When logged out, check if we're on reset-password or signup (web only)
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname
+      const currentSearch = window.location.search
+      const fullPath = currentPath + currentSearch
+      
+      if (fullPath.includes('reset-password')) {
+        // Return undefined to let linking handle reset-password route
+        return undefined
+      }
+      if (fullPath.includes('signup')) {
+        // Return undefined to let linking handle signup route
+        return undefined
+      }
+      
+      // If we're on a protected route when logged out, force Login state
+      // This ensures we don't try to navigate to protected routes
+      if (currentPath.includes('MainTabs') || currentPath.includes('/Home') || 
+          currentPath.includes('/Profile') || currentPath.includes('/Logout')) {
+        return { routes: [{ name: "Login" as never }], index: 0 }
+      }
+    }
+    
+    // Default to Login for all other cases (including after logout)
+    return { routes: [{ name: "Login" as never }], index: 0 }
+  }
+
+  // Custom onStateChange handler
+  const handleStateChange = (state: any) => {
+    if (onStateChange) {
+      onStateChange(state)
+    }
+    if (navigationPersistenceProps.onStateChange) {
+      navigationPersistenceProps.onStateChange(state)
+    }
+  }
+
+  const computedInitialState = getInitialState()
+  
+  // When linking is disabled, we MUST provide initialState
+  // React Navigation will use initialState when linking is undefined
+  // CRITICAL: When logged out on a protected route, we MUST disable linking and provide initialState
+  // to prevent React Navigation from reading the URL
+  const finalLinking = shouldDisableLinking ? undefined : linkingConfig
+  // Always provide initialState when linking is disabled to ensure it's used
+  // When just logged out, force Login screen regardless of computedInitialState
+  const finalInitialState = shouldDisableLinking 
+    ? (justLoggedOut 
+        ? { routes: [{ name: "Login" as never }], index: 0 }  // Force Login when just logged out
+        : (computedInitialState || { routes: [{ name: "Login" as never }], index: 0 }))
+    : (computedInitialState || undefined)
+  
+  // Log for debugging
+  if (justLoggedOut && typeof window !== 'undefined') {
+    logger.debug(`Logout: shouldDisableLinking=${shouldDisableLinking}, currentPath=${window.location.pathname}, finalLinking=${finalLinking ? 'enabled' : 'disabled'}, finalInitialState=${JSON.stringify(finalInitialState)}`)
+  }
+
+  // Force a remount when logging out to ensure UnauthStack starts fresh
+  // Use justLoggedOut in the key to force a remount when logout happens
+  const containerKey = isLoggedIn ? 'auth' : (justLoggedOut ? `unauth-${Date.now()}` : 'unauth')
+  
   return (
     <NavigationContainer
+      key={containerKey}
       ref={navigationRef}
       theme={navigationTheme}
-      linking={linking}
-      initialState={initialState || navigationPersistenceProps.initialState}
-      onStateChange={onStateChange || navigationPersistenceProps.onStateChange}
+      linking={finalLinking}
+      initialState={finalInitialState}
+      onStateChange={handleStateChange}
       {...otherProps}
     >
       {isLoggedIn ? <AuthStack /> : <UnauthStack />}
