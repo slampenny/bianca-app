@@ -71,23 +71,38 @@ else
   IMAGE_TAG="staging"
 fi
 
+# CRITICAL: Force pull with --all-tags to ensure we get the latest
+# Remove the specific tag first to force fresh pull
+echo "   Removing existing image tags to force fresh pull..."
+docker rmi ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG} 2>/dev/null || true
+docker rmi ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG} 2>/dev/null || true
+docker rmi ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG} 2>/dev/null || true
+
 echo "   Pulling backend image: ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG}"
-timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG} || {
+timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG} 2>&1 | tee /tmp/backend-pull.log || {
   echo "⚠️  Backend image pull failed, trying latest tag..."
-  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:latest || echo "⚠️  Backend pull failed"
+  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:latest 2>&1 | tee /tmp/backend-pull-latest.log || echo "⚠️  Backend pull failed"
 }
 
 echo "   Pulling frontend image: ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG}"
-timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG} || {
+timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG} 2>&1 | tee /tmp/frontend-pull.log || {
   echo "⚠️  Frontend image pull failed, trying latest tag..."
-  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:latest || echo "⚠️  Frontend pull failed"
+  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:latest 2>&1 | tee /tmp/frontend-pull-latest.log || echo "⚠️  Frontend pull failed"
 }
 
 echo "   Pulling asterisk image: ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG}"
-timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG} || {
+timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG} 2>&1 | tee /tmp/asterisk-pull.log || {
   echo "⚠️  Asterisk image pull failed, trying latest tag..."
-  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:latest || echo "⚠️  Asterisk pull failed"
+  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:latest 2>&1 | tee /tmp/asterisk-pull-latest.log || echo "⚠️  Asterisk pull failed"
 }
+
+# Show what was actually pulled
+echo ""
+echo "   Pull logs (checking if images were updated):"
+echo "   Backend pull:"
+grep -E "Status:|Digest:|Pulling|Downloaded|Already exists" /tmp/backend-pull.log 2>/dev/null | tail -5 || echo "   (No backend pull log)"
+echo "   Frontend pull:"
+grep -E "Status:|Digest:|Pulling|Downloaded|Already exists" /tmp/frontend-pull.log 2>/dev/null | tail -5 || echo "   (No frontend pull log)"
 
 # Verify what we actually pulled
 echo ""
