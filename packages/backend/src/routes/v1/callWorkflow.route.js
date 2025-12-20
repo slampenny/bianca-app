@@ -274,4 +274,44 @@ router.get('/active', auth(), callWorkflowController.getActiveCalls);
  */
 router.get('/:conversationId/conversation', auth(), validate(callWorkflowValidation.getConversationWithCallDetails), callWorkflowController.getConversationWithCallDetails);
 
+/**
+ * @swagger
+ * /calls/by-call/{callIdOrSid}/conversation-id:
+ *   get:
+ *     summary: Get conversation ID from call ID or SID
+ *     description: Retrieve conversation ID for a call that may not have a conversation yet
+ *     tags: [Calls]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: callIdOrSid
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Call ID (MongoDB ObjectId) or Call SID (Twilio SID)
+ *     responses:
+ *       "200":
+ *         description: Conversation ID retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 callId:
+ *                   type: string
+ *                 callSid:
+ *                   type: string
+ *                 conversationId:
+ *                   type: string
+ *                   nullable: true
+ *                 hasConversation:
+ *                   type: boolean
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.get('/by-call/:callIdOrSid/conversation-id', auth(), callWorkflowController.getConversationIdByCall);
+
 module.exports = router;

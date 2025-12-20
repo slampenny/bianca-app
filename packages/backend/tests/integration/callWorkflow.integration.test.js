@@ -6,7 +6,7 @@ const httpStatus = require('http-status');
 const mongoose = require('mongoose');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Alert, Org, Caregiver, Patient, Schedule, Conversation } = require('../../src/models');
+const { Alert, Org, Caregiver, Patient, Schedule, Conversation, Call } = require('../../src/models');
 const { caregiverOne, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { alertOne, insertAlerts } = require('../fixtures/alert.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
@@ -48,6 +48,7 @@ describe('Call Workflow Integration Tests', () => {
     await Org.deleteMany();
     await Schedule.deleteMany();
     await Conversation.deleteMany();
+    await Call.deleteMany();
   });
 
   describe('POST /v1/calls/initiate', () => {
@@ -64,19 +65,28 @@ describe('Call Workflow Integration Tests', () => {
         .expect(httpStatus.CREATED);
 
       expect(response.body).toHaveProperty('conversationId');
+      expect(response.body).toHaveProperty('callId');
       expect(response.body).toHaveProperty('callSid', 'mock-call-sid-12345');
       expect(response.body.patientId.toString()).toBe(patient.id);
       expect(response.body.patientName).toBe(patient.name);
       expect(response.body.agentId.toString()).toBe(caregiver.id);
-      expect(response.body.callStatus).toBe('in-progress');
+      expect(response.body.status).toBe('in-progress');
+      expect(response.body.callStatus).toBe('ringing');
 
       // Verify conversation was created in database
       const conversation = await Conversation.findById(response.body.conversationId);
       expect(conversation).toBeTruthy();
       expect(conversation.patientId.toString()).toBe(patient.id);
-      expect(conversation.agentId.toString()).toBe(caregiver.id);
-      expect(conversation.callStatus).toBe('initiating');
-      expect(conversation.callNotes).toBe(callData.callNotes);
+      expect(conversation.callId.toString()).toBe(response.body.callId);
+
+      // Verify call was created and linked to conversation
+      const { Call } = require('../../src/models');
+      const call = await Call.findById(response.body.callId);
+      expect(call).toBeTruthy();
+      expect(call.conversationId.toString()).toBe(response.body.conversationId);
+      expect(call.agentId.toString()).toBe(caregiver.id);
+      expect(call.callStatus).toBe('ringing');
+      expect(call.callNotes).toBe(callData.callNotes);
     });
 
     it('should return 400 if patient does not have phone number', async () => {
@@ -129,18 +139,30 @@ describe('Call Workflow Integration Tests', () => {
 
   describe('GET /v1/calls/:conversationId/status', () => {
     let conversation;
+    let call;
 
     beforeEach(async () => {
-      // Create a test conversation
-      conversation = new Conversation({
+      // Create a test call first
+      call = await Call.create({
+        callSid: 'CA1234567890abcdef',
         patientId: patient.id,
         agentId: caregiver.id,
+        status: 'in-progress',
         callStatus: 'ringing',
-        callStartTime: new Date(),
         callType: 'outbound',
-        status: 'initiated'
+        startTime: new Date(),
+        callStartTime: new Date()
       });
-      await conversation.save();
+
+      // Create a test conversation linked to the call
+      conversation = await Conversation.create({
+        patientId: patient.id,
+        callId: call._id
+      });
+
+      // Link call to conversation
+      call.conversationId = conversation._id;
+      await call.save();
     });
 
     it('should return call status successfully', async () => {
@@ -151,7 +173,7 @@ describe('Call Workflow Integration Tests', () => {
 
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.conversationId.toString()).toBe(conversation.id);
-      expect(response.body.data.status).toBe('initiated');
+      expect(response.body.data.status).toBe('in-progress'); // Call status, not conversation status
       expect(response.body.data.patient).toBeTruthy();
       expect(response.body.data.agent).toBeTruthy();
     });
@@ -174,18 +196,30 @@ describe('Call Workflow Integration Tests', () => {
 
   describe('POST /v1/calls/:conversationId/status', () => {
     let conversation;
+    let call;
 
     beforeEach(async () => {
-      // Create a test conversation
-      conversation = new Conversation({
+      // Create a test call first
+      call = await Call.create({
+        callSid: 'CA1234567890abcdef',
         patientId: patient.id,
         agentId: caregiver.id,
+        status: 'in-progress',
         callStatus: 'ringing',
-        callStartTime: new Date(Date.now() - 1000), // 1 second ago to ensure duration > 0
         callType: 'outbound',
-        status: 'initiated'
+        startTime: new Date(Date.now() - 1000), // 1 second ago to ensure duration > 0
+        callStartTime: new Date(Date.now() - 1000)
       });
-      await conversation.save();
+
+      // Create a test conversation linked to the call
+      conversation = await Conversation.create({
+        patientId: patient.id,
+        callId: call._id
+      });
+
+      // Link call to conversation
+      call.conversationId = conversation._id;
+      await call.save();
     });
 
     it('should update call status successfully', async () => {
@@ -203,12 +237,13 @@ describe('Call Workflow Integration Tests', () => {
 
       // The response is a ConversationDTO
       expect(response.body).toHaveProperty('id');
-      expect(response.body.status).toBe('in-progress'); // Mapped conversation status
+      expect(response.body.status).toBe('in-progress'); // Status is now included from call
+      expect(response.body.id.toString()).toBe(conversation.id);
 
-      // Verify database was updated
-      const updatedConversation = await Conversation.findById(conversation.id);
-      expect(updatedConversation.status).toBe('in-progress');
-      expect(updatedConversation.callNotes).toBe(updateData.notes);
+      // Verify call was updated (status and notes are on Call, not Conversation)
+      const updatedCall = await Call.findById(call._id);
+      expect(updatedCall.status).toBe('in-progress');
+      expect(updatedCall.callNotes).toBe(updateData.notes);
     });
 
     it('should handle call end status correctly', async () => {
@@ -226,13 +261,14 @@ describe('Call Workflow Integration Tests', () => {
 
       // The response is a ConversationDTO
       expect(response.body).toHaveProperty('id');
-      expect(response.body.status).toBe('completed'); // Mapped conversation status
+      expect(response.body.status).toBe('completed'); // Status is now included from call
+      expect(response.body.id.toString()).toBe(conversation.id);
 
-      // Verify call end time and duration were set
-      const updatedConversation = await Conversation.findById(conversation.id);
-      expect(updatedConversation.status).toBe('completed');
-      expect(updatedConversation.endTime).toBeTruthy();
-      expect(updatedConversation.duration).toBeGreaterThan(0);
+      // Verify call end time and duration were set (these are on Call, not Conversation)
+      const updatedCall = await Call.findById(call._id);
+      expect(updatedCall.status).toBe('completed');
+      expect(updatedCall.endTime).toBeTruthy();
+      expect(updatedCall.duration).toBeGreaterThan(0);
     });
 
     it('should return 400 for invalid status', async () => {
@@ -250,18 +286,30 @@ describe('Call Workflow Integration Tests', () => {
 
   describe('POST /v1/calls/:conversationId/end', () => {
     let conversation;
+    let call;
 
     beforeEach(async () => {
-      // Create a test conversation
-      conversation = new Conversation({
+      // Create a test call first
+      call = await Call.create({
+        callSid: 'CA1234567890abcdef',
         patientId: patient.id,
         agentId: caregiver.id,
+        status: 'in-progress',
         callStatus: 'connected',
-        callStartTime: new Date(Date.now() - 60000), // 1 minute ago
         callType: 'outbound',
-        status: 'in-progress'
+        startTime: new Date(Date.now() - 60000), // 1 minute ago
+        callStartTime: new Date(Date.now() - 60000)
       });
-      await conversation.save();
+
+      // Create a test conversation linked to the call
+      conversation = await Conversation.create({
+        patientId: patient.id,
+        callId: call._id
+      });
+
+      // Link call to conversation
+      call.conversationId = conversation._id;
+      await call.save();
     });
 
     it('should end call successfully', async () => {
@@ -278,14 +326,15 @@ describe('Call Workflow Integration Tests', () => {
 
       // The response is a ConversationDTO
       expect(response.body).toHaveProperty('id');
-      expect(response.body.status).toBe('completed');
+      expect(response.body.status).toBe('completed'); // Status is now included from call
+      expect(response.body.id.toString()).toBe(conversation.id);
 
-      // Verify database was updated
-      const updatedConversation = await Conversation.findById(conversation.id);
-      expect(updatedConversation.status).toBe('completed');
-      expect(updatedConversation.callNotes).toBe(endData.notes);
-      expect(updatedConversation.endTime).toBeTruthy();
-      expect(updatedConversation.duration).toBeGreaterThan(0);
+      // Verify call was updated (status, notes, endTime, duration are on Call, not Conversation)
+      const updatedCall = await Call.findById(call._id);
+      expect(updatedCall.status).toBe('completed');
+      expect(updatedCall.callNotes).toBe(endData.notes);
+      expect(updatedCall.endTime).toBeTruthy();
+      expect(updatedCall.duration).toBeGreaterThan(0);
     });
 
     it('should return 400 without required outcome', async () => {
@@ -303,27 +352,43 @@ describe('Call Workflow Integration Tests', () => {
 
   describe('GET /v1/calls/active', () => {
     beforeEach(async () => {
-      // Create multiple conversations with different statuses
-      const activeConversations = [
-        {
-          patientId: patient.id,
-          agentId: caregiver.id,
-          callStatus: 'ringing',
-          callStartTime: new Date(),
-          callType: 'outbound',
-          status: 'initiated'
-        },
-        {
-          patientId: patient.id,
-          agentId: caregiver.id,
-          callStatus: 'connected',
-          callStartTime: new Date(),
-          callType: 'outbound',
-          status: 'in-progress'
-        }
-      ];
+      // Create multiple calls with different statuses and their conversations
+      const call1 = await Call.create({
+        callSid: 'CA1111111111111111',
+        patientId: patient.id,
+        agentId: caregiver.id,
+        status: 'in-progress',
+        callStatus: 'ringing',
+        callType: 'outbound',
+        startTime: new Date(),
+        callStartTime: new Date()
+      });
 
-      await Conversation.insertMany(activeConversations);
+      const call2 = await Call.create({
+        callSid: 'CA2222222222222222',
+        patientId: patient.id,
+        agentId: caregiver.id,
+        status: 'in-progress',
+        callStatus: 'connected',
+        callType: 'outbound',
+        startTime: new Date(),
+        callStartTime: new Date()
+      });
+
+      const conversation1 = await Conversation.create({
+        patientId: patient.id,
+        callId: call1._id
+      });
+
+      const conversation2 = await Conversation.create({
+        patientId: patient.id,
+        callId: call2._id
+      });
+
+      call1.conversationId = conversation1._id;
+      call2.conversationId = conversation2._id;
+      await call1.save();
+      await call2.save();
     });
 
     it('should return active calls for the agent', async () => {
@@ -351,19 +416,31 @@ describe('Call Workflow Integration Tests', () => {
 
   describe('GET /v1/calls/:conversationId/conversation', () => {
     let conversation;
+    let call;
 
     beforeEach(async () => {
-      // Create a test conversation
-      conversation = new Conversation({
+      // Create a test call first
+      call = await Call.create({
+        callSid: 'CA1234567890abcdef',
         patientId: patient.id,
         agentId: caregiver.id,
-        callStatus: 'connected',
-        callStartTime: new Date(),
-        callType: 'outbound',
         status: 'in-progress',
+        callStatus: 'connected',
+        callType: 'outbound',
+        startTime: new Date(),
+        callStartTime: new Date(),
         callNotes: 'Test conversation'
       });
-      await conversation.save();
+
+      // Create a test conversation linked to the call
+      conversation = await Conversation.create({
+        patientId: patient.id,
+        callId: call._id
+      });
+
+      // Link call to conversation
+      call.conversationId = conversation._id;
+      await call.save();
     });
 
     it('should return conversation with call details', async () => {

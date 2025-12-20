@@ -11,7 +11,7 @@ import { useGetConversationQuery } from "../services/api/conversationApi"
 import { useGetCallStatusQuery } from "../services/api/callWorkflowApi"
 import { useTheme } from "app/theme/ThemeContext"
 import { logger } from "../utils/logger"
-import { STRINGS } from "../constants"
+import { STRINGS, POLLING_INTERVALS } from "../constants"
 
 export function CallScreen() {
   const dispatch = useDispatch()
@@ -20,7 +20,7 @@ export function CallScreen() {
   const currentConversation = useSelector(getConversation)
   const { colors, isLoading: themeLoading } = useTheme()
 
-  // Get call status - no polling (polling only for alerts)
+  // Get call status - enable polling for dynamic updates
   const { 
     data: callStatusData, 
     error: callStatusError,
@@ -30,10 +30,12 @@ export function CallScreen() {
     activeCall?.conversationId || '',
     {
       skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID,
+      // Enable polling for dynamic status updates
+      pollingInterval: POLLING_INTERVALS.CALL_STATUS,
     }
   )
 
-  // Get full conversation data if call status is working
+  // Get full conversation data - enable polling for dynamic message updates
   const { 
     data: liveConversationData, 
     error: conversationError,
@@ -42,8 +44,9 @@ export function CallScreen() {
   } = useGetConversationQuery(
     { conversationId: activeCall?.conversationId || '' },
     {
-      skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID || !callStatusData,
-      // Only try conversation API if call status is working
+      skip: !activeCall?.conversationId || activeCall.conversationId === STRINGS.TEMP_CALL_ID,
+      // Enable polling for dynamic message updates
+      pollingInterval: POLLING_INTERVALS.CONVERSATION,
     }
   )
 
@@ -169,16 +172,27 @@ export function CallScreen() {
       </View>
 
       {/* Call Status Banner - Prominently displayed */}
-      {activeCall && (
+      {activeCall && activeCall.conversationId && (
         <View style={styles.bannerContainer}>
           <CallStatusBanner
-            conversationId={activeCall.conversationId || 'temp-call'}
+            conversationId={activeCall.conversationId}
             initialStatus={activeCall.status || 'initiated'}
             patientName={patient.name}
             onStatusChange={(status) => {
               logger.debug('Call status changed:', status)
             }}
           />
+        </View>
+      )}
+      
+      {/* Show error if activeCall exists but no conversationId (shouldn't happen normally) */}
+      {activeCall && !activeCall.conversationId && (
+        <View style={styles.bannerContainer}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>
+              Error: Call initiated but conversation ID is missing. Please try again.
+            </Text>
+          </View>
         </View>
       )}
       
@@ -378,6 +392,18 @@ const createStyles = (colors: any) => StyleSheet.create({
   errorText: {
     color: colors.palette.biancaError,
     fontSize: 16,
+  },
+  infoContainer: {
+    padding: 16,
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.palette.biancaBorder,
+  },
+  infoText: {
+    color: colors.palette.biancaHeader,
+    fontSize: 14,
+    textAlign: 'center',
   },
   debugContainer: {
     backgroundColor: colors.palette.neutral200,

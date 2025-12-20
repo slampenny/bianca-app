@@ -48,9 +48,10 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       logger.debug('CallNowButton - response.success:', (response as any).success)
       
       dispatch(setActiveCall(response))
+      // Conversation is now created immediately, so conversationId is always available
       dispatch(setCallStatus({
         conversationId: response.conversationId,
-        status: response.status,
+        status: response.status || 'initiated',
         callStartTime: new Date().toISOString(),
         callDuration: 0,
         callOutcome: null,
@@ -58,22 +59,17 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
         patient: {
           _id: patientId,
           name: patientName,
-          phone: "" // Will be populated by backend
+          phone: response.patientPhone || "" // Will be populated by backend
         },
         agent: {
           _id: response.agentId,
           name: response.agentName
         },
-        status: "initiated"
+        status: response.status || "initiated"
       }))
       
-      // Navigate to conversation screen with call in progress
-      navigation.navigate("Conversations" as keyof HomeStackParamList, {
-        conversationId: response.conversationId,
-        isActiveCall: true,
-        status: response.status,
-        patientName: response.patientName
-      })
+      // Navigate to call screen
+      navigation.navigate("Call" as keyof HomeStackParamList)
       
     } catch (err: any) {
       const errorMessage = err?.response?.data?.message || 'Failed to initiate call'
