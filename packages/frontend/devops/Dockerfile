@@ -47,8 +47,9 @@ RUN echo "Validating web-required images..." && \
     done && \
     echo "✅ Web-required images validated"
 
-# Build argument for environment
+# Build arguments
 ARG BUILD_ENV=production
+ARG BUILD_VERSION=0.00.0001
 
 # Fix broken expo symlink if needed (monorepo symlinks point to workspace root)
 RUN echo "Checking expo CLI..." && \
@@ -81,14 +82,18 @@ RUN if [ "$BUILD_ENV" = "staging" ]; then \
       echo "Clearing Metro cache..." && \
       rm -rf .expo .metro node_modules/.cache 2>/dev/null || true && \
       echo "Setting EXPO_PUBLIC_ENVIRONMENT=staging..." && \
+      echo "Setting EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION..." && \
       export EXPO_PUBLIC_ENVIRONMENT=staging && \
-      EXPO_PUBLIC_ENVIRONMENT=staging yarn bundle:web:staging || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
-      echo "Staging build complete"; \
+      export EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION && \
+      EXPO_PUBLIC_ENVIRONMENT=staging EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION yarn bundle:web:staging || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
+      echo "Staging build complete with version $BUILD_VERSION"; \
     else \
       echo "Building for production environment..." && \
+      echo "Setting EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION..." && \
+      export EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION && \
       rm -rf .expo .metro node_modules/.cache 2>/dev/null || true && \
-      yarn bundle:web || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
-      echo "Production build complete"; \
+      EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION yarn bundle:web || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
+      echo "Production build complete with version $BUILD_VERSION"; \
     fi
 
 # Production stage

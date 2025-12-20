@@ -455,11 +455,12 @@ function ProfileScreen() {
             {/* Legal Links */}
             <LegalLinks style={styles.legalLinks} />
             
-            {/* Version Number - CRITICAL: Increment this on EVERY staging deployment push
-                Format: 0.00.0001 (increment last digit: 0001 -> 0002 -> 0003, etc.)
-                This is the ONLY way to verify the frontend container is actually updating */}
+            {/* Version Number - Auto-generated from build-time environment variable
+                This changes on every build, allowing us to verify frontend container updates */}
             <View style={styles.versionContainer}>
-              <Text style={styles.versionText}>Version: 0.00.0001</Text>
+              <Text style={styles.versionText}>
+                Version: {process.env.EXPO_PUBLIC_BUILD_VERSION || '0.00.0001'}
+              </Text>
             </View>
           </View>
         </ScrollView>
