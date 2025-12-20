@@ -43,8 +43,10 @@ echo "   Stopping any existing containers..."
 docker compose down 2>/dev/null || true
 
 # Start containers - use background process with timeout to prevent hangs
-# --pull always ensures we use the latest images, --force-recreate ensures new containers
-echo "   Starting containers with newly pulled images..."
+# CRITICAL: --pull always forces Docker to check ECR even if image exists locally
+# --force-recreate ensures new containers even if config hasn't changed
+echo "   Starting containers with --pull always to ensure latest images..."
+echo "   CRITICAL: This forces Docker to check ECR for image updates..."
 docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 DOCKER_PID=$!
 
