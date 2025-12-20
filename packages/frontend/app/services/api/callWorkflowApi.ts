@@ -7,7 +7,8 @@ export interface InitiateCallRequest {
 }
 
 export interface InitiateCallResponse {
-  conversationId: string
+  conversationId: string  // Always available - conversation is created when call is initiated
+  callId: string
   callSid: string
   patientId: string
   patientName: string
@@ -15,6 +16,14 @@ export interface InitiateCallResponse {
   agentId: string
   agentName: string
   status: string
+  callStatus?: string
+}
+
+export interface ConversationIdResponse {
+  callId: string
+  callSid: string
+  conversationId: string | null
+  hasConversation: boolean
 }
 
 export interface CallStatusResponse {
@@ -98,6 +107,9 @@ export const callWorkflowApi = createApi({
     getConversationWithCallDetails: builder.query<{ data: CallStatusResponse }, string>({
       query: (conversationId) => `/calls/${conversationId}/conversation`,
     }),
+    getConversationIdByCall: builder.query<ConversationIdResponse, string>({
+      query: (callIdOrSid) => `/calls/by-call/${callIdOrSid}/conversation-id`,
+    }),
   }),
 })
 
@@ -108,4 +120,5 @@ export const {
   useEndCallMutation,
   useGetActiveCallsQuery,
   useGetConversationWithCallDetailsQuery,
+  useGetConversationIdByCallQuery,
 } = callWorkflowApi

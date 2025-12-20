@@ -445,7 +445,7 @@ resource "aws_lb_listener" "production_https" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
-  certificate_arn   = data.aws_acm_certificate.app_cert_legacy.arn # Legacy cert as default
+  certificate_arn   = aws_acm_certificate_validation.primary_domain_cert.certificate_arn # Primary domain cert as default (covers app.biancawellness.com, api.biancawellness.com, etc.)
 
   default_action {
     type             = "forward"
@@ -453,10 +453,10 @@ resource "aws_lb_listener" "production_https" {
   }
 }
 
-# Add primary domain certificate to production listener (SNI - supports multiple certs)
-resource "aws_lb_listener_certificate" "production_https_primary" {
+# Add legacy wildcard certificate to production listener (SNI - for backward compatibility with myphonefriend.com domains)
+resource "aws_lb_listener_certificate" "production_https_legacy" {
   listener_arn    = aws_lb_listener.production_https.arn
-  certificate_arn = aws_acm_certificate_validation.primary_domain_cert.certificate_arn
+  certificate_arn = data.aws_acm_certificate.app_cert_legacy.arn
 }
 
 # Redirect rules - higher priority (lower number) so redirects happen first

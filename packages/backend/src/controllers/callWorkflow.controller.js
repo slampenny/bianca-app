@@ -13,7 +13,7 @@ const logger = require('../config/logger');
 const initiateCall = catchAsync(async (req, res) => {
   const { patientId, callNotes } = req.body;
   const agentId = req.caregiver.id; // Get agent ID from authenticated user
-  let conversation; // Declare conversation variable for error handling
+  let call = null; // Declare call variable for error handling
 
   // Validate patient exists and has phone number
   const patient = await patientService.getPatientById(patientId);
@@ -57,19 +57,34 @@ const initiateCall = catchAsync(async (req, res) => {
     call.callType = 'outbound';
     await call.save();
     
-    // Note: Conversation will be created when call is answered and messages start
-    // For now, we return the call ID - frontend can use this to track the call
+    // Create Conversation immediately when call is initiated
+    // This ensures conversationId is always available for the frontend
+    let conversation = await Conversation.findOne({ callId: call._id });
+    if (!conversation) {
+      // Create conversation using the conversation service
+      conversation = await conversationService.createConversationForPatient(patient._id, call._id);
+      
+      // Update call with conversation reference
+      call.conversationId = conversation._id;
+      await call.save();
+      
+      logger.info(`[CallWorkflow] Created Conversation ${conversation._id} for call ${call._id}`);
+    } else {
+      logger.info(`[CallWorkflow] Found existing Conversation ${conversation._id} for call ${call._id}`);
+    }
 
-    logger.info(`[CallWorkflow] Call initiated for patient ${patient.name}, SID: ${callSid}`);
+    logger.info(`[CallWorkflow] Call initiated for patient ${patient.name}, SID: ${callSid}, Conversation: ${conversation._id}`);
 
     res.status(httpStatus.CREATED).send({
-      callId: call._id,
+      callId: call._id.toString(),
       callSid,
+      conversationId: conversation._id.toString(), // Always available now
       patientId: patient._id,
       patientName: patient.name,
       patientPhone: patient.phone,
       agentId: agent._id,
       agentName: agent.name,
+      status: call.status,
       callStatus: call.callStatus,
     });
 
@@ -107,7 +122,7 @@ const getCallStatus = catchAsync(async (req, res) => {
   
   // Populate patient and agent details
   await conversation.populate('patientId', 'name phone');
-  await conversation.populate('agentId', 'name');
+  // Note: agentId is on Call, not Conversation
   await call.populate('patientId', 'name phone');
   await call.populate('agentId', 'name');
   
@@ -267,6 +282,19 @@ const updateCallStatus = catchAsync(async (req, res) => {
 
   // Return conversation with call data populated
   await conversation.populate('callId');
+  // Set status from call for DTO (ConversationDTO expects status field)
+  conversation.status = call.status;
+  conversation.callStatus = call.callStatus;
+  conversation.callNotes = call.callNotes;
+  conversation.callOutcome = call.callOutcome;
+  conversation.startTime = call.startTime;
+  conversation.endTime = call.endTime;
+  conversation.duration = call.duration;
+  conversation.callStartTime = call.callStartTime;
+  conversation.callEndTime = call.callEndTime;
+  conversation.callDuration = call.callDuration;
+  conversation.agentId = call.agentId;
+  conversation.callSid = call.callSid;
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
@@ -416,6 +444,19 @@ const endCall = catchAsync(async (req, res) => {
 
   // Return conversation with call data populated
   await conversation.populate('callId');
+  // Set status from call for DTO (ConversationDTO expects status field)
+  conversation.status = call.status;
+  conversation.callStatus = call.callStatus;
+  conversation.callNotes = call.callNotes;
+  conversation.callOutcome = call.callOutcome;
+  conversation.startTime = call.startTime;
+  conversation.endTime = call.endTime;
+  conversation.duration = call.duration;
+  conversation.callStartTime = call.callStartTime;
+  conversation.callEndTime = call.callEndTime;
+  conversation.callDuration = call.callDuration;
+  conversation.agentId = call.agentId;
+  conversation.callSid = call.callSid;
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
@@ -492,6 +533,49 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ data: callDetails });
 });
 
+/**
+ * Get conversation ID from call ID or call SID
+ * This is useful when a call is initiated but conversation hasn't been created yet
+ * @route GET /api/v1/calls/by-call/:callIdOrSid/conversation-id
+ */
+const getConversationIdByCall = catchAsync(async (req, res) => {
+  const { callIdOrSid } = req.params;
+  
+  // Try to find by callId (MongoDB ObjectId) first
+  let call = await Call.findById(callIdOrSid);
+  
+  // If not found, try to find by callSid
+  if (!call) {
+    call = await Call.findOne({ callSid: callIdOrSid });
+  }
+  
+  if (!call) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Call not found');
+  }
+  
+  // Check if conversation exists
+  let conversationId = null;
+  if (call.conversationId) {
+    conversationId = call.conversationId.toString();
+  } else {
+    // Try to find conversation by callId
+    const conversation = await Conversation.findOne({ callId: call._id });
+    if (conversation) {
+      conversationId = conversation._id.toString();
+      // Update call with conversationId for future lookups
+      call.conversationId = conversation._id;
+      await call.save();
+    }
+  }
+  
+  res.status(httpStatus.OK).send({
+    callId: call._id.toString(),
+    callSid: call.callSid,
+    conversationId,
+    hasConversation: !!conversationId
+  });
+});
+
 module.exports = {
   initiateCall,
   getCallStatus,
@@ -499,4 +583,5 @@ module.exports = {
   endCall,
   getActiveCalls,
   getConversationWithCallDetails,
+  getConversationIdByCall,
 };

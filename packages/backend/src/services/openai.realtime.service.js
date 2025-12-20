@@ -379,10 +379,12 @@ class OpenAIRealtimeService {
         // Find the Call record
         const call = await Call.findOne({ callSid });
         if (call) {
-          // Check if Conversation already exists for this call
+          // Conversation should already exist (created when call was initiated)
+          // But handle the case where it might not exist (backward compatibility)
           let conversation = await Conversation.findOne({ callId: call._id });
           if (!conversation) {
-            // Create Conversation when call is answered and conversation starts
+            // Fallback: Create Conversation if it doesn't exist (shouldn't normally happen)
+            logger.warn(`[OpenAI Realtime] Conversation not found for call ${call._id}, creating fallback conversation`);
             conversation = await Conversation.create({
               callId: call._id,
               patientId: call.patientId,
@@ -392,7 +394,9 @@ class OpenAIRealtimeService {
             call.conversationId = conversation._id;
             await call.save();
             
-            logger.info(`[OpenAI Realtime] Created Conversation ${conversation._id} for call ${call._id}`);
+            logger.info(`[OpenAI Realtime] Created fallback Conversation ${conversation._id} for call ${call._id}`);
+          } else {
+            logger.info(`[OpenAI Realtime] Using existing Conversation ${conversation._id} for call ${call._id}`);
           }
           finalConversationId = conversation._id.toString();
         }
