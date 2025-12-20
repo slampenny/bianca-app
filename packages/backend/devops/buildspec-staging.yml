@@ -93,9 +93,16 @@ phases:
         fi
         cd packages/frontend
         # Use --no-cache for staging to ensure we always get fresh code
+        # Generate unique build version from git commit and timestamp
+        BUILD_VERSION="0.00.$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7 | sed 's/[^0-9]//g' | head -c 4)"
+        if [ -z "$BUILD_VERSION" ] || [ "$BUILD_VERSION" = "0.00." ]; then
+          BUILD_VERSION="0.00.$(date +%s | tail -c 4)"
+        fi
         echo "   Building with --no-cache to ensure fresh code..."
+        echo "   Build version: $BUILD_VERSION"
         if docker build --no-cache \
                      --build-arg BUILD_ENV=staging \
+                     --build-arg BUILD_VERSION=$BUILD_VERSION \
                      -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:staging \
                      -f devops/Dockerfile .; then
