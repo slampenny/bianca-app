@@ -46,16 +46,56 @@ fi
 # We just need to pull the latest images
 
 # Pull latest images (with timeout to prevent hangs)
-# Remove old images first to force fresh pull
-echo "   Removing old images to force fresh pull..."
+# CRITICAL: Remove ALL old images first to force fresh pull
+echo "   Removing ALL old images to force fresh pull..."
 cd "$DEPLOY_DIR"
 docker compose down 2>/dev/null || true
+
+# Remove ALL bianca-app images by ID (most reliable)
+echo "   Removing all cached bianca-app images..."
+docker images --format "{{.ID}} {{.Repository}}" | grep "bianca-app" | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
 docker images | grep "bianca-app" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
-echo "   Pulling latest Docker images (5 min timeout)..."
-timeout 300 docker compose pull || {
-  echo "⚠️  Image pull timed out or failed, but continuing..."
+# Force remove dangling images
+docker image prune -af || true
+
+# CRITICAL: Pull images directly by tag to force fresh pull from ECR
+# docker compose pull doesn't always pull if tag exists locally
+echo "   Pulling latest Docker images directly from ECR (5 min timeout)..."
+ECR_REGISTRY="730335291008.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+# Determine image tag based on environment
+if echo "$INSTANCE_NAME" | grep -qi "production"; then
+  IMAGE_TAG="production"
+else
+  IMAGE_TAG="staging"
+fi
+
+echo "   Pulling backend image: ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG}"
+timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:${IMAGE_TAG} || {
+  echo "⚠️  Backend image pull failed, trying latest tag..."
+  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-backend:latest || echo "⚠️  Backend pull failed"
 }
+
+echo "   Pulling frontend image: ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG}"
+timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:${IMAGE_TAG} || {
+  echo "⚠️  Frontend image pull failed, trying latest tag..."
+  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-frontend:latest || echo "⚠️  Frontend pull failed"
+}
+
+echo "   Pulling asterisk image: ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG}"
+timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:${IMAGE_TAG} || {
+  echo "⚠️  Asterisk image pull failed, trying latest tag..."
+  timeout 300 docker pull ${ECR_REGISTRY}/bianca-app-asterisk:latest || echo "⚠️  Asterisk pull failed"
+}
+
+# Verify what we actually pulled
+echo ""
+echo "   =========================================="
+echo "   VERIFICATION: Images pulled from ECR"
+echo "   =========================================="
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Digest}}\t{{.CreatedAt}}\t{{.ID}}" | grep -E "REPOSITORY|bianca-app" || echo "   (No bianca-app images found)"
+echo "   =========================================="
 
 echo "✅ AfterInstall completed"
 
