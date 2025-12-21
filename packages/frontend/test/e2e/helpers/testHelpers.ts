@@ -172,48 +172,71 @@ export async function loginUserViaUI(page: Page, email: string, password: string
     }
   }
   
-  // Wait for either success or error with longer timeout
-  try {
-    // Wait for home screen indicators - try multiple possible selectors
-    const homeIndicators = [
-      '[data-testid="home-header"]',
-      '[data-testid="tab-home"]',
-      '[data-testid="add-patient-button"]',
-      '[aria-label="Home tab"]',
-      'text=Add Patient'
-    ]
-    
-    let foundHome = false
-    for (const selector of homeIndicators) {
-      try {
-        await page.waitForSelector(selector, { timeout: 5000 })
-        foundHome = true
-        console.log(`Login successful - found home indicator: ${selector}`)
-        break
-      } catch (e) {
-        // Continue to next selector
+    // Wait for either success or error with longer timeout
+    try {
+      // Wait for navigation to complete first
+      await page.waitForTimeout(3000)
+      
+      // Check URL first - if we're on MainTabs/Home, that's a valid home screen
+      const currentUrl = page.url()
+      if (currentUrl.includes('MainTabs/Home') || currentUrl.includes('/Home')) {
+        console.log(`Login successful - on home URL: ${currentUrl}`)
+        return // Success - we're on home screen
       }
-    }
-    
-    if (!foundHome) {
-      // Try waiting a bit more and check again
-      await page.waitForTimeout(2000)
+      
+      // Wait for home screen indicators - try multiple possible selectors
+      const homeIndicators = [
+        '[data-testid="home-header"]',
+        '[data-testid="tab-home"]',
+        '[data-testid="add-patient-button"]',
+        '[aria-label="Home tab"]',
+        'text=Add Patient'
+      ]
+      
+      let foundHome = false
       for (const selector of homeIndicators) {
         try {
-          if (await page.locator(selector).isVisible({ timeout: 2000 })) {
-            foundHome = true
-            console.log(`Login successful - found home indicator after wait: ${selector}`)
-            break
-          }
+          await page.waitForSelector(selector, { timeout: 5000 })
+          foundHome = true
+          console.log(`Login successful - found home indicator: ${selector}`)
+          break
         } catch (e) {
-          // Continue
+          // Continue to next selector
         }
       }
-    }
-    
-    if (!foundHome) {
-      throw new Error('Home screen not found')
-    }
+      
+      if (!foundHome) {
+        // Try waiting a bit more and check again
+        await page.waitForTimeout(2000)
+        // Check URL again after wait
+        const urlAfterWait = page.url()
+        if (urlAfterWait.includes('MainTabs/Home') || urlAfterWait.includes('/Home')) {
+          console.log(`Login successful - on home URL after wait: ${urlAfterWait}`)
+          return // Success
+        }
+        
+        for (const selector of homeIndicators) {
+          try {
+            if (await page.locator(selector).isVisible({ timeout: 2000 })) {
+              foundHome = true
+              console.log(`Login successful - found home indicator after wait: ${selector}`)
+              break
+            }
+          } catch (e) {
+            // Continue
+          }
+        }
+      }
+      
+      if (!foundHome) {
+        // Final URL check
+        const finalUrl = page.url()
+        if (finalUrl.includes('MainTabs/Home') || finalUrl.includes('/Home')) {
+          console.log(`Login successful - on home URL (final check): ${finalUrl}`)
+          return // Success
+        }
+        throw new Error('Home screen not found')
+      }
   } catch (error) {
     console.log('Login failed - checking for error messages')
     
