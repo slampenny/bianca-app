@@ -27,12 +27,15 @@ export default defineConfig({
   // If you're actively developing/fixing code, start the dev server manually:
   //   yarn web:staging  (runs on port 8081 with hot-reloading)
   // Then Playwright will reuse it. Otherwise, it will build and serve static files.
-  webServer: {
-    command: 'yarn bundle:web:staging && npx serve dist -l 8081',
-    port: 8081,
-    timeout: 120000, // 2 minutes for build + serve
-    reuseExistingServer: true, // Always reuse if dev server is already running (for live code changes)
-  },
+  // In CI (CodeBuild), the frontend is already running in a Docker container, so disable webServer
+  ...(process.env.CODEBUILD_BUILD_ID ? {} : {
+    webServer: {
+      command: 'yarn bundle:web:staging && npx serve dist -l 8081',
+      port: 8081,
+      timeout: 120000, // 2 minutes for build + serve
+      reuseExistingServer: true, // Always reuse if dev server is already running (for live code changes)
+    },
+  }),
   // Note: Backend (port 3000) must still be running separately
   // Start it with `cd packages/backend && yarn dev` before running tests
   //

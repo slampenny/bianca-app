@@ -25,18 +25,26 @@ class ConnectionManager {
    * @returns {WebSocket} Created WebSocket instance
    */
   static createConnection(connectionState, callId, attachHandlers) {
-    const model = config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17';
+    // Model is now set in config based on useGA flag (gpt-realtime for GA, gpt-4o-realtime-preview-2025-01-12 for Beta)
+    const model = config.openai.realtimeModel || (config.openai.useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12');
     const voice = config.openai.realtimeVoice || 'alloy';
     const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
-    logger.info(`[Connection Manager] Connecting to ${wsUrl} for callId: ${callId}`);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    
+    logger.info(`[Connection Manager] Connecting to ${wsUrl} for callId: ${callId} (GA: ${useGA})`);
+
+    // Build headers - remove beta header if using GA
+    const headers = {
+      Authorization: `Bearer ${config.openai.apiKey}`,
+    };
+    
+    // Only add beta header if NOT using GA
+    if (!useGA) {
+      headers['OpenAI-Beta'] = 'realtime=v1';
+    }
 
     // Create WebSocket with immediate event handler setup
-    const ws = new WebSocket(wsUrl, {
-      headers: {
-        Authorization: `Bearer ${config.openai.apiKey}`,
-        'OpenAI-Beta': 'realtime=v1',
-      },
-    });
+    const ws = new WebSocket(wsUrl, { headers });
 
     // Attach all handlers immediately
     if (attachHandlers) {

@@ -366,7 +366,12 @@ class OpenAIRealtimeService {
       return existingConn.status !== 'error' && existingConn.status !== 'closed';
     }
 
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
     logger.info(`[OpenAI Realtime] Initializing for callId: ${callId} (Initial Asterisk ID: ${initialAsteriskChannelId})`);
+    logger.info(`[OpenAI Realtime] Using ${apiVersion} API (useGA: ${useGA})`);
+    logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12')}`);
+    logger.info(`[OpenAI Realtime] Transcription: ${config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe'}`);
     logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);
     if (patientId) {
       logger.info(`[OpenAI Realtime] Emergency detection enabled for patient: ${patientId}`);
@@ -681,7 +686,9 @@ class OpenAIRealtimeService {
    * Handle WebSocket open event
    */
   async handleOpen(callId) {
-    logger.info(`[OpenAI Realtime] WebSocket opened for callId: ${callId}`);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
+    logger.info(`[OpenAI Realtime] WebSocket opened for callId: ${callId} (${apiVersion} API)`);
     this.updateConnectionStatus(callId, 'connected');
     this.reconnectAttempts.set(callId, 0);
     // OpenAI will send session.created automatically
@@ -710,7 +717,9 @@ class OpenAIRealtimeService {
    */
   handleError(callId, error) {
     this.clearConnectionTimeout(callId);
-    logger.error(`[OpenAI Realtime] WebSocket error for ${callId}: ${error.message}`);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
+    logger.error(`[OpenAI Realtime] WebSocket error for ${callId} (${apiVersion}): ${error.message}`);
     this.notify(callId, 'openai_error', { message: error.message || 'WebSocket error' });
 
     if (this.connections.has(callId)) {
@@ -724,7 +733,9 @@ class OpenAIRealtimeService {
   handleClose(callId, code, reason) {
     this.clearConnectionTimeout(callId);
     const reasonStr = reason ? reason.toString() : 'No reason provided';
-    logger.info(`[OpenAI Realtime] WebSocket closed for ${callId}. Code: ${code}, Reason: ${reasonStr}`);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
+    logger.info(`[OpenAI Realtime] WebSocket closed for ${callId} (${apiVersion}). Code: ${code}, Reason: ${reasonStr}`);
 
     const currentConnState = this.connections.get(callId);
     if (!currentConnState) {
@@ -938,33 +949,13 @@ class OpenAIRealtimeService {
     conn.sessionId = message.session.id;
 
     // CRITICAL: Add turn detection to prevent AI from talking over user
-    const sessionConfig = {
-      type: 'session.update',
-      session: {
-        modalities: ['text', 'audio'],
-        instructions: conn.initialPrompt || 'You are Bianca, a helpful AI assistant. Always respond in English.',
-        voice: config.openai.realtimeVoice || 'alloy',
-        input_audio_format: 'g711_ulaw',
-        output_audio_format: 'g711_ulaw',
+    // Use MessageHandler to build session config (supports both Beta and GA formats)
+    const sessionConfig = MessageHandler.buildSessionConfig(conn);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
 
-        // CRITICAL: Add turn detection - optimized for faster response and natural interruptions
-        // Reduced delays for more conversational feel
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.6,              // More selective (ignores quiet background)
-          prefix_padding_ms: 200,      // Reduced from 300ms - faster speech start detection
-          silence_duration_ms: 500     // Reduced from 1000ms - faster response after user stops speaking
-        },
-
-        // Add input transcription for debugging
-        input_audio_transcription: {
-          model: 'whisper-1',
-        }
-      },
-    };
-
-    logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId}`);
-    logger.debug(`[OpenAI Realtime] Session config: ${JSON.stringify(sessionConfig.session, null, 2)}`);
+    logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId} (${apiVersion} format)`);
+    logger.debug(`[OpenAI Realtime] Session config (${apiVersion}): ${JSON.stringify(sessionConfig.session, null, 2)}`);
 
     try {
       await this.sendJsonMessage(callId, sessionConfig);
@@ -1000,6 +991,8 @@ class OpenAIRealtimeService {
     const message = MessageHandler.parseMessage(data);
     if (!message) {
       logger.error(`[OpenAI Realtime] Failed to parse message for ${callId}`);
+      const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+      logger.error(`[OpenAI Realtime] API Version: ${useGA ? 'GA' : 'Beta'}, Raw message (first 500 chars): ${data.toString().substring(0, 500)}`);
       return;
     }
 
@@ -1011,7 +1004,9 @@ class OpenAIRealtimeService {
     conn.lastActivity = Date.now();
 
     // Log all message types for debugging
-    logger.info(`[OpenAI Realtime] RECEIVED from OpenAI (${callId}): type=${message.type}`);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
+    logger.info(`[OpenAI Realtime] RECEIVED from OpenAI (${callId}, ${apiVersion}): type=${message.type}`);
 
     // Enhanced debugging for response-related messages
     if (message.type.startsWith('response.')) {
@@ -1314,17 +1309,32 @@ class OpenAIRealtimeService {
           break;
 
         default:
-          logger.info(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId}`);
+          // Unhandled message type - log for debugging and track for migration monitoring
+          const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+          const apiVersion = useGA ? 'GA' : 'Beta';
+          logger.warn(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId} (${apiVersion})`);
           const connMsg = this.connections.get(callId);
           if (connMsg) {
             connMsg.lastMessageTime = Date.now();
             connMsg.messageCount = (connMsg.messageCount || 0) + 1;
             logger.debug(`[OpenAI Realtime] Message #${connMsg.messageCount} received for ${callId}: ${message.type}`);
+            // Track unexpected events for migration monitoring
+            if (!connMsg._unexpectedEvents) connMsg._unexpectedEvents = [];
+            connMsg._unexpectedEvents.push({
+              type: message.type,
+              timestamp: new Date().toISOString(),
+              apiVersion,
+              messageStructure: JSON.stringify(message).substring(0, 200)
+            });
           }
+          logger.debug(`[OpenAI Realtime] Unhandled message structure (${apiVersion}): ${JSON.stringify(message, null, 2).substring(0, 500)}`);
       }
     } catch (err) {
-      logger.error(`[OpenAI Realtime] Error processing message type ${message?.type} for ${callId}: ${err.message}`, err);
-      this.notify(callId, 'openai_message_processing_error', { messageType: message?.type, error: err.message });
+      const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+      const apiVersion = useGA ? 'GA' : 'Beta';
+      logger.error(`[OpenAI Realtime] Error processing message type ${message?.type} for ${callId} (${apiVersion}): ${err.message}`, err);
+      logger.error(`[OpenAI Realtime] Message structure that caused error: ${JSON.stringify(message, null, 2).substring(0, 1000)}`);
+      this.notify(callId, 'openai_message_processing_error', { messageType: message?.type, error: err.message, apiVersion });
     }
   }
 
@@ -1344,9 +1354,11 @@ class OpenAIRealtimeService {
 
     // Use MessageHandler to build session config
     const sessionConfig = MessageHandler.buildSessionConfig(conn);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
 
-    logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId}`);
-    logger.debug(`[OpenAI Realtime] Session config: ${JSON.stringify(sessionConfig.session, null, 2)}`);
+    logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId} (${apiVersion} format)`);
+    logger.debug(`[OpenAI Realtime] Session config (${apiVersion}): ${JSON.stringify(sessionConfig.session, null, 2)}`);
 
     try {
       await this.sendJsonMessage(callId, sessionConfig);
@@ -1364,8 +1376,10 @@ class OpenAIRealtimeService {
     const conn = this.connections.get(callId);
     if (!conn) return;
 
-    logger.info(`[OpenAI Realtime] Session UPDATED for ${callId}`);
-    logger.debug(`[OpenAI Realtime] Session update response for ${callId}: ${JSON.stringify(message)}`);
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const apiVersion = useGA ? 'GA' : 'Beta';
+    logger.info(`[OpenAI Realtime] Session UPDATED for ${callId} (${apiVersion})`);
+    logger.debug(`[OpenAI Realtime] Session update response for ${callId} (${apiVersion}): ${JSON.stringify(message)}`);
 
     // Track session update timing
     conn.sessionUpdateTime = Date.now();
@@ -3647,17 +3661,26 @@ class OpenAIRealtimeService {
       }, CONSTANTS.TEST_CONNECTION_TIMEOUT);
 
       try {
-        const model = config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17';
+        // Model is now set in config based on useGA flag (gpt-realtime for GA, gpt-4o-realtime-preview-2025-01-12 for Beta)
+        const model = config.openai.realtimeModel || (config.openai.useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12');
         const voice = config.openai.realtimeVoice || 'alloy';
         const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
         logger.info(`[OpenAI TestConn] Connecting to ${wsUrl}`);
 
-        wsClient = new WebSocket(wsUrl, {
-          headers: {
-            Authorization: `Bearer ${config.openai.apiKey}`,
-            'OpenAI-Beta': 'realtime=v1',
-          },
-        });
+        // Build headers - remove beta header if using GA
+        const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+        const headers = {
+          Authorization: `Bearer ${config.openai.apiKey}`,
+        };
+        
+        // Only add beta header if NOT using GA
+        if (!useGA) {
+          headers['OpenAI-Beta'] = 'realtime=v1';
+        }
+        
+        logger.info(`[OpenAI TestConn] Using ${useGA ? 'GA' : 'Beta'} API`);
+        
+        wsClient = new WebSocket(wsUrl, { headers });
 
         wsClient.on('open', async () => {
           logger.info(`[OpenAI TestConn] WebSocket opened`);
@@ -3685,17 +3708,12 @@ class OpenAIRealtimeService {
             openAIResponseSessionId = message.session?.id;
             logger.info(`[OpenAI TestConn] Session created, ID: ${openAIResponseSessionId}`);
 
-            const sessionConfig = {
-              type: 'session.update',
-              session: {
-                instructions: `Test connection prompt for ${testId}`,
-                voice: config.openai.realtimeVoice || 'alloy',
-                input_audio_format: 'g711_ulaw',
-                output_audio_format: 'g711_ulaw',
-              },
-              _testWebSocket: wsClient,
-              _testId: testId,
-            };
+            // Use MessageHandler to build session config (supports both Beta and GA)
+            const testConnection = { initialPrompt: `Test connection prompt for ${testId}` };
+            const sessionConfig = MessageHandler.buildSessionConfig(testConnection);
+            // Add test-specific metadata (not sent to OpenAI)
+            sessionConfig._testWebSocket = wsClient;
+            sessionConfig._testId = testId;
 
             try {
               await this.sendJsonMessage(null, sessionConfig);

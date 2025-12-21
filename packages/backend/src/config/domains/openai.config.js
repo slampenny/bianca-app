@@ -15,14 +15,23 @@ const buildOpenAIConfig = (envVars) => {
     realtimeSessionConfig = {};
   }
   
+  const useGA = envVars.OPENAI_REALTIME_USE_GA !== undefined ? envVars.OPENAI_REALTIME_USE_GA : false;
+  
+  // GA uses 'gpt-realtime', Beta uses 'gpt-4o-realtime-preview-2025-01-12'
+  // Allow override via env var, but default based on useGA flag
+  const defaultRealtimeModel = useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12';
+  const realtimeModel = envVars.OPENAI_REALTIME_MODEL || defaultRealtimeModel;
+  
   return {
     openai: {
       apiKey: envVars.OPENAI_API_KEY,
-      realtimeModel: envVars.OPENAI_REALTIME_MODEL,
+      realtimeModel,
       realtimeVoice: envVars.OPENAI_REALTIME_VOICE || 'alloy',
       realtimeSessionConfig,
       idleTimeout: envVars.OPENAI_IDLE_TIMEOUT || 300000,
-      model: envVars.OPENAI_MODEL || 'gpt-4o',
+      model: envVars.OPENAI_MODEL || 'gpt-4o-2025-01-12',
+      useGA,
+      realtimeTranscriptionModel: envVars.OPENAI_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
       debugAudio: true,
     },
   };
@@ -36,6 +45,8 @@ const validateOpenAIEnvVars = (envVars) => {
     OPENAI_REALTIME_SESSION_CONFIG: Joi.string().optional(),
     OPENAI_IDLE_TIMEOUT: Joi.number().optional(),
     OPENAI_MODEL: Joi.string().optional(),
+    OPENAI_REALTIME_USE_GA: Joi.boolean().optional(),
+    OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().optional(),
   });
   return schema.validate(envVars, { allowUnknown: true });
 };

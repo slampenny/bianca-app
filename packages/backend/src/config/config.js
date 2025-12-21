@@ -102,11 +102,19 @@ const envVarsSchema = Joi.object({
     otherwise: Joi.string().optional() // Optional in dev/test environments (can use default for testing)
   }),
   // **NEW:** Realtime API specific variables
-  OPENAI_REALTIME_MODEL: Joi.string().default('gpt-4o-realtime-preview-2024-12-17'),
+  // Note: Model is auto-selected based on OPENAI_REALTIME_USE_GA:
+  // - GA: 'gpt-realtime' (default when useGA=true)
+  // - Beta: 'gpt-4o-realtime-preview-2025-01-12' (default when useGA=false)
+  // Can be overridden via OPENAI_REALTIME_MODEL env var
+  OPENAI_REALTIME_MODEL: Joi.string().optional(),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
   OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
   OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
-  OPENAI_MODEL: Joi.string().default('gpt-4o'),
+  OPENAI_MODEL: Joi.string().default('gpt-4o-2025-01-12'),
+  // Feature flag for GA migration (default: false = use beta, true = use GA)
+  OPENAI_REALTIME_USE_GA: Joi.boolean().default(false),
+  // Transcription model: 'gpt-4o-mini-transcribe' (latest, faster) or 'gpt-4o-transcribe' (higher accuracy) or 'whisper-1' (legacy)
+  OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().default('gpt-4o-mini-transcribe'),
   
   // Cache configuration (optional - defaults to in-memory)
   CACHE_TYPE: Joi.string().valid('memory', 'redis').default('memory'),
