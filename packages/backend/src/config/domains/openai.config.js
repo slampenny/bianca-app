@@ -15,7 +15,16 @@ const buildOpenAIConfig = (envVars) => {
     realtimeSessionConfig = {};
   }
   
-  const useGA = envVars.OPENAI_REALTIME_USE_GA !== undefined ? envVars.OPENAI_REALTIME_USE_GA : false;
+  // Parse useGA flag - handle both boolean and string values from AWS Secrets Manager
+  let useGA = false;
+  if (envVars.OPENAI_REALTIME_USE_GA !== undefined) {
+    if (typeof envVars.OPENAI_REALTIME_USE_GA === 'boolean') {
+      useGA = envVars.OPENAI_REALTIME_USE_GA;
+    } else if (typeof envVars.OPENAI_REALTIME_USE_GA === 'string') {
+      // AWS Secrets Manager stores values as strings, so parse "true"/"false"
+      useGA = envVars.OPENAI_REALTIME_USE_GA.toLowerCase() === 'true';
+    }
+  }
   
   // GA uses 'gpt-realtime', Beta uses 'gpt-4o-realtime-preview-2025-01-12'
   // Allow override via env var, but default based on useGA flag

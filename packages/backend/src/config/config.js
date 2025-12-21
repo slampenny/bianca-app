@@ -112,7 +112,8 @@ const envVarsSchema = Joi.object({
   OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
   OPENAI_MODEL: Joi.string().default('gpt-4o-2025-01-12'),
   // Feature flag for GA migration (default: false = use beta, true = use GA)
-  OPENAI_REALTIME_USE_GA: Joi.boolean().default(false),
+  // Coerce string values from AWS Secrets Manager to boolean
+  OPENAI_REALTIME_USE_GA: Joi.boolean().coerce().default(false),
   // Transcription model: 'gpt-4o-mini-transcribe' (latest, faster) or 'gpt-4o-transcribe' (higher accuracy) or 'whisper-1' (legacy)
   OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().default('gpt-4o-mini-transcribe'),
   
