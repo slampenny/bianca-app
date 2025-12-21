@@ -1,4 +1,5 @@
 import { Page, expect } from '@playwright/test'
+import { navigateToOrgScreen } from '../helpers/navigation'
 
 // Modular caregiver management workflow components
 export class CaregiverWorkflow {
@@ -18,7 +19,6 @@ export class CaregiverWorkflow {
     await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
     // Use navigation helper
     try {
-      const { navigateToOrgScreen } = await import('../helpers/navigation')
       await navigateToOrgScreen(this.page)
     } catch (error) {
       console.log('⚠️ Could not navigate to org screen:', error)
@@ -34,7 +34,6 @@ export class CaregiverWorkflow {
     
     try {
       // Use navigation helper to navigate to org screen
-      const { navigateToOrgScreen } = await import('../helpers/navigation')
       await navigateToOrgScreen(this.page)
       
       // Try multiple ways to navigate to caregivers

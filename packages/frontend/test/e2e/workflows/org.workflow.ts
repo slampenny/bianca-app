@@ -1,4 +1,5 @@
 import { Page, expect } from '@playwright/test'
+import { navigateToOrgScreen } from '../helpers/navigation'
 
 // Modular organization management workflow components
 export class OrgWorkflow {
@@ -21,7 +22,6 @@ export class OrgWorkflow {
   async givenIAmOnOrgManagementScreen() {
     // Navigate to organization tab - use flexible selectors
     try {
-      const { navigateToOrgScreen } = await import('../helpers/navigation')
       await navigateToOrgScreen(this.page)
     } catch (error) {
       console.log('⚠️ Could not navigate to org screen via helper, trying direct navigation:', error)

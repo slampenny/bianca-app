@@ -1,6 +1,25 @@
 // Global test setup to handle cleanup of intervals and resources
 // This prevents Jest from hanging due to open handles
 
+// Set required environment variables for tests BEFORE any modules are loaded
+// This must happen before config.js is loaded, as it validates env vars
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'test-jwt-secret-key-for-unit-tests-only';
+}
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'test';
+}
+// ARI configuration for tests
+if (!process.env.ASTERISK_URL) {
+  process.env.ASTERISK_URL = 'http://localhost:8088';
+}
+if (!process.env.ARI_PASSWORD) {
+  process.env.ARI_PASSWORD = 'test-ari-password';
+}
+if (!process.env.BIANCA_PASSWORD) {
+  process.env.BIANCA_PASSWORD = 'test-bianca-password';
+}
+
 // Mock i18n module to prevent configuration issues in tests
 jest.mock('i18n', () => ({
   configure: jest.fn(),

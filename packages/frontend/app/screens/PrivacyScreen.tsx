@@ -14,8 +14,8 @@ import Markdown from 'react-native-markdown-display'
 const PRIVACY_MD_PIPEDA = `
 ## Bianca Wellness - Privacy Policy (PIPEDA)
 
-**Effective Date:** January 2025  
-**Last Updated:** January 2025
+**Effective Date:** December 21, 2025  
+**Last Updated:** December 21, 2025
 
 Welcome to Bianca Wellness ("we," "us," "our"). We are committed to protecting your privacy in accordance with the **Personal Information Protection and Electronic Documents Act (PIPEDA)**, Canada's federal privacy law. This Privacy Policy explains how we collect, use, disclose, and safeguard your personal information when you use our Bianca Wellness mobile application (the "App") and services (collectively, the "Services").
 
@@ -166,8 +166,8 @@ If you believe we have not handled your personal information in accordance with 
 const PRIVACY_MD = `
 ## Bianca Wellness - Privacy Policy
 
-**Effective Date:** [Date]
-**Last Updated:** [Date]
+**Effective Date:** December 21, 2025
+**Last Updated:** December 21, 2025
 
 Welcome to Bianca Wellness ("we," "us," "our"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Bianca Wellness mobile application (the "App") and services (collectively, the "Services"). Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the app.
 
@@ -250,10 +250,10 @@ We do not knowingly solicit information from or market to children under the age
 
 If you have questions or comments about this Privacy Policy, please contact us at:
 
-[Your Company Name]
-[Your Company Address]
-[Your Email Address]
-[Your Phone Number, Optional]
+Bianca Technologies Inc.
+2955 Elbow Place, Port Coquitlam, BC V3B 7T3
+privacy@biancawellness.com
++1-604-562-4263
 `;
 
 export const PrivacyScreen = () => {

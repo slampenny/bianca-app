@@ -40,6 +40,7 @@ describe('Privacy Controller', () => {
 
     caregiverId = new mongoose.Types.ObjectId();
     req.user = { id: caregiverId };
+    req.caregiver = { id: caregiverId }; // Controller uses req.caregiver
   });
 
   describe('createAccessRequest', () => {
@@ -214,6 +215,9 @@ describe('Privacy Controller', () => {
 
       expect(res.statusCode).toBe(httpStatus.OK);
       const data = res._getData();
+      if (!data || (typeof data === 'string' && data.trim() === '')) {
+        throw new Error('Response data is empty');
+      }
       const result = typeof data === 'string' ? JSON.parse(data) : data;
       expect(result).toEqual({ hasConsent: true });
     });
@@ -230,6 +234,9 @@ describe('Privacy Controller', () => {
 
       expect(res.statusCode).toBe(httpStatus.OK);
       const data = res._getData();
+      if (!data || (typeof data === 'string' && data.trim() === '')) {
+        throw new Error('Response data is empty');
+      }
       const result = typeof data === 'string' ? JSON.parse(data) : data;
       expect(result).toEqual({ hasConsent: false });
     });

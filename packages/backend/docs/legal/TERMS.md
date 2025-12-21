@@ -1,15 +1,15 @@
-## Bianca Technologies Inc. - Terms of Service
+## Bianca Wellness - Terms of Service
 
-**Effective Date:** January 5, 2025
-**Last Updated:** January 5, 2025
+**Effective Date:** December 21, 2025
+**Last Updated:** December 21, 2025
 
-Please read these Terms of Service ("Terms", "Terms of Service") carefully before using the Bianca Technologies Inc. mobile application (the "App") and related services (collectively, the "Service") operated by Bianca Technologies Inc. ("us", "we", or "our").
+Please read these Terms of Service ("Terms", "Terms of Service") carefully before using the Bianca Wellness mobile application (the "App") and related services (collectively, the "Service") operated by Bianca Technologies Inc. ("us", "we", or "our").
 
 Your access to and use of the Service is conditioned upon your acceptance of and compliance with these Terms. These Terms apply to all visitors, users, and others who wish to access or use the Service. By accessing or using the Service you agree to be bound by these Terms. If you disagree with any part of the terms then you do not have permission to access the Service.
 
 **1. DESCRIPTION OF SERVICE**
 
-Bianca Technologies Inc. is a mobile application designed to facilitate wellness checks through AI-assisted phone calls. Users (including individuals, family members, or authorized personnel from organizations like retirement homes) can use the App to initiate or manage these calls. The Service may involve recording calls, transcribing calls using AI, and analyzing content to provide summaries or insights related to wellness (**subject to necessary consents as outlined herein and in our Privacy Policy**).
+Bianca Wellness is a mobile application designed to facilitate wellness checks through AI-assisted phone calls. Users (including individuals, family members, or authorized personnel from organizations like retirement homes) can use the App to initiate or manage these calls. The Service may involve recording calls, transcribing calls using AI, and analyzing content to provide summaries or insights related to wellness (**subject to necessary consents as outlined herein and in our Privacy Policy**).
 
 **2. IMPORTANT DISCLAIMERS**
 
@@ -30,7 +30,7 @@ Bianca Technologies Inc. is a mobile application designed to facilitate wellness
     * **Calling Others:** If you use the Service to initiate a call to another person ("Recipient"), **you are solely responsible for obtaining explicit consent from the Recipient, as required by applicable law, *before* initiating any recording or transcription** through the Service. You represent and warrant that you have obtained all legally required consents.
     * **Organizational Users (e.g., Retirement Homes):** If you are using the Service in an organizational capacity to contact residents, patients, or other individuals, **you are solely responsible for obtaining all necessary consents** from those individuals and/or their legal representatives in accordance with all applicable laws (including privacy, health information, and call recording laws) and your organization's policies. You agree to implement appropriate notice and consent procedures.
 * **Service Notice:** The Service may provide automated notices (e.g., audio prompts) regarding recording/transcription where required or feasible, but this does not absolve you of your responsibility to obtain necessary consents.
-* **Indemnification:** You agree to indemnify and hold harmless [Your Company Name] and its affiliates, officers, agents, and employees from any claim or demand, including reasonable attorneys' fees, made by any third party due to or arising out of your failure to obtain necessary consents related to calls, recording, or transcription.
+* **Indemnification:** You agree to indemnify and hold harmless Bianca Technologies Inc. and its affiliates, officers, agents, and employees from any claim or demand, including reasonable attorneys' fees, made by any third party due to or arising out of your failure to obtain necessary consents related to calls, recording, or transcription.
 
 **5. LICENSE TO USE THE SERVICE**
 
@@ -48,7 +48,7 @@ We grant you a revocable, non-exclusive, non-transferable, limited license to do
 
 **7. INTELLECTUAL PROPERTY**
 
-The Service and its original content (excluding User Content), features, and functionality are and will remain the exclusive property of [Your Company Name] and its licensors. The Service is protected by copyright, trademark, and other laws of both Canada and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without our prior written consent.
+The Service and its original content (excluding User Content), features, and functionality are and will remain the exclusive property of Bianca Technologies Inc. and its licensors. The Service is protected by copyright, trademark, and other laws of both Canada and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without our prior written consent.
 
 **8. PROHIBITED USES**
 
@@ -67,11 +67,11 @@ We may terminate or suspend your account and bar access to the Service immediate
 
 **10. INDEMNIFICATION**
 
-You agree to defend, indemnify and hold harmless [Your Company Name] and its licensee and licensors, and their employees, contractors, agents, officers and directors, from and against any and all claims, damages, obligations, losses, liabilities, costs or debt, and expenses (including but not limited to attorney's fees), resulting from or arising out of a) your use and access of the Service, by you or any person using your account and password; b) a breach of these Terms, or c) User Content provided via your account, including failure to obtain necessary third-party consents.
+You agree to defend, indemnify and hold harmless Bianca Technologies Inc. and its licensee and licensors, and their employees, contractors, agents, officers and directors, from and against any and all claims, damages, obligations, losses, liabilities, costs or debt, and expenses (including but not limited to attorney's fees), resulting from or arising out of a) your use and access of the Service, by you or any person using your account and password; b) a breach of these Terms, or c) User Content provided via your account, including failure to obtain necessary third-party consents.
 
 **11. LIMITATION OF LIABILITY**
 
-IN NO EVENT SHALL [Your Company Name], NOR ITS DIRECTORS, EMPLOYEES, PARTNERS, AGENTS, SUPPLIERS, OR AFFILIATES, BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION, LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM (I) YOUR ACCESS TO OR USE OF OR INABILITY TO ACCESS OR USE THE SERVICE; (II) ANY CONDUCT OR CONTENT OF ANY THIRD PARTY ON THE SERVICE; (III) ANY CONTENT OBTAINED FROM THE SERVICE, INCLUDING RELIANCE ON CALL RECORDINGS, TRANSCRIPTIONS, OR AI ANALYSIS; AND (IV) UNAUTHORIZED ACCESS, USE OR ALTERATION OF YOUR TRANSMISSIONS OR CONTENT, WHETHER BASED ON WARRANTY, CONTRACT, TORT (INCLUDING NEGLIGENCE) OR ANY OTHER LEGAL THEORY, WHETHER OR NOT WE HAVE BEEN INFORMED OF THE POSSIBILITY OF SUCH DAMAGE, AND EVEN IF A REMEDY SET FORTH HEREIN IS FOUND TO HAVE FAILED OF ITS ESSENTIAL PURPOSE. THE SERVICE IS PROVIDED FOR WELLNESS CHECKS AND IS NOT A SUBSTITUTE FOR PROFESSIONAL CARE OR EMERGENCY SERVICES.
+IN NO EVENT SHALL Bianca Technologies Inc., NOR ITS DIRECTORS, EMPLOYEES, PARTNERS, AGENTS, SUPPLIERS, OR AFFILIATES, BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION, LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM (I) YOUR ACCESS TO OR USE OF OR INABILITY TO ACCESS OR USE THE SERVICE; (II) ANY CONDUCT OR CONTENT OF ANY THIRD PARTY ON THE SERVICE; (III) ANY CONTENT OBTAINED FROM THE SERVICE, INCLUDING RELIANCE ON CALL RECORDINGS, TRANSCRIPTIONS, OR AI ANALYSIS; AND (IV) UNAUTHORIZED ACCESS, USE OR ALTERATION OF YOUR TRANSMISSIONS OR CONTENT, WHETHER BASED ON WARRANTY, CONTRACT, TORT (INCLUDING NEGLIGENCE) OR ANY OTHER LEGAL THEORY, WHETHER OR NOT WE HAVE BEEN INFORMED OF THE POSSIBILITY OF SUCH DAMAGE, AND EVEN IF A REMEDY SET FORTH HEREIN IS FOUND TO HAVE FAILED OF ITS ESSENTIAL PURPOSE. THE SERVICE IS PROVIDED FOR WELLNESS CHECKS AND IS NOT A SUBSTITUTE FOR PROFESSIONAL CARE OR EMERGENCY SERVICES.
 
 **12. GOVERNING LAW**
 

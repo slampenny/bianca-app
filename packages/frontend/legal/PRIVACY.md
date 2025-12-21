@@ -1,9 +1,9 @@
-## Bianca Technologies Inc. - Privacy Policy
+## Bianca Wellness - Privacy Policy
 
-**Effective Date:** January 5, 2025
-**Last Updated:** January 5, 2025
+**Effective Date:** December 21, 2025
+**Last Updated:** December 21, 2025
 
-Welcome to Bianca Technologies Inc. ("we," "us," "our"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Bianca Technologies Inc. mobile application (the "App") and services (collectively, the "Services"). Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the app.
+Welcome to Bianca Wellness ("we," "us," "our"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Bianca Wellness mobile application (the "App") and services (collectively, the "Services"). Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the app.
 
 We reserve the right to make changes to this Privacy Policy at any time and for any reason. We will alert you about any changes by updating the "Last Updated" date of this Privacy Policy.
 
