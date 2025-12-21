@@ -52,18 +52,14 @@ else
   exit 1
 fi
 
-# Ensure ECR is logged in (token might have expired)
-echo "   Ensuring ECR login..."
-ECR_TOKEN_FILE=/tmp/ecr-token-$(date +%Y%m%d)
-if [ ! -f "$ECR_TOKEN_FILE" ]; then
-  echo "   Logging into ECR..."
-  aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 730335291008.dkr.ecr.$AWS_REGION.amazonaws.com || {
-    echo "   ⚠️  ECR login failed, but continuing..."
-  }
-  touch "$ECR_TOKEN_FILE"
-else
-  echo "   Using cached ECR token"
-fi
+# Ensure ECR is logged in (always re-authenticate - tokens expire after 12 hours)
+echo "   Logging into ECR (tokens expire, so we always re-authenticate)..."
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 730335291008.dkr.ecr.$AWS_REGION.amazonaws.com || {
+  echo "❌ ERROR: ECR login failed" >&2
+  echo "   This is required to pull Docker images from ECR" >&2
+  exit 1
+}
+echo "   ✅ ECR login successful"
 
 # Ensure we're in the deploy directory
 cd "$DEPLOY_DIR" || {
@@ -95,13 +91,13 @@ echo "   ✅ docker-compose.yml is valid"
 # Start containers - use background process with timeout to prevent hangs
 # CRITICAL: --pull always forces Docker to check ECR for latest images
 # --force-recreate ensures new containers even if config hasn't changed
-# --no-deps prevents pulling dependencies (we already pulled everything)
+# Note: We start all services, so dependencies will be handled by depends_on
 echo "   Starting containers with --pull always to ensure latest images..."
 echo "   CRITICAL: This will force Docker to check ECR for image updates..."
 if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
-  docker compose up -d --pull always --force-recreate --remove-orphans --no-deps > /tmp/docker_start.log 2>&1 &
+  docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 else
-  docker-compose up -d --pull always --force-recreate --remove-orphans --no-deps > /tmp/docker_start.log 2>&1 &
+  docker-compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &
 fi
 DOCKER_PID=$!
 
