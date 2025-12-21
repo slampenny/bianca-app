@@ -3,9 +3,16 @@ version: 0.2
 phases:
   pre_build:
     commands:
+      - echo "Getting sequential build number..."
+      - |
+        # Get sequential build number from S3 (increments globally across all projects)
+        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" bianca-staging-pipeline)
+        export SEQUENTIAL_BUILD_NUMBER
+        echo "Sequential Build Number: $SEQUENTIAL_BUILD_NUMBER"
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
       - echo Build started on `date`
+      - echo "Build Number: $SEQUENTIAL_BUILD_NUMBER (CodeBuild: ${CODEBUILD_BUILD_NUMBER})"
       - echo Building Docker images...
       - echo "Configuring Git to preserve binary files..."
       - git config --global core.autocrlf false

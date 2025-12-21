@@ -1040,33 +1040,45 @@ class OpenAIRealtimeService {
 
         case 'response.audio.delta':  // Beta event name
         case 'response.output_audio.delta':  // GA event name
-          // Track that AI is speaking
-          if (conn && !conn._aiIsSpeaking) {
-            conn._aiIsSpeaking = true;
-            conn._lastAiSpeechStart = Date.now();
-            const apiVersion = config.openai.useGA ? 'GA' : 'Beta';
-            logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId} (${apiVersion})`);
+          {
+            const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+            const apiVersion = useGA ? 'GA' : 'Beta';
+            const eventType = message.type;
             
-            // CRITICAL: Only create placeholder if user is NOT currently speaking
-            // If user is speaking, defer placeholder creation until user finishes
-            // This ensures user's message gets finalized first (gets earlier _id), then AI placeholder is created
-            if (!conn._userIsSpeaking) {
-              // User is not speaking - create AI placeholder now
-              await this.createPlaceholderAssistantMessage(callId);
-            } else {
-              // User is still speaking - defer AI placeholder creation
-              // It will be created when user finishes speaking (in speech_stopped handler)
-              logger.info(`[OpenAI Realtime] AI started speaking but user is still speaking - deferring placeholder creation for ${callId}`);
-              conn._pendingAiPlaceholder = true;
+            // Log that we received the event
+            logger.info(`[OpenAI Realtime] Received ${eventType} event for ${callId} (${apiVersion}), delta length: ${message.delta?.length || 0}`);
+            
+            // Track that AI is speaking
+            if (conn && !conn._aiIsSpeaking) {
+              conn._aiIsSpeaking = true;
+              conn._lastAiSpeechStart = Date.now();
+              logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId} (${apiVersion})`);
+              
+              // CRITICAL: Only create placeholder if user is NOT currently speaking
+              // If user is speaking, defer placeholder creation until user finishes
+              // This ensures user's message gets finalized first (gets earlier _id), then AI placeholder is created
+              if (!conn._userIsSpeaking) {
+                // User is not speaking - create AI placeholder now
+                await this.createPlaceholderAssistantMessage(callId);
+              } else {
+                // User is still speaking - defer AI placeholder creation
+                // It will be created when user finishes speaking (in speech_stopped handler)
+                logger.info(`[OpenAI Realtime] AI started speaking but user is still speaking - deferring placeholder creation for ${callId}`);
+                conn._pendingAiPlaceholder = true;
+              }
+            }
+
+            // STRANGLER FIG: Use MessageHandler for audio delta processing
+            const processed = MessageHandler.handleResponseAudioDelta(
+              conn,
+              message,
+              (audioBase64) => this.processAudioResponse(callId, audioBase64)
+            );
+            
+            if (!processed) {
+              logger.warn(`[OpenAI Realtime] Failed to process ${eventType} for ${callId}`);
             }
           }
-
-          // STRANGLER FIG: Use MessageHandler for audio delta processing
-          MessageHandler.handleResponseAudioDelta(
-            conn,
-            message,
-            (audioBase64) => this.processAudioResponse(callId, audioBase64)
-          );
           break;
 
         case 'conversation.item.created':
@@ -2086,17 +2098,39 @@ class OpenAIRealtimeService {
    * Process audio response from OpenAI (PCM) -> Resample -> Convert to uLaw -> Notify ARI.
    */
   async processAudioResponse(callId, audioBase64) {
-    if (!audioBase64) return;
+    if (!audioBase64) {
+      logger.warn(`[OpenAI Realtime] processAudioResponse called with empty audioBase64 for ${callId}`);
+      return;
+    }
 
     try {
+      // Track audio processing
+      if (!this._audioProcessCount) this._audioProcessCount = new Map();
+      const count = (this._audioProcessCount.get(callId) || 0) + 1;
+      this._audioProcessCount.set(callId, count);
+      
+      // Log first few chunks and periodically
+      if (count <= 10 || count % 50 === 0) {
+        const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+        const apiVersion = useGA ? 'GA' : 'Beta';
+        logger.info(`[OpenAI Realtime] Processing audio chunk #${count} for ${callId} (${apiVersion}), base64 length: ${audioBase64.length}`);
+      }
+
       // Simple direct pass-through
       const ulawBuffer = Buffer.from(audioBase64, 'base64');
-      if (ulawBuffer.length === 0) return;
+      if (ulawBuffer.length === 0) {
+        logger.warn(`[OpenAI Realtime] Decoded audio buffer is empty for ${callId}`);
+        return;
+      }
 
       // Record for debugging
       await this.appendToContinuousDebugFile(callId, 'continuous_from_openai_ulaw.ulaw', ulawBuffer);
 
       // Send to RTP immediately
+      if (count <= 10 || count % 50 === 0) {
+        logger.info(`[OpenAI Realtime] Sending audio chunk #${count} to ARI for ${callId}, buffer size: ${ulawBuffer.length} bytes`);
+      }
+      
       this.notify(callId, 'audio_chunk', {
         audio: audioBase64,
         originalSizeBytes: ulawBuffer.length,
@@ -2104,7 +2138,7 @@ class OpenAIRealtimeService {
       });
 
     } catch (err) {
-      logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`);
+      logger.error(`[OpenAI Realtime] Error processing audio for ${callId}: ${err.message}`, err);
     }
   }
 

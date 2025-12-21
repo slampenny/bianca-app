@@ -335,7 +335,8 @@ phases:
           echo "Playwright Test Run Summary"
           echo "=========================="
           echo "Build ID: ${CODEBUILD_BUILD_ID}"
-          echo "Build Number: ${CODEBUILD_BUILD_NUMBER}"
+          echo "Sequential Build Number: ${SEQUENTIAL_BUILD_NUMBER:-${CODEBUILD_BUILD_NUMBER}}"
+          echo "CodeBuild Build Number: ${CODEBUILD_BUILD_NUMBER}"
           echo "Source Version: ${CODEBUILD_SOURCE_VERSION}"
           echo "Start Time: ${CODEBUILD_START_TIME}"
           echo "Environment: ${NODE_ENV}"
@@ -361,6 +362,12 @@ phases:
         
         echo "✅ Artifacts collected"
         ls -la /tmp/playwright-artifacts/ || true
+      - echo "Getting sequential build number for test results..."
+      - |
+        # Get sequential build number from S3 (read-only, already incremented by build stage)
+        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" bianca-staging-pipeline read-only)
+        export SEQUENTIAL_BUILD_NUMBER
+        echo "Sequential Build Number: $SEQUENTIAL_BUILD_NUMBER"
       - echo "Uploading test results to S3 for easy access..."
       - |
         # Get the S3 bucket name from the artifact store
@@ -368,7 +375,8 @@ phases:
         # We'll upload to a dedicated test-results location
         PIPELINE_NAME="bianca-staging-pipeline"
         BUILD_ID="${CODEBUILD_BUILD_ID}"
-        BUILD_NUMBER="${CODEBUILD_BUILD_NUMBER}"
+        # Use sequential build number instead of CodeBuild's per-project number
+        BUILD_NUMBER="${SEQUENTIAL_BUILD_NUMBER:-${CODEBUILD_BUILD_NUMBER}}"
         
         # Get S3 bucket from CodePipeline (it's in the artifact store)
         # We'll use a predictable path structure
