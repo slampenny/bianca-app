@@ -104,8 +104,11 @@ class MessageHandler {
    * @returns {boolean} True if audio was processed
    */
   static handleResponseAudioDelta(connection, message, processAudioCallback) {
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const eventType = useGA ? 'response.output_audio.delta' : 'response.audio.delta';
+    
     if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
-      logger.warn(`[Message Handler] Received 'response.audio.delta' but 'message.delta' (audio data) is missing or empty.`);
+      logger.warn(`[Message Handler] Received '${eventType}' but 'message.delta' (audio data) is missing or empty.`);
       return false;
     }
 
@@ -115,7 +118,8 @@ class MessageHandler {
 
       // Log first few chunks for debugging
       if (connection._openaiChunkCount <= 5 || connection._openaiChunkCount % 50 === 0) {
-        logger.info(`[Message Handler] Processing response.audio.delta #${connection._openaiChunkCount}, data length: ${message.delta.length}`);
+        const apiVersion = useGA ? 'GA' : 'Beta';
+        logger.info(`[Message Handler] Processing ${eventType} #${connection._openaiChunkCount} (${apiVersion}), data length: ${message.delta.length}`);
       }
     }
 

@@ -1038,12 +1038,14 @@ class OpenAIRealtimeService {
           );
           break;
 
-        case 'response.audio.delta':
+        case 'response.audio.delta':  // Beta event name
+        case 'response.output_audio.delta':  // GA event name
           // Track that AI is speaking
           if (conn && !conn._aiIsSpeaking) {
             conn._aiIsSpeaking = true;
             conn._lastAiSpeechStart = Date.now();
-            logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId}`);
+            const apiVersion = config.openai.useGA ? 'GA' : 'Beta';
+            logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId} (${apiVersion})`);
             
             // CRITICAL: Only create placeholder if user is NOT currently speaking
             // If user is speaking, defer placeholder creation until user finishes
@@ -1080,12 +1082,14 @@ class OpenAIRealtimeService {
           await this.handleInputAudioTranscriptionCompleted(callId, message);
           break;
 
-        case 'response.audio_transcript.delta':
+        case 'response.audio_transcript.delta':  // Beta event name
+        case 'response.output_audio_transcript.delta':  // GA event name
           // STRANGLER FIG: Use MessageHandler for audio transcript delta
           MessageHandler.handleResponseAudioTranscriptDelta(conn, message);
           break;
 
-        case 'response.audio_transcript.done':
+        case 'response.audio_transcript.done':  // Beta event name
+        case 'response.output_audio_transcript.done':  // GA event name
           // STRANGLER FIG: Use MessageHandler for audio transcript done
           MessageHandler.handleResponseAudioTranscriptDone(conn, message);
           break;
