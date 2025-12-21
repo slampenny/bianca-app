@@ -23,8 +23,24 @@ export default defineConfig({
   },
   // Capture console logs and errors
   globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
-  // Note: Backend (port 3000) and Frontend (port 8081) servers must be running
-  // Start them with `yarn dev` from the root directory before running tests
+  // Automatically start frontend server before tests
+  // If you're actively developing/fixing code, start the dev server manually:
+  //   yarn web:staging  (runs on port 8081 with hot-reloading)
+  // Then Playwright will reuse it. Otherwise, it will build and serve static files.
+  webServer: {
+    command: 'yarn bundle:web:staging && npx serve dist -l 8081',
+    port: 8081,
+    timeout: 120000, // 2 minutes for build + serve
+    reuseExistingServer: true, // Always reuse if dev server is already running (for live code changes)
+  },
+  // Note: Backend (port 3000) must still be running separately
+  // Start it with `cd packages/backend && yarn dev` before running tests
+  //
+  // For active development with code changes:
+  //   1. Start backend: cd packages/backend && yarn dev
+  //   2. Start frontend dev server: cd packages/frontend && yarn web:staging
+  //   3. Run tests: yarn test:web:e2e
+  //   Playwright will detect and reuse the running dev server, so code changes are live!
   projects: [
     {
       name: 'chromium',

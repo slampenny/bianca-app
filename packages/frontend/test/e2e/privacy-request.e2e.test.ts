@@ -137,14 +137,7 @@ test.describe('PIPEDA Privacy Request Workflow', () => {
     const informationField = page.getByLabel(/Information Requested/i).or(page.getByPlaceholder(/All my personal information/i))
     await informationField.fill('I would like to access my conversation history and medical analysis data.')
     
-    // AND: User selects download method
-    const downloadButton = page.locator('[data-testid="access-method-download"], [aria-label="access-method-download"]').first()
-    await downloadButton.waitFor({ state: 'attached', timeout: 10000 })
-    await downloadButton.scrollIntoViewIfNeeded()
-    await downloadButton.waitFor({ state: 'visible', timeout: 5000 })
-    await downloadButton.click()
-    
-    // AND: User submits the request
+    // AND: User submits the request (access method is always "email" in current implementation)
     let requestBody: any = null
     page.on('request', (request) => {
       if (request.url().includes('/v1/privacy/requests/access') && request.method() === 'POST') {
@@ -156,11 +149,11 @@ test.describe('PIPEDA Privacy Request Workflow', () => {
     await submitButton.waitFor({ state: 'visible', timeout: 5000 })
     await submitButton.click()
     
-    // THEN: API request should include custom information
+    // THEN: API request should include custom information and default to email method
     await page.waitForTimeout(1000)
     expect(requestBody).toMatchObject({
       informationRequested: 'I would like to access my conversation history and medical analysis data.',
-      accessMethod: 'download',
+      accessMethod: 'email', // Access method is hardcoded to "email" in current implementation
     })
   })
 
@@ -245,37 +238,18 @@ test.describe('PIPEDA Privacy Request Workflow', () => {
     await submitButton.scrollIntoViewIfNeeded()
     await expect(submitButton).toBeVisible({ timeout: 5000 })
     
-    const emailButton = page.locator('[data-testid="access-method-email"], [aria-label="access-method-email"]').first()
-    await emailButton.waitFor({ state: 'attached', timeout: 10000 })
-    await emailButton.scrollIntoViewIfNeeded()
-    await expect(emailButton).toBeVisible({ timeout: 5000 })
-    
-    const downloadButton = page.locator('[data-testid="access-method-download"], [aria-label="access-method-download"]').first()
-    await downloadButton.waitFor({ state: 'attached', timeout: 10000 })
-    await downloadButton.scrollIntoViewIfNeeded()
-    await expect(downloadButton).toBeVisible({ timeout: 5000 })
+    // Access method selection UI has been removed - access method is always "email" now
+    // Verify that information requested field is visible instead
+    const informationField = page.getByLabel(/Information Requested/i).or(page.getByPlaceholder(/All my personal information/i))
+    await expect(informationField).toBeVisible({ timeout: 5000 })
   })
 
   test('Access method selection works correctly', async ({ page }) => {
     // GIVEN: User is on privacy request screen
     await navigateToPrivacyRequestScreen(page)
     
-    // WHEN: User clicks download method then email method
-    const downloadButton = page.locator('[data-testid="access-method-download"], [aria-label="access-method-download"]').first()
-    await downloadButton.waitFor({ state: 'attached', timeout: 10000 })
-    await downloadButton.scrollIntoViewIfNeeded()
-    await downloadButton.waitFor({ state: 'visible', timeout: 5000 })
-    await downloadButton.click()
-    await page.waitForTimeout(200)
-    
-    const emailButton = page.locator('[data-testid="access-method-email"], [aria-label="access-method-email"]').first()
-    await emailButton.waitFor({ state: 'attached', timeout: 10000 })
-    await emailButton.scrollIntoViewIfNeeded()
-    await emailButton.waitFor({ state: 'visible', timeout: 5000 })
-    await emailButton.click()
-    await page.waitForTimeout(200)
-    
-    // THEN: Email method should be selected (verify via API call)
+    // WHEN: User submits a request (access method is always "email" in current implementation)
+    // Note: Access method selection UI has been removed - it's always email now
     let requestBody: any = null
     page.on('request', (request) => {
       if (request.url().includes('/v1/privacy/requests/access') && request.method() === 'POST') {
@@ -286,8 +260,9 @@ test.describe('PIPEDA Privacy Request Workflow', () => {
     const submitButton = page.locator('[data-testid="submit-privacy-request-button"], [aria-label="submit-privacy-request-button"]').first()
     await submitButton.waitFor({ state: 'visible', timeout: 5000 })
     await submitButton.click()
-    await page.waitForTimeout(1000)
     
+    // THEN: Email method should be used (verify via API call)
+    await page.waitForTimeout(1000)
     expect(requestBody?.accessMethod).toBe('email')
   })
 

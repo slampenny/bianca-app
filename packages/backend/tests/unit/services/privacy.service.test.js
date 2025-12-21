@@ -195,8 +195,9 @@ describe('Privacy Service', () => {
   });
 
   describe('processAccessRequest', () => {
+    jest.setTimeout(30000); // Increase timeout to 30 seconds for email retrieval
+    
     it('should automatically gather and email all user data', async () => {
-      jest.setTimeout(30000); // Increase timeout to 30 seconds for email retrieval
       // Create test data - first create a call (conversations require callId)
       const call = await Call.create({
         patientId: patientId,
