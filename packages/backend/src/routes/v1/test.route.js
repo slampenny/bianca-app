@@ -1453,4 +1453,121 @@ router.get('/get-ethereal-account', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/openai-connection:
+ *   post:
+ *     summary: Test OpenAI Realtime API connection (Beta/GA)
+ *     description: |
+ *       Tests the OpenAI Realtime API connection and session handshake.
+ *       Can test both Beta and GA API versions based on OPENAI_REALTIME_USE_GA env var.
+ *       
+ *       This endpoint:
+ *       1. Connects to OpenAI Realtime API (Beta or GA based on config)
+ *       2. Creates a session
+ *       3. Updates session configuration
+ *       4. Verifies the connection works
+ *       
+ *       Use this to test the Beta to GA migration locally.
+ *     tags: [Test]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               useGA:
+ *                 type: boolean
+ *                 description: Override feature flag - true for GA, false for Beta (defaults to OPENAI_REALTIME_USE_GA env var)
+ *                 example: true
+ *     responses:
+ *       "200":
+ *         description: Connection test result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 apiVersion:
+ *                   type: string
+ *                   enum: [Beta, GA]
+ *                 testId:
+ *                   type: string
+ *                 sessionId:
+ *                   type: string
+ *                 sessionDetails:
+ *                   type: object
+ *                 receivedMessages:
+ *                   type: array
+ *                 message:
+ *                   type: string
+ *       "400":
+ *         description: Invalid request
+ *       "500":
+ *         description: Connection test failed
+ */
+router.post('/openai-connection', auth(), async (req, res) => {
+  try {
+    if (!openAIService) {
+      return res.status(503).json({
+        success: false,
+        error: 'OpenAI Realtime Service not available'
+      });
+    }
+
+    // Allow override of useGA via request body
+    const useGAOverride = req.body?.useGA;
+    if (useGAOverride !== undefined) {
+      // Temporarily override config for this test
+      const originalUseGA = config.openai.useGA;
+      config.openai.useGA = useGAOverride;
+      logger.info(`[Test Route] Overriding OPENAI_REALTIME_USE_GA to ${useGAOverride} for this test`);
+      
+      try {
+        const testId = `test-${Date.now()}`;
+        const result = await openAIService.testBasicConnectionAndSession(testId);
+        
+        // Restore original config
+        config.openai.useGA = originalUseGA;
+        
+        res.json({
+          success: true,
+          apiVersion: useGAOverride ? 'GA' : 'Beta',
+          testId,
+          ...result
+        });
+      } catch (testError) {
+        // Restore original config even on error
+        config.openai.useGA = originalUseGA;
+        throw testError;
+      }
+    } else {
+      // Use current config
+      const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+      const testId = `test-${Date.now()}`;
+      const result = await openAIService.testBasicConnectionAndSession(testId);
+      
+      res.json({
+        success: true,
+        apiVersion: useGA ? 'GA' : 'Beta',
+        testId,
+        ...result
+      });
+    }
+  } catch (error) {
+    logger.error('[Test Route] Error testing OpenAI connection:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      apiVersion: config.openai.useGA ? 'GA' : 'Beta',
+      stack: config.env === 'development' || config.env === 'staging' ? error.stack : undefined
+    });
+  }
+});
+
 module.exports = router;

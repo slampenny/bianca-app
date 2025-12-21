@@ -28,34 +28,72 @@ class MessageHandler {
 
   /**
    * Build session configuration for session.update
+   * Supports both Beta and GA formats based on config.openai.useGA
    * @param {Object} connection - Connection object
    * @returns {Object} Session configuration object
    */
   static buildSessionConfig(connection) {
-    return {
+    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+    const voice = config.openai.realtimeVoice || 'alloy';
+    const transcriptionModel = config.openai.realtimeTranscriptionModel || 
+      (useGA ? 'gpt-4o-mini-transcribe' : 'whisper-1');
+    
+    const baseConfig = {
       type: 'session.update',
       session: {
-        modalities: ['text', 'audio'],
         instructions: connection.initialPrompt || 'You are Bianca, a helpful AI assistant. Always respond in English.',
-        voice: config.openai.realtimeVoice || 'alloy',
-        input_audio_format: 'g711_ulaw',
-        output_audio_format: 'g711_ulaw',
-
-        // CRITICAL: Add turn detection - optimized for faster response and natural interruptions
-        // Reduced delays for more conversational feel
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.6,              // More selective (ignores quiet background)
-          prefix_padding_ms: 200,      // Reduced from 300ms - faster speech start detection
-          silence_duration_ms: 500     // Reduced from 1000ms - faster response after user stops speaking
-        },
-
-        // Add input transcription for debugging
-        input_audio_transcription: {
-          model: 'whisper-1',
-        }
+        // Turn detection location differs: GA uses audio.input.turn_detection, Beta uses session.turn_detection
+        // Will be set in the if/else block below
       },
     };
+
+    if (useGA) {
+      // GA format: Audio settings nested under session.audio
+      // GA requires session.type to be set
+      // GA uses audio/pcmu (not g711_ulaw) for μ-law format
+      baseConfig.session.type = 'realtime';
+      baseConfig.session.audio = {
+        input: {
+          format: {
+            type: 'audio/pcmu'  // GA uses audio/pcmu instead of g711_ulaw
+          },
+          transcription: {
+            model: transcriptionModel
+          },
+          // Turn detection is nested under audio.input for GA
+          turn_detection: {
+            type: 'server_vad',
+            threshold: 0.6,
+            prefix_padding_ms: 200,
+            silence_duration_ms: 500
+          }
+        },
+        output: {
+          format: {
+            type: 'audio/pcmu'  // GA uses audio/pcmu instead of g711_ulaw
+          },
+          voice: voice  // Voice is in audio.output for GA
+        }
+      };
+    } else {
+      // Beta format: Audio settings at top level
+      baseConfig.session.modalities = ['text', 'audio'];
+      baseConfig.session.voice = voice;  // Voice is at top level for Beta
+      baseConfig.session.input_audio_format = 'g711_ulaw';
+      baseConfig.session.output_audio_format = 'g711_ulaw';
+      baseConfig.session.input_audio_transcription = {
+        model: transcriptionModel,
+      };
+      // Turn detection is at session level for Beta
+      baseConfig.session.turn_detection = {
+        type: 'server_vad',
+        threshold: 0.6,
+        prefix_padding_ms: 200,
+        silence_duration_ms: 500
+      };
+    }
+
+    return baseConfig;
   }
 
   /**
