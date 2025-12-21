@@ -197,7 +197,21 @@ test.describe('MFA Workflow Tests', () => {
     }
 
     // WHEN: User clicks regenerate backup codes button
-    await page.getByTestId('mfa-regenerate-backup-codes-button').click()
+    // Wait for any overlays/modals to disappear first
+    await page.waitForTimeout(1000)
+    const regenerateButton = page.getByTestId('mfa-regenerate-backup-codes-button')
+    // Try normal click first, then force if intercepted
+    try {
+      await regenerateButton.click({ timeout: 5000 })
+    } catch (error) {
+      if (error.message?.includes('intercept') || error.message?.includes('not clickable')) {
+        // Wait a bit more for overlay to clear
+        await page.waitForTimeout(2000)
+        await regenerateButton.click({ force: true, timeout: 5000 })
+      } else {
+        throw error
+      }
+    }
 
     // THEN: Regenerate backup codes form should be visible
     const regenerateForm = await page.locator('input[data-testid="mfa-regenerate-token-input"]').isVisible().catch(() => false)

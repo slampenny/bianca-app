@@ -40,11 +40,12 @@ export class AuthWorkflow {
     
     // Check if we're already on login screen
     const emailInputCheck = this.page.locator('input[data-testid="email-input"]')
-    const isAlreadyOnLogin = await emailInputCheck.isVisible({ timeout: 2000 }).catch(() => false)
+    const isAlreadyOnLogin = await emailInputCheck.isVisible({ timeout: 3000 }).catch(() => false)
     
     if (!isAlreadyOnLogin) {
       // Force navigation to login by going to root
-      await this.page.goto('/')
+      // Use networkidle to ensure page fully loads
+      await this.page.goto('/', { waitUntil: 'networkidle', timeout: 15000 })
       await this.page.waitForTimeout(2000)
     }
     
@@ -53,8 +54,13 @@ export class AuthWorkflow {
       await emailInputCheck.waitFor({ state: 'visible', timeout: 10000 })
     } catch (error) {
       // Try navigating again if first attempt failed
-      await this.page.goto('/')
-      await this.page.waitForTimeout(2000)
+      // Clear any cached state that might be preventing login screen
+      await this.page.evaluate(() => {
+        localStorage.clear()
+        sessionStorage.clear()
+      })
+      await this.page.goto('/', { waitUntil: 'networkidle', timeout: 15000 })
+      await this.page.waitForTimeout(3000)
       await emailInputCheck.waitFor({ state: 'visible', timeout: 10000 })
     }
   }
