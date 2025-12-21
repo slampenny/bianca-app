@@ -11,8 +11,9 @@ phases:
         echo "Sequential Build Number: $SEQUENTIAL_BUILD_NUMBER"
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-      - echo Build started on `date`
-      - echo "Build Number: $SEQUENTIAL_BUILD_NUMBER (CodeBuild: ${CODEBUILD_BUILD_NUMBER})"
+      - echo "Build started on $(date)"
+      - |
+        echo "Build Number: $SEQUENTIAL_BUILD_NUMBER (CodeBuild: ${CODEBUILD_BUILD_NUMBER})"
       - echo Building Docker images...
       - echo "Configuring Git to preserve binary files..."
       - git config --global core.autocrlf false
