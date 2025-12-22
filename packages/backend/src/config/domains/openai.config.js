@@ -26,9 +26,9 @@ const buildOpenAIConfig = (envVars) => {
     }
   }
   
-  // GA uses 'gpt-realtime', Beta uses 'gpt-4o-realtime-preview-2025-01-12'
+  // GA uses 'gpt-realtime', fallback uses 'gpt-realtime-2025-08-28' (preview models no longer work)
   // Allow override via env var, but default based on useGA flag
-  const defaultRealtimeModel = useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12';
+  const defaultRealtimeModel = useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28';
   const realtimeModel = envVars.OPENAI_REALTIME_MODEL || defaultRealtimeModel;
   
   return {
@@ -77,7 +77,7 @@ const applyOpenAISecrets = (config, secrets) => {
     
     // Update model based on useGA flag (unless explicitly overridden)
     if (!secrets.OPENAI_REALTIME_MODEL) {
-      config.openai.realtimeModel = useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12';
+      config.openai.realtimeModel = useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28';
     }
   }
   
