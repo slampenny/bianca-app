@@ -324,6 +324,11 @@ class TwilioCallService {
             const voicemailPatient = await Patient.findById(call.patientId).populate('org');
             const voicemailOrg = voicemailPatient?.org;
             
+            // Warn if patient doesn't have an org (shouldn't happen in normal operation)
+            if (!voicemailOrg) {
+              logger.warn(`[Twilio Service] Patient ${call.patientId} does not have an org assigned - using default retry settings`);
+            }
+            
             // Schedule retry if org has retry settings enabled
             if (voicemailOrg && voicemailOrg.callRetrySettings && voicemailOrg.callRetrySettings.retryCount > 0) {
               try {
@@ -339,10 +344,12 @@ class TwilioCallService {
             const voicemailMaxRetries = voicemailOrg?.callRetrySettings?.retryCount || 2;
             const voicemailShouldAlert = voicemailAlertOnAllMissedCalls || voicemailCurrentRetryAttempt >= voicemailMaxRetries;
             
+            logger.info(`[Twilio Service] Alert decision for voicemail ${CallSid}: alertOnAllMissedCalls=${voicemailAlertOnAllMissedCalls}, currentRetryAttempt=${voicemailCurrentRetryAttempt}, maxRetries=${voicemailMaxRetries}, shouldAlert=${voicemailShouldAlert}`);
+            
             if (voicemailShouldAlert) {
               try {
                 await alertService.createAlert({
-                  message: `Wellness check call went to voicemail`,
+                  message: 'Wellness check call went to voicemail',
                   importance: 'medium',
                   alertType: 'patient',
                   relatedPatient: call.patientId,
@@ -354,8 +361,10 @@ class TwilioCallService {
                 });
                 logger.info(`[Twilio Service] Created alert for voicemail call ${CallSid}`);
               } catch (alertError) {
-                logger.error(`[Twilio Service] Failed to create alert: ${alertError.message}`);
+                logger.error(`[Twilio Service] Failed to create alert for voicemail ${CallSid}: ${alertError.message}`, alertError);
               }
+            } else {
+              logger.info(`[Twilio Service] Skipping alert for voicemail ${CallSid} - alertOnAllMissedCalls=false and retries remaining (attempt ${voicemailCurrentRetryAttempt}/${voicemailMaxRetries})`);
             }
           } else {
             // Call ended normally - answered and had conversation
@@ -424,6 +433,11 @@ class TwilioCallService {
           const patient = await Patient.findById(call.patientId).populate('org');
           const org = patient?.org;
           
+          // Warn if patient doesn't have an org (shouldn't happen in normal operation)
+          if (!org) {
+            logger.warn(`[Twilio Service] Patient ${call.patientId} does not have an org assigned - using default retry settings`);
+          }
+          
           // Schedule retry if org has retry settings enabled
           if (org && org.callRetrySettings && org.callRetrySettings.retryCount > 0) {
             try {
@@ -441,10 +455,28 @@ class TwilioCallService {
           const maxRetries = org?.callRetrySettings?.retryCount || 2;
           const shouldAlert = alertOnAllMissedCalls || currentRetryAttempt >= maxRetries;
           
+          // Create descriptive message based on call status
+          let alertMessage;
+          switch (CallStatus) {
+            case 'busy':
+              alertMessage = 'Wellness check call received busy signal';
+              break;
+            case 'no-answer':
+              alertMessage = 'Wellness check call was not answered';
+              break;
+            case 'failed':
+              alertMessage = 'Wellness check call failed to connect';
+              break;
+            default:
+              alertMessage = `Wellness check call failed: ${CallStatus}`;
+          }
+          
+          logger.info(`[Twilio Service] Alert decision for ${CallSid} (${CallStatus}): alertOnAllMissedCalls=${alertOnAllMissedCalls}, currentRetryAttempt=${currentRetryAttempt}, maxRetries=${maxRetries}, shouldAlert=${shouldAlert}`);
+          
           if (shouldAlert) {
             try {
               await alertService.createAlert({
-                message: `Wellness check call failed: ${CallStatus}`,
+                message: alertMessage,
                 importance: 'medium',
                 alertType: 'patient',
                 relatedPatient: call.patientId,
@@ -454,10 +486,12 @@ class TwilioCallService {
                 visibility: 'assignedCaregivers',
                 relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
               });
-              logger.info(`[Twilio Service] Created alert for failed call ${CallSid}`);
+              logger.info(`[Twilio Service] Created alert for failed call ${CallSid} (${CallStatus})`);
             } catch (alertError) {
-              logger.error(`[Twilio Service] Failed to create alert: ${alertError.message}`);
+              logger.error(`[Twilio Service] Failed to create alert for ${CallSid}: ${alertError.message}`, alertError);
             }
+          } else {
+            logger.info(`[Twilio Service] Skipping alert for ${CallSid} (${CallStatus}) - alertOnAllMissedCalls=false and retries remaining (attempt ${currentRetryAttempt}/${maxRetries})`);
           }
           break;
         
@@ -478,6 +512,11 @@ class TwilioCallService {
           const machinePatient = await Patient.findById(call.patientId).populate('org');
           const machineOrg = machinePatient?.org;
           
+          // Warn if patient doesn't have an org (shouldn't happen in normal operation)
+          if (!machineOrg) {
+            logger.warn(`[Twilio Service] Patient ${call.patientId} does not have an org assigned - using default retry settings`);
+          }
+          
           // Schedule retry if org has retry settings enabled
           if (machineOrg && machineOrg.callRetrySettings && machineOrg.callRetrySettings.retryCount > 0) {
             try {
@@ -493,10 +532,12 @@ class TwilioCallService {
           const machineMaxRetries = machineOrg?.callRetrySettings?.retryCount || 2;
           const machineShouldAlert = machineAlertOnAllMissedCalls || machineCurrentRetryAttempt >= machineMaxRetries;
           
+          logger.info(`[Twilio Service] Alert decision for machine/voicemail ${CallSid}: alertOnAllMissedCalls=${machineAlertOnAllMissedCalls}, currentRetryAttempt=${machineCurrentRetryAttempt}, maxRetries=${machineMaxRetries}, shouldAlert=${machineShouldAlert}`);
+          
           if (machineShouldAlert) {
             try {
               await alertService.createAlert({
-                message: `Wellness check call went to voicemail`,
+                message: 'Wellness check call went to voicemail',
                 importance: 'medium',
                 alertType: 'patient',
                 relatedPatient: call.patientId,
@@ -508,8 +549,10 @@ class TwilioCallService {
               });
               logger.info(`[Twilio Service] Created alert for voicemail call ${CallSid}`);
             } catch (alertError) {
-              logger.error(`[Twilio Service] Failed to create alert: ${alertError.message}`);
+              logger.error(`[Twilio Service] Failed to create alert for machine/voicemail ${CallSid}: ${alertError.message}`, alertError);
             }
+          } else {
+            logger.info(`[Twilio Service] Skipping alert for machine/voicemail ${CallSid} - alertOnAllMissedCalls=false and retries remaining (attempt ${machineCurrentRetryAttempt}/${machineMaxRetries})`);
           }
           break;
           

@@ -73,7 +73,7 @@ const patientSchema = mongoose.Schema(
     org: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Org',
-      default: null,
+      required: true,
     },
     caregivers: [
       {

@@ -4,7 +4,7 @@ const { password, objectId } = require('./custom.validation');
 
 const createPatient = {
   body: Joi.object().keys({
-    org: Joi.string().custom(objectId),
+    org: Joi.string().custom(objectId).required(),
     email: Joi.string().required().email(),
     avatar: Joi.string().optional(),
     name: Joi.string().required(),
