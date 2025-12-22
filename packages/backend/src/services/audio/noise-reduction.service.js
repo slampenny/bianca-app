@@ -6,7 +6,16 @@
  * 
  * Current Stages:
  * - Stage 1: Noise Gate (filters low-energy audio)
+ * - Stage 2: Frequency Filtering (band-pass filter 300-3400Hz) - NOT YET IMPLEMENTED
  * - Stage 3: Primary Speaker Detection (focuses on loudest/most consistent speaker)
+ * - Stage 4: Adaptive Noise Reduction - NOT YET IMPLEMENTED
+ * 
+ * Note: OpenAI Realtime API (gpt-realtime) has built-in noise reduction via audio.input.noise_reduction:
+ * - near_field: Optimized for phone calls (speaker close to microphone), reduces far-field ambient noise
+ * - far_field: Optimized for speakerphone/conference (speaker farther from mic), handles more ambient noise/reverb
+ * This is different from frequency filtering. Frequency filtering removes frequencies outside human speech
+ * range (300-3400Hz), while OpenAI's noise reduction focuses on background noise suppression based on
+ * microphone distance. Both can be used together for optimal results.
  */
 
 const logger = require('../../config/logger');
@@ -18,6 +27,9 @@ class NoiseReductionService {
         this.noiseGateEnabled = config.audio?.noiseReduction?.noiseGateEnabled ?? true;
         this.noiseGateThreshold = config.audio?.noiseReduction?.noiseGateThreshold ?? 0.1;
         
+        // Stage 2: Frequency Filtering Configuration (band-pass filter 300-3400Hz)
+        this.frequencyFilteringEnabled = config.audio?.noiseReduction?.frequencyFilteringEnabled ?? false;
+        
         // Stage 3: Primary Speaker Detection Configuration
         this.primarySpeakerEnabled = config.audio?.noiseReduction?.primarySpeakerEnabled ?? false;
         this.primarySpeakerHistorySize = config.audio?.noiseReduction?.primarySpeakerHistorySize ?? 50; // ~1 second at 20ms packets
@@ -25,7 +37,7 @@ class NoiseReductionService {
         this.primarySpeakerEnergyMultiplier = config.audio?.noiseReduction?.primarySpeakerEnergyMultiplier ?? 1.5; // 1.5x average
         this.primarySpeakerVolumeReduction = config.audio?.noiseReduction?.primarySpeakerVolumeReduction ?? 0.3; // Reduce to 30% if not primary
         
-        // Stage 2: Adaptive Noise Reduction (not yet implemented)
+        // Stage 4: Adaptive Noise Reduction (not yet implemented)
         this.adaptiveNoiseReductionEnabled = config.audio?.noiseReduction?.adaptiveNoiseReductionEnabled ?? false;
         
         // Per-call energy history for primary speaker detection
@@ -43,6 +55,7 @@ class NoiseReductionService {
         logger.info('[Noise Reduction] Service initialized', {
             noiseGateEnabled: this.noiseGateEnabled,
             noiseGateThreshold: this.noiseGateThreshold,
+            frequencyFilteringEnabled: this.frequencyFilteringEnabled,
             primarySpeakerEnabled: this.primarySpeakerEnabled,
             primarySpeakerHistorySize: this.primarySpeakerHistorySize,
             primarySpeakerFocusThreshold: this.primarySpeakerFocusThreshold,
@@ -69,14 +82,20 @@ class NoiseReductionService {
             processed = this.applyNoiseGate(processed, callId);
         }
         
+        // Stage 2: Frequency Filtering (band-pass filter 300-3400Hz)
+        if (this.frequencyFilteringEnabled) {
+            // TODO: Implement frequency filtering
+            // processed = this.applyFrequencyFiltering(processed, callId);
+        }
+        
         // Stage 3: Primary Speaker Detection
         if (this.primarySpeakerEnabled) {
             processed = this.applyPrimarySpeakerDetection(processed, callId);
         }
         
-        // Stage 3: Adaptive Noise Reduction (not yet implemented)
+        // Stage 4: Adaptive Noise Reduction (not yet implemented)
         if (this.adaptiveNoiseReductionEnabled) {
-            // TODO: Implement in Stage 3
+            // TODO: Implement adaptive noise reduction
             // processed = this.applyAdaptiveNoiseReduction(processed, callId);
         }
         
