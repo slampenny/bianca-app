@@ -104,7 +104,7 @@ const envVarsSchema = Joi.object({
   // **NEW:** Realtime API specific variables
   // Note: Model is auto-selected based on OPENAI_REALTIME_USE_GA:
   // - GA: 'gpt-realtime' (default when useGA=true)
-  // - Beta: 'gpt-4o-realtime-preview-2025-01-12' (default when useGA=false)
+  // - Fallback: 'gpt-realtime-2025-08-28' (default when useGA=false, preview models no longer work)
   // Can be overridden via OPENAI_REALTIME_MODEL env var
   OPENAI_REALTIME_MODEL: Joi.string().optional(),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),

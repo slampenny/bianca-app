@@ -370,7 +370,7 @@ class OpenAIRealtimeService {
     const apiVersion = useGA ? 'GA' : 'Beta';
     logger.info(`[OpenAI Realtime] Initializing for callId: ${callId} (Initial Asterisk ID: ${initialAsteriskChannelId})`);
     logger.info(`[OpenAI Realtime] Using ${apiVersion} API (useGA: ${useGA})`);
-    logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12')}`);
+    logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28')}`);
     logger.info(`[OpenAI Realtime] Transcription: ${config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe'}`);
     logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);
     if (patientId) {
@@ -3699,8 +3699,8 @@ class OpenAIRealtimeService {
       }, CONSTANTS.TEST_CONNECTION_TIMEOUT);
 
       try {
-        // Model is now set in config based on useGA flag (gpt-realtime for GA, gpt-4o-realtime-preview-2025-01-12 for Beta)
-        const model = config.openai.realtimeModel || (config.openai.useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12');
+        // Model is now set in config based on useGA flag (gpt-realtime for GA, gpt-realtime-2025-08-28 as fallback)
+        const model = config.openai.realtimeModel || (config.openai.useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28');
         const voice = config.openai.realtimeVoice || 'alloy';
         const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
         logger.info(`[OpenAI TestConn] Connecting to ${wsUrl}`);
@@ -3776,7 +3776,7 @@ class OpenAIRealtimeService {
                       input_audio_format: 'g711_ulaw',
                       output_audio_format: 'g711_ulaw',
                       voice: config.openai.realtimeVoice || 'alloy',
-                      model: config.openai.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17'
+                      model: config.openai.realtimeModel || 'gpt-realtime-2025-08-28'
                     }
                   },
                   receivedMessages,
