@@ -62,6 +62,35 @@ const validateOpenAIEnvVars = (envVars) => {
 
 const applyOpenAISecrets = (config, secrets) => {
   if (secrets.OPENAI_API_KEY) config.openai.apiKey = secrets.OPENAI_API_KEY;
+  
+  // Update useGA flag from secrets (secrets are already in process.env at this point)
+  // Re-parse useGA flag - handle both boolean and string values from AWS Secrets Manager
+  if (secrets.OPENAI_REALTIME_USE_GA !== undefined) {
+    let useGA = false;
+    if (typeof secrets.OPENAI_REALTIME_USE_GA === 'boolean') {
+      useGA = secrets.OPENAI_REALTIME_USE_GA;
+    } else if (typeof secrets.OPENAI_REALTIME_USE_GA === 'string') {
+      // AWS Secrets Manager stores values as strings, so parse "true"/"false"
+      useGA = secrets.OPENAI_REALTIME_USE_GA.toLowerCase() === 'true';
+    }
+    config.openai.useGA = useGA;
+    
+    // Update model based on useGA flag (unless explicitly overridden)
+    if (!secrets.OPENAI_REALTIME_MODEL) {
+      config.openai.realtimeModel = useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12';
+    }
+  }
+  
+  // Update model if explicitly provided in secrets
+  if (secrets.OPENAI_REALTIME_MODEL) {
+    config.openai.realtimeModel = secrets.OPENAI_REALTIME_MODEL;
+  }
+  
+  // Update transcription model if provided
+  if (secrets.OPENAI_REALTIME_TRANSCRIPTION_MODEL) {
+    config.openai.realtimeTranscriptionModel = secrets.OPENAI_REALTIME_TRANSCRIPTION_MODEL;
+  }
+  
   return config;
 };
 
