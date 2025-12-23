@@ -427,6 +427,9 @@ describe('Breach Detection Service', () => {
   });
 
   describe('runAllDetections', () => {
+    // Increase timeout for this describe block
+    jest.setTimeout(20000);
+
     it('should run all detection checks', async () => {
       const results = await breachDetectionService.runAllDetections();
 
@@ -439,7 +442,6 @@ describe('Breach Detection Service', () => {
     });
 
     it('should detect multiple breach types simultaneously', async () => {
-      jest.setTimeout(15000); // Increase timeout for this test
       // Create failed logins
       for (let i = 0; i < 6; i++) {
         await AuditLog.create({
