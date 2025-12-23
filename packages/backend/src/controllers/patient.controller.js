@@ -19,6 +19,17 @@ const createPatient = catchAsync(async (req, res) => {
     patientData.avatar = file.path;
   }
 
+  // Set org from caregiver before creating patient (org is required)
+  // If org is not provided in request body, use caregiver's org
+  if (!patientData.org && req.caregiver?.org) {
+    patientData.org = req.caregiver.org;
+  }
+
+  // If still no org, throw error
+  if (!patientData.org) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Organization is required. Patient must be associated with an organization.');
+  }
+
   let patient = await patientService.createPatient(patientData);
 
   if (schedules) {
@@ -26,6 +37,8 @@ const createPatient = catchAsync(async (req, res) => {
       await scheduleService.createSchedule({ patientId: patient.id, ...schedule });
     }
   }
+  
+  // Add patient to caregiver (this also ensures two-way relationship)
   patient = await caregiverService.addPatient(req.caregiver, patient.id);
   res.status(httpStatus.CREATED).send(PatientDTO(patient));
 });
