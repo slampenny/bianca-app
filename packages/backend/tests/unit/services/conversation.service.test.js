@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const conversationService = require('../../../src/services/conversation.service');
-const { Conversation, Message, Patient, Call } = require('../../../src/models');
+const { Conversation, Message, Patient, Call, Org } = require('../../../src/models');
 
 let mongoServer;
 
@@ -18,6 +18,17 @@ afterAll(async () => {
 });
 
 describe('conversationService', () => {
+  let testOrg;
+
+  beforeAll(async () => {
+    // Create a test org for all tests
+    testOrg = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+  });
+
   beforeEach(async () => {
     await Patient.deleteMany();
     await Conversation.deleteMany();
@@ -31,7 +42,8 @@ describe('conversationService', () => {
       name: 'Test Patient',
       email: 'test@example.com',
       phone: '+16045624263',
-      preferredLanguage: 'en'
+      preferredLanguage: 'en',
+      org: testOrg._id
     });
     await patient.save();
 
@@ -56,7 +68,8 @@ describe('conversationService', () => {
       name: 'Test Patient',
       email: 'test@example.com',
       phone: '+16045624263',
-      preferredLanguage: 'en'
+      preferredLanguage: 'en',
+      org: testOrg._id
     });
     await patient.save();
 
@@ -87,7 +100,8 @@ describe('conversationService', () => {
       name: 'Test Patient',
       email: 'test@example.com',
       phone: '+16045624263',
-      preferredLanguage: 'en'
+      preferredLanguage: 'en',
+      org: testOrg._id
     });
     await patient.save();
 
@@ -111,7 +125,8 @@ describe('conversationService', () => {
       name: 'Test Patient',
       email: 'test@example.com',
       phone: '+16045624263',
-      preferredLanguage: 'en'
+      preferredLanguage: 'en',
+      org: testOrg._id
     });
     await patient.save();
 

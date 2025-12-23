@@ -22,7 +22,7 @@ const app = require('../../../src/app');
 const { Schedule, Patient, Caregiver, Org } = require('../../../src/models');
 const { scheduleService } = require('../../../src/services');
 const { scheduleOne, scheduleTwo, insertSchedules } = require('../../fixtures/schedule.fixture');
-const { patientOne, insertPatients } = require('../../fixtures/patient.fixture');
+const { patientOne, insertPatients, insertPatientsWithOrg } = require('../../fixtures/patient.fixture');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 
 let mongoServer;
@@ -49,7 +49,8 @@ describe('Schedule Service', () => {
 
   describe('createSchedule', () => {
     test("should create a new schedule and add it to the patient's schedules", async () => {
-      const [patient] = await insertPatients([patientOne]);
+      const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
+      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
 
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
@@ -65,7 +66,8 @@ describe('Schedule Service', () => {
 
   describe('updateSchedule', () => {
     test('should update schedule details', async () => {
-      const [patient] = await insertPatients([patientOne]);
+      const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
+      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
       const updateBody = {
@@ -84,7 +86,8 @@ describe('Schedule Service', () => {
 
   describe('deleteSchedule', () => {
     test("should delete a schedule and update the patient's schedule list", async () => {
-      const [patient] = await insertPatients([patientOne]);
+      const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
+      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
       await scheduleService.deleteSchedule(schedule.id);
@@ -99,7 +102,8 @@ describe('Schedule Service', () => {
 
   describe('getScheduleById', () => {
     test('should retrieve a schedule by its ID', async () => {
-      const [patient] = await insertPatients([patientOne]);
+      const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
+      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
       const foundSchedule = await scheduleService.getScheduleById(schedule.id);

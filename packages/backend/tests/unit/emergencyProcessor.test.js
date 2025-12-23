@@ -96,12 +96,20 @@ describe('Emergency Processor', () => {
       password: 'testpassword123'
     });
     
+    // Create org for patient
+    const org = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+    
     // Create patient
     const patient = await Patient.create({
       name: 'John Doe',
       preferredName: 'John',
       email: 'john@example.com',
       phone: '+16045624265',
+      org: org._id,
       caregivers: [caregiver1._id, caregiver2._id]
     });
     
