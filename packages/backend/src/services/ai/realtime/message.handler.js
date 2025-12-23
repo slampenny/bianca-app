@@ -52,6 +52,10 @@ class MessageHandler {
       // GA requires session.type to be set
       // GA uses audio/pcmu (not g711_ulaw) for μ-law format
       baseConfig.session.type = 'realtime';
+      
+      // Get OpenAI noise reduction setting (near_field for phone calls, far_field for speakerphone, null to disable)
+      const openaiNoiseReduction = config.audio?.openaiNoiseReduction || 'near_field';
+      
       baseConfig.session.audio = {
         input: {
           format: {
@@ -60,6 +64,8 @@ class MessageHandler {
           transcription: {
             model: transcriptionModel
           },
+          // OpenAI built-in noise reduction (optimized for phone calls)
+          noise_reduction: openaiNoiseReduction !== 'null' && openaiNoiseReduction !== null ? openaiNoiseReduction : null,
           // Turn detection is nested under audio.input for GA
           turn_detection: {
             type: 'server_vad',

@@ -62,6 +62,9 @@ COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.js
 # Build: ${GIT_COMMIT:-unknown}
 COPY --chown=node:node src/ ./src/
 COPY --chown=node:node tests/ ./tests/
+# Copy migrations directory and config for database migrations
+COPY --chown=node:node migrations/ ./migrations/
+COPY --chown=node:node migrate-mongo-config.js ./
 # Note: devops/ directory not needed in container - used only for infrastructure deployment
 
 # Production stage - minimal final image

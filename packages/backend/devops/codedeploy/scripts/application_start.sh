@@ -88,11 +88,84 @@ else
 fi
 echo "   ✅ docker-compose.yml is valid"
 
-# Start containers - use background process with timeout to prevent hangs
-# CRITICAL: --pull always forces Docker to check ECR for latest images
-# --force-recreate ensures new containers even if config hasn't changed
-# Note: We start all services, so dependencies will be handled by depends_on
-echo "   Starting containers with --pull always to ensure latest images..."
+# Step 1: Start MongoDB first (needed for migrations)
+echo ""
+echo "   📊 Step 1: Starting MongoDB for migrations..."
+if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
+  docker compose up -d mongodb
+else
+  docker-compose up -d mongodb
+fi
+
+# Wait for MongoDB to be ready (max 60 seconds)
+echo "   ⏳ Waiting for MongoDB to be ready..."
+MONGODB_READY=false
+for i in {1..60}; do
+  if docker exec ${CONTAINER_PREFIX}_mongodb mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; then
+    MONGODB_READY=true
+    break
+  fi
+  sleep 1
+done
+
+if [ "$MONGODB_READY" = "false" ]; then
+  echo "   ⚠️  WARNING: MongoDB may not be fully ready, but continuing with migrations..."
+else
+  echo "   ✅ MongoDB is ready"
+fi
+
+# Step 2: Run database migrations
+echo ""
+echo "   🔄 Step 2: Running database migrations..."
+# Determine environment for migrations
+if echo "$INSTANCE_NAME" | grep -qi "production"; then
+  MIGRATION_NODE_ENV="production"
+else
+  MIGRATION_NODE_ENV="staging"
+fi
+
+# Get MongoDB URL from docker-compose environment (same as app container will use)
+MONGODB_URL="mongodb://mongodb:27017/bianca-service"
+
+# Run migrations using docker compose run (automatically connects to correct network)
+# This uses the app service definition but runs a one-off command
+# Working directory in container is /usr/src/bianca-app (set in Dockerfile)
+echo "   Running: yarn migrate:up"
+if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
+  if docker compose run --rm \
+    -e NODE_ENV="$MIGRATION_NODE_ENV" \
+    -e MONGODB_URL="$MONGODB_URL" \
+    app \
+    yarn migrate:up; then
+    echo "   ✅ Migrations completed successfully"
+  else
+    MIGRATION_EXIT_CODE=$?
+    echo "   ❌ ERROR: Migrations failed with exit code: $MIGRATION_EXIT_CODE" >&2
+    echo "   ⚠️  WARNING: Continuing with deployment, but database may not be up-to-date" >&2
+    echo "   💡 You may need to run migrations manually:" >&2
+    echo "      cd $DEPLOY_DIR && docker compose run --rm -e NODE_ENV=$MIGRATION_NODE_ENV -e MONGODB_URL=$MONGODB_URL app yarn migrate:up" >&2
+    # Don't exit - allow deployment to continue, but log the error
+  fi
+else
+  if docker-compose run --rm \
+    -e NODE_ENV="$MIGRATION_NODE_ENV" \
+    -e MONGODB_URL="$MONGODB_URL" \
+    app \
+    yarn migrate:up; then
+    echo "   ✅ Migrations completed successfully"
+  else
+    MIGRATION_EXIT_CODE=$?
+    echo "   ❌ ERROR: Migrations failed with exit code: $MIGRATION_EXIT_CODE" >&2
+    echo "   ⚠️  WARNING: Continuing with deployment, but database may not be up-to-date" >&2
+    echo "   💡 You may need to run migrations manually:" >&2
+    echo "      cd $DEPLOY_DIR && docker-compose run --rm -e NODE_ENV=$MIGRATION_NODE_ENV -e MONGODB_URL=$MONGODB_URL app yarn migrate:up" >&2
+    # Don't exit - allow deployment to continue, but log the error
+  fi
+fi
+
+# Step 3: Start all containers
+echo ""
+echo "   🚀 Step 3: Starting all containers with --pull always to ensure latest images..."
 echo "   CRITICAL: This will force Docker to check ECR for image updates..."
 if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
   docker compose up -d --pull always --force-recreate --remove-orphans > /tmp/docker_start.log 2>&1 &

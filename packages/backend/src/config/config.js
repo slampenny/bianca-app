@@ -186,7 +186,9 @@ const baselineConfig = {
       primarySpeakerEnergyMultiplier: parseFloat(process.env.AUDIO_PRIMARY_SPEAKER_ENERGY_MULTIPLIER) || 1.5, // Default: 1.5x average
       primarySpeakerVolumeReduction: parseFloat(process.env.AUDIO_PRIMARY_SPEAKER_VOLUME_REDUCTION) || 0.3, // Default: 0.3 (30% volume for non-primary)
       adaptiveNoiseReductionEnabled: process.env.AUDIO_ADAPTIVE_NOISE_REDUCTION_ENABLED === 'true', // Default: false (Stage 4)
-    }
+    },
+    // OpenAI built-in noise reduction (for gpt-realtime GA model)
+    openaiNoiseReduction: process.env.AUDIO_OPENAI_NOISE_REDUCTION || 'near_field', // 'near_field' (phone calls), 'far_field' (speakerphone), or null to disable
   },
   google: {
     language: 'en-US',
