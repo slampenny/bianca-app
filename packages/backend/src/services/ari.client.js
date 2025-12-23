@@ -2047,8 +2047,29 @@ async handleStasisStartForPlayback(channel, channelName, event) {
                 state: 'setting_up_media'
             });
 
-            // Step 4: Get call type from SIP parameters or default to inbound
-            const callType = this.extractCallTypeFromChannel(channel) || 'inbound';
+            // Step 4: Get call type - first try to get from Call record in database, then from channel
+            let callType = 'inbound'; // default
+            if (twilioCallSid) {
+                try {
+                    const { Call } = require('../models');
+                    const callRecord = await Call.findOne({ callSid: twilioCallSid }).select('callType').lean();
+                    if (callRecord?.callType) {
+                        callType = callRecord.callType;
+                        logger.info(`[ARI Pipeline] Found callType "${callType}" from Call record for ${twilioCallSid}`);
+                    } else {
+                        // Fallback to extracting from channel
+                        callType = this.extractCallTypeFromChannel(channel) || 'inbound';
+                        logger.info(`[ARI Pipeline] Call record not found or no callType, using channel extraction: "${callType}"`);
+                    }
+                } catch (err) {
+                    logger.warn(`[ARI Pipeline] Error looking up Call record: ${err.message}, falling back to channel extraction`);
+                    callType = this.extractCallTypeFromChannel(channel) || 'inbound';
+                }
+            } else {
+                // No twilioCallSid, try channel extraction
+                callType = this.extractCallTypeFromChannel(channel) || 'inbound';
+                logger.info(`[ARI Pipeline] No twilioCallSid, using channel extraction: "${callType}"`);
+            }
 
             const conversationService = require('./conversation.service');
             const enhancedPrompt = await conversationService.buildEnhancedPrompt(patientId, callType);
