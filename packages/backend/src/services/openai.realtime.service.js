@@ -417,6 +417,7 @@ class OpenAIRealtimeService {
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
       patientId, // Store patient ID for emergency detection
+      preferredLanguage: null, // Will be loaded when needed
       webSocket: null,
       sessionReady: false,
       startTime: Date.now(),
@@ -683,11 +684,37 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Get language-specific filler words
+   * @param {string} languageCode - Language code (en, es, fr, de, zh, ja, pt, it, ru, ar)
+   * @returns {Set<string>} - Set of filler words for that language
+   */
+  getFillerWordsForLanguage(languageCode) {
+    const fillerWordsByLanguage = {
+      'en': ['um', 'uh', 'ah', 'er', 'eh', 'hmm', 'hm', 'mm', 'mhm', 'uh-huh', 'oh', 'ahh', 'umm', 'uhh', 'err', 'ehh', 'hmmm', 'mmm', 'well', 'like', 'you know', 'i mean', 'so', 'actually', 'basically'],
+      'es': ['eh', 'este', 'pues', 'bueno', 'o sea', 'como', 'mm', 'hmm', 'ah', 'ay', 'uy', 'ehh', 'mmm', 'pues', 'entonces'],
+      'fr': ['euh', 'ben', 'alors', 'hein', 'mm', 'hmm', 'ah', 'oh', 'bah', 'quoi', 'tu vois', 'genre'],
+      'de': ['äh', 'ähm', 'hmm', 'mm', 'also', 'nun', 'ja', 'eh', 'oh', 'tja', 'weißt du', 'sozusagen'],
+      'zh': ['嗯', '呃', '那个', '就是', '然后', '这个', '啊', '哦', '呢', '吧'],
+      'ja': ['えー', 'あの', 'その', 'まあ', 'なんか', 'えっと', 'うーん', 'あー', 'んー', 'えーと'],
+      'pt': ['é', 'né', 'tipo', 'assim', 'então', 'hmm', 'mm', 'ah', 'oh', 'éé', 'néé', 'sabe'],
+      'it': ['eh', 'ehm', 'allora', 'cioè', 'tipo', 'mm', 'hmm', 'ah', 'oh', 'beh', 'sai', 'capisci'],
+      'ru': ['э', 'ээ', 'эм', 'ну', 'типа', 'как бы', 'мм', 'хм', 'а', 'о', 'вот', 'знаешь'],
+      'ar': ['إم', 'إيه', 'يعني', 'يعني', 'هه', 'أه', 'مم', 'حسناً', 'طيب', 'يعني']
+    };
+
+    // Default to English if language not found
+    const fillerWords = fillerWordsByLanguage[languageCode] || fillerWordsByLanguage['en'];
+    return new Set(fillerWords);
+  }
+
+  /**
    * Check if transcript contains only filler words (um, ah, uh, etc.)
+   * Supports multiple languages based on patient's preferred language
    * @param {string} transcript - The transcript to check
+   * @param {string} languageCode - Optional language code (en, es, fr, etc.). If not provided, uses English.
    * @returns {boolean} - True if transcript is only filler words
    */
-  isOnlyFillerWords(transcript) {
+  isOnlyFillerWords(transcript, languageCode = 'en') {
     if (!transcript || !transcript.trim()) {
       return false; // Empty transcript is not filler words
     }
@@ -701,12 +728,8 @@ class OpenAIRealtimeService {
       return false;
     }
 
-    // Common filler words and sounds
-    const fillerWords = new Set([
-      'um', 'uh', 'ah', 'er', 'eh', 'hmm', 'hm', 'mm', 'mhm', 'uh-huh',
-      'oh', 'ahh', 'umm', 'uhh', 'err', 'ehh', 'hmmm', 'hmm', 'mmm',
-      'well', 'like', 'you know', 'i mean', 'so', 'actually', 'basically'
-    ]);
+    // Get language-specific filler words
+    const fillerWords = this.getFillerWordsForLanguage(languageCode);
 
     // Check if ALL words are filler words
     const allFiller = words.every(word => {
@@ -1202,9 +1225,27 @@ class OpenAIRealtimeService {
               if (currentConn.pendingUserTranscript && currentConn.pendingUserTranscript.trim()) {
                 const transcript = currentConn.pendingUserTranscript.trim();
                 
+                // Get patient's preferred language for filler word detection (cache in connection)
+                let preferredLanguage = currentConn.preferredLanguage || 'en'; // default to English
+                if (!currentConn.preferredLanguage && currentConn.patientId) {
+                  try {
+                    const { Patient } = require('../models');
+                    const patient = await Patient.findById(currentConn.patientId).select('preferredLanguage').lean();
+                    if (patient?.preferredLanguage) {
+                      preferredLanguage = patient.preferredLanguage;
+                      currentConn.preferredLanguage = preferredLanguage; // Cache it
+                    } else {
+                      currentConn.preferredLanguage = 'en'; // Cache default
+                    }
+                  } catch (err) {
+                    logger.warn(`[OpenAI Realtime] Could not get patient language for filler word detection: ${err.message}`);
+                    currentConn.preferredLanguage = 'en'; // Cache default on error
+                  }
+                }
+                
                 // Check if transcript is only filler words - if so, don't save or respond, just wait
-                if (this.isOnlyFillerWords(transcript)) {
-                  logger.info(`[OpenAI Realtime] User transcript contains only filler words: "${transcript}" - waiting for more substantial speech`);
+                if (this.isOnlyFillerWords(transcript, preferredLanguage)) {
+                  logger.info(`[OpenAI Realtime] User transcript contains only filler words (${preferredLanguage}): "${transcript}" - waiting for more substantial speech`);
                   // Clear the transcript but keep the placeholder - user might continue speaking
                   currentConn.pendingUserTranscript = '';
                   // Don't finalize message or trigger response - just wait
@@ -1340,9 +1381,27 @@ class OpenAIRealtimeService {
 
               // Check if pending transcript is only filler words - if so, wait for more substantial speech
               if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
-                if (this.isOnlyFillerWords(conn.pendingUserTranscript)) {
+                // Get patient's preferred language for filler word detection (cache in connection)
+                let preferredLanguage = conn.preferredLanguage || 'en'; // default to English
+                if (!conn.preferredLanguage && conn.patientId) {
+                  try {
+                    const { Patient } = require('../models');
+                    const patient = await Patient.findById(conn.patientId).select('preferredLanguage').lean();
+                    if (patient?.preferredLanguage) {
+                      preferredLanguage = patient.preferredLanguage;
+                      conn.preferredLanguage = preferredLanguage; // Cache it
+                    } else {
+                      conn.preferredLanguage = 'en'; // Cache default
+                    }
+                  } catch (err) {
+                    logger.warn(`[OpenAI Realtime] Could not get patient language for filler word detection: ${err.message}`);
+                    conn.preferredLanguage = 'en'; // Cache default on error
+                  }
+                }
+                
+                if (this.isOnlyFillerWords(conn.pendingUserTranscript, preferredLanguage)) {
                   logger.info(
-                    `[OpenAI Realtime] Ignoring speech_stopped for ${callId} - transcript contains only filler words: "${conn.pendingUserTranscript}"`
+                    `[OpenAI Realtime] Ignoring speech_stopped for ${callId} - transcript contains only filler words (${preferredLanguage}): "${conn.pendingUserTranscript}"`
                   );
                   return; // Don't trigger response - wait for more substantial speech
                 }
