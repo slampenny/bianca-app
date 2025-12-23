@@ -32,11 +32,12 @@ describe('Emergency Processor', () => {
     processor = new EmergencyProcessor();
     
     // Create actual Patient and Caregiver documents in the database
-    const { Patient, Caregiver, EmergencyPhrase } = require('../../src/models');
+    const { Patient, Caregiver, Org, EmergencyPhrase } = require('../../src/models');
     
     // Clear existing documents
     await Patient.deleteMany({});
     await Caregiver.deleteMany({});
+    await Org.deleteMany({});
     await EmergencyPhrase.deleteMany({});
     
     // Create test emergency phrases for detection
