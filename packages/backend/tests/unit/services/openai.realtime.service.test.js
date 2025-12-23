@@ -31,7 +31,8 @@ jest.mock('../../../src/models', () => ({
     create: jest.fn(),
     find: jest.fn(),
     findById: jest.fn(),
-    findByIdAndUpdate: jest.fn()
+    findByIdAndUpdate: jest.fn(),
+    findByIdAndDelete: jest.fn()
   },
   Patient: {
     findById: jest.fn(),
@@ -572,5 +573,242 @@ describe('OpenAI Realtime Service', () => {
       
       // Test passes if no error is thrown - real logger will log the error
     });
+  });
+
+  describe('Interruption Handling', () => {
+    const mockCallId = 'test-call-id';
+    let connection;
+    let Message;
+
+    beforeEach(async () => {
+      await service.initialize('test-channel', mockCallId, 'test-conversation', 'test prompt');
+      connection = service.connections.get(mockCallId);
+      connection.sessionReady = true;
+      connection.webSocket = mockWebSocket;
+      connection.webSocket.readyState = WebSocket.OPEN;
+      
+      // Get Message model for mocking
+      Message = require('../../../src/models').Message;
+      
+      // Mock sendJsonMessage to track calls
+      jest.spyOn(service, 'sendJsonMessage').mockResolvedValue();
+      jest.spyOn(service, 'createPlaceholderUserMessage').mockResolvedValue();
+      jest.spyOn(service, 'createPlaceholderAssistantMessage').mockResolvedValue();
+      jest.spyOn(service, 'transitionState').mockReturnValue(true);
+      jest.spyOn(service, 'canUserSpeak').mockReturnValue(true);
+      jest.spyOn(service, 'canAIRespond').mockReturnValue(true);
+      jest.spyOn(service, 'isInGracePeriod').mockReturnValue(false);
+      jest.spyOn(service, 'getConversationState').mockReturnValue('conversation_active');
+      jest.spyOn(service, 'sendResponseCreate').mockResolvedValue();
+    });
+
+    it('should cancel AI response when user interrupts', async () => {
+      // Set up AI as speaking
+      connection._aiIsSpeaking = true;
+      
+      // Simulate user starting to speak (interruption)
+      const speechStartedMessage = {
+        type: 'input_audio_buffer.speech_started'
+      };
+      
+      await service.handleOpenAIMessageInternal(mockCallId, JSON.stringify(speechStartedMessage));
+      
+      // Verify response.cancel was sent
+      expect(service.sendJsonMessage).toHaveBeenCalledWith(
+        mockCallId,
+        { type: 'response.cancel' }
+      );
+      
+      // Verify AI speaking flag is cleared
+      expect(connection._aiIsSpeaking).toBe(false);
+      
+      // Verify cancellation is tracked
+      expect(connection._responseCanceled).toBe(true);
+      expect(connection._responseCanceledAt).toBeDefined();
+      
+      // Verify pending transcript is cleared
+      expect(connection.pendingAssistantTranscript).toBe('');
+    });
+
+    it('should skip processing canceled response.done event with status cancelled', async () => {
+      // Set up a canceled response
+      connection._responseCanceled = true;
+      connection._responseCanceledAt = Date.now();
+      connection._aiIsSpeaking = true;
+      connection.pendingAssistantTranscript = 'This should not be saved';
+      connection.activeAssistantMessageId = 'test-message-id';
+      
+      // Mock Message.findByIdAndDelete
+      Message.findByIdAndDelete.mockResolvedValue({});
+      
+      // Simulate response.done with status 'cancelled'
+      const responseDoneMessage = {
+        type: 'response.done',
+        response: {
+          id: 'response-123',
+          status: 'cancelled'
+        }
+      };
+      
+      await service.handleResponseDone(mockCallId, responseDoneMessage);
+      
+      // Verify placeholder message was deleted
+      expect(Message.findByIdAndDelete).toHaveBeenCalledWith('test-message-id');
+      
+      // Verify transcript was not saved (pendingAssistantTranscript should be cleared)
+      expect(connection.pendingAssistantTranscript).toBe('');
+      
+      // Verify flags are reset
+      expect(connection._aiIsSpeaking).toBe(false);
+      expect(connection._responseCanceled).toBe(false);
+      expect(connection._responseCanceledAt).toBeNull();
+    });
+
+    it('should skip processing response.done when cancellation is tracked locally', async () => {
+      // Set up a locally tracked cancellation (even if status is not 'cancelled')
+      connection._responseCanceled = true;
+      connection._responseCanceledAt = Date.now();
+      connection._aiIsSpeaking = true;
+      connection.pendingAssistantTranscript = 'This should not be saved';
+      connection.activeAssistantMessageId = 'test-message-id';
+      
+      // Mock Message.findByIdAndDelete
+      Message.findByIdAndDelete.mockResolvedValue({});
+      
+      // Simulate response.done without status (or with 'completed' status)
+      const responseDoneMessage = {
+        type: 'response.done',
+        response: {
+          id: 'response-123',
+          status: 'completed' // Even if status says completed, we track it as canceled
+        }
+      };
+      
+      await service.handleResponseDone(mockCallId, responseDoneMessage);
+      
+      // Verify placeholder message was deleted (canceled response not saved)
+      expect(Message.findByIdAndDelete).toHaveBeenCalledWith('test-message-id');
+      
+      // Verify transcript was not saved
+      expect(connection.pendingAssistantTranscript).toBe('');
+      
+      // Verify flags are reset
+      expect(connection._aiIsSpeaking).toBe(false);
+      expect(connection._responseCanceled).toBe(false);
+    });
+
+    it('should prevent immediate response after cancel (debounce behavior)', async () => {
+      // Set up: AI was canceled very recently (within debounce window)
+      connection._responseCanceled = true;
+      connection._responseCanceledAt = Date.now() - 100; // Canceled 100ms ago (within 500ms debounce)
+      connection._aiIsSpeaking = false;
+      connection._userIsSpeaking = false;
+      connection.pendingUserTranscript = 'User said something';
+      connection.activeUserMessageId = 'test-user-message-id';
+      
+      // Mock Message operations for user message finalization
+      Message.findById.mockResolvedValue({ createdAt: new Date() });
+      Message.findByIdAndUpdate.mockResolvedValue({});
+      
+      // Ensure all state checks pass
+      service.canAIRespond.mockReturnValue(true);
+      service.isInGracePeriod.mockReturnValue(false);
+      service.getConversationState.mockReturnValue('conversation_active');
+      service.transitionState.mockReturnValue(true);
+      
+      // Simulate user stopping speaking
+      const speechStoppedMessage = {
+        type: 'input_audio_buffer.speech_stopped'
+      };
+      
+      // Start handling speech_stopped
+      service.handleOpenAIMessageInternal(
+        mockCallId,
+        JSON.stringify(speechStoppedMessage)
+      );
+      
+      // Wait a short time - response should NOT be triggered immediately due to debounce
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Verify sendResponseCreate was NOT called immediately (debounce prevents it)
+      // The debounce logic should have scheduled a delayed response instead
+      expect(service.sendResponseCreate).not.toHaveBeenCalled();
+      
+      // Verify the cancel flag is still set (debounce timeout hasn't fired yet)
+      expect(connection._responseCanceled).toBe(true);
+    }, 5000);
+
+    it('should process normal (non-canceled) response.done event', async () => {
+      // Set up a normal (non-canceled) response
+      connection._responseCanceled = false;
+      connection._aiIsSpeaking = true;
+      connection.pendingAssistantTranscript = 'This is a complete response';
+      connection.activeAssistantMessageId = 'test-message-id';
+      
+      // Mock Message operations
+      const mockMessage = { createdAt: new Date() };
+      Message.findById.mockResolvedValue(mockMessage);
+      Message.findByIdAndUpdate.mockResolvedValue({});
+      
+      // Simulate response.done with status 'completed'
+      const responseDoneMessage = {
+        type: 'response.done',
+        response: {
+          id: 'response-123',
+          status: 'completed'
+        }
+      };
+      
+      await service.handleResponseDone(mockCallId, responseDoneMessage);
+      
+      // Verify message was updated (not deleted)
+      expect(Message.findByIdAndUpdate).toHaveBeenCalledWith(
+        'test-message-id',
+        expect.objectContaining({
+          content: 'This is a complete response',
+          messageType: 'assistant_response'
+        }),
+        expect.any(Object)
+      );
+      
+      // Verify flags are reset
+      expect(connection._aiIsSpeaking).toBe(false);
+      expect(connection._responseCanceled).toBe(false);
+    });
+
+    it('should not trigger new response immediately after cancel if user is still speaking', async () => {
+      jest.useFakeTimers();
+      
+      // Set up: AI was canceled, but user is still speaking
+      connection._responseCanceled = true;
+      connection._responseCanceledAt = Date.now();
+      connection._aiIsSpeaking = false;
+      connection._userIsSpeaking = true; // User still speaking
+      
+      // Simulate user stopping speaking
+      const speechStoppedMessage = {
+        type: 'input_audio_buffer.speech_stopped'
+      };
+      
+      // Mock Message operations
+      Message.findById.mockResolvedValue({ createdAt: new Date() });
+      Message.findByIdAndUpdate.mockResolvedValue({});
+      
+      // The handler sets _userIsSpeaking to false immediately, but the debounce logic
+      // should still prevent immediate response due to the cancel flag
+      service.handleOpenAIMessageInternal(
+        mockCallId,
+        JSON.stringify(speechStoppedMessage)
+      );
+      
+      // Fast-forward past the initial 500ms delay
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      
+      // Verify sendResponseCreate was NOT called yet (still in debounce period)
+      expect(service.sendResponseCreate).not.toHaveBeenCalled();
+      
+      jest.useRealTimers();
+    }, 5000);
   });
 });

@@ -1087,7 +1087,7 @@ class OpenAIRealtimeService {
 
         case 'response.done':
           logger.info(`[OpenAI Realtime] AI FINISHED SPEAKING for ${callId}`);
-          await this.handleResponseDone(callId);
+          await this.handleResponseDone(callId, message);
           break;
 
         case 'conversation.item.input_audio_transcription.completed':
@@ -1129,8 +1129,14 @@ class OpenAIRealtimeService {
                 // Cancel any ongoing AI response
                 await this.sendJsonMessage(callId, { type: 'response.cancel' });
                 conn._aiIsSpeaking = false;
+                // Track that we canceled a response - this prevents processing the canceled response.done event
+                conn._responseCanceled = true;
+                conn._responseCanceledAt = Date.now();
+                // Clear any pending assistant transcript since we're canceling
+                conn.pendingAssistantTranscript = '';
                 // Transition back to conversation active since AI was interrupted
                 this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
+                logger.info(`[OpenAI Realtime] Response canceled for ${callId} - will wait for user to finish before responding`);
               } catch (err) {
                 logger.error(`[OpenAI Realtime] Failed to cancel AI response: ${err.message}`);
               }
@@ -1217,6 +1223,62 @@ class OpenAIRealtimeService {
             }, 500); // Wait 500ms for transcription to complete
 
             // STATE MACHINE: Only trigger AI response if we're in the right state
+            // CRITICAL: If we just canceled a response, wait a bit before triggering a new one
+            // This prevents race conditions where response.done arrives after we cancel
+            const timeSinceCancel = conn._responseCanceledAt ? Date.now() - conn._responseCanceledAt : Infinity;
+            const CANCEL_DEBOUNCE_MS = 500; // Wait 500ms after canceling before allowing new response
+            
+            if (conn._responseCanceled && timeSinceCancel < CANCEL_DEBOUNCE_MS) {
+              logger.info(
+                `[OpenAI Realtime] User finished speaking for ${callId} but response was recently canceled ` +
+                `(${Math.round(timeSinceCancel)}ms ago) - waiting ${CANCEL_DEBOUNCE_MS}ms before allowing new response`
+              );
+              
+              // Wait for the debounce period, then check again
+              setTimeout(async () => {
+                const currentConn = this.connections.get(callId);
+                if (!currentConn) return;
+                
+                // Clear the canceled flag after debounce period
+                currentConn._responseCanceled = false;
+                currentConn._responseCanceledAt = null;
+                
+                // Now check if we should trigger a response
+                if (!currentConn._aiIsSpeaking && this.canAIRespond(callId)) {
+                  // Check grace period
+                  if (this.isInGracePeriod(callId)) {
+                    const timeSinceGreeting = Date.now() - currentConn._initialGreetingCompletedAt;
+                    logger.info(
+                      `[OpenAI Realtime] Ignoring speech_stopped for ${callId} - in grace period ` +
+                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms).`
+                    );
+                    return;
+                  }
+                  
+                  // Transition to AI_RESPONDING state
+                  if (this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_finished_speaking_after_cancel')) {
+                    logger.info(`[OpenAI Realtime] User finished speaking (after cancel debounce) - will trigger AI response for ${callId}`);
+                    
+                    setTimeout(async () => {
+                      const finalConn = this.connections.get(callId);
+                      if (finalConn && this.getConversationState(callId) === CONVERSATION_STATES.AI_RESPONDING) {
+                        try {
+                          await this.sendResponseCreate(callId);
+                          finalConn._aiIsSpeaking = true;
+                          logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking (post-cancel) for ${callId}`);
+                        } catch (err) {
+                          logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
+                          this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
+                        }
+                      }
+                    }, 200);
+                  }
+                }
+              }, CANCEL_DEBOUNCE_MS - timeSinceCancel);
+              
+              return; // Exit early - we'll handle response after debounce
+            }
+            
             if (!conn._aiIsSpeaking && this.canAIRespond(callId)) {
               // Check if we're in grace period after initial greeting
               if (this.isInGracePeriod(callId)) {
@@ -1506,15 +1568,58 @@ class OpenAIRealtimeService {
    * 2. We save any accumulated AI text from pendingAssistantTranscript
    * 3. This ensures AI messages are saved with timestamps reflecting when AI actually finished speaking
    * 4. The message gets a timestamp when it's saved to the database, not when text was first generated
+   * 
+   * INTERRUPTION HANDLING:
+   * - If the response was canceled (status: 'cancelled'), we skip processing to avoid saving incomplete responses
+   * - If we tracked a cancellation locally, we also skip processing to prevent race conditions
    */
-  async handleResponseDone(callId) {
-    logger.info(`[OpenAI Realtime] Assistant response done for ${callId}`);
-
+  async handleResponseDone(callId, message) {
     const conn = this.connections.get(callId);
     if (!conn) {
       this.notify(callId, 'response_done', {});
       return;
     }
+
+    // Check if this response was canceled
+    const responseStatus = message?.response?.status;
+    const wasCanceled = responseStatus === 'cancelled' || conn._responseCanceled;
+    
+    if (wasCanceled) {
+      logger.info(`[OpenAI Realtime] Response done event received for ${callId} but response was canceled (status: ${responseStatus || 'tracked locally'}) - skipping processing`);
+      
+      // Clear the canceled flag and reset state
+      conn._responseCanceled = false;
+      conn._responseCanceledAt = null;
+      conn._aiIsSpeaking = false;
+      conn._responseCreated = false;
+      conn._responseStartTime = null;
+      
+      // Clear any pending assistant transcript since we canceled
+      conn.pendingAssistantTranscript = '';
+      
+      // Remove placeholder if it exists
+      if (conn.activeAssistantMessageId) {
+        try {
+          const { Message } = require('../models');
+          await Message.findByIdAndDelete(conn.activeAssistantMessageId);
+          logger.info(`[OpenAI Realtime] Removed placeholder assistant message for canceled response ${callId}`);
+          conn.activeAssistantMessageId = null;
+        } catch (err) {
+          logger.error(`[OpenAI Realtime] Failed to remove placeholder for canceled response: ${err.message}`);
+        }
+      }
+      
+      // Transition state back to conversation active
+      const currentState = this.getConversationState(callId);
+      if (currentState === CONVERSATION_STATES.AI_RESPONDING) {
+        this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
+      }
+      
+      this.notify(callId, 'response_done', { canceled: true });
+      return;
+    }
+
+    logger.info(`[OpenAI Realtime] Assistant response done for ${callId} (status: ${responseStatus || 'completed'})`);
 
     // Save AI transcript now that AI has finished speaking
     if (conn.pendingAssistantTranscript && conn.pendingAssistantTranscript.trim()) {
@@ -1566,6 +1671,9 @@ class OpenAIRealtimeService {
     conn._aiIsSpeaking = false;
     conn._responseCreated = false;
     conn._responseStartTime = null; // Clear timeout tracking
+    // Clear canceled flag if it was set (shouldn't be, but defensive)
+    conn._responseCanceled = false;
+    conn._responseCanceledAt = null;
 
     // STATE MACHINE: Transition based on current state
     const currentState = this.getConversationState(callId);
