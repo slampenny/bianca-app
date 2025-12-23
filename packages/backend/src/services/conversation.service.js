@@ -293,12 +293,8 @@ ${conversationHistory}
 Note: Use this context naturally to provide continuity, but don't explicitly mention "previous calls" unless the patient brings them up first.`;
     }
 
-    // Add call type specific context
-    if (callType === 'wellness-check') {
-      enhancedPrompt += `\n\nCall Context: This is a wellness check call you initiated. Wait for the person to speak first, then introduce yourself with "This is Bianca" and ask about their general well-being. Keep it conversational and friendly.`;
-    } else {
-      enhancedPrompt += `\n\nCall Context: The patient called you. Listen first to understand what they need, then provide appropriate support while maintaining your warm, empathetic personality.`;
-    }
+    // Add call context - Bianca always initiates calls, patients cannot call Bianca
+    enhancedPrompt += `\n\nCall Context: You initiated this call to the patient for a wellness check. Wait for them to speak first when they answer, then introduce yourself with "This is Bianca" and ask about their general well-being. Keep it conversational and friendly. Listen to what they need and provide appropriate support while maintaining your warm, empathetic personality.`;
     
     // Add subtle health metric nudge (one at a time, gently)
     const healthMetrics = ['sleep', 'appetite', 'pain', 'energy', 'medication adherence', 'social connection'];
