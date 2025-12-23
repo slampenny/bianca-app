@@ -54,9 +54,25 @@ beforeAll(async () => {
   await patient.save();
   patientId = patient._id;
 
+  // Create a Call first (Conversation requires callId)
+  const { Call } = require('../../src/models');
+  const call1 = new Call({
+    callSid: 'fraud-test-call-1',
+    patientId: patientId,
+    startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    callStartTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    callType: 'wellness-check',
+    status: 'completed',
+    callStatus: 'ended',
+    duration: 300000,
+    callDuration: 300000
+  });
+  await call1.save();
+
   // Create conversations with fraud/abuse patterns
   const conversation1 = new Conversation({
     patientId: patientId,
+    callId: call1._id,
     callSid: 'fraud-test-call-1',
     messages: [],
     startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
@@ -77,8 +93,22 @@ beforeAll(async () => {
   conversation1.messages = [message1._id];
   await conversation1.save();
 
+  const call2 = new Call({
+    callSid: 'abuse-test-call-1',
+    patientId: patientId,
+    startTime: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+    callStartTime: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+    callType: 'wellness-check',
+    status: 'completed',
+    callStatus: 'ended',
+    duration: 200000,
+    callDuration: 200000
+  });
+  await call2.save();
+
   const conversation2 = new Conversation({
     patientId: patientId,
+    callId: call2._id,
     callSid: 'abuse-test-call-1',
     messages: [],
     startTime: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
@@ -99,8 +129,22 @@ beforeAll(async () => {
   conversation2.messages = [message2._id];
   await conversation2.save();
 
+  const call3 = new Call({
+    callSid: 'neglect-test-call-1',
+    patientId: patientId,
+    startTime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+    callStartTime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+    callType: 'wellness-check',
+    status: 'completed',
+    callStatus: 'ended',
+    duration: 250000,
+    callDuration: 250000
+  });
+  await call3.save();
+
   const conversation3 = new Conversation({
     patientId: patientId,
+    callId: call3._id,
     callSid: 'neglect-test-call-1',
     messages: [],
     startTime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
