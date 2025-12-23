@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const privacyService = require('../../../src/services/privacy.service');
-const { PrivacyRequest, ConsentRecord, Caregiver, Patient, Conversation, MedicalAnalysis, Call } = require('../../../src/models');
+const { PrivacyRequest, ConsentRecord, Caregiver, Patient, Org, Conversation, MedicalAnalysis, Call } = require('../../../src/models');
 const ApiError = require('../../../src/utils/ApiError');
 const emailService = require('../../../src/services/email.service');
 
@@ -34,6 +34,7 @@ describe('Privacy Service', () => {
     await ConsentRecord.deleteMany({});
     await Caregiver.deleteMany({});
     await Patient.deleteMany({});
+    await Org.deleteMany({});
     await Conversation.deleteMany({});
     await Call.deleteMany({});
     await MedicalAnalysis.deleteMany({});
@@ -51,10 +52,18 @@ describe('Privacy Service', () => {
     caregiverId = caregiver._id;
 
     // Create test patient
+    // Create org for patient
+    const org = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+    
     const patient = await Patient.create({
       name: 'Test Patient',
       email: 'patient@test.com',
       phone: '+16045624264', // Valid phone format
+      org: org._id,
       caregivers: [caregiverId],
     });
     patientId = patient._id;

@@ -80,7 +80,8 @@ describe('caregiverService', () => {
 
   it('should assign a patient to a caregiver', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const patient = await patientService.createPatient(patientOne);
+    const patientData = { ...patientOne, org: org._id };
+    const patient = await patientService.createPatient(patientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     const addedPatient = await caregiverService.addPatient(caregiver.id, patient.id);
     expect(addedPatient.id).toEqual(patient.id);
@@ -88,7 +89,8 @@ describe('caregiverService', () => {
 
   it('should remove a patient from a caregiver', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const patient = await patientService.createPatient(patientOne);
+    const patientData = { ...patientOne, org: org._id };
+    const patient = await patientService.createPatient(patientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     await caregiverService.addPatient(caregiver.id, patient.id);
     const updatedCaregiver = await caregiverService.removePatient(caregiver.id, patient.id);
@@ -97,7 +99,8 @@ describe('caregiverService', () => {
 
   it('should get patients by caregiver id', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const patient = await patientService.createPatient(patientOne);
+    const patientData = { ...patientOne, org: org._id };
+    const patient = await patientService.createPatient(patientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     await caregiverService.addPatient(caregiver.id, patient.id);
     const patients = await caregiverService.getPatients(caregiver.id);
