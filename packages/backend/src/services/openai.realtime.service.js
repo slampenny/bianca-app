@@ -683,6 +683,42 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Check if transcript contains only filler words (um, ah, uh, etc.)
+   * @param {string} transcript - The transcript to check
+   * @returns {boolean} - True if transcript is only filler words
+   */
+  isOnlyFillerWords(transcript) {
+    if (!transcript || !transcript.trim()) {
+      return false; // Empty transcript is not filler words
+    }
+
+    // Normalize: lowercase, remove punctuation, split into words
+    const normalized = transcript.toLowerCase().trim();
+    const words = normalized.split(/\s+/).filter(word => word.length > 0);
+
+    // If no words, not filler
+    if (words.length === 0) {
+      return false;
+    }
+
+    // Common filler words and sounds
+    const fillerWords = new Set([
+      'um', 'uh', 'ah', 'er', 'eh', 'hmm', 'hm', 'mm', 'mhm', 'uh-huh',
+      'oh', 'ahh', 'umm', 'uhh', 'err', 'ehh', 'hmmm', 'hmm', 'mmm',
+      'well', 'like', 'you know', 'i mean', 'so', 'actually', 'basically'
+    ]);
+
+    // Check if ALL words are filler words
+    const allFiller = words.every(word => {
+      // Remove punctuation from word
+      const cleanWord = word.replace(/[.,!?;:]/g, '');
+      return fillerWords.has(cleanWord);
+    });
+
+    return allFiller && words.length > 0;
+  }
+
+  /**
    * Handle WebSocket open event
    */
   async handleOpen(callId) {
@@ -1164,7 +1200,18 @@ class OpenAIRealtimeService {
               // CRITICAL: We MUST update the existing placeholder (not create new) to preserve queue position
               let userMessageFinalized = false;
               if (currentConn.pendingUserTranscript && currentConn.pendingUserTranscript.trim()) {
-                logger.info(`[OpenAI Realtime] Saving user transcript now that user finished speaking: "${currentConn.pendingUserTranscript}"`);
+                const transcript = currentConn.pendingUserTranscript.trim();
+                
+                // Check if transcript is only filler words - if so, don't save or respond, just wait
+                if (this.isOnlyFillerWords(transcript)) {
+                  logger.info(`[OpenAI Realtime] User transcript contains only filler words: "${transcript}" - waiting for more substantial speech`);
+                  // Clear the transcript but keep the placeholder - user might continue speaking
+                  currentConn.pendingUserTranscript = '';
+                  // Don't finalize message or trigger response - just wait
+                  return; // Exit early, don't trigger AI response
+                }
+                
+                logger.info(`[OpenAI Realtime] Saving user transcript now that user finished speaking: "${transcript}"`);
                 
                 // Update the existing placeholder message if it exists (preserve original _id and position in queue)
                 if (currentConn.activeUserMessageId) {
@@ -1180,12 +1227,12 @@ class OpenAIRealtimeService {
                     await Message.findByIdAndUpdate(
                       currentConn.activeUserMessageId,
                       { 
-                        content: currentConn.pendingUserTranscript.trim(),
+                        content: transcript,
                         messageType: 'user_message',
                       },
                       { timestamps: false, runValidators: false } // Disable auto-timestamps
                     );
-                    logger.info(`[OpenAI Realtime] Updated placeholder user message ${currentConn.activeUserMessageId} with transcript: "${currentConn.pendingUserTranscript}" (preserved _id and queue position)`);
+                    logger.info(`[OpenAI Realtime] Updated placeholder user message ${currentConn.activeUserMessageId} with transcript: "${transcript}" (preserved _id and queue position)`);
                     userMessageFinalized = true;
                     currentConn.activeUserMessageId = null; // Clear the active message ID
                   } catch (err) {
@@ -1197,7 +1244,7 @@ class OpenAIRealtimeService {
                 } else {
                   // No placeholder exists - this shouldn't happen, but create new message as fallback
                   logger.warn(`[OpenAI Realtime] No active user message ID - creating new message (this may break queue order)`);
-                  await this.saveCompleteMessage(callId, 'patient', currentConn.pendingUserTranscript);
+                  await this.saveCompleteMessage(callId, 'patient', transcript);
                   userMessageFinalized = true;
                 }
                 
@@ -1289,6 +1336,16 @@ class OpenAIRealtimeService {
                   `This prevents lingering audio from "hello" or transfer message from triggering response.`
                 );
                 return; // Don't trigger response - this is likely lingering audio
+              }
+
+              // Check if pending transcript is only filler words - if so, wait for more substantial speech
+              if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
+                if (this.isOnlyFillerWords(conn.pendingUserTranscript)) {
+                  logger.info(
+                    `[OpenAI Realtime] Ignoring speech_stopped for ${callId} - transcript contains only filler words: "${conn.pendingUserTranscript}"`
+                  );
+                  return; // Don't trigger response - wait for more substantial speech
+                }
               }
 
               // Transition to AI_RESPONDING state
