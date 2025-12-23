@@ -21,7 +21,7 @@ afterAll(async () => {
 describe('Enhanced Emergency Processor with Context Awareness', () => {
   let processor;
   let mockPatient;
-  const { Patient, EmergencyPhrase } = require('../../src/models');
+  const { Patient, Org, EmergencyPhrase } = require('../../src/models');
 
   beforeEach(async () => {
     // Clear context window
@@ -32,6 +32,7 @@ describe('Enhanced Emergency Processor with Context Awareness', () => {
     
     // Clear existing documents
     await Patient.deleteMany({});
+    await Org.deleteMany({});
     await EmergencyPhrase.deleteMany({});
     
     // Create test emergency phrases
