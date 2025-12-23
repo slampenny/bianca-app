@@ -55,11 +55,18 @@ describe('Enhanced Emergency Processor with Context Awareness', () => {
     await localizedEmergencyDetector.loadPhrases();
     
     // Create test patient
+    const testOrg = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+    
     mockPatient = await Patient.create({
       name: 'Test Patient',
       email: 'test@example.com',
       phone: '1234567890',
-      preferredLanguage: 'en'
+      preferredLanguage: 'en',
+      org: testOrg._id
     });
   });
 
