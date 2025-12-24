@@ -14,18 +14,15 @@ if [ -f "/opt/bianca-deployment/devops/maintenance/enable-maintenance.sh" ]; the
     }
 fi
 
-# Detect environment from instance Name tag or Environment tag
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+# Detect environment - use directory existence as primary method (most reliable)
+# Fallback to instance tags if directories don't exist yet
 AWS_REGION="us-east-2"
-INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
-ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
 
-echo "   Instance ID: $INSTANCE_ID"
-echo "   Instance Name tag: $INSTANCE_NAME"
-echo "   Environment tag: $ENVIRONMENT_TAG"
+echo "   Detecting environment..."
 
-# Determine environment based on multiple checks
-if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "production"; then
+# Primary method: Check which deployment directory exists
+if [ -d "/opt/bianca-production" ]; then
+  echo "   ✅ Found /opt/bianca-production directory - using production"
   ENVIRONMENT="production"
   DEPLOY_DIR="/opt/bianca-production"
   CONTAINER_PREFIX="production"
@@ -38,7 +35,8 @@ if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "pr
   SERVER_NAME_API="api.biancawellness.com"
   YARN_COMMAND="yarn start"
   CLOUDWATCH_LOG_PREFIX="/bianca/production"
-elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
+elif [ -d "/opt/bianca-staging" ]; then
+  echo "   ✅ Found /opt/bianca-staging directory - using staging"
   ENVIRONMENT="staging"
   DEPLOY_DIR="/opt/bianca-staging"
   CONTAINER_PREFIX="staging"
@@ -52,10 +50,51 @@ elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "sta
   YARN_COMMAND="yarn dev:staging"
   CLOUDWATCH_LOG_PREFIX="/bianca/staging"
 else
-  echo "   ❌ ERROR: Cannot determine environment"
-  echo "   Instance Name: $INSTANCE_NAME"
-  echo "   Environment Tag: $ENVIRONMENT_TAG"
-  exit 1
+  # Fallback: Try to get instance tags (may fail due to permissions)
+  echo "   ⚠️  No deployment directory found, trying instance tags..."
+  INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
+  INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
+  ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
+  
+  echo "   Instance ID: $INSTANCE_ID"
+  echo "   Instance Name tag: $INSTANCE_NAME"
+  echo "   Environment tag: $ENVIRONMENT_TAG"
+  
+  if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "production"; then
+    echo "   ✅ Detected production from tags"
+    ENVIRONMENT="production"
+    DEPLOY_DIR="/opt/bianca-production"
+    CONTAINER_PREFIX="production"
+    IMAGE_TAG="production"
+    NODE_ENV="production"
+    API_BASE_URL="https://api.biancawellness.com"
+    WEBSOCKET_URL="wss://api.biancawellness.com"
+    FRONTEND_URL="https://app.biancawellness.com"
+    SERVER_NAME_FRONTEND="app.biancawellness.com"
+    SERVER_NAME_API="api.biancawellness.com"
+    YARN_COMMAND="yarn start"
+    CLOUDWATCH_LOG_PREFIX="/bianca/production"
+  elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
+    echo "   ✅ Detected staging from tags"
+    ENVIRONMENT="staging"
+    DEPLOY_DIR="/opt/bianca-staging"
+    CONTAINER_PREFIX="staging"
+    IMAGE_TAG="staging"
+    NODE_ENV="staging"
+    API_BASE_URL="https://staging-api.biancawellness.com"
+    WEBSOCKET_URL="wss://staging-api.biancawellness.com"
+    FRONTEND_URL="https://staging.biancawellness.com"
+    SERVER_NAME_FRONTEND="staging.biancawellness.com"
+    SERVER_NAME_API="staging-api.biancawellness.com"
+    YARN_COMMAND="yarn dev:staging"
+    CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+  else
+    echo "   ❌ ERROR: Cannot determine environment"
+    echo "   No deployment directories found and instance tags unavailable"
+    echo "   Instance Name: $INSTANCE_NAME"
+    echo "   Environment Tag: $ENVIRONMENT_TAG"
+    exit 1
+  fi
 fi
 
 echo "   ✅ Detected environment: $ENVIRONMENT"

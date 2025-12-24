@@ -5,30 +5,32 @@ set -e  # Exit on error - we want to fail if validation doesn't pass
 
 echo "✅ ValidateService: Verifying deployment..."
 
-# Detect environment from instance Name tag or Environment tag
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+# Detect environment - use directory existence as primary method (most reliable)
 AWS_REGION="us-east-2"
-INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
-ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
 
-# Determine environment based on multiple checks
-if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "production"; then
+# Primary method: Check which deployment directory exists
+if [ -d "/opt/bianca-production" ]; then
   DEPLOY_DIR="/opt/bianca-production"
   CONTAINER_PREFIX="production"
-elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
-  DEPLOY_DIR="/opt/bianca-staging"
-  CONTAINER_PREFIX="staging"
-elif [ -d "/opt/bianca-production" ] && [ -f "/opt/bianca-production/docker-compose.yml" ]; then
-  echo "   ⚠️  Environment detection unclear, but /opt/bianca-production exists, using production"
-  DEPLOY_DIR="/opt/bianca-production"
-  CONTAINER_PREFIX="production"
-elif [ -d "/opt/bianca-staging" ] && [ -f "/opt/bianca-staging/docker-compose.yml" ]; then
-  echo "   ⚠️  Environment detection unclear, but /opt/bianca-staging exists, using staging"
+elif [ -d "/opt/bianca-staging" ]; then
   DEPLOY_DIR="/opt/bianca-staging"
   CONTAINER_PREFIX="staging"
 else
-  echo "   ❌ ERROR: Cannot determine environment and no deployment directory found"
-  exit 1
+  # Fallback: Try to get instance tags (may fail due to permissions)
+  INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
+  INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
+  ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
+  
+  if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "production"; then
+    DEPLOY_DIR="/opt/bianca-production"
+    CONTAINER_PREFIX="production"
+  elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
+    DEPLOY_DIR="/opt/bianca-staging"
+    CONTAINER_PREFIX="staging"
+  else
+    echo "   ❌ ERROR: Cannot determine environment and no deployment directory found"
+    exit 1
+  fi
 fi
 
 cd "$DEPLOY_DIR" || {
