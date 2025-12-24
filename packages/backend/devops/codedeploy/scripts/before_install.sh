@@ -14,13 +14,18 @@ if [ -f "/opt/bianca-deployment/devops/maintenance/enable-maintenance.sh" ]; the
     }
 fi
 
-# Detect environment from instance Name tag
+# Detect environment from instance Name tag or Environment tag
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 AWS_REGION="us-east-2"
 INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
+ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
 
-# Determine environment based on instance name
-if echo "$INSTANCE_NAME" | grep -qi "production"; then
+echo "   Instance ID: $INSTANCE_ID"
+echo "   Instance Name tag: $INSTANCE_NAME"
+echo "   Environment tag: $ENVIRONMENT_TAG"
+
+# Determine environment based on multiple checks
+if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "production"; then
   ENVIRONMENT="production"
   DEPLOY_DIR="/opt/bianca-production"
   CONTAINER_PREFIX="production"
@@ -33,8 +38,7 @@ if echo "$INSTANCE_NAME" | grep -qi "production"; then
   SERVER_NAME_API="api.biancawellness.com"
   YARN_COMMAND="yarn start"
   CLOUDWATCH_LOG_PREFIX="/bianca/production"
-else
-  # Default to staging
+elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
   ENVIRONMENT="staging"
   DEPLOY_DIR="/opt/bianca-staging"
   CONTAINER_PREFIX="staging"
@@ -47,12 +51,17 @@ else
   SERVER_NAME_API="staging-api.biancawellness.com"
   YARN_COMMAND="yarn dev:staging"
   CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+else
+  echo "   ❌ ERROR: Cannot determine environment"
+  echo "   Instance Name: $INSTANCE_NAME"
+  echo "   Environment Tag: $ENVIRONMENT_TAG"
+  exit 1
 fi
 
-echo "   Detected environment: $ENVIRONMENT"
-echo "   Deployment directory: $DEPLOY_DIR"
-echo "   Container prefix: $CONTAINER_PREFIX"
-echo "   Image tag: $IMAGE_TAG"
+echo "   ✅ Detected environment: $ENVIRONMENT"
+echo "   ✅ Deployment directory: $DEPLOY_DIR"
+echo "   ✅ Container prefix: $CONTAINER_PREFIX"
+echo "   ✅ Image tag: $IMAGE_TAG"
 
 # Configure Docker log rotation to prevent disk space issues
 echo "   Configuring Docker log rotation..."
