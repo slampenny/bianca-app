@@ -1,7 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 import { DEFAULT_API_CONFIG } from "./api"
-import { Caregiver, Org, AuthTokens } from "./api.types"
+import { Caregiver, Org, AuthTokens, Patient, Alert } from "./api.types"
 
 export interface SSOLoginRequest {
   provider: 'google' | 'microsoft'
@@ -17,6 +17,8 @@ export interface SSOLoginResponse {
   tokens: AuthTokens
   user: Caregiver
   org?: Org
+  patients?: Patient[]
+  alerts?: Alert[]
 }
 
 export interface SSOVerifyRequest {

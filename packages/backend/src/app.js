@@ -149,12 +149,11 @@ const corsOptions = {
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:8080',
-      'http://localhost:8081',
-      'http://localhost:8082',  // For Playwright E2E tests
+      config.frontendUrl,        // Frontend URL from config (single source of truth)
       'http://127.0.0.1:3000',   // Alternative localhost format
       'http://127.0.0.1:3001',
       'null'                     // Some browsers send 'null' as origin for file:// URLs
-    ];
+    ].filter(Boolean); // Remove any undefined/null values
     
     // In development, allow all localhost origins for easier testing
     if (config.env === 'development') {

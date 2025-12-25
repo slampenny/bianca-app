@@ -163,7 +163,7 @@ const baselineConfig = {
   authEnabled: true,
   baseUrl: envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain))),
   apiUrl: (envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain)))) + '/v1',
-  frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' || envVars.NODE_ENV === 'test' ? 'http://localhost:8081' : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging', primaryDomain) : getUrlFromDomain('app', primaryDomain))),
+  frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' || envVars.NODE_ENV === 'test' ? 'http://localhost:8082' : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging', primaryDomain) : getUrlFromDomain('app', primaryDomain))),
   billing: { 
     ratePerMinute: 0.1,
     minimumBillableDuration: 30,

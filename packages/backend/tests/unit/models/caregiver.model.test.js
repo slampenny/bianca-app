@@ -1,7 +1,19 @@
 const faker = require('faker');
-const { Patient, Caregiver } = require('../../../src/models');
+const mongoose = require('mongoose');
+const { Patient, Caregiver, Org } = require('../../../src/models');
 
 describe('Caregiver model', () => {
+  let testOrg;
+  
+  beforeAll(async () => {
+    // Create a test org for all caregiver tests
+    testOrg = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+  });
+  
   describe('Caregiver validation', () => {
     let newCaregiver;
     beforeEach(() => {
@@ -11,6 +23,7 @@ describe('Caregiver model', () => {
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
         isEmailVerified: false,
+        org: testOrg._id,
       };
     });
 
@@ -54,6 +67,7 @@ describe('Caregiver model', () => {
         isEmailVerified: false,
         caregiver: null,
         schedules: [],
+        org: testOrg._id,
       };
       expect(new Caregiver(newCaregiver).toJSON()).not.toHaveProperty('password');
     });
@@ -65,7 +79,8 @@ describe('Caregiver model', () => {
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
         mfaSecret: 'encrypted-secret-string',
-        mfaBackupCodes: ['code1', 'code2']
+        mfaBackupCodes: ['code1', 'code2'],
+        org: testOrg._id,
       };
       const caregiverJSON = new Caregiver(newCaregiver).toJSON();
       expect(caregiverJSON).not.toHaveProperty('mfaSecret');
@@ -80,6 +95,7 @@ describe('Caregiver model', () => {
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
+        org: testOrg._id,
       };
       const caregiver = new Caregiver(newCaregiver);
       expect(caregiver.mfaEnabled).toBe(false);
@@ -92,7 +108,8 @@ describe('Caregiver model', () => {
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
         mfaSecret: 'encrypted-mfa-secret',
-        mfaEnabled: true
+        mfaEnabled: true,
+        org: testOrg._id,
       };
       await expect(new Caregiver(newCaregiver).validate()).resolves.toBeUndefined();
     });
@@ -103,7 +120,8 @@ describe('Caregiver model', () => {
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
-        mfaBackupCodes: ['code1', 'code2', 'code3']
+        mfaBackupCodes: ['code1', 'code2', 'code3'],
+        org: testOrg._id,
       };
       await expect(new Caregiver(newCaregiver).validate()).resolves.toBeUndefined();
     });
@@ -116,7 +134,8 @@ describe('Caregiver model', () => {
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
         mfaEnabled: true,
-        mfaEnrolledAt: enrolledAt
+        mfaEnrolledAt: enrolledAt,
+        org: testOrg._id,
       };
       const caregiver = new Caregiver(newCaregiver);
       expect(caregiver.mfaEnrolledAt).toEqual(enrolledAt);
@@ -130,6 +149,7 @@ describe('Caregiver model', () => {
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
+        org: testOrg._id,
       };
       const caregiver = new Caregiver(newCaregiver);
       expect(caregiver.accountLocked).toBe(false);
@@ -144,7 +164,8 @@ describe('Caregiver model', () => {
         phone: faker.phone.phoneNumberFormat(1),
         accountLocked: true,
         lockedReason: 'Security breach detected',
-        lockedAt: lockedAt
+        lockedAt: lockedAt,
+        org: testOrg._id,
       };
       const caregiver = new Caregiver(newCaregiver);
       expect(caregiver.accountLocked).toBe(true);
@@ -159,7 +180,8 @@ describe('Caregiver model', () => {
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
         failedLoginAttempts: 3,
-        lastFailedLogin: new Date()
+        lastFailedLogin: new Date(),
+        org: testOrg._id,
       };
       const caregiver = new Caregiver(newCaregiver);
       expect(caregiver.failedLoginAttempts).toBe(3);
@@ -172,6 +194,7 @@ describe('Caregiver model', () => {
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
+        org: testOrg._id,
       };
       const caregiver = new Caregiver(newCaregiver);
       expect(caregiver.failedLoginAttempts).toBe(0);

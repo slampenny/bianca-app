@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const httpStatus = require('http-status');
 const mfaService = require('../../../src/services/mfa.service');
-const { Caregiver, AuditLog } = require('../../../src/models');
+const { Caregiver, AuditLog, Org } = require('../../../src/models');
 const ApiError = require('../../../src/utils/ApiError');
 
 let mongoServer;
@@ -49,13 +49,22 @@ afterAll(async () => {
 afterEach(async () => {
   await Caregiver.deleteMany();
   await AuditLog.deleteMany();
+  await Org.deleteMany();
   jest.clearAllMocks();
 });
 
 describe('MFA Service', () => {
   let testCaregiver;
+  let testOrg;
 
   beforeEach(async () => {
+    // Create org first (required for caregiver)
+    testOrg = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+    
     // Create a test caregiver
     testCaregiver = await Caregiver.create({
       name: 'Test Caregiver',
@@ -63,7 +72,8 @@ describe('MFA Service', () => {
       password: 'Password123',
       phone: '1234567890',
       role: 'staff',
-      isEmailVerified: true
+      isEmailVerified: true,
+      org: testOrg._id,
     });
   });
 
@@ -186,7 +196,8 @@ describe('MFA Service', () => {
         email: 'new@example.com',
         password: 'Password123',
         phone: '9876543210',
-        role: 'staff'
+        role: 'staff',
+        org: testOrg._id,
       });
 
       await expect(
@@ -237,6 +248,7 @@ describe('MFA Service', () => {
         name: 'No MFA User',
         email: 'nomfa@example.com',
         password: 'Password123',
+        org: testOrg._id,
         phone: '5555555555',
         role: 'staff'
       });
@@ -346,7 +358,8 @@ describe('MFA Service', () => {
         email: 'nomfa@example.com',
         password: 'Password123',
         phone: '5555555555',
-        role: 'staff'
+        role: 'staff',
+        org: testOrg._id,
       });
 
       await expect(

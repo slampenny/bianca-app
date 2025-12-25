@@ -1,17 +1,19 @@
 import { test, expect } from '@playwright/test'
 import { MFAWorkflow } from './workflows/mfa.workflow'
-import { loginUserViaUI } from './helpers/testHelpers'
+import { navigateToHome } from './helpers/navigation'
+import { TEST_USERS } from './fixtures/testData'
 
 test.describe('MFA Workflow Tests', () => {
   let mfaWorkflow: MFAWorkflow
 
   test.beforeEach(async ({ page }) => {
+    // Use the same login helper as other working tests
+    await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
     mfaWorkflow = new MFAWorkflow(page)
   })
 
   test('User can navigate to MFA setup screen from profile', async ({ page }) => {
     // GIVEN: User is logged in and on profile screen
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheProfileScreen()
 
     // WHEN: User clicks MFA setup button
@@ -52,7 +54,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User can view MFA status', async ({ page }) => {
     // GIVEN: User is on MFA setup screen
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
 
     // THEN: MFA status should be visible (enabled or disabled)
@@ -62,7 +63,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User can initiate MFA setup', async ({ page }) => {
     // GIVEN: User is on MFA setup screen and MFA is disabled
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
     
     // Check if MFA is already enabled
@@ -87,7 +87,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User can cancel MFA setup', async ({ page }) => {
     // GIVEN: User has initiated MFA setup
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
     
     const mfaStatus = await page.locator('text=/enabled|disabled/i').first().textContent().catch(() => '')
@@ -133,7 +132,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User sees error for invalid MFA token during setup', async ({ page }) => {
     // GIVEN: User has initiated MFA setup
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
     
     const mfaStatus = await page.locator('text=/enabled|disabled/i').first().textContent().catch(() => '')
@@ -158,7 +156,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User can view MFA status when enabled', async ({ page }) => {
     // GIVEN: User is on MFA setup screen
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
 
     // THEN: MFA status information should be visible
@@ -168,7 +165,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User can navigate to disable MFA', async ({ page }) => {
     // GIVEN: User is on MFA setup screen and MFA is enabled
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
     
     const mfaStatus = await page.locator('text=/enabled|disabled/i').first().textContent().catch(() => '')
@@ -187,7 +183,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User can navigate to regenerate backup codes', async ({ page }) => {
     // GIVEN: User is on MFA setup screen and MFA is enabled
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
     
     const mfaStatus = await page.locator('text=/enabled|disabled/i').first().textContent().catch(() => '')
@@ -231,7 +226,6 @@ test.describe('MFA Workflow Tests', () => {
       console.log('⚠️ Could not reset MFA state (may not exist):', error.message)
     }
     
-    await mfaWorkflow.givenIAmLoggedIn()
     
     // After reset, we need to refresh the MFA status query
     // Navigate away and back to force a refresh, or wait for the query to refetch
@@ -295,7 +289,6 @@ test.describe('MFA Workflow Tests', () => {
   test('MFA verification screen displays correctly after login', async ({ page }) => {
     // GIVEN: User has MFA enabled
     // First, log in and enable MFA
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
     
     // Check if MFA is already enabled, if not enable it
@@ -452,7 +445,6 @@ test.describe('MFA Workflow Tests', () => {
 
   test('User can navigate back from MFA setup to profile', async ({ page }) => {
     // GIVEN: User is on MFA setup screen
-    await mfaWorkflow.givenIAmLoggedIn()
     await mfaWorkflow.givenIAmOnTheMFASetupScreen()
 
     // WHEN: User clicks back button

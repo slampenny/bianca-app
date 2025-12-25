@@ -254,13 +254,15 @@ class SSOService {
       }
 
       if (response.data.success) {
-        // Return the user info with tokens and org for the frontend to handle
+        // Return the user info with tokens, org, patients, and alerts for the frontend to handle
         return {
           ...userInfo,
           tokens: response.data.tokens,
           backendUser: response.data.user,
           backendOrg: response.data.org,
-        } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any };
+          backendPatients: response.data.patients,
+          backendAlerts: response.data.alerts,
+        } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] };
       } else {
         return {
           error: 'Backend authentication failed',

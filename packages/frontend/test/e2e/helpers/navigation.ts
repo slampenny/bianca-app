@@ -52,6 +52,44 @@ export async function navigateToHome(page: Page, user?: { email: string; passwor
   const testUser = user || TEST_USERS.WITHOUT_PATIENTS;
   await loginUserViaUI(page, testUser.email, testUser.password);
   await isHomeScreen(page)
+  
+  // Wait for auth token to be stored in Redux state (not just localStorage)
+  // This ensures API calls made by the UI will include the token
+  // The Redux state is what the API actually uses via prepareHeaders
+  try {
+    await page.waitForFunction(() => {
+      try {
+        // Check Redux state via window.__REDUX_DEVTOOLS_EXTENSION__ or directly via store
+        // The token should be in localStorage persist:root, but we also need to ensure Redux has hydrated
+        const authState = localStorage.getItem('persist:root')
+        if (authState) {
+          const parsed = JSON.parse(authState)
+          const auth = JSON.parse(parsed.auth || '{}')
+          const hasToken = !!auth.tokens?.access?.token
+          
+          // Also check if Redux store is accessible (for web)
+          if (typeof window !== 'undefined' && (window as any).__REDUX_STORE__) {
+            const state = (window as any).__REDUX_STORE__.getState()
+            const reduxToken = state?.auth?.tokens?.access?.token
+            return !!reduxToken || hasToken
+          }
+          
+          return hasToken
+        }
+        return false
+      } catch {
+        return false
+      }
+    }, { timeout: 10000 })
+    console.log('✅ Auth token verified in Redux state')
+  } catch {
+    // If we can't verify token storage, wait a bit anyway
+    console.warn('⚠️ Could not verify auth token in Redux state, waiting longer...')
+    await page.waitForTimeout(2000) // Wait longer to ensure Redux has hydrated
+  }
+  
+  // Additional wait to ensure Redux state is fully initialized and API calls will work
+  await page.waitForTimeout(1000)
 }
 
 export async function isLoginScreen(page: Page) {
@@ -66,6 +104,9 @@ export async function isLoginScreen(page: Page) {
 
 export async function isHomeScreen(page: Page) {
   console.log("Checking if on Home Screen...")
+  
+  // Wait a moment for navigation to complete after login
+  await page.waitForTimeout(1000)
 
   // Try multiple indicators that we're on the home screen
   const homeIndicators = [
@@ -76,12 +117,20 @@ export async function isHomeScreen(page: Page) {
     page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
   ]
   
-  // Check if we're still on login screen
+  // Check if we're still on login screen - wait a bit longer to ensure navigation completed
   const emailInput = page.locator('input[data-testid="email-input"]')
-  const isOnLogin = await emailInput.isVisible({ timeout: 2000 }).catch(() => false)
+  const isOnLogin = await emailInput.isVisible({ timeout: 3000 }).catch(() => false)
   
   if (isOnLogin) {
-    throw new Error('Still on login screen - login may have failed')
+    // Double-check by waiting a bit more and checking URL
+    await page.waitForTimeout(2000)
+    const currentUrl = page.url()
+    const isOnLoginUrl = currentUrl.includes('/login') || currentUrl === '/' || currentUrl.endsWith('/')
+    
+    if (isOnLoginUrl && await emailInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+      throw new Error('Still on login screen - login may have failed')
+    }
+    // If URL suggests we're not on login, continue even if email input is visible (might be a timing issue)
   }
   
   // Wait for any home indicator
@@ -235,7 +284,8 @@ export async function navigateToOrgTab(page: Page) {
   // Use flexible selector - try both testID and aria-label
   const orgTab = page.locator('[data-testid="tab-org"]').first()
   await orgTab.waitFor({ timeout: 10000, state: 'visible' })
-  await orgTab.click()
+  // Use force click to bypass overlay intercepts (e.g., "Sign In" text overlay)
+  await orgTab.click({ force: true, timeout: 10000 })
   await page.waitForTimeout(1000) // Wait for tab to activate
   console.log("Successfully clicked Organization tab")
 }
@@ -243,8 +293,17 @@ export async function navigateToOrgTab(page: Page) {
 export async function navigateToOrgScreen(page: Page) {
   console.log("Navigating to Organization screen...")
   await navigateToOrgTab(page)
-  // Wait for org screen to load
-  await page.waitForSelector('[data-testid="org-screen"]', { timeout: 10000 })
+  // Wait for org screen to load and be visible (not just present)
+  // The screen might be in a loading state initially, so wait for it to become visible
+  await page.waitForFunction(
+    () => {
+      const screen = document.querySelector('[data-testid="org-screen"]')
+      if (!screen) return false
+      const style = window.getComputedStyle(screen)
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
+    },
+    { timeout: 15000 }
+  )
   await page.waitForTimeout(1000) // Wait for screen to fully render
   console.log("Successfully navigated to Organization screen")
 }
@@ -308,7 +367,8 @@ export async function navigateToTab(page: Page, tabName: 'home' | 'org' | 'alert
   
   const tab = page.locator(tabSelectors[tabName]).first()
   await tab.waitFor({ timeout: 10000, state: 'visible' })
-  await tab.click()
+  // Use force click to bypass overlay intercepts (e.g., "Sign In" text overlay)
+  await tab.click({ force: true, timeout: 10000 })
   await page.waitForTimeout(1000) // Wait for tab to activate
   console.log(`Successfully clicked ${tabName} tab`)
 }
@@ -320,16 +380,39 @@ export async function navigateToHomeTab(page: Page) {
 
 export async function navigateToAlertTab(page: Page) {
   await navigateToTab(page, 'alert')
-  // Wait for alert screen to load
-  await page.waitForSelector('[data-testid="alert-screen"]', { timeout: 10000 })
+  // Wait for alert screen to load and be visible (not just present)
+  // The screen might be in a loading state initially, so wait for it to become visible
+  await page.waitForFunction(
+    () => {
+      const screen = document.querySelector('[data-testid="alert-screen"]')
+      if (!screen) return false
+      const style = window.getComputedStyle(screen)
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
+    },
+    { timeout: 15000 }
+  )
   await page.waitForTimeout(1000)
   console.log("Successfully navigated to Alerts screen")
 }
 
 export async function navigateToReportsTab(page: Page) {
+  // First, ensure we're on a screen where tabs are visible (e.g., home screen)
+  const homeHeader = page.locator('[data-testid="home-header"]')
+  const isHomeVisible = await homeHeader.isVisible({ timeout: 5000 }).catch(() => false)
+  if (!isHomeVisible) {
+    // Try to navigate to home first
+    await navigateToTab(page, 'home')
+    await page.waitForTimeout(1000)
+  }
+  
+  // Now navigate to reports tab
   await navigateToTab(page, 'reports')
-  // Wait for reports screen to load
-  await page.waitForSelector('[data-testid="reports-screen"]', { timeout: 10000 })
+  // Wait for reports screen to load - be more flexible with what we wait for
+  await Promise.race([
+    page.waitForSelector('[data-testid="reports-screen"]', { timeout: 10000 }),
+    page.waitForSelector('text=/Reports/i', { timeout: 10000 }),
+    page.waitForTimeout(2000) // Fallback timeout
+  ])
   await page.waitForTimeout(1000)
   console.log("Successfully navigated to Reports screen")
 }

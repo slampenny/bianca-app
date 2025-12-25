@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { View, StyleSheet, Platform } from "react-native"
 import { Picker } from "@react-native-picker/picker"
-import { Toggle, Text } from "."
+import { Toggle, Text, TimePicker } from "."
 import { Schedule } from "../services/api/api.types"
 import { translate } from "../i18n"
 import { useTheme } from "../theme/ThemeContext"
@@ -291,36 +291,15 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
     }
   }
 
-  const times: string[] = []
-  for (let i = 0; i < 24; i++) {
-    for (let j = 0; j < 60; j += 15) {
-      const formattedTime = (i < 10 ? "0" + i : i) + ":" + (j < 10 ? "0" + j : j)
-      times.push(formattedTime)
-    }
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.formGroup}>
-        <Text style={styles.label}>{translate("scheduleComponent.startTime")}</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            selectedValue={time}
-            onValueChange={(itemValue) => setTime(itemValue)}
-            style={styles.picker}
-            itemStyle={styles.pickerItem}
-            dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-          >
-            {times.map((t, index) => (
-              <Picker.Item 
-                key={index} 
-                label={t} 
-                value={t}
-                color={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
-              />
-            ))}
-          </Picker>
-        </View>
+        <TimePicker
+          value={time}
+          onValueChange={(value) => setTime(value)}
+          labelTx="scheduleComponent.startTime"
+          testID="schedule-time-picker"
+        />
       </View>
 
       <View style={styles.formGroup}>

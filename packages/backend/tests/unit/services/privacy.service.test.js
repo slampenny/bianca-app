@@ -39,7 +39,14 @@ describe('Privacy Service', () => {
     await Call.deleteMany({});
     await MedicalAnalysis.deleteMany({});
 
-    // Create test caregiver
+    // Create org first (required for caregiver)
+    const org = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+    
+    // Create test caregiver with org
     const caregiver = await Caregiver.create({
       name: 'Test Caregiver',
       email: 'caregiver@test.com',
@@ -48,16 +55,11 @@ describe('Privacy Service', () => {
       role: 'orgAdmin',
       isEmailVerified: true,
       isPhoneVerified: true,
+      org: org._id,
     });
     caregiverId = caregiver._id;
 
     // Create test patient
-    // Create org for patient
-    const org = await Org.create({
-      name: 'Test Org',
-      email: 'testorg@example.com',
-      country: 'US',
-    });
     
     const patient = await Patient.create({
       name: 'Test Patient',
@@ -165,6 +167,7 @@ describe('Privacy Service', () => {
         password: 'password123',
         role: 'superAdmin',
         isEmailVerified: true,
+        org: (await Org.findOne({ email: 'testorg@example.com' }))._id,
       });
 
       const request = await PrivacyRequest.create({
@@ -180,11 +183,13 @@ describe('Privacy Service', () => {
     });
 
     it('should throw error if user tries to view another user\'s request', async () => {
+      const org = await Org.findOne({ email: 'testorg@example.com' });
       const otherUser = await Caregiver.create({
         name: 'Other User',
         email: 'other@test.com',
         phone: '+16045624266',
         password: 'password123',
+        org: org._id,
         role: 'staff',
         isEmailVerified: true,
       });
@@ -482,6 +487,7 @@ describe('Privacy Service', () => {
     });
 
     it('should throw error if user tries to withdraw another user\'s consent', async () => {
+      const org = await Org.findOne({ email: 'testorg@example.com' });
       const otherUser = await Caregiver.create({
         name: 'Other User',
         email: 'other@test.com',
@@ -489,6 +495,7 @@ describe('Privacy Service', () => {
         password: 'password123',
         role: 'staff',
         isEmailVerified: true,
+        org: org._id,
       });
 
       const consent = await ConsentRecord.create({

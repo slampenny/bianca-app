@@ -82,26 +82,28 @@ describe('Emergency Processor', () => {
     const { localizedEmergencyDetector } = require('../../src/services/localizedEmergencyDetector.service');
     await localizedEmergencyDetector.loadPhrases();
     
-    // Create caregivers first
+    // Create org first (required for caregivers)
+    const org = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+    
+    // Create caregivers with org
     const caregiver1 = await Caregiver.create({
       name: 'Nurse Smith',
       phone: '+16045624263',
       email: 'nurse@example.com',
-      password: 'testpassword123'
+      password: 'testpassword123',
+      org: org._id,
     });
     
     const caregiver2 = await Caregiver.create({
       name: 'Dr. Johnson',
       phone: '+16045624264',
       email: 'doctor@example.com',
-      password: 'testpassword123'
-    });
-    
-    // Create org for patient
-    const org = await Org.create({
-      name: 'Test Org',
-      email: 'testorg@example.com',
-      country: 'US',
+      password: 'testpassword123',
+      org: org._id,
     });
     
     // Create patient

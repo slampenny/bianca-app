@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const httpStatus = require('http-status');
-const { Caregiver, Token } = require('../../../src/models');
+const { Caregiver, Token, Org } = require('../../../src/models');
 const { tokenTypes } = require('../../../src/config/tokens');
 const authService = require('../../../src/services/auth.service');
 const caregiverService = require('../../../src/services/caregiver.service');
@@ -26,10 +26,18 @@ describe('Auth Service - Email Verification', () => {
   afterEach(async () => {
     await Caregiver.deleteMany();
     await Token.deleteMany();
+    await Org.deleteMany();
   });
 
   describe('verifyEmail', () => {
     test('should verify email successfully', async () => {
+      // Create org first (required for caregiver)
+      const org = await Org.create({
+        name: 'Test Org',
+        email: 'testorg@example.com',
+        country: 'US',
+      });
+      
       // Create a caregiver
       const caregiver = new Caregiver({
         name: 'Test User',
@@ -38,6 +46,7 @@ describe('Auth Service - Email Verification', () => {
         phone: '+16045624263',
         isEmailVerified: false,
         role: 'orgAdmin',
+        org: org._id,
       });
       await caregiver.save();
 
@@ -81,6 +90,13 @@ describe('Auth Service - Email Verification', () => {
 
   describe('loginCaregiverWithEmailAndPassword', () => {
     test('should login successfully with valid credentials', async () => {
+      // Create org first (required for caregiver)
+      const org = await Org.create({
+        name: 'Test Org',
+        email: 'testorg@example.com',
+        country: 'US',
+      });
+      
       // Create a caregiver
       const caregiver = new Caregiver({
         name: 'Test User',
@@ -89,6 +105,7 @@ describe('Auth Service - Email Verification', () => {
         phone: '+16045624263',
         isEmailVerified: true,
         role: 'staff',
+        org: org._id,
       });
       await caregiver.save();
 
@@ -100,6 +117,13 @@ describe('Auth Service - Email Verification', () => {
     });
 
     test('should throw error for invalid credentials', async () => {
+      // Create org first (required for caregiver)
+      const org = await Org.create({
+        name: 'Test Org',
+        email: 'testorg@example.com',
+        country: 'US',
+      });
+      
       // Create a caregiver
       const caregiver = new Caregiver({
         name: 'Test User',
@@ -108,6 +132,7 @@ describe('Auth Service - Email Verification', () => {
         phone: '+16045624263',
         isEmailVerified: true,
         role: 'staff',
+        org: org._id,
       });
       await caregiver.save();
 

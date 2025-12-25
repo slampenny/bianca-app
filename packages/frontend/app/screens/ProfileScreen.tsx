@@ -390,7 +390,7 @@ function ProfileScreen() {
                   <Button
                     text={translate("profileScreen.verifyPhone") || "Verify Phone"}
                     onPress={() => navigation.navigate("VerifyPhone" as never)}
-                    preset="link"
+                    preset="default"
                     style={styles.verifyButton}
                     testID="verify-phone-button"
                     accessibilityLabel="Verify phone button"
@@ -546,9 +546,10 @@ const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
     marginRight: 8,
   },
   verifyButton: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    minHeight: 0,
+    // Match the update buttons - default preset already has border
+    // In dark mode, the border from default preset will be visible
+    alignSelf: "flex-start", // Align to left like a link button
+    marginTop: 4,
   },
   success: { color: colors.palette.biancaSuccess, fontSize: 16 * fontScale, marginBottom: 10, textAlign: "center" },
   unverifiedBanner: {

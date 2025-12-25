@@ -2,6 +2,7 @@ import { test } from './helpers/testHelpers'
 import { expect } from '@playwright/test'
 import { AuthWorkflow } from './workflows/auth.workflow'
 import { LogoutWorkflow } from './workflows/logout.workflow'
+import { FRONTEND_URL } from './helpers/testConfig'
 
 /**
  * Logout Workflow Tests
@@ -128,7 +129,7 @@ test.describe('Logout Workflow - Real Backend Integration', () => {
 
   test('Workflow: User without authentication sees error on profile', async ({ page }) => {
     // GIVEN: I am not logged in
-    await page.goto('http://localhost:8081/')
+    await page.goto(`${FRONTEND_URL}/`)
     
     // WHEN: I try to access the profile screen (via profile button)
     const profileButton = page.locator('[aria-label="profile-button"]')

@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Patient } from "../services/api/api.types"
 import { authApi, patientApi } from "app/services/api"
+import { ssoApi } from "app/services/api/ssoApi"
 import { logger } from "../utils/logger"
 
 interface PatientState {
@@ -57,6 +58,16 @@ export const patientSlice = createSlice({
         state.patients[payload.caregiver.id!] = []
         payload.patients.forEach((patient: Patient) => {
           state.patients[payload.caregiver.id!].push(patient)
+        })
+      }
+    })
+    // Handle SSO login - patients come in the response
+    builder.addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
+      logger.debug("SSO login matchFulfilled:", payload)
+      if (payload?.user?.id && payload?.patients) {
+        state.patients[payload.user.id] = []
+        payload.patients.forEach((patient: Patient) => {
+          state.patients[payload.user.id].push(patient)
         })
       }
     })

@@ -1,4 +1,5 @@
 import { Page, expect } from '@playwright/test'
+import { FRONTEND_URL } from '../helpers/testConfig'
 
 // Simple, robust workflow components that work with your actual app
 export class SimpleWorkflow {
@@ -79,7 +80,7 @@ export class SimpleWorkflow {
     
     // AND: Page should still be responsive
     const currentUrl = this.page.url()
-    expect(currentUrl).toContain('localhost:8081')
+    expect(currentUrl).toContain(new URL(FRONTEND_URL).hostname)
   }
 
   // PATIENT WORKFLOWS  

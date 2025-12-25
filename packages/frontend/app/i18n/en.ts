@@ -356,6 +356,7 @@ const en = {
     cancel: "Cancel",
     close: "Close",
     back: "Back",
+    done: "Done",
     error: "Error",
     anErrorOccurred: "An error occurred",
     selectImage: "Select Image",

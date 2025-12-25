@@ -91,6 +91,13 @@ describe('Auth Controller - Email Verification', () => {
 
   describe('resendVerificationEmail', () => {
     test('should resend verification email for user with unverified email', async () => {
+      // Create org first (required for caregiver)
+      const org = await Org.create({
+        name: 'Test Org',
+        email: 'testorg@example.com',
+        country: 'US',
+      });
+      
       // Create a caregiver with unverified email
       const caregiver = new Caregiver({
         name: 'Test User',
@@ -98,6 +105,7 @@ describe('Auth Controller - Email Verification', () => {
         password: 'Password123',
         phone: '+16045624263',
         isEmailVerified: false,
+        org: org._id,
         role: 'orgAdmin',
       });
       await caregiver.save();
@@ -129,6 +137,13 @@ describe('Auth Controller - Email Verification', () => {
     });
 
     test('should reject resend for verified user', async () => {
+      // Create org first (required for caregiver)
+      const org = await Org.create({
+        name: 'Test Org',
+        email: 'testorg@example.com',
+        country: 'US',
+      });
+      
       // Create a verified caregiver
       const caregiver = new Caregiver({
         name: 'Test User',
@@ -137,6 +152,7 @@ describe('Auth Controller - Email Verification', () => {
         phone: '+16045624263',
         isEmailVerified: true,
         role: 'staff',
+        org: org._id,
       });
       await caregiver.save();
 
@@ -180,6 +196,13 @@ describe('Auth Controller - Email Verification', () => {
 
   describe('verifyEmail', () => {
     test('should verify email with valid token', async () => {
+      // Create org first (required for caregiver)
+      const org = await Org.create({
+        name: 'Test Org',
+        email: 'testorg@example.com',
+        country: 'US',
+      });
+      
       // Create a caregiver
       const caregiver = new Caregiver({
         name: 'Test User',
@@ -188,6 +211,7 @@ describe('Auth Controller - Email Verification', () => {
         phone: '+16045624263',
         isEmailVerified: false,
         role: 'orgAdmin',
+        org: org._id,
       });
       await caregiver.save();
 

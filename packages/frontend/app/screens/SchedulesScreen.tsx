@@ -11,6 +11,7 @@ import {
   useDeleteScheduleMutation,
 } from "../services/api/scheduleApi"
 import { useCreateAlertMutation } from "../services/api/alertApi"
+import { getAlerts } from "../store/alertSlice"
 import { getSchedules, setSchedule, getSchedule, setSchedules } from "../store/scheduleSlice"
 import { getPatient, setPatient } from "../store/patientSlice"
 import { getCurrentUser } from "../store/authSlice"
@@ -34,6 +35,7 @@ export const SchedulesScreen = () => {
   const selectedSchedule = useSelector(getSchedule)
   const schedules = useSelector(getSchedules)
   const currentUser = useSelector(getCurrentUser)
+  const existingAlerts = useSelector(getAlerts)
   const isNewPatient = route.params?.isNewPatient ?? false
   const [updateSchedule, { isLoading: isUpdating, isError: isUpdatingError }] =
     useUpdateScheduleMutation()
@@ -157,8 +159,22 @@ export const SchedulesScreen = () => {
           schedulesSource: selectedPatient.schedules ? 'patient.schedules' : 'Redux'
         })
         
-        // If no schedules exist, create an alert
+        // If no schedules exist, check if alert already exists before creating a new one
         if (!hasSchedules) {
+          // Check if an alert with the same message and patient already exists
+          const alertMessage = `Patient ${selectedPatient.name} has no schedule configured`
+          const existingAlert = existingAlerts.find(
+            (alert) =>
+              alert.message === alertMessage &&
+              alert.relatedPatient === selectedPatient.id &&
+              alert.alertType === 'patient'
+          )
+
+          if (existingAlert) {
+            logger.debug(`Alert already exists for patient ${selectedPatient.name} with no schedule, skipping creation`)
+            return
+          }
+
           logger.info(`Creating alert for patient ${selectedPatient.name} with no schedule`)
           // Use setTimeout to ensure this runs after navigation completes
           // and doesn't block the navigation
@@ -171,7 +187,7 @@ export const SchedulesScreen = () => {
               // Use assignedCaregivers visibility with patient as creator so all caregivers
               // assigned to this patient see the alert (one alert visible to all assigned caregivers)
               const result = await createAlert({
-                message: `Patient ${selectedPatient.name} has no schedule configured`,
+                message: alertMessage,
                 importance: 'medium',
                 alertType: 'patient',
                 relatedPatient: selectedPatient.id,
@@ -193,7 +209,7 @@ export const SchedulesScreen = () => {
           logger.debug(`Patient ${selectedPatient.name} has ${patientSchedules.length} schedule(s), no alert needed`)
         }
       }
-    }, [isNewPatient, selectedPatient, currentUser, schedules, createAlert])
+    }, [isNewPatient, selectedPatient, currentUser, schedules, createAlert, existingAlerts])
   )
 
   // Inject CSS for web Picker dropdown theming
@@ -533,8 +549,7 @@ export const SchedulesScreen = () => {
 
 const createStyles = (colors: ThemeColors, fontScale: number) => StyleSheet.create({
   button: {
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: 15, // Match patient screen button spacing
   },
 
   cardHeading: {

@@ -68,9 +68,11 @@ const createCaregiver = async (orgId, caregiverBody) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
   }
 
-  const caregiver = await Caregiver.create(caregiverBody);
-  caregiver.org = org.id;
-  await caregiver.save();
+  // CRITICAL: Set org at creation time, not after
+  const caregiver = await Caregiver.create({
+    ...caregiverBody,
+    org: org._id, // Set org at creation time
+  });
 
   // Add caregiver to org's caregivers array
   org.caregivers.push(caregiver._id);

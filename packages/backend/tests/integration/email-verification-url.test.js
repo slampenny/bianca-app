@@ -39,8 +39,8 @@ describe('Email Verification URL Integration Tests', () => {
       // Verify the link format directly
       const expectedLink = `${config.frontendUrl}/auth/verify-email?token=${tokenValue}`;
       
-      // Should use frontend URL (localhost:8081 in test/dev)
-      expect(expectedLink).toContain('localhost:8081');
+      // Should use frontend URL (localhost:8082 in test/dev)
+      expect(expectedLink).toContain('localhost:8082');
       expect(expectedLink).toContain('/auth/verify-email');
       expect(expectedLink).toContain(`token=${tokenValue}`);
       
@@ -51,7 +51,7 @@ describe('Email Verification URL Integration Tests', () => {
       // Verify link format
       const url = new URL(expectedLink);
       expect(url.hostname).toBe('localhost');
-      expect(url.port).toBe('8081');
+      expect(url.port).toBe('8082');
       expect(url.pathname).toBe('/auth/verify-email');
       expect(url.searchParams.get('token')).toBe(tokenValue);
     });

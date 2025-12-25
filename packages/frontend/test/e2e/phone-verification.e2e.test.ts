@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { generateUniqueTestData, TEST_USERS } from './fixtures/testData'
 import { loginUserViaUI } from './helpers/testHelpers'
+import { FRONTEND_URL } from './helpers/testConfig'
 
 test.describe('Phone Verification Flow', () => {
   let testData: ReturnType<typeof generateUniqueTestData>
@@ -234,7 +235,7 @@ test.describe('Phone Verification Flow', () => {
 
   test('phone verification screen displays correctly', async ({ page }) => {
     // Login
-    await page.goto('http://localhost:8081')
+    await page.goto(FRONTEND_URL)
     
     try {
       await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
@@ -365,7 +366,7 @@ test.describe('Phone Verification Flow', () => {
 
   test('phone verification shows error for invalid code', async ({ page }) => {
     // Login
-    await page.goto('http://localhost:8081')
+    await page.goto(FRONTEND_URL)
     
     try {
       await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
@@ -482,7 +483,7 @@ test.describe('Phone Verification Flow', () => {
 
   test('phone verification status shows in profile', async ({ page }) => {
     // Login
-    await page.goto('http://localhost:8081')
+    await page.goto(FRONTEND_URL)
     
     try {
       await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)

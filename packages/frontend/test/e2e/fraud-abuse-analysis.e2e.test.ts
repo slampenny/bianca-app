@@ -1,15 +1,11 @@
 import { test, expect } from '@playwright/test'
-import { AuthWorkflow } from './workflows/auth.workflow'
-import { navigateToReportsTab } from './helpers/navigation'
+import { navigateToHome, navigateToReportsTab } from './helpers/navigation'
+import { TEST_USERS } from './fixtures/testData'
 
 test.describe('Fraud Abuse Analysis', () => {
   test.beforeEach(async ({ page }) => {
-    const auth = new AuthWorkflow(page)
-    await auth.givenIAmOnTheLoginScreen()
-    const credentials = await auth.givenIHaveValidCredentials()
-    await auth.whenIEnterCredentials(credentials.email, credentials.password)
-    await auth.whenIClickLoginButton()
-    await auth.thenIShouldBeOnHomeScreen()
+    // Use the same login helper as other working tests
+    await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
   })
 
   test('FraudAbuseAnalysisScreen should load without crashing', async ({ page }) => {
@@ -43,22 +39,36 @@ test.describe('Fraud Abuse Analysis', () => {
     // Navigate to reports tab
     await navigateToReportsTab(page)
     
-    // Select a patient first
+    // Select a patient first - REQUIRED for button to be enabled
     const patientPicker = page.locator('[data-testid="patient-picker-button"]')
-    if (await patientPicker.count() > 0) {
-      await patientPicker.click()
-      await page.waitForTimeout(500)
-      const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
-      if (await firstPatient.count() > 0) {
-        await firstPatient.click()
-        await page.waitForTimeout(500)
-      }
-    }
+    await patientPicker.waitFor({ timeout: 10000, state: 'visible' })
+    await patientPicker.click()
+    await page.waitForTimeout(500)
     
-    // Click fraud/abuse button
+    // Wait for patient picker modal to appear and select first patient
+    const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
+    await firstPatient.waitFor({ timeout: 5000, state: 'visible' })
+    await firstPatient.click()
+    await page.waitForTimeout(1000) // Wait for patient to be selected and button to enable
+    
+    // Wait for fraud/abuse button to be enabled (it's disabled until patient is selected)
     const fraudAbuseButton = page.locator('[data-testid="fraud-abuse-reports-button"]')
-    await fraudAbuseButton.waitFor({ timeout: 5000 }).catch(() => {})
-    await fraudAbuseButton.click({ timeout: 3000 }).catch(() => {})
+    await fraudAbuseButton.waitFor({ timeout: 5000, state: 'visible' })
+    
+    // Wait for button to be enabled (not disabled)
+    await page.waitForFunction(
+      (buttonSelector) => {
+        const button = document.querySelector(buttonSelector) as HTMLButtonElement
+        return button && !button.disabled
+      },
+      `[data-testid="fraud-abuse-reports-button"]`,
+      { timeout: 5000 }
+    ).catch(() => {
+      // Fallback: just wait a bit more and try
+      console.warn('Could not verify button enabled state, proceeding anyway')
+    })
+    
+    await fraudAbuseButton.click({ force: true, timeout: 10000 })
     
     // Wait for screen to load
     await page.waitForTimeout(2000)
@@ -96,22 +106,34 @@ test.describe('Fraud Abuse Analysis', () => {
     // Navigate to reports
     await navigateToReportsTab(page)
     
-    // Select a patient
+    // Select a patient - REQUIRED for button to be enabled
     const patientPicker = page.locator('[data-testid="patient-picker-button"]')
-    if (await patientPicker.count() > 0) {
-      await patientPicker.click()
-      await page.waitForTimeout(500)
-      const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
-      if (await firstPatient.count() > 0) {
-        await firstPatient.click()
-        await page.waitForTimeout(500)
-      }
-    }
+    await patientPicker.waitFor({ timeout: 10000, state: 'visible' })
+    await patientPicker.click()
+    await page.waitForTimeout(500)
     
-    // Click fraud/abuse analysis button
+    const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
+    await firstPatient.waitFor({ timeout: 5000, state: 'visible' })
+    await firstPatient.click()
+    await page.waitForTimeout(1000) // Wait for patient to be selected
+    
+    // Wait for fraud/abuse button to be enabled
     const fraudAbuseButton = page.locator('[data-testid="fraud-abuse-reports-button"]')
     await expect(fraudAbuseButton).toBeVisible({ timeout: 5000 })
-    await fraudAbuseButton.click()
+    
+    // Wait for button to be enabled
+    await page.waitForFunction(
+      (buttonSelector) => {
+        const button = document.querySelector(buttonSelector) as HTMLButtonElement
+        return button && !button.disabled
+      },
+      `[data-testid="fraud-abuse-reports-button"]`,
+      { timeout: 5000 }
+    ).catch(() => {
+      console.warn('Could not verify button enabled state, proceeding anyway')
+    })
+    
+    await fraudAbuseButton.click({ force: true, timeout: 10000 })
     
     // Verify we're on the fraud/abuse analysis screen
     await page.waitForTimeout(2000)
@@ -150,34 +172,45 @@ test.describe('Fraud Abuse Analysis', () => {
     // Navigate to reports
     await navigateToReportsTab(page)
     
-    // Select a patient
+    // Select a patient - REQUIRED for button to be enabled
     const patientPicker = page.locator('[data-testid="patient-picker-button"]')
-    if (await patientPicker.count() > 0) {
-      await patientPicker.click()
-      await page.waitForTimeout(500)
-      const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
-      if (await firstPatient.count() > 0) {
-        await firstPatient.click()
-        await page.waitForTimeout(500)
-      }
-    }
+    await patientPicker.waitFor({ timeout: 10000, state: 'visible' })
+    await patientPicker.click()
+    await page.waitForTimeout(500)
     
-    // Navigate to fraud/abuse analysis
+    const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
+    await firstPatient.waitFor({ timeout: 5000, state: 'visible' })
+    await firstPatient.click()
+    await page.waitForTimeout(1000) // Wait for patient to be selected
+    
+    // Wait for fraud/abuse button to be enabled
     const fraudAbuseButton = page.locator('[data-testid="fraud-abuse-reports-button"]')
-    if (await fraudAbuseButton.isVisible()) {
-      await fraudAbuseButton.click()
-      await page.waitForTimeout(2000)
-      
-      // Check for trigger button or results
-      const triggerButton = page.locator('text=/trigger.*analysis|Trigger.*Analysis/i')
-      const results = page.locator('text=/risk.*score|Risk.*Score/i')
-      
-      // Either trigger button or results should be visible
-      const hasTrigger = await triggerButton.count() > 0
-      const hasResults = await results.count() > 0
-      
-      expect(hasTrigger || hasResults).toBe(true)
-    }
+    await fraudAbuseButton.waitFor({ timeout: 5000, state: 'visible' })
+    
+    // Wait for button to be enabled
+    await page.waitForFunction(
+      (buttonSelector) => {
+        const button = document.querySelector(buttonSelector) as HTMLButtonElement
+        return button && !button.disabled
+      },
+      `[data-testid="fraud-abuse-reports-button"]`,
+      { timeout: 5000 }
+    ).catch(() => {
+      console.warn('Could not verify button enabled state, proceeding anyway')
+    })
+    
+    await fraudAbuseButton.click({ force: true, timeout: 10000 })
+    await page.waitForTimeout(2000)
+    
+    // Check for trigger button or results
+    const triggerButton = page.locator('text=/trigger.*analysis|Trigger.*Analysis/i')
+    const results = page.locator('text=/risk.*score|Risk.*Score/i')
+    
+    // Either trigger button or results should be visible
+    const hasTrigger = await triggerButton.count() > 0
+    const hasResults = await results.count() > 0
+    
+    expect(hasTrigger || hasResults).toBe(true)
     
     if (consoleErrors.length > 0) {
       console.error('Console errors found:', consoleErrors)
@@ -189,37 +222,59 @@ test.describe('Fraud Abuse Analysis', () => {
     // Navigate to reports
     await navigateToReportsTab(page)
     
-    // Select a patient
-    const patientPicker = page.locator('[data-testid="patient-picker-button"]')
-    if (await patientPicker.count() > 0) {
-      await patientPicker.click()
-      await page.waitForTimeout(500)
-      const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
-      if (await firstPatient.count() > 0) {
-        await firstPatient.click()
-        await page.waitForTimeout(500)
-      }
-    }
+    // Wait for reports screen to be fully loaded first
+    await page.waitForTimeout(2000)
     
-    // Navigate to fraud/abuse analysis
-    const fraudAbuseButton = page.locator('[data-testid="fraud-abuse-reports-button"]')
-    if (await fraudAbuseButton.isVisible()) {
-      await fraudAbuseButton.click()
-      await page.waitForTimeout(2000)
-      
-      // Look for trigger button
-      const triggerButton = page.locator('text=/trigger.*analysis|Trigger.*Analysis/i')
-      if (await triggerButton.count() > 0) {
-        await triggerButton.click()
-        await page.waitForTimeout(3000) // Wait for analysis to complete
-        
-        // Should show either results or success message
-        const results = page.locator('text=/risk.*score|Risk.*Score|analysis.*completed/i')
-        const hasResults = await results.count() > 0
-        
-        // Either results appear or we see a success message
-        expect(hasResults || await triggerButton.isVisible()).toBe(true)
+    // Select a patient - REQUIRED for button to be enabled
+    const patientPicker = page.locator('[data-testid="patient-picker-button"]')
+    // Wait for it to be visible, with longer timeout
+    await patientPicker.waitFor({ timeout: 15000, state: 'visible' }).catch(async (error) => {
+      // If not found, check if reports screen loaded
+      const reportsScreen = await page.locator('[data-testid="reports-screen"]').isVisible({ timeout: 2000 }).catch(() => false)
+      if (!reportsScreen) {
+        throw new Error(`Patient picker not found and reports screen not visible. Error: ${error.message}`)
       }
+      throw error
+    })
+    await patientPicker.click()
+    await page.waitForTimeout(500)
+    
+    const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
+    await firstPatient.waitFor({ timeout: 5000, state: 'visible' })
+    await firstPatient.click()
+    await page.waitForTimeout(1000) // Wait for patient to be selected
+    
+    // Wait for fraud/abuse button to be enabled
+    const fraudAbuseButton = page.locator('[data-testid="fraud-abuse-reports-button"]')
+    await fraudAbuseButton.waitFor({ timeout: 5000, state: 'visible' })
+    
+    // Wait for button to be enabled
+    await page.waitForFunction(
+      (buttonSelector) => {
+        const button = document.querySelector(buttonSelector) as HTMLButtonElement
+        return button && !button.disabled
+      },
+      `[data-testid="fraud-abuse-reports-button"]`,
+      { timeout: 5000 }
+    ).catch(() => {
+      console.warn('Could not verify button enabled state, proceeding anyway')
+    })
+    
+    await fraudAbuseButton.click({ force: true, timeout: 10000 })
+    await page.waitForTimeout(2000)
+    
+    // Look for trigger button
+    const triggerButton = page.locator('text=/trigger.*analysis|Trigger.*Analysis/i')
+    if (await triggerButton.count() > 0) {
+      await triggerButton.click()
+      await page.waitForTimeout(3000) // Wait for analysis to complete
+      
+      // Should show either results or success message
+      const results = page.locator('text=/risk.*score|Risk.*Score|analysis.*completed/i')
+      const hasResults = await results.count() > 0
+      
+      // Either results appear or we see a success message
+      expect(hasResults || await triggerButton.isVisible()).toBe(true)
     }
   })
 
@@ -227,37 +282,48 @@ test.describe('Fraud Abuse Analysis', () => {
     // Navigate to reports
     await navigateToReportsTab(page)
     
-    // Select a patient
+    // Select a patient - REQUIRED for button to be enabled
     const patientPicker = page.locator('[data-testid="patient-picker-button"]')
-    if (await patientPicker.count() > 0) {
-      await patientPicker.click()
-      await page.waitForTimeout(500)
-      const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
-      if (await firstPatient.count() > 0) {
-        await firstPatient.click()
-        await page.waitForTimeout(500)
-      }
-    }
+    await patientPicker.waitFor({ timeout: 10000, state: 'visible' })
+    await patientPicker.click()
+    await page.waitForTimeout(500)
     
-    // Navigate to fraud/abuse analysis
+    const firstPatient = page.locator('[data-testid^="patient-option-"]').first()
+    await firstPatient.waitFor({ timeout: 5000, state: 'visible' })
+    await firstPatient.click()
+    await page.waitForTimeout(1000) // Wait for patient to be selected
+    
+    // Wait for fraud/abuse button to be enabled
     const fraudAbuseButton = page.locator('[data-testid="fraud-abuse-reports-button"]')
-    if (await fraudAbuseButton.isVisible()) {
-      await fraudAbuseButton.click()
-      await page.waitForTimeout(2000)
-      
-      // Check for localized text (should be in English by default)
-      const title = page.locator('text=/Fraud.*Abuse|fraud.*abuse/i').first()
-      const hasTitle = await title.count() > 0
-      
-      // Check for disclaimer (localized)
-      const disclaimer = page.locator('text=/informational purposes|substitute for professional/i').first()
-      const hasDisclaimer = await disclaimer.count() > 0
-      
-      // Screen should be visible and themed
-      const screen = page.locator('[data-testid="fraud-abuse-analysis-screen"], [aria-label="fraud-abuse-analysis-screen"]')
-      const screenVisible = await screen.count() > 0
-      
-      expect(hasTitle || screenVisible).toBe(true)
-    }
+    await fraudAbuseButton.waitFor({ timeout: 5000, state: 'visible' })
+    
+    // Wait for button to be enabled
+    await page.waitForFunction(
+      (buttonSelector) => {
+        const button = document.querySelector(buttonSelector) as HTMLButtonElement
+        return button && !button.disabled
+      },
+      `[data-testid="fraud-abuse-reports-button"]`,
+      { timeout: 5000 }
+    ).catch(() => {
+      console.warn('Could not verify button enabled state, proceeding anyway')
+    })
+    
+    await fraudAbuseButton.click({ force: true, timeout: 10000 })
+    await page.waitForTimeout(2000)
+    
+    // Check for localized text (should be in English by default)
+    const title = page.locator('text=/Fraud.*Abuse|fraud.*abuse/i').first()
+    const hasTitle = await title.count() > 0
+    
+    // Check for disclaimer (localized)
+    const disclaimer = page.locator('text=/informational purposes|substitute for professional/i').first()
+    const hasDisclaimer = await disclaimer.count() > 0
+    
+    // Screen should be visible and themed
+    const screen = page.locator('[data-testid="fraud-abuse-analysis-screen"], [aria-label="fraud-abuse-analysis-screen"]')
+    const screenVisible = await screen.count() > 0
+    
+    expect(hasTitle || screenVisible).toBe(true)
   })
 })

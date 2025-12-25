@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const httpStatus = require('http-status');
-const { Caregiver } = require('../../../src/models');
+const { Caregiver, Org } = require('../../../src/models');
 const smsVerificationService = require('../../../src/services/smsVerification.service');
 const { twilioSmsService } = require('../../../src/services/twilioSms.service');
 const ApiError = require('../../../src/utils/ApiError');
@@ -20,8 +20,18 @@ afterAll(async () => {
 });
 
 describe('SMS Verification Service', () => {
+  let testOrg;
+  
   beforeEach(async () => {
     await Caregiver.deleteMany();
+    await Org.deleteMany();
+    
+    // Create org for test caregivers
+    testOrg = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
     // Mock Twilio SMS service methods
     if (twilioSmsService.sendSMS) {
       jest.spyOn(twilioSmsService, 'sendSMS').mockResolvedValue({
@@ -116,6 +126,7 @@ describe('SMS Verification Service', () => {
         phone: '+16045624263', // Valid phone format
         isPhoneVerified: false,
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -152,6 +163,7 @@ describe('SMS Verification Service', () => {
         phone: '+16045624263',
         isPhoneVerified: true,
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -171,6 +183,7 @@ describe('SMS Verification Service', () => {
         phoneVerificationAttempts: 3,
         phoneVerificationCodeExpires: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes from now
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -190,6 +203,7 @@ describe('SMS Verification Service', () => {
         phoneVerificationAttempts: 3,
         phoneVerificationCodeExpires: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -211,6 +225,7 @@ describe('SMS Verification Service', () => {
         phone: '+16045624263',
         isPhoneVerified: false,
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -232,6 +247,7 @@ describe('SMS Verification Service', () => {
         phoneVerificationCode: code,
         phoneVerificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes from now
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -258,6 +274,7 @@ describe('SMS Verification Service', () => {
         phone: '+16045624263',
         isPhoneVerified: true,
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -275,6 +292,7 @@ describe('SMS Verification Service', () => {
         phoneVerificationCode: '123456',
         phoneVerificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000),
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -298,6 +316,7 @@ describe('SMS Verification Service', () => {
         phoneVerificationCode: '123456',
         phoneVerificationCodeExpires: new Date(Date.now() - 1000), // Expired
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -319,6 +338,7 @@ describe('SMS Verification Service', () => {
         phone: '+16045624263',
         isPhoneVerified: false,
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -337,6 +357,7 @@ describe('SMS Verification Service', () => {
         phone: '+16045624263',
         isPhoneVerified: false,
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 
@@ -354,6 +375,7 @@ describe('SMS Verification Service', () => {
         phone: '+16045624263',
         isPhoneVerified: true,
         role: 'staff',
+        org: testOrg._id,
       });
       await caregiver.save();
 

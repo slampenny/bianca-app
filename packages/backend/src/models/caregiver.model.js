@@ -8,7 +8,11 @@ const { roles } = require('../config/roles');
 // Caregiver Schema
 const caregiverSchema = mongoose.Schema(
   {
-    org: { type: mongoose.Schema.Types.ObjectId, ref: 'Org' },
+    org: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Org',
+      required: true,
+    },
     name: {
       type: String,
       required: true,

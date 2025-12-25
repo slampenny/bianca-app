@@ -12,6 +12,7 @@ import { useDispatch } from "react-redux"
 import { setAuthEmail, setAuthTokens, setCurrentUser } from "app/store/authSlice"
 import { setCaregiver } from "app/store/caregiverSlice"
 import { setOrg } from "app/store/orgSlice"
+import { setPatientsForCaregiver } from "app/store/patientSlice"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
 
@@ -193,7 +194,7 @@ export const SSOAccountLinkingScreen = () => {
     }
   }
 
-  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any }) => {
+  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] }) => {
     setIsSSOLoading(true)
     try {
       if (user.tokens && user.backendUser) {
@@ -206,6 +207,14 @@ export const SSOAccountLinkingScreen = () => {
         // Set org if included in response (orgSlice handles this)
         if (user.backendOrg) {
           dispatch(setOrg(user.backendOrg))
+        }
+        
+        // Set patients if included in response
+        if (user.backendPatients && user.backendUser?.id) {
+          dispatch(setPatientsForCaregiver({ 
+            caregiverId: user.backendUser.id, 
+            patients: user.backendPatients 
+          }))
         }
         
         setErrorMessage("")

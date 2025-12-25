@@ -20,17 +20,63 @@ const createPatient = catchAsync(async (req, res) => {
   }
 
   // Set org from caregiver before creating patient (org is required)
-  // If org is not provided in request body, use caregiver's org
-  if (!patientData.org && req.caregiver?.org) {
-    patientData.org = req.caregiver.org;
+  // EVERY caregiver should ALWAYS have an org assigned
+  if (!req.caregiver?.org) {
+    logger.error('Patient creation failed: caregiver has no org', {
+      caregiverId: req.caregiver?._id,
+      caregiverEmail: req.caregiver?.email,
+    });
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Your caregiver account does not have an organization assigned. Please contact support to resolve this issue.'
+    );
   }
 
-  // If still no org, throw error
+  // Use caregiver's org if not explicitly provided in request body
   if (!patientData.org) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Organization is required. Patient must be associated with an organization.');
+    // Handle both ObjectId, populated object, and string formats
+    const mongoose = require('mongoose');
+    let orgId = req.caregiver.org;
+    
+    // If org is populated (has _id property), use _id
+    if (orgId && orgId._id) {
+      orgId = orgId._id;
+    }
+    
+    // Convert to string if it's an ObjectId
+    if (orgId instanceof mongoose.Types.ObjectId) {
+      orgId = orgId.toString();
+    } else if (typeof orgId === 'object' && orgId && orgId.toString) {
+      orgId = orgId.toString();
+    }
+    
+    patientData.org = orgId;
   }
+
+  // Final check - org should always be set at this point
+  if (!patientData.org) {
+    logger.error('Patient creation failed: org not set after processing', {
+      caregiverId: req.caregiver?._id,
+      caregiverOrg: req.caregiver?.org,
+      patientData,
+    });
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to assign organization to patient. Please contact support.');
+  }
+
+  logger.info('Creating patient', {
+    caregiverId: req.caregiver._id,
+    orgId: patientData.org,
+    patientEmail: patientData.email,
+    patientName: patientData.name,
+  });
 
   let patient = await patientService.createPatient(patientData);
+  
+  logger.info('Patient created successfully', {
+    patientId: patient._id,
+    patientName: patient.name,
+    orgId: patient.org,
+  });
 
   if (schedules) {
     for (const schedule of schedules) {
@@ -166,7 +212,14 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
   }
 
   const result = await conversationService.queryConversationsByPatient(patientId, options);
-  res.status(httpStatus.OK).send(result);
+  
+  // Apply DTO to each conversation in the results
+  const transformedResult = {
+    ...result,
+    results: result.results.map((conversation) => ConversationDTO(conversation)),
+  };
+  
+  res.status(httpStatus.OK).send(transformedResult);
 });
 
 const getCaregivers = catchAsync(async (req, res) => {

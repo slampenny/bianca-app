@@ -61,8 +61,26 @@ const playwrightTestUser = {
   patients: [],
 };
 
-const insertCaregivers = async (caregivers) => {
-  return await Caregiver.insertMany(caregivers.map((caregiver) => ({ ...caregiver, password: hashedPassword, isEmailVerified: true })));
+const insertCaregivers = async (caregivers, org = null) => {
+  // If no org provided, create a default org for test caregivers
+  let testOrg = org;
+  if (!testOrg) {
+    const { Org } = require('../../src/models');
+    testOrg = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+  }
+  
+  return await Caregiver.insertMany(
+    caregivers.map((caregiver) => ({ 
+      ...caregiver, 
+      org: testOrg._id || testOrg.id || testOrg,
+      password: hashedPassword, 
+      isEmailVerified: true 
+    }))
+  );
 };
 
 const insertCaregiversAndAddToOrg = async (org, caregivers) => {

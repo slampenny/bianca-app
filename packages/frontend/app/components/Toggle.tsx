@@ -450,7 +450,7 @@ function Switch(props: ToggleInputProps & { testID?: string }) {
   )
 
   // Use theme-aware colors with better contrast for dark mode
-  // Use same background color for both on and off states (no color change)
+  // Off state uses neutral colors, on state uses green
   const offBackgroundColor = [
     disabled && themeColors.palette.neutral400,
     status === "error" && themeColors.errorBackground,
@@ -460,7 +460,7 @@ function Switch(props: ToggleInputProps & { testID?: string }) {
   const onBackgroundColor = [
     disabled && themeColors.transparent,
     status === "error" && themeColors.errorBackground,
-    isDarkMode ? themeColors.palette.neutral500 : colors.palette.neutral300, // Same as off state
+    themeColors.palette.success500 || colors.palette.success500 || "#10b981", // Green when active
   ].filter(Boolean)[0]
 
   // Keep knob color constant to avoid re-renders that break animation

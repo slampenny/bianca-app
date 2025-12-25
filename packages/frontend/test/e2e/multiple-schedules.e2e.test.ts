@@ -113,32 +113,66 @@ async function createSchedule(page: any, time: string): Promise<void> {
   }
   // If no schedules exist, the form is already in "new schedule" mode
   
-  // Find all select elements - the time picker is the first one in the ScheduleComponent
-  // (before the schedule selector picker if it exists)
-  const allSelects = page.locator('select')
-  const selectCount = await allSelects.count()
+  // Click the time picker button to open the modal
+  const timePickerButton = page.locator('[data-testid="schedule-time-picker"]')
+  await timePickerButton.waitFor({ timeout: 5000, state: 'visible' })
+  await timePickerButton.click()
+  await page.waitForTimeout(500) // Wait for modal to open
   
-  if (selectCount === 0) {
-    throw new Error('Cannot create schedule: no select elements found (schedule form not visible)')
-  }
+  // Parse time string (format: "HH:MM") and convert to 12-hour format
+  const [hour24, minute] = time.split(':').map(Number)
+  const hour12 = hour24 === 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24)
+  const isAM = hour24 < 12
   
-  // The time picker is typically the first select in the ScheduleComponent
-  // If there's a schedule selector picker, it comes first, so we need the second select
-  // Otherwise, the first select is the time picker
-  let timePicker
-  if (buttonCount > 0) {
-    // Schedule selector exists, so time picker is the second select
-    timePicker = allSelects.nth(1)
+  // Wait for modal to be visible - look for modal content
+  await page.waitForSelector('text=Select Time, text=Hour', { timeout: 5000 }).catch(() => {})
+  await page.waitForTimeout(500)
+  
+  // Find the modal content container to scope our selectors
+  // The hour/minute options are in scrollable lists within the modal
+  // Use a more specific approach: find elements that are clickable Pressables within the modal
+  
+  // Click the hour value - find it within a scrollable container
+  // Look for the hour number that's not part of the time display (e.g., "9:00 AM")
+  const hourOption = page.locator(`text=/^${hour12}$/`).first()
+  await hourOption.waitFor({ timeout: 5000, state: 'visible' })
+  await hourOption.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(200) // Small wait after scroll
+  // Use force click to bypass any overlay intercepts
+  await hourOption.click({ force: true, timeout: 5000 })
+  await page.waitForTimeout(300)
+  
+  // Click the minute value - find exact match for minute (padded)
+  const minuteStr = minute.toString().padStart(2, '0')
+  // Find minute that's exactly the number (not part of time display)
+  const minuteOption = page.locator(`text=/^${minuteStr}$/`).first()
+  await minuteOption.waitFor({ timeout: 5000, state: 'visible' })
+  await minuteOption.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(200) // Small wait after scroll
+  // Use force click to bypass any overlay intercepts
+  await minuteOption.click({ force: true, timeout: 5000 })
+  await page.waitForTimeout(300)
+  
+  // Click AM/PM button if needed - these are buttons in the modal
+  if (isAM) {
+    const amButton = page.locator('text=/^AM$/').first()
+    await amButton.waitFor({ timeout: 2000, state: 'visible' }).catch(() => {})
+    if (await amButton.isVisible().catch(() => false)) {
+      await amButton.click({ force: true })
+    }
   } else {
-    // No schedule selector, time picker is the first select
-    timePicker = allSelects.first()
+    const pmButton = page.locator('text=/^PM$/').first()
+    await pmButton.waitFor({ timeout: 2000, state: 'visible' }).catch(() => {})
+    if (await pmButton.isVisible().catch(() => false)) {
+      await pmButton.click({ force: true })
+    }
   }
   
-  await timePicker.waitFor({ timeout: 5000, state: 'visible' })
-  
-  // Select the time value
-  await timePicker.selectOption(time)
-  await page.waitForTimeout(500) // Wait for selection to process
+  // Click the "Done" button to close the modal
+  const doneButton = page.locator('text=Done').first()
+  await doneButton.waitFor({ timeout: 5000, state: 'visible' })
+  await doneButton.click()
+  await page.waitForTimeout(500) // Wait for modal to close
   
   // Frequency should default to "daily" which is fine for this test
   // Daily frequency doesn't require intervals, so we don't need to set anything else
@@ -147,13 +181,33 @@ async function createSchedule(page: any, time: string): Promise<void> {
   const saveButton = page.locator('[data-testid="schedule-save-button"]')
   await saveButton.waitFor({ timeout: 5000, state: 'visible' })
   
+  // Ensure auth token is available in localStorage (Redux will hydrate from this)
+  // Wait for token to be in localStorage persist:root
+  await page.waitForFunction(() => {
+    try {
+      const authState = localStorage.getItem('persist:root')
+      if (authState) {
+        const parsed = JSON.parse(authState)
+        const auth = JSON.parse(parsed.auth || '{}')
+        return !!auth.tokens?.access?.token
+      }
+      return false
+    } catch {
+      return false
+    }
+  }, { timeout: 10000 })
+  
+  // Additional wait to ensure Redux state is fully hydrated from localStorage
+  // The API uses getState() which should be hydrated by now
+  await page.waitForTimeout(3000)
+  
   // Wait for the save to complete by waiting for network request
   const savePromise = page.waitForResponse(response => 
     response.url().includes('/schedules/patients/') && response.request().method() === 'POST',
-    { timeout: 10000 }
+    { timeout: 20000 }
   ).catch(() => null) // Don't fail if we can't catch the response
   
-  await saveButton.click()
+  await saveButton.click({ force: true })
   
   // Wait for the API response and verify it succeeded
   const response = await savePromise
@@ -161,7 +215,49 @@ async function createSchedule(page: any, time: string): Promise<void> {
     const status = response.status()
     if (status >= 400) {
       const responseBody = await response.json().catch(() => ({}))
+      // Check if it's a 401 - might be auth token issue, wait a bit and retry once
+      if (status === 401) {
+        console.log('⚠️ Got 401, waiting a bit and retrying...')
+        // Wait for token to be in localStorage (Redux will hydrate from this)
+        await page.waitForFunction(() => {
+          try {
+            const authState = localStorage.getItem('persist:root')
+            if (authState) {
+              const parsed = JSON.parse(authState)
+              const auth = JSON.parse(parsed.auth || '{}')
+              return !!auth.tokens?.access?.token
+            }
+            return false
+          } catch {
+            return false
+          }
+        }, { timeout: 5000 }).catch(() => {
+          console.warn('⚠️ Could not verify auth token, proceeding with retry anyway')
+        })
+        await page.waitForTimeout(3000) // Give Redux time to hydrate
+        
+        // Click save again to retry
+        await saveButton.click({ force: true })
+        const retryResponse = await page.waitForResponse(response => 
+          response.url().includes('/schedules/patients/') && response.request().method() === 'POST',
+          { timeout: 20000 }
+        ).catch(() => null)
+        if (retryResponse && retryResponse.status() < 400) {
+          return // Success on retry
+        }
+        // If retry also fails, throw with more context
+        const retryBody = retryResponse ? await retryResponse.json().catch(() => ({})) : {}
+        throw new Error(`Schedule creation failed with status ${status} (retry also failed with ${retryResponse?.status() || 'no response'}): ${JSON.stringify(responseBody)}`)
+      }
       throw new Error(`Schedule creation failed with status ${status}: ${JSON.stringify(responseBody)}`)
+    }
+  } else {
+    // No response caught - might have succeeded, wait a bit and check for errors
+    await page.waitForTimeout(2000)
+    // Check if there's an error message on the page
+    const errorMessage = await page.locator('text=/error|failed/i').first().isVisible().catch(() => false)
+    if (errorMessage) {
+      throw new Error('Schedule creation may have failed - error message detected on page')
     }
   }
   

@@ -5,6 +5,7 @@ import { useLoginMutation } from "../services/api/authApi"
 import { setAuthEmail, setAuthTokens, setCurrentUser, getValidationError, getAuthEmail } from "../store/authSlice"
 import { setCaregiver } from "../store/caregiverSlice"
 import { setOrg } from "../store/orgSlice"
+import { setPatientsForCaregiver } from "../store/patientSlice"
 import { Button, Text, TextField, PasswordField } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { SSOLoginButtons } from "./SSOLoginButtons"
@@ -265,7 +266,7 @@ export const LoginForm: FC<LoginFormProps> = ({
     }
   }
 
-  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any }) => {
+  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] }) => {
     setIsLoading(true)
     try {
       if (user.tokens && user.backendUser) {
@@ -278,6 +279,14 @@ export const LoginForm: FC<LoginFormProps> = ({
         // Set org if included in response
         if (user.backendOrg) {
           dispatch(setOrg(user.backendOrg));
+        }
+        
+        // Set patients if included in response
+        if (user.backendPatients && user.backendUser?.id) {
+          dispatch(setPatientsForCaregiver({ 
+            caregiverId: user.backendUser.id, 
+            patients: user.backendPatients 
+          }));
         }
         
         setErrorMessage("");

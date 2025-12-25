@@ -14,7 +14,7 @@ services:
       - USE_SES_IN_DEV=${USE_SES_IN_DEV:-false}  # Default to Ethereal for local dev (set to true if you want SES)
       - AWS_PROFILE=${AWS_PROFILE:-jordan}
       - AWS_REGION=${AWS_REGION:-us-east-2}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8081}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8082}
       # Unset placeholder credentials to avoid conflicts with AWS_PROFILE
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=
