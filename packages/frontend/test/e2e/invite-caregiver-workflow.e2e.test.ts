@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test'
 import { generateUniqueTestData, TEST_USERS } from './fixtures/testData'
 import { getEmailFromEthereal } from './helpers/backendHelpers'
 import { loginUserViaUI, logoutViaUI } from './helpers/testHelpers'
+import { FRONTEND_URL, getFrontendUrl } from './helpers/testConfig'
 
 test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
   let testData: ReturnType<typeof generateUniqueTestData>
@@ -55,10 +56,10 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
           const token = email.tokens.verification
           if (token) {
             // Verify the email by navigating to the verification link
-            await page.goto(`http://localhost:8081/auth/verify-email?token=${token}`)
+            await page.goto(getFrontendUrl(`/auth/verify-email?token=${token}`))
             await page.waitForTimeout(2000)
             // Try login again
-            await page.goto('http://localhost:8081')
+            await page.goto(FRONTEND_URL)
             await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
           } else {
             throw new Error('Could not retrieve verification token from email')
@@ -164,7 +165,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     const invitePage = await context.newPage()
 
     // Navigate to signup page with invite token (this is what the email link points to)
-    const inviteLink = `http://localhost:8081/signup?token=${inviteToken}`
+    const inviteLink = getFrontendUrl(`/signup?token=${inviteToken}`)
     await invitePage.goto(inviteLink)
     await invitePage.waitForSelector('[data-testid="signup-screen"]', { timeout: 10000 })
 
@@ -508,7 +509,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
 
   test('invite email contains correct link format', async ({ page }) => {
     // Step 1: Admin logs in
-    await page.goto('http://localhost:8081')
+    await page.goto(FRONTEND_URL)
     await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
 
     // Step 2: Navigate to Organization screen
@@ -560,14 +561,15 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log('Email HTML (first 500 chars):', emailHtml.substring(0, 500))
     
     // Find the invite link in the email - try multiple patterns
-    // Pattern 1: http://localhost:8081/signup?token=...
-    // Pattern 2: http://localhost:8081/signup?token=...&...
+    // Pattern 1: {FRONTEND_URL}/signup?token=...
+    // Pattern 2: {FRONTEND_URL}/signup?token=...&...
     // Pattern 3: Any URL with signup and token
+    const frontendHost = new URL(FRONTEND_URL).host
     const linkPatterns = [
-      /http:\/\/localhost:8081\/signup\?token=[^\s"'>]+/,
-      /http:\/\/localhost:8081\/signup\?token=[^"'\s&]+/,
-      /http:\/\/localhost:8081\/signup[?&]token=[^\s"'>]+/,
-      /localhost:8081\/signup[?&]token=[^\s"'>]+/,
+      new RegExp(`http://${frontendHost}/signup\\?token=[^\\s"'>]+`),
+      new RegExp(`http://${frontendHost}/signup\\?token=[^"'\\s&]+`),
+      new RegExp(`http://${frontendHost}/signup[?&]token=[^\\s"'>]+`),
+      new RegExp(`${frontendHost}/signup[?&]token=[^\\s"'>]+`),
     ]
     
     let linkMatch: RegExpMatchArray | null = null
@@ -603,7 +605,8 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log('Extracted link:', frontendLink)
     
     // Verify link format - be more flexible with the format
-    expect(frontendLink).toMatch(/localhost:8081.*signup.*token/)
+    // frontendHost already declared above
+    expect(frontendLink).toMatch(new RegExp(`${frontendHost}.*signup.*token`))
     expect(frontendLink).not.toContain('localhost:3000')
     expect(frontendLink).not.toContain('/v1')
     
@@ -623,7 +626,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     const url = new URL(frontendLink)
     expect(url.protocol).toBe('http:')
     expect(url.hostname).toBe('localhost')
-    expect(url.port).toBe('8081')
+    expect(url.port).toBe('8082')
     expect(url.pathname).toBe('/signup')
     expect(url.searchParams.get('token')).toBeTruthy()
     
@@ -643,7 +646,7 @@ test.describe('Invite Caregiver Workflow - End to End with Ethereal', () => {
     console.log(`Using unique invite email: ${uniqueInviteEmail}`)
     
     // Step 1: Admin logs in
-    await page.goto('http://localhost:8081')
+    await page.goto(FRONTEND_URL)
     await loginUserViaUI(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
 
     // Step 2: Navigate to Organization screen

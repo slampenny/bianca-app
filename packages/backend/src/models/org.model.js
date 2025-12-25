@@ -160,15 +160,26 @@ orgSchema.statics.createOrgAndCaregiver = async function (orgBody, caregiverBody
   if (await Caregiver.isEmailTaken(caregiverBody.email)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Caregiver Email already taken');
   }
-  const caregiver = await Caregiver.create({ ...caregiverBody, role: caregiverBody.role || 'orgAdmin' });
+  
+  // Create org first so we can assign it to caregiver at creation time
   // Set privacy officer to org creator (first caregiver) by default
   const org = await this.create({ 
     ...orgBody, 
-    caregivers: [caregiver],
-    privacyOfficerId: caregiver._id // Default privacy officer to org creator
+    caregivers: [], // Will add caregiver after creation
+    privacyOfficerId: null // Will set after caregiver is created
   });
-  caregiver.org = org.id;
-  await caregiver.save();
+  
+  // Create caregiver WITH org assigned from the start
+  const caregiver = await Caregiver.create({ 
+    ...caregiverBody, 
+    role: caregiverBody.role || 'orgAdmin',
+    org: org._id // CRITICAL: Set org at creation time
+  });
+  
+  // Update org with caregiver and privacy officer
+  org.caregivers.push(caregiver._id);
+  org.privacyOfficerId = caregiver._id;
+  await org.save();
 
   return org;
 };

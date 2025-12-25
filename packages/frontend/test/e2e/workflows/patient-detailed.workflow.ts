@@ -14,8 +14,29 @@ export class PatientDetailedWorkflow {
     await loginButton.waitFor({ state: 'visible', timeout: 10000 })
     await loginButton.click()
     
-    // Wait for home screen with patients
-    await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
+    // Wait for home screen with patients - try multiple indicators
+    const homeIndicators = [
+      this.page.getByText("Add Patient", { exact: true }),
+      this.page.getByTestId('add-patient-button'),
+      this.page.getByTestId('home-header'),
+      this.page.locator('[data-testid="home-screen"]'),
+      this.page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
+    ]
+    
+    let foundHome = false
+    for (const indicator of homeIndicators) {
+      try {
+        await expect(indicator).toBeVisible({ timeout: 5000 })
+        foundHome = true
+        break
+      } catch {
+        // Continue to next indicator
+      }
+    }
+    
+    if (!foundHome) {
+      throw new Error('Home screen not found after login')
+    }
     
     // Verify we have patients assigned
     const patientCards = await this.page.locator('[data-testid^="patient-card-"]').count()

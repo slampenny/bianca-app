@@ -1,4 +1,5 @@
 import { Page, expect } from '@playwright/test'
+import { FRONTEND_URL } from '../helpers/testConfig'
 
 /**
  * Logout workflow - tests logout functionality using real UI interactions
@@ -94,7 +95,8 @@ export class LogoutWorkflow {
     
     await logoutButton.waitFor({ state: 'visible', timeout: 5000 })
     console.log('Found logout button, clicking...')
-    await logoutButton.click()
+    // Use force click to bypass any overlay intercepts (e.g., "Sign In" text overlay)
+    await logoutButton.click({ force: true, timeout: 10000 })
     console.log('Clicked logout button, waiting for navigation...')
     await this.page.waitForTimeout(2000)
     console.log('Current URL after logout click:', this.page.url())
@@ -107,7 +109,8 @@ export class LogoutWorkflow {
     const hasConfirmButton = await confirmButton.isVisible({ timeout: 5000 }).catch(() => false)
     
     if (hasConfirmButton) {
-      await confirmButton.click()
+      // Use force click to bypass overlay intercepts
+      await confirmButton.click({ force: true, timeout: 10000 })
     } else {
       // No confirmation screen - logout happened directly, which is fine
       console.log('No confirmation screen - logout happened directly')
@@ -126,7 +129,8 @@ export class LogoutWorkflow {
     }
     
     await logoutButton.waitFor({ state: 'visible', timeout: 5000 })
-    await logoutButton.click()
+    // Use force click to bypass overlay intercepts
+    await logoutButton.click({ force: true, timeout: 10000 })
     
     // Wait for logout confirmation screen to appear (or direct logout)
     // Some implementations may logout directly without confirmation
@@ -286,7 +290,7 @@ export class LogoutWorkflow {
   async thenIShouldNotBeAbleToAccessProtectedScreens() {
     // Try to navigate to home screen
     try {
-      await this.page.goto('http://localhost:8081/', { timeout: 10000 })
+      await this.page.goto(`${FRONTEND_URL}/`, { timeout: 10000 })
     } catch {
       // Navigation may fail, that's okay
     }

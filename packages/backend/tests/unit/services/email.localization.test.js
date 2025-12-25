@@ -1,6 +1,6 @@
 // Set test environment variables before importing config
 process.env.NODE_ENV = 'test';
-process.env.FRONTEND_URL = 'http://localhost:8081';
+process.env.FRONTEND_URL = 'http://localhost:8082';
 
 // Unmock i18n for this test - we need real translations
 jest.unmock('i18n');
@@ -236,7 +236,7 @@ describe('Email Service - Localization', () => {
   describe('sendInviteEmail - Localization', () => {
     test('should send invite email in English', async () => {
       const testEmail = 'invite-en@example.com';
-      const inviteLink = 'http://localhost:8081/signup?token=test-invite-token';
+      const inviteLink = 'http://localhost:8082/signup?token=test-invite-token';
       
       await emailService.sendInviteEmail(
         testEmail,
@@ -260,7 +260,7 @@ describe('Email Service - Localization', () => {
 
     test('should send invite email in Spanish', async () => {
       const testEmail = 'invite-es@example.com';
-      const inviteLink = 'http://localhost:8081/signup?token=test-invite-token';
+      const inviteLink = 'http://localhost:8082/signup?token=test-invite-token';
       
       await emailService.sendInviteEmail(
         testEmail,

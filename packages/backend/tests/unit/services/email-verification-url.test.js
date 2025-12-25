@@ -1,14 +1,14 @@
 // Set test environment variables before importing config
 process.env.NODE_ENV = 'test';
-process.env.FRONTEND_URL = 'http://localhost:8081';
+process.env.FRONTEND_URL = 'http://localhost:8082';
 
 const config = require('../../../src/config/config');
 
 describe('Email Verification URL Generation', () => {
   describe('Frontend URL Configuration', () => {
     it('should use FRONTEND_URL env var when set', () => {
-      // In test environment, FRONTEND_URL is set to localhost:8081
-      expect(config.frontendUrl).toBe('http://localhost:8081');
+      // In test environment, FRONTEND_URL is set to localhost:8082
+      expect(config.frontendUrl).toBe('http://localhost:8082');
     });
 
     it('should not use backend API URL (localhost:3000)', () => {
@@ -26,17 +26,17 @@ describe('Email Verification URL Generation', () => {
       
       // Set up test environment
       process.env.NODE_ENV = 'development';
-      process.env.FRONTEND_URL = 'http://localhost:8081';
+      process.env.FRONTEND_URL = 'http://localhost:8082';
       
       delete require.cache[require.resolve('../../../src/config/config')];
       const testConfig = require('../../../src/config/config');
       
       // Verify the link format
       const expectedLink = `${testConfig.frontendUrl}/auth/verify-email?token=${mockToken}`;
-      expect(expectedLink).toBe('http://localhost:8081/auth/verify-email?token=test-verification-token-123');
+      expect(expectedLink).toBe('http://localhost:8082/auth/verify-email?token=test-verification-token-123');
       
       // Verify link contains correct components
-      expect(expectedLink).toContain('localhost:8081');
+      expect(expectedLink).toContain('localhost:8082');
       expect(expectedLink).toContain('/auth/verify-email');
       expect(expectedLink).toContain('token=');
       expect(expectedLink).toContain(mockToken);
@@ -44,7 +44,7 @@ describe('Email Verification URL Generation', () => {
 
     it('should not use backend API URL for verification links', () => {
       process.env.NODE_ENV = 'development';
-      process.env.FRONTEND_URL = 'http://localhost:8081';
+      process.env.FRONTEND_URL = 'http://localhost:8082';
       
       delete require.cache[require.resolve('../../../src/config/config')];
       const testConfig = require('../../../src/config/config');
@@ -57,7 +57,7 @@ describe('Email Verification URL Generation', () => {
       expect(verificationLink).not.toContain('/v1');
       
       // Should contain frontend URL
-      expect(verificationLink).toContain('localhost:8081');
+      expect(verificationLink).toContain('localhost:8082');
     });
   });
 });

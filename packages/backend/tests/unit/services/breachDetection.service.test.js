@@ -6,7 +6,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const breachDetectionService = require('../../../src/services/breachDetection.service');
-const { AuditLog, BreachLog, Caregiver } = require('../../../src/models');
+const { AuditLog, BreachLog, Caregiver, Org } = require('../../../src/models');
 
 let mongoServer;
 
@@ -30,20 +30,30 @@ afterEach(async () => {
   await AuditLog.deleteMany();
   await BreachLog.deleteMany();
   await Caregiver.deleteMany();
+  await Org.deleteMany();
   jest.clearAllMocks();
 });
 
 describe('Breach Detection Service', () => {
   let testCaregiver;
+  let testOrg;
 
   beforeEach(async () => {
+    // Create org first (required for caregiver)
+    testOrg = await Org.create({
+      name: 'Test Org',
+      email: 'testorg@example.com',
+      country: 'US',
+    });
+    
     testCaregiver = await Caregiver.create({
       name: 'Test User',
       email: 'test@example.com',
       password: 'Password123',
       phone: '1234567890',
       role: 'staff',
-      isEmailVerified: true
+      isEmailVerified: true,
+      org: testOrg._id,
     });
   });
 

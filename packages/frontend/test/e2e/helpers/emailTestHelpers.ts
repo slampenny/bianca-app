@@ -1,5 +1,6 @@
 import { Page, BrowserContext } from '@playwright/test'
 import { getEmailFromEthereal } from './backendHelpers'
+import { getFrontendUrl } from './testConfig'
 
 /**
  * Email testing helpers for invite workflow tests
@@ -141,7 +142,7 @@ export class EmailTestHelper {
    * Generate invite link (matches backend implementation)
    */
   private generateInviteLink(inviteToken: string): string {
-    return `http://localhost:8081/signup?token=${inviteToken}`
+    return getFrontendUrl(`/signup?token=${inviteToken}`)
   }
 
   /**

@@ -299,7 +299,8 @@ export class AuthWorkflow {
     // If still not on home, check URL
     if (!isOnHome) {
       const currentUrl = this.page.url()
-      isOnHome = currentUrl.includes('MainTabs') || currentUrl.includes('Home') || currentUrl === 'http://localhost:8081/' || currentUrl === 'http://localhost:8081'
+      const { FRONTEND_URL } = await import('../helpers/testConfig')
+      isOnHome = currentUrl.includes('MainTabs') || currentUrl.includes('Home') || currentUrl === `${FRONTEND_URL}/` || currentUrl === FRONTEND_URL
     }
     
     expect(isOnHome).toBe(true)

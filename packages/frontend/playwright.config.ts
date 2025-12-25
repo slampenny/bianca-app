@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 import * as fs from 'fs'
 import * as path from 'path'
+import { FRONTEND_URL, FRONTEND_PORT } from './test/e2e/helpers/testConfig'
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, 'test-logs')
@@ -13,7 +14,7 @@ export default defineConfig({
   testDir: './test/e2e',
   use: {
     screenshot: 'only-on-failure',
-    baseURL: 'http://localhost:8081',
+    baseURL: FRONTEND_URL,
     headless: true,
     browserName: 'chromium',
     viewport: { width: 1280, height: 720 },
@@ -25,13 +26,13 @@ export default defineConfig({
   globalSetup: require.resolve('./test/e2e/helpers/globalSetup'),
   // Automatically start frontend server before tests
   // If you're actively developing/fixing code, start the dev server manually:
-  //   yarn web:staging  (runs on port 8081 with hot-reloading)
+  //   yarn web:staging  (runs on port 8082 with hot-reloading)
   // Then Playwright will reuse it. Otherwise, it will build and serve static files.
   // In CI (CodeBuild), the frontend is already running in a Docker container, so disable webServer
   ...(process.env.CODEBUILD_BUILD_ID ? {} : {
     webServer: {
-      command: 'yarn bundle:web:staging && npx serve dist -l 8081',
-      port: 8081,
+      command: `yarn bundle:web:staging && npx serve dist -l ${FRONTEND_PORT}`,
+      port: parseInt(FRONTEND_PORT, 10),
       timeout: 120000, // 2 minutes for build + serve
       reuseExistingServer: true, // Always reuse if dev server is already running (for live code changes)
     },

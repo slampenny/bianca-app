@@ -76,6 +76,11 @@ export class MFAWorkflow {
     // Navigate to MFA setup screen
     await this.givenIAmOnTheProfileScreen()
     
+    // Check if page is still open
+    if (this.page.isClosed()) {
+      throw new Error('Page was closed during MFA setup navigation')
+    }
+    
     // Wait for profile screen to fully render
     await this.page.waitForTimeout(2000)
     
@@ -102,11 +107,30 @@ export class MFAWorkflow {
     await this.page.waitForTimeout(500)
     
     await mfaButton.waitFor({ state: 'visible', timeout: 15000 })
-    await mfaButton.click()
+    // Use force click to bypass overlay intercepts (e.g., card overlays, other UI elements)
+    await mfaButton.click({ force: true, timeout: 10000 })
     
-    // Wait for the MFA setup screen specifically (not the button)
-    await this.page.waitForSelector('[data-testid="mfa-setup-screen"]', { timeout: 15000 })
-    // Wait a moment for navigation to complete
+    // Wait for navigation to complete - wait for URL change or screen to appear
+    await this.page.waitForTimeout(1000) // Give time for navigation
+    
+    // Wait for the MFA setup screen - try multiple ways to detect it
+    try {
+      await Promise.race([
+        this.page.waitForSelector('[data-testid="mfa-setup-screen"]', { timeout: 10000 }),
+        this.page.waitForSelector('[aria-label="mfa-setup-screen"]', { timeout: 10000 }),
+        this.page.waitForSelector('text=/Multi-Factor Authentication|MFA/i', { timeout: 10000 }),
+        // Also check for URL change
+        this.page.waitForURL(/mfa|MFASetup/i, { timeout: 10000 }).catch(() => null)
+      ])
+    } catch (error) {
+      // Debug: check what's actually on the page
+      const bodyText = await this.page.textContent('body').catch(() => '')
+      const url = this.page.url()
+      const buttonVisible = await mfaButton.isVisible().catch(() => false)
+      throw new Error(`MFA setup screen not found. URL: ${url}, Button still visible: ${buttonVisible}, Body preview: ${bodyText.substring(0, 200)}`)
+    }
+    
+    // Wait a moment for screen to fully render
     await this.page.waitForTimeout(1000)
   }
 

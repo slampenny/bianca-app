@@ -4,7 +4,7 @@ const { password, objectId } = require('./custom.validation');
 
 const createPatient = {
   body: Joi.object().keys({
-    org: Joi.string().custom(objectId).required(),
+    org: Joi.string().custom(objectId).optional(), // Optional - controller will set from caregiver if not provided
     email: Joi.string().required().email(),
     avatar: Joi.string().optional(),
     name: Joi.string().required(),

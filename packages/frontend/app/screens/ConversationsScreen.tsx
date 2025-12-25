@@ -241,26 +241,34 @@ export function ConversationsScreen() {
     setRefreshing(false)
   }
 
-  const toggleConversation = (conversationId: string) => {
-    logger.debug('[ConversationsScreen] Toggling conversation:', conversationId, 'Current expanded:', Array.from(expandedConversations))
-    const newExpanded = new Set(expandedConversations)
-    if (newExpanded.has(conversationId)) {
-      newExpanded.delete(conversationId)
-      logger.debug('[ConversationsScreen] Collapsing conversation:', conversationId)
-    } else {
-      newExpanded.add(conversationId)
-      logger.debug('[ConversationsScreen] Expanding conversation:', conversationId)
-      // Set this conversation as the current one in Redux
-      // Use conversationsData.results if available, otherwise fall back to Redux conversations
-      const allConversations = conversationsData?.results || conversations
-      const conversation = allConversations.find((c: any) => c.id === conversationId)
-      if (conversation) {
-        dispatch(setConversation(conversation))
-      }
+  const toggleConversation = useCallback((conversationId: string) => {
+    // Guard against invalid IDs
+    if (!conversationId) {
+      logger.warn('[ConversationsScreen] Cannot toggle conversation with invalid ID')
+      return
     }
-    setExpandedConversations(newExpanded)
-    logger.debug('[ConversationsScreen] New expanded set:', Array.from(newExpanded))
-  }
+    
+    setExpandedConversations(prev => {
+      logger.debug('[ConversationsScreen] Toggling conversation:', conversationId, 'Current expanded:', Array.from(prev))
+      const newExpanded = new Set(prev)
+      if (newExpanded.has(conversationId)) {
+        newExpanded.delete(conversationId)
+        logger.debug('[ConversationsScreen] Collapsing conversation:', conversationId)
+      } else {
+        newExpanded.add(conversationId)
+        logger.debug('[ConversationsScreen] Expanding conversation:', conversationId)
+        // Set this conversation as the current one in Redux
+        // Use conversationsData.results if available, otherwise fall back to Redux conversations
+        const allConversations = conversationsData?.results || conversations
+        const conversation = allConversations.find((c: any) => c.id === conversationId)
+        if (conversation) {
+          dispatch(setConversation(conversation))
+        }
+      }
+      logger.debug('[ConversationsScreen] New expanded set:', Array.from(newExpanded))
+      return newExpanded
+    })
+  }, [conversationsData, conversations, dispatch])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -302,7 +310,12 @@ export function ConversationsScreen() {
   }
 
   const renderConversation = ({ item }: { item: Conversation }) => {
-    const isExpanded = expandedConversations.has(item.id!)
+    // Guard against invalid IDs - if ID is missing, conversation cannot be expanded
+    const conversationId = item.id
+    if (!conversationId) {
+      logger.warn('[ConversationsScreen] Conversation missing ID, cannot expand')
+    }
+    const isExpanded = conversationId ? expandedConversations.has(conversationId) : false
     const messageCount = item.messages?.length || 0
     const lastMessage = item.messages?.[item.messages.length - 1]
     const conversationDate = lastMessage?.createdAt || item.startTime || new Date().toISOString()
@@ -310,8 +323,8 @@ export function ConversationsScreen() {
     return (
       <Card 
         style={styles.conversationCard} 
-        testID={`conversation-card-${item.id}`}
-        accessibilityLabel={`conversation-card-${item.id}`}
+        testID={`conversation-card-${conversationId || 'unknown'}`}
+        accessibilityLabel={`conversation-card-${conversationId || 'unknown'}`}
         heading={`Conversation ${formatDate(conversationDate)}`}
         content={`${getConversationPreview(item.messages || [])}\n${messageCount} message${messageCount !== 1 ? 's' : ''}`}
         RightComponent={
@@ -334,11 +347,11 @@ export function ConversationsScreen() {
             <ConversationMessages
               messages={item.messages || []}
               style={styles.messagesContainer}
-              data-testid={`messages-container-${item.id}`}
+              data-testid={`messages-container-${conversationId || 'unknown'}`}
             />
           ) : undefined
         }
-        onPress={() => toggleConversation(item.id!)}
+        onPress={() => conversationId && toggleConversation(conversationId)}
       />
     )
   }

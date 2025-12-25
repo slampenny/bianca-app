@@ -1,17 +1,24 @@
 // conversation.dto.js
+const { ObjectId } = require('mongodb');
 const { SentimentAnalysisDTO } = require('./sentiment.dto');
 
 const ConversationDTO = (conversation) => {
   const { _id, callSid, patientId, lineItemId, messages, history, analyzedData, metadata, startTime, endTime, duration, callStatus, callStartTime, callEndTime, callDuration, callOutcome, callNotes, agentId, status } =
     conversation;
 
-  const id = _id;
+  // Convert _id (ObjectId) to string, or use id if already converted by toJSON plugin
+  const id = _id ? (_id.toString ? _id.toString() : _id) : (conversation.id || null);
+  
+  // Convert ObjectId fields to strings if needed
+  const patientIdStr = patientId ? (patientId instanceof ObjectId ? patientId.toString() : (patientId.toString ? patientId.toString() : patientId)) : null;
+  const agentIdStr = agentId ? (agentId instanceof ObjectId ? agentId.toString() : (agentId.toString ? agentId.toString() : agentId)) : null;
+  const lineItemIdStr = lineItemId ? (lineItemId instanceof ObjectId ? lineItemId.toString() : (lineItemId.toString ? lineItemId.toString() : lineItemId)) : null;
 
   return {
     id,
     callSid,
-    patientId,
-    lineItemId,
+    patientId: patientIdStr,
+    lineItemId: lineItemIdStr,
     messages,
     history,
     analyzedData,
@@ -25,7 +32,7 @@ const ConversationDTO = (conversation) => {
     callDuration,
     callOutcome,
     callNotes,
-    agentId,
+    agentId: agentIdStr,
     status,
     // Include sentiment analysis if available
     sentiment: analyzedData?.sentiment ? SentimentAnalysisDTO(analyzedData.sentiment) : null,

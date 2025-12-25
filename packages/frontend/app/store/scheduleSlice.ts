@@ -11,8 +11,8 @@ interface ScheduleState {
 const defaultSchedule: Schedule = {
   frequency: "weekly",
   intervals: [],
-  time: "",
-  isActive: false,
+  time: "09:00",
+  isActive: true,
 }
 
 const initialState: ScheduleState = {

@@ -5,9 +5,9 @@ const Org = require('../models/org.model');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const logger = require('../config/logger');
-const { tokenService, orgService, emailService } = require('../services');
+const { tokenService, orgService, emailService, alertService } = require('../services');
 const { tokenTypes } = require('../config/tokens');
-const { CaregiverDTO, OrgDTO } = require('../dtos');
+const { CaregiverDTO, OrgDTO, PatientDTO, AlertDTO } = require('../dtos');
 
 const login = async (req, res) => {
   try {
@@ -20,8 +20,16 @@ const login = async (req, res) => {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Missing required SSO fields: provider, email, name, and id are required');
     }
 
-    // Check if caregiver exists with this email
-    let caregiver = await Caregiver.findOne({ email });
+    // Check if caregiver exists with this email - populate patients and org
+    let caregiver = await Caregiver.findOne({ email })
+      .populate('org')
+      .populate({
+        path: 'patients',
+        populate: {
+          path: 'schedules',
+          model: 'Schedule',
+        },
+      });
     logger.debug('SSO login caregiver lookup', { email, found: !!caregiver });
 
     let orgForDTO = null;
@@ -145,6 +153,15 @@ const login = async (req, res) => {
     const accessExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
     const refreshExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
+    // Get alerts and patients for the caregiver
+    const caregiverId = caregiver._id || caregiver.id;
+    const alerts = await alertService.getAlerts(caregiverId);
+    const alertDTOs = alerts.map((alert) => AlertDTO(alert));
+    
+    // Get patients from caregiver (already populated)
+    const patients = caregiver.patients || [];
+    const patientDTOs = patients.map((patient) => PatientDTO(patient));
+
     // Generate DTOs
     let userDTO, orgDTO;
     try {
@@ -167,7 +184,9 @@ const login = async (req, res) => {
       provider,
       email,
       caregiverId: caregiver._id,
-      orgId: orgForDTO?._id
+      orgId: orgForDTO?._id,
+      patientCount: patientDTOs.length,
+      alertCount: alertDTOs.length
     });
 
     res.json({
@@ -184,7 +203,9 @@ const login = async (req, res) => {
         },
       },
       user: userDTO,
-      org: orgDTO
+      org: orgDTO,
+      patients: patientDTOs,
+      alerts: alertDTOs
     });
 
   } catch (error) {

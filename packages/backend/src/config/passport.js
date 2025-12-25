@@ -13,7 +13,8 @@ const jwtVerify = async (payload, done) => {
     if (payload.type !== tokenTypes.ACCESS) {
       throw new Error('Invalid token type');
     }
-    const caregiver = await Caregiver.findById(payload.sub);
+    // Populate org so it's available in req.caregiver.org
+    const caregiver = await Caregiver.findById(payload.sub).populate('org');
     if (!caregiver) {
       return done(null, false);
     }

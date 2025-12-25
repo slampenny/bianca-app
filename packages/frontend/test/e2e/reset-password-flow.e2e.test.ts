@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test'
 import { generateUniqueTestData, TEST_USERS } from './fixtures/testData'
 import { getEmailFromEthereal } from './helpers/backendHelpers'
 import { loginUserViaUI } from './helpers/testHelpers'
+import { FRONTEND_URL, getFrontendUrl } from './helpers/testConfig'
 
 test.describe('Reset Password Flow - End to End with Ethereal', () => {
   let testData: ReturnType<typeof generateUniqueTestData>
@@ -103,7 +104,7 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     
     // Step 5: Verify we're on the reset password screen (not error screen)
     const currentUrl = page.url()
-    expect(currentUrl).toContain('localhost:8081')
+    expect(currentUrl).toContain(new URL(FRONTEND_URL).hostname)
     expect(currentUrl).toContain('reset-password')
     expect(currentUrl).toContain('token=')
     
@@ -117,12 +118,17 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     expect(isErrorScreenVisible).toBe(false)
     
     // Check for reset password form indicators (should be present)
-    const resetForm = page.getByText('Reset Password', { exact: false })
-      .or(page.getByText('New Password', { exact: false }))
-      .or(page.locator('input[type="password"]'))
+    // The ConfirmResetScreen has testID="new-password-input" for the password field
+    const passwordInput = page.locator('[data-testid="new-password-input"]')
+    const isPasswordInputVisible = await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)
     
-    const isResetFormVisible = await resetForm.first().isVisible({ timeout: 5000 }).catch(() => false)
-    expect(isResetFormVisible).toBe(true)
+    // Also check for other indicators
+    const resetFormText = page.getByText('Reset Password', { exact: false })
+      .or(page.getByText('New Password', { exact: false }))
+    const hasFormText = await resetFormText.first().isVisible({ timeout: 2000 }).catch(() => false)
+    
+    // Either the password input or the form text should be visible
+    expect(isPasswordInputVisible || hasFormText).toBe(true)
     
     console.log('✅ Reset password screen loaded without crash!')
     console.log('   - No JavaScript errors detected')
@@ -195,7 +201,7 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     expect(resetLink).toBeTruthy()
     
     // Verify link format
-    expect(resetLink).toContain('localhost:8081')
+    expect(resetLink).toContain(new URL(FRONTEND_URL).hostname)
     expect(resetLink).toContain('/reset-password')
     expect(resetLink).toContain('token=')
     
@@ -239,7 +245,7 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     
     // Step 8: Verify we're on the reset password screen (not error screen)
     const currentUrl = page.url()
-    expect(currentUrl).toContain('localhost:8081')
+    expect(currentUrl).toContain(new URL(FRONTEND_URL).hostname)
     expect(currentUrl).toContain('reset-password')
     expect(currentUrl).toContain('token=')
     
@@ -253,13 +259,17 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
     expect(isErrorScreenVisible).toBe(false)
     
     // Check for reset password form indicators (should be present)
-    const resetForm = page.getByText('Reset Password', { exact: false })
-      .or(page.locator('input[data-testid="new-password-input"]'))
-      .or(page.locator('[data-testid="new-password-input"]'))
-      .or(page.getByText('New Password', { exact: false }))
+    // The ConfirmResetScreen has testID="new-password-input" for the password field
+    const passwordInput = page.locator('[data-testid="new-password-input"]')
+    const isPasswordInputVisible = await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)
     
-    const isResetFormVisible = await resetForm.first().isVisible({ timeout: 5000 }).catch(() => false)
-    expect(isResetFormVisible).toBe(true)
+    // Also check for other indicators
+    const resetFormText = page.getByText('Reset Password', { exact: false })
+      .or(page.getByText('New Password', { exact: false }))
+    const hasFormText = await resetFormText.first().isVisible({ timeout: 2000 }).catch(() => false)
+    
+    // Either the password input or the form text should be visible
+    expect(isPasswordInputVisible || hasFormText).toBe(true)
     
     // Step 9: Fill in new password and confirm - use data-testid for TextField inputs
     const newPasswordInput = page.locator('input[data-testid="new-password-input"]').first()
@@ -342,7 +352,7 @@ test.describe('Reset Password Flow - End to End with Ethereal', () => {
   test('reset password screen loads without crash when token is invalid', async ({ page }) => {
     // Navigate to reset password screen with invalid token
     const invalidToken = 'invalid-token-12345'
-    const resetLink = `http://localhost:8081/reset-password?token=${invalidToken}`
+    const resetLink = getFrontendUrl(`/reset-password?token=${invalidToken}`)
     
     // Set up console error listener
     const consoleErrors: string[] = []
