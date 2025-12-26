@@ -252,15 +252,19 @@ function setupShutdownHandlers(server) {
     }
     
     if (server) {
-      server.close(() => {
+      server.close(async () => {
         logger.info('HTTP server closed');
         
-        // Close database connection
-        mongoose.connection.close(false, () => {
+        // Close database connection (returns Promise in newer Mongoose versions)
+        try {
+          await mongoose.connection.close(false);
           logger.info('MongoDB connection closed');
           logger.info('Graceful shutdown completed');
           process.exit(0);
-        });
+        } catch (err) {
+          logger.error('Error closing MongoDB connection:', err);
+          process.exit(1);
+        }
       });
       
       // Force exit after timeout
