@@ -179,7 +179,7 @@ const baselineConfig = {
     noiseReduction: {
       noiseGateEnabled: process.env.AUDIO_NOISE_GATE_ENABLED !== 'false', // Default: true
       noiseGateThreshold: parseFloat(process.env.AUDIO_NOISE_GATE_THRESHOLD) || 0.1, // Default: 0.1 (10% energy)
-      frequencyFilteringEnabled: process.env.AUDIO_FREQUENCY_FILTERING_ENABLED === 'true', // Default: false (Stage 2: band-pass filter 300-3400Hz)
+      frequencyFilteringEnabled: process.env.AUDIO_FREQUENCY_FILTERING_ENABLED !== 'false', // Default: true (Stage 2: band-pass filter 300-3400Hz) - can be disabled with AUDIO_FREQUENCY_FILTERING_ENABLED=false
       frequencyFilterLowCutoff: parseInt(process.env.AUDIO_FREQUENCY_FILTER_LOW_CUTOFF) || 300, // Default: 300Hz
       frequencyFilterHighCutoff: parseInt(process.env.AUDIO_FREQUENCY_FILTER_HIGH_CUTOFF) || 3400, // Default: 3400Hz
       primarySpeakerEnabled: process.env.AUDIO_PRIMARY_SPEAKER_ENABLED === 'true', // Default: false
