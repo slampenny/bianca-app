@@ -33,12 +33,12 @@ callNotes: String
 ```
 
 ### 2. New API Endpoints
-- `POST /api/v1/calls/initiate` - Start a call to a patient
-- `GET /api/v1/calls/:conversationId/status` - Get current call status
-- `POST /api/v1/calls/:conversationId/status` - Update call status
-- `POST /api/v1/calls/:conversationId/end` - End a call
-- `GET /api/v1/calls/active` - Get active calls for current agent
-- `GET /api/v1/calls/:conversationId/conversation` - Get conversation with call details
+- `POST /v1/calls/initiate` - Start a call to a patient
+- `GET /v1/calls/:conversationId/status` - Get current call status
+- `POST /v1/calls/:conversationId/status` - Update call status
+- `POST /v1/calls/:conversationId/end` - End a call
+- `GET /v1/calls/active` - Get active calls for current agent
+- `GET /v1/calls/:conversationId/conversation` - Get conversation with call details
 
 ### 3. Controller Implementation
 The controller handles:

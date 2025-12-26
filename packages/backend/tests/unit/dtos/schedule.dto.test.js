@@ -92,8 +92,9 @@ describe('Schedule DTO', () => {
 
       const dto = ScheduleDTO(schedule);
 
-      // Should use default (America/New_York)
-      expect(['09:00', '10:00']).toContain(dto.time);
+      // Should use default (America/Los_Angeles)
+      // 14:00 UTC = 6:00 AM PST or 7:00 AM PDT
+      expect(['06:00', '07:00']).toContain(dto.time);
     });
 
     test('should handle patient as ID string (not populated)', () => {
@@ -109,9 +110,9 @@ describe('Schedule DTO', () => {
 
       const dto = ScheduleDTO(schedule);
 
-      // Should use default timezone (America/New_York) when org is not populated
-      // 14:00 UTC = 9:00 AM EST or 10:00 AM EDT
-      expect(['09:00', '10:00']).toContain(dto.time);
+      // Should use default timezone (America/Los_Angeles) when org is not populated
+      // 14:00 UTC = 6:00 AM PST or 7:00 AM PDT
+      expect(['06:00', '07:00']).toContain(dto.time);
       expect(dto.patient).toBe('patient123');
     });
 

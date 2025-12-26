@@ -34,6 +34,26 @@
 		"CRITICAL": "🚨 KRITISCHER NOTFALL: %s - %s: %s",
 		"HIGH": "⚠️ HOHE PRIORITÄT: %s - %s: %s",
 		"MEDIUM": "📢 WARNUNG: %s - %s: %s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - Einverständnis für Anrufaufzeichnung erforderlich",
+		"title": "Einverständnis für Anrufaufzeichnung erforderlich",
+		"greeting": "Sehr geehrte/r %s,",
+		"intro": "Ihre Gesundheitsorganisation, %s, nutzt Bianca Wellness zur Durchführung von Wellness-Check-Anrufen. Gemäß den geltenden Gesetzen in Ihrer Gerichtsbarkeit benötigen wir Ihre Zustimmung, bevor wir diese Anrufe aufzeichnen können.",
+		"whyConsentTitle": "Warum wir Ihre Zustimmung benötigen:",
+		"whyConsent": "Einige Gerichtsbarkeiten erfordern die Zustimmung aller Parteien, bevor ein Anruf aufgezeichnet werden kann. Ihre Organisation hat die Einstellung \"Patienteneinverständnis erforderlich\" aktiviert, was bedeutet, dass wir Ihre ausdrückliche Zustimmung benötigen, bevor wir Anrufe aufzeichnen.",
+		"consentTitle": "Was passiert, wenn Sie zustimmen:",
+		"consentBenefit1": "Ihre Wellness-Check-Anrufe können zu Zwecken der Qualitätssicherung und Versorgungskoordination aufgezeichnet werden",
+		"consentBenefit2": "Aufzeichnungen werden verwendet, um Zusammenfassungen und Erkenntnisse für Ihre Pflegekräfte bereitzustellen",
+		"consentBenefit3": "Aufzeichnungen werden sicher und in Übereinstimmung mit den geltenden Datenschutzgesetzen gespeichert",
+		"noConsentTitle": "Was passiert, wenn Sie nicht zustimmen:",
+		"noConsent1": "Anrufe werden weiterhin durchgeführt, aber sie werden nicht aufgezeichnet",
+		"noConsent2": "Sie können weiterhin Wellness-Check-Anrufe von Ihrer Organisation erhalten",
+		"buttonText": "Zustimmung geben",
+		"expiryNote": "Dieser Zustimmungslink läuft aus Sicherheitsgründen in 30 Tagen ab.",
+		"contactInfo": "Wenn Sie Fragen oder Bedenken haben, wenden Sie sich bitte an Ihre Organisation oder senden Sie uns eine E-Mail an privacy@biancawellness.com.",
+		"versionLabel": "Version der Zustimmungs-E-Mail:",
+		"closing": "Mit freundlichen Grüßen,\nDas Bianca Wellness Team"
 	}
 }
 

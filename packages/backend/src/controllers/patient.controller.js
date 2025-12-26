@@ -86,6 +86,12 @@ const createPatient = catchAsync(async (req, res) => {
   
   // Add patient to caregiver (this also ensures two-way relationship)
   patient = await caregiverService.addPatient(req.caregiver, patient.id);
+  
+  // Send consent email if org requires it (async, don't wait)
+  patientService.sendConsentEmailIfRequired(patient).catch(err => {
+    logger.error('Failed to send consent email after patient creation:', err);
+  });
+  
   res.status(httpStatus.CREATED).send(PatientDTO(patient));
 });
 
@@ -113,6 +119,15 @@ const updatePatient = catchAsync(async (req, res) => {
       await scheduleService.updateSchedule(schedule.id, { ...schedule });
     }
   }
+  
+  // Send consent email if org requires it and patient email was updated or consent status changed
+  // (async, don't wait)
+  if (patientData.email || patientData.consented === undefined) {
+    patientService.sendConsentEmailIfRequired(patient).catch(err => {
+      logger.error('Failed to send consent email after patient update:', err);
+    });
+  }
+  
   res.send(PatientDTO(patient));
 });
 
@@ -236,12 +251,137 @@ const getUnassignedPatients = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(patients.map((patient) => PatientDTO(patient)));
 });
 
+const verifyConsent = catchAsync(async (req, res) => {
+  logger.info(`[Patient Controller] verifyConsent called - method: ${req.method}`);
+  
+  // Check if client wants JSON response (API call from frontend)
+  const wantsJson = req.headers.accept?.includes('application/json') || req.query.format === 'json';
+  
+  // Validate token parameter
+  const token = req.query.token || req.body.token;
+  if (!token) {
+    logger.warn(`[Patient Controller] Consent token missing`);
+    if (wantsJson) {
+      return res.status(httpStatus.BAD_REQUEST).json({
+        success: false,
+        error: 'Consent token is required'
+      });
+    }
+    return res.status(httpStatus.BAD_REQUEST).send('Consent token is required');
+  }
+  
+  try {
+    logger.info(`[Patient Controller] Calling patientService.verifyConsentToken with token`);
+    const result = await patientService.verifyConsentToken(token);
+    logger.info(`[Patient Controller] Consent verification successful - alreadyConsented: ${result.alreadyConsented}`);
+    
+    // Return JSON response
+    if (wantsJson) {
+      return res.status(httpStatus.OK).json({
+        success: true,
+        message: result.message,
+        alreadyConsented: result.alreadyConsented,
+        patient: PatientDTO(result.patient),
+      });
+    }
+    
+    // Return simple HTML page for non-JSON requests
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Consent Confirmed - Bianca Wellness</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+          }
+          .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+          }
+          h1 { color: #2c3e50; }
+          .success { color: #27ae60; }
+          .message { color: #555; line-height: 1.6; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1 class="success">✓ Consent Confirmed</h1>
+          <p class="message">${result.message}</p>
+          <p class="message">You can close this window.</p>
+        </div>
+      </body>
+      </html>
+    `;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(httpStatus.OK).send(html);
+  } catch (error) {
+    logger.error(`[Patient Controller] Consent verification failed:`, error);
+    
+    if (wantsJson) {
+      return res.status(error.statusCode || httpStatus.UNAUTHORIZED).json({
+        success: false,
+        error: error.message || 'Invalid or expired consent token'
+      });
+    }
+    
+    const errorHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Consent Error - Bianca Wellness</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+          }
+          .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+          }
+          h1 { color: #e74c3c; }
+          .error { color: #e74c3c; }
+          .message { color: #555; line-height: 1.6; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1 class="error">✗ Consent Error</h1>
+          <p class="message">${error.message || 'Invalid or expired consent token'}</p>
+          <p class="message">Please contact your healthcare organization if you need a new consent link.</p>
+        </div>
+      </body>
+      </html>
+    `;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(error.statusCode || httpStatus.UNAUTHORIZED).send(errorHtml);
+  }
+});
+
 module.exports = {
   createPatient,
   getPatients,
   getPatient,
   getConversationsByPatient,
   updatePatient,
+  verifyConsent,
   uploadPatientAvatar,
   deletePatient,
   assignCaregiver,

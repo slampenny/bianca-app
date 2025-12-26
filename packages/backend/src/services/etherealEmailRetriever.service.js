@@ -185,6 +185,11 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
                               emailHtml.match(/reset-password\?token=([^"'\s&]+)/);
       const resetToken = resetTokenMatch ? resetTokenMatch[1] : null;
       
+      // Extract patient consent token (from patient/consent links)
+      const consentTokenMatch = emailText.match(/patient\/consent[?&]token=([^\s&]+)/) || 
+                                emailHtml.match(/patient\/consent[?&]token=([^"'\s&]+)/);
+      const consentToken = consentTokenMatch ? consentTokenMatch[1] : null;
+      
       logger.info(`[Ethereal Email Retriever] Retrieved email for ${recipientEmail}: ${parsed.subject}`);
       
       return {
@@ -198,6 +203,7 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
           verification: verificationToken,
           invite: inviteToken,
           resetPassword: resetToken,
+          consent: consentToken,
         },
         raw: parsed,
       };

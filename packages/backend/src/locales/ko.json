@@ -34,6 +34,26 @@
 		"CRITICAL": "🚨 긴급 상황: %s - %s: %s",
 		"HIGH": "⚠️ 높은 우선순위: %s - %s: %s",
 		"MEDIUM": "📢 경고: %s - %s: %s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - 통화 녹음에 대한 동의가 필요합니다",
+		"title": "통화 녹음에 대한 동의가 필요합니다",
+		"greeting": "%s님께,",
+		"intro": "귀하의 의료 기관인 %s는 Bianca Wellness를 사용하여 웰니스 확인 통화를 수행합니다. 귀하의 관할권에서 적용되는 법률에 따라 이러한 통화를 녹음하기 전에 귀하의 동의가 필요합니다.",
+		"whyConsentTitle": "동의가 필요한 이유:",
+		"whyConsent": "일부 관할권에서는 통화를 녹음하기 전에 모든 당사자의 동의가 필요합니다. 귀하의 기관은 \"환자 동의 필요\" 설정을 활성화했으며, 이는 모든 통화를 녹음하기 전에 명시적인 동의가 필요함을 의미합니다.",
+		"consentTitle": "동의하는 경우 발생하는 일:",
+		"consentBenefit1": "웰니스 확인 통화는 품질 보증 및 간병 조정 목적으로 녹음될 수 있습니다",
+		"consentBenefit2": "녹음은 귀하의 간병인에게 요약 및 통찰을 제공하는 데 사용됩니다",
+		"consentBenefit3": "녹음은 안전하게 저장되며 적용 가능한 개인정보 보호법을 준수합니다",
+		"noConsentTitle": "동의하지 않는 경우 발생하는 일:",
+		"noConsent1": "통화는 계속 진행되지만 녹음되지 않습니다",
+		"noConsent2": "귀하는 여전히 기관으로부터 웰니스 확인 통화를 받을 수 있습니다",
+		"buttonText": "동의 제공",
+		"expiryNote": "이 동의 링크는 보안상의 이유로 30일 후 만료됩니다.",
+		"contactInfo": "질문이나 우려사항이 있으시면 기관에 문의하거나 privacy@biancawellness.com으로 이메일을 보내주세요.",
+		"versionLabel": "동의 이메일 버전:",
+		"closing": "감사합니다,\nBianca Wellness 팀"
 	}
 }
 

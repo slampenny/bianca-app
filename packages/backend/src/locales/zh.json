@@ -34,6 +34,26 @@
 		"CRITICAL": "🚨 紧急情况：%s - %s：%s",
 		"HIGH": "⚠️ 高优先级：%s - %s：%s",
 		"MEDIUM": "📢 警报：%s - %s：%s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - 需要同意才能录制通话",
+		"title": "需要同意才能录制通话",
+		"greeting": "亲爱的%s，",
+		"intro": "您的医疗组织%s使用Bianca Wellness进行健康检查通话。根据您所在司法管辖区的适用法律，我们需要您的同意才能录制这些通话。",
+		"whyConsentTitle": "为什么我们需要您的同意：",
+		"whyConsent": "某些司法管辖区要求在录制通话之前获得所有各方的同意。您的组织已启用\"需要患者同意\"设置，这意味着我们需要您的明确同意才能录制任何通话。",
+		"consentTitle": "如果您同意会发生什么：",
+		"consentBenefit1": "您的健康检查通话可能会被录制，用于质量保证和护理协调目的",
+		"consentBenefit2": "录音将用于向您的护理人员提供摘要和见解",
+		"consentBenefit3": "录音将安全存储并符合适用的隐私法律",
+		"noConsentTitle": "如果您不同意会发生什么：",
+		"noConsent1": "通话仍会进行，但不会被录制",
+		"noConsent2": "您仍可能收到来自您组织的健康检查通话",
+		"buttonText": "提供同意",
+		"expiryNote": "此同意链接将在30天后出于安全原因过期。",
+		"contactInfo": "如果您有任何问题或疑虑，请联系您的组织或发送电子邮件至privacy@biancawellness.com。",
+		"versionLabel": "同意电子邮件版本：",
+		"closing": "此致，\nBianca Wellness 团队"
 	}
 }
 

@@ -10,6 +10,7 @@ export type AppStackParamList = {
   EmailVerified: undefined
   EmailVerificationRequired: { email?: string } | undefined
   VerifyPhone: undefined
+  PatientConsent: { token?: string } | undefined
 }
 
 export type DrawerParamList = {
@@ -95,6 +96,7 @@ export type LoginStackParamList = {
   SSOAccountLinking: { email: string; ssoProvider?: string } | undefined
   Signup: { token?: string }
   MFAVerification: { email: string; password: string; tempToken: string }
+  PatientConsent: { token?: string } | undefined
 }
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {

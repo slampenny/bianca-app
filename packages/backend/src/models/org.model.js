@@ -69,11 +69,11 @@ const orgSchema = mongoose.Schema(
         ref: 'PaymentMethod',
       },
     ],
-    // Organization timezone (IANA timezone identifier, e.g., 'America/New_York', 'Europe/London')
+    // Organization timezone (IANA timezone identifier, e.g., 'America/Los_Angeles', 'Europe/London')
     // Used for converting schedule times to/from UTC
     timezone: {
       type: String,
-      default: 'America/New_York',
+      default: 'America/Los_Angeles',
       trim: true,
     },
     // Organization country (ISO 3166-1 alpha-2 country code, e.g., 'US', 'CA')
@@ -125,6 +125,13 @@ const orgSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Caregiver',
       required: false,
+    },
+    // Require Patient Consent for Recording
+    // When enabled, organization must obtain explicit consent from patients before recording calls
+    // Used in double-party consent jurisdictions (e.g., California, Florida)
+    requirePatientConsent: {
+      type: Boolean,
+      default: false,
     },
   },
   {

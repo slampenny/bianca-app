@@ -19,7 +19,6 @@ const patientSchema = mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       lowercase: true,
       validate(value) {
@@ -27,6 +26,7 @@ const patientSchema = mongoose.Schema(
           throw new Error('Invalid email');
         }
       },
+      // Note: Email is not unique to allow duplicates (e.g., family members sharing email)
     },
     phone: {
       type: String,
@@ -69,6 +69,24 @@ const patientSchema = mongoose.Schema(
     isEmailVerified: {
       type: Boolean,
       default: false,
+    },
+    // Patient consent for call recording
+    // When requirePatientConsent is enabled on the org, this tracks if patient has consented
+    consented: {
+      type: Boolean,
+      default: true,
+    },
+    // Timestamp when patient consented to recording
+    consentedAt: {
+      type: Date,
+      required: false,
+    },
+    // Version of the consent email that patient consented to
+    // Allows tracking which version of the consent email was used
+    consentEmailVersion: {
+      type: String,
+      required: false,
+      trim: true,
     },
     org: {
       type: mongoose.SchemaTypes.ObjectId,

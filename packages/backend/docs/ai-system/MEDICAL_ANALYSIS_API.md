@@ -8,7 +8,7 @@ The Medical NLP Analysis API provides endpoints for analyzing patient conversati
 
 ### Base URL
 ```
-/api/v1/medical-analysis
+/v1/medical-analysis
 ```
 
 ### Authentication
@@ -17,7 +17,7 @@ All endpoints require Bearer token authentication.
 ## Endpoints
 
 ### 1. Get Medical Analysis
-**GET** `/api/v1/medical-analysis/{patientId}`
+**GET** `/v1/medical-analysis/{patientId}`
 
 Retrieves comprehensive medical NLP analysis for a patient over a specified time period.
 
@@ -93,7 +93,7 @@ Retrieves comprehensive medical NLP analysis for a patient over a specified time
 ```
 
 ### 2. Get Medical Analysis Summary
-**GET** `/api/v1/medical-analysis/{patientId}/summary`
+**GET** `/v1/medical-analysis/{patientId}/summary`
 
 Retrieves a summary of medical analysis suitable for dashboard display.
 
@@ -135,7 +135,7 @@ Retrieves a summary of medical analysis suitable for dashboard display.
 ```
 
 ### 3. Get Baseline
-**GET** `/api/v1/medical-analysis/{patientId}/baseline`
+**GET** `/v1/medical-analysis/{patientId}/baseline`
 
 Retrieves the established baseline metrics for a patient.
 
@@ -173,7 +173,7 @@ Retrieves the established baseline metrics for a patient.
 ```
 
 ### 4. Establish Baseline
-**POST** `/api/v1/medical-analysis/{patientId}/baseline`
+**POST** `/v1/medical-analysis/{patientId}/baseline`
 
 Establishes or updates the baseline metrics for a patient.
 

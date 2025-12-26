@@ -34,6 +34,26 @@
 		"CRITICAL": "🚨 EMERGENZA CRITICA: %s - %s: %s",
 		"HIGH": "⚠️ ALTA PRIORITÀ: %s - %s: %s",
 		"MEDIUM": "📢 ALLERTA: %s - %s: %s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - Consenso richiesto per la registrazione delle chiamate",
+		"title": "Consenso richiesto per la registrazione delle chiamate",
+		"greeting": "Caro/a %s,",
+		"intro": "La tua organizzazione sanitaria, %s, utilizza Bianca Wellness per effettuare chiamate di verifica del benessere. In conformità con le leggi applicabili nella tua giurisdizione, abbiamo bisogno del tuo consenso prima di poter registrare queste chiamate.",
+		"whyConsentTitle": "Perché abbiamo bisogno del tuo consenso:",
+		"whyConsent": "Alcune giurisdizioni richiedono il consenso di tutte le parti prima che una chiamata possa essere registrata. La tua organizzazione ha abilitato l'impostazione \"Richiedi consenso del paziente\", il che significa che abbiamo bisogno del tuo consenso esplicito prima di registrare qualsiasi chiamata.",
+		"consentTitle": "Cosa succede se dai il consenso:",
+		"consentBenefit1": "Le tue chiamate di verifica del benessere possono essere registrate per scopi di garanzia della qualità e coordinamento dell'assistenza",
+		"consentBenefit2": "Le registrazioni saranno utilizzate per fornire riassunti e approfondimenti ai tuoi caregiver",
+		"consentBenefit3": "Le registrazioni saranno archiviate in modo sicuro e in conformità con le leggi sulla privacy applicabili",
+		"noConsentTitle": "Cosa succede se non dai il consenso:",
+		"noConsent1": "Le chiamate verranno comunque effettuate, ma non verranno registrate",
+		"noConsent2": "Potresti comunque ricevere chiamate di verifica del benessere dalla tua organizzazione",
+		"buttonText": "Fornisci il consenso",
+		"expiryNote": "Questo link di consenso scadrà tra 30 giorni per motivi di sicurezza.",
+		"contactInfo": "Se hai domande o dubbi, contatta la tua organizzazione o inviaci un'email a privacy@biancawellness.com.",
+		"versionLabel": "Versione email di consenso:",
+		"closing": "Cordiali saluti,\nIl team Bianca Wellness"
 	}
 }
 

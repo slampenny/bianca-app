@@ -16,7 +16,7 @@ The sentiment analysis system automatically analyzes patient conversations using
 ## API Endpoints
 
 ### Base URL
-All sentiment analysis endpoints are available under `/api/v1/sentiment/`
+All sentiment analysis endpoints are available under `/v1/sentiment/`
 
 ### Authentication
 All endpoints require Bearer token authentication:
@@ -249,7 +249,7 @@ Manually triggers sentiment analysis for a completed conversation using ChatGPT.
 ```typescript
 // Get sentiment trend for a patient
 const getSentimentTrend = async (patientId: string, timeRange: 'month' | 'year' | 'lifetime' = 'month') => {
-  const response = await fetch(`/api/v1/sentiment/patient/${patientId}/trend?timeRange=${timeRange}`, {
+  const response = await fetch(`/v1/sentiment/patient/${patientId}/trend?timeRange=${timeRange}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -313,12 +313,12 @@ const prepareChartData = (trendData) => {
 The sentiment analysis system includes comprehensive test routes that can be accessed without authentication:
 
 #### Available Test Endpoints:
-- `POST /api/v1/test/sentiment/analyze` - Test basic sentiment analysis
-- `GET /api/v1/test/sentiment/trend/{patientId}` - Test patient trend analysis
-- `GET /api/v1/test/sentiment/summary/{patientId}` - Test patient summary analysis
-- `GET /api/v1/test/sentiment/conversation/{conversationId}` - Test conversation sentiment check
-- `POST /api/v1/test/sentiment/analyze-conversation/{conversationId}` - Test manual analysis
-- `POST /api/v1/test/sentiment/run-all-tests` - Run comprehensive test suite
+- `POST /v1/test/sentiment/analyze` - Test basic sentiment analysis
+- `GET /v1/test/sentiment/trend/{patientId}` - Test patient trend analysis
+- `GET /v1/test/sentiment/summary/{patientId}` - Test patient summary analysis
+- `GET /v1/test/sentiment/conversation/{conversationId}` - Test conversation sentiment check
+- `POST /v1/test/sentiment/analyze-conversation/{conversationId}` - Test manual analysis
+- `POST /v1/test/sentiment/run-all-tests` - Run comprehensive test suite
 
 #### Staging Test Script:
 ```bash

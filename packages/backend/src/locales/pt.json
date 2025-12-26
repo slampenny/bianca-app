@@ -34,6 +34,26 @@
 		"CRITICAL": "🚨 EMERGÊNCIA CRÍTICA: %s - %s: %s",
 		"HIGH": "⚠️ ALTA PRIORIDADE: %s - %s: %s",
 		"MEDIUM": "📢 ALERTA: %s - %s: %s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - Consentimento necessário para gravação de chamadas",
+		"title": "Consentimento necessário para gravação de chamadas",
+		"greeting": "Caro/a %s,",
+		"intro": "Sua organização de saúde, %s, usa Bianca Wellness para realizar chamadas de verificação de bem-estar. De acordo com as leis aplicáveis em sua jurisdição, precisamos do seu consentimento antes de podermos gravar essas chamadas.",
+		"whyConsentTitle": "Por que precisamos do seu consentimento:",
+		"whyConsent": "Algumas jurisdições exigem o consentimento de todas as partes antes que uma chamada possa ser gravada. Sua organização habilitou a configuração \"Exigir consentimento do paciente\", o que significa que precisamos do seu consentimento explícito antes de gravar qualquer chamada.",
+		"consentTitle": "O que acontece se você consentir:",
+		"consentBenefit1": "Suas chamadas de verificação de bem-estar podem ser gravadas para fins de garantia de qualidade e coordenação de cuidados",
+		"consentBenefit2": "As gravações serão usadas para fornecer resumos e insights aos seus cuidadores",
+		"consentBenefit3": "As gravações serão armazenadas com segurança e em conformidade com as leis de privacidade aplicáveis",
+		"noConsentTitle": "O que acontece se você não consentir:",
+		"noConsent1": "As chamadas ainda serão feitas, mas não serão gravadas",
+		"noConsent2": "Você ainda pode receber chamadas de verificação de bem-estar da sua organização",
+		"buttonText": "Fornecer consentimento",
+		"expiryNote": "Este link de consentimento expirará em 30 dias por motivos de segurança.",
+		"contactInfo": "Se você tiver alguma dúvida ou preocupação, entre em contato com sua organização ou envie um e-mail para privacy@biancawellness.com.",
+		"versionLabel": "Versão do e-mail de consentimento:",
+		"closing": "Atenciosamente,\nA equipe Bianca Wellness"
 	}
 }
 

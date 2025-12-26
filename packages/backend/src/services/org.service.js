@@ -303,8 +303,9 @@ const updateCallRetrySettings = async (orgId, retrySettings) => {
 
   // Update only the provided fields
   if (retrySettings.retryCount !== undefined) {
-    if (!Number.isInteger(retrySettings.retryCount) || retrySettings.retryCount < 0 || retrySettings.retryCount > 10) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Retry count must be an integer between 0 and 10');
+    // Allow 0 (retries disabled) or 1-5 (retries enabled)
+    if (!Number.isInteger(retrySettings.retryCount) || retrySettings.retryCount < 0 || retrySettings.retryCount > 5) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Retry count must be 0 (disabled) or an integer between 1 and 5');
     }
     org.callRetrySettings.retryCount = retrySettings.retryCount;
   }

@@ -34,6 +34,26 @@
 		"CRITICAL": "🚨 URGENCE CRITIQUE: %s - %s: %s",
 		"HIGH": "⚠️ HAUTE PRIORITÉ: %s - %s: %s",
 		"MEDIUM": "📢 ALERTE: %s - %s: %s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - Consentement requis pour l'enregistrement d'appels",
+		"title": "Consentement requis pour l'enregistrement d'appels",
+		"greeting": "Cher/Chère %s,",
+		"intro": "Votre organisation de santé, %s, utilise Bianca Wellness pour effectuer des appels de vérification de bien-être. Conformément aux lois applicables dans votre juridiction, nous avons besoin de votre consentement avant de pouvoir enregistrer ces appels.",
+		"whyConsentTitle": "Pourquoi nous avons besoin de votre consentement:",
+		"whyConsent": "Certaines juridictions exigent le consentement de toutes les parties avant qu'un appel puisse être enregistré. Votre organisation a activé le paramètre \"Exiger le consentement du patient\", ce qui signifie que nous avons besoin de votre consentement explicite avant d'enregistrer tout appel.",
+		"consentTitle": "Ce qui se passe si vous donnez votre consentement:",
+		"consentBenefit1": "Vos appels de vérification de bien-être peuvent être enregistrés à des fins d'assurance qualité et de coordination des soins",
+		"consentBenefit2": "Les enregistrements seront utilisés pour fournir des résumés et des informations à vos soignants",
+		"consentBenefit3": "Les enregistrements seront stockés en toute sécurité et conformément aux lois de confidentialité applicables",
+		"noConsentTitle": "Ce qui se passe si vous ne donnez pas votre consentement:",
+		"noConsent1": "Les appels seront toujours effectués, mais ils ne seront pas enregistrés",
+		"noConsent2": "Vous pouvez toujours recevoir des appels de vérification de bien-être de votre organisation",
+		"buttonText": "Donner mon consentement",
+		"expiryNote": "Ce lien de consentement expirera dans 30 jours pour des raisons de sécurité.",
+		"contactInfo": "Si vous avez des questions ou des préoccupations, veuillez contacter votre organisation ou nous envoyer un e-mail à privacy@biancawellness.com.",
+		"versionLabel": "Version de l'e-mail de consentement:",
+		"closing": "Cordialement,\nL'équipe Bianca Wellness"
 	}
 }
 

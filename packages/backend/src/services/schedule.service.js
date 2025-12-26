@@ -12,8 +12,8 @@ const createSchedule = async (patientId, scheduleData) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
 
-  // Get org timezone (default to 'America/New_York' if not set)
-  const orgTimezone = patient.org?.timezone || 'America/New_York';
+  // Get org timezone (default to 'America/Los_Angeles' if not set)
+  const orgTimezone = patient.org?.timezone || 'America/Los_Angeles';
 
   // Convert time from org timezone to UTC before storing
   const scheduleDataWithUTCTime = { ...scheduleData };

@@ -65,7 +65,9 @@ export function OrgScreen() {
   const [logoBlob, setLogoBlob] = useState<Blob | null>(null)
   const [retryCount, setRetryCount] = useState("2")
   const [retryIntervalMinutes, setRetryIntervalMinutes] = useState("15")
+  const [retriesEnabled, setRetriesEnabled] = useState(true)
   const [alertOnAllMissedCalls, setAlertOnAllMissedCalls] = useState(false)
+  const [requirePatientConsent, setRequirePatientConsent] = useState(false)
   const [timezone, setTimezone] = useState("America/New_York")
   const [country, setCountry] = useState<string>("CA")
 
@@ -89,15 +91,20 @@ export function OrgScreen() {
         setCountry(currentOrg.country || "CA")
         // Initialize call retry settings
         if (currentOrg.callRetrySettings) {
-          setRetryCount(String(currentOrg.callRetrySettings.retryCount ?? 2))
+          const retryCountValue = currentOrg.callRetrySettings.retryCount ?? 2
+          setRetriesEnabled(retryCountValue > 0)
+          setRetryCount(String(retryCountValue > 0 ? retryCountValue : 2))
           setRetryIntervalMinutes(String(currentOrg.callRetrySettings.retryIntervalMinutes ?? 15))
           setAlertOnAllMissedCalls(currentOrg.callRetrySettings.alertOnAllMissedCalls ?? false)
         } else {
           // Use defaults if not set
+          setRetriesEnabled(true)
           setRetryCount("2")
           setRetryIntervalMinutes("15")
           setAlertOnAllMissedCalls(false)
         }
+        // Initialize requirePatientConsent
+        setRequirePatientConsent(currentOrg.requirePatientConsent ?? false)
         setIsLoading(false)
         return
       }
@@ -131,6 +138,16 @@ export function OrgScreen() {
   const handleSave = async () => {
     if (currentOrg?.id) {
       try {
+        // Ensure retryIntervalMinutes is valid (1-60) and not empty
+        const retryMinutes = parseInt(retryIntervalMinutes, 10)
+        const validRetryMinutes = (retryMinutes >= 1 && retryMinutes <= 60) ? retryMinutes : 15
+        
+        // Ensure retryCount is valid (1-5) or 0 if retries are disabled
+        const retryCountValue = parseInt(retryCount, 10)
+        const validRetryCount = retriesEnabled 
+          ? ((retryCountValue >= 1 && retryCountValue <= 5) ? retryCountValue : 2)
+          : 0
+        
         const result = await updateOrg({
           orgId: currentOrg.id,
           org: {
@@ -140,9 +157,10 @@ export function OrgScreen() {
             logo,
             timezone,
             country,
+            requirePatientConsent,
             callRetrySettings: {
-              retryCount: parseInt(retryCount, 10) || 2,
-              retryIntervalMinutes: parseInt(retryIntervalMinutes, 10) || 15,
+              retryCount: validRetryCount,
+              retryIntervalMinutes: validRetryMinutes,
               alertOnAllMissedCalls,
             },
           },
@@ -177,6 +195,52 @@ export function OrgScreen() {
   const handlePaymentPress = () => {
     // Navigate to payment screen
     navigation.navigate("Payment")
+  }
+
+  // Handler to only allow numeric input for retry count (1-5)
+  const handleRetryCountChange = (text: string) => {
+    // Remove any non-numeric characters
+    const numericOnly = text.replace(/[^0-9]/g, '')
+    
+    // Allow empty string during editing (so user can backspace)
+    if (numericOnly === '') {
+      setRetryCount('')
+      return
+    }
+    
+    // Parse the number
+    const num = parseInt(numericOnly, 10)
+    
+    // Validate range: 1-5
+    if (num > 5) {
+      setRetryCount('5')
+    } else {
+      setRetryCount(numericOnly)
+    }
+  }
+
+  // Handler to only allow numeric input for retry interval minutes (1-60)
+  const handleRetryIntervalMinutesChange = (text: string) => {
+    // Remove any non-numeric characters
+    const numericOnly = text.replace(/[^0-9]/g, '')
+    
+    // Allow empty string during editing (so user can backspace)
+    if (numericOnly === '') {
+      setRetryIntervalMinutes('')
+      return
+    }
+    
+    // Parse the number
+    const num = parseInt(numericOnly, 10)
+    
+    // Validate range: 1-60
+    // Allow typing numbers that could become valid (e.g., "6" could become "60")
+    // But clamp if it's already clearly out of range
+    if (num > 60) {
+      setRetryIntervalMinutes('60')
+    } else {
+      setRetryIntervalMinutes(numericOnly)
+    }
   }
 
   if (isLoading) {
@@ -292,35 +356,110 @@ export function OrgScreen() {
           </View>
         </View>
 
+        {/* Patient Consent Settings Section */}
+        <View style={styles.callRetrySection}>
+          <Text style={styles.sectionTitle} preset="formLabel">
+            Patient Consent Settings
+          </Text>
+          
+          <Toggle
+            variant="switch"
+            label="Require Patient Consent"
+            helper="When enabled, consent requests will be automatically sent to patients via email."
+            value={requirePatientConsent}
+            onValueChange={setRequirePatientConsent}
+            editable={canEditOrg}
+            containerStyle={styles.inputContainer}
+          />
+        </View>
+
         {/* Call Retry Settings Section */}
         <View style={styles.callRetrySection}>
           <Text style={styles.sectionTitle} preset="formLabel">
             {translate("orgScreen.callRetrySettings")}
           </Text>
           
-          <TextField
-            labelTx="orgScreen.retryCountLabel"
-            helperTx="orgScreen.retryCountHelper"
-            value={retryCount}
-            onChangeText={setRetryCount}
-            keyboardType="numeric"
+          <Toggle
+            variant="switch"
+            labelTx="orgScreen.enableRetriesLabel"
+            helperTx="orgScreen.enableRetriesHelper"
+            value={retriesEnabled}
+            onValueChange={(value) => {
+              setRetriesEnabled(value)
+              // Reset to default if enabling
+              if (value && (!retryCount || retryCount === '' || parseInt(retryCount, 10) === 0)) {
+                setRetryCount('2')
+              }
+            }}
             editable={canEditOrg}
             containerStyle={styles.inputContainer}
-            inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
-            style={!canEditOrg ? styles.readonlyInput : styles.input}
           />
           
-          <TextField
-            labelTx="orgScreen.retryIntervalMinutesLabel"
-            helperTx="orgScreen.retryIntervalMinutesHelper"
-            value={retryIntervalMinutes}
-            onChangeText={setRetryIntervalMinutes}
-            keyboardType="numeric"
-            editable={canEditOrg}
-            containerStyle={styles.inputContainer}
-            inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
-            style={!canEditOrg ? styles.readonlyInput : styles.input}
-          />
+          {retriesEnabled && (
+            <>
+              <TextField
+                labelTx="orgScreen.retryCountLabel"
+                helperTx="orgScreen.retryCountHelper"
+                value={retryCount}
+                onChangeText={handleRetryCountChange}
+                onBlur={() => {
+                  // Ensure value is never empty on blur
+                  if (!retryCount || retryCount === '') {
+                    setRetryCount('2')
+                  } else {
+                    const num = parseInt(retryCount, 10)
+                    if (isNaN(num) || num < 1) {
+                      setRetryCount('1')
+                    } else if (num > 5) {
+                      setRetryCount('5')
+                    }
+                  }
+                }}
+                keyboardType="numeric"
+                editable={canEditOrg}
+                containerStyle={styles.inputContainer}
+                inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+                style={!canEditOrg ? styles.readonlyInput : styles.input}
+                // Web: Use number input type with min/max
+                {...(Platform.OS === 'web' && {
+                  type: 'number',
+                  min: 1,
+                  max: 5,
+                })}
+              />
+              
+              <TextField
+                labelTx="orgScreen.retryIntervalMinutesLabel"
+                helperTx="orgScreen.retryIntervalMinutesHelper"
+                value={retryIntervalMinutes}
+                onChangeText={handleRetryIntervalMinutesChange}
+                onBlur={() => {
+                  // Ensure value is never empty on blur
+                  if (!retryIntervalMinutes || retryIntervalMinutes === '') {
+                    setRetryIntervalMinutes('15')
+                  } else {
+                    const num = parseInt(retryIntervalMinutes, 10)
+                    if (isNaN(num) || num < 1) {
+                      setRetryIntervalMinutes('1')
+                    } else if (num > 60) {
+                      setRetryIntervalMinutes('60')
+                    }
+                  }
+                }}
+                keyboardType="numeric"
+                editable={canEditOrg}
+                containerStyle={styles.inputContainer}
+                inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+                style={!canEditOrg ? styles.readonlyInput : styles.input}
+                // Web: Use number input type with min/max
+                {...(Platform.OS === 'web' && {
+                  type: 'number',
+                  min: 1,
+                  max: 60,
+                })}
+              />
+            </>
+          )}
           
           <Toggle
             variant="switch"

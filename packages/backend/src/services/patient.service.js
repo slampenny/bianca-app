@@ -1,7 +1,11 @@
 const httpStatus = require('http-status');
-const { Caregiver, Patient } = require('../models');
+const { Caregiver, Patient, Org, Token } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const emailService = require('./email.service');
+const tokenService = require('./token.service');
+const config = require('../config/config');
+const { tokenTypes } = require('../config/tokens');
 
 /**
  * Create a patient
@@ -9,9 +13,7 @@ const logger = require('../config/logger');
  * @returns {Promise<Patient>}
  */
 const createPatient = async (patientBody) => {
-  if (await Patient.isEmailTaken(patientBody.email)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
-  }
+  // Note: Email uniqueness check removed - emails can be duplicated (e.g., family members sharing email)
   return await Patient.create(patientBody);
 };
 
@@ -58,9 +60,7 @@ const updatePatientById = async (patientId, updateBody) => {
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
   }
-  if (updateBody.email && (await Patient.isEmailTaken(updateBody.email, patientId))) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
-  }
+  // Note: Email uniqueness check removed - emails can be duplicated (e.g., family members sharing email)
   Object.assign(patient, updateBody);
   await patient.save();
   return patient;
@@ -188,6 +188,143 @@ const getUnassignedPatients = async () => {
   }
 };
 
+/**
+ * Send consent request email to patient if org requires it
+ * @param {Patient} patient - Patient document
+ * @returns {Promise<void>}
+ */
+const sendConsentEmailIfRequired = async (patient) => {
+  try {
+    // Populate org to check requirePatientConsent setting
+    const patientWithOrg = await Patient.findById(patient._id).populate('org');
+    if (!patientWithOrg || !patientWithOrg.org) {
+      logger.warn(`[Patient Service] Cannot send consent email: patient ${patient._id} has no org`);
+      return;
+    }
+
+    const org = patientWithOrg.org;
+    
+    // Only send if org requires patient consent
+    if (!org.requirePatientConsent) {
+      logger.debug(`[Patient Service] Org ${org._id} does not require patient consent, skipping email`);
+      return;
+    }
+
+    // Only send if patient hasn't consented yet
+    if (patient.consented === true) {
+      logger.debug(`[Patient Service] Patient ${patient._id} already consented, skipping email`);
+      return;
+    }
+
+    // Generate consent token using token service
+    const consentToken = await tokenService.generatePatientConsentToken(patient);
+    const consentLink = `${config.frontendUrl}/patient/consent?token=${consentToken}`;
+    
+    const consentEmailVersion = '1.0'; // Version of consent email template
+    
+    await emailService.sendPatientConsentRequestEmail(
+      patient.email,
+      patient.name,
+      org.name,
+      consentLink,
+      patient.preferredLanguage || 'en',
+      consentEmailVersion
+    );
+
+    logger.info(`[Patient Service] Consent request email sent to patient ${patient._id} (${patient.email})`);
+  } catch (error) {
+    // Log error but don't fail patient creation/update
+    logger.error(`[Patient Service] Failed to send consent email to patient ${patient._id}:`, error);
+  }
+};
+
+/**
+ * Check if patient has consented to recording
+ * @param {ObjectId|string} patientId - Patient ID
+ * @returns {Promise<boolean>} - True if patient has consented or org doesn't require consent
+ */
+const checkPatientConsent = async (patientId) => {
+  try {
+    const patient = await Patient.findById(patientId).populate('org');
+    if (!patient || !patient.org) {
+      logger.warn(`[Patient Service] Cannot check consent: patient ${patientId} not found or has no org`);
+      return false;
+    }
+
+    const org = patient.org;
+    
+    // If org doesn't require consent, allow recording
+    if (!org.requirePatientConsent) {
+      return true;
+    }
+
+    // If org requires consent, check patient's consent status
+    return patient.consented === true;
+  } catch (error) {
+    logger.error(`[Patient Service] Error checking patient consent for ${patientId}:`, error);
+    return false; // Fail safe: don't allow recording if we can't verify consent
+  }
+};
+
+/**
+ * Verify patient consent token and update patient consent status
+ * @param {string} consentToken - Consent token from email
+ * @returns {Promise<{success: boolean, patient: Patient, message: string}>}
+ */
+const verifyConsentToken = async (consentToken) => {
+  try {
+    logger.info(`[Patient Service] Verifying consent token (length: ${consentToken?.length || 0})`);
+    
+    // Verify the token
+    const consentTokenDoc = await tokenService.verifyToken(consentToken, tokenTypes.PATIENT_CONSENT);
+    logger.info(`[Patient Service] Token verified successfully, patient ID: ${consentTokenDoc.patient}`);
+    
+    const patient = await Patient.findById(consentTokenDoc.patient).populate('org');
+    
+    if (!patient) {
+      logger.error(`[Patient Service] Patient not found for ID: ${consentTokenDoc.patient}`);
+      throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+    }
+    
+    logger.info(`[Patient Service] Patient found: ${patient.name}, already consented: ${patient.consented}`);
+    
+    // Check if already consented
+    if (patient.consented === true) {
+      // Delete the token but return success
+      await Token.deleteMany({ patient: patient.id, type: tokenTypes.PATIENT_CONSENT });
+      return {
+        success: true,
+        alreadyConsented: true,
+        message: 'You have already provided consent for call recording.',
+        patient,
+      };
+    }
+    
+    // Delete all consent tokens for this patient
+    await Token.deleteMany({ patient: patient.id, type: tokenTypes.PATIENT_CONSENT });
+    
+    // Update patient consent status
+    const consentEmailVersion = patient.consentEmailVersion || '1.0';
+    await updatePatientById(patient.id, {
+      consented: true,
+      consentedAt: new Date(),
+      consentEmailVersion,
+    });
+    
+    logger.info(`[Patient Service] Patient ${patient.id} consent updated successfully`);
+    
+    return {
+      success: true,
+      alreadyConsented: false,
+      message: 'Thank you for providing your consent. Your wellness check calls may now be recorded.',
+      patient: await getPatientById(patient.id),
+    };
+  } catch (error) {
+    logger.error(`[Patient Service] Consent verification failed:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   createPatient,
   queryPatients,
@@ -200,4 +337,7 @@ module.exports = {
   getCaregivers,
   getActivePatients,
   getUnassignedPatients,
+  sendConsentEmailIfRequired,
+  checkPatientConsent,
+  verifyConsentToken,
 };

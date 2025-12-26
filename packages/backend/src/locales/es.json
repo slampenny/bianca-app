@@ -34,5 +34,25 @@
 		"CRITICAL": "🚨 EMERGENCIA CRÍTICA: %s - %s: %s",
 		"HIGH": "⚠️ ALTA PRIORIDAD: %s - %s: %s",
 		"MEDIUM": "📢 ALERTA: %s - %s: %s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - Consentimiento requerido para grabación de llamadas",
+		"title": "Consentimiento requerido para grabación de llamadas",
+		"greeting": "Estimado/a %s,",
+		"intro": "Su organización de salud, %s, utiliza Bianca Wellness para realizar llamadas de verificación de bienestar. De acuerdo con las leyes aplicables en su jurisdicción, necesitamos su consentimiento antes de poder grabar estas llamadas.",
+		"whyConsentTitle": "Por qué necesitamos su consentimiento:",
+		"whyConsent": "Algunas jurisdicciones requieren el consentimiento de todas las partes antes de que una llamada pueda ser grabada. Su organización ha habilitado la configuración \"Requerir consentimiento del paciente\", lo que significa que necesitamos su consentimiento explícito antes de grabar cualquier llamada.",
+		"consentTitle": "Qué sucede si da su consentimiento:",
+		"consentBenefit1": "Sus llamadas de verificación de bienestar pueden ser grabadas para fines de garantía de calidad y coordinación de atención",
+		"consentBenefit2": "Las grabaciones se utilizarán para proporcionar resúmenes e información a sus cuidadores",
+		"consentBenefit3": "Las grabaciones se almacenarán de forma segura y en cumplimiento de las leyes de privacidad aplicables",
+		"noConsentTitle": "Qué sucede si no da su consentimiento:",
+		"noConsent1": "Las llamadas aún se realizarán, pero no se grabarán",
+		"noConsent2": "Aún puede recibir llamadas de verificación de bienestar de su organización",
+		"buttonText": "Proporcionar consentimiento",
+		"expiryNote": "Este enlace de consentimiento expirará en 30 días por razones de seguridad.",
+		"contactInfo": "Si tiene alguna pregunta o inquietud, por favor contacte a su organización o envíenos un correo a privacy@biancawellness.com.",
+		"versionLabel": "Versión del correo de consentimiento:",
+		"closing": "Saludos cordiales,\nEl equipo de Bianca Wellness"
 	}
 }
