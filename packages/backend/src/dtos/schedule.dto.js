@@ -7,9 +7,9 @@ const ScheduleDTO = (schedule) => {
   const id = _id;
   const patientId = patient ? (typeof patient === 'object' ? patient._id : patient) : null;
 
-  // Get org timezone (default to 'America/New_York' if not set)
+  // Get org timezone (default to 'America/Los_Angeles' if not set)
   // Check if patient is populated and has org
-  let orgTimezone = 'America/New_York';
+  let orgTimezone = 'America/Los_Angeles';
   if (patient && typeof patient === 'object' && patient.org) {
     if (typeof patient.org === 'object' && patient.org.timezone) {
       orgTimezone = patient.org.timezone;

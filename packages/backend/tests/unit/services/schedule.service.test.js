@@ -161,8 +161,8 @@ describe('Schedule Service', () => {
       expect(['19:00', '20:00']).toContain(updatedSchedule.time);
     });
 
-    test('should use default timezone (America/New_York) if org has no timezone', async () => {
-      // Create org without timezone (should default to America/New_York)
+    test('should use default timezone (America/Los_Angeles) if org has no timezone', async () => {
+      // Create org without timezone (should default to America/Los_Angeles)
       const [org] = await insertOrgs([orgOne]);
       const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
       
@@ -175,8 +175,8 @@ describe('Schedule Service', () => {
 
       const schedule = await scheduleService.createSchedule(patient.id, scheduleData);
 
-      // Should still convert using default timezone
-      expect(['13:00', '14:00']).toContain(schedule.time);
+      // Should still convert using default timezone (PST/PDT: UTC-8 or UTC-7)
+      expect(['16:00', '17:00']).toContain(schedule.time);
     });
 
     test('should handle different timezones correctly', async () => {

@@ -17,6 +17,9 @@ const createPatient = {
         return value;
       }),
     preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar').optional(),
+    consented: Joi.boolean().optional(),
+    consentedAt: Joi.date().optional(),
+    consentEmailVersion: Joi.string().optional(),
     caregivers: Joi.array().optional(),
     schedules: Joi.array()
       .items(
@@ -75,6 +78,9 @@ const updatePatient = {
         }),
       preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar').optional(),
       isEmailVerified: Joi.boolean().optional(),
+      consented: Joi.boolean().optional(),
+      consentedAt: Joi.date().optional(),
+      consentEmailVersion: Joi.string().optional(),
       caregivers: Joi.array().optional(),
       schedules: Joi.array()
         .items(

@@ -87,10 +87,19 @@ class TwilioCallService {
         timeout: 30 // Ring for 30 seconds before giving up
       };
       
-      // Only add record option if enabled in config (staging/dev only)
-      if (config.twilio.recordCalls) {
+      // Check patient consent before enabling recording
+      const patientService = require('./patient.service');
+      const hasConsent = await patientService.checkPatientConsent(patientId);
+      
+      // Only add record option if:
+      // 1. Enabled in config (staging/dev only)
+      // 2. Patient has consented (or org doesn't require consent)
+      if (config.twilio.recordCalls && hasConsent) {
         callOptions.record = true;
-        logger.info(`[Twilio Service] Call recording enabled for ${config.env} environment`);
+        logger.info(`[Twilio Service] Call recording enabled for ${config.env} environment (patient has consented)`);
+      } else if (config.twilio.recordCalls && !hasConsent) {
+        logger.warn(`[Twilio Service] Call recording disabled: patient ${patientId} has not consented to recording`);
+        // Don't record if patient hasn't consented
       } else {
         logger.info(`[Twilio Service] Call recording disabled for ${config.env} environment`);
       }

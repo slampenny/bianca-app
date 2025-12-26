@@ -101,6 +101,18 @@ export const patientApi = createApi({
         body: { caregiverId, patientIds },
       }),
     }),
+    verifyConsent: builder.mutation<
+      { success: boolean; message: string; alreadyConsented: boolean; patient: Patient },
+      { token: string }
+    >({
+      query: ({ token }) => ({
+        url: `/patients/consent/verify?token=${encodeURIComponent(token)}`,
+        method: "GET",
+        headers: {
+          'Accept': 'application/json',
+        },
+      }),
+    }),
   }),
 })
 
@@ -117,4 +129,5 @@ export const {
   useGetCaregiversQuery,
   useGetUnassignedPatientsQuery,
   useAssignUnassignedPatientsMutation,
+  useVerifyConsentMutation,
 } = patientApi

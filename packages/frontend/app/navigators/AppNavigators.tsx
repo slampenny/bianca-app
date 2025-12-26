@@ -1,6 +1,6 @@
 import { createStackNavigator } from "@react-navigation/stack"
 import { useEffect } from "react"
-import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, SSOAccountLinkingScreen, MFAVerificationScreen } from "app/screens"
+import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, SSOAccountLinkingScreen, MFAVerificationScreen, PatientConsentScreen } from "app/screens"
 import MainTabs from "./MainTabs"
 import { AppStackParamList, LoginStackParamList } from "./navigationTypes"
 import { translate } from "app/i18n"
@@ -41,6 +41,7 @@ export const AuthStack = () => {
       <Stack.Screen name="EmailVerified" component={EmailVerifiedScreen} />
       <Stack.Screen name="EmailVerificationRequired" component={EmailVerificationRequiredScreen} />
       <Stack.Screen name="VerifyPhone" component={VerifyPhoneScreen} />
+      <Stack.Screen name="PatientConsent" component={PatientConsentScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   )
 }
@@ -83,6 +84,7 @@ export const UnauthStack = () => {
       <LoginStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
       <LoginStack.Screen name="SSOAccountLinking" component={SSOAccountLinkingScreen} />
       <LoginStack.Screen name="MFAVerification" component={MFAVerificationScreen} />
+      <LoginStack.Screen name="PatientConsent" component={PatientConsentScreen} options={{ headerShown: false }} />
     </LoginStack.Navigator>
   )
 }

@@ -89,6 +89,7 @@ export interface Org {
   patients: string[]
   planName?: string
   nextBillingDate?: string
+  requirePatientConsent?: boolean
   callRetrySettings?: {
     retryCount: number
     retryIntervalMinutes: number

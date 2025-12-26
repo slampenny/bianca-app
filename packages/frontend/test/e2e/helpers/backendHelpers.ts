@@ -71,6 +71,7 @@ export async function getEmailFromEthereal(
     verification: string | null
     invite: string | null
     resetPassword: string | null
+    consent: string | null
   }
 }> {
   try {

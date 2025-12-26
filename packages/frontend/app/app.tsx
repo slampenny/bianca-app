@@ -32,7 +32,7 @@ import { customFontsToLoad } from "./theme"
 import { ThemeProvider } from "./theme/ThemeContext"
 import Config from "./config"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
-import { ViewStyle } from "react-native"
+import { ViewStyle, Platform, View } from "react-native"
 import useRefreshToken from "./effects/useRefreshToken"
 import { useLanguage } from "./hooks/useLanguage"
 import { AuthModalProvider } from "./contexts/AuthModalContext"
@@ -58,6 +58,12 @@ const config = {
     },
     Signup: "signup",
     ConfirmReset: "reset-password",
+    PatientConsent: {
+      path: "patient/consent/:token?",
+      parse: {
+        token: (value: string) => value || undefined,
+      },
+    },
   },
 }
 
@@ -118,26 +124,28 @@ function App(props: AppProps) {
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ErrorBoundary catchErrors={Config.catchErrors}>
-        <GestureHandlerRootView style={$container}>
-          <Provider store={store}>
-            <ThemeProvider>
-              <AuthModalProvider>
-                <PersistGate
-                  loading={null}
-                  onBeforeLift={onBeforeLiftPersistGate}
-                  persistor={persistor}
-                >
-                  <AppNavigator
-                    linking={linking}
-                    initialState={initialNavigationState}
-                    onStateChange={onNavigationStateChange}
-                  />
-                  <InnerApp />
-                </PersistGate>
-              </AuthModalProvider>
-            </ThemeProvider>
-          </Provider>
-        </GestureHandlerRootView>
+        <View style={$outerContainer}>
+          <GestureHandlerRootView style={$container}>
+            <Provider store={store}>
+              <ThemeProvider>
+                <AuthModalProvider>
+                  <PersistGate
+                    loading={null}
+                    onBeforeLift={onBeforeLiftPersistGate}
+                    persistor={persistor}
+                  >
+                    <AppNavigator
+                      linking={linking}
+                      initialState={initialNavigationState}
+                      onStateChange={onNavigationStateChange}
+                    />
+                    <InnerApp />
+                  </PersistGate>
+                </AuthModalProvider>
+              </ThemeProvider>
+            </Provider>
+          </GestureHandlerRootView>
+        </View>
       </ErrorBoundary>
     </SafeAreaProvider>
   )
@@ -145,6 +153,23 @@ function App(props: AppProps) {
 
 export default App
 
+const $outerContainer: ViewStyle = {
+  flex: 1,
+  ...(Platform.OS === 'web' && {
+    backgroundColor: '#f5f5f5',
+    minHeight: '100vh',
+  } as any),
+}
+
 const $container: ViewStyle = {
   flex: 1,
+  ...(Platform.OS === 'web' && {
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
+    marginHorizontal: 'auto',
+    backgroundColor: '#ffffff',
+    minHeight: '100vh',
+    boxShadow: '0 0 20px rgba(0, 0, 0, 0.1)',
+  } as any),
 }

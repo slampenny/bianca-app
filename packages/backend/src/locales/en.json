@@ -34,5 +34,25 @@
 		"CRITICAL": "🚨 CRITICAL EMERGENCY: %s - %s: %s",
 		"HIGH": "⚠️ HIGH PRIORITY: %s - %s: %s",
 		"MEDIUM": "📢 ALERT: %s - %s: %s"
+	},
+	"patientConsentEmail": {
+		"subject": "Bianca Wellness - Consent Required for Call Recording",
+		"title": "Consent Required for Call Recording",
+		"greeting": "Dear %s,",
+		"intro": "Your healthcare organization, %s, uses Bianca Wellness to conduct wellness check calls. In accordance with applicable laws in your jurisdiction, we need your consent before we can record these calls.",
+		"whyConsentTitle": "Why we need your consent:",
+		"whyConsent": "Some jurisdictions require consent from all parties before a call can be recorded. Your organization has enabled the \"Require Patient Consent\" setting, which means we need your explicit consent before recording any calls.",
+		"consentTitle": "What happens if you consent:",
+		"consentBenefit1": "Your wellness check calls may be recorded for quality assurance and care coordination purposes",
+		"consentBenefit2": "Recordings will be used to provide summaries and insights to your caregivers",
+		"consentBenefit3": "Recordings will be stored securely and in compliance with applicable privacy laws",
+		"noConsentTitle": "What happens if you don't consent:",
+		"noConsent1": "Calls will still be made, but they will not be recorded",
+		"noConsent2": "You may still receive wellness check calls from your organization",
+		"buttonText": "Provide Consent",
+		"expiryNote": "This consent link will expire in 30 days for security purposes.",
+		"contactInfo": "If you have any questions or concerns, please contact your organization or email us at privacy@biancawellness.com.",
+		"versionLabel": "Consent Email Version:",
+		"closing": "Best regards,\nThe Bianca Wellness Team"
 	}
 }

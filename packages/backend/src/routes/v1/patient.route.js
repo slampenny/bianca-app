@@ -76,6 +76,12 @@ router
   .route('/:patientId/caregivers')
   .get(auth('readAny:caregiver'), validate(patientValidation.getCaregivers), patientController.getCaregivers);
 
+// Consent verification route - public endpoint (no auth required)
+router
+  .route('/consent/verify')
+  .post(patientController.verifyConsent)
+  .get(patientController.verifyConsent);
+
 module.exports = router;
 
 /**

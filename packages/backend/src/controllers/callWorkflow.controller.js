@@ -8,7 +8,7 @@ const logger = require('../config/logger');
 
 /**
  * Initiate a call to a patient
- * @route POST /api/v1/calls/initiate
+ * @route POST /v1/calls/initiate
  */
 const initiateCall = catchAsync(async (req, res) => {
   const { patientId, callNotes } = req.body;
@@ -104,7 +104,7 @@ const initiateCall = catchAsync(async (req, res) => {
 
 /**
  * Get call status for a conversation
- * @route GET /api/v1/calls/:conversationId/status
+ * @route GET /v1/calls/:conversationId/status
  */
 const getCallStatus = catchAsync(async (req, res) => {
   const { conversationId } = req.params;
@@ -231,7 +231,7 @@ const getCallStatus = catchAsync(async (req, res) => {
 
 /**
  * Update call status (for webhooks)
- * @route POST /api/v1/calls/:conversationId/status
+ * @route POST /v1/calls/:conversationId/status
  */
 const updateCallStatus = catchAsync(async (req, res) => {
   const { conversationId } = req.params;
@@ -300,7 +300,7 @@ const updateCallStatus = catchAsync(async (req, res) => {
 
 /**
  * End a call
- * @route POST /api/v1/calls/:conversationId/end
+ * @route POST /v1/calls/:conversationId/end
  */
 const endCall = catchAsync(async (req, res) => {
   const { conversationId } = req.params;
@@ -462,7 +462,7 @@ const endCall = catchAsync(async (req, res) => {
 
 /**
  * Get active calls for the current agent
- * @route GET /api/v1/calls/active
+ * @route GET /v1/calls/active
  */
 const getActiveCalls = catchAsync(async (req, res) => {
   const agentId = req.caregiver.id;
@@ -497,7 +497,7 @@ const getActiveCalls = catchAsync(async (req, res) => {
 
 /**
  * Get conversation with call details
- * @route GET /api/v1/calls/:conversationId/conversation
+ * @route GET /v1/calls/:conversationId/conversation
  */
 const getConversationWithCallDetails = catchAsync(async (req, res) => {
   const { conversationId } = req.params;
@@ -536,7 +536,7 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
 /**
  * Get conversation ID from call ID or call SID
  * This is useful when a call is initiated but conversation hasn't been created yet
- * @route GET /api/v1/calls/by-call/:callIdOrSid/conversation-id
+ * @route GET /v1/calls/by-call/:callIdOrSid/conversation-id
  */
 const getConversationIdByCall = catchAsync(async (req, res) => {
   const { callIdOrSid } = req.params;

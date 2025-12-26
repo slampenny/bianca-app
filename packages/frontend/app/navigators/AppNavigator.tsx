@@ -55,9 +55,11 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   // Reset navigation when user logs out
   useEffect(() => {
     if (justLoggedOut && !hasResetNavigationOnLogout.current) {
-      // Check if we're on a route that should be accessible when logged out (web only)
-      const isUnauthRoute = typeof window !== 'undefined' && 
-        (window.location.pathname.includes('reset-password') || window.location.pathname.includes('signup'))
+          // Check if we're on a route that should be accessible when logged out (web only)
+          const isUnauthRoute = typeof window !== 'undefined' && 
+            (window.location.pathname.includes('reset-password') || 
+             window.location.pathname.includes('signup') || 
+             window.location.pathname.includes('patient/consent'))
       
       // Only reset navigation if we're NOT on an unauth route
       if (!isUnauthRoute) {
@@ -204,12 +206,12 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
           return null
         },
         getStateFromPath: (path: string, options: any) => {
-          // Allow reset-password and signup routes even when logged out
-          if (path.includes('reset-password') || path.includes('signup')) {
+          // Allow reset-password, signup, and patient consent routes even when logged out
+          if (path.includes('reset-password') || path.includes('signup') || path.includes('patient/consent')) {
             try {
               return getStateFromPathDefault(path, options)
             } catch (error) {
-              logger.warn("getStateFromPath failed for reset-password/signup:", error)
+              logger.warn("getStateFromPath failed for reset-password/signup/patient-consent:", error)
               return undefined
             }
           }

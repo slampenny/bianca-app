@@ -713,6 +713,163 @@ const forceEtherealInitialization = async () => {
   forceEthereal = false;
 };
 
+/**
+ * Send patient consent request email
+ * @param {string} to - Patient email address
+ * @param {string} patientName - Patient's name
+ * @param {string} orgName - Organization name
+ * @param {string} consentLink - Link to consent page (frontend URL with token)
+ * @param {string} [locale='en'] - Patient's preferred language
+ * @param {string} [consentEmailVersion='1.0'] - Version of consent email template
+ * @returns {Promise}
+ */
+const sendPatientConsentRequestEmail = async (to, patientName, orgName, consentLink, locale = 'en', consentEmailVersion = '1.0') => {
+  // Set locale for this email
+  const previousLocale = i18n.getLocale();
+  i18n.setLocale(locale);
+  
+  // Get localized strings
+  const subject = i18n.__ ? i18n.__('patientConsentEmail.subject') : 'Bianca Wellness - Consent Required for Call Recording';
+  
+  let greeting, intro, whyConsent, consentBenefit1, consentBenefit2, consentBenefit3, noConsent1, noConsent2;
+  let buttonText, expiryNote, contactInfo, versionLabel, closing, title, whyConsentTitle, consentTitle, noConsentTitle;
+  
+  if (i18n.__) {
+    // Get templates and replace placeholders
+    const greetingTemplate = i18n.__('patientConsentEmail.greeting');
+    greeting = greetingTemplate.replace('%s', patientName || 'Patient');
+    
+    const introTemplate = i18n.__('patientConsentEmail.intro');
+    intro = introTemplate.replace('%s', orgName);
+    
+    whyConsent = i18n.__('patientConsentEmail.whyConsent');
+    consentBenefit1 = i18n.__('patientConsentEmail.consentBenefit1');
+    consentBenefit2 = i18n.__('patientConsentEmail.consentBenefit2');
+    consentBenefit3 = i18n.__('patientConsentEmail.consentBenefit3');
+    noConsent1 = i18n.__('patientConsentEmail.noConsent1');
+    noConsent2 = i18n.__('patientConsentEmail.noConsent2');
+    buttonText = i18n.__('patientConsentEmail.buttonText');
+    expiryNote = i18n.__('patientConsentEmail.expiryNote');
+    contactInfo = i18n.__('patientConsentEmail.contactInfo');
+    versionLabel = i18n.__('patientConsentEmail.versionLabel');
+    closing = i18n.__('patientConsentEmail.closing');
+    title = i18n.__('patientConsentEmail.title');
+    whyConsentTitle = i18n.__('patientConsentEmail.whyConsentTitle');
+    consentTitle = i18n.__('patientConsentEmail.consentTitle');
+    noConsentTitle = i18n.__('patientConsentEmail.noConsentTitle');
+  } else {
+    // Fallback to English
+    greeting = `Dear ${patientName || 'Patient'},`;
+    intro = `Your healthcare organization, ${orgName}, uses Bianca Wellness to conduct wellness check calls. In accordance with applicable laws in your jurisdiction, we need your consent before we can record these calls.`;
+    whyConsent = 'Some jurisdictions require consent from all parties before a call can be recorded. Your organization has enabled the "Require Patient Consent" setting, which means we need your explicit consent before recording any calls.';
+    consentBenefit1 = 'Your wellness check calls may be recorded for quality assurance and care coordination purposes';
+    consentBenefit2 = 'Recordings will be used to provide summaries and insights to your caregivers';
+    consentBenefit3 = 'Recordings will be stored securely and in compliance with applicable privacy laws';
+    noConsent1 = 'Calls will still be made, but they will not be recorded';
+    noConsent2 = 'You may still receive wellness check calls from your organization';
+    buttonText = 'Provide Consent';
+    expiryNote = 'This consent link will expire in 30 days for security purposes.';
+    contactInfo = 'If you have any questions or concerns, please contact your organization or email us at privacy@biancawellness.com.';
+    versionLabel = 'Consent Email Version:';
+    closing = 'Best regards,\nThe Bianca Wellness Team';
+    title = 'Consent Required for Call Recording';
+    whyConsentTitle = 'Why we need your consent:';
+    consentTitle = 'What happens if you consent:';
+    noConsentTitle = 'What happens if you don\'t consent:';
+  }
+  
+  const text = `${greeting}
+
+${intro}
+
+**${whyConsentTitle}**
+${whyConsent}
+
+**${consentTitle}**
+- ${consentBenefit1}
+- ${consentBenefit2}
+- ${consentBenefit3}
+
+**${noConsentTitle}**
+- ${noConsent1}
+- ${noConsent2}
+
+**To provide your consent, please click the link below:**
+${consentLink}
+
+${expiryNote}
+
+${contactInfo}
+
+**${versionLabel}** ${consentEmailVersion}
+
+${closing}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #2c3e50; margin-top: 0;">${title}</h2>
+        <p style="color: #555; line-height: 1.6;">${greeting}</p>
+        <p style="color: #555; line-height: 1.6;">${intro}</p>
+        
+        <h3 style="color: #2c3e50; margin-top: 25px;">${whyConsentTitle}</h3>
+        <p style="color: #555; line-height: 1.6;">${whyConsent}</p>
+        
+        <h3 style="color: #2c3e50; margin-top: 25px;">${consentTitle}</h3>
+        <ul style="color: #555; line-height: 1.8;">
+          <li>${consentBenefit1}</li>
+          <li>${consentBenefit2}</li>
+          <li>${consentBenefit3}</li>
+        </ul>
+        
+        <h3 style="color: #2c3e50; margin-top: 25px;">${noConsentTitle}</h3>
+        <ul style="color: #555; line-height: 1.8;">
+          <li>${noConsent1}</li>
+          <li>${noConsent2}</li>
+        </ul>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${consentLink}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">${buttonText}</a>
+        </div>
+        
+        <p style="color: #777; font-size: 14px;">${expiryNote}</p>
+        
+        <p style="color: #555; line-height: 1.6;">${contactInfo.replace('privacy@biancawellness.com', '<a href="mailto:privacy@biancawellness.com">privacy@biancawellness.com</a>')}</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <p style="color: #777; font-size: 14px; margin: 5px 0;"><strong>${versionLabel}</strong> ${consentEmailVersion}</p>
+        </div>
+        
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">${closing.replace('\n', '<br>')}</p>
+        <hr style="border: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">Bianca Wellness - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
+      </div>
+    </div>
+  `;
+  
+  try {
+    await sendEmail(to, subject, text, html);
+    logger.info(`[Email Service] Patient consent request email successfully sent to ${to} (locale: ${locale}, version: ${consentEmailVersion})`);
+  } catch (error) {
+    logger.error(`[Email Service] Failed to send patient consent request email to ${to}`, {
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
+      stack: error.stack,
+      to,
+      patientName,
+      orgName,
+      locale,
+      consentEmailVersion,
+      consentLink,
+    });
+    throw error; // Re-throw to let caller handle
+  }
+  
+  // Restore previous locale
+  i18n.setLocale(previousLocale);
+};
+
 // Export functions
 module.exports = {
   initializeEmailTransport, // Call this at application startup
@@ -721,6 +878,7 @@ module.exports = {
   sendResetPasswordEmail,
   sendVerificationEmail,
   sendPrivacyDataEmail,
+  sendPatientConsentRequestEmail,
   getStatus,
   isReady,
   forceEtherealInitialization
