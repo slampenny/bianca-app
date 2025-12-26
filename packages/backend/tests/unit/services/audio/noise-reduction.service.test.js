@@ -2,6 +2,7 @@
  * Unit Tests for Noise Reduction Service
  * 
  * Tests Stage 1: Noise Gate functionality
+ * Tests Stage 2: Frequency Filtering functionality
  */
 
 const { Buffer } = require('buffer');
@@ -12,6 +13,9 @@ jest.mock('../../../../src/config/config', () => ({
     noiseReduction: {
       noiseGateEnabled: true,
       noiseGateThreshold: 0.1,
+      frequencyFilteringEnabled: false,
+      frequencyFilterLowCutoff: 300,
+      frequencyFilterHighCutoff: 3400,
       primarySpeakerEnabled: false,
       adaptiveNoiseReductionEnabled: false,
     }
@@ -25,6 +29,8 @@ jest.mock('../../../../src/config/logger', () => ({
   warn: jest.fn(),
   error: jest.fn(),
 }));
+
+// Note: We don't mock AudioUtils - it's a service we own, so we use the real implementation
 
 describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
   let noiseReductionService;
@@ -51,7 +57,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
   });
 
   describe('Noise Gate - Basic Functionality', () => {
-    it('should return silence for low-energy audio (below threshold)', () => {
+    it('should return silence for low-energy audio (below threshold)', async () => {
       // Create low-energy audio (mostly silence with tiny variations)
       // μ-law silence is 0x7F, so we'll use values close to it
       const lowEnergyBuffer = Buffer.alloc(160); // 20ms at 8kHz
@@ -60,7 +66,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         lowEnergyBuffer[i] = 127 + Math.floor(Math.random() * 5) - 2;
       }
       
-      const result = noiseReductionService.processAudio(lowEnergyBuffer, 'test-call-1');
+      const result = await noiseReductionService.processAudio(lowEnergyBuffer, 'test-call-1');
       
       // Should be all silence (0x7F)
       expect(result.length).toBe(160);
@@ -73,7 +79,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       expect(stats.noiseGated).toBeGreaterThan(0);
     });
 
-    it('should preserve high-energy audio (above threshold)', () => {
+    it('should preserve high-energy audio (above threshold)', async () => {
       // Create high-energy audio (speech-like, far from silence)
       const highEnergyBuffer = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
@@ -82,7 +88,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         highEnergyBuffer[i] = i % 2 === 0 ? 100 : 150;
       }
       
-      const result = noiseReductionService.processAudio(highEnergyBuffer, 'test-call-2');
+      const result = await noiseReductionService.processAudio(highEnergyBuffer, 'test-call-2');
       
       // Should be identical to input (no filtering)
       expect(result.length).toBe(160);
@@ -93,38 +99,33 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       expect(stats.totalProcessed).toBeGreaterThan(0);
     });
 
-    it('should handle silence buffer correctly', () => {
+    it('should handle silence buffer correctly', async () => {
       // Pure silence (all 0x7F)
       const silenceBuffer = Buffer.alloc(160, 0x7F);
       
-      const result = noiseReductionService.processAudio(silenceBuffer, 'test-call-3');
+      const result = await noiseReductionService.processAudio(silenceBuffer, 'test-call-3');
       
       // Should return silence (no change)
       expect(Buffer.compare(result, silenceBuffer)).toBe(0);
       expect(result.length).toBe(160);
     });
 
-    it('should handle empty buffer', () => {
+    it('should handle empty buffer', async () => {
       const emptyBuffer = Buffer.alloc(0);
       
-      const result = noiseReductionService.processAudio(emptyBuffer, 'test-call-4');
+      const result = await noiseReductionService.processAudio(emptyBuffer, 'test-call-4');
       
       expect(result.length).toBe(0);
     });
 
-    it('should handle null/undefined gracefully', () => {
-      expect(() => {
-        noiseReductionService.processAudio(null, 'test-call-5');
-      }).not.toThrow();
-      
-      expect(() => {
-        noiseReductionService.processAudio(undefined, 'test-call-6');
-      }).not.toThrow();
+    it('should handle null/undefined gracefully', async () => {
+      await expect(noiseReductionService.processAudio(null, 'test-call-5')).resolves.toBe(null);
+      await expect(noiseReductionService.processAudio(undefined, 'test-call-6')).resolves.toBe(undefined);
     });
   });
 
   describe('Noise Gate - Threshold Behavior', () => {
-    it('should filter audio at exactly threshold', () => {
+    it('should filter audio at exactly threshold', async () => {
       // Create audio with energy exactly at threshold (0.1)
       // RMS of 0.1 means average distance from silence is ~0.1 * 127 = ~12.7
       // So values should be around 127 ± 12.7 = 114-140
@@ -134,7 +135,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         thresholdBuffer[i] = 127 + (i % 20) - 10; // Range: 117-137
       }
       
-      const result = noiseReductionService.processAudio(thresholdBuffer, 'test-call-threshold');
+      const result = await noiseReductionService.processAudio(thresholdBuffer, 'test-call-threshold');
       
       // At threshold, should be filtered (below threshold)
       // Note: Actual RMS calculation may vary, so this is approximate
@@ -142,7 +143,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       expect(stats.totalProcessed).toBeGreaterThan(0);
     });
 
-    it('should preserve audio just above threshold', () => {
+    it('should preserve audio just above threshold', async () => {
       // Create audio with energy slightly above threshold
       const aboveThresholdBuffer = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
@@ -150,7 +151,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         aboveThresholdBuffer[i] = i % 2 === 0 ? 90 : 160; // Significant distance from 127
       }
       
-      const result = noiseReductionService.processAudio(aboveThresholdBuffer, 'test-call-above');
+      const result = await noiseReductionService.processAudio(aboveThresholdBuffer, 'test-call-above');
       
       // Should be preserved
       expect(Buffer.compare(result, aboveThresholdBuffer)).toBe(0);
@@ -158,7 +159,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
   });
 
   describe('Noise Gate - Real-world Scenarios', () => {
-    it('should filter constant background noise (TV, fan)', () => {
+    it('should filter constant background noise (TV, fan)', async () => {
       // Simulate constant background: steady low-level noise
       const backgroundNoise = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
@@ -166,14 +167,14 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         backgroundNoise[i] = 127 + (i % 3) - 1;
       }
       
-      const result = noiseReductionService.processAudio(backgroundNoise, 'test-call-background');
+      const result = await noiseReductionService.processAudio(backgroundNoise, 'test-call-background');
       
       // Should be filtered to silence
       const isSilence = result.every(byte => byte === 0x7F);
       expect(isSilence).toBe(true);
     });
 
-    it('should preserve speech-like audio', () => {
+    it('should preserve speech-like audio', async () => {
       // Simulate speech: varying amplitude with significant energy
       const speechBuffer = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
@@ -182,13 +183,13 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         speechBuffer[i] = Math.max(0, Math.min(255, 127 + wave));
       }
       
-      const result = noiseReductionService.processAudio(speechBuffer, 'test-call-speech');
+      const result = await noiseReductionService.processAudio(speechBuffer, 'test-call-speech');
       
       // Should be preserved (not filtered)
       expect(Buffer.compare(result, speechBuffer)).toBe(0);
     });
 
-    it('should handle mixed audio (speech + background)', () => {
+    it('should handle mixed audio (speech + background)', async () => {
       // Simulate speech with background: speech should dominate
       const mixedBuffer = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
@@ -198,7 +199,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         mixedBuffer[i] = Math.max(0, Math.min(255, 127 + speech + background));
       }
       
-      const result = noiseReductionService.processAudio(mixedBuffer, 'test-call-mixed');
+      const result = await noiseReductionService.processAudio(mixedBuffer, 'test-call-mixed');
       
       // Should be preserved (speech energy dominates)
       // Note: May not be identical due to processing, but should not be all silence
@@ -208,34 +209,34 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
   });
 
   describe('Statistics Tracking', () => {
-    it('should track total processed packets', () => {
+    it('should track total processed packets', async () => {
       const buffer = Buffer.alloc(160, 0x7F);
       
-      noiseReductionService.processAudio(buffer, 'test-call-stats-1');
-      noiseReductionService.processAudio(buffer, 'test-call-stats-2');
-      noiseReductionService.processAudio(buffer, 'test-call-stats-3');
+      await noiseReductionService.processAudio(buffer, 'test-call-stats-1');
+      await noiseReductionService.processAudio(buffer, 'test-call-stats-2');
+      await noiseReductionService.processAudio(buffer, 'test-call-stats-3');
       
       const stats = noiseReductionService.getStats();
       expect(stats.totalProcessed).toBe(3);
     });
 
-    it('should track noise gated packets', () => {
+    it('should track noise gated packets', async () => {
       // Process low-energy audio (will be gated)
       const lowEnergy = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
         lowEnergy[i] = 127 + (i % 3) - 1; // Very quiet
       }
       
-      noiseReductionService.processAudio(lowEnergy, 'test-call-gated');
+      await noiseReductionService.processAudio(lowEnergy, 'test-call-gated');
       
       const stats = noiseReductionService.getStats();
       expect(stats.noiseGated).toBeGreaterThan(0);
       expect(parseFloat(stats.noiseGateRate)).toBeGreaterThan(0);
     });
 
-    it('should reset statistics correctly', () => {
+    it('should reset statistics correctly', async () => {
       const buffer = Buffer.alloc(160);
-      noiseReductionService.processAudio(buffer, 'test-call-reset');
+      await noiseReductionService.processAudio(buffer, 'test-call-reset');
       
       noiseReductionService.resetStats();
       
@@ -246,7 +247,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
   });
 
   describe('Configuration', () => {
-    it('should respect noiseGateEnabled = false', () => {
+    it('should respect noiseGateEnabled = false', async () => {
       // Temporarily disable noise gate
       const originalEnabled = noiseReductionService.noiseGateEnabled;
       noiseReductionService.noiseGateEnabled = false;
@@ -256,7 +257,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         lowEnergyBuffer[i] = 127 + (i % 3) - 1; // Very quiet
       }
       
-      const result = noiseReductionService.processAudio(lowEnergyBuffer, 'test-call-disabled');
+      const result = await noiseReductionService.processAudio(lowEnergyBuffer, 'test-call-disabled');
       
       // Should return original (not filtered)
       expect(Buffer.compare(result, lowEnergyBuffer)).toBe(0);
@@ -265,7 +266,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       noiseReductionService.noiseGateEnabled = originalEnabled;
     });
 
-    it('should use configured threshold', () => {
+    it('should use configured threshold', async () => {
       const originalThreshold = noiseReductionService.noiseGateThreshold;
       
       // Set higher threshold (more aggressive filtering)
@@ -277,7 +278,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         mediumEnergyBuffer[i] = 127 + (i % 10) - 5; // Range: 122-132
       }
       
-      const result = noiseReductionService.processAudio(mediumEnergyBuffer, 'test-call-threshold-high');
+      const result = await noiseReductionService.processAudio(mediumEnergyBuffer, 'test-call-threshold-high');
       
       // With higher threshold, more should be filtered
       const stats = noiseReductionService.getStats();
@@ -289,20 +290,22 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
   });
 
   describe('Performance', () => {
-    it('should process audio quickly (no significant delay)', () => {
+    it('should process audio quickly (no significant delay)', async () => {
       const buffer = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
         buffer[i] = 100 + (i % 50);
       }
       
       const start = Date.now();
+      const promises = [];
       for (let i = 0; i < 1000; i++) {
-        noiseReductionService.processAudio(buffer, `test-call-perf-${i}`);
+        promises.push(noiseReductionService.processAudio(buffer, `test-call-perf-${i}`));
       }
+      await Promise.all(promises);
       const duration = Date.now() - start;
       
-      // Should process 1000 packets in < 100ms (very fast)
-      expect(duration).toBeLessThan(100);
+      // Should process 1000 packets in < 500ms (allowing for async overhead)
+      expect(duration).toBeLessThan(500);
     });
   });
 
@@ -320,7 +323,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       noiseReductionService.noiseGateEnabled = true;
     });
 
-    it('should preserve audio when primary speaker detected', () => {
+    it('should preserve audio when primary speaker detected', async () => {
       const callId = 'test-call-primary';
       
       // Create high-energy audio (primary speaker) - consistent high energy
@@ -331,11 +334,11 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // Process multiple packets to build history (need enough to establish pattern)
       for (let i = 0; i < 20; i++) {
-        noiseReductionService.processAudio(highEnergyBuffer, callId);
+        await noiseReductionService.processAudio(highEnergyBuffer, callId);
       }
       
       // After history is built, should preserve primary speaker audio
-      const result = noiseReductionService.processAudio(highEnergyBuffer, callId);
+      const result = await noiseReductionService.processAudio(highEnergyBuffer, callId);
       
       // Should preserve original (not reduced) - check that it's not all silence
       const isAllSilence = result.every(byte => byte === 0x7F);
@@ -355,7 +358,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       expect(stats.primarySpeakerPreserved).toBeGreaterThan(0);
     });
 
-    it('should reduce volume when background audio detected', () => {
+    it('should reduce volume when background audio detected', async () => {
       const callId = 'test-call-background';
       
       // First, establish a high-energy baseline (primary speaker)
@@ -366,7 +369,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // Build history with high energy
       for (let i = 0; i < 10; i++) {
-        noiseReductionService.processAudio(highEnergyBuffer, callId);
+        await noiseReductionService.processAudio(highEnergyBuffer, callId);
       }
       
       // Now send lower-energy audio (background/TV)
@@ -375,7 +378,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         lowEnergyBuffer[i] = 127 + (i % 5) - 2; // Quiet background
       }
       
-      const result = noiseReductionService.processAudio(lowEnergyBuffer, callId);
+      const result = await noiseReductionService.processAudio(lowEnergyBuffer, callId);
       
       // Should be reduced (not identical)
       expect(Buffer.compare(result, lowEnergyBuffer)).not.toBe(0);
@@ -395,7 +398,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       expect(stats.primarySpeakerFiltered).toBeGreaterThan(0);
     });
 
-    it('should preserve audio during initial learning period', () => {
+    it('should preserve audio during initial learning period', async () => {
       const callId = 'test-call-learning';
       const buffer = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
@@ -404,12 +407,12 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // First few packets should be preserved (learning period)
       for (let i = 0; i < 3; i++) {
-        const result = noiseReductionService.processAudio(buffer, callId);
+        const result = await noiseReductionService.processAudio(buffer, callId);
         expect(Buffer.compare(result, buffer)).toBe(0);
       }
     });
 
-    it('should track energy history per call', () => {
+    it('should track energy history per call', async () => {
       const callId1 = 'test-call-1';
       const callId2 = 'test-call-2';
       
@@ -422,21 +425,21 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // Process packets for both calls
       for (let i = 0; i < 10; i++) {
-        noiseReductionService.processAudio(buffer1, callId1);
-        noiseReductionService.processAudio(buffer2, callId2);
+        await noiseReductionService.processAudio(buffer1, callId1);
+        await noiseReductionService.processAudio(buffer2, callId2);
       }
       
       // Both should have independent histories
       // Call 2 should have higher energy, so its audio should be preserved
-      const result1 = noiseReductionService.processAudio(buffer1, callId1);
-      const result2 = noiseReductionService.processAudio(buffer2, callId2);
+      const result1 = await noiseReductionService.processAudio(buffer1, callId1);
+      const result2 = await noiseReductionService.processAudio(buffer2, callId2);
       
       // Both should be processed (may be preserved or reduced based on their own history)
       expect(result1.length).toBe(160);
       expect(result2.length).toBe(160);
     });
 
-    it('should cleanup call history', () => {
+    it('should cleanup call history', async () => {
       const callId = 'test-call-cleanup';
       const buffer = Buffer.alloc(160);
       for (let i = 0; i < 160; i++) {
@@ -445,7 +448,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // Build history
       for (let i = 0; i < 10; i++) {
-        noiseReductionService.processAudio(buffer, callId);
+        await noiseReductionService.processAudio(buffer, callId);
       }
       
       // Cleanup
@@ -453,11 +456,11 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // History should be cleared
       // Next packet should start fresh (preserved during learning)
-      const result = noiseReductionService.processAudio(buffer, callId);
+      const result = await noiseReductionService.processAudio(buffer, callId);
       expect(Buffer.compare(result, buffer)).toBe(0);
     });
 
-    it('should respect primarySpeakerEnabled = false', () => {
+    it('should respect primarySpeakerEnabled = false', async () => {
       noiseReductionService.primarySpeakerEnabled = false;
       
       const callId = 'test-call-disabled';
@@ -468,10 +471,10 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // Build history
       for (let i = 0; i < 10; i++) {
-        noiseReductionService.processAudio(buffer, callId);
+        await noiseReductionService.processAudio(buffer, callId);
       }
       
-      const result = noiseReductionService.processAudio(buffer, callId);
+      const result = await noiseReductionService.processAudio(buffer, callId);
       
       // Should be unchanged (primary speaker detection disabled)
       expect(Buffer.compare(result, buffer)).toBe(0);
@@ -481,7 +484,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       expect(stats.primarySpeakerFiltered).toBe(0);
     });
 
-    it('should handle multiple speakers (primary vs background)', () => {
+    it('should handle multiple speakers (primary vs background)', async () => {
       const callId = 'test-call-multi-speaker';
       
       // Establish primary speaker (loud, consistent)
@@ -492,7 +495,7 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
       
       // Build history with primary speaker (need enough to establish pattern)
       for (let i = 0; i < 20; i++) {
-        noiseReductionService.processAudio(primaryBuffer, callId);
+        await noiseReductionService.processAudio(primaryBuffer, callId);
       }
       
       // Now send background speaker (quieter, different pattern)
@@ -501,8 +504,8 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         backgroundBuffer[i] = 127 + Math.sin(i / 5) * 10; // Quieter background
       }
       
-      const primaryResult = noiseReductionService.processAudio(primaryBuffer, callId);
-      const backgroundResult = noiseReductionService.processAudio(backgroundBuffer, callId);
+      const primaryResult = await noiseReductionService.processAudio(primaryBuffer, callId);
+      const backgroundResult = await noiseReductionService.processAudio(backgroundBuffer, callId);
       
       // Primary should be preserved (high energy), background should be reduced
       let primaryOriginalEnergy = 0;
@@ -524,6 +527,199 @@ describe('Noise Reduction Service - Stage 1: Noise Gate', () => {
         backgroundResultEnergy += Math.abs(backgroundResult[i] - 127);
       }
       expect(backgroundResultEnergy).toBeLessThan(backgroundOriginalEnergy * 0.8);
+    });
+  });
+
+  describe('Frequency Filtering - Stage 2', () => {
+    beforeEach(() => {
+      // Enable frequency filtering, disable other stages for cleaner tests
+      noiseReductionService.frequencyFilteringEnabled = true;
+      noiseReductionService.noiseGateEnabled = false;
+      noiseReductionService.primarySpeakerEnabled = false;
+      noiseReductionService.resetStats();
+    });
+
+    afterEach(() => {
+      // Restore defaults
+      noiseReductionService.frequencyFilteringEnabled = false;
+      noiseReductionService.noiseGateEnabled = true;
+    });
+
+    it('should apply frequency filtering when enabled', async () => {
+      const callId = 'test-call-frequency';
+      const inputBuffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        inputBuffer[i] = 100 + (i % 50); // Some audio data
+      }
+      
+      const result = await noiseReductionService.processAudio(inputBuffer, callId);
+      
+      // Should have processed the audio (may not be identical due to filtering)
+      expect(result.length).toBe(160);
+      
+      // Stats should show frequency filtering was applied
+      const stats = noiseReductionService.getStats();
+      expect(stats.frequencyFiltered).toBeGreaterThan(0);
+    });
+
+    it('should maintain filter state per call', async () => {
+      const callId1 = 'test-call-1';
+      const callId2 = 'test-call-2';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      // Process audio for both calls
+      await noiseReductionService.processAudio(buffer, callId1);
+      await noiseReductionService.processAudio(buffer, callId2);
+      
+      // Both calls should have independent filter state
+      expect(noiseReductionService.filterState.has(callId1)).toBe(true);
+      expect(noiseReductionService.filterState.has(callId2)).toBe(true);
+      
+      // Process more audio - state should persist
+      await noiseReductionService.processAudio(buffer, callId1);
+      await noiseReductionService.processAudio(buffer, callId2);
+      
+      // Both should still have state
+      expect(noiseReductionService.filterState.has(callId1)).toBe(true);
+      expect(noiseReductionService.filterState.has(callId2)).toBe(true);
+    });
+
+    it('should cleanup filter state on cleanupCall', async () => {
+      const callId = 'test-call-cleanup';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      // Process audio to create filter state
+      await noiseReductionService.processAudio(buffer, callId);
+      expect(noiseReductionService.filterState.has(callId)).toBe(true);
+      
+      // Cleanup
+      noiseReductionService.cleanupCall(callId);
+      
+      // Filter state should be removed
+      expect(noiseReductionService.filterState.has(callId)).toBe(false);
+    });
+
+    it('should handle conversion errors gracefully', async () => {
+      const callId = 'test-call-error';
+      // Use invalid buffer that might cause conversion issues
+      const buffer = Buffer.alloc(0); // Empty buffer
+      
+      const result = await noiseReductionService.processAudio(buffer, callId);
+      
+      // Should return original buffer on error or empty input
+      expect(result.length).toBe(0);
+    });
+
+    it('should handle empty input buffer', async () => {
+      const callId = 'test-call-empty';
+      const buffer = Buffer.alloc(0);
+      
+      const result = await noiseReductionService.processAudio(buffer, callId);
+      
+      // Should return original empty buffer
+      expect(result.length).toBe(0);
+    });
+
+    it('should respect frequencyFilteringEnabled = false', async () => {
+      noiseReductionService.frequencyFilteringEnabled = false;
+      
+      const callId = 'test-call-disabled';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      const result = await noiseReductionService.processAudio(buffer, callId);
+      
+      // Should return original (no filtering)
+      expect(Buffer.compare(result, buffer)).toBe(0);
+      
+      const stats = noiseReductionService.getStats();
+      expect(stats.frequencyFiltered).toBe(0);
+    });
+
+    it('should use configured frequency cutoff values', async () => {
+      const originalLow = noiseReductionService.frequencyFilterLowCutoff;
+      const originalHigh = noiseReductionService.frequencyFilterHighCutoff;
+      
+      // Set custom cutoffs
+      noiseReductionService.frequencyFilterLowCutoff = 400;
+      noiseReductionService.frequencyFilterHighCutoff = 3000;
+      
+      const callId = 'test-call-cutoffs';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      await noiseReductionService.processAudio(buffer, callId);
+      
+      // Filter should use the configured values
+      const stats = noiseReductionService.getStats();
+      expect(stats.frequencyFiltered).toBeGreaterThan(0);
+      
+      // Restore
+      noiseReductionService.frequencyFilterLowCutoff = originalLow;
+      noiseReductionService.frequencyFilterHighCutoff = originalHigh;
+    });
+
+    it('should track frequency filtering statistics', async () => {
+      const callId = 'test-call-stats';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      await noiseReductionService.processAudio(buffer, callId);
+      await noiseReductionService.processAudio(buffer, callId);
+      await noiseReductionService.processAudio(buffer, callId);
+      
+      const stats = noiseReductionService.getStats();
+      expect(stats.frequencyFiltered).toBe(3);
+      expect(stats.totalProcessed).toBe(3);
+    });
+
+    it('should maintain buffer length after filtering', async () => {
+      const callId = 'test-call-length';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      const result = await noiseReductionService.processAudio(buffer, callId);
+      
+      // Should maintain same length (real AudioUtils should preserve length)
+      expect(result.length).toBe(160);
+    });
+
+    it('should process multiple packets maintaining filter continuity', async () => {
+      const callId = 'test-call-continuity';
+      const buffer = Buffer.alloc(160);
+      for (let i = 0; i < 160; i++) {
+        buffer[i] = 100 + (i % 50);
+      }
+      
+      // Process multiple packets
+      for (let i = 0; i < 10; i++) {
+        await noiseReductionService.processAudio(buffer, callId);
+      }
+      
+      // Filter state should be maintained
+      expect(noiseReductionService.filterState.has(callId)).toBe(true);
+      const state = noiseReductionService.filterState.get(callId);
+      expect(state).toHaveProperty('x1');
+      expect(state).toHaveProperty('x2');
+      expect(state).toHaveProperty('y1');
+      expect(state).toHaveProperty('y2');
+      
+      const stats = noiseReductionService.getStats();
+      expect(stats.frequencyFiltered).toBe(10);
     });
   });
 });

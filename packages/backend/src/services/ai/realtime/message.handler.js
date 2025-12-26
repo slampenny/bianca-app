@@ -56,6 +56,11 @@ class MessageHandler {
       // Get OpenAI noise reduction setting (near_field for phone calls, far_field for speakerphone, null to disable)
       const openaiNoiseReduction = config.audio?.openaiNoiseReduction || 'near_field';
       
+      // Get turn detection settings from config (with defaults)
+      const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
+      const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
+      const turnDetectionSilenceDuration = config.audio?.turnDetection?.silenceDurationMs ?? 1000;
+      
       baseConfig.session.audio = {
         input: {
           format: {
@@ -69,9 +74,9 @@ class MessageHandler {
           // Turn detection is nested under audio.input for GA
           turn_detection: {
             type: 'server_vad',
-            threshold: 0.6,
-            prefix_padding_ms: 200,
-            silence_duration_ms: 500
+            threshold: turnDetectionThreshold,
+            prefix_padding_ms: turnDetectionPrefixPadding,
+            silence_duration_ms: turnDetectionSilenceDuration
           }
         },
         output: {
@@ -90,12 +95,16 @@ class MessageHandler {
       baseConfig.session.input_audio_transcription = {
         model: transcriptionModel,
       };
+      // Get turn detection settings from config (with defaults)
+      const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
+      const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
+      const turnDetectionSilenceDuration = config.audio?.turnDetection?.silenceDurationMs ?? 1000;
       // Turn detection is at session level for Beta
       baseConfig.session.turn_detection = {
         type: 'server_vad',
-        threshold: 0.6,
-        prefix_padding_ms: 200,
-        silence_duration_ms: 500
+        threshold: turnDetectionThreshold,
+        prefix_padding_ms: turnDetectionPrefixPadding,
+        silence_duration_ms: turnDetectionSilenceDuration
       };
     }
 

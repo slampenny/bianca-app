@@ -180,6 +180,8 @@ const baselineConfig = {
       noiseGateEnabled: process.env.AUDIO_NOISE_GATE_ENABLED !== 'false', // Default: true
       noiseGateThreshold: parseFloat(process.env.AUDIO_NOISE_GATE_THRESHOLD) || 0.1, // Default: 0.1 (10% energy)
       frequencyFilteringEnabled: process.env.AUDIO_FREQUENCY_FILTERING_ENABLED === 'true', // Default: false (Stage 2: band-pass filter 300-3400Hz)
+      frequencyFilterLowCutoff: parseInt(process.env.AUDIO_FREQUENCY_FILTER_LOW_CUTOFF) || 300, // Default: 300Hz
+      frequencyFilterHighCutoff: parseInt(process.env.AUDIO_FREQUENCY_FILTER_HIGH_CUTOFF) || 3400, // Default: 3400Hz
       primarySpeakerEnabled: process.env.AUDIO_PRIMARY_SPEAKER_ENABLED === 'true', // Default: false
       primarySpeakerHistorySize: parseInt(process.env.AUDIO_PRIMARY_SPEAKER_HISTORY_SIZE) || 50, // Default: 50 packets (~1 second)
       primarySpeakerFocusThreshold: parseFloat(process.env.AUDIO_PRIMARY_SPEAKER_FOCUS_THRESHOLD) || 0.7, // Default: 0.7 (70% of max)
@@ -189,6 +191,12 @@ const baselineConfig = {
     },
     // OpenAI built-in noise reduction (for gpt-realtime GA model)
     openaiNoiseReduction: process.env.AUDIO_OPENAI_NOISE_REDUCTION || 'near_field', // 'near_field' (phone calls), 'far_field' (speakerphone), or null to disable
+    // Turn detection settings (controls when Bianca responds after user stops speaking)
+    turnDetection: {
+      threshold: parseFloat(process.env.AUDIO_TURN_DETECTION_THRESHOLD) || 0.6, // Default: 0.6 (higher = more selective, ignores quiet background)
+      prefixPaddingMs: parseInt(process.env.AUDIO_TURN_DETECTION_PREFIX_PADDING_MS) || 200, // Default: 200ms (captures speech start)
+      silenceDurationMs: parseInt(process.env.AUDIO_TURN_DETECTION_SILENCE_DURATION_MS) || 1000, // Default: 1000ms (delay before Bianca answers, increased from 500ms)
+    },
   },
   google: {
     language: 'en-US',

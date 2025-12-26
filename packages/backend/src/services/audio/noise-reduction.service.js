@@ -6,7 +6,7 @@
  * 
  * Current Stages:
  * - Stage 1: Noise Gate (filters low-energy audio)
- * - Stage 2: Frequency Filtering (band-pass filter 300-3400Hz) - NOT YET IMPLEMENTED
+ * - Stage 2: Frequency Filtering (band-pass filter 300-3400Hz) - IMPLEMENTED
  * - Stage 3: Primary Speaker Detection (focuses on loudest/most consistent speaker)
  * - Stage 4: Adaptive Noise Reduction - NOT YET IMPLEMENTED
  * 
@@ -20,6 +20,7 @@
 
 const logger = require('../../config/logger');
 const config = require('../../config/config');
+const AudioUtils = require('../../api/audio.utils');
 
 class NoiseReductionService {
     constructor() {
@@ -29,6 +30,12 @@ class NoiseReductionService {
         
         // Stage 2: Frequency Filtering Configuration (band-pass filter 300-3400Hz)
         this.frequencyFilteringEnabled = config.audio?.noiseReduction?.frequencyFilteringEnabled ?? false;
+        this.frequencyFilterLowCutoff = config.audio?.noiseReduction?.frequencyFilterLowCutoff ?? 300; // Hz
+        this.frequencyFilterHighCutoff = config.audio?.noiseReduction?.frequencyFilterHighCutoff ?? 3400; // Hz
+        this.sampleRate = 8000; // 8kHz for μ-law audio
+        
+        // Initialize band-pass filter state (per-call to maintain filter continuity)
+        this.filterState = new Map(); // callId -> { x1, x2, y1, y2 } (biquad filter state)
         
         // Stage 3: Primary Speaker Detection Configuration
         this.primarySpeakerEnabled = config.audio?.noiseReduction?.primarySpeakerEnabled ?? false;
@@ -47,6 +54,7 @@ class NoiseReductionService {
         this.stats = {
             totalProcessed: 0,
             noiseGated: 0,
+            frequencyFiltered: 0,
             primarySpeakerFiltered: 0,
             primarySpeakerPreserved: 0,
             adaptiveReduced: 0
@@ -59,7 +67,9 @@ class NoiseReductionService {
             primarySpeakerEnabled: this.primarySpeakerEnabled,
             primarySpeakerHistorySize: this.primarySpeakerHistorySize,
             primarySpeakerFocusThreshold: this.primarySpeakerFocusThreshold,
-            adaptiveNoiseReductionEnabled: this.adaptiveNoiseReductionEnabled
+            adaptiveNoiseReductionEnabled: this.adaptiveNoiseReductionEnabled,
+            frequencyFilterLowCutoff: this.frequencyFilterLowCutoff,
+            frequencyFilterHighCutoff: this.frequencyFilterHighCutoff
         });
     }
     
@@ -67,9 +77,9 @@ class NoiseReductionService {
      * Main processing function - applies all enabled stages
      * @param {Buffer} audioBuffer - Raw μ-law audio buffer
      * @param {string} callId - Call identifier for logging
-     * @returns {Buffer} - Processed audio buffer
+     * @returns {Promise<Buffer>} - Processed audio buffer
      */
-    processAudio(audioBuffer, callId) {
+    async processAudio(audioBuffer, callId) {
         if (!audioBuffer || audioBuffer.length === 0) {
             return audioBuffer;
         }
@@ -84,8 +94,7 @@ class NoiseReductionService {
         
         // Stage 2: Frequency Filtering (band-pass filter 300-3400Hz)
         if (this.frequencyFilteringEnabled) {
-            // TODO: Implement frequency filtering
-            // processed = this.applyFrequencyFiltering(processed, callId);
+            processed = await this.applyFrequencyFiltering(processed, callId);
         }
         
         // Stage 3: Primary Speaker Detection
@@ -96,7 +105,7 @@ class NoiseReductionService {
         // Stage 4: Adaptive Noise Reduction (not yet implemented)
         if (this.adaptiveNoiseReductionEnabled) {
             // TODO: Implement adaptive noise reduction
-            // processed = this.applyAdaptiveNoiseReduction(processed, callId);
+            // processed = await this.applyAdaptiveNoiseReduction(processed, callId);
         }
         
         return processed;
@@ -142,6 +151,162 @@ class NoiseReductionService {
         
         // Energy is above threshold, keep original audio
         return audioBuffer;
+    }
+    
+    /**
+     * Stage 2: Frequency Filtering
+     * Applies a band-pass filter (300-3400Hz) to remove frequencies outside human speech range.
+     * This helps filter out TV/music background noise while preserving speech.
+     * 
+     * @param {Buffer} audioBuffer - μ-law audio buffer
+     * @param {string} callId - Call identifier for maintaining filter state
+     * @returns {Promise<Buffer>} - Filtered audio buffer (μ-law)
+     */
+    async applyFrequencyFiltering(audioBuffer, callId) {
+        try {
+            // Convert μ-law to PCM for filtering
+            const pcmBuffer = await AudioUtils.convertUlawToPcm(audioBuffer);
+            
+            if (!pcmBuffer || pcmBuffer.length === 0) {
+                return audioBuffer; // Return original if conversion fails
+            }
+            
+            // Extract PCM samples (16-bit signed integers)
+            const samples = [];
+            for (let i = 0; i < pcmBuffer.length - 1; i += 2) {
+                samples.push(pcmBuffer.readInt16LE(i));
+            }
+            
+            if (samples.length === 0) {
+                return audioBuffer;
+            }
+            
+            // Apply band-pass filter
+            const filteredSamples = this.applyBandPassFilter(samples, callId);
+            
+            // Convert filtered PCM back to μ-law
+            const filteredPcmBuffer = Buffer.alloc(filteredSamples.length * 2);
+            for (let i = 0; i < filteredSamples.length; i++) {
+                const sample = Math.max(-32768, Math.min(32767, Math.round(filteredSamples[i])));
+                filteredPcmBuffer.writeInt16LE(sample, i * 2);
+            }
+            
+            const filteredUlawBase64 = await AudioUtils.convertPcmToUlaw(filteredPcmBuffer);
+            const filteredUlawBuffer = Buffer.from(filteredUlawBase64, 'base64');
+            
+            this.stats.frequencyFiltered++;
+            
+            // Log periodically
+            if (this.stats.frequencyFiltered % 100 === 0) {
+                logger.debug(`[Noise Reduction] Frequency filtering applied for ${callId} (${samples.length} samples)`);
+            }
+            
+            // Return filtered audio (same length as input)
+            return filteredUlawBuffer.length === audioBuffer.length 
+                ? filteredUlawBuffer 
+                : audioBuffer; // Fallback to original if length mismatch
+                
+        } catch (err) {
+            logger.error(`[Noise Reduction] Error in frequency filtering for ${callId}: ${err.message}`);
+            // Return original audio on error
+            return audioBuffer;
+        }
+    }
+    
+    /**
+     * Apply band-pass filter to PCM samples using a biquad IIR filter
+     * Filters frequencies outside the 300-3400Hz range (human speech range)
+     * 
+     * @param {number[]} samples - PCM samples (16-bit signed integers)
+     * @param {string} callId - Call identifier for maintaining filter state
+     * @returns {number[]} - Filtered samples
+     */
+    applyBandPassFilter(samples, callId) {
+        // Initialize or get filter state for this call
+        if (!this.filterState.has(callId)) {
+            this.filterState.set(callId, {
+                x1: 0, x2: 0, // Input history
+                y1: 0, y2: 0  // Output history
+            });
+        }
+        
+        const state = this.filterState.get(callId);
+        const filtered = new Array(samples.length);
+        
+        // Calculate filter coefficients for band-pass filter
+        // Using a second-order biquad band-pass filter
+        const { a1, a2, b0, b1, b2 } = this.calculateBandPassCoefficients(
+            this.frequencyFilterLowCutoff,
+            this.frequencyFilterHighCutoff,
+            this.sampleRate
+        );
+        
+        // Apply filter to each sample
+        // Biquad filter equation: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
+        for (let i = 0; i < samples.length; i++) {
+            const x = samples[i];
+            
+            const y = b0 * x + b1 * state.x1 + b2 * state.x2 - a1 * state.y1 - a2 * state.y2;
+            
+            // Clamp output to prevent overflow
+            filtered[i] = Math.max(-32768, Math.min(32767, Math.round(y)));
+            
+            // Update state for next iteration
+            state.x2 = state.x1;
+            state.x1 = x;
+            state.y2 = state.y1;
+            state.y1 = filtered[i];
+        }
+        
+        return filtered;
+    }
+    
+    /**
+     * Calculate biquad filter coefficients for a band-pass filter
+     * Uses standard biquad band-pass filter design
+     * 
+     * @param {number} lowFreq - Low cutoff frequency (Hz)
+     * @param {number} highFreq - High cutoff frequency (Hz)
+     * @param {number} sampleRate - Sample rate (Hz)
+     * @returns {Object} - Filter coefficients { a0, a1, a2, b1, b2 }
+     */
+    calculateBandPassCoefficients(lowFreq, highFreq, sampleRate) {
+        // Normalize frequencies to 0-1 range (Nyquist = 0.5)
+        const nyquist = sampleRate / 2;
+        const lowNorm = Math.min(lowFreq / nyquist, 0.45);
+        const highNorm = Math.min(highFreq / nyquist, 0.45);
+        
+        // Center frequency and bandwidth
+        const centerFreq = Math.sqrt(lowNorm * highNorm); // Geometric mean for center
+        const bandwidth = highNorm - lowNorm;
+        
+        // Convert to angular frequency
+        const w0 = 2 * Math.PI * centerFreq;
+        const cosW0 = Math.cos(w0);
+        const sinW0 = Math.sin(w0);
+        
+        // Q factor (quality factor) - controls bandwidth sharpness
+        const Q = centerFreq / bandwidth;
+        const alpha = sinW0 / (2 * Q);
+        
+        // Band-pass filter coefficients (standard biquad form)
+        // y[n] = (b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]) / a0
+        const a0 = 1 + alpha;
+        const a1 = -2 * cosW0;
+        const a2 = 1 - alpha;
+        const b0 = alpha;
+        const b1 = 0;
+        const b2 = -alpha;
+        
+        // Return normalized coefficients (divide by a0)
+        return {
+            a0: 1, // Normalized
+            a1: a1 / a0,
+            a2: a2 / a0,
+            b1: b1 / a0,
+            b2: b2 / a0,
+            b0: b0 / a0 // Also need b0 for proper filter
+        };
     }
     
     /**
@@ -254,11 +419,12 @@ class NoiseReductionService {
     }
     
     /**
-     * Clean up energy history for a call (call when call ends)
+     * Clean up energy history and filter state for a call (call when call ends)
      * @param {string} callId - Call identifier
      */
     cleanupCall(callId) {
         this.energyHistory.delete(callId);
+        this.filterState.delete(callId);
     }
     
     /**
@@ -287,15 +453,16 @@ class NoiseReductionService {
         this.stats = {
             totalProcessed: 0,
             noiseGated: 0,
+            frequencyFiltered: 0,
             primarySpeakerFiltered: 0,
             primarySpeakerPreserved: 0,
             adaptiveReduced: 0
         };
-        // Optionally clear energy history too
+        // Optionally clear energy history and filter state too
         // this.energyHistory.clear();
+        // this.filterState.clear();
     }
 }
 
 // Export singleton instance
 module.exports = new NoiseReductionService();
-
