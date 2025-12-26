@@ -286,8 +286,14 @@ phases:
         # Set headless mode
         export PLAYWRIGHT_HEADLESS=1
         
+        # Set frontend URL/port to match Docker container (port 8081, not default 8082)
+        export FRONTEND_URL="http://localhost:8081"
+        export FRONTEND_PORT="8081"
+        
         # Run Playwright tests
         echo "Running Playwright tests against containers..."
+        echo "Frontend URL: $FRONTEND_URL"
+        echo "Frontend Port: $FRONTEND_PORT"
         set +e  # Don't exit on error, we'll handle it
         NODE_ENV=test npx playwright test --project=chromium --reporter=list > /tmp/playwright-output.log 2>&1
         TEST_EXIT_CODE=$?
