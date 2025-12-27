@@ -5,6 +5,7 @@ import baseQueryWithReauth from "./baseQueryWithAuth"
 export const patientApi = createApi({
   reducerPath: "patientApi",
   baseQuery: baseQueryWithReauth(),
+  tagTypes: ["Patient"],
   endpoints: (builder) => ({
     createPatient: builder.mutation<Patient, { patient: Partial<Patient> }>({
       query: ({ patient }) => {
@@ -27,6 +28,7 @@ export const patientApi = createApi({
     }),
     getPatient: builder.query<Patient, { id: string }>({
       query: ({ id }) => `/patients/${id}`,
+      providesTags: (result, error, { id }) => [{ type: "Patient", id }],
     }),
     updatePatient: builder.mutation<Patient, { id: string; patient: Partial<Patient> }>({
       query: ({ id, patient }) => {

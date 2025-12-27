@@ -282,10 +282,21 @@ export const SchedulesScreen = () => {
     try {
       if (selectedSchedule && selectedSchedule.id) {
         // Update existing schedule
-        await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule }).unwrap()
+        const updatedSchedule = await updateSchedule({ scheduleId: selectedSchedule.id, data: selectedSchedule }).unwrap()
         // Reset changes after successful save
         setHasChanges(false)
         initialScheduleRef.current = JSON.parse(JSON.stringify(selectedSchedule))
+        // Update patient in Redux to keep patient.schedules in sync with Redux schedules
+        // This prevents the useEffect from overwriting updated schedules with stale patient data
+        if (selectedPatient) {
+          const currentState = store.getState()
+          const currentSchedules = getSchedules(currentState)
+          const updatedPatient: Patient = {
+            ...selectedPatient,
+            schedules: currentSchedules,
+          }
+          dispatch(setPatient(updatedPatient))
+        }
       } else {
         // Create new schedule (no ID or ID is null/undefined)
         if (selectedPatient && selectedPatient.id && selectedSchedule) {
@@ -399,17 +410,23 @@ export const SchedulesScreen = () => {
   
   // Sync schedules from patient when patient changes (but only on initial load or when patient ID changes)
   // Don't sync on every schedule change to avoid overwriting Redux state updates
+  // CRITICAL: Only sync when patient ID changes, not when schedules change, to prevent overwriting
+  // updated schedules with stale patient data
   const previousPatientIdRef = useRef<string | null>(null)
   useEffect(() => {
     const currentPatientId = selectedPatient?.id || null
-    // Only sync if patient ID changed (new patient selected) or if schedules are missing
-    if (currentPatientId !== previousPatientIdRef.current || (selectedPatient?.schedules && schedules.length === 0)) {
+    // Only sync if patient ID changed (new patient selected) - don't sync on schedule updates
+    // This prevents overwriting Redux schedules with stale patient data after schedule updates
+    if (currentPatientId !== previousPatientIdRef.current) {
       if (selectedPatient?.schedules) {
         dispatch(setSchedules(selectedPatient.schedules))
+      } else if (schedules.length === 0) {
+        // Only clear if we have no schedules and patient has no schedules
+        dispatch(setSchedules([]))
       }
       previousPatientIdRef.current = currentPatientId
     }
-  }, [selectedPatient?.id, selectedPatient?.schedules, schedules.length, dispatch])
+  }, [selectedPatient?.id, dispatch]) // Removed selectedPatient?.schedules and schedules.length from dependencies
 
   // Initialize tracking when schedule changes
   useEffect(() => {

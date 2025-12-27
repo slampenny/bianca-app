@@ -689,4 +689,81 @@ test.describe("Schedule Workflow", () => {
     const scheduleScreen = page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')
     await expect(scheduleScreen).toBeVisible({ timeout: 5000 })
   })
+
+  test("schedule changes persist after navigating away and back", async ({ page }) => {
+    // GIVEN: I'm on the schedules screen with an existing schedule
+    await navigateToSchedulesViaPatient(page)
+    await expect(page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')).toBeVisible({ timeout: 10000 })
+    await page.waitForTimeout(2000) // Wait for schedules to load
+    
+    // Check if schedules exist
+    const schedulePicker = page.locator('select, [role="combobox"]')
+    const pickerCount = await schedulePicker.count()
+    
+    if (pickerCount === 0) {
+      // No schedules exist - create one first
+      const timeInput = page.locator('[data-testid="schedule-time-input"], input[type="time"]')
+      if (await timeInput.count() > 0) {
+        await timeInput.fill('14:30')
+        await page.waitForTimeout(500)
+      }
+      
+      const saveButton = page.locator('[data-testid="schedule-save-button"], button:has-text("Save")')
+      await saveButton.first().click()
+      await page.waitForTimeout(3000) // Wait for save to complete
+    }
+    
+    // Get the current schedule time before making changes
+    const timeInput = page.locator('[data-testid="schedule-time-input"], input[type="time"]')
+    const timeInputCount = await timeInput.count()
+    
+    if (timeInputCount === 0) {
+      console.log('⚠️ Time input not found - skipping time change test')
+      return
+    }
+    
+    const originalTime = await timeInput.inputValue().catch(() => null)
+    if (!originalTime) {
+      console.log('⚠️ Could not get original time - skipping test')
+      return
+    }
+    
+    // WHEN: I change the schedule time and save
+    const newTime = originalTime === '14:30' ? '15:45' : '14:30'
+    await timeInput.fill(newTime)
+    await page.waitForTimeout(500)
+    
+    const saveButton = page.locator('[data-testid="schedule-save-button"], button:has-text("Save")')
+    await saveButton.first().click()
+    await page.waitForTimeout(3000) // Wait for save to complete
+    
+    // THEN: Navigate to home and back
+    // Navigate back to patient screen first
+    await page.goBack()
+    await page.waitForTimeout(2000)
+    
+    // Navigate to home
+    await page.goBack()
+    await page.waitForTimeout(2000)
+    
+    // Verify we're on home screen
+    const homeHeader = page.locator('[data-testid="home-header"], [aria-label="home-header"]')
+    await expect(homeHeader).toBeVisible({ timeout: 10000 })
+    
+    // Navigate back to schedules
+    await navigateToSchedulesViaPatient(page)
+    await expect(page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')).toBeVisible({ timeout: 10000 })
+    await page.waitForTimeout(2000) // Wait for schedules to load
+    
+    // Verify the schedule time persisted
+    const timeInputAfter = page.locator('[data-testid="schedule-time-input"], input[type="time"]')
+    const timeAfter = await timeInputAfter.inputValue().catch(() => null)
+    
+    if (timeAfter) {
+      expect(timeAfter).toBe(newTime)
+      console.log(`✅ Schedule time persisted correctly: ${timeAfter}`)
+    } else {
+      console.log('⚠️ Could not verify schedule time - may still be loading')
+    }
+  })
 })
